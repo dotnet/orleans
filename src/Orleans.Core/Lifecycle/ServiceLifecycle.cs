@@ -8,35 +8,35 @@ namespace Orleans;
 /// <summary>
 /// Allows consumers to observe and participate in the client/silo's lifecycle.
 /// </summary>
-public interface IServiceLifetime
+public interface IServiceLifecycle
 {
     /// <summary>
     /// Triggered when the client/silo has fully started and is ready to accept traffic.
     /// </summary>
-    IServiceLifetimeStage Started { get; }
+    IServiceLifecycleStage Started { get; }
 
     /// <summary>
     /// Triggered when the client/silo is beginning the shutdown process.
     /// </summary>
-    IServiceLifetimeStage Stopping { get; }
+    IServiceLifecycleStage Stopping { get; }
 
     /// <summary>
     /// Triggered when the client/silo has completed its shutdown process.
     /// </summary>
-    IServiceLifetimeStage Stopped { get; }
+    IServiceLifecycleStage Stopped { get; }
 }
 
-internal sealed class ServiceLifetime<TLifecycleObservable>(ILogger<ServiceLifetime<TLifecycleObservable>> logger) :
-    IServiceLifetime, ILifecycleParticipant<TLifecycleObservable>
+internal sealed class ServiceLifecycle<TLifecycleObservable>(ILogger<ServiceLifecycle<TLifecycleObservable>> logger) :
+    IServiceLifecycle, ILifecycleParticipant<TLifecycleObservable>
         where TLifecycleObservable : ILifecycleObservable
 {
-    private readonly ServiceLifetimeStage _started = new(logger, "Started");
-    private readonly ServiceLifetimeStage _stopping = new(logger, "Stopping");
-    private readonly ServiceLifetimeStage _stopped = new(logger, "Stopped");
+    private readonly ServiceLifecycleNotificationStage _started = new(logger, "Started");
+    private readonly ServiceLifecycleNotificationStage _stopping = new(logger, "Stopping");
+    private readonly ServiceLifecycleNotificationStage _stopped = new(logger, "Stopped");
 
-    public IServiceLifetimeStage Started => _started;
-    public IServiceLifetimeStage Stopping => _stopping;
-    public IServiceLifetimeStage Stopped => _stopped;
+    public IServiceLifecycleStage Started => _started;
+    public IServiceLifecycleStage Stopping => _stopping;
+    public IServiceLifecycleStage Stopped => _stopped;
 
     public void Participate(TLifecycleObservable lifecycle)
     {

@@ -9,9 +9,9 @@ namespace Orleans;
 #nullable enable
 
 /// <summary>
-/// Represents a specific stage in the client / silo lifetime.
+/// Represents a specific stage in the client / silo lifecycle.
 /// </summary>
-public interface IServiceLifetimeStage
+public interface IServiceLifecycleStage
 {
     /// <summary>
     /// Gets a cancellation token that is triggered when this stage completes.
@@ -21,15 +21,15 @@ public interface IServiceLifetimeStage
     CancellationToken Token { get; }
 
     /// <summary>
-    /// Waits for this lifetime stage to complete.
+    /// Waits for this lifecycle stage to complete.
     /// </summary>
     /// <param name="cancellationToken">
-    /// A token used to cancel the wait. This does not cancel the lifetime stage itself!
+    /// A token used to cancel the wait. This does not cancel the lifecycle stage itself!
     /// </param>
     Task WaitAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
-    /// Registers a callback to be executed during this lifetime stage.
+    /// Registers a callback to be executed during this lifecycle stage.
     /// </summary>
     /// <param name="callback">
     /// <para>The asynchronous operation to perform.</para>
@@ -41,14 +41,14 @@ public interface IServiceLifetimeStage
     /// </param>
     /// <param name="state">An optional state to pass.</param>
     /// <remarks>
-    /// Disposing the returned value removes the callback from the lifetime stage.
+    /// Disposing the returned value removes the callback from the lifecycle stage.
     /// This is useful for components that have a shorter lifespan than the client / silo to prevent holding onto the reference,
     /// and ensure that cleanup logic is not executed for components that are no longer active.
     /// </remarks>
     IDisposable Register(Func<object?, CancellationToken, Task> callback, object? state = null, bool terminateOnError = true);
 }
 
-internal sealed partial class ServiceLifetimeStage(ILogger logger, string name) : IServiceLifetimeStage
+internal sealed partial class ServiceLifecycleNotificationStage(ILogger logger, string name) : IServiceLifecycleStage
 {
     // We use this so that late registrations can still be executed, otherwise
     // we'd need to rely on the TCS which means we'd need to set it *before* the callbacks
@@ -227,7 +227,7 @@ internal sealed partial class ServiceLifetimeStage(ILogger logger, string name) 
         }
     }
 
-    private record StageParticipant(ServiceLifetimeStage Stage,
+    private record StageParticipant(ServiceLifecycleNotificationStage Stage,
         Func<object?, CancellationToken, Task> Callback, object? State, bool TerminateOnError) : IDisposable
     {
         public Task ExecuteAsync(CancellationToken cancellationToken) => Callback(State, cancellationToken);

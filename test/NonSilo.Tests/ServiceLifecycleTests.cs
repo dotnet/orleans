@@ -8,25 +8,25 @@ using Xunit.Abstractions;
 
 namespace NonSilo.Tests;
 
-[TestCategory("BVT"), TestCategory("Lifetime")]
-public class ServiceLifetimeTests
+[TestCategory("BVT"), TestCategory("Lifecycle")]
+public class ServiceLifecycleTests
 {
-    private readonly ServiceLifetime<ISiloLifecycle> _lifetime;
+    private readonly ServiceLifecycle<ISiloLifecycle> _lifecycle;
     private readonly CancelableSiloLifecycleSubject _subject;
     private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(30);
 
-    public ServiceLifetimeTests(ITestOutputHelper output)
+    public ServiceLifecycleTests(ITestOutputHelper output)
     {
         var factory = new LoggerFactory([new XunitLoggerProvider(output)]);
 
         _subject = new CancelableSiloLifecycleSubject(factory.CreateLogger<SiloLifecycleSubject>());
-        _lifetime = new ServiceLifetime<ISiloLifecycle>(factory.CreateLogger<ServiceLifetime<ISiloLifecycle>>());
+        _lifecycle = new ServiceLifecycle<ISiloLifecycle>(factory.CreateLogger<ServiceLifecycle<ISiloLifecycle>>());
 
-        _lifetime.Participate(_subject);
+        _lifecycle.Participate(_subject);
     }
 
     private static (Task<object?> Task, IDisposable Registration) RegisterCallback(
-        IServiceLifetimeStage stage,
+        IServiceLifecycleStage stage,
         Action<object?, CancellationToken>? action = null,
         object? state = null,
         bool terminateOnError = true)
@@ -59,7 +59,7 @@ public class ServiceLifetimeTests
     {
         var callbackState = "test-state";
 
-        var (task, _) = RegisterCallback(_lifetime.Started, (state, ct) => { }, callbackState);
+        var (task, _) = RegisterCallback(_lifecycle.Started, (state, ct) => { }, callbackState);
 
         await _subject.OnStart();
 
@@ -70,7 +70,7 @@ public class ServiceLifetimeTests
     [Fact]
     public async Task Stage_WaitAsync()
     {
-        var waitTask = _lifetime.Started.WaitAsync();
+        var waitTask = _lifecycle.Started.WaitAsync();
 
         Assert.False(waitTask.IsCompleted);
 
@@ -89,10 +89,10 @@ public class ServiceLifetimeTests
         // This forces WaitAsync to actually block, allowing us to verify that cancelling
         // the token interrupts the wait as expected.
 
-        _lifetime.Started.Register((_, _) => tcs.Task);
+        _lifecycle.Started.Register((_, _) => tcs.Task);
 
         var startTask = _subject.OnStart();
-        var waitTask = _lifetime.Started.WaitAsync(cts.Token);
+        var waitTask = _lifecycle.Started.WaitAsync(cts.Token);
 
         Assert.False(waitTask.IsCompleted, "WaitAsync should be paused waiting for the stage to complete");
 
@@ -107,7 +107,7 @@ public class ServiceLifetimeTests
     [Fact]
     public async Task Stage_NotifyCompleted_IsIdempotent()
     {
-        var stage = new ServiceLifetimeStage(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, "Started");
+        var stage = new ServiceLifecycleNotificationStage(Microsoft.Extensions.Logging.Abstractions.NullLogger.Instance, "Started");
         var gate = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
         var executionCount = 0;
 
@@ -133,7 +133,7 @@ public class ServiceLifetimeTests
     [Fact]
     public async Task CallbackDisposal_PreventsExecution()
     {
-        var (task, registration) = RegisterCallback(_lifetime.Stopping);
+        var (task, registration) = RegisterCallback(_lifecycle.Stopping);
 
         registration.Dispose();
 
@@ -148,7 +148,7 @@ public class ServiceLifetimeTests
     {
         var tcs = new TaskCompletionSource();
 
-        using var registration = _lifetime.Stopping.Token.Register(tcs.SetResult);
+        using var registration = _lifecycle.Stopping.Token.Register(tcs.SetResult);
 
         await _subject.OnStart();
         await _subject.OnStop();
@@ -160,7 +160,7 @@ public class ServiceLifetimeTests
     public async Task ErrorHandling_TerminateOnErrorFalse()
     {
         var (task, _) = RegisterCallback(
-        _lifetime.Started,
+        _lifecycle.Started,
         (state, ct) => throw new InvalidOperationException("Test"),
         terminateOnError: false);
 
@@ -174,7 +174,7 @@ public class ServiceLifetimeTests
     public async Task ErrorHandling_TerminateOnErrorTrue()
     {
         var (task, _) = RegisterCallback(
-            _lifetime.Started,
+            _lifecycle.Started,
             (state, ct) => throw new InvalidOperationException("Test"),
             terminateOnError: true);
 
@@ -192,12 +192,12 @@ public class ServiceLifetimeTests
     public async Task ErrorHandling_TerminateOnErrorTrue_MultipleFailures()
     {
         var (task1, _) = RegisterCallback(
-            _lifetime.Started,
+            _lifecycle.Started,
             (_, _) => throw new InvalidOperationException("first"),
             terminateOnError: true);
 
         var (task2, _) = RegisterCallback(
-            _lifetime.Started,
+            _lifecycle.Started,
             (_, _) => throw new ArgumentException("second"),
             terminateOnError: true);
 
@@ -230,7 +230,7 @@ public class ServiceLifetimeTests
         await _subject.OnStop();
 
         // Registering after stage completes should run immediately
-        var (task, _) = RegisterCallback(_lifetime.Stopping);
+        var (task, _) = RegisterCallback(_lifecycle.Stopping);
 
         await task.WaitAsync(TimeSpan.FromSeconds(1));
     }
@@ -249,7 +249,7 @@ public class ServiceLifetimeTests
             tasks[i] = Task.Run(() =>
             {
                 startSignal.Wait();
-                RegisterCallback(_lifetime.Started, (_, _) => Interlocked.Increment(ref executionCount));
+                RegisterCallback(_lifecycle.Started, (_, _) => Interlocked.Increment(ref executionCount));
             });
         }
 
@@ -266,11 +266,11 @@ public class ServiceLifetimeTests
     {
         var executionOrder = new ConcurrentQueue<string>();
 
-        RegisterCallback(_lifetime.Started, (_, _) => executionOrder.Enqueue("Started"));
-        RegisterCallback(_lifetime.Stopping, (_, _) => executionOrder.Enqueue("Stopping"));
+        RegisterCallback(_lifecycle.Started, (_, _) => executionOrder.Enqueue("Started"));
+        RegisterCallback(_lifecycle.Stopping, (_, _) => executionOrder.Enqueue("Stopping"));
 
         // We capture the stopped task to wait on it specifically.
-        var (stoppedTask, _) = RegisterCallback(_lifetime.Stopped, (_, _) => executionOrder.Enqueue("Stopped"));
+        var (stoppedTask, _) = RegisterCallback(_lifecycle.Stopped, (_, _) => executionOrder.Enqueue("Stopped"));
 
         await _subject.OnStart();
         await _subject.OnStop();
@@ -288,7 +288,7 @@ public class ServiceLifetimeTests
     public async Task BackgroundWorker_StopsOnCancellation()
     {
         var workerExited = new TaskCompletionSource();
-        var token = _lifetime.Stopping.Token;
+        var token = _lifecycle.Stopping.Token;
 
         _ = Task.Run(async () =>
         {
@@ -315,7 +315,7 @@ public class ServiceLifetimeTests
 
         // We manually register here because the logic is specific to CT handling inside the callback
         // and returns a Task result different from the standard flow.
-        _lifetime.Started.Register(async (state, ct) =>
+        _lifecycle.Started.Register(async (state, ct) =>
         {
             try
             {
@@ -364,3 +364,4 @@ public class ServiceLifetimeTests
         }
     }
 }
+

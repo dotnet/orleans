@@ -62,10 +62,10 @@ namespace Orleans
             services.AddSingleton<ClientOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
 
-            // Lifetime
-            services.AddSingleton<ServiceLifetime<IClusterClientLifecycle>>();
-            services.TryAddFromExisting<IServiceLifetime, ServiceLifetime<IClusterClientLifecycle>>();
-            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ServiceLifetime<IClusterClientLifecycle>>();
+            // Lifecycle
+            services.AddSingleton<ServiceLifecycle<IClusterClientLifecycle>>();
+            services.TryAddFromExisting<IServiceLifecycle, ServiceLifecycle<IClusterClientLifecycle>>();
+            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ServiceLifecycle<IClusterClientLifecycle>>();
 
             // Statistics
             services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();

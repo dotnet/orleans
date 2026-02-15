@@ -82,10 +82,10 @@ namespace Orleans.Hosting
             services.AddSingleton<SiloControl>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloControl>();
 
-            // Lifetime
-            services.AddSingleton<ServiceLifetime<ISiloLifecycle>>();
-            services.TryAddFromExisting<IServiceLifetime, ServiceLifetime<ISiloLifecycle>>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ServiceLifetime<ISiloLifecycle>>();
+            // Lifecycle
+            services.AddSingleton<ServiceLifecycle<ISiloLifecycle>>();
+            services.TryAddFromExisting<IServiceLifecycle, ServiceLifecycle<ISiloLifecycle>>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ServiceLifecycle<ISiloLifecycle>>();
 
             // Statistics
             services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
