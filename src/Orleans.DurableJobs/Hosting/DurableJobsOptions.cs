@@ -50,8 +50,8 @@ public sealed class DurableJobsOptions
     /// <summary>
     /// Gets or sets the maximum number of times a shard can be stolen from a dead owner before
     /// being marked as poisoned. A shard that repeatedly causes silos to crash will exceed this
-    /// threshold as it bounces between owners. When the stolen count is reached, the shard is
-    /// considered poisoned and will no longer be assigned to any silo.
+    /// threshold as it bounces between owners. When the next steal would cause the stolen count
+    /// to exceed this value, the shard is considered poisoned and will no longer be assigned to any silo.
     /// Default: 3.
     /// </summary>
     /// <remarks>

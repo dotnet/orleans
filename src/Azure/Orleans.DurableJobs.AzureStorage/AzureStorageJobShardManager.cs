@@ -39,6 +39,18 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         string containerName,
         string blobPrefix,
         AzureStorageJobShardOptions options,
+        IClusterMembershipService clusterMembership,
+        ILoggerFactory loggerFactory)
+        : this(siloAddress, client, containerName, blobPrefix, options, new DurableJobsOptions(), clusterMembership, loggerFactory)
+    {
+    }
+
+    public AzureStorageJobShardManager(
+        SiloAddress siloAddress,
+        BlobServiceClient client,
+        string containerName,
+        string blobPrefix,
+        AzureStorageJobShardOptions options,
         DurableJobsOptions durableJobsOptions,
         IClusterMembershipService clusterMembership,
         ILoggerFactory loggerFactory)
@@ -52,6 +64,15 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         _loggerFactory = loggerFactory;
         _options = options;
         _durableJobsOptions = durableJobsOptions;
+    }
+
+    public AzureStorageJobShardManager(
+        ILocalSiloDetails localSiloDetails,
+        IOptions<AzureStorageJobShardOptions> options,
+        IClusterMembershipService clusterMembership,
+        ILoggerFactory loggerFactory)
+        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId, options.Value, clusterMembership, loggerFactory)
+    {
     }
 
     public AzureStorageJobShardManager(
@@ -169,12 +190,29 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         {
             if (isStolen)
             {
-                // Increment stolen count for shards taken from dead owners
-                var stolenCount = GetStolenCount(metadata) + 1;
+                var existingStolenCount = GetStolenCount(metadata);
+                if (existingStolenCount > _durableJobsOptions.MaxStolenCount)
+                {
+                    // Already marked as poisoned.
+                    return false;
+                }
 
+                // Increment stolen count for shards taken from dead owners.
+                var stolenCount = existingStolenCount + 1;
                 if (stolenCount > _durableJobsOptions.MaxStolenCount)
                 {
-                    // Shard is poisoned - don't claim it
+                    // Persist poisoned marker so this shard is not repeatedly re-evaluated as newly poisoned.
+                    metadata[StolenCountKey] = stolenCount.ToString(CultureInfo.InvariantCulture);
+                    metadata[LastStolenTimeKey] = DateTimeOffset.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+                    try
+                    {
+                        await shard.UpdateBlobMetadata(metadata, ct);
+                    }
+                    catch (RequestFailedException ex)
+                    {
+                        LogOwnershipFailed(_logger, ex, shard.Id, newOwner);
+                    }
+
                     LogPoisonedShardDetected(_logger, shard.Id, stolenCount, _durableJobsOptions.MaxStolenCount);
                     return false;
                 }
@@ -203,7 +241,10 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
 
         static int GetStolenCount(IDictionary<string, string> metadata)
         {
-            return metadata.TryGetValue(StolenCountKey, out var countStr) && int.TryParse(countStr, out var count) ? count : 0;
+            return metadata.TryGetValue(StolenCountKey, out var countStr)
+                   && int.TryParse(countStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)
+                ? count
+                : 0;
         }
     }
 

@@ -112,46 +112,6 @@ internal class InMemoryJobShardManager : JobShardManager
         }
     }
 
-    /// <summary>
-    /// Gets debug info for testing. For testing purposes only.
-    /// </summary>
-    internal static async Task<string> GetDebugInfoAsync(string shardId, IClusterMembershipService? membershipService)
-    {
-        await _asyncLock.WaitAsync();
-        try
-        {
-            var sb = new System.Text.StringBuilder();
-            
-            if (!_globalShardStore.TryGetValue(shardId, out var ownership))
-            {
-                return "Shard not found in store";
-            }
-            
-            sb.AppendLine($"Owner: '{ownership.OwnerSiloAddress}'");
-            sb.AppendLine($"StolenCount: {ownership.StolenCount}");
-            
-            var snapshot = membershipService?.CurrentSnapshot;
-            if (snapshot is null)
-            {
-                sb.AppendLine("Snapshot is null");
-            }
-            else
-            {
-                sb.AppendLine($"Snapshot has {snapshot.Members.Count} members");
-                foreach (var member in snapshot.Members.Values)
-                {
-                    sb.AppendLine($"  Member: '{member.SiloAddress}' ({member.SiloAddress.ToString()}) Status: {member.Status}");
-                }
-            }
-            
-            return sb.ToString();
-        }
-        finally
-        {
-            _asyncLock.Release();
-        }
-    }
-
     public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
     {
         var alreadyOwnedShards = new List<IJobShard>();

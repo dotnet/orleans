@@ -73,6 +73,11 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         Assert.Single(assignedShards);
         Assert.Equal(shard.Id, assignedShards[0].Id);
+
+        var ownershipInfo = await InMemoryJobShardManager.GetOwnershipInfoAsync(shard.Id);
+        Assert.True(ownershipInfo.HasValue);
+        Assert.Equal(Silo2.ToString(), ownershipInfo.Value.Owner);
+        Assert.Equal(0, ownershipInfo.Value.StolenCount);
     }
 
     [Fact]
@@ -95,6 +100,11 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         // Shard should be assigned (stolen count = 1, under threshold)
         Assert.Single(assignedShards);
         Assert.Equal(shard.Id, assignedShards[0].Id);
+
+        var ownershipInfo = await InMemoryJobShardManager.GetOwnershipInfoAsync(shard.Id);
+        Assert.True(ownershipInfo.HasValue);
+        Assert.Equal(Silo2.ToString(), ownershipInfo.Value.Owner);
+        Assert.Equal(1, ownershipInfo.Value.StolenCount);
     }
 
     [Fact]
@@ -110,7 +120,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         var minDueTime = DateTimeOffset.UtcNow;
         var maxDueTime = minDueTime.AddHours(1);
 
-        var shard = await manager1.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
+        await manager1.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
 
         // Silo2 steals from dead Silo1 (stolen count = 1)
         var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxStolenCount: 2);
