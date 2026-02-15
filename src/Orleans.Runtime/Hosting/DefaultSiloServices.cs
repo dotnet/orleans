@@ -61,7 +61,9 @@ namespace Orleans.Hosting
             // Common services
             services.AddLogging();
             services.AddOptions();
+            services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+            services.TryAddSingleton<OrleansInstruments>();
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
