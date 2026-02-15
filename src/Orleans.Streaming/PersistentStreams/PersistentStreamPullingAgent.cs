@@ -158,7 +158,7 @@ namespace Orleans.Streams
             Task localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
             {
-                await localReceiverInitTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await localReceiverInitTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
                 receiverInitTask = null;
             }
 

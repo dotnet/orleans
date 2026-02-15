@@ -183,4 +183,16 @@
   <data name="IncorrectAttributeUseTitleDescription" xml:space="preserve">
     <value>This attribute should not be used on grain implementations.</value>
   </data>
+  <data name="AvoidConfigureAwaitFalseInGrainTitle" xml:space="preserve">
+    <value>Avoid ConfigureAwait(false) or ConfigureAwait not specifying ContinueOnCapturedContext in grain code</value>
+  </data>
+  <data name="AvoidConfigureAwaitFalseInGrainMessageFormat" xml:space="preserve">
+    <value>ConfigureAwait in grain code must not use 'false' and must include ConfigureAwaitOptions.ContinueOnCapturedContext</value>
+  </data>
+  <data name="AvoidConfigureAwaitFalseInGrainDescription" xml:space="preserve">
+    <value>Grain code must maintain the grain's execution context. Using ConfigureAwait(false) or ConfigureAwait without ContinueOnCapturedContext can cause the continuation to run outside the grain's context, leading to concurrency issues and loss of grain identity.</value>
+  </data>
+  <data name="ConfigureAwaitCodeFixTitle" xml:space="preserve">
+    <value>Use ConfigureAwait with ContinueOnCapturedContext</value>
+  </data>
 </root>
