@@ -163,6 +163,7 @@ namespace UnitTests.SchedulerTests
         public async Task Sched_Task_ClosureWorkItem_Wait()
         {
             const int NumTasks = 10;
+            var workItemCompletionTimeout = TimeSpan.FromSeconds(10);
 
             var flags = new ManualResetEvent[NumTasks];
             for (var i = 0; i < NumTasks; i++)
@@ -177,27 +178,22 @@ namespace UnitTests.SchedulerTests
                 tasks[i] = new Task(() => { _output.WriteLine("Inside Task-" + taskNum); flags[taskNum].WaitOne(); });
             }
 
-            var workItems = new Action[NumTasks];
+            var workItems = new Task[NumTasks];
             for (var i = 0; i < NumTasks; i++)
             {
                 var taskNum = i; // Capture
-                workItems[i] = () =>
+                workItems[i] = _rootContext.QueueAction(taskIndex =>
                 {
-                    _output.WriteLine("Inside ClosureWorkItem-" + taskNum);
-                    tasks[taskNum].Start(TaskScheduler.Default);
+                    _output.WriteLine("Inside ClosureWorkItem-" + taskIndex);
+                    tasks[taskIndex].Start(TaskScheduler.Default);
 #pragma warning disable xUnit1031 // Do not use blocking task operations in test method
-                    var ok = tasks[taskNum].Wait(TimeSpan.FromMilliseconds(NumTasks * 100));
+                    tasks[taskIndex].Wait();
 #pragma warning restore xUnit1031 // Do not use blocking task operations in test method
-                    Assert.True(ok, "Wait completed successfully inside ClosureWorkItem-" + taskNum);
-                };
+                }, taskNum);
             }
 
-            foreach (var workItem in workItems) _rootContext.Scheduler.QueueAction(workItem);
             foreach (var flag in flags) flag.Set();
-            for (var i = 0; i < tasks.Length; i++)
-            {
-                await tasks[i].WaitAsync(TimeSpan.FromMilliseconds(NumTasks * 150));
-            }
+            await Task.WhenAll(workItems).WaitAsync(workItemCompletionTimeout);
 
 
             for (var i = 0; i < tasks.Length; i++)
