@@ -78,11 +78,7 @@ internal sealed partial class ActivationRebalancerMonitor : SystemTarget, IActiv
                     || elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod;
                 if (shouldFetchReport)
                 {
-                    if (elapsedSinceHeartbeat >= IActivationRebalancerMonitor.WorkerReportPeriod)
-                    {
-                        LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
-                    }
-
+                    LogStartingRebalancer(elapsedSinceHeartbeat, IActivationRebalancerMonitor.WorkerReportPeriod);
                     _latestReport = await _rebalancerGrain.GetReport().AsTask().WaitAsync(ct);
                 }
 
