@@ -11,9 +11,45 @@ namespace UnitTests.GrainInterfaces
         [Id(4)] public List<(DateTime, string)> Log { get; init; } = new();
     }
 
+    [GenerateSerializer]
+    public record class ReminderTickRecord(
+        [property: Id(0)] string ReminderName,
+        [property: Id(1)] DateTime CurrentTickTime,
+        [property: Id(2)] DateTime FirstTickTime,
+        [property: Id(3)] TimeSpan Period,
+        [property: Id(4)] ReminderScheduleKind ScheduleKind);
+
     public interface IReminderTestGrain2 : IGrainWithGuidKey
     {
         Task<IGrainReminder> StartReminder(string reminderName, TimeSpan? period = null, bool validate = false);
+        Task<IGrainReminder> StartReminderWithOptions(
+            string reminderName,
+            TimeSpan dueTime,
+            TimeSpan period,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false);
+        Task<IGrainReminder> StartReminderAtUtc(
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false);
+        Task<IGrainReminder> StartCronReminder(
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false);
+        Task UpsertRawReminderEntry(
+            string reminderName,
+            DateTime startAtUtc,
+            TimeSpan period,
+            string cronExpression,
+            DateTime? nextDueUtc,
+            ReminderPriority priority,
+            MissedReminderAction action);
 
         Task StopReminder(string reminderName);
         Task StopReminder(IGrainReminder reminder);
@@ -27,6 +63,9 @@ namespace UnitTests.GrainInterfaces
         Task EraseReminderTable();
 
         Task<Dictionary<string, ReminderState>> GetReminderStates();
+        Task<List<ReminderTickRecord>> GetTickRecords();
+        Task<List<ReminderTickRecord>> GetTickRecords(string reminderName);
+        Task<ReminderEntry> GetReminderEntry(string reminderName);
     }
 
     // to test reminders for different grain types
@@ -46,4 +85,3 @@ namespace UnitTests.GrainInterfaces
         Task<bool> StartReminder(string reminderName);
     }
 }
-

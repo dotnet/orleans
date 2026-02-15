@@ -62,5 +62,17 @@ namespace AWSUtils.Tests.RemindersTest
         {
             await ReminderSimple();
         }
+
+        [SkippableFact]
+        public async Task RemindersTable_AWS_ReminderCronRoundTrip()
+        {
+            await ReminderCronRoundTrip();
+        }
+
+        [SkippableFact]
+        public async Task RemindersTable_AWS_ReminderAdaptiveFieldsRoundTrip()
+        {
+            await ReminderAdaptiveFieldsRoundTrip();
+        }
     }
 }

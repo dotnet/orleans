@@ -71,5 +71,17 @@ namespace UnitTests.RemindersTest
         {
             await ReminderSimple();
         }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task RemindersTable_Azure_ReminderCronRoundTrip()
+        {
+            await ReminderCronRoundTrip();
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task RemindersTable_Azure_ReminderAdaptiveFieldsRoundTrip()
+        {
+            await ReminderAdaptiveFieldsRoundTrip();
+        }
     }
 }
