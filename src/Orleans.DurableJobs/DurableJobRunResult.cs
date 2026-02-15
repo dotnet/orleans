@@ -9,9 +9,15 @@ namespace Orleans.DurableJobs;
 [GenerateSerializer]
 public sealed class DurableJobRunResult
 {
+    /// <summary>
+    /// Gets a value indicating whether the job execution failed.
+    /// </summary>
     [MemberNotNullWhen(true, nameof(Exception))]
     public bool IsFailed => Status == DurableJobRunStatus.Failed;
 
+    /// <summary>
+    /// Gets a value indicating whether the job should be polled again after a delay.
+    /// </summary>
     [MemberNotNullWhen(true, nameof(PollAfterDelay))]
     public bool IsPending => Status == DurableJobRunStatus.PollAfter;
 
