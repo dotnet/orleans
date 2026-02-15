@@ -65,7 +65,7 @@ namespace Orleans.Storage
     /// Required configuration: <c>ConnectionString</c> - The database connection string.
     /// </para>
     /// <para>
-    /// Optional configuration: <c>Invariant</c> - The ADO.NET provider invariant name (defaults to <c>System.Data.SqlClient</c>).
+    /// Optional configuration: <c>Invariant</c> - The ADO.NET provider invariant name (defaults to <c>Microsoft.Data.SqlClient</c>).
     /// </para>
     /// </remarks>
     [DebuggerDisplay("Name = {Name}, ConnectionString = {Storage.ConnectionString}")]
