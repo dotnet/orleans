@@ -42,6 +42,7 @@
     <Project Path="src/Orleans.Sdk/Orleans.Sdk.csproj" />
     <Project Path="src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj" />
     <Project Path="src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
+    <Project Path="src/Orleans.Serialization.MemoryPack/Orleans.Serialization.MemoryPack.csproj" />
     <Project Path="src/Orleans.Serialization.MessagePack/Orleans.Serialization.MessagePack.csproj" />
     <Project Path="src/Orleans.Serialization.NewtonsoftJson/Orleans.Serialization.NewtonsoftJson.csproj" />
     <Project Path="src/Orleans.Serialization.SystemTextJson/Orleans.Serialization.SystemTextJson.csproj" />
