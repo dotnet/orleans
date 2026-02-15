@@ -69,7 +69,17 @@ namespace Orleans.Tests.SqlUtils
                                     supportsStreamNatively: true,
                                     supportsCommandCancellation: true,
                                     commandInterceptor: NoOpCommandInterceptor.Instance)
-                }
+                },
+                {
+                    AdoNetInvariants.InvariantNameSqlLite,
+                    new DbConstants(startEscapeIndicator: '\"',
+                                    endEscapeIndicator: '\"',
+                                    unionAllSelectTemplate: " UNION ALL SELECT ",
+                                    isSynchronousAdoNetImplementation: false,
+                                    supportsStreamNatively: false,
+                                    supportsCommandCancellation: true,
+                                    commandInterceptor: NoOpCommandInterceptor.Instance)
+            }
             };
 
         public static DbConstants GetDbConstants(string invariantName)
