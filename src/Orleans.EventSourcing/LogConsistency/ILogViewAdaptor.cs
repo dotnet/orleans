@@ -114,5 +114,16 @@ namespace Orleans.EventSourcing
         /// </summary>
         /// <returns>A task that completes after getting the latest version and confirming all entries.</returns>
         Task Synchronize();
+
+        /// <summary>
+        /// Clear the log stream completely. Throws <see cref="NotSupportedException"/> if
+        /// the log stream does not support clearing.
+        /// </summary>
+        /// <param name="cancellationToken">A cancellation token to cancel the operation.</param>
+        /// <returns>A task that represents the asynchronous clear operation.</returns>
+        Task ClearLogAsync(CancellationToken cancellationToken)
+        {
+            throw new NotSupportedException($"The operation {nameof(ClearLogAsync)} is not supported by this implementation of {nameof(ILogViewUpdate<TLogEntry>)}.");
+        }
     }
 }

@@ -26,12 +26,17 @@ namespace Orleans.EventSourcing.CustomStorage
             ILogConsistencyProtocolServices services, string primaryCluster)
             : base(host, initialState, services)
         {
-            if (!(host is ICustomStorageInterface<TLogView, TLogEntry>))
+            if (!(host is ICustomStorageInterface<TLogView, TLogEntry> customGrainStorage))
+            {
                 throw new BadProviderConfigException("Must implement ICustomStorageInterface<TLogView,TLogEntry> for CustomStorageLogView provider");
+            }
+
+            this.customGrainStorage = customGrainStorage;
             this.primaryCluster = primaryCluster;
         }
 
         private readonly string primaryCluster;
+        private readonly ICustomStorageInterface<TLogView, TLogEntry> customGrainStorage;
 
         private TLogView cached;
         private int version;
@@ -46,6 +51,14 @@ namespace Orleans.EventSourcing.CustomStorage
         protected override int GetConfirmedVersion()
         {
             return version;
+        }
+
+        /// <inheritdoc/>
+        protected override Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return this.customGrainStorage.ClearStoredState();
         }
 
         /// <inheritdoc/>
