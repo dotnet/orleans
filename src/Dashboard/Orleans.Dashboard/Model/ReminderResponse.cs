@@ -1,6 +1,7 @@
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.ReminderResponse")]
 internal sealed class ReminderResponse
 {
     [Id(0)]

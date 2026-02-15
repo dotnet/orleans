@@ -25,6 +25,12 @@ public class GenerateGenerateSerializerAttributeAnalyzerTest : DiagnosticAnalyze
         Assert.Equal(DiagnosticSeverity.Info, diagnostic.Severity);
     }
 
+    private async Task VerifyNoDiagnostic(string code)
+    {
+        var (diagnostics, _) = await GetDiagnosticsAsync(code, new string[0]);
+        Assert.Empty(diagnostics);
+    }
+
     /// <summary>
     /// Verifies that the analyzer detects when a class uses [Serializable] attribute
     /// and suggests using [GenerateSerializer] instead for better Orleans serialization performance.
@@ -56,4 +62,14 @@ public class GenerateGenerateSerializerAttributeAnalyzerTest : DiagnosticAnalyze
     [Fact]
     public Task SerializableRecordStruct()
         => VerifyGeneratedDiagnostic(@"[System.Serializable] public record struct D { }");
+
+    [Fact]
+    public Task SerializableClassWithGenerateSerializer_ShouldNotTriggerDiagnostic()
+        => VerifyNoDiagnostic(
+            """
+            [System.Serializable, GenerateSerializer]
+            public class D
+            {
+            }
+            """);
 }

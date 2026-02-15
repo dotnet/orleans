@@ -53,10 +53,15 @@ interface SiloProperties {
   hostVersion?: string;
 }
 
+interface SiloMetadata {
+  [key: string]: string;
+}
+
 interface SiloProps {
   silo: string;
   data: (SiloDataPoint | null)[];
   siloProperties: SiloProperties;
+  siloMetadata: (SiloMetadata | null)[];
   dashboardCounters: DashboardCounters;
   siloStats: SiloStatsData;
 }
@@ -169,9 +174,7 @@ export default class Silo extends React.Component<SiloProps> {
     };
 
     if (this.props.siloProperties.orleansVersion) {
-      configuration[
-        'Orleans version'
-      ] = this.props.siloProperties.orleansVersion;
+      configuration['Orleans version'] = this.props.siloProperties.orleansVersion;
     }
 
     if (this.props.siloProperties.hostVersion) {
@@ -180,6 +183,7 @@ export default class Silo extends React.Component<SiloProps> {
 
     let cpuGauge: React.ReactNode;
     let memGauge: React.ReactNode;
+    let metadata: React.ReactNode;
 
     if (this.hasSeries(x => (x.cpuUsage || 0) > 0)) {
       cpuGauge = (
@@ -308,11 +312,15 @@ export default class Silo extends React.Component<SiloProps> {
             </Panel>
           </div>
           <div className="col-md-6">
-            <Panel title="Silo Properties">
-              <PropertiesWidget data={configuration} />
+            <Panel title="Silo Metadata">
+              <PropertiesWidget data={this.props.siloMetadata} />
             </Panel>
           </div>
         </div>
+
+        <Panel title="Silo Properties">
+          <PropertiesWidget data={configuration} />
+        </Panel>
 
         <Panel title="Activations by Type">
           <GrainBreakdown data={grainStats} silo={this.props.silo} />
@@ -321,26 +329,3 @@ export default class Silo extends React.Component<SiloProps> {
     );
   }
 }
-/*
-
-dateTime: "2015-12-30T17:02:32.6695724Z"
-
-cpuUsage: 11.8330326
-activationCount: 4
-availableMemory: 4301320000
-totalPhysicalMemory: 8589934592
-memoryUsage: 8618116
-recentlyUsedActivationCount: 2
-
-
-clientCount: 0
-isOverloaded: false
-
-receiveQueueLength: 0
-requestQueueLength: 0
-sendQueueLength: 0
-
-receivedMessages: 0
-sentMessages: 0
-
-*/
