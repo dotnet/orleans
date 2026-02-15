@@ -1,4 +1,6 @@
 using System;
+using System.Collections.Concurrent;
+using System.Reflection;
 using MemoryPack;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
@@ -7,8 +9,6 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
-using System.Collections.Concurrent;
-using System.Reflection;
 
 namespace Orleans.Serialization;
 
@@ -68,7 +68,7 @@ public class MemoryPackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilte
         var bufferWriter = new BufferWriterBox<PooledBuffer>(new());
         try
         {
-            MemoryPackSerializer.Serialize(value.GetType(), bufferWriter, value);
+            MemoryPackSerializer.Serialize(value.GetType(), bufferWriter, value, _options.SerializerOptions);
 
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeaderExpected(1, WireType.LengthPrefixed);
@@ -125,7 +125,7 @@ public class MemoryPackCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilte
                     try
                     {
                         reader.ReadBytes(ref bufferWriter, (int)length);
-                        result = MemoryPackSerializer.Deserialize(type, bufferWriter.Value.AsReadOnlySequence());
+                        result = MemoryPackSerializer.Deserialize(type, bufferWriter.Value.AsReadOnlySequence(), _options.SerializerOptions);
                     }
                     finally
                     {

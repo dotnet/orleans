@@ -1,6 +1,5 @@
-using MemoryPack;
 using System;
-using System.Collections.Generic;
+using MemoryPack;
 
 namespace Orleans.Serialization;
 
@@ -9,7 +8,6 @@ namespace Orleans.Serialization;
 /// </summary>
 public class MemoryPackCodecOptions
 {
-    //
     /// <summary>
     /// Gets or sets the <see cref="MemoryPackSerializerOptions"/>.
     /// </summary>
