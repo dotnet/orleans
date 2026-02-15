@@ -12,7 +12,7 @@
   <ItemGroup>
     <PackageReference Include="Microsoft.Data.SqlClient" />
     <!--<PackageReference Include="MySqlConnector" Version="1.2.1" />-->
-    <PackageReference Include="Microsoft.Data.Sqlite" VersionOverride="5.0.2" />
+    <PackageReference Include="Microsoft.Data.Sqlite" />
     <PackageReference Include="Npgsql" />
     <PackageReference Include="MySql.Data" />
     <PackageReference Include="System.Drawing.Common" /> <!-- For some reason it's a dependency of MySql.Data. We want to force it to a specific version -->
