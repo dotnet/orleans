@@ -171,11 +171,11 @@ namespace Orleans.Storage
                 var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
 
                 var queryText = options.DeleteStateOnClear ? CurrentOperationalQueries.DeleteState : CurrentOperationalQueries.ClearState;
-                //Backward compatibility checks in Init should handle this case and throw prior to reaching this state.
+
+                // Backward compatibility checks in Init should handle this case and throw prior to reaching this state.
                 if (queryText is null)
                 {
-                    //We should not be here.
-                    throw new UnreachableException($"QueryText is null for options.DeleteStateOnClear={options.DeleteStateOnClear}");
+                    throw new UnreachableException($"QueryText is null for {nameof(options.DeleteStateOnClear)}={options.DeleteStateOnClear}");
                 }
                 var clearRecord = (await Storage.ReadAsync(queryText, command =>
                 {
@@ -203,7 +203,8 @@ namespace Orleans.Storage
                 throw inconsistentStateException;
             }
 
-            //if delete on clear is set, ETag should be set to null since record has been deleted, but db script returns deleted record version + 1 as storageVersion for CheckVersionInconsistency method.
+            // When delete on clear is set, ETag should be null since the record was deleted.
+            // The DB script returns deleted record version + 1 as storageVersion for the CheckVersionInconsistency check above.
             //No errors found, the version of the state held by the grain can be updated and also the state.
             grainState.ETag = options.DeleteStateOnClear ? null : storageVersion;
             grainState.RecordExists = false;
@@ -339,13 +340,13 @@ namespace Orleans.Storage
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
             }).ConfigureAwait(false);
 
-            //This check is for backward compatibility:
-            //1. Some AdoNet storage invariants may not support delete on clear
-            //2. AdoNet invariant supports delete on clear but updated persistence scripts have not been deployed to management db.
+            // This check is for backward compatibility:
+            // 1. Some AdoNet storage invariants may not support delete on clear.
+            // 2. AdoNet invariant supports delete on clear but updated persistence scripts have not been deployed to management db.
             var deleteStateQuery = queries.SingleOrDefault(i => i.Item1 == "DeleteStorageKey")?.Item2;
             if (options.DeleteStateOnClear && deleteStateQuery is null)
             {
-                throw new ArgumentException("DeleteStateOnClear=true option is not supported. Use options.DeleteStateOnClear=false instead or check persistence scripts.");
+                throw new ArgumentException($"{nameof(options.DeleteStateOnClear)}=true is not supported. Use {nameof(options.DeleteStateOnClear)}=false instead or check persistence scripts.");
             }
             CurrentOperationalQueries = new RelationalStorageProviderQueries(
                 queries.Single(i => i.Item1 == "WriteToStorageKey").Item2,

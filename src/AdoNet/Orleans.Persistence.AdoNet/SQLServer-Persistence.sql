@@ -264,8 +264,7 @@ WHERE NOT EXISTS
 );
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
-VALUES
-(
+SELECT
     'DeleteStorageKey',
     'BEGIN TRANSACTION;
     SET XACT_ABORT, NOCOUNT ON;
@@ -282,4 +281,9 @@ VALUES
         OPTION(FAST 1, OPTIMIZE FOR(@GrainIdHash UNKNOWN, @GrainTypeHash UNKNOWN));
 
     COMMIT TRANSACTION;'
+WHERE NOT EXISTS
+(
+    SELECT 1
+    FROM OrleansQuery oqt
+    WHERE oqt.[QueryKey] = 'DeleteStorageKey'
 );
