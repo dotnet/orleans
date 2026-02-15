@@ -50,6 +50,31 @@ namespace Tester.AdoNet.Persistence
         }
 
         [Fact]
+        public async Task ClearInconsistentFailsWithInconsistentStateException()
+        {
+            var storage = await this.fixture.CreateGrainStorageAsync($"SqliteClearInconsistent-{Guid.NewGuid():N}");
+            const string grainType = "sqlite-clear-inconsistent-grain";
+            var grainId = GrainId.Create(GrainType.Create(grainType), GrainIdKeyExtensions.CreateIntegerKey(Random.Shared.NextInt64()));
+
+            var grainState = new GrainState<TestState1> { State = new TestState1 { A = "initial", B = 1, C = 1 } };
+            await storage.WriteStateAsync(grainType, grainId, grainState);
+
+            grainState.State = new TestState1 { A = "latest", B = 2, C = 2 };
+            await storage.WriteStateAsync(grainType, grainId, grainState);
+            var staleVersion = (int.Parse(Assert.IsType<string>(grainState.ETag), CultureInfo.InvariantCulture) - 1).ToString(CultureInfo.InvariantCulture);
+
+            var staleState = new GrainState<TestState1> { State = new TestState1(), ETag = staleVersion, RecordExists = true };
+            var exception = await Record.ExceptionAsync(() => storage.ClearStateAsync(grainType, grainId, staleState));
+            var inconsistent = Assert.IsType<InconsistentStateException>(exception);
+            CommonStorageUtilities.AssertRelationalInconsistentExceptionMessage(inconsistent.Message);
+
+            var readState = new GrainState<TestState1> { State = new TestState1() };
+            await storage.ReadStateAsync(grainType, grainId, readState);
+            Assert.True(readState.RecordExists);
+            Assert.Equal(grainState.State, readState.State);
+        }
+
+        [Fact]
         public async Task HashCollisionWriteReadWriteRead()
         {
             var storage = await this.fixture.CreateGrainStorageAsync($"SqliteHashCollision-{Guid.NewGuid():N}");

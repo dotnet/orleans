@@ -42,8 +42,8 @@ namespace Tester.AdoNet.Persistence
 
         public async Task InitializeSchemaAsync()
         {
-            await this.DatabaseStorage.ExecuteAsync(await LoadScriptAsync("SQLLite-Main.sql"), command => { }).ConfigureAwait(false);
-            await this.DatabaseStorage.ExecuteAsync(await LoadScriptAsync("SQLLite-Persistence.sql"), command => { }).ConfigureAwait(false);
+            await this.DatabaseStorage.ExecuteAsync(await LoadScriptAsync("Sqlite-Main.sql"), command => { }).ConfigureAwait(false);
+            await this.DatabaseStorage.ExecuteAsync(await LoadScriptAsync("Sqlite-Persistence.sql"), command => { }).ConfigureAwait(false);
         }
 
         public async Task<AdoNetGrainStorage> CreateGrainStorageAsync(string storageName = "SqliteGrainStorageForTest")

@@ -163,9 +163,14 @@ INSERT INTO OrleansQuery (QueryKey, QueryText) VALUES
         AND Version = @GrainStateVersion;
 
     SELECT Version AS NewGrainStateVersion FROM OrleansStorage
-    WHERE GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
+    WHERE changes() > 0
+        AND GrainIdHash = @GrainIdHash AND GrainTypeHash = @GrainTypeHash
         AND GrainIdN0 = @GrainIdN0 AND GrainIdN1 = @GrainIdN1
         AND GrainTypeString = @GrainTypeString
         AND (GrainIdExtensionString = @GrainIdExtensionString OR (GrainIdExtensionString IS NULL AND @GrainIdExtensionString IS NULL))
         AND ServiceId = @ServiceId;
+
+    SELECT @GrainStateVersion AS NewGrainStateVersion
+    WHERE changes() = 0
+        AND @GrainStateVersion IS NOT NULL;
 ');
