@@ -39,19 +39,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         string containerName,
         string blobPrefix,
         AzureStorageJobShardOptions options,
-        IClusterMembershipService clusterMembership,
-        ILoggerFactory loggerFactory)
-        : this(siloAddress, client, containerName, blobPrefix, options, new DurableJobsOptions(), clusterMembership, loggerFactory)
-    {
-    }
-
-    public AzureStorageJobShardManager(
-        SiloAddress siloAddress,
-        BlobServiceClient client,
-        string containerName,
-        string blobPrefix,
-        AzureStorageJobShardOptions options,
-        DurableJobsOptions durableJobsOptions,
+        IOptions<DurableJobsOptions> durableJobsOptions,
         IClusterMembershipService clusterMembership,
         ILoggerFactory loggerFactory)
         : base(siloAddress)
@@ -63,16 +51,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         _logger = loggerFactory.CreateLogger<AzureStorageJobShardManager>();
         _loggerFactory = loggerFactory;
         _options = options;
-        _durableJobsOptions = durableJobsOptions;
-    }
-
-    public AzureStorageJobShardManager(
-        ILocalSiloDetails localSiloDetails,
-        IOptions<AzureStorageJobShardOptions> options,
-        IClusterMembershipService clusterMembership,
-        ILoggerFactory loggerFactory)
-        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId, options.Value, clusterMembership, loggerFactory)
-    {
+        _durableJobsOptions = durableJobsOptions.Value;
     }
 
     public AzureStorageJobShardManager(
@@ -81,7 +60,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         IOptions<DurableJobsOptions> durableJobsOptions,
         IClusterMembershipService clusterMembership,
         ILoggerFactory loggerFactory)
-        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId, options.Value, durableJobsOptions.Value, clusterMembership, loggerFactory)
+        : this(localSiloDetails.SiloAddress, options.Value.BlobServiceClient, options.Value.ContainerName, localSiloDetails.ClusterId, options.Value, durableJobsOptions, clusterMembership, loggerFactory)
     {
     }
 

@@ -32,11 +32,13 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
     internal InMemoryClusterMembershipService MembershipService { get; }
 
     internal IOptions<AzureStorageJobShardOptions> StorageOptions { get; }
+    internal IOptions<DurableJobsOptions> DurableJobsOptions { get; }
 
     public AzureStorageJobShardBatchingTests()
     {
         MembershipService = new InMemoryClusterMembershipService();
         StorageOptions = Options.Create(new AzureStorageJobShardOptions());
+        DurableJobsOptions = Options.Create(new DurableJobsOptions());
         StorageOptions.Value.ConfigureTestDefaults();
         StorageOptions.Value.ContainerName = "test-batch-container-" + Guid.NewGuid().ToString("N");
     }
@@ -70,7 +72,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
     internal AzureStorageJobShardManager CreateManager(SiloAddress siloAddress)
     {
         var localSiloDetails = new TestLocalSiloDetails(siloAddress);
-        return new AzureStorageJobShardManager(localSiloDetails, StorageOptions, MembershipService, NullLoggerFactory.Instance);
+        return new AzureStorageJobShardManager(localSiloDetails, StorageOptions, DurableJobsOptions, MembershipService, NullLoggerFactory.Instance);
     }
 
     internal void SetSiloStatus(SiloAddress siloAddress, SiloStatus status)
