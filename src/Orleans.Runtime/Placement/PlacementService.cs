@@ -1,13 +1,10 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.Placement;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
@@ -120,11 +117,20 @@ namespace Orleans.Runtime.Placement
             var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
             if (filters.Length > 0)
             {
+                // Capture the parent activity context now so each filter span is parented to the
+                // current activity (e.g. PlaceGrain) rather than to sibling filter spans that may
+                // be active during deferred enumeration.
+                var parentActivityContext = Activity.Current?.Context;
+
                 IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
                 foreach (var placementFilter in filters)
                 {
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
-                    filteredSilos = director.Filter(placementFilter, target, filteredSilos);
+                    filteredSilos = InstrumentFilteredSilos(
+                        director.Filter(placementFilter, target, filteredSilos),
+                        placementFilter,
+                        grainType,
+                        parentActivityContext);
                 }
 
                 compatibleSilos = filteredSilos.ToArray();
@@ -220,11 +226,12 @@ namespace Orleans.Runtime.Placement
         /// <param name="requestContextData">The request context, which will be available to the placement strategy.</param>
         /// <param name="placementStrategy">The placement strategy to use.</param>
         /// <returns>A location for the new activation.</returns>
-        public Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object> requestContextData, PlacementStrategy placementStrategy)
+        public async Task<SiloAddress> PlaceGrainAsync(GrainId grainId, Dictionary<string, object> requestContextData, PlacementStrategy placementStrategy)
         {
+            using var _ = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
             var target = new PlacementTarget(grainId, requestContextData, default, 0);
             var director = _directorResolver.GetPlacementDirector(placementStrategy);
-            return director.OnAddActivation(placementStrategy, target, this);
+            return await director.OnAddActivation(placementStrategy, target, this);
         }
 
         private class PlacementWorker
@@ -367,32 +374,48 @@ namespace Orleans.Runtime.Placement
             private async Task<SiloAddress> GetOrPlaceActivationAsync(Message firstMessage)
             {
                 await Task.Yield();
-                var target = new PlacementTarget(
-                    firstMessage.TargetGrain,
-                    firstMessage.RequestContextData,
-                    firstMessage.InterfaceType,
-                    firstMessage.InterfaceVersion);
 
-                var targetGrain = target.GrainIdentity;
-                var result = await _placementService._grainLocator.Lookup(targetGrain);
-                if (result is not null)
+                // InnerGetOrPlaceActivationAsync may set a new activity as current from the RequestContextData,
+                // so we need to save and restore the current activity.
+                var currentActivity = Activity.Current;
+                var activationLocation = await InnerGetOrPlaceActivationAsync();
+                Activity.Current = currentActivity;
+
+                return activationLocation;
+
+                async Task<SiloAddress> InnerGetOrPlaceActivationAsync()
                 {
-                    return result.SiloAddress;
+                    // Restore activity context from the message's request context data
+                    // This ensures directory lookups are properly traced as children of the original request
+                    using var restoredActivity = TryRestoreActivityContext(firstMessage.RequestContextData, ActivityNames.PlaceGrain);
+
+                    var target = new PlacementTarget(
+                        firstMessage.TargetGrain,
+                        firstMessage.RequestContextData,
+                        firstMessage.InterfaceType,
+                        firstMessage.InterfaceVersion);
+
+                    var targetGrain = target.GrainIdentity;
+                    var result = await _placementService._grainLocator.Lookup(targetGrain);
+                    if (result is not null)
+                    {
+                        return result.SiloAddress;
+                    }
+
+                    var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
+                    var director = _placementService._directorResolver.GetPlacementDirector(strategy);
+                    var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
+
+                    // Give the grain locator one last chance to tell us that the grain has already been placed
+                    if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
+                    {
+                        return result.SiloAddress;
+                    }
+
+                    _placementService._grainLocator.InvalidateCache(targetGrain);
+                    _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
+                    return siloAddress;
                 }
-
-                var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
-                var director = _placementService._directorResolver.GetPlacementDirector(strategy);
-                var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
-
-                // Give the grain locator one last chance to tell us that the grain has already been placed
-                if (_placementService._grainLocator.TryLookupInCache(targetGrain, out result) && _placementService.CachedAddressIsValid(firstMessage, result))
-                {
-                    return result.SiloAddress;
-                }
-
-                _placementService._grainLocator.InvalidateCache(targetGrain);
-                _placementService._grainLocator.UpdateCache(targetGrain, siloAddress);
-                return siloAddress;
             }
 
             private class GrainPlacementWorkItem
@@ -401,6 +424,50 @@ namespace Orleans.Runtime.Placement
 
                 public Task<SiloAddress> Result { get; set; }
             }
+        }
+
+        /// <summary>
+        /// Wraps a filter's output enumerable so that an Activity span is created when the
+        /// sequence is actually enumerated, not when the filter is composed. This avoids
+        /// per-filter array materialization while still giving accurate span timings.
+        /// </summary>
+        private static IEnumerable<SiloAddress> InstrumentFilteredSilos(
+            IEnumerable<SiloAddress> silos,
+            PlacementFilterStrategy filter,
+            GrainType grainType,
+            ActivityContext? parentActivityContext)
+        {
+            using var filterSpan = parentActivityContext is { } parentContext
+                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates, ActivityKind.Internal, parentContext)
+                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
+            filterSpan?.SetTag(ActivityTagKeys.PlacementFilterType, filter.GetType().Name);
+            filterSpan?.SetTag(ActivityTagKeys.GrainType, grainType.ToString());
+
+            foreach (var silo in silos)
+            {
+                yield return silo;
+            }
+        }
+
+        /// <summary>
+        /// Attempts to restore the parent activity context from request context data.
+        /// </summary>
+        private static Activity TryRestoreActivityContext(Dictionary<string, object> requestContextData, string operationName)
+        {
+            if (requestContextData is null)
+            {
+                return null;
+            }
+
+            var activityContext = requestContextData.TryGetActivityContext();
+
+            if (activityContext is {} parentContext)
+            {
+                // Start the activity from the Catalog's ActivitySource to properly associate it with activation tracing
+                return ActivitySources.LifecycleGrainSource.StartActivity(operationName, ActivityKind.Internal, parentContext);
+            }
+
+            return null;
         }
 
         [LoggerMessage(

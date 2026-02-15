@@ -1,4 +1,8 @@
+using System.Collections.Immutable;
+using System.Reflection;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Orleans.Analyzers;
 using Xunit;
 
@@ -95,6 +99,24 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
         return VerifyHasNoDiagnostic(code);
     }
 
+    [Fact]
+    public async Task ReferencedGrainInterfaceWithoutAliasAttribute_ShouldNotCrashAnalyzer()
+    {
+        const string referencedSource = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            public interface IReferencedGrain : IGrainWithGuidKey
+            {
+                Task<int> M1();
+            }
+            """;
+
+        var diagnostics = await GetDiagnosticsWithReferencedAssemblyAsync("public class C {}", referencedSource);
+
+        Assert.Empty(diagnostics);
+    }
+
     #endregion
 
     #region Classes, Structs, Records
@@ -168,4 +190,59 @@ public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<Ge
        => VerifyHasNoDiagnostic("public record struct RS {}");
 
     #endregion
+
+    private static async Task<Diagnostic[]> GetDiagnosticsWithReferencedAssemblyAsync(string source, string referencedSource)
+    {
+        static CSharpCompilation CreateCompilation(string assemblyName, string sourceText, IEnumerable<MetadataReference> references)
+            => CSharpCompilation.Create(
+                assemblyName,
+                [CSharpSyntaxTree.ParseText(sourceText)],
+                references,
+                new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
+
+        var references = GetMetadataReferences();
+        var referencedCompilation = CreateCompilation("ReferencedAssembly", referencedSource, references);
+
+        using var stream = new MemoryStream();
+        var emitResult = referencedCompilation.Emit(stream);
+        Assert.True(emitResult.Success, string.Join(Environment.NewLine, emitResult.Diagnostics));
+
+        var compilation = CreateCompilation("TestProject", source, [.. references, MetadataReference.CreateFromImage(stream.ToArray())]);
+        var analyzer = new GenerateAliasAttributesAnalyzer();
+        var compilationWithAnalyzers = compilation
+            .WithOptions(
+                compilation.Options.WithSpecificDiagnosticOptions(
+                    analyzer.SupportedDiagnostics.ToDictionary(d => d.Id, d => ReportDiagnostic.Default)))
+            .WithAnalyzers([analyzer]);
+
+        return (await compilationWithAnalyzers.GetAnalyzerDiagnosticsAsync()).ToArray();
+    }
+
+    private static IReadOnlyCollection<MetadataReference> GetMetadataReferences()
+    {
+        var assemblies = new[]
+        {
+            typeof(Task).Assembly,
+            typeof(Orleans.IGrain).Assembly,
+            typeof(Orleans.Grain).Assembly,
+            typeof(Attribute).Assembly,
+            typeof(int).Assembly,
+            typeof(object).Assembly,
+        };
+
+        var metadataReferences = assemblies
+            .SelectMany(x => x.GetReferencedAssemblies().Select(Assembly.Load))
+            .Concat(assemblies)
+            .Distinct()
+            .Select(x => MetadataReference.CreateFromFile(x.Location))
+            .ToList();
+
+        var assemblyPath = Path.GetDirectoryName(typeof(object).Assembly.Location);
+        metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath!, "mscorlib.dll")));
+        metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.dll")));
+        metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Core.dll")));
+        metadataReferences.Add(MetadataReference.CreateFromFile(Path.Combine(assemblyPath, "System.Runtime.dll")));
+
+        return metadataReferences;
+    }
 }

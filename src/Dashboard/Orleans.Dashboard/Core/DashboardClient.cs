@@ -13,7 +13,7 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
     private readonly IDashboardRemindersGrain _remindersGrain = grainFactory.GetGrain<IDashboardRemindersGrain>(0);
     private readonly IGrainFactory _grainFactory = grainFactory;
 
-    public async Task<Immutable<DashboardCounters>> DashboardCounters() => await _dashboardGrain.GetCounters();
+    public async Task<Immutable<DashboardCounters>> DashboardCounters(string[] exclusions) => await _dashboardGrain.GetCounters(exclusions);
 
     public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> ClusterStats() => await _dashboardGrain.GetClusterTracing();
 
@@ -23,6 +23,8 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
 
     public async Task<Immutable<Dictionary<string, string>>> SiloProperties(string siloAddress) => await Silo(siloAddress).GetExtendedProperties();
 
+    public async Task<Immutable<Dictionary<string, string>>> SiloMetadata(string siloAddress) => await Silo(siloAddress).GetMetadata();
+
     public async Task<Immutable<Dictionary<string, GrainTraceEntry>>> SiloStats(string siloAddress) => await _dashboardGrain.GetSiloTracing(siloAddress);
 
     public async Task<Immutable<StatCounter[]>> GetCounters(string siloAddress) => await Silo(siloAddress).GetCounters();
@@ -30,11 +32,11 @@ internal sealed class DashboardClient(IGrainFactory grainFactory) : IDashboardCl
     public async Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GrainStats(
         string grainName) => await _dashboardGrain.GetGrainTracing(grainName);
 
-    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take) => await _dashboardGrain.TopGrainMethods(take);
+    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[] exclusions) => await _dashboardGrain.TopGrainMethods(take, exclusions);
 
-    private ISiloGrainService Silo(string siloAddress) => _grainFactory.GetGrain<ISiloGrainProxy>(siloAddress);
+    private ISiloGrainProxy Silo(string siloAddress) => _grainFactory.GetGrain<ISiloGrainProxy>(siloAddress);
 
     public async Task<Immutable<string>> GetGrainState(string id, string grainType) => await _dashboardGrain.GetGrainState(id, grainType);
 
-    public async Task<Immutable<string[]>> GetGrainTypes() => await _dashboardGrain.GetGrainTypes();
+    public async Task<Immutable<string[]>> GetGrainTypes(string[] exclusions = null) => await _dashboardGrain.GetGrainTypes(exclusions);
 }
