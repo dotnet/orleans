@@ -1338,6 +1338,13 @@ namespace Orleans.Runtime
         public void OnDeserialized(Orleans.Serialization.IOnDeserialized value) { }
     }
 
+    public partial class OrleansInstruments
+    {
+        public OrleansInstruments(System.Diagnostics.Metrics.IMeterFactory meterFactory) { }
+
+        public System.Diagnostics.Metrics.Meter Meter { get { throw null; } }
+    }
+
     public static partial class RangeFactory
     {
         public const long RING_SIZE = 4294967296L;
