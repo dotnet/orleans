@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
@@ -38,54 +39,93 @@ public class AzureStorageBlobDurableJobsTests : TestClusterPerTest
     }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task DurableJobGrain()
-        => _runner.DurableJobGrain();
+    public async Task DurableJobGrain()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.DurableJobGrain(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task JobExecutionOrder()
-        => _runner.JobExecutionOrder();
+    public async Task JobExecutionOrder()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobExecutionOrder(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task PastDueTime()
-        => _runner.PastDueTime();
+    public async Task PastDueTime()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.PastDueTime(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task JobWithMetadata()
-        => _runner.JobWithMetadata();
+    public async Task JobWithMetadata()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobWithMetadata(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task MultipleGrains()
-        => _runner.MultipleGrains();
+    public async Task MultipleGrains()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.MultipleGrains(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task DuplicateJobNames()
-        => _runner.DuplicateJobNames();
+    public async Task DuplicateJobNames()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.DuplicateJobNames(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task CancelNonExistentJob()
-        => _runner.CancelNonExistentJob();
+    public async Task CancelNonExistentJob()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.CancelNonExistentJob(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task CancelAlreadyExecutedJob()
-        => _runner.CancelAlreadyExecutedJob();
+    public async Task CancelAlreadyExecutedJob()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.CancelAlreadyExecutedJob(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task ConcurrentScheduling()
-        => _runner.ConcurrentScheduling();
+    public async Task ConcurrentScheduling()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ConcurrentScheduling(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task JobPropertiesVerification()
-        => _runner.JobPropertiesVerification();
+    public async Task JobPropertiesVerification()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobPropertiesVerification(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task DequeueCount()
-        => _runner.DequeueCount();
+    public async Task DequeueCount()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.DequeueCount(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task ScheduleJobOnAnotherGrain()
-        => _runner.ScheduleJobOnAnotherGrain();
+    public async Task ScheduleJobOnAnotherGrain()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ScheduleJobOnAnotherGrain(cts.Token);
+    }
 
     [SkippableFact, TestCategory("Azure"), TestCategory("DurableJobs")]
-    public Task JobRetry()
-        => _runner.JobRetry();
+    public async Task JobRetry()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobRetry(cts.Token);
+    }
 }
