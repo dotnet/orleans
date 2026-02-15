@@ -38,7 +38,6 @@ var builder = Host.CreateApplicationBuilder(args)
                     options.Invariant = "Microsoft.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
                     options.ConnectionString = "Server=localhost;Database=OrleansStorage;User Id=myUsername;******;";
                     // Optional: Configure custom queries
-                    options.UseJsonFormat = true; // Store as JSON instead of binary
                 });
     });
 
