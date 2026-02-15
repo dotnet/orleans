@@ -65,21 +65,27 @@ internal sealed partial class DurableJobReceiverExtension : IDurableJobReceiverE
 
     private Task<DurableJobRunResult> GetJobStatus(IDurableJobContext context, Task task)
     {
+        // Cancellation is cooperative: only terminal task state is authoritative for job outcome.
+        if (!task.IsCompleted)
+        {
+            return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(1)));
+        }
+
+        _runningJobs.TryRemove(context.RunId, out _);
+
         if (task.IsCompletedSuccessfully)
         {
-            _runningJobs.TryRemove(context.RunId, out _);
             return Task.FromResult(DurableJobRunResult.Completed);
         }
 
         if (task.IsFaulted)
         {
-            _runningJobs.TryRemove(context.RunId, out _);
             var ex = task.Exception!.InnerException ?? task.Exception;
             LogErrorExecutingDurableJob(ex, context.Job.Id, _grain.GrainId);
             return Task.FromResult(DurableJobRunResult.Failed(ex));
         }
 
-        return Task.FromResult(DurableJobRunResult.PollAfter(TimeSpan.FromSeconds(1)));
+        return Task.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true));
     }
 
     [LoggerMessage(Level = LogLevel.Error, Message = "Error executing durable job {JobId} on grain {GrainId}")]

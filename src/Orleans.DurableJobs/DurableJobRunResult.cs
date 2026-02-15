@@ -72,7 +72,11 @@ public sealed class DurableJobRunResult
     /// <remarks>
     /// The exception will be passed to the retry callback to determine if the job should be retried.
     /// </remarks>
-    public static DurableJobRunResult Failed(Exception exception) => new(DurableJobRunStatus.Failed, null, exception);
+    public static DurableJobRunResult Failed(Exception exception)
+    {
+        ArgumentNullException.ThrowIfNull(exception);
+        return new(DurableJobRunStatus.Failed, null, exception);
+    }
 }
 
 /// <summary>

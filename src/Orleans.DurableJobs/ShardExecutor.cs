@@ -111,43 +111,44 @@ internal sealed partial class ShardExecutor
 
         try
         {
-            LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
-
-            var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
-
-            var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
-
-            // Handle the result based on status
-            while (result.IsPending)
+            try
             {
-                // Enter polling loop
-                LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
-                
-                await Task.Delay(result.PollAfterDelay.Value, cancellationToken);
-                
-                result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+                LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
+
+                var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
+
+                var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+
+                // Handle the result based on status
+                while (result.IsPending)
+                {
+                    // Enter polling loop
+                    LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
+
+                    await Task.Delay(result.PollAfterDelay.Value, cancellationToken);
+
+                    result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+                }
+
+                if (result.Status == DurableJobRunStatus.Completed)
+                {
+                    await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
+                    LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                }
+                else if (result.IsFailed)
+                {
+                    // Handle failed result through retry policy
+                    LogJobFailedWithResult(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                    failureException = result.Exception;
+                }
+            }
+            catch (Exception ex) when (ex is not OperationCanceledException)
+            {
+                LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
+                failureException = ex;
             }
 
-            if (result.Status == DurableJobRunStatus.Completed)
-            {
-                await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
-                LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
-            }
-            else if (result.IsFailed)
-            {
-                // Handle failed result through retry policy
-                LogJobFailedWithResult(_logger, jobContext.Job.Id, jobContext.Job.Name);
-                failureException = result.Exception;
-            }
-        }
-        catch (Exception ex) when (ex is not OperationCanceledException)
-        {
-            LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
-            failureException = ex;
-        }
-        finally
-        {
-            // Handle failures and retries in common path
+            // Cancellation is handled by shard takeover, so only non-cancellation failures are retried here.
             if (failureException is not null)
             {
                 var retryTime = _options.ShouldRetry(jobContext, failureException);
@@ -161,7 +162,10 @@ internal sealed partial class ShardExecutor
                     LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
                 }
             }
-
+        }
+        finally
+        {
+            // Cleanup must happen even when retry persistence throws, otherwise slots leak and shard processing can stall.
             _jobConcurrencyLimiter.Release();
             runningTasks.TryRemove(jobContext.Job.Id, out _);
         }

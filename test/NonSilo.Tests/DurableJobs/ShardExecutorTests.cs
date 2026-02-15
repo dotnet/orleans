@@ -203,7 +203,7 @@ public class ShardExecutorTests
         Assert.Single(failedJobs);
         
         await shard.Received(1).RetryJobLaterAsync(
-            Arg.Is<IJobRunContext>(ctx => ctx.Job.Id == "job-0"),
+            Arg.Any<IDurableJobContext>(),
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
         
@@ -315,6 +315,59 @@ public class ShardExecutorTests
             Arg.Any<DateTimeOffset>(),
             Arg.Any<CancellationToken>());
         
+        await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunShardAsync_WhenRetryPersistenceFails_ReleasesConcurrencyAndContinuesProcessing()
+    {
+        var options = CreateOptions(
+            maxConcurrentJobs: 1,
+            shouldRetry: (context, ex) => DateTimeOffset.UtcNow.AddSeconds(1)
+        );
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var jobs = CreateJobs(2);
+        var shard = CreateJobShard(jobs);
+        var grainFactory = CreateGrainFactory();
+        var completedJobs = new List<string>();
+        var failedJobs = new List<string>();
+        var jobExecutionCount = 0;
+        ConfigureGrainFactoryWithSelectiveFailures(grainFactory, completedJobs, failedJobs, ref jobExecutionCount);
+
+        shard.RetryJobLaterAsync(
+            Arg.Any<IDurableJobContext>(),
+            Arg.Any<DateTimeOffset>(),
+            Arg.Any<CancellationToken>())
+            .Returns(Task.FromException(new InvalidOperationException("Simulated retry persistence failure")));
+
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await executor.RunShardAsync(shard, cts.Token);
+
+        Assert.Single(failedJobs);
+        Assert.Single(completedJobs);
+        await shard.Received(1).RetryJobLaterAsync(Arg.Any<IDurableJobContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
+        await shard.Received(1).RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task RunShardAsync_WhenExecutionIsCanceled_DoesNotRetryOrRemove()
+    {
+        var options = CreateOptions(
+            maxConcurrentJobs: 10,
+            shouldRetry: (context, ex) => DateTimeOffset.UtcNow.AddSeconds(1)
+        );
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var jobs = CreateJobs(1);
+        var shard = CreateJobShard(jobs);
+        var grainFactory = CreateGrainFactoryWithCanceledExecution();
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
+
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() => executor.RunShardAsync(shard, cts.Token));
+
+        await shard.DidNotReceive().RetryJobLaterAsync(Arg.Any<IDurableJobContext>(), Arg.Any<DateTimeOffset>(), Arg.Any<CancellationToken>());
         await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
@@ -508,8 +561,21 @@ public class ShardExecutorTests
             });
         
         factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
-        
+
         jobExecutionCount = executionCount;
+    }
+
+    private static IInternalGrainFactory CreateGrainFactoryWithCanceledExecution()
+    {
+        var factory = Substitute.For<IInternalGrainFactory>();
+
+        var extension = Substitute.For<IDurableJobReceiverExtension>();
+        extension.HandleDurableJobAsync(Arg.Any<IDurableJobContext>(), Arg.Any<CancellationToken>())
+            .Returns(Task.FromCanceled<DurableJobRunResult>(new CancellationToken(canceled: true)));
+
+        factory.GetGrain<IDurableJobReceiverExtension>(Arg.Any<GrainId>()).Returns(extension);
+
+        return factory;
     }
 
     private static (IInternalGrainFactory, StrongBox<int>) CreateGrainFactoryWithPollingBehavior()
