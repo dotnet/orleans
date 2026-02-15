@@ -74,7 +74,7 @@ public static class DurableJobsExtensions
             var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
             var membershipService = sp.GetRequiredService<IClusterMembershipService>();
             var durableJobsOptions = sp.GetRequiredService<IOptions<DurableJobsOptions>>();
-            return new InMemoryJobShardManager(siloDetails.SiloAddress, membershipService, durableJobsOptions.Value.MaxStolenCount);
+            return new InMemoryJobShardManager(siloDetails.SiloAddress, membershipService, durableJobsOptions.Value.MaxAdoptedCount);
         });
         services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
         return services;

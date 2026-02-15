@@ -52,7 +52,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AssignJobShardsAsync_OrphanedShard_IsAssignedWithoutIncrementingStolenCount()
+    public async Task AssignJobShardsAsync_OrphanedShard_IsAssignedWithoutIncrementingAdoptedCount()
     {
         // Silo1 creates a shard and gracefully releases it
         var manager1 = new InMemoryJobShardManager(Silo1);
@@ -77,11 +77,11 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         var ownershipInfo = await InMemoryJobShardManager.GetOwnershipInfoAsync(shard.Id);
         Assert.True(ownershipInfo.HasValue);
         Assert.Equal(Silo2.ToString(), ownershipInfo.Value.Owner);
-        Assert.Equal(0, ownershipInfo.Value.StolenCount);
+        Assert.Equal(0, ownershipInfo.Value.AdoptedCount);
     }
 
     [Fact]
-    public async Task AssignJobShardsAsync_StolenFromDeadSilo_IncrementsStolenCount()
+    public async Task AssignJobShardsAsync_AdoptedFromDeadSilo_IncrementsAdoptedCount()
     {
         // Setup membership service that reports Silo1 as dead
         var membershipService = CreateMembershipService(deadSilos: [Silo1]);
@@ -93,18 +93,18 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         var shard = await manager1.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
 
-        // Silo2 steals the shard from dead Silo1
-        var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxStolenCount: 3);
+        // Silo2 adopts the shard from dead Silo1
+        var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxAdoptedCount: 3);
         var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
 
-        // Shard should be assigned (stolen count = 1, under threshold)
+        // Shard should be assigned (adopted count = 1, under threshold)
         Assert.Single(assignedShards);
         Assert.Equal(shard.Id, assignedShards[0].Id);
 
         var ownershipInfo = await InMemoryJobShardManager.GetOwnershipInfoAsync(shard.Id);
         Assert.True(ownershipInfo.HasValue);
         Assert.Equal(Silo2.ToString(), ownershipInfo.Value.Owner);
-        Assert.Equal(1, ownershipInfo.Value.StolenCount);
+        Assert.Equal(1, ownershipInfo.Value.AdoptedCount);
     }
 
     [Fact]
@@ -116,24 +116,24 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         membershipService.CurrentSnapshot.Returns(snapshot);
 
         // Silo1 creates a shard
-        var manager1 = new InMemoryJobShardManager(Silo1, membershipService, maxStolenCount: 2);
+        var manager1 = new InMemoryJobShardManager(Silo1, membershipService, maxAdoptedCount: 2);
         var minDueTime = DateTimeOffset.UtcNow;
         var maxDueTime = minDueTime.AddHours(1);
 
         await manager1.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
 
-        // Silo2 steals from dead Silo1 (stolen count = 1)
-        var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxStolenCount: 2);
+        // Silo2 adopts from dead Silo1 (adopted count = 1)
+        var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxAdoptedCount: 2);
         var shards2 = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
         Assert.Single(shards2);
 
-        // Silo3 steals from dead Silo2 (stolen count = 2)
-        var manager3 = new InMemoryJobShardManager(Silo3, membershipService, maxStolenCount: 2);
+        // Silo3 adopts from dead Silo2 (adopted count = 2)
+        var manager3 = new InMemoryJobShardManager(Silo3, membershipService, maxAdoptedCount: 2);
         var shards3 = await manager3.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
         Assert.Single(shards3);
 
-        // Silo4 tries to steal from dead Silo3 (stolen count would be 3, exceeds max of 2)
-        var manager4 = new InMemoryJobShardManager(Silo4, membershipService, maxStolenCount: 2);
+        // Silo4 tries to adopt from dead Silo3 (adopted count would be 3, exceeds max of 2)
+        var manager4 = new InMemoryJobShardManager(Silo4, membershipService, maxAdoptedCount: 2);
         var shards4 = await manager4.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
 
         // Shard is poisoned and should not be assigned
@@ -141,34 +141,34 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
     }
 
     [Fact]
-    public async Task AssignJobShardsAsync_MaxStolenCountOfZero_NeverAssignsStolenShards()
+    public async Task AssignJobShardsAsync_MaxAdoptedCountOfZero_NeverAssignsAdoptedShards()
     {
         // Setup membership service that reports Silo1 as dead
         var membershipService = CreateMembershipService(deadSilos: [Silo1]);
 
         // Silo1 creates a shard
-        var manager1 = new InMemoryJobShardManager(Silo1, membershipService, maxStolenCount: 0);
+        var manager1 = new InMemoryJobShardManager(Silo1, membershipService, maxAdoptedCount: 0);
         var minDueTime = DateTimeOffset.UtcNow;
         var maxDueTime = minDueTime.AddHours(1);
 
         await manager1.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
 
-        // Silo2 tries to steal from dead Silo1 with maxStolenCount=0
-        var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxStolenCount: 0);
+        // Silo2 tries to adopt from dead Silo1 with maxAdoptedCount=0
+        var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxAdoptedCount: 0);
         var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
 
-        // Shard should not be assigned (stolen count would be 1, exceeds max of 0)
+        // Shard should not be assigned (adopted count would be 1, exceeds max of 0)
         Assert.Empty(assignedShards);
     }
 
     [Fact]
-    public async Task UseInMemoryDurableJobs_ConfiguredMaxStolenCount_IsApplied()
+    public async Task UseInMemoryDurableJobs_ConfiguredMaxAdoptedCount_IsApplied()
     {
         var membershipService = CreateMembershipService(deadSilos: [Silo2]);
         var minDueTime = DateTimeOffset.UtcNow;
         var maxDueTime = minDueTime.AddHours(1);
 
-        var ownerManager = new InMemoryJobShardManager(Silo2, membershipService, maxStolenCount: 3);
+        var ownerManager = new InMemoryJobShardManager(Silo2, membershipService, maxAdoptedCount: 3);
         await ownerManager.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
 
         var localSiloDetails = Substitute.For<ILocalSiloDetails>();
@@ -177,7 +177,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         var services = new ServiceCollection();
         services.AddSingleton(localSiloDetails);
         services.AddSingleton(membershipService);
-        services.Configure<DurableJobsOptions>(options => options.MaxStolenCount = 0);
+        services.Configure<DurableJobsOptions>(options => options.MaxAdoptedCount = 0);
         services.UseInMemoryDurableJobs();
 
         using var serviceProvider = services.BuildServiceProvider();

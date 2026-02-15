@@ -48,22 +48,22 @@ public sealed class DurableJobsOptions
     public Func<IJobRunContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
 
     /// <summary>
-    /// Gets or sets the maximum number of times a shard can be stolen from a dead owner before
+    /// Gets or sets the maximum number of times a shard can be adopted from a dead owner before
     /// being marked as poisoned. A shard that repeatedly causes silos to crash will exceed this
-    /// threshold as it bounces between owners. When the next steal would cause the stolen count
+    /// threshold as it bounces between owners. When the next adoption would cause the adopted count
     /// to exceed this value, the shard is considered poisoned and will no longer be assigned to any silo.
     /// Default: 3.
     /// </summary>
     /// <remarks>
     /// <para>
-    /// The stolen count is only incremented when a shard is taken from a dead silo (i.e., the previous
+    /// The adopted count is only incremented when a shard is taken from a dead silo (i.e., the previous
     /// owner crashed). It is NOT incremented when a silo gracefully shuts down and releases ownership.
     /// </para>
     /// <para>
-    /// When a shard completes successfully (all jobs processed), the stolen count is reset to 0.
+    /// When a shard completes successfully (all jobs processed), the adopted count is reset to 0.
     /// </para>
     /// </remarks>
-    public int MaxStolenCount { get; set; } = 3;
+    public int MaxAdoptedCount { get; set; } = 3;
 
     private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, Exception ex)
     {
@@ -99,9 +99,9 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShouldRetry must not be null.");
         }
-        if (options.MaxStolenCount < 0)
+        if (options.MaxAdoptedCount < 0)
         {
-            throw new OrleansConfigurationException("DurableJobsOptions.MaxStolenCount must be greater than or equal to zero.");
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxAdoptedCount must be greater than or equal to zero.");
         }
         _logger.LogInformation("DurableJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
     }

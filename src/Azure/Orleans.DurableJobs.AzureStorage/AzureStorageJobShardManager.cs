@@ -30,8 +30,10 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     private readonly DurableJobsOptions _durableJobsOptions;
     private long _shardCounter = 0; // For generating unique shard IDs
 
-    private const string StolenCountKey = "StolenCount";
-    private const string LastStolenTimeKey = "LastStolenTime";
+    private const string AdoptedCountKey = "AdoptedCount";
+    private const string LastAdoptedTimeKey = "LastAdoptedTime";
+    private const string LegacyStolenCountKey = "StolenCount";
+    private const string LegacyLastStolenTimeKey = "LastStolenTime";
 
     public AzureStorageJobShardManager(
         SiloAddress siloAddress,
@@ -120,15 +122,15 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 continue;
             }
 
-            // Determine if this is a stolen shard (taken from dead owner) vs orphaned (gracefully released)
-            var isStolen = owner is not null && ownerStatus == SiloStatus.Dead;
+            // Determine if this is an adopted shard (taken from dead owner) vs orphaned (gracefully released)
+            var isAdopted = owner is not null && ownerStatus == SiloStatus.Dead;
 
-            // Try to claim orphaned or stolen shard
+            // Try to claim orphaned or adopted shard
             LogClaimingShard(_logger, blob.Name, SiloAddress, owner);
             var blobClient = _client.GetAppendBlobClient(blob.Name);
             var metadata = blob.Metadata;
             var orphanedShard = new AzureStorageJobShard(blob.Name, shardStartTime, maxDueTime, blobClient, metadata, blob.Properties.ETag, _options, _loggerFactory.CreateLogger<AzureStorageJobShard>());
-            if (!await TryTakeOwnership(orphanedShard, metadata, SiloAddress, isStolen, cancellationToken))
+            if (!await TryTakeOwnership(orphanedShard, metadata, SiloAddress, isAdopted, cancellationToken))
             {
                 // Either poisoned shard or someone else took ownership - dispose and continue
                 await orphanedShard.DisposeAsync();
@@ -153,9 +155,11 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                 var properties = await blobClient.GetPropertiesAsync(cancellationToken: cancellationToken);
                 var metadata = properties.Value.Metadata;
                 metadata.Remove("Owner");
-                // Reset stolen count since we're gracefully releasing
-                metadata.Remove(StolenCountKey);
-                metadata.Remove(LastStolenTimeKey);
+                // Reset adopted count since we're gracefully releasing
+                metadata.Remove(AdoptedCountKey);
+                metadata.Remove(LastAdoptedTimeKey);
+                metadata.Remove(LegacyStolenCountKey);
+                metadata.Remove(LegacyLastStolenTimeKey);
                 await blobClient.SetMetadataAsync(metadata, new BlobRequestConditions { IfMatch = properties.Value.ETag }, cancellationToken);
             }
             catch (Exception ex)
@@ -165,24 +169,23 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             }
         }
 
-        async Task<bool> TryTakeOwnership(AzureStorageJobShard shard, IDictionary<string, string> metadata, SiloAddress newOwner, bool isStolen, CancellationToken ct)
+        async Task<bool> TryTakeOwnership(AzureStorageJobShard shard, IDictionary<string, string> metadata, SiloAddress newOwner, bool isAdopted, CancellationToken ct)
         {
-            if (isStolen)
+            if (isAdopted)
             {
-                var existingStolenCount = GetStolenCount(metadata);
-                if (existingStolenCount > _durableJobsOptions.MaxStolenCount)
+                var existingAdoptedCount = GetAdoptedCount(metadata);
+                if (existingAdoptedCount > _durableJobsOptions.MaxAdoptedCount)
                 {
                     // Already marked as poisoned.
                     return false;
                 }
 
-                // Increment stolen count for shards taken from dead owners.
-                var stolenCount = existingStolenCount + 1;
-                if (stolenCount > _durableJobsOptions.MaxStolenCount)
+                // Increment adopted count for shards taken from dead owners.
+                var adoptedCount = existingAdoptedCount + 1;
+                if (adoptedCount > _durableJobsOptions.MaxAdoptedCount)
                 {
                     // Persist poisoned marker so this shard is not repeatedly re-evaluated as newly poisoned.
-                    metadata[StolenCountKey] = stolenCount.ToString(CultureInfo.InvariantCulture);
-                    metadata[LastStolenTimeKey] = DateTimeOffset.UtcNow.ToString("o", CultureInfo.InvariantCulture);
+                    SetAdoptedMetadata(metadata, adoptedCount, DateTimeOffset.UtcNow);
                     try
                     {
                         await shard.UpdateBlobMetadata(metadata, ct);
@@ -192,13 +195,12 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
                         LogOwnershipFailed(_logger, ex, shard.Id, newOwner);
                     }
 
-                    LogPoisonedShardDetected(_logger, shard.Id, stolenCount, _durableJobsOptions.MaxStolenCount);
+                    LogPoisonedShardDetected(_logger, shard.Id, adoptedCount, _durableJobsOptions.MaxAdoptedCount);
                     return false;
                 }
 
-                metadata[StolenCountKey] = stolenCount.ToString(CultureInfo.InvariantCulture);
-                metadata[LastStolenTimeKey] = DateTimeOffset.UtcNow.ToString("o");
-                LogShardStolen(_logger, shard.Id, newOwner, stolenCount);
+                SetAdoptedMetadata(metadata, adoptedCount, DateTimeOffset.UtcNow);
+                LogShardAdopted(_logger, shard.Id, newOwner, adoptedCount);
             }
 
             metadata["Owner"] = newOwner.ToParsableString();
@@ -218,12 +220,26 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             }
         }
 
-        static int GetStolenCount(IDictionary<string, string> metadata)
+        static int GetAdoptedCount(IDictionary<string, string> metadata)
         {
-            return metadata.TryGetValue(StolenCountKey, out var countStr)
-                   && int.TryParse(countStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var count)
-                ? count
+            if (metadata.TryGetValue(AdoptedCountKey, out var countStr)
+                   && int.TryParse(countStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var adoptedCount))
+            {
+                return adoptedCount;
+            }
+
+            return metadata.TryGetValue(LegacyStolenCountKey, out countStr)
+                   && int.TryParse(countStr, NumberStyles.Integer, CultureInfo.InvariantCulture, out var legacyCount)
+                ? legacyCount
                 : 0;
+        }
+
+        static void SetAdoptedMetadata(IDictionary<string, string> metadata, int adoptedCount, DateTimeOffset adoptedTime)
+        {
+            metadata[AdoptedCountKey] = adoptedCount.ToString(CultureInfo.InvariantCulture);
+            metadata[LastAdoptedTimeKey] = adoptedTime.ToString("o", CultureInfo.InvariantCulture);
+            metadata.Remove(LegacyStolenCountKey);
+            metadata.Remove(LegacyLastStolenTimeKey);
         }
     }
 
@@ -299,9 +315,11 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         {
             // There are still jobs in the shard, release ownership gracefully.
             metadata.Remove("Owner");
-            // Reset stolen count since we're gracefully releasing (not crashing)
-            metadata.Remove(StolenCountKey);
-            metadata.Remove(LastStolenTimeKey);
+            // Reset adopted count since we're gracefully releasing (not crashing)
+            metadata.Remove(AdoptedCountKey);
+            metadata.Remove(LastAdoptedTimeKey);
+            metadata.Remove(LegacyStolenCountKey);
+            metadata.Remove(LegacyLastStolenTimeKey);
             await azureShard.BlobClient.SetMetadataAsync(metadata, conditions, cancellationToken);
             _jobShardCache.TryRemove(shard.Id, out _);
             LogShardOwnershipReleased(_logger, shard.Id, SiloAddress, count);
@@ -473,13 +491,13 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Poisoned shard detected: '{ShardId}' has been stolen {StolenCount} times (max allowed: {MaxStolenCount}). Shard will not be assigned."
+        Message = "Poisoned shard detected: '{ShardId}' has been adopted {AdoptedCount} times (max allowed: {MaxAdoptedCount}). Shard will not be assigned."
     )]
-    private static partial void LogPoisonedShardDetected(ILogger logger, string shardId, int stolenCount, int maxStolenCount);
+    private static partial void LogPoisonedShardDetected(ILogger logger, string shardId, int adoptedCount, int maxAdoptedCount);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Shard '{ShardId}' stolen by silo {SiloAddress} (stolen count: {StolenCount})"
+        Message = "Shard '{ShardId}' adopted by silo {SiloAddress} (adopted count: {AdoptedCount})"
     )]
-    private static partial void LogShardStolen(ILogger logger, string shardId, SiloAddress siloAddress, int stolenCount);
+    private static partial void LogShardAdopted(ILogger logger, string shardId, SiloAddress siloAddress, int adoptedCount);
 }

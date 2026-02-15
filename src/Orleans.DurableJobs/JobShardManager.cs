@@ -60,7 +60,7 @@ internal class InMemoryJobShardManager : JobShardManager
     private static readonly Dictionary<string, ShardOwnership> _globalShardStore = new();
     private static readonly SemaphoreSlim _asyncLock = new(1, 1);
     private readonly IClusterMembershipService? _membershipService;
-    private readonly int _maxStolenCount;
+    private readonly int _maxAdoptedCount;
 
     public InMemoryJobShardManager(SiloAddress siloAddress) : this(siloAddress, null, 3)
     {
@@ -70,10 +70,10 @@ internal class InMemoryJobShardManager : JobShardManager
     {
     }
 
-    public InMemoryJobShardManager(SiloAddress siloAddress, IClusterMembershipService? membershipService, int maxStolenCount) : base(siloAddress)
+    public InMemoryJobShardManager(SiloAddress siloAddress, IClusterMembershipService? membershipService, int maxAdoptedCount) : base(siloAddress)
     {
         _membershipService = membershipService;
-        _maxStolenCount = maxStolenCount;
+        _maxAdoptedCount = maxAdoptedCount;
     }
 
     /// <summary>
@@ -95,14 +95,14 @@ internal class InMemoryJobShardManager : JobShardManager
     /// <summary>
     /// Gets ownership info for a shard. For testing purposes only.
     /// </summary>
-    internal static async Task<(string? Owner, int StolenCount)?> GetOwnershipInfoAsync(string shardId)
+    internal static async Task<(string? Owner, int AdoptedCount)?> GetOwnershipInfoAsync(string shardId)
     {
         await _asyncLock.WaitAsync();
         try
         {
             if (_globalShardStore.TryGetValue(shardId, out var ownership))
             {
-                return (ownership.OwnerSiloAddress, ownership.StolenCount);
+                return (ownership.OwnerSiloAddress, ownership.AdoptedCount);
             }
             return null;
         }
@@ -115,7 +115,7 @@ internal class InMemoryJobShardManager : JobShardManager
     public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
     {
         var alreadyOwnedShards = new List<IJobShard>();
-        var stolenShards = new List<IJobShard>();
+        var adoptedShards = new List<IJobShard>();
         
         await _asyncLock.WaitAsync(cancellationToken);
         try
@@ -150,7 +150,7 @@ internal class InMemoryJobShardManager : JobShardManager
                     continue;
                 }
 
-                // Check if this is an orphaned shard (gracefully released) or stolen (from dead silo)
+                // Check if this is an orphaned shard (gracefully released) or adopted (from dead silo)
                 var isOrphaned = ownership.OwnerSiloAddress is null;
                 var ownerAddress = ownership.OwnerSiloAddress;
                 var isFromDeadSilo = ownerAddress is not null && deadSilos.Contains(ownerAddress);
@@ -159,13 +159,13 @@ internal class InMemoryJobShardManager : JobShardManager
                 {
                     if (ownership.Shard.StartTime <= maxDueTime)
                     {
-                        // If stolen from dead silo, increment stolen count
+                        // If adopted from dead silo, increment adopted count
                         if (isFromDeadSilo)
                         {
-                            ownership.StolenCount++;
+                            ownership.AdoptedCount++;
 
                             // Check if shard is poisoned
-                            if (ownership.StolenCount > _maxStolenCount)
+                            if (ownership.AdoptedCount > _maxAdoptedCount)
                             {
                                 // Shard is poisoned - don't assign it
                                 continue;
@@ -173,7 +173,7 @@ internal class InMemoryJobShardManager : JobShardManager
                         }
 
                         ownership.OwnerSiloAddress = SiloAddress.ToString();
-                        stolenShards.Add(ownership.Shard);
+                        adoptedShards.Add(ownership.Shard);
                     }
                 }
             }
@@ -183,13 +183,13 @@ internal class InMemoryJobShardManager : JobShardManager
             _asyncLock.Release();
         }
 
-        foreach (var shard in stolenShards)
+        foreach (var shard in adoptedShards)
         {
-            // Mark stolen shards as complete
+            // Mark adopted shards as complete
             await shard.MarkAsCompleteAsync(CancellationToken.None);
         }
 
-        return [.. alreadyOwnedShards, .. stolenShards];
+        return [.. alreadyOwnedShards, .. adoptedShards];
     }
 
     public override async Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
@@ -232,8 +232,8 @@ internal class InMemoryJobShardManager : JobShardManager
                 {
                     // Mark as unowned so another silo can pick it up
                     ownership.OwnerSiloAddress = null;
-                    // Reset stolen count since we're gracefully releasing (not crashing)
-                    ownership.StolenCount = 0;
+                    // Reset adopted count since we're gracefully releasing (not crashing)
+                    ownership.AdoptedCount = 0;
                 }
             }
         }
@@ -247,6 +247,6 @@ internal class InMemoryJobShardManager : JobShardManager
     {
         public required IJobShard Shard { get; init; }
         public string? OwnerSiloAddress { get; set; }
-        public int StolenCount { get; set; }
+        public int AdoptedCount { get; set; }
     }
 }
