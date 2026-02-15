@@ -247,7 +247,7 @@ namespace Orleans.Storage
 
 namespace OrleansCodeGen.Orleans.Storage
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_TableStorageUpdateConditionNotSatisfiedException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -265,7 +265,7 @@ namespace OrleansCodeGen.Orleans.Storage
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_TableStorageUpdateConditionNotSatisfiedException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Storage.TableStorageUpdateConditionNotSatisfiedException, global::Orleans.Storage.InconsistentStateException>
