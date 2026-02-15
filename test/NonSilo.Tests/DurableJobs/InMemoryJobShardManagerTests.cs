@@ -2,7 +2,9 @@
 
 using System.Collections.Immutable;
 using System.Net;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.DurableJobs;
+using Orleans.Hosting;
 using Orleans.Runtime;
 using NSubstitute;
 using Xunit;
@@ -146,6 +148,32 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
 
         // Shard should not be assigned (stolen count would be 1, exceeds max of 0)
+        Assert.Empty(assignedShards);
+    }
+
+    [Fact]
+    public async Task UseInMemoryDurableJobs_ConfiguredMaxStolenCount_IsApplied()
+    {
+        var membershipService = CreateMembershipService(deadSilos: [Silo2]);
+        var minDueTime = DateTimeOffset.UtcNow;
+        var maxDueTime = minDueTime.AddHours(1);
+
+        var ownerManager = new InMemoryJobShardManager(Silo2, membershipService, maxStolenCount: 3);
+        await ownerManager.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
+
+        var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+        localSiloDetails.SiloAddress.Returns(Silo1);
+
+        var services = new ServiceCollection();
+        services.AddSingleton(localSiloDetails);
+        services.AddSingleton(membershipService);
+        services.Configure<DurableJobsOptions>(options => options.MaxStolenCount = 0);
+        services.UseInMemoryDurableJobs();
+
+        using var serviceProvider = services.BuildServiceProvider();
+        var manager = serviceProvider.GetRequiredService<InMemoryJobShardManager>();
+
+        var assignedShards = await manager.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
         Assert.Empty(assignedShards);
     }
 
