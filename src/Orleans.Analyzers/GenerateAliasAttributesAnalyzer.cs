@@ -56,7 +56,11 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
             if (!symbol.HasAttribute(aliasAttributeSymbol))
             {
-                var interfaceDeclaration = (InterfaceDeclarationSyntax)symbol.DeclaringSyntaxReferences[0].GetSyntax();
+                if (!TryGetDeclarationSyntax(symbol, out InterfaceDeclarationSyntax interfaceDeclaration))
+                {
+                    return;
+                }
+
                 ReportFor(
                     context,
                     interfaceDeclaration.GetLocation(),
@@ -74,7 +78,12 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
 
                 if (!methodSymbol.HasAttribute(aliasAttributeSymbol))
                 {
-                    ReportFor(context, methodSymbol.DeclaringSyntaxReferences[0].GetSyntax().GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
+                    if (!TryGetDeclarationSyntax(methodSymbol, out MethodDeclarationSyntax methodDeclaration))
+                    {
+                        continue;
+                    }
+
+                    ReportFor(context, methodDeclaration.GetLocation(), methodSymbol.Name, arity: 0, namespaceAndNesting: null);
                 }
             }
 
@@ -99,7 +108,11 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
                 return;
             }
 
-            var typeDeclaration = (TypeDeclarationSyntax)symbol.DeclaringSyntaxReferences[0].GetSyntax();
+            if (!TryGetDeclarationSyntax(symbol, out TypeDeclarationSyntax typeDeclaration))
+            {
+                return;
+            }
+
             ReportFor(
                 context,
                 typeDeclaration.GetLocation(),
@@ -153,6 +166,13 @@ public class GenerateAliasAttributesAnalyzer : DiagnosticAnalyzer
         }
 
         return sb.ToString();
+    }
+
+    private static bool TryGetDeclarationSyntax<TSyntax>(ISymbol symbol, out TSyntax syntax)
+        where TSyntax : SyntaxNode
+    {
+        syntax = symbol.DeclaringSyntaxReferences.FirstOrDefault()?.GetSyntax() as TSyntax;
+        return syntax is not null;
     }
 
     private static void ReportFor(SymbolAnalysisContext context, Location location, string typeName, int arity, string namespaceAndNesting)
