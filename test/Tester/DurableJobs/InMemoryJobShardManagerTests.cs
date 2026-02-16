@@ -1,3 +1,5 @@
+using System;
+using System.Threading;
 using System.Threading.Tasks;
 using Xunit;
 
@@ -24,35 +26,79 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
     public Task DisposeAsync() => _fixture.DisposeAsync().AsTask();
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_ShardCreationAndAssignment() => _runner.ShardCreationAndAssignment();
+    public async Task InMemoryJobShardManager_ShardCreationAndAssignment()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardCreationAndAssignment(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_ReadFrozenShard() => _runner.ReadFrozenShard();
+    public async Task InMemoryJobShardManager_ReadFrozenShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ReadFrozenShard(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_LiveShard() => _runner.LiveShard();
+    public async Task InMemoryJobShardManager_LiveShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.LiveShard(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_JobMetadata() => _runner.JobMetadata();
+    public async Task InMemoryJobShardManager_JobMetadata()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobMetadata(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_ConcurrentShardAssignment_OwnershipConflicts() => _runner.ConcurrentShardAssignment_OwnershipConflicts();
+    public async Task InMemoryJobShardManager_ConcurrentShardAssignment_OwnershipConflicts()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ConcurrentShardAssignment_OwnershipConflicts(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_ShardMetadataMerge() => _runner.ShardMetadataMerge();
+    public async Task InMemoryJobShardManager_ShardMetadataMerge()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardMetadataMerge(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_StopProcessingShard() => _runner.StopProcessingShard();
+    public async Task InMemoryJobShardManager_StopProcessingShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.StopProcessingShard(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_RetryJobLater() => _runner.RetryJobLater();
+    public async Task InMemoryJobShardManager_RetryJobLater()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.RetryJobLater(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_JobCancellation() => _runner.JobCancellation();
+    public async Task InMemoryJobShardManager_JobCancellation()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobCancellation(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_ShardRegistrationRetry_IdCollisions() => _runner.ShardRegistrationRetry_IdCollisions();
+    public async Task InMemoryJobShardManager_ShardRegistrationRetry_IdCollisions()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardRegistrationRetry_IdCollisions(cts.Token);
+    }
 
     [SkippableFact]
-    public Task InMemoryJobShardManager_UnregisterShard_WithJobsRemaining() => _runner.UnregisterShard_WithJobsRemaining();
+    public async Task InMemoryJobShardManager_UnregisterShard_WithJobsRemaining()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.UnregisterShard_WithJobsRemaining(cts.Token);
+    }
 }
