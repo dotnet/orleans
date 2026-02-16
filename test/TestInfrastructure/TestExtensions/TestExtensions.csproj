@@ -14,7 +14,6 @@
     <PackageReference Include="xunit.extensibility.execution" />
     <PackageReference Include="Xunit.SkippableFact" />
     <PackageReference Include="AwesomeAssertions" />
-    <PackageReference Include="Azure.Identity" />
     <PackageReference Include="Testcontainers.Azurite" />
   </ItemGroup>
 

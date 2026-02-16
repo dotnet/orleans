@@ -1,6 +1,6 @@
 using System.Diagnostics;
-using System.Net;
 using Orleans.Runtime;
+using TestExtensions;
 using Xunit;
 using static TestExtensions.TestDefaultConfiguration;
 
@@ -12,23 +12,6 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            if (UseAadAuthentication)
-            {
-                if (TableEndpoint is null)
-                {
-                    throw new SkipException("No connection string found. Skipping");
-                }
-
-                return;
-            }
-
-            // If a connection string is explicitly configured (e.g. real Azure), use it as-is.
-            if (!string.IsNullOrWhiteSpace(DataConnectionString)
-                && !string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
             // Start Azurite via Testcontainers (or reuse an already-running instance).
             if (!AzuriteContainerManager.EnsureStartedAsync().GetAwaiter().GetResult())
             {
@@ -38,8 +21,7 @@ namespace Tester
 
         public static void CheckForEventHub()
         {
-            if ((UseAadAuthentication && (EventHubFullyQualifiedNamespace == null)) ||
-                (!UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubConnectionString)))
+            if (string.IsNullOrWhiteSpace(EventHubConnectionString))
             {
                 throw new SkipException("No connection string found. Skipping");
             }

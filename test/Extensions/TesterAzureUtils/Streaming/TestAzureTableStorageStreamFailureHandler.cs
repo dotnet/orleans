@@ -1,5 +1,4 @@
 using Azure.Data.Tables;
-using Azure.Identity;
 using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Persistence.AzureStorage;
 using Orleans.Providers.Streams.PersistentStreams;
@@ -32,14 +31,7 @@ namespace Tester.AzureUtils.Streaming
         private static AzureTableDataManager<TableEntity> GetDataManager()
         {
             var options = new AzureStorageOperationOptions { TableName = TableName };
-            if (TestDefaultConfiguration.UseAadAuthentication)
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential);
-            }
-            else
-            {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-            }
+            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
             return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
         }
     }

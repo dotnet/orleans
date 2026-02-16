@@ -7,7 +7,6 @@ using Tester;
 
 using Orleans.Configuration;
 using Azure.Data.Tables;
-using Azure.Identity;
 
 namespace Tests.GeoClusterTests
 {
@@ -51,9 +50,7 @@ namespace Tests.GeoClusterTests
 
                 private static TableServiceClient GetTableServiceClient()
                 {
-                    return TestDefaultConfiguration.UseAadAuthentication
-                        ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
-                        : new(TestDefaultConfiguration.DataConnectionString);
+                    return new(TestDefaultConfiguration.DataConnectionString);
                 }
             }
         }
