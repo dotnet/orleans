@@ -9,7 +9,9 @@ namespace TestExtensions;
 /// </summary>
 public static class AzuriteContainerManager
 {
-    private static readonly AzuriteContainer _container = new AzuriteBuilder().Build();
+    private static readonly AzuriteContainer _container = new AzuriteBuilder()
+        .WithImage("mcr.microsoft.com/azure-storage/azurite:3.35.0")
+        .Build();
 
     /// <summary>
     /// Gets the connection string for the running Azurite container.
