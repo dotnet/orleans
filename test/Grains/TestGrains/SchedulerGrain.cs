@@ -34,12 +34,14 @@ public class SchedulerGrain : Grain, ISchedulerGrain
             targetGrainKey,
             this.GetPrimaryKeyString());
 
-        var job = await _localDurableJobManager.ScheduleJobAsync(
-            targetGrainId,
-            jobName,
-            scheduledTime,
-            null,
-            CancellationToken.None);
+        var request = new ScheduleJobRequest
+        {
+            Target = targetGrainId,
+            JobName = jobName,
+            DueTime = scheduledTime,
+            Metadata = null
+        };
+        var job = await _localDurableJobManager.ScheduleJobAsync(request, CancellationToken.None);
 
         return job;
     }
