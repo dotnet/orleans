@@ -290,7 +290,8 @@ public static class ServiceCollectionExtensions
         {
             if (opts.Value.HideTrace)
             {
-                return Results.StatusCode(StatusCodes.Status403Forbidden);
+                return Results.Problem("The trace endpoint is disabled in the dashboard options.",
+                    title: "Trace Endpoint Disabled", statusCode: StatusCodes.Status403Forbidden);
             }
 
             await StreamTraceAsync(context, logger);
