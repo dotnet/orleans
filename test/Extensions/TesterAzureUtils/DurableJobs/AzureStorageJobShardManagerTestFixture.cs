@@ -19,10 +19,12 @@ namespace Orleans.Tests.DurableJobs.AzureStorage;
 internal sealed class AzureStorageJobShardManagerTestFixture : IJobShardManagerTestFixture
 {
     private readonly IOptions<AzureStorageJobShardOptions> _storageOptions;
+    private readonly IOptions<DurableJobsOptions> _durableJobsOptions;
 
     public AzureStorageJobShardManagerTestFixture()
     {
         _storageOptions = Options.Create(new AzureStorageJobShardOptions());
+        _durableJobsOptions = Options.Create(new DurableJobsOptions());
         _storageOptions.Value.ConfigureTestDefaults();
         _storageOptions.Value.ContainerName = "test-container-" + Guid.NewGuid().ToString("N");
     }
@@ -32,6 +34,7 @@ internal sealed class AzureStorageJobShardManagerTestFixture : IJobShardManagerT
         return new AzureStorageJobShardManager(
             localSiloDetails,
             _storageOptions,
+            _durableJobsOptions,
             membershipService,
             NullLoggerFactory.Instance);
     }

@@ -47,6 +47,24 @@ public sealed class DurableJobsOptions
     /// </summary>
     public Func<IJobRunContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
 
+    /// <summary>
+    /// Gets or sets the maximum number of times a shard can be adopted from a dead owner before
+    /// being marked as poisoned. A shard that repeatedly causes silos to crash will exceed this
+    /// threshold as it bounces between owners. When the next adoption would cause the adopted count
+    /// to exceed this value, the shard is considered poisoned and will no longer be assigned to any silo.
+    /// Default: 3.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The adopted count is only incremented when a shard is taken from a dead silo (i.e., the previous
+    /// owner crashed). It is NOT incremented when a silo gracefully shuts down and releases ownership.
+    /// </para>
+    /// <para>
+    /// When a shard completes successfully (all jobs processed), the adopted count is reset to 0.
+    /// </para>
+    /// </remarks>
+    public int MaxAdoptedCount { get; set; } = 3;
+
     private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, Exception ex)
     {
         // Default retry logic: retry up to 5 times with exponential backoff
@@ -80,6 +98,10 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         if (options.ShouldRetry == null)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShouldRetry must not be null.");
+        }
+        if (options.MaxAdoptedCount < 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxAdoptedCount must be greater than or equal to zero.");
         }
         _logger.LogInformation("DurableJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
     }
