@@ -72,7 +72,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         LogAssigningShards(_logger, SiloAddress, maxShardStartTime, _containerName);
 
         var result = new List<Orleans.DurableJobs.IJobShard>();
-        await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, cancellationToken: cancellationToken, prefix: _blobPrefix))
+        await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, states: BlobStates.None, cancellationToken: cancellationToken, prefix: _blobPrefix))
         {
             // Get the owner and creator of the shard
             var (owner, membershipVersion, shardStartTime, maxDueTime) = ParseMetadata(blob.Metadata);

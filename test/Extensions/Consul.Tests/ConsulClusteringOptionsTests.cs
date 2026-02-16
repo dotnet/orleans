@@ -92,6 +92,8 @@ namespace Consul.Tests
 
             public ICatalogEndpoint Catalog => throw new NotImplementedException();
 
+            public Consul.Interfaces.IConfigurationEndpoint Configuration => throw new NotImplementedException();
+
             public IEventEndpoint Event => throw new NotImplementedException();
 
             public IHealthEndpoint Health => throw new NotImplementedException();
@@ -111,6 +113,8 @@ namespace Consul.Tests
             public ICoordinateEndpoint Coordinate => throw new NotImplementedException();
 
             public ISnapshotEndpoint Snapshot => throw new NotImplementedException();
+
+            public Consul.Interfaces.IDiscoveryChainEndpoint DiscoveryChain => throw new NotImplementedException();
 
             public Task<IDistributedLock> AcquireLock(LockOptions opts, CancellationToken ct = default) => throw new NotImplementedException();
             public Task<IDistributedLock> AcquireLock(string key, CancellationToken ct = default) => throw new NotImplementedException();
