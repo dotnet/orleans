@@ -201,7 +201,26 @@ namespace Orleans.Runtime.Configuration
                     }
                 }
             }
-            if (candidates.Count > 0) return PickIPAddress(candidates);
+            return ResolveLocalIPAddress(candidates, family, interfaceName);
+        }
+
+        internal static IPAddress ResolveLocalIPAddress(IReadOnlyList<IPAddress> candidates, AddressFamily family, string interfaceName)
+        {
+            if (candidates.Count > 0)
+            {
+                return PickIPAddress(candidates);
+            }
+
+            if (string.IsNullOrWhiteSpace(interfaceName))
+            {
+                return family switch
+                {
+                    AddressFamily.InterNetwork => IPAddress.Loopback,
+                    AddressFamily.InterNetworkV6 => IPAddress.IPv6Loopback,
+                    _ => throw new OrleansException("Failed to get a local IP address."),
+                };
+            }
+
             throw new OrleansException("Failed to get a local IP address.");
         }
 

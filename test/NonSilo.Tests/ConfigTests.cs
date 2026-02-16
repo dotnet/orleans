@@ -1,3 +1,5 @@
+using System.Net;
+using System.Net.Sockets;
 using Orleans.Runtime.Configuration;
 using Xunit;
 using Xunit.Abstractions;
@@ -51,6 +53,26 @@ namespace UnitTests
             output.WriteLine("Output = " + sqlConnectionString);
             Assert.True(sqlConnectionString.EndsWith("Password=<--SNIP-->", StringComparison.InvariantCultureIgnoreCase),
                 "Removed password info from SqlServer connection string " + sqlConnectionString);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_LocalIPAddressFallback_UsesIPv4Loopback()
+        {
+            var result = ConfigUtilities.ResolveLocalIPAddress(Array.Empty<IPAddress>(), AddressFamily.InterNetwork, interfaceName: null);
+            Assert.Equal(IPAddress.Loopback, result);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_LocalIPAddressFallback_UsesIPv6Loopback()
+        {
+            var result = ConfigUtilities.ResolveLocalIPAddress(Array.Empty<IPAddress>(), AddressFamily.InterNetworkV6, interfaceName: null);
+            Assert.Equal(IPAddress.IPv6Loopback, result);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Config")]
+        public void Config_LocalIPAddressFallback_ThrowsForExplicitInterface()
+        {
+            Assert.Throws<Orleans.Runtime.OrleansException>(() => ConfigUtilities.ResolveLocalIPAddress(Array.Empty<IPAddress>(), AddressFamily.InterNetwork, "en0"));
         }
     }
 }
