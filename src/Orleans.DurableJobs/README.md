@@ -142,10 +142,14 @@ public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
         };
 
         _durableJob = await _jobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            "SendNotification",
-            sendTime,
-            metadata);
+            new ScheduleJobRequest
+            {
+                Target = this.GetGrainId(),
+                JobName = "SendNotification",
+                DueTime = sendTime,
+                Metadata = metadata
+            },
+            CancellationToken.None);
 
         _logger.LogInformation(
             "Scheduled notification for user {UserId} at {SendTime} (JobId: {JobId})",
@@ -225,26 +229,34 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         // Schedule delivery reminder for 24 hours before delivery
         var reminderTime = details.DeliveryDate.AddHours(-24);
         await _jobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            "DeliveryReminder",
-            reminderTime,
-            new Dictionary<string, string>
+            new ScheduleJobRequest
             {
-                ["Step"] = "DeliveryReminder",
-                ["CustomerId"] = details.CustomerId,
-                ["OrderNumber"] = details.OrderNumber
-            });
+                Target = this.GetGrainId(),
+                JobName = "DeliveryReminder",
+                DueTime = reminderTime,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["Step"] = "DeliveryReminder",
+                    ["CustomerId"] = details.CustomerId,
+                    ["OrderNumber"] = details.OrderNumber
+                }
+            },
+            CancellationToken.None);
 
         // Schedule order expiration if payment not received
         var expirationTime = DateTimeOffset.UtcNow.AddHours(24);
         await _jobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            "OrderExpiration",
-            expirationTime,
-            new Dictionary<string, string>
+            new ScheduleJobRequest
             {
-                ["Step"] = "OrderExpiration"
-            });
+                Target = this.GetGrainId(),
+                JobName = "OrderExpiration",
+                DueTime = expirationTime,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["Step"] = "OrderExpiration"
+                }
+            },
+            CancellationToken.None);
     }
 
     public async Task CancelOrder()
@@ -340,9 +352,14 @@ public class WorkflowGrain : Grain, IDurableJobHandler
     public async Task<IDurableJob> ScheduleWorkflowStep(string stepName, DateTimeOffset executeAt)
     {
         var job = await _jobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            stepName,
-            executeAt);
+            new ScheduleJobRequest
+            {
+                Target = this.GetGrainId(),
+                JobName = stepName,
+                DueTime = executeAt,
+                Metadata = null
+            },
+            CancellationToken.None);
 
         _pendingJobs[job.Id] = new TaskCompletionSource();
         return job;

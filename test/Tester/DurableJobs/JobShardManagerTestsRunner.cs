@@ -120,10 +120,10 @@ public class JobShardManagerTestsRunner
         var shard1 = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
 
         // Schedule some jobs
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", date.AddSeconds(1), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", date.AddSeconds(3), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", date.AddSeconds(2), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", date.AddSeconds(4), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = date.AddSeconds(1), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job3", DueTime = date.AddSeconds(3), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job2", DueTime = date.AddSeconds(2), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job4", DueTime = date.AddSeconds(4), Metadata = null }, cancellationToken);
 
         // Mark the silo1 as dead, and create a new incarnation
         SetSiloStatus(silo1Address, SiloStatus.Dead);
@@ -162,11 +162,11 @@ public class JobShardManagerTestsRunner
         var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule some jobs
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job0", startTime.AddSeconds(1), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job2", startTime.AddSeconds(3), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job1", startTime.AddSeconds(2), null, cancellationToken);
-        var lastJob = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", startTime.AddSeconds(4), null, cancellationToken);
-        var jobToCancel = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", startTime.AddSeconds(5), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job0", DueTime = startTime.AddSeconds(1), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job2", DueTime = startTime.AddSeconds(3), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job1", DueTime = startTime.AddSeconds(2), Metadata = null }, cancellationToken);
+        var lastJob = await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job3", DueTime = startTime.AddSeconds(4), Metadata = null }, cancellationToken);
+        var jobToCancel = await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job4", DueTime = startTime.AddSeconds(5), Metadata = null }, cancellationToken);
 
         var counter = 0;
         await shard1.MarkAsCompleteAsync(cancellationToken);
@@ -215,9 +215,9 @@ public class JobShardManagerTestsRunner
             { "Category", "Notification" }
         };
 
-        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), jobMetadata1, cancellationToken);
-        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(2), jobMetadata2, cancellationToken);
-        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddSeconds(3), null, cancellationToken);
+        var job1 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddSeconds(1), Metadata = jobMetadata1 }, cancellationToken);
+        var job2 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job2", DueTime = DateTime.UtcNow.AddSeconds(2), Metadata = jobMetadata2 }, cancellationToken);
+        var job3 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target3"), JobName = "job3", DueTime = DateTime.UtcNow.AddSeconds(3), Metadata = null }, cancellationToken);
 
         // Verify metadata is set on the durable jobs
         Assert.Equal(jobMetadata1, job1.Metadata);
@@ -330,7 +330,7 @@ public class JobShardManagerTestsRunner
         });
 
         // Schedule a job to ensure shard persistence
-        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, cancellationToken);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddSeconds(5), Metadata = null }, cancellationToken);
 
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
@@ -360,10 +360,10 @@ public class JobShardManagerTestsRunner
         var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule some jobs
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(5), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job3", DateTime.UtcNow.AddSeconds(10), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(6), null, cancellationToken);
-        await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job4", DateTime.UtcNow.AddSeconds(15), null, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddSeconds(5), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job3", DueTime = DateTime.UtcNow.AddSeconds(10), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job2", DueTime = DateTime.UtcNow.AddSeconds(6), Metadata = null }, cancellationToken);
+        await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job4", DueTime = DateTime.UtcNow.AddSeconds(15), Metadata = null }, cancellationToken);
 
         var counter = 1;
         await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
@@ -394,8 +394,9 @@ public class JobShardManagerTestsRunner
         var shard1 = await manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule a job
-        var job = await shard1.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), null, cancellationToken);
-        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cancellationToken))
+        var job = await shard1.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddSeconds(1), Metadata = null }, cancellationToken);
+        var cts = new CancellationTokenSource(TimeSpan.FromSeconds(40));
+        await foreach (var jobCtx in shard1.ConsumeDurableJobsAsync().WithCancellation(cts.Token))
         {
             Assert.Equal("job1", jobCtx.Job.Name);
             var newDueTime = DateTimeOffset.UtcNow.AddSeconds(1);
@@ -433,10 +434,10 @@ public class JobShardManagerTestsRunner
         var shard = await silo1Manager.CreateShardAsync(date, date.AddYears(1), _testMetadata, cancellationToken);
 
         // Schedule multiple jobs in a single shard
-        var job1 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddMilliseconds(500), null, cancellationToken);
-        var job2 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddMilliseconds(1000), null, cancellationToken);
-        var job3 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", DateTime.UtcNow.AddMilliseconds(1500), null, cancellationToken);
-        var job4 = await shard.TryScheduleJobAsync(GrainId.Create("type", "target4"), "job4", DateTime.UtcNow.AddMilliseconds(2000), null, cancellationToken);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddMilliseconds(500), Metadata = null }, cancellationToken);
+        var job2 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job2", DueTime = DateTime.UtcNow.AddMilliseconds(1000), Metadata = null }, cancellationToken);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target3"), JobName = "job3", DueTime = DateTime.UtcNow.AddMilliseconds(1500), Metadata = null }, cancellationToken);
+        var job4 = await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target4"), JobName = "job4", DueTime = DateTime.UtcNow.AddMilliseconds(2000), Metadata = null }, cancellationToken);
 
         // Cancel job2 before processing starts
         await shard.RemoveJobAsync(job2.Id, cancellationToken);
@@ -526,8 +527,8 @@ public class JobShardManagerTestsRunner
         var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
 
         // Create a shard on silo1, schedule some jobs, then unregister the shard
-        await shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", DateTime.UtcNow.AddSeconds(1), null, cancellationToken);
-        await shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", DateTime.UtcNow.AddSeconds(2), null, cancellationToken);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = DateTime.UtcNow.AddSeconds(1), Metadata = null }, cancellationToken);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job2", DueTime = DateTime.UtcNow.AddSeconds(2), Metadata = null }, cancellationToken);
 
         await silo1Manager.UnregisterShardAsync(shard, cancellationToken);
 

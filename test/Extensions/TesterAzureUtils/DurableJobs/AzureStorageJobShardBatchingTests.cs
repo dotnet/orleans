@@ -101,7 +101,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var tasks = new List<Task>();
         for (int i = 0; i < 10; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", date.AddMilliseconds(i*10), null, cancellationToken));
+            tasks.Add(shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", $"target{i}"), JobName = $"job{i}", DueTime = date.AddMilliseconds(i * 10d), Metadata = null }, cancellationToken));
         }
 
         await Task.WhenAll(tasks);
@@ -152,9 +152,9 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
 
         // Schedule only 3 jobs (less than MinBatchSize of 10)
         var tasks = new Task[3];
-        tasks[0] = shard.TryScheduleJobAsync(GrainId.Create("type", "target1"), "job1", date.AddSeconds(1), null, cancellationToken);
-        tasks[1] = shard.TryScheduleJobAsync(GrainId.Create("type", "target2"), "job2", date.AddSeconds(2), null, cancellationToken);
-        tasks[2] = shard.TryScheduleJobAsync(GrainId.Create("type", "target3"), "job3", date.AddSeconds(3), null, cancellationToken);
+        tasks[0] = shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target1"), JobName = "job1", DueTime = date.AddSeconds(1), Metadata = null }, cancellationToken);
+        tasks[1] = shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target2"), JobName = "job2", DueTime = date.AddSeconds(2), Metadata = null }, cancellationToken);
+        tasks[2] = shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", "target3"), JobName = "job3", DueTime = date.AddSeconds(3), Metadata = null }, cancellationToken);
 
         await Task.WhenAll(tasks);
 
@@ -203,7 +203,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var tasks = new List<Task>();
         for (int i = 0; i < 50; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", date.AddMilliseconds(i), null, cancellationToken));
+            tasks.Add(shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", $"target{i}"), JobName = $"job{i}", DueTime = date.AddMilliseconds(i), Metadata = null }, cancellationToken));
         }
 
         await Task.WhenAll(tasks);
@@ -257,7 +257,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         var tasks = new List<Task>();
         for (int i = 0; i < 5; i++)
         {
-            tasks.Add(shard.TryScheduleJobAsync(GrainId.Create("type", $"target{i}"), $"job{i}", date.AddMilliseconds(i), null, cancellationToken));
+            tasks.Add(shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("type", $"target{i}"), JobName = $"job{i}", DueTime = date.AddMilliseconds(i), Metadata = null }, cancellationToken));
         }
 
         // Give operations time to queue
