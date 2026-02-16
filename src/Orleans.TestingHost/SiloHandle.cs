@@ -44,17 +44,7 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>Performs application-defined tasks associated with freeing, releasing, or resetting unmanaged resources.</summary>
-        protected virtual void Dispose(bool disposing)
-        {
-            if (!this.IsActive) return;
-
-            // Do not attempt to perform expensive blocking operations in the finalizer thread.
-            // Concrete SiloHandle implementations can do have their own cleanup functionality
-            if (disposing)
-            {
-                StopSiloAsync(true).GetAwaiter().GetResult();
-            }
-        }
+        protected abstract void Dispose(bool disposing);
 
         /// <inheritdoc />
         public abstract ValueTask DisposeAsync();

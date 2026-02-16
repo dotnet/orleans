@@ -13,7 +13,7 @@ namespace Orleans.Runtime.GrainDirectory
     /// <summary>
     /// Implementation of <see cref="IGrainLocator"/> that uses <see cref="IGrainDirectory"/> stores.
     /// </summary>
-    internal class CachedGrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator.ITestAccessor
+    internal sealed class CachedGrainLocator : IGrainLocator, ILifecycleParticipant<ISiloLifecycle>, CachedGrainLocator.ITestAccessor
     {
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly IGrainDirectoryCache cache;
