@@ -539,7 +539,7 @@ namespace UnitTests.ActivationsLifeCycleTests
             var grain = this.testCluster.GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
 
             // Schedule a timer to fire at the 30s mark which will not extend the grain's lifetime.
-            await grain.StartTimer(testName, TimeSpan.FromSeconds(4), keepAlive: false);
+            await grain.StartTimer(testName, TimeSpan.FromSeconds(30), keepAlive: false);
             await Task.Delay(TimeSpan.FromSeconds(7));
 
             var tickCount = await grain.GetTickCount();
