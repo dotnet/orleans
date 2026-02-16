@@ -4,6 +4,7 @@ import CounterWidget from '../components/counter-widget';
 import SiloBreakdown from './silo-table';
 import Panel from '../components/panel';
 import Page from '../components/page';
+import { getName } from '../lib/typeName';
 
 interface GrainMethodValue {
   count: number;
@@ -194,9 +195,4 @@ export default class Grain extends React.Component<GrainProps> {
       return this.renderEmpty();
     return this.renderGraphs();
   }
-}
-
-function getName(value: string): string {
-  const parts = value.split('.');
-  return parts[parts.length - 1];
 }
