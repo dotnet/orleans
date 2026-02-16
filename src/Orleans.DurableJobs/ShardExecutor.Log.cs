@@ -83,4 +83,28 @@ internal sealed partial class ShardExecutor
         Message = "Overload cleared for shard {ShardId}, resuming job processing"
     )]
     private static partial void LogOverloadCleared(ILogger logger, string shardId);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Slow start initiated: initial concurrency {InitialConcurrency}, target {TargetConcurrency}, interval {Interval}"
+    )]
+    private static partial void LogSlowStartBegin(ILogger logger, int initialConcurrency, int targetConcurrency, TimeSpan interval);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Slow start: concurrency increased to {CurrentConcurrency} (target: {TargetConcurrency})"
+    )]
+    private static partial void LogSlowStartConcurrencyIncreased(ILogger logger, int currentConcurrency, int targetConcurrency);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Slow start complete: concurrency reached target {TargetConcurrency}"
+    )]
+    private static partial void LogSlowStartComplete(ILogger logger, int targetConcurrency);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Slow start ramp-up failed; all remaining concurrency has been released"
+    )]
+    private static partial void LogSlowStartError(ILogger logger, Exception exception);
 }

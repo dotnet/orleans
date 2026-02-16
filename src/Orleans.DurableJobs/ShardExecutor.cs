@@ -21,6 +21,8 @@ internal sealed partial class ShardExecutor
     private readonly DurableJobsOptions _options;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
     private readonly IOverloadDetector _overloadDetector;
+    private int _currentCapacity;
+    private int _slowStartRampUpStarted;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ShardExecutor"/> class.
@@ -38,8 +40,13 @@ internal sealed partial class ShardExecutor
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
-        _jobConcurrencyLimiter = new SemaphoreSlim(_options.MaxConcurrentJobsPerSilo);
         _overloadDetector = overloadDetector;
+
+        _currentCapacity = _options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo
+            ? _options.SlowStartInitialConcurrency
+            : _options.MaxConcurrentJobsPerSilo;
+
+        _jobConcurrencyLimiter = new SemaphoreSlim(_currentCapacity);
     }
 
     /// <summary>
@@ -51,6 +58,12 @@ internal sealed partial class ShardExecutor
     public async Task RunShardAsync(IJobShard shard, CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        if (Volatile.Read(ref _currentCapacity) < _options.MaxConcurrentJobsPerSilo
+            && Interlocked.CompareExchange(ref _slowStartRampUpStarted, 1, 0) == 0)
+        {
+            _ = Task.Run(SlowStartRampUpAsync);
+        }
 
         var tasks = new ConcurrentDictionary<string, Task>();
         try
@@ -97,6 +110,59 @@ internal sealed partial class ShardExecutor
             // Wait for all jobs to complete
             await Task.WhenAll(tasks.Values);
         }
+    }
+
+    private async Task SlowStartRampUpAsync()
+    {
+        var targetCapacity = _options.MaxConcurrentJobsPerSilo;
+        LogSlowStartBegin(_logger, Volatile.Read(ref _currentCapacity), targetCapacity, _options.SlowStartInterval);
+
+        try
+        {
+            while (Volatile.Read(ref _currentCapacity) < targetCapacity)
+            {
+                await Task.Delay(_options.SlowStartInterval);
+
+                while (true)
+                {
+                    var currentCapacity = Volatile.Read(ref _currentCapacity);
+                    if (currentCapacity >= targetCapacity)
+                    {
+                        break;
+                    }
+
+                    var newCapacity = (int)Math.Min((long)currentCapacity * 2, targetCapacity);
+                    var toRelease = newCapacity - currentCapacity;
+                    if (toRelease <= 0)
+                    {
+                        break;
+                    }
+
+                    if (Interlocked.CompareExchange(ref _currentCapacity, newCapacity, currentCapacity) == currentCapacity)
+                    {
+                        _jobConcurrencyLimiter.Release(toRelease);
+                        LogSlowStartConcurrencyIncreased(_logger, newCapacity, targetCapacity);
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // If the ramp-up fails for any reason, release all remaining capacity to avoid being stuck at low concurrency.
+            var currentCapacity = Volatile.Read(ref _currentCapacity);
+            var remaining = targetCapacity - currentCapacity;
+            if (remaining > 0)
+            {
+                _jobConcurrencyLimiter.Release(remaining);
+                Interlocked.Exchange(ref _currentCapacity, targetCapacity);
+            }
+
+            LogSlowStartError(_logger, ex);
+            return;
+        }
+
+        LogSlowStartComplete(_logger, Volatile.Read(ref _currentCapacity));
     }
 
     private async Task RunJobAsync(

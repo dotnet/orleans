@@ -371,18 +371,150 @@ public class ShardExecutorTests
         await shard.DidNotReceive().RemoveJobAsync(Arg.Any<string>(), Arg.Any<CancellationToken>());
     }
 
+    [Fact]
+    public async Task RunShardAsync_WithSlowStart_GraduallyIncreasesConcurrency()
+    {
+        var initialConcurrency = 2;
+        var maxConcurrency = 16;
+        var options = CreateOptions(
+            maxConcurrentJobs: maxConcurrency,
+            concurrencySlowStartEnabled: true,
+            slowStartInitialConcurrency: initialConcurrency,
+            slowStartInterval: TimeSpan.FromMilliseconds(100));
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var grainFactory = CreateGrainFactory();
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
+
+        var currentConcurrent = 0;
+        var maxObservedConcurrent = 0;
+        var concurrentLock = new object();
+        var releaseJobs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        var concurrencyIncreased = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        // Enough jobs to exercise the slow start ramp-up
+        var jobs = CreateJobs(20);
+        var shard = CreateJobShard(jobs);
+
+        ConfigureGrainFactoryWithSlowJobExecution(grainFactory, async () =>
+        {
+            lock (concurrentLock)
+            {
+                currentConcurrent++;
+                if (currentConcurrent > maxObservedConcurrent)
+                {
+                    maxObservedConcurrent = currentConcurrent;
+                    if (maxObservedConcurrent > initialConcurrency)
+                    {
+                        concurrencyIncreased.TrySetResult();
+                    }
+                }
+            }
+
+            await releaseJobs.Task;
+
+            lock (concurrentLock)
+            {
+                currentConcurrent--;
+            }
+        });
+
+        var runTask = executor.RunShardAsync(shard, CancellationToken.None);
+        try
+        {
+            var completedTask = await Task.WhenAny(concurrencyIncreased.Task, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(concurrencyIncreased.Task, completedTask);
+        }
+        finally
+        {
+            releaseJobs.TrySetResult();
+            await runTask;
+        }
+
+        // Slow start should limit initial concurrency, then ramp up
+        Assert.True(maxObservedConcurrent <= maxConcurrency,
+            $"Max concurrent jobs was {maxObservedConcurrent}, but limit was {maxConcurrency}");
+        Assert.True(maxObservedConcurrent > initialConcurrency,
+            $"Expected concurrency to increase beyond initial {initialConcurrency}, but max observed was {maxObservedConcurrent}");
+    }
+
+    [Fact]
+    public async Task RunShardAsync_WithSlowStartDisabled_UsesFullConcurrencyImmediately()
+    {
+        var maxConcurrency = 5;
+        var options = CreateOptions(
+            maxConcurrentJobs: maxConcurrency,
+            concurrencySlowStartEnabled: false);
+        var overloadDetector = CreateOverloadDetector(isOverloaded: false);
+        var grainFactory = CreateGrainFactory();
+        var executor = new ShardExecutor(grainFactory, options, overloadDetector, NullLogger<ShardExecutor>.Instance);
+
+        var currentConcurrent = 0;
+        var maxObservedConcurrent = 0;
+        var concurrentLock = new object();
+
+        var jobs = CreateJobs(10);
+        var shard = CreateJobShard(jobs);
+
+        ConfigureGrainFactoryWithSlowJobExecution(grainFactory, async () =>
+        {
+            lock (concurrentLock)
+            {
+                currentConcurrent++;
+                if (currentConcurrent > maxObservedConcurrent)
+                {
+                    maxObservedConcurrent = currentConcurrent;
+                }
+            }
+
+            await Task.Delay(100);
+
+            lock (concurrentLock)
+            {
+                currentConcurrent--;
+            }
+        });
+
+        await executor.RunShardAsync(shard, CancellationToken.None);
+
+        // Without slow start, all concurrency slots should be available immediately
+        Assert.True(maxObservedConcurrent <= maxConcurrency,
+            $"Max concurrent jobs was {maxObservedConcurrent}, but limit was {maxConcurrency}");
+        Assert.Equal(maxConcurrency, maxObservedConcurrent);
+    }
+
+    [Fact]
+    public void ValidateConfiguration_WithSlowStartDisabled_AllowsNonPositiveInitialConcurrency()
+    {
+        var options = Options.Create(new DurableJobsOptions
+        {
+            ConcurrencySlowStartEnabled = false,
+            SlowStartInitialConcurrency = 0
+        });
+        var validator = new Orleans.Hosting.DurableJobsOptionsValidator(
+            NullLogger<Orleans.Hosting.DurableJobsOptionsValidator>.Instance,
+            options);
+
+        validator.ValidateConfiguration();
+    }
+
     // Helper methods
 
     private static IOptions<DurableJobsOptions> CreateOptions(
         int maxConcurrentJobs = 10,
         TimeSpan? overloadBackoffDelay = null,
-        Func<IJobRunContext, Exception, DateTimeOffset?> shouldRetry = null)
+        Func<IJobRunContext, Exception, DateTimeOffset?> shouldRetry = null,
+        bool concurrencySlowStartEnabled = false,
+        int? slowStartInitialConcurrency = null,
+        TimeSpan? slowStartInterval = null)
     {
         var options = new DurableJobsOptions
         {
             MaxConcurrentJobsPerSilo = maxConcurrentJobs,
             OverloadBackoffDelay = overloadBackoffDelay ?? TimeSpan.FromMilliseconds(100),
-            ShouldRetry = shouldRetry ?? ((_, _) => null) // Default: no retry
+            ShouldRetry = shouldRetry ?? ((_, _) => null), // Default: no retry
+            ConcurrencySlowStartEnabled = concurrencySlowStartEnabled,
+            SlowStartInitialConcurrency = slowStartInitialConcurrency ?? Environment.ProcessorCount,
+            SlowStartInterval = slowStartInterval ?? TimeSpan.FromSeconds(10)
         };
         return Options.Create(options);
     }
