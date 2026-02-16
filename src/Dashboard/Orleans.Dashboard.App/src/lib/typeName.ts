@@ -51,6 +51,7 @@ export function getName(value: string): string {
     }
 
     const inner = s.substring(openerPos + 1, end);
+    const remainder = s.substring(end + 1);
 
     // Split inner by top-level commas only
     const args: string[] = [];
@@ -67,7 +68,34 @@ export function getName(value: string): string {
     args.push(inner.substring(argStart));
 
     const parsed = args.map(a => parseType(a));
-    return `${trimIdentifier(main)}<${parsed.join(', ')}>`;
+
+    // If there is a remainder after the generic (e.g. ".Method"),
+    // preserve it while shortening each dotted segment inside it.
+    function parseSuffix(rem: string): string {
+      if (!rem) return '';
+      let i = 0;
+      // accept leading dots/spaces
+      while (i < rem.length && (rem[i] === '.' || rem[i] === ' ')) i++;
+      if (i === 0) return rem; // unexpected format, return raw
+
+      const segments: string[] = [];
+      let segStart = i;
+      let depth = 0;
+      for (let j = i; j < rem.length; j++) {
+        const ch = rem[j];
+        if (ch === '<' || ch === '[') depth++; else if (ch === '>' || ch === ']') depth--;
+        else if (ch === '.' && depth === 0) {
+          segments.push(rem.substring(segStart, j));
+          segStart = j + 1;
+        }
+      }
+      if (segStart <= rem.length) segments.push(rem.substring(segStart));
+
+      const parsedSegs = segments.map(seg => parseType(seg));
+      return '.' + parsedSegs.join('.');
+    }
+
+    return `${trimIdentifier(main)}<${parsed.join(', ')}>${parseSuffix(remainder)}`;
   }
 
   return parseType(value);
