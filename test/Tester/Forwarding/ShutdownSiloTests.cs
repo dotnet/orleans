@@ -6,7 +6,6 @@ using Orleans.Configuration;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Azure.Data.Tables;
-using Azure.Identity;
 using Orleans.Runtime.Placement;
 
 namespace Tester.Forwarding
@@ -39,9 +38,7 @@ namespace Tester.Forwarding
 
             private static TableServiceClient GetTableServiceClient()
             {
-                return TestDefaultConfiguration.UseAadAuthentication
-                    ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
-                    : new(TestDefaultConfiguration.DataConnectionString);
+                return new(AzuriteContainerManager.ConnectionString);
             }
         }
 

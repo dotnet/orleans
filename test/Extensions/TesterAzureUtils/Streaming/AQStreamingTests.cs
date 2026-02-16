@@ -49,19 +49,7 @@ namespace Tester.AzureUtils.Streaming
                     }
 
                     ConfigureStreaming("ProviderType", "AzureQueueStorage");
-                    if (TestDefaultConfiguration.UseAadAuthentication)
-                    {
-                        cb.AddKeyedAzureQueueServiceClient(AzureQueueStreamProviderName, settings =>
-                        {
-                            settings.ServiceUri = TestDefaultConfiguration.DataQueueUri;
-                            settings.Credential = TestDefaultConfiguration.TokenCredential;
-                        });
-                        ConfigureStreaming("ServiceKey", AzureQueueStreamProviderName);
-                    }
-                    else
-                    {
-                        ConfigureStreaming("ConnectionString", TestDefaultConfiguration.DataConnectionString);
-                    }
+                    ConfigureStreaming("ConnectionString", AzuriteContainerManager.ConnectionString);
 
                     var names = AzureQueueUtilities.GenerateQueueNames(builder.Options.ClusterId, queueCount);
                     for (var i = 0; i < names.Count; i++)

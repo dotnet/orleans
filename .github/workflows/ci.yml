@@ -257,13 +257,6 @@ jobs:
       matrix:
         framework: ["net8.0", "net10.0"]
         provider: ["AzureStorage"]
-    services:
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite:latest
-        ports:
-          - 10000:10000
-          - 10001:10001
-          - 10002:10002
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -278,11 +271,6 @@ jobs:
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
-      env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
-        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -341,8 +329,6 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSEVENTHUBCONNECTIONSTRING: "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
     - name: Clean up Event Hubs emulator
       if: always()
       run: docker rm -f eventhubs-emulator
@@ -595,7 +581,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.suite }}&Category!=Consul"
+        --filter "Category=${{ matrix.suite }}&Category!=Consul&Category!=AzureStorage"
         --blame-hang-timeout 10m
         --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
         --

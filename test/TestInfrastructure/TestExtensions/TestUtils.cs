@@ -1,7 +1,6 @@
 using System.Diagnostics;
-using System.Net;
 using Orleans.Runtime;
-using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Xunit;
 using static TestExtensions.TestDefaultConfiguration;
 
@@ -13,33 +12,12 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            if ((UseAadAuthentication && (TableEndpoint == null)) ||
-                (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString)))
-            {
-                throw new SkipException("No connection string found. Skipping");
-            }
-
-            bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-
-            if (!usingLocalWAS)
-            {
-                // Tests are using Azure Cloud Storage, not local WAS emulator.
-                return;
-            }
-
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
-            {
-                string errorMsg = "Azure Storage Emulator could not be started.";
-                Console.WriteLine(errorMsg);
-                throw new SkipException(errorMsg);
-            }
+            AzuriteContainerManager.EnsureStarted();
         }
 
         public static void CheckForEventHub()
         {
-            if ((UseAadAuthentication && (EventHubFullyQualifiedNamespace == null)) ||
-                (!UseAadAuthentication && string.IsNullOrWhiteSpace(EventHubConnectionString)))
+            if (string.IsNullOrWhiteSpace(EventHubConnectionString))
             {
                 throw new SkipException("No connection string found. Skipping");
             }

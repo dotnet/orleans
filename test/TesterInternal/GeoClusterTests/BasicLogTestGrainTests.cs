@@ -7,7 +7,6 @@ using Tester;
 
 using Orleans.Configuration;
 using Azure.Data.Tables;
-using Azure.Identity;
 
 namespace Tests.GeoClusterTests
 {
@@ -46,18 +45,16 @@ namespace Tests.GeoClusterTests
                         {
                             options.TableServiceClient = GetTableServiceClient();
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
 
                 private static TableServiceClient GetTableServiceClient()
                 {
-                    return TestDefaultConfiguration.UseAadAuthentication
-                        ? new(TestDefaultConfiguration.TableEndpoint, TestDefaultConfiguration.TokenCredential)
-                        : new(TestDefaultConfiguration.DataConnectionString);
+                    return new(AzuriteContainerManager.ConnectionString);
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;
@@ -105,7 +102,7 @@ namespace Tests.GeoClusterTests
 
         private async Task ThreeCheckers(string grainClass, int phases)
         {
-            // Global 
+            // Global
             async Task checker1()
             {
                 int x = GetRandom();
