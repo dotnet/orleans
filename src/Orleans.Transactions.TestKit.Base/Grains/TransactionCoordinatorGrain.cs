@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
+using Orleans.Transactions;
 using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.TestKit.Correctnesss;
 
@@ -28,7 +29,7 @@ namespace Orleans.Transactions.TestKit
 
         public Task OrphanCallTransaction(ITransactionTestGrain grain)
         {
-            _ = grain.Add(1000);
+            _ = TransactionContext.GetRequiredTransactionInfo().Fork();
             return Task.CompletedTask;
         }
 
