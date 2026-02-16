@@ -68,6 +68,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -102,6 +104,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -148,6 +152,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -190,6 +196,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -234,6 +242,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -275,6 +285,8 @@ jobs:
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -333,6 +345,8 @@ jobs:
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional|Category=Streaming)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -391,6 +405,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -427,6 +443,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -463,6 +481,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -507,6 +527,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -556,6 +578,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -597,6 +621,8 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.suite }}&Category!=Consul"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
@@ -627,5 +653,8 @@ jobs:
       run: dotnet test
         test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
         --framework ${{ matrix.framework }}
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.framework }}.trx"
         --
