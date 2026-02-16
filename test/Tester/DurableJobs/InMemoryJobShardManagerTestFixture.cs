@@ -10,15 +10,18 @@ namespace Tester.DurableJobs;
 /// </summary>
 internal sealed class InMemoryJobShardManagerTestFixture : IJobShardManagerTestFixture
 {
-    public InMemoryJobShardManagerTestFixture()
+    private readonly int _maxAdoptedCount;
+
+    public InMemoryJobShardManagerTestFixture(int maxAdoptedCount = 3)
     {
+        _maxAdoptedCount = maxAdoptedCount;
         // Clear any state from previous tests
         InMemoryJobShardManager.ClearAllShardsAsync().GetAwaiter().GetResult();
     }
 
     public JobShardManager CreateManager(ILocalSiloDetails localSiloDetails, IClusterMembershipService membershipService)
     {
-        return new InMemoryJobShardManager(localSiloDetails.SiloAddress, membershipService);
+        return new InMemoryJobShardManager(localSiloDetails.SiloAddress, membershipService, _maxAdoptedCount);
     }
 
     public async ValueTask DisposeAsync()

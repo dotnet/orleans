@@ -1,6 +1,7 @@
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
@@ -72,7 +73,8 @@ public static class DurableJobsExtensions
         {
             var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
             var membershipService = sp.GetRequiredService<IClusterMembershipService>();
-            return new InMemoryJobShardManager(siloDetails.SiloAddress, membershipService);
+            var durableJobsOptions = sp.GetRequiredService<IOptions<DurableJobsOptions>>();
+            return new InMemoryJobShardManager(siloDetails.SiloAddress, membershipService, durableJobsOptions.Value.MaxAdoptedCount);
         });
         services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
         return services;
