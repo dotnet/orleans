@@ -1764,11 +1764,10 @@ internal sealed partial class ActivationData :
                         LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
                         CatalogInstruments.ActivationFailedToActivate.Add(1);
                         Deactivate(new(DeactivationReason.ReasonCode, ode, DeactivationReason.Description), CancellationToken.None);
-                        // TODO: after the PR for activation data activity is in, re-enable this
-                        // SetActivityError(_activationActivity, ode, ActivityErrorEvents.ActivationCancelled);
+                        SetActivityError(_activationActivity, ode, ActivityErrorEvents.ActivationCancelled);
                         LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
-                        // TODO: after the PR for activation data activity is in, re-enable this
-                        // _activationActivity?.Stop();
+                        _activationActivity?.Dispose();
+                        _activationActivity = null;
                         return;
                     }
                     // catch OperationCanceledException only if it wasn't for a timeout.
@@ -1776,11 +1775,10 @@ internal sealed partial class ActivationData :
                     {
                         CatalogInstruments.ActivationFailedToActivate.Add(1);
                         Deactivate(new(DeactivationReason.ReasonCode, oce, DeactivationReason.Description), CancellationToken.None);
-                        // TODO: after the PR for activation data activity is in, re-enable this
-                        // SetActivityError(_activationActivity, oce, ActivityErrorEvents.ActivationCancelled);
+                        SetActivityError(_activationActivity, oce, ActivityErrorEvents.ActivationCancelled);
                         LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
-                        // TODO: after the PR for activation data activity is in, re-enable this
-                        // _activationActivity?.Stop();
+                        _activationActivity?.Dispose();
+                        _activationActivity = null;
                         return;
                     }
                     catch (Exception exception)
