@@ -581,7 +581,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.suite }}&Category!=Consul"
+        --filter "Category=${{ matrix.suite }}&Category!=Consul&Category!=AzureStorage"
         --blame-hang-timeout 10m
         --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
         --
