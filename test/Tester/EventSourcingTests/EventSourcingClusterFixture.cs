@@ -26,12 +26,14 @@ namespace Tester.EventSourcingTests
                 hostBuilder
                     .AddLogStorageBasedLogConsistencyProvider("LogStorage")
                     .AddStateStorageBasedLogConsistencyProvider("StateStorage")
+                    .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
                     {
                         builder.AddFilter(typeof(MemoryGrainStorage).FullName, LogLevel.Debug);
                         builder.AddFilter(typeof(LogConsistencyProvider).Namespace, LogLevel.Debug);
                     })
                     .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("AzureStore")
                     .AddMemoryGrainStorage("MemoryStore")
                     .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
             }

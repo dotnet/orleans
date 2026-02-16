@@ -291,7 +291,7 @@ namespace Orleans.CodeGenerator
             {
                 var t = member.Type;
                 TypeSyntax codecType = null;
-                if (t.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+                if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
                     && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                     && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
@@ -335,7 +335,7 @@ namespace Orleans.CodeGenerator
         private BaseCodecFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription)
         {
             var baseType = serializableTypeDescription.BaseType;
-            if (baseType.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+            if (baseType.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
                 && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, LibraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                 && baseType is not INamedTypeSymbol { IsGenericType: true })
             {
@@ -1178,7 +1178,7 @@ namespace Orleans.CodeGenerator
 
             private LibraryTypes LibraryTypes => _member.CodeGenerator.LibraryTypes;
 
-            public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
+            public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAttribute(LibraryTypes.ImmutableAttribute);
 
             /// <summary>
             /// Gets syntax representing the type of this field.
@@ -1237,8 +1237,8 @@ namespace Orleans.CodeGenerator
 
             public bool IsShallowCopyable =>
                 LibraryTypes.IsShallowCopyable(_member.Type)
-                || Property is { } prop && prop.HasAnyAttribute(LibraryTypes.ImmutableAttributes)
-                || _member.Symbol.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
+                || Property is { } prop && prop.HasAttribute(LibraryTypes.ImmutableAttribute)
+                || _member.Symbol.HasAttribute(LibraryTypes.ImmutableAttribute);
 
             public bool IsValueType => Type.IsValueType;
 

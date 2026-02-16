@@ -204,7 +204,7 @@ namespace Orleans.CodeGenerator
 
         public bool IsUnsealedImmutable => !Type.IsSealed && IsImmutable;
 
-        public bool IsImmutable => Type.HasAnyAttribute(_libraryTypes.ImmutableAttributes);
+        public bool IsImmutable => Type.HasAttribute(_libraryTypes.ImmutableAttribute);
 
         public bool IsExceptionType => Type.HasBaseType(_libraryTypes.Exception);
 

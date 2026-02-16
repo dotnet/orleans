@@ -148,5 +148,97 @@ namespace Orleans.Analyzers
 
             return false;
         }
+        public static bool InheritsGrainClass(this ClassDeclarationSyntax declaration, SemanticModel semanticModel)
+        {
+            var baseTypes = declaration.BaseList?.Types;
+            if (baseTypes is null)
+            {
+                return false;
+            }
+
+            foreach (var baseTypeSyntax in baseTypes)
+            {
+                var baseTypeSymbol = semanticModel.GetTypeInfo(baseTypeSyntax.Type).Type;
+                if (baseTypeSymbol is INamedTypeSymbol currentTypeSymbol)
+                {
+                    if (currentTypeSymbol.IsGenericType &&
+                        currentTypeSymbol.TypeParameters.Length == 1 &&
+                        currentTypeSymbol.BaseType is { } baseBaseTypeSymbol)
+                    {
+                        currentTypeSymbol = baseBaseTypeSymbol;
+                    }
+
+                    if (Constants.GrainBaseFullyQualifiedName.Equals(currentTypeSymbol.ToDisplayString(NullableFlowState.None), StringComparison.Ordinal))
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        public static bool IsGrainClass(this INamedTypeSymbol typeSymbol)
+        {
+            if (typeSymbol is null || typeSymbol.TypeKind != TypeKind.Class)
+            {
+                return false;
+            }
+
+            // Check if the type implements IGrain or ISystemTarget interface
+            foreach (var interfaceSymbol in typeSymbol.AllInterfaces)
+            {
+                var interfaceName = interfaceSymbol.ToDisplayString(NullableFlowState.None);
+                if (Constants.IGrainFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal) ||
+                    Constants.ISystemTargetFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal))
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        public static AttributeArgumentBag<T> GetArgumentBag<T>(this AttributeSyntax attribute, SemanticModel semanticModel)
+        {
+            if (attribute is null)
+            {
+                return default;
+            }
+
+            var argument = attribute.ArgumentList?.Arguments.FirstOrDefault();
+            if (argument is null || argument.Expression is not { } expression)
+            {
+                return default;
+            }
+
+            var constantValue = semanticModel.GetConstantValue(expression);
+            return constantValue.HasValue && constantValue.Value is T value ?
+                new(value, attribute.GetLocation()) : default;
+        }
+
+        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, string attributeName) =>
+            attributeLists
+                .SelectMany(attributeList => attributeList.Attributes)
+                .Where(attribute => attribute.IsAttribute(attributeName));
+
+        public static string GetArgumentValue(this AttributeSyntax attribute, SemanticModel semanticModel)
+        {
+            if (attribute?.ArgumentList == null || attribute.ArgumentList.Arguments.Count == 0)
+            {
+                return null;
+            }
+
+            var symbolInfo = semanticModel.GetSymbolInfo(attribute);
+            if (symbolInfo.Symbol == null && symbolInfo.CandidateSymbols.Length == 0)
+            {
+                return null;
+            }
+
+            var argumentExpression = attribute.ArgumentList.Arguments[0].Expression;
+            var constant = semanticModel.GetConstantValue(argumentExpression);
+
+            return constant.HasValue ? constant.Value?.ToString() : null;
+        }
     }
 }

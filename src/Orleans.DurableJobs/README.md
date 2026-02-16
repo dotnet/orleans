@@ -170,7 +170,7 @@ public class NotificationGrain : Grain, INotificationGrain, IDurableJobHandler
     }
 
     // This method is called when the durable job executes
-    public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         var userId = this.GetPrimaryKeyString();
         var message = context.Job.Metadata?["Message"];
@@ -253,7 +253,7 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         await _orderService.CancelOrderAsync(orderId);
     }
 
-    public async Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public async Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         var step = context.Job.Metadata!["Step"];
         var orderId = this.GetPrimaryKey();
@@ -270,7 +270,7 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         }
     }
 
-    private async Task HandleDeliveryReminder(IDurableJobContext context, CancellationToken ct)
+    private async Task HandleDeliveryReminder(IJobRunContext context, CancellationToken ct)
     {
         var customerId = context.Job.Metadata!["CustomerId"];
         var orderNumber = context.Job.Metadata["OrderNumber"];
@@ -304,7 +304,7 @@ public class PaymentProcessorGrain : Grain, IDurableJobHandler
     private readonly IPaymentService _paymentService;
     private readonly ILogger<PaymentProcessorGrain> _logger;
 
-    public Task ExecuteJobAsync(IDurableJobContext context, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken)
     {
         var paymentId = context.Job.Metadata?["PaymentId"];
         

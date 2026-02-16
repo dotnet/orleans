@@ -58,11 +58,13 @@ public class StatelessWorkerActivationTests : IClassFixture<StatelessWorkerActiv
     public async Task SingleWorkerInvocationUnderLoad()
     {
         var workerGrain = _fixture.GrainFactory.GetGrain<IStatelessWorkerScalingGrain>(0);
+        var managementGrain = _fixture.GrainFactory.GetGrain<IManagementGrain>(0);
+        var grainReference = (GrainReference)workerGrain;
 
         for (var i = 0; i < 100; i++)
         {
-            var activationCount = await workerGrain.GetActivationCount();
-            Assert.Equal(1, activationCount);
+            await workerGrain.GetActivationCount();
+            await Until(async () => 1 == await managementGrain.GetGrainActivationCount(grainReference), 5_000);
         }
     }
 

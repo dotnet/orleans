@@ -33,6 +33,7 @@
     <PackageVersion Include="Grpc.Tools" Version="2.72.0" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
     <PackageVersion Include="KubernetesClient" Version="18.0.5" />
+    <PackageVersion Include="MemoryPack" Version="1.21.4" />
     <PackageVersion Include="MessagePack" Version="3.1.4" />
     <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.11" />
     <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.54.1" />
@@ -47,6 +48,7 @@
     <PackageVersion Include="Microsoft.Crank.EventSources" Version="0.2.0-alpha.23422.5" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
     <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.2" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="8.0.11" />
     <PackageVersion Include="Microsoft.DotNet.GenAPI.Task" Version="9.0.103-servicing.25065.25" />
     <PackageVersion Include="Microsoft.DotNet.PlatformAbstractions" Version="3.1.6" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
@@ -90,6 +92,7 @@
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
     <PackageVersion Include="protobuf-net" Version="3.2.30" />
     <PackageVersion Include="SpanJson" Version="4.0.1" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
     <PackageVersion Include="StackExchange.Redis" Version="2.9.32" />
     <PackageVersion Include="StructureMap.Microsoft.DependencyInjection" Version="2.0.0" />
     <PackageVersion Include="System.CodeDom" Version="10.0.0" />
@@ -102,6 +105,7 @@
     <PackageVersion Include="System.Memory.Data" Version="8.0.1" />
     <PackageVersion Include="System.Text.Json" Version="8.0.5" />
     <PackageVersion Include="Testcontainers" Version="4.8.1" />
+    <PackageVersion Include="Testcontainers.Consul" Version="4.8.1" />
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
     <PackageVersion Include="Verify.Xunit" Version="29.3.1" />
     <PackageVersion Include="xunit.assert" Version="2.9.3" />
@@ -124,6 +128,7 @@
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis" Version="5.0.0" />
+    <PackageVersion Update="Microsoft.Data.Sqlite" Version="10.0.3" />
     <PackageVersion Update="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
     <PackageVersion Update="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
     <PackageVersion Update="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />

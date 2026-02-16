@@ -59,14 +59,13 @@ namespace Orleans.Storage
     /// </summary>
     /// <remarks>
     /// <para>
-    /// Required configuration params: <c>DataConnectionString</c>
+    /// Configuration is provided through <see cref="AdoNetGrainStorageOptions"/>.
     /// </para>
     /// <para>
-    /// Optional configuration params:
-    /// <c>AdoInvariant</c> -- defaults to <c>Microsoft.Data.SqlClient</c>
-    /// <c>UseJsonFormat</c> -- defaults to <c>false</c>
-    /// <c>UseXmlFormat</c> -- defaults to <c>false</c>
-    /// <c>UseBinaryFormat</c> -- defaults to <c>true</c>
+    /// Required configuration: <c>ConnectionString</c> - The database connection string.
+    /// </para>
+    /// <para>
+    /// Optional configuration: <c>Invariant</c> - The ADO.NET provider invariant name (defaults to <c>Microsoft.Data.SqlClient</c>).
     /// </para>
     /// </remarks>
     [DebuggerDisplay("Name = {Name}, ConnectionString = {Storage.ConnectionString}")]
@@ -109,7 +108,7 @@ namespace Orleans.Storage
         /// <summary>
         /// The default query to initialize this structure from the Orleans database.
         /// </summary>
-        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey'";
+        public const string DefaultInitializationQuery = "SELECT QueryKey, QueryText FROM OrleansQuery WHERE QueryKey = 'WriteToStorageKey' OR QueryKey = 'ReadFromStorageKey' OR QueryKey = 'ClearStorageKey' OR QueryKey = 'DeleteStorageKey'";
 
         /// <summary>
         /// The queries currently used. When this is updated, the new queries will take effect immediately.
@@ -169,7 +168,15 @@ namespace Orleans.Storage
             {
                 var grainIdHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(grainId.GetHashBytes());
                 var grainTypeHash = HashPicker.PickHasher(serviceId, this.name, baseGrainType, grainReference, grainState).Hash(Encoding.UTF8.GetBytes(baseGrainType));
-                var clearRecord = (await Storage.ReadAsync(CurrentOperationalQueries.ClearState, command =>
+
+                var queryText = options.DeleteStateOnClear ? CurrentOperationalQueries.DeleteState : CurrentOperationalQueries.ClearState;
+
+                // Backward compatibility checks in Init should handle this case and throw prior to reaching this state.
+                if (queryText is null)
+                {
+                    throw new UnreachableException($"QueryText is null for {nameof(options.DeleteStateOnClear)}={options.DeleteStateOnClear}");
+                }
+                var clearRecord = (await Storage.ReadAsync(queryText, command =>
                 {
                     command.AddParameter("GrainIdHash", grainIdHash);
                     command.AddParameter("GrainIdN0", grainId.N0Key);
@@ -195,8 +202,10 @@ namespace Orleans.Storage
                 throw inconsistentStateException;
             }
 
+            // When delete on clear is set, ETag should be null since the record was deleted.
+            // The DB script returns deleted record version + 1 as storageVersion for the CheckVersionInconsistency check above.
             //No errors found, the version of the state held by the grain can be updated and also the state.
-            grainState.ETag = storageVersion;
+            grainState.ETag = options.DeleteStateOnClear ? null : storageVersion;
             grainState.RecordExists = false;
             grainState.State = CreateInstance<T>();
             LogTraceClearedGrainState(serviceId, name, baseGrainType, grainId, grainState.ETag);
@@ -330,10 +339,19 @@ namespace Orleans.Storage
                 return Task.FromResult(Tuple.Create(selector.GetValue<string>("QueryKey"), selector.GetValue<string>("QueryText")));
             }).ConfigureAwait(false);
 
+            // This check is for backward compatibility:
+            // 1. Some AdoNet storage invariants may not support delete on clear.
+            // 2. AdoNet invariant supports delete on clear but updated persistence scripts have not been deployed to management db.
+            var deleteStateQuery = queries.SingleOrDefault(i => i.Item1 == "DeleteStorageKey")?.Item2;
+            if (options.DeleteStateOnClear && deleteStateQuery is null)
+            {
+                throw new ArgumentException($"{nameof(options.DeleteStateOnClear)}=true is not supported. Use {nameof(options.DeleteStateOnClear)}=false instead or check persistence scripts.");
+            }
             CurrentOperationalQueries = new RelationalStorageProviderQueries(
                 queries.Single(i => i.Item1 == "WriteToStorageKey").Item2,
                 queries.Single(i => i.Item1 == "ReadFromStorageKey").Item2,
-                queries.Single(i => i.Item1 == "ClearStorageKey").Item2);
+                queries.Single(i => i.Item1 == "ClearStorageKey").Item2,
+                deleteStateQuery);
 
             LogInfoInitializedStorageProvider(
                 serviceId,
@@ -371,7 +389,7 @@ namespace Orleans.Storage
             //it means two grains were activated an the other one succeeded in writing its state.
             //
             //NOTE: the storage could return also the new and old ETag (Version), but currently it doesn't.
-            if (storageVersion == grainVersion || storageVersion == string.Empty)
+            if (storageVersion == grainVersion || storageVersion == string.Empty || (storageVersion is null && grainVersion is not null))
             {
                 //TODO: Note that this error message should be canonical across back-ends.
                 return new InconsistentStateException($"Version conflict ({operation}): ServiceId={serviceId} ProviderName={providerName} GrainType={normalizedGrainType} GrainId={grainId} ETag={grainVersion}.");
