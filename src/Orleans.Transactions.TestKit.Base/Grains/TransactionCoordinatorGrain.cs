@@ -27,7 +27,7 @@ namespace Orleans.Transactions.TestKit
             return Task.WhenAll(grains.Select(Double));
         }
 
-        public Task OrphanCallTransaction(ITransactionTestGrain grain)
+        public Task OrphanCallTransaction()
         {
             _ = TransactionContext.GetRequiredTransactionInfo().Fork();
             return Task.CompletedTask;
