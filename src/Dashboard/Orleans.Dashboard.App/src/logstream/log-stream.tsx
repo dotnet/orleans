@@ -37,9 +37,25 @@ export default class LogStream extends React.Component<LogStreamProps, LogStream
 
   onProgress() {
     if (!this.state.scrollEnabled) return;
+
+    let newLog = this.props.xhr.responseText;
+
+    if (this.props.xhr.status === 403) {
+      const responseText = this.props.xhr.responseText;
+
+      if (responseText) {
+        try {
+          const parsed = JSON.parse(responseText) as { detail?: string };
+          newLog = parsed.detail ?? responseText;
+        } catch {
+          newLog = responseText;
+        }
+      }
+    }
+
     this.setState(
       {
-        log: this.props.xhr.responseText
+        log: newLog
       },
       this.scroll
     );
@@ -47,6 +63,8 @@ export default class LogStream extends React.Component<LogStreamProps, LogStream
 
   componentDidMount() {
     this.props.xhr.onprogress = this.onProgress;
+    this.props.xhr.onload = this.onProgress;
+    this.props.xhr.onerror = this.onProgress;
   }
 
   componentWillUnmount() {
