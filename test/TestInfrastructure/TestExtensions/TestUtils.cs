@@ -1,7 +1,6 @@
 using System.Diagnostics;
 using System.Net;
 using Orleans.Runtime;
-using Orleans.TestingHost.Utils;
 using Xunit;
 using static TestExtensions.TestDefaultConfiguration;
 
@@ -13,26 +12,27 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            if ((UseAadAuthentication && (TableEndpoint == null)) ||
-                (!UseAadAuthentication && string.IsNullOrWhiteSpace(DataConnectionString)))
+            if (UseAadAuthentication)
             {
-                throw new SkipException("No connection string found. Skipping");
-            }
+                if (TableEndpoint is null)
+                {
+                    throw new SkipException("No connection string found. Skipping");
+                }
 
-            bool usingLocalWAS = string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase);
-
-            if (!usingLocalWAS)
-            {
-                // Tests are using Azure Cloud Storage, not local WAS emulator.
                 return;
             }
 
-            //Starts the storage emulator if not started already and it exists (i.e. is installed).
-            if (!StorageEmulator.TryStart())
+            // If a connection string is explicitly configured (e.g. real Azure), use it as-is.
+            if (!string.IsNullOrWhiteSpace(DataConnectionString)
+                && !string.Equals(DataConnectionString, "UseDevelopmentStorage=true", StringComparison.OrdinalIgnoreCase))
             {
-                string errorMsg = "Azure Storage Emulator could not be started.";
-                Console.WriteLine(errorMsg);
-                throw new SkipException(errorMsg);
+                return;
+            }
+
+            // Start Azurite via Testcontainers (or reuse an already-running instance).
+            if (!TestExtensions.AzuriteContainer.EnsureStartedAsync().GetAwaiter().GetResult())
+            {
+                throw new SkipException("Azurite container could not be started. Skipping.");
             }
         }
 

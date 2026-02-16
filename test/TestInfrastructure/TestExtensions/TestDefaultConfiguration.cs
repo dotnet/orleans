@@ -39,7 +39,7 @@ namespace TestExtensions
         public static Uri TableEndpoint => new Uri(defaultConfiguration[nameof(TableEndpoint)]);
         public static Uri DataBlobUri => new Uri(defaultConfiguration[nameof(DataBlobUri)]);
         public static Uri DataQueueUri => new Uri(defaultConfiguration[nameof(DataQueueUri)]);
-        public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)];
+        public static string DataConnectionString => defaultConfiguration[nameof(DataConnectionString)] ?? AzuriteContainer.ConnectionString;
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string EventHubFullyQualifiedNamespace => defaultConfiguration[nameof(EventHubFullyQualifiedNamespace)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
