@@ -4,7 +4,7 @@
     <CentralPackageTransitivePinningEnabled>true</CentralPackageTransitivePinningEnabled>
   </PropertyGroup>
   <ItemGroup>
-    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
+    <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
     <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
