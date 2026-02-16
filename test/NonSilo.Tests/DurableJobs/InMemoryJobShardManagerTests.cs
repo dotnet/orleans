@@ -62,7 +62,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         var shard = await manager1.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
         
         // Schedule a job so the shard isn't deleted on unregister
-        await shard.TryScheduleJobAsync(GrainId.Create("test", "grain1"), "TestJob", minDueTime.AddMinutes(30), null, CancellationToken.None);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("test", "grain1"), JobName = "TestJob", DueTime = minDueTime.AddMinutes(30), Metadata = null }, CancellationToken.None);
         
         // Gracefully unregister (sets owner to null)
         await manager1.UnregisterShardAsync(shard, CancellationToken.None);
@@ -234,7 +234,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         var shard = await manager1.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
         
         // Add a job
-        await shard.TryScheduleJobAsync(GrainId.Create("test", "grain1"), "TestJob", minDueTime.AddMinutes(30), null, CancellationToken.None);
+        await shard.TryScheduleJobAsync(new ScheduleJobRequest { Target = GrainId.Create("test", "grain1"), JobName = "TestJob", DueTime = minDueTime.AddMinutes(30), Metadata = null }, CancellationToken.None);
         
         // Unregister with jobs remaining
         await manager1.UnregisterShardAsync(shard, CancellationToken.None);
