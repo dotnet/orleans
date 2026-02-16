@@ -11,7 +11,9 @@ export function getName(value: string): string {
     const comma = id.indexOf(',');
     if (comma !== -1) id = id.substring(0, comma).trim();
     const parts = id.split('.');
-    return parts[parts.length - 1];
+    const last = parts[parts.length - 1];
+    const tickIndex = last.indexOf('`');
+    return tickIndex !== -1 ? last.substring(0, tickIndex) : last;
   }
 
   function parseType(str: string): string {
