@@ -72,7 +72,7 @@ public class TransactionBenchmark : IDisposable
         {
             hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
             {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                options.TableServiceClient = new(AzuriteContainerManager.ConnectionString);
             });
         }
     }

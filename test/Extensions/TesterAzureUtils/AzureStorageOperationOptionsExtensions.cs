@@ -15,7 +15,7 @@ namespace Tester.AzureUtils
 
         public static TableServiceClient GetTableServiceClient()
         {
-            return new(TestDefaultConfiguration.DataConnectionString);
+            return new(AzuriteContainerManager.ConnectionString);
         }
 
         public static Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions ConfigureTestDefaults(this Orleans.GrainDirectory.AzureStorage.AzureStorageOperationOptions options)
@@ -41,28 +41,28 @@ namespace Tester.AzureUtils
 
         public static Orleans.Configuration.AzureBlobStorageOptions ConfigureTestDefaults(this Orleans.Configuration.AzureBlobStorageOptions options)
         {
-            options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            options.BlobServiceClient = new(AzuriteContainerManager.ConnectionString);
 
             return options;
         }
 
         public static AzureStorageJobShardOptions ConfigureTestDefaults(this AzureStorageJobShardOptions options)
         {
-            options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            options.BlobServiceClient = new(AzuriteContainerManager.ConnectionString);
 
             return options;
         }
 
         public static Orleans.Configuration.AzureQueueOptions ConfigureTestDefaults(this Orleans.Configuration.AzureQueueOptions options)
         {
-            options.QueueServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            options.QueueServiceClient = new(AzuriteContainerManager.ConnectionString);
 
             return options;
         }
 
         public static Orleans.Configuration.AzureBlobLeaseProviderOptions ConfigureTestDefaults(this Orleans.Configuration.AzureBlobLeaseProviderOptions options)
         {
-            options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            options.BlobServiceClient = new(AzuriteContainerManager.ConnectionString);
 
             return options;
         }

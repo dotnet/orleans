@@ -68,7 +68,7 @@ public class GrainStorageBenchmark : IDisposable
         {
             hostBuilder.AddAzureTableGrainStorageAsDefault(options =>
             {
-                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                options.TableServiceClient = new(AzuriteContainerManager.ConnectionString);
             });
         }
     }
@@ -79,7 +79,7 @@ public class GrainStorageBenchmark : IDisposable
         {
             hostBuilder.AddAzureBlobGrainStorageAsDefault(options =>
             {
-                options.BlobServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+                options.BlobServiceClient = new(AzuriteContainerManager.ConnectionString);
             });
         }
     }
@@ -90,7 +90,7 @@ public class GrainStorageBenchmark : IDisposable
         {
             hostBuilder.AddAdoNetGrainStorageAsDefault(options =>
             {
-                options.ConnectionString = TestDefaultConfiguration.DataConnectionString;
+                options.ConnectionString = AzuriteContainerManager.ConnectionString;
             });
         }
     }

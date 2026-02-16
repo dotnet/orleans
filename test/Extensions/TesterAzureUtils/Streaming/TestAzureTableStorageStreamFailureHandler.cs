@@ -31,7 +31,7 @@ namespace Tester.AzureUtils.Streaming
         private static AzureTableDataManager<TableEntity> GetDataManager()
         {
             var options = new AzureStorageOperationOptions { TableName = TableName };
-            options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            options.TableServiceClient = new(AzuriteContainerManager.ConnectionString);
             return new AzureTableDataManager<TableEntity>(options, NullLogger.Instance);
         }
     }

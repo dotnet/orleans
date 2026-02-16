@@ -25,7 +25,6 @@ namespace TestExtensions
 
         public static string CosmosDBAccountEndpoint => defaultConfiguration[nameof(CosmosDBAccountEndpoint)];
         public static string CosmosDBAccountKey => defaultConfiguration[nameof(CosmosDBAccountKey)];
-        public static string DataConnectionString => AzuriteContainerManager.ConnectionString;
         public static string EventHubConnectionString => defaultConfiguration[nameof(EventHubConnectionString)];
         public static string ZooKeeperConnectionString => defaultConfiguration[nameof(ZooKeeperConnectionString)];
         public static string ConsulConnectionString => defaultConfiguration[nameof(ConsulConnectionString)];

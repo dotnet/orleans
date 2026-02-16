@@ -45,16 +45,16 @@ namespace Tests.GeoClusterTests
                         {
                             options.TableServiceClient = GetTableServiceClient();
                         }))
-                        .AddMemoryGrainStorage("MemoryStore"); 
+                        .AddMemoryGrainStorage("MemoryStore");
                 }
 
                 private static TableServiceClient GetTableServiceClient()
                 {
-                    return new(TestDefaultConfiguration.DataConnectionString);
+                    return new(AzuriteContainerManager.ConnectionString);
                 }
             }
         }
-        
+
         public BasicLogTestGrainTests(Fixture fixture)
         {
             this.fixture = fixture;
@@ -102,7 +102,7 @@ namespace Tests.GeoClusterTests
 
         private async Task ThreeCheckers(string grainClass, int phases)
         {
-            // Global 
+            // Global
             async Task checker1()
             {
                 int x = GetRandom();

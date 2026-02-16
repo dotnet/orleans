@@ -49,7 +49,7 @@ namespace Tester.AzureUtils.Streaming
                     }
 
                     ConfigureStreaming("ProviderType", "AzureQueueStorage");
-                    ConfigureStreaming("ConnectionString", TestDefaultConfiguration.DataConnectionString);
+                    ConfigureStreaming("ConnectionString", AzuriteContainerManager.ConnectionString);
 
                     var names = AzureQueueUtilities.GenerateQueueNames(builder.Options.ClusterId, queueCount);
                     for (var i = 0; i < names.Count; i++)

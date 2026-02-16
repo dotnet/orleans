@@ -38,7 +38,7 @@ namespace Tester.Forwarding
 
             private static TableServiceClient GetTableServiceClient()
             {
-                return new(TestDefaultConfiguration.DataConnectionString);
+                return new(AzuriteContainerManager.ConnectionString);
             }
         }
 
