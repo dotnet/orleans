@@ -257,15 +257,21 @@ jobs:
       matrix:
         framework: ["net8.0", "net10.0"]
         provider: ["AzureStorage"]
-    services:
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite:latest
-        ports:
-          - 10000:10000
-          - 10001:10001
-          - 10002:10002
     steps:
     - uses: actions/checkout@v4
+    - name: Start Azurite
+      run: |
+        docker run -d --name azurite \
+          -p 10000:10000 \
+          -p 10001:10001 \
+          -p 10002:10002 \
+          mcr.microsoft.com/azure-storage/azurite:latest \
+          azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    - name: Wait for Azurite
+      run: |
+        echo "Waiting for Azurite to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
+        echo "Azurite is ready"
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -283,6 +289,9 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+    - name: Clean up Azurite
+      if: always()
+      run: docker rm -f azurite
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -300,15 +309,21 @@ jobs:
       matrix:
         framework: ["net8.0", "net10.0"]
         provider: ["EventHub"]
-    services:
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite:latest
-        ports:
-          - 10000:10000
-          - 10001:10001
-          - 10002:10002
     steps:
     - uses: actions/checkout@v4
+    - name: Start Azurite
+      run: |
+        docker run -d --name azurite \
+          -p 10000:10000 \
+          -p 10001:10001 \
+          -p 10002:10002 \
+          mcr.microsoft.com/azure-storage/azurite:latest \
+          azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    - name: Wait for Azurite
+      run: |
+        echo "Waiting for Azurite to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
+        echo "Azurite is ready"
     - name: Start Event Hubs emulator
       run: |
         docker run -d --name eventhubs-emulator \
@@ -346,6 +361,9 @@ jobs:
     - name: Clean up Event Hubs emulator
       if: always()
       run: docker rm -f eventhubs-emulator
+    - name: Clean up Azurite
+      if: always()
+      run: docker rm -f azurite
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4

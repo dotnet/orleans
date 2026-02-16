@@ -24,7 +24,7 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
     public ValueTask Ping() => default;
 }
 
-[TestCategory("SlowBVT"), TestCategory("Directory")]
+[TestCategory("Stress"), TestCategory("Directory")]
 public sealed class GrainDirectoryResilienceTests
 {
     /// <summary>
