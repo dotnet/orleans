@@ -517,7 +517,10 @@ namespace Orleans.Streams
                 }
                 else
                 {
-                    consumerData.PendingStartToken ??= startToken;
+                    if (consumerData.PendingStartToken is null || startToken.Older(consumerData.PendingStartToken))
+                    {
+                        consumerData.PendingStartToken = startToken;
+                    }
                     LogDebugPulledNewMessages(consumerData.StreamId);
                 }
             }
