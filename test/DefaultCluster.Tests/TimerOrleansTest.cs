@@ -354,9 +354,17 @@ namespace DefaultCluster.Tests.TimerTests
 
             var grain3 = GrainFactory.GetGrain<ITimerCallGrain>(GetRandomGrainId());
             await grain3.StartTimer(testName, delay, "dispose_timer");
-            await Task.Delay(wait);
+            var grain3Timeout = wait.Multiply(2);
+            var grain3Stopwatch = Stopwatch.StartNew();
+            var grain3TickCount = await grain3.GetTickCount();
+            while (grain3Stopwatch.Elapsed < grain3Timeout && grain3TickCount < 1)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(200));
+                grain3TickCount = await grain3.GetTickCount();
+            }
+
             Assert.Null(await grain3.GetException()); // Should be no exceptions during timer callback
-            Assert.Equal(1, await grain3.GetTickCount());
+            Assert.Equal(1, grain3TickCount);
 
             await grain.StopTimer(testName);
         }
