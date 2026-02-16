@@ -14,8 +14,7 @@ public class CassandraContainer
         {
             var containerPort = 9042;
 
-            var container = new ContainerBuilder()
-                    .WithImage("cassandra:" + Environment.GetEnvironmentVariable("CASSANDRAVERSION"))
+            var container = new ContainerBuilder("cassandra:" + Environment.GetEnvironmentVariable("CASSANDRAVERSION"))
                     .WithPortBinding(containerPort, true)
                     .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(containerPort))
                     .Build();

@@ -8,8 +8,7 @@ namespace Consul.Tests
     /// </summary>
     public static class ConsulTestUtils
     {
-        private static readonly ConsulContainer _container = new ConsulBuilder()
-            .WithImage("hashicorp/consul:1.19")
+        private static readonly ConsulContainer _container = new ConsulBuilder("hashicorp/consul:1.19")
             .WithCreateParameterModifier(parameters =>
             {
                 if (parameters.HostConfig is not null)
