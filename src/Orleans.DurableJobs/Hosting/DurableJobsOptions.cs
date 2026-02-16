@@ -40,6 +40,29 @@ public sealed class DurableJobsOptions
     public TimeSpan OverloadBackoffDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Gets or sets whether concurrent job slow start is enabled.
+    /// When enabled, job concurrency is gradually increased during startup to avoid starvation
+    /// issues that can occur before caches, connection pools, and thread pool sizing have warmed up.
+    /// Concurrency starts at <see cref="SlowStartInitialConcurrency"/> and doubles every
+    /// <see cref="SlowStartInterval"/> until <see cref="MaxConcurrentJobsPerSilo"/> is reached.
+    /// Default: <see langword="true"/>.
+    /// </summary>
+    public bool ConcurrencySlowStartEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the initial number of concurrent jobs allowed per silo when slow start is enabled.
+    /// Concurrency will exponentially increase from this value until <see cref="MaxConcurrentJobsPerSilo"/> is reached.
+    /// Default: <see cref="Environment.ProcessorCount"/>.
+    /// </summary>
+    public int SlowStartInitialConcurrency { get; set; } = Environment.ProcessorCount;
+
+    /// <summary>
+    /// Gets or sets the interval at which concurrency is doubled during slow start ramp-up.
+    /// Default: 10 seconds.
+    /// </summary>
+    public TimeSpan SlowStartInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Gets or sets the function that determines whether a failed job should be retried and when.
     /// The function receives the job context and the exception that caused the failure, and returns
     /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.
@@ -95,9 +118,24 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
         }
-        if (options.ShouldRetry == null)
+        if (options.ShouldRetry is null)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShouldRetry must not be null.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInitialConcurrency must be greater than zero.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInterval <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInterval must be greater than zero when slow start is enabled.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency > options.MaxConcurrentJobsPerSilo)
+        {
+            _logger.LogWarning(
+                "DurableJobsOptions.SlowStartInitialConcurrency ({SlowStartInitialConcurrency}) exceeds MaxConcurrentJobsPerSilo ({MaxConcurrentJobsPerSilo}); slow start will not be applied.",
+                options.SlowStartInitialConcurrency,
+                options.MaxConcurrentJobsPerSilo);
         }
         if (options.MaxAdoptedCount < 0)
         {
