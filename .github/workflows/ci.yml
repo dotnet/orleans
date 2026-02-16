@@ -658,3 +658,13 @@ jobs:
         --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.framework }}.trx"
         --
+        -parallel none -noshadow
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
