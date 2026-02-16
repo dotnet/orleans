@@ -42,14 +42,9 @@ internal sealed partial class ShardExecutor
         _options = options.Value;
         _overloadDetector = overloadDetector;
 
-        if (_options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo)
-        {
-            _currentCapacity = _options.SlowStartInitialConcurrency;
-        }
-        else
-        {
-            _currentCapacity = _options.MaxConcurrentJobsPerSilo;
-        }
+        _currentCapacity = _options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo
+            ? _options.SlowStartInitialConcurrency
+            : _options.MaxConcurrentJobsPerSilo;
 
         _jobConcurrencyLimiter = new SemaphoreSlim(_currentCapacity);
     }
