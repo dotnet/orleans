@@ -6,9 +6,9 @@ namespace TestExtensions;
 /// Manages a singleton Azurite container for Azure Storage integration tests.
 /// The container is lazily started on first use and shared across all tests in the process.
 /// </summary>
-public static class AzuriteContainer
+public static class AzuriteContainerManager
 {
-    private static Testcontainers.Azurite.AzuriteContainer _container;
+    private static AzuriteContainer _container;
     private static string _connectionString;
     private static readonly object _lock = new();
     private static Task<bool> _startTask;

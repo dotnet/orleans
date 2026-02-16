@@ -30,7 +30,7 @@ namespace Tester
             }
 
             // Start Azurite via Testcontainers (or reuse an already-running instance).
-            if (!TestExtensions.AzuriteContainer.EnsureStartedAsync().GetAwaiter().GetResult())
+            if (!AzuriteContainerManager.EnsureStartedAsync().GetAwaiter().GetResult())
             {
                 throw new SkipException("Azurite container could not be started. Skipping.");
             }
