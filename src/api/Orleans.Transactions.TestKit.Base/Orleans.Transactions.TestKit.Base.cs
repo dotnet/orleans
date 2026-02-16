@@ -323,7 +323,7 @@ namespace Orleans.Transactions.TestKit
         [Transaction(TransactionOption.Create)]
         System.Threading.Tasks.Task MultiGrainSetBit(System.Collections.Generic.List<Correctnesss.ITransactionalBitArrayGrain> grains, int bitIndex);
         [Transaction(TransactionOption.Create)]
-        System.Threading.Tasks.Task OrphanCallTransaction(ITransactionTestGrain grain);
+        System.Threading.Tasks.Task OrphanCallTransaction();
         [Transaction(TransactionOption.Create)]
         [Concurrency.ReadOnly]
         System.Threading.Tasks.Task UpdateViolated(ITransactionTestGrain grains, int numberToAdd);
@@ -719,7 +719,7 @@ namespace Orleans.Transactions.TestKit
 
         public System.Threading.Tasks.Task MultiGrainSetBit(System.Collections.Generic.List<Correctnesss.ITransactionalBitArrayGrain> grains, int bitIndex) { throw null; }
 
-        public System.Threading.Tasks.Task OrphanCallTransaction(ITransactionTestGrain grain) { throw null; }
+        public System.Threading.Tasks.Task OrphanCallTransaction() { throw null; }
 
         public System.Threading.Tasks.Task UpdateViolated(ITransactionTestGrain grain, int numberToAdd) { throw null; }
     }
