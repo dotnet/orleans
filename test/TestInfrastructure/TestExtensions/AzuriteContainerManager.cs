@@ -43,9 +43,7 @@ public static class AzuriteContainerManager
     {
         try
         {
-            var container = new AzuriteBuilder()
-                .WithInMemoryPersistence()
-                .Build();
+            var container = new AzuriteBuilder().Build();
 
             await container.StartAsync();
 
