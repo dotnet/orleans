@@ -66,10 +66,7 @@ public static class AzuriteContainer
                 .WithPortBinding(BlobPort, true)
                 .WithPortBinding(QueuePort, true)
                 .WithPortBinding(TablePort, true)
-                .WithWaitStrategy(Wait.ForUnixContainer()
-                    .UntilPortIsAvailable(BlobPort)
-                    .UntilPortIsAvailable(QueuePort)
-                    .UntilPortIsAvailable(TablePort))
+                .WithWaitStrategy(Wait.ForUnixContainer().UntilInternalTcpPortIsAvailable(BlobPort))
                 .Build();
 
             await container.StartAsync();
