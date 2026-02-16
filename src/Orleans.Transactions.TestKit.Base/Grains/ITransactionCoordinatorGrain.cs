@@ -24,7 +24,7 @@ namespace Orleans.Transactions.TestKit
         Task MultiGrainDoubleByWRWR(List<ITransactionTestGrain> grains, int numberToAdd);
 
         [Transaction(TransactionOption.Create)]
-        Task OrphanCallTransaction(ITransactionTestGrain grain);
+        Task OrphanCallTransaction();
 
         [Transaction(TransactionOption.Create)]
         Task AddAndThrow(ITransactionTestGrain grain, int numberToAdd);
