@@ -122,9 +122,23 @@ namespace UnitTests.StuckGrainTests
 
             for (var i = 0; i < 3; i++)
             {
-                await Assert.ThrowsAsync<TimeoutException>(
-                    () => stuckGrain.NonBlockingCall().WaitAsync(TimeSpan.FromMilliseconds(500)));
+                var call = stuckGrain.NonBlockingCall();
+                await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500)));
             }
+
+            await TestingUtils.WaitUntilAsync(
+                async lastTry =>
+                {
+                    var count = await stuckGrain.GetNonBlockingCallCounter();
+                    if (lastTry)
+                    {
+                        Assert.Equal(3, count);
+                    }
+
+                    return count == 3;
+                },
+                TimeSpan.FromSeconds(10),
+                TimeSpan.FromMilliseconds(200));
 
             // No issue on this one
             await stuckGrain.NonBlockingCall();
