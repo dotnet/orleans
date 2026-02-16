@@ -32,10 +32,8 @@
     <AssemblyAttribute Include="Orleans.Metadata.FrameworkPartAttribute" />
   </ItemGroup>
 
-<!--
   <ItemGroup>
     <PackageReference Include="Microsoft.DotNet.GenAPI.Task" PrivateAssets="All" />
   </ItemGroup>
--->
 
 </Project>
