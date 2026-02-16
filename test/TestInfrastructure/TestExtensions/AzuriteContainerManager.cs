@@ -1,4 +1,5 @@
 using Testcontainers.Azurite;
+using Xunit;
 
 namespace TestExtensions;
 
@@ -8,50 +9,49 @@ namespace TestExtensions;
 /// </summary>
 public static class AzuriteContainerManager
 {
-    private static AzuriteContainer _container;
-    private static string _connectionString;
-    private static readonly object _lock = new();
-    private static Task<bool> _startTask;
+    private static readonly AzuriteContainer _container = new AzuriteBuilder().Build();
 
     /// <summary>
     /// Gets the connection string for the running Azurite container.
-    /// Returns <see langword="null"/> if the container has not been started.
     /// </summary>
-    public static string ConnectionString => _connectionString;
+    public static string ConnectionString
+    {
+        get
+        {
+            EnsureStarted();
+            return _container.GetConnectionString();
+        }
+    }
+
+    private static readonly Lazy<bool> _ensureStartedLazy = new(() => EnsureStartedAsync().Result);
+
+    /// <summary>
+    /// Ensures Azurite is available by starting the container if not already running.
+    /// </summary>
+    /// <exception cref="SkipException">Thrown if the container could not be started.</exception>
+    public static void EnsureStarted()
+    {
+        if (!_ensureStartedLazy.Value)
+            throw new SkipException("Azurite container could not be started. Skipping.");
+    }
 
     /// <summary>
     /// Ensures Azurite is available by starting an Azurite Testcontainer.
     /// The container is started once and shared across all tests in the process.
     /// </summary>
     /// <returns><see langword="true"/> if Azurite is available; <see langword="false"/> if it could not be started.</returns>
-    public static Task<bool> EnsureStartedAsync()
-    {
-        if (_startTask is not null)
-        {
-            return _startTask;
-        }
-
-        lock (_lock)
-        {
-            _startTask ??= StartAsync();
-        }
-
-        return _startTask;
-    }
-
-    private static async Task<bool> StartAsync()
+    public static async Task<bool> EnsureStartedAsync()
     {
         try
         {
-            var container = new AzuriteBuilder().Build();
-
-            await container.StartAsync();
-
-            _connectionString = container.GetConnectionString();
-            _container = container;
+            await _container.StartAsync();
             return true;
         }
-        catch
+        catch (HttpRequestException)
+        {
+            return false;
+        }
+        catch (OperationCanceledException)
         {
             return false;
         }

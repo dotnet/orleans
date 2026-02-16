@@ -12,11 +12,7 @@ namespace Tester
 
         public static void CheckForAzureStorage()
         {
-            // Start Azurite via Testcontainers (or reuse an already-running instance).
-            if (!AzuriteContainerManager.EnsureStartedAsync().GetAwaiter().GetResult())
-            {
-                throw new SkipException("Azurite container could not be started. Skipping.");
-            }
+            AzuriteContainerManager.EnsureStarted();
         }
 
         public static void CheckForEventHub()
