@@ -5,27 +5,27 @@ using Orleans.GrainDirectory;
 
 namespace Orleans.Runtime.GrainDirectory
 {
-    internal class GrainLocatorResolver
+    internal sealed class GrainLocatorResolver
     {
         private readonly ConcurrentDictionary<GrainType, IGrainLocator> resolvedLocators = new();
         private readonly Func<GrainType, IGrainLocator> getLocatorInternal;
         private readonly IServiceProvider _servicesProvider;
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly CachedGrainLocator cachedGrainLocator;
-        private readonly DhtGrainLocator dhtGrainLocator;
+        private readonly IGrainLocator defaultGrainLocator;
         private ClientGrainLocator _clientGrainLocator;
 
         public GrainLocatorResolver(
             IServiceProvider servicesProvider,
             GrainDirectoryResolver grainDirectoryResolver,
             CachedGrainLocator cachedGrainLocator,
-            DhtGrainLocator dhtGrainLocator)
+            IGrainLocator grainLocator)
         {
             this.getLocatorInternal = GetGrainLocatorInternal;
             _servicesProvider = servicesProvider;
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.cachedGrainLocator = cachedGrainLocator;
-            this.dhtGrainLocator = dhtGrainLocator;
+            this.defaultGrainLocator = grainLocator;
         }
 
         public IGrainLocator GetGrainLocator(GrainType grainType) => resolvedLocators.GetOrAdd(grainType, this.getLocatorInternal);
@@ -39,7 +39,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else if (this.grainDirectoryResolver.IsUsingDefaultDirectory(grainType))
             {
-                result = this.dhtGrainLocator;
+                result = this.defaultGrainLocator;
             }
             else
             {
