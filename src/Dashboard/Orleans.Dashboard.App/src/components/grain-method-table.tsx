@@ -28,7 +28,7 @@ export default class GrainMethodTable extends React.Component<GrainMethodTablePr
           {value.method}
           <br />
           <small>
-            <a href={`#/grain/${value.grain}`}>{getName(value.grain)}</a>
+            <a href={`#/grain/${value.grain}`} title={value.grain}>{getName(value.grain)}</a>
           </small>
         </td>
       </tr>
