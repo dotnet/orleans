@@ -83,9 +83,11 @@ namespace UnitTests.StuckGrainTests
             // Should timeout
             await Assert.ThrowsAsync<TimeoutException>(() => task.WaitAsync(TimeSpan.FromSeconds(1)));
 
-            for (var i = 0; i < 3; i++)
+            var calls = new Task[3];
+            for (var i = 0; i < calls.Length; i++)
             {
                 var call = stuckGrain.NonBlockingCall();
+                calls[i] = call;
                 await Task.WhenAny(call, Task.Delay(TimeSpan.FromMilliseconds(500)));
             }
 
@@ -95,20 +97,8 @@ namespace UnitTests.StuckGrainTests
             // No issue on this one
             await stuckGrain.NonBlockingCall();
 
-            // All 4 otherwise stuck calls should have been forwarded to a new activation
-            await TestingUtils.WaitUntilAsync(
-                async lastTry =>
-                {
-                    var count = await stuckGrain.GetNonBlockingCallCounter();
-                    if (lastTry)
-                    {
-                        Assert.Equal(4, count);
-                    }
-
-                    return count == 4;
-                },
-                TimeSpan.FromSeconds(10),
-                TimeSpan.FromMilliseconds(200));
+            // All otherwise stuck calls should have been forwarded to a new activation.
+            await Task.WhenAll(calls).WaitAsync(TimeSpan.FromSeconds(10));
         }
 
         [Fact, TestCategory("Functional"), TestCategory("ActivationCollection")]
