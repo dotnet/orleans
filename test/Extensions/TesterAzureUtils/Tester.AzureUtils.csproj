@@ -23,6 +23,7 @@
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.DurableJobs.AzureStorage\Orleans.DurableJobs.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.GrainDirectory.AzureStorage\Orleans.GrainDirectory.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Orleans.Persistence.TestKit\Orleans.Persistence.TestKit.csproj" />
   </ItemGroup>
 
   <ItemGroup>
