@@ -558,18 +558,20 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         });
 
         var values = new List<string>();
+        var cleanupCountBeforeMoveNext = listener.CleanupCount;
         await foreach (var entry in grain.GetValues().WithBatchSize(1))
         {
             values.Add(entry);
 
-            // Sleep for 1 cycle before reading the next value.
-            // The enumerator should not be cleaned up.
-            var initialCleanupCount = listener.CleanupCount;
-            while (listener.CleanupCount == initialCleanupCount)
+            // Wait for one cleanup cycle before reading the next value.
+            // Track the count captured before the corresponding MoveNext call to avoid waiting
+            // for a second cycle if cleanup happens right after MoveNext completes.
+            while (listener.CleanupCount == cleanupCountBeforeMoveNext)
             {
                 await Task.Delay(cleanupInterval / 10, cts.Token);
             }
 
+            cleanupCountBeforeMoveNext = listener.CleanupCount;
             Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
         }
 
