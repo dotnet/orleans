@@ -12,6 +12,7 @@ using System.Runtime.CompilerServices;
 [assembly: InternalsVisibleTo("Orleans.Streaming.EventHubs.Tests")]
 [assembly: InternalsVisibleTo("Orleans.Azure.Tests")]
 [assembly: InternalsVisibleTo("Orleans.AWS.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Tests")]
 [assembly: InternalsVisibleTo("Orleans.Runtime.Internal.Tests")]
 [assembly: InternalsVisibleTo("Orleans.Placement.Tests")]
 [assembly: InternalsVisibleTo("Orleans.GrainDirectory.Tests")]
