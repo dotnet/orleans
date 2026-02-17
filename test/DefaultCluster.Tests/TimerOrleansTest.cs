@@ -1,4 +1,5 @@
 using System.Diagnostics;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -24,6 +25,31 @@ namespace DefaultCluster.Tests.TimerTests
             this.output = output;
         }
 
+        private static async Task<int> WaitForCounterAtLeast(Func<Task<int>> getCounter, int minimumValue, TimeSpan timeout, TimeSpan delay)
+        {
+            var last = 0;
+            await TestingUtils.WaitUntilAsync(
+                async lastTry =>
+                {
+                    last = await getCounter();
+                    if (last >= minimumValue)
+                    {
+                        return true;
+                    }
+
+                    if (lastTry)
+                    {
+                        Assert.Fail($"Counter did not reach {minimumValue} within {timeout}. Last value: {last}");
+                    }
+
+                    return false;
+                },
+                timeout,
+                delay);
+
+            return last;
+        }
+
         /// <summary>
         /// Tests basic timer functionality including start and stop operations.
         /// Verifies that timers tick at expected intervals, can be stopped,
@@ -37,14 +63,8 @@ namespace DefaultCluster.Tests.TimerTests
             {
                 var grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
                 var period = await grain.GetTimerPeriod();
-                var timeout = period.Multiply(100);
-                var stopwatch = Stopwatch.StartNew();
-                var last = 0;
-                while (stopwatch.Elapsed < timeout && last < 10)
-                {
-                    await Task.Delay(period.Divide(2));
-                    last = await grain.GetCounter();
-                }
+                var timeout = period.Multiply(50);
+                var last = await WaitForCounterAtLeast(grain.GetCounter, 10, timeout, period);
 
                 output.WriteLine("value = " + last);
                 Assert.True(last >= 10 & last <= 12, last.ToString());
@@ -383,13 +403,7 @@ namespace DefaultCluster.Tests.TimerTests
                 var grain = GrainFactory.GetGrain<IPocoTimerGrain>(GetRandomGrainId());
                 var period = await grain.GetTimerPeriod();
                 var timeout = period.Multiply(50);
-                var stopwatch = Stopwatch.StartNew();
-                var last = 0;
-                while (stopwatch.Elapsed < timeout && last < 10)
-                {
-                    await Task.Delay(period.Divide(2));
-                    last = await grain.GetCounter();
-                }
+                var last = await WaitForCounterAtLeast(grain.GetCounter, 10, timeout, period);
 
                 output.WriteLine("value = " + last);
                 Assert.True(last >= 10 & last <= 12, last.ToString());
