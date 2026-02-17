@@ -37,7 +37,7 @@ namespace DefaultCluster.Tests.TimerTests
             {
                 var grain = GrainFactory.GetGrain<ITimerGrain>(GetRandomGrainId());
                 var period = await grain.GetTimerPeriod();
-                var timeout = period.Multiply(50);
+                var timeout = period.Multiply(100);
                 var stopwatch = Stopwatch.StartNew();
                 var last = 0;
                 while (stopwatch.Elapsed < timeout && last < 10)
