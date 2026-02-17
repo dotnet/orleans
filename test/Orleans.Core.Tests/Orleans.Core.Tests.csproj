@@ -27,4 +27,8 @@
   <ItemGroup>
     <Content Include="*.xml" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+  </ItemGroup>
 </Project>

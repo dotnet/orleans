@@ -13,4 +13,12 @@
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
+    <InternalsVisibleTo Include="Orleans.AWS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
+  </ItemGroup>
 </Project>
+

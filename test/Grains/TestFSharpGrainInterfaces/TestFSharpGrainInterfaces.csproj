@@ -18,4 +18,11 @@
     <PackageReference Include="Newtonsoft.Json" />
     <PackageReference Include="protobuf-net" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+  </ItemGroup>
 </Project>
+
