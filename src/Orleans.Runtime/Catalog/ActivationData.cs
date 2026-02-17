@@ -1765,7 +1765,7 @@ internal sealed partial class ActivationData :
                         CatalogInstruments.ActivationFailedToActivate.Add(1);
                         Deactivate(new(DeactivationReason.ReasonCode, ode, DeactivationReason.Description), CancellationToken.None);
                         SetActivityError(_activationActivity, ode, ActivityErrorEvents.ActivationCancelled);
-                        LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
+                        LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
                         _activationActivity?.Dispose();
                         _activationActivity = null;
                         return;
@@ -1776,7 +1776,7 @@ internal sealed partial class ActivationData :
                         CatalogInstruments.ActivationFailedToActivate.Add(1);
                         Deactivate(new(DeactivationReason.ReasonCode, oce, DeactivationReason.Description), CancellationToken.None);
                         SetActivityError(_activationActivity, oce, ActivityErrorEvents.ActivationCancelled);
-                        LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode.ToString(), ForwardingAddress);
+                        LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
                         _activationActivity?.Dispose();
                         _activationActivity = null;
                         return;
@@ -2614,9 +2614,9 @@ internal sealed partial class ActivationData :
     [LoggerMessage(
         EventId = (int)ErrorCode.Catalog_CancelledActivate,
         Level = LogLevel.Information,
-        Message = "Activation was cancelled for {Grain}. CancellationRequested={CancellationRequested}, DeactivationReason={DeactivationReason}, ForwardingAddress={ForwardingAddress}"
+        Message = "Activation was cancelled for {Grain}. CancellationRequested={CancellationRequested}, DeactivationReasonCode={DeactivationReasonCode}, DeactivationReason={DeactivationReason}, ForwardingAddress={ForwardingAddress}"
     )]
-    private static partial void LogActivationCancelled(ILogger logger, ActivationData grain, bool cancellationRequested, string? deactivationReason, SiloAddress? forwardingAddress);
+    private static partial void LogActivationCancelled(ILogger logger, ActivationData grain, bool cancellationRequested, DeactivationReasonCode deactivationReasonCode, string? deactivationReason, SiloAddress? forwardingAddress);
     [LoggerMessage(
         Level = LogLevel.Trace,
         Message = "Completing deactivation of '{Activation}'")]
