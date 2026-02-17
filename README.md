@@ -137,7 +137,7 @@ Orleans is designed to scale elastically. When a silo joins a cluster it is able
 
 ### Run anywhere
 
-Orleans runs anywhere that .NET Core or .NET Framework are supported. This includes hosting on Linux, Windows, and macOS and deploying to Kubernetes, virtual or physical machines, on premises or in the cloud, and PaaS services such as Azure Cloud Services.
+Orleans runs anywhere that .NET Core or .NET Framework are supported. This includes hosting on Linux, Windows, and macOS and deploying to Kubernetes, virtual or physical machines, on premises or in the cloud.
 
 ### Stateless workers
 

@@ -80,7 +80,6 @@
     <Project Path="src/Azure/Orleans.Clustering.AzureStorage/Orleans.Clustering.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Clustering.Cosmos/Orleans.Clustering.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.GrainDirectory.AzureStorage/Orleans.GrainDirectory.AzureStorage.csproj" />
-    <Project Path="src/Azure/Orleans.Hosting.AzureCloudServices/Orleans.Hosting.AzureCloudServices.csproj" />
     <Project Path="src/Azure/Orleans.Journaling.AzureStorage/Orleans.Journaling.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.AzureStorage/Orleans.Persistence.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.Cosmos/Orleans.Persistence.Cosmos.csproj" />
