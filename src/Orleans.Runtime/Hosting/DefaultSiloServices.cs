@@ -504,7 +504,17 @@ namespace Orleans.Hosting
                         ?? throw new InvalidOperationException($"{kind} provider, '{name}', of type {type}, does not implement {typeof(IProviderBuilder<ISiloBuilder>)}.");
                 }
 
-                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.");
+                var knownProvidersOfKind = knownProviderTypes
+                    .Where(kvp => string.Equals(kvp.Key.Kind, kind, StringComparison.OrdinalIgnoreCase))
+                    .Select(kvp => kvp.Key.Name)
+                    .OrderBy(n => n)
+                    .ToList();
+
+                var knownProvidersMessage = knownProvidersOfKind.Count > 0
+                    ? $" Known {kind} providers: {string.Join(", ", knownProvidersOfKind)}."
+                    : string.Empty;
+
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.{knownProvidersMessage}");
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
