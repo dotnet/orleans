@@ -1765,6 +1765,7 @@ internal sealed partial class ActivationData :
                         CatalogInstruments.ActivationFailedToActivate.Add(1);
                         Deactivate(new(DeactivationReasonCode.RuntimeRequested, ode, $"Disposed object {ode.ObjectName} referenced after cancellation of activation was requested."), CancellationToken.None);
                         SetActivityError(_activationActivity, ode, ActivityErrorEvents.ActivationCancelled);
+                        LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
                         LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
                         _activationActivity?.Dispose();
                         _activationActivity = null;
