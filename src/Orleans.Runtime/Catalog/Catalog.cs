@@ -50,11 +50,7 @@ namespace Orleans.Runtime
             // Initialize lock striping array
             for (var i = 0; i < LockCount; i++)
             {
-#if NET9_0_OR_GREATER
-                _locks[i] = new Lock();
-#else
-                _locks[i] = new object();
-#endif
+                _locks[i] = new();
             }
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
@@ -81,14 +77,16 @@ namespace Orleans.Runtime
         /// <param name="grainId">The grain ID to get the lock for.</param>
         /// <returns>The lock object for the specified grain ID.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-#pragma warning disable CS9216 // A value of type 'System.Threading.Lock' converted to a different type will use likely unintended monitor-based locking in 'lock' statement.
+#if NET9_0_OR_GREATER
+        private Lock GetStripedLock(in GrainId grainId)
+#else
         private object GetStripedLock(in GrainId grainId)
+#endif
         {
             var hash = grainId.GetUniformHashCode();
             var lockIndex = (int)(hash & LockMask);
             return _locks[lockIndex];
         }
-#pragma warning restore CS9216
 
         /// <summary>
         /// Unregister message target and stop delivering messages to it
