@@ -16,7 +16,11 @@ namespace Orleans.TestingHost;
 public class TestClusterPortAllocator : ITestClusterPortAllocator
 {
     private bool _disposed;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lockObj = new();
+#else
     private readonly object _lockObj = new();
+#endif
     private readonly Dictionary<int, string> _allocatedPorts = [];
 
     /// <inheritdoc />

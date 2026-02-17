@@ -1,3 +1,4 @@
+using System.Threading;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
@@ -13,7 +14,11 @@ namespace Orleans.Runtime.Messaging
         private readonly ClientConnectionOptions clientConnectionOptions;
         private readonly ClusterOptions clusterOptions;
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
-        private readonly object initializationLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock initializationLock = new();
+#else
+        private readonly object initializationLock = new();
+#endif
         private volatile bool isInitialized;
         private ClientMessageCenter messageCenter;
         private ConnectionManager connectionManager;

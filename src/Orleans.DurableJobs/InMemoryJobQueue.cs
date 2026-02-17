@@ -16,7 +16,11 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
     private bool _isComplete;
+#if NET9_0_OR_GREATER
+    private readonly Lock _syncLock = new();
+#else
     private readonly object _syncLock = new();
+#endif
 
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
