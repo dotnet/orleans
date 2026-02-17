@@ -3,6 +3,7 @@ import Page from '../components/page';
 import http from '../lib/http';
 import DisplayGrainState from '../components/display-grain-state';
 import Panel from '../components/panel';
+import { getName } from '../lib/typeName';
 
 interface GrainDetailsProps {
   grainTypes: string[];
@@ -68,7 +69,7 @@ export default class GrainDetails extends React.Component<GrainDetailsProps, Gra
                   <select value={this.state.grainType || ''} className="form-control" onChange={this.handleGrainTypeChange}>
                     <option disabled value=""> -- Select an grain type -- </option>
                     {
-                      this.props.grainTypes.map((_item) => <option key={_item} value={_item}>{_item}</option>)
+                      this.props.grainTypes.map((_item) => <option key={_item} value={_item} title={_item}>{getName(_item)}</option>)
                     }
                   </select>
                 </div>
