@@ -1757,50 +1757,38 @@ internal sealed partial class ActivationData :
                     {
                         await grainBase.OnActivateAsync(cancellationToken).WaitAsync(cancellationToken);
                     }
-                    catch (ObjectDisposedException ode)
-                    {
-                        // this captures the case where user code in OnActivateAsync doesn't use the passed cancellation token
-                        // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation.
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
-                            CatalogInstruments.ActivationFailedToActivate.Add(1);
-                            Deactivate(
-                                new(DeactivationReasonCode.RuntimeRequested, ode,
-                                    $"Disposed object {ode.ObjectName} referenced after cancellation of activation was requested."),
-                                CancellationToken.None);
-                            SetActivityError(_activationActivity, ode, ActivityErrorEvents.ActivationCancelled);
-                            LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
-                            LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested,
-                                DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
-                            _activationActivity?.Dispose();
-                            _activationActivity = null;
-                            return;
-                        }
-
-                        throw;
-                    }
-                    catch (OperationCanceledException oce)
-                    {
-                        // catch OperationCanceledException only if it wasn't for a timeout.
-                        if (cancellationToken.IsCancellationRequested)
-                        {
-                            CatalogInstruments.ActivationFailedToActivate.Add(1);
-                            Deactivate(
-                                new(DeactivationReasonCode.RuntimeRequested, oce,
-                                    "Activation was cancelled by the runtime."), CancellationToken.None);
-                            SetActivityError(_activationActivity, oce, ActivityErrorEvents.ActivationCancelled);
-                            LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested,
-                                DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
-                            _activationActivity?.Dispose();
-                            _activationActivity = null;
-                            return;
-                        }
-
-                        throw;
-                    }
                     catch (Exception exception)
                     {
+                        if (cancellationToken.IsCancellationRequested && exception is ObjectDisposedException or OperationCanceledException)
+                        {
+                            CatalogInstruments.ActivationFailedToActivate.Add(1);
+
+                            // This captures the case where user code in OnActivateAsync doesn't use the passed cancellation token
+                            // and makes a call that tries to resolve the scoped IServiceProvider or other type that has been disposed because of cancellation,
+                            // or a direct OperationCanceledException from cancellation.
+                            if (exception is ObjectDisposedException ode)
+                            {
+                                LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
+                                Deactivate(
+                                    new(DeactivationReasonCode.RuntimeRequested, ode,
+                                        $"Disposed object {ode.ObjectName} referenced after cancellation of activation was requested."),
+                                    CancellationToken.None);
+                            }
+                            else
+                            {
+                                Deactivate(
+                                    new(DeactivationReasonCode.RuntimeRequested, exception,
+                                        "Activation was cancelled by the runtime."), CancellationToken.None);
+                            }
+
+                            SetActivityError(_activationActivity, exception, ActivityErrorEvents.ActivationCancelled);
+                            LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested,
+                                DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
+                            _activationActivity?.Dispose();
+                            _activationActivity = null;
+                            return;
+                        }
+
                         LogErrorInGrainMethod(_shared.Logger, exception, nameof(IGrainBase.OnActivateAsync), this);
                         SetActivityError(onActivateSpan, exception, ActivityErrorEvents.OnActivateFailed);
                         throw;
