@@ -1,5 +1,5 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("TesterInternal")]
-[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
-[assembly: InternalsVisibleTo("NonSilo.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Internal.Tests")]
+[assembly: InternalsVisibleTo("Orleans.DefaultCluster.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Core.Tests")]

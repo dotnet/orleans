@@ -6,9 +6,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <ProjectReference Include="$(SourceRoot)test\Misc\TestInterfaces\TestInterfaces.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Grains\TestFSharp\TestFSharp.fsproj" />
-    <ProjectReference Include="$(SourceRoot)test\Misc\TestFSharpInterfaces\TestFSharpInterfaces.fsproj" />
+    <ProjectReference Include="FSharpInterfaces\TestFSharpInterfaces.fsproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Serialization.FSharp\Orleans.Serialization.FSharp.csproj" />
     <ProjectReference Include="..\..\..\src\Orleans.Streaming\Orleans.Streaming.csproj" />
   </ItemGroup>

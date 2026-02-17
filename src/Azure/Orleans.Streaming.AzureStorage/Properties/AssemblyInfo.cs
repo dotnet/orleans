@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("Tester")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Tests")]

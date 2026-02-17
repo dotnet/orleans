@@ -1,3 +1,3 @@
 using System.Runtime.CompilerServices;
 
-[assembly: InternalsVisibleTo("ServiceBus.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Streaming.EventHubs.Tests")]

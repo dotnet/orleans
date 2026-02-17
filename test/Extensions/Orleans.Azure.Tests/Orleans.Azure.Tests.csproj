@@ -1,0 +1,33 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <DefineConstants>TRACE;TESTER_AZUREUTILS;ORLEANS_PERSISTENCE</DefineConstants>
+    <OutputType>Exe</OutputType>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <GenerateProgramFile>false</GenerateProgramFile>
+    <CopyLocalLockFileAssemblies>true</CopyLocalLockFileAssemblies>
+    <SatelliteResourceLanguages>en-US</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Aspire.Azure.Storage.Queues" />
+    <PackageReference Include="Azure.Data.Tables" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Azure.Identity" />
+    <PackageReference Include="System.Diagnostics.PerformanceCounter" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.DurableJobs.Tests\Orleans.DurableJobs.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Reminders.AzureStorage\Orleans.Reminders.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.DurableJobs.AzureStorage\Orleans.DurableJobs.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.GrainDirectory.AzureStorage\Orleans.GrainDirectory.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)\src\Azure\Orleans.Streaming.AzureStorage\Orleans.Streaming.AzureStorage.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Compile Include="$(SourceRoot)src\Azure\Shared\Utilities\ErrorCode.cs" Link="Utilities\ErrorCode.cs" />
+  </ItemGroup>
+</Project>

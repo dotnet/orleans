@@ -1,11 +1,12 @@
 using System.Runtime.CompilerServices;
 
 [assembly: InternalsVisibleTo("TestInternalGrains")]
-[assembly: InternalsVisibleTo("TesterInternal")]
-[assembly: InternalsVisibleTo("NonSilo.Tests")]
-[assembly: InternalsVisibleTo("AWSUtils.Tests")]
-[assembly: InternalsVisibleTo("Tester.AzureUtils")]
+[assembly: InternalsVisibleTo("Orleans.Runtime.Internal.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Streaming.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Core.Tests")]
+[assembly: InternalsVisibleTo("Orleans.AWS.Tests")]
+[assembly: InternalsVisibleTo("Orleans.Azure.Tests")]
 [assembly: InternalsVisibleTo("LoadTestGrains")]
-[assembly: InternalsVisibleTo("Tester.AdoNet")]
+[assembly: InternalsVisibleTo("Orleans.AdoNet.Tests")]
 [assembly: InternalsVisibleTo("TestExtensions")]
-[assembly: InternalsVisibleTo("DefaultCluster.Tests")]
+[assembly: InternalsVisibleTo("Orleans.DefaultCluster.Tests")]
