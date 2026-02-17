@@ -1763,7 +1763,7 @@ internal sealed partial class ActivationData :
                     {
                         LogActivationDisposedObjectAccessed(_shared.Logger, ode.ObjectName, this);
                         CatalogInstruments.ActivationFailedToActivate.Add(1);
-                        Deactivate(new(DeactivationReason.ReasonCode, ode, DeactivationReason.Description), CancellationToken.None);
+                        Deactivate(new(DeactivationReasonCode.RuntimeRequested, ode, $"Disposed object {ode.ObjectName} referenced after cancellation of activation was requested."), CancellationToken.None);
                         SetActivityError(_activationActivity, ode, ActivityErrorEvents.ActivationCancelled);
                         LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
                         _activationActivity?.Dispose();
@@ -1774,7 +1774,7 @@ internal sealed partial class ActivationData :
                     catch (OperationCanceledException oce) when (cancellationToken.IsCancellationRequested && DeactivationReason.ReasonCode != DeactivationReasonCode.ActivationUnresponsive)
                     {
                         CatalogInstruments.ActivationFailedToActivate.Add(1);
-                        Deactivate(new(DeactivationReason.ReasonCode, oce, DeactivationReason.Description), CancellationToken.None);
+                        Deactivate(new(DeactivationReasonCode.RuntimeRequested, oce, "Activation was cancelled by the runtime."), CancellationToken.None);
                         SetActivityError(_activationActivity, oce, ActivityErrorEvents.ActivationCancelled);
                         LogActivationCancelled(_shared.Logger, this, cancellationToken.IsCancellationRequested, DeactivationReason.ReasonCode, DeactivationReason.Description, ForwardingAddress);
                         _activationActivity?.Dispose();
