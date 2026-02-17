@@ -20,4 +20,25 @@
     <Folder Include="Diagnostics\" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Benchmarks" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    <InternalsVisibleTo Include="LoadTestGrains" />
+    <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
+    <InternalsVisibleTo Include="Orleans.AWS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs" />
+    <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling" />
+    <InternalsVisibleTo Include="Orleans.Placement.Tests" />
+    <InternalsVisibleTo Include="Orleans.Reminders" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming" />
+    <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
+    <InternalsVisibleTo Include="Orleans.TestingHost" />
+    <InternalsVisibleTo Include="TestInternalGrains" />
+  </ItemGroup>
 </Project>
+
