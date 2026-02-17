@@ -1,5 +1,6 @@
 using System.Globalization;
 using Orleans.Runtime;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using TestGrainInterfaces;
 using UnitTests.GrainInterfaces;
@@ -731,8 +732,25 @@ namespace DefaultCluster.Tests.General
             var target = this.GrainFactory.GetGrain<IGenericPingSelf<string>>(targetId);
             var s1 = Guid.NewGuid().ToString();
             await grain.ScheduleDelayedPingToSelfAndDeactivate(target, s1, TimeSpan.FromSeconds(5));
-            await Task.Delay(TimeSpan.FromSeconds(6));
-            var s2 = await grain.GetLastValue();
+            string s2 = null;
+            await TestingUtils.WaitUntilAsync(
+                async lastTry =>
+                {
+                    s2 = await grain.GetLastValue();
+                    if (s2 == s1)
+                    {
+                        return true;
+                    }
+
+                    if (lastTry)
+                    {
+                        Assert.Fail($"Expected delayed ping to set value '{s1}', but saw '{s2 ?? "null"}'.");
+                    }
+
+                    return false;
+                },
+                timeout: TimeSpan.FromSeconds(30),
+                delayOnFail: TimeSpan.FromMilliseconds(200));
             Assert.Equal(s1, s2);
         }
 
