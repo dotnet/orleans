@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
 using System.Reflection.Emit;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
@@ -23,7 +24,11 @@ namespace Orleans.GrainReferences
     /// </summary>
     public sealed class GrainReferenceActivator
     {
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private readonly IServiceProvider _serviceProvider;
         private readonly IGrainReferenceActivatorProvider[] _providers;
         private Dictionary<(GrainType, GrainInterfaceType), IGrainReferenceActivator> _activators = new();

@@ -22,7 +22,11 @@ namespace Orleans.Runtime
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
         private const int LockMask = LockCount - 1;
+#if NET9_0_OR_GREATER
+        private readonly Lock[] _locks = new Lock[LockCount];
+#else
         private readonly object[] _locks = new object[LockCount];
+#endif
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -46,7 +50,7 @@ namespace Orleans.Runtime
             // Initialize lock striping array
             for (var i = 0; i < LockCount; i++)
             {
-                _locks[i] = new object();
+                _locks[i] = new();
             }
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
@@ -73,7 +77,11 @@ namespace Orleans.Runtime
         /// <param name="grainId">The grain ID to get the lock for.</param>
         /// <returns>The lock object for the specified grain ID.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET9_0_OR_GREATER
+        private Lock GetStripedLock(in GrainId grainId)
+#else
         private object GetStripedLock(in GrainId grainId)
+#endif
         {
             var hash = grainId.GetUniformHashCode();
             var lockIndex = (int)(hash & LockMask);

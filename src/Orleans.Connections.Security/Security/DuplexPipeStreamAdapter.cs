@@ -1,6 +1,7 @@
 using System;
 using System.IO;
 using System.IO.Pipelines;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Connections.Security
@@ -12,7 +13,11 @@ namespace Orleans.Connections.Security
     internal class DuplexPipeStreamAdapter<TStream> : DuplexPipeStream, IDuplexPipe where TStream : Stream
     {
         private bool _disposed;
-        private readonly object _disposeLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _disposeLock = new();
+#else
+        private readonly object _disposeLock = new();
+#endif
 
         public DuplexPipeStreamAdapter(IDuplexPipe duplexPipe, Func<Stream, TStream> createStream) :
             this(duplexPipe, new StreamPipeReaderOptions(leaveOpen: true), new StreamPipeWriterOptions(leaveOpen: true), createStream)

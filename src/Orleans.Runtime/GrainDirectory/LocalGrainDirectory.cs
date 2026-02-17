@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -20,7 +21,11 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly SiloAddress? seed;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
-        private readonly object writeLock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock writeLock = new();
+#else
+        private readonly object writeLock = new();
+#endif
         private readonly IServiceProvider _serviceProvider;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
