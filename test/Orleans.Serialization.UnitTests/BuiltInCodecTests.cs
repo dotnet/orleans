@@ -1,4 +1,8 @@
 using CsCheck;
+#if NET8_0_OR_GREATER
+using Orleans;
+using Orleans.CodeGeneration;
+#endif
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
@@ -16,6 +20,11 @@ using System.Collections.Specialized;
 using System.Linq;
 using System.Net;
 using System.Numerics;
+#if NET8_0_OR_GREATER
+using System.Xml.Linq;
+using Orleans.Runtime;
+using Orleans.Runtime.Serialization;
+#endif
 using Xunit;
 using Microsoft.FSharp.Collections;
 using Xunit.Abstractions;
@@ -27,6 +36,7 @@ using System.Collections;
 using Orleans.Serialization.Invocation;
 using System.Globalization;
 using System.Threading;
+using System.Threading.Tasks;
 
 namespace Orleans.Serialization.UnitTests
 {
@@ -93,7 +103,7 @@ namespace Orleans.Serialization.UnitTests
                         typesWithCodecs.Add(typeArg);
                     }
 
-                    if (gtd == typeof(IDeepCopier<>) && gtd.GenericTypeArguments[0] is { IsArray: false })
+                    if (gtd == typeof(IDeepCopier<>) && iface.GenericTypeArguments[0] is { IsArray: false })
                     {
                         var typeArg = iface.GenericTypeArguments[0] switch
                         {
@@ -137,16 +147,28 @@ namespace Orleans.Serialization.UnitTests
                 }
             }
 
-            var typesWithoutCodecTests = typesWithCodecs.Except(typesWithCodecTests).ToArray();
+            var excludedTypes = new HashSet<Type>();
+            TryAddExcludedType(excludedTypes, "UnitTests.GrainInterfaces.UnserializableType, TestGrainInterfaces");
+            TryAddExcludedType(excludedTypes, "UnitTests.GrainInterfaces.UndeserializableType, TestGrainInterfaces");
+
+            var typesWithoutCodecTests = typesWithCodecs.Except(typesWithCodecTests).Except(excludedTypes).ToArray();
             if (typesWithoutCodecTests.Length > 0)
             {
                 Assert.Fail($"Missing codec tests for \n * {string.Join("\n * ", typesWithoutCodecTests.Select(t => t.ToString()))}");
             }
 
-            var typesWithoutCopierTests = typesWithCopiers.Except(typesWithCopierTests).ToArray();
+            var typesWithoutCopierTests = typesWithCopiers.Except(typesWithCopierTests).Except(excludedTypes).ToArray();
             if (typesWithoutCopierTests.Length > 0)
             {
                 Assert.Fail($"Missing copier tests for \n * {string.Join("\n * ", typesWithoutCopierTests.Select(t => t.ToString()))}");
+            }
+
+            static void TryAddExcludedType(HashSet<Type> excluded, string typeName)
+            {
+                if (Type.GetType(typeName) is { } type)
+                {
+                    excluded.Add(type);
+                }
             }
         }
     }
@@ -4021,4 +4043,342 @@ namespace Orleans.Serialization.UnitTests
             new CancellationToken(true)
         ];
     }
+
+#if NET8_0_OR_GREATER
+    public class GrainCancellationTokenCodecTests(ITestOutputHelper output) : FieldCodecTester<GrainCancellationToken, IFieldCodec<GrainCancellationToken>>(output)
+    {
+        private static readonly PropertyInfo TokenIdProperty = typeof(GrainCancellationToken).GetProperty("Id", BindingFlags.Instance | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Unable to locate GrainCancellationToken.Id property.");
+
+        protected override void Configure(ISerializerBuilder builder)
+        {
+            var runtimeInterfaceType = Type.GetType("Orleans.Runtime.IGrainCancellationTokenRuntime, Orleans.Core.Abstractions")
+                ?? throw new InvalidOperationException("Unable to locate IGrainCancellationTokenRuntime.");
+            var runtimeImplementationType = Type.GetType("Orleans.Runtime.GrainCancellationTokenRuntime, Orleans.Core")
+                ?? throw new InvalidOperationException("Unable to locate GrainCancellationTokenRuntime.");
+            var runtimeInstance = Activator.CreateInstance(runtimeImplementationType, nonPublic: true)
+                ?? throw new InvalidOperationException("Unable to create GrainCancellationTokenRuntime.");
+
+            builder.Services.AddSingleton(runtimeInterfaceType, runtimeInstance);
+        }
+
+        protected override GrainCancellationToken CreateValue() => CreateToken(isCanceled: false);
+
+        protected override GrainCancellationToken[] TestValues =>
+        [
+            null,
+            CreateToken(isCanceled: false),
+            CreateToken(isCanceled: true),
+        ];
+
+        protected override bool Equals(GrainCancellationToken left, GrainCancellationToken right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left is null || right is null)
+            {
+                return false;
+            }
+
+            return GetTokenId(left) == GetTokenId(right)
+                && left.CancellationToken.IsCancellationRequested == right.CancellationToken.IsCancellationRequested;
+        }
+
+        private static GrainCancellationToken CreateToken(bool isCanceled)
+        {
+            var source = new GrainCancellationTokenSource();
+            if (isCanceled)
+            {
+                source.Cancel().GetAwaiter().GetResult();
+            }
+
+            return source.Token;
+        }
+
+        private static Guid GetTokenId(GrainCancellationToken token)
+            => (Guid)TokenIdProperty.GetValue(token)!;
+    }
+
+    public class IdSpanCodecTests(ITestOutputHelper output) : FieldCodecTester<IdSpan, IdSpanCodec>(output)
+    {
+        protected override IdSpan CreateValue() => IdSpan.Create(Guid.NewGuid().ToString("N"));
+
+        protected override IdSpan[] TestValues =>
+        [
+            default,
+            IdSpan.Create("alpha"),
+            new IdSpan([1, 2, 3, 4]),
+            new IdSpan([10, 20, 30]),
+        ];
+    }
+
+    public class SiloAddressCodecTests(ITestOutputHelper output) : FieldCodecTester<SiloAddress, SiloAddressCodec>(output)
+    {
+        protected override int[] MaxSegmentSizes => [256];
+
+        protected override SiloAddress CreateValue()
+            => SiloAddress.New(IPAddress.Loopback, Random.Next(10240, 30240), Random.Next(1, 1000));
+
+        protected override SiloAddress[] TestValues =>
+        [
+            null,
+            SiloAddress.Zero,
+            SiloAddress.New(IPAddress.Loopback, 11111, 1),
+            SiloAddress.New(IPAddress.Parse("127.0.0.2"), 22222, 2),
+        ];
+    }
+
+    public class IAddressableCodecTests(ITestOutputHelper output) : FieldCodecTester<IAddressable, IFieldCodec<IAddressable>>(output)
+    {
+        protected override void Configure(ISerializerBuilder builder)
+        {
+            builder.Services.AddSingleton<IGrainReferenceRuntime, TestGrainReferenceRuntime>();
+            builder.Services.AddSingleton<IGrainFactory, TestGrainFactory>();
+
+            var codecProviderType = Type.GetType("Orleans.Runtime.GrainReferenceCodecProvider, Orleans.Core.Abstractions")
+                ?? throw new InvalidOperationException("Unable to locate GrainReferenceCodecProvider.");
+            builder.Services.AddSingleton(typeof(ISpecializableCodec), codecProviderType);
+        }
+
+        protected override IAddressable CreateValue()
+        {
+            var grainId = GrainReferenceTestHelper.CreateGrainId();
+            return GrainReferenceTestHelper.CreateGrainReference(ServiceProvider, grainId, GrainReferenceTestHelper.InterfaceType);
+        }
+
+        protected override IAddressable[] TestValues =>
+        [
+            null,
+            CreateValue(),
+            CreateValue(),
+        ];
+
+        protected override bool Equals(IAddressable left, IAddressable right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left is null || right is null)
+            {
+                return false;
+            }
+
+            if (left is not GrainReference leftRef || right is not GrainReference rightRef)
+            {
+                return false;
+            }
+
+            return leftRef.GrainId == rightRef.GrainId && leftRef.InterfaceType == rightRef.InterfaceType;
+        }
+    }
+
+    public class XDocumentCodecTests(ITestOutputHelper output) : FieldCodecTester<XDocument, IFieldCodec<XDocument>>(output)
+    {
+        protected override int[] MaxSegmentSizes => [256];
+
+        protected override XDocument CreateValue() => CreateDocument();
+
+        protected override XDocument[] TestValues =>
+        [
+            null,
+            CreateDocument(),
+            CreateDocument(),
+        ];
+
+        protected override bool Equals(XDocument left, XDocument right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left is null || right is null)
+            {
+                return false;
+            }
+
+            return XNode.DeepEquals(left, right);
+        }
+
+        private static XDocument CreateDocument()
+            => new(new XElement("root", new XAttribute("id", Guid.NewGuid()), new XElement("value", Guid.NewGuid().ToString("N"))));
+    }
+
+    public class XDocumentCopierTests(ITestOutputHelper output) : CopierTester<XDocument, IDeepCopier<XDocument>>(output)
+    {
+        protected override bool IsPooled => true;
+
+        protected override XDocument CreateValue() => CreateDocument();
+
+        protected override XDocument[] TestValues =>
+        [
+            CreateDocument(),
+            CreateDocument(),
+        ];
+
+        protected override bool Equals(XDocument left, XDocument right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left is null || right is null)
+            {
+                return false;
+            }
+
+            return XNode.DeepEquals(left, right);
+        }
+
+        private static XDocument CreateDocument()
+            => new(new XElement("root", new XAttribute("id", Guid.NewGuid()), new XElement("value", Guid.NewGuid().ToString("N"))));
+    }
+
+    public class GrainReferenceCopierTests(ITestOutputHelper output) : CopierTester<GrainReference, IDeepCopier<GrainReference>>(output)
+    {
+        protected override bool IsImmutable => true;
+
+        protected override void Configure(ISerializerBuilder builder)
+        {
+            builder.Services.AddSingleton<IGrainReferenceRuntime, TestGrainReferenceRuntime>();
+        }
+
+        protected override GrainReference CreateValue()
+        {
+            var grainId = GrainReferenceTestHelper.CreateGrainId();
+            return GrainReferenceTestHelper.CreateGrainReference(ServiceProvider, grainId, GrainReferenceTestHelper.InterfaceType);
+        }
+
+        protected override GrainReference[] TestValues =>
+        [
+            null,
+            CreateValue(),
+            CreateValue(),
+        ];
+
+        protected override bool Equals(GrainReference left, GrainReference right)
+        {
+            if (ReferenceEquals(left, right))
+            {
+                return true;
+            }
+
+            if (left is null || right is null)
+            {
+                return false;
+            }
+
+            return left.GrainId == right.GrainId && left.InterfaceType == right.InterfaceType;
+        }
+    }
+
+    internal static class GrainReferenceTestHelper
+    {
+        private static readonly MethodInfo GrainReferenceFromGrainId = typeof(GrainReference).GetMethod("FromGrainId", BindingFlags.Static | BindingFlags.NonPublic)
+            ?? throw new InvalidOperationException("Unable to locate GrainReference.FromGrainId.");
+
+        internal static readonly GrainInterfaceType InterfaceType = GrainInterfaceType.Create("unit-tests");
+
+        internal static GrainId CreateGrainId()
+            => GrainId.Create(GrainType.Create("unit-tests"), IdSpan.Create(Guid.NewGuid().ToString("N")));
+
+        internal static GrainReference CreateGrainReference(IServiceProvider serviceProvider, GrainId grainId, GrainInterfaceType interfaceType)
+        {
+            var runtime = serviceProvider.GetRequiredService<IGrainReferenceRuntime>();
+            var codecProvider = serviceProvider.GetRequiredService<CodecProvider>();
+            var copyContextPool = serviceProvider.GetRequiredService<CopyContextPool>();
+            var shared = new GrainReferenceShared(
+                grainId.Type,
+                interfaceType,
+                interfaceVersion: 0,
+                runtime,
+                InvokeMethodOptions.None,
+                codecProvider,
+                copyContextPool,
+                serviceProvider);
+            return (GrainReference)GrainReferenceFromGrainId.Invoke(null, new object[] { shared, grainId })!;
+        }
+    }
+
+    internal sealed class TestGrainReferenceRuntime : IGrainReferenceRuntime
+    {
+        public object Cast(IAddressable grain, Type interfaceType) => grain;
+
+        public ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+            => throw new NotSupportedException("Grain invocations are not supported in codec tests.");
+
+        public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+            => throw new NotSupportedException("Grain invocations are not supported in codec tests.");
+
+        public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+            => throw new NotSupportedException("Grain invocations are not supported in codec tests.");
+    }
+
+    internal sealed class TestGrainFactory(IServiceProvider serviceProvider) : IGrainFactory
+    {
+        private const string UnsupportedMessage = "TestGrainFactory only supports GrainId-based lookups.";
+        private readonly IServiceProvider _serviceProvider = serviceProvider;
+
+        public IAddressable GetGrain(GrainId grainId, GrainInterfaceType interfaceType)
+            => GrainReferenceTestHelper.CreateGrainReference(_serviceProvider, grainId, interfaceType);
+
+        public IAddressable GetGrain(GrainId grainId)
+            => GetGrain(grainId, GrainReferenceTestHelper.InterfaceType);
+
+        public TGrainInterface GetGrain<TGrainInterface>(GrainId grainId) where TGrainInterface : IAddressable
+            => (TGrainInterface)GetGrain(grainId, GrainReferenceTestHelper.InterfaceType);
+
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidKey
+            => ThrowUnsupported<TGrainInterface>();
+
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerKey
+            => ThrowUnsupported<TGrainInterface>();
+
+        public TGrainInterface GetGrain<TGrainInterface>(string primaryKey, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithStringKey
+            => ThrowUnsupported<TGrainInterface>();
+
+        public TGrainInterface GetGrain<TGrainInterface>(Guid primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithGuidCompoundKey
+            => ThrowUnsupported<TGrainInterface>();
+
+        public TGrainInterface GetGrain<TGrainInterface>(long primaryKey, string keyExtension, string grainClassNamePrefix = null) where TGrainInterface : IGrainWithIntegerCompoundKey
+            => ThrowUnsupported<TGrainInterface>();
+
+        public TGrainObserverInterface CreateObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
+            => ThrowUnsupported<TGrainObserverInterface>();
+
+        public void DeleteObjectReference<TGrainObserverInterface>(IGrainObserver obj) where TGrainObserverInterface : IGrainObserver
+            => ThrowUnsupported();
+
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey)
+            => ThrowUnsupported<IGrain>();
+
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey)
+            => ThrowUnsupported<IGrain>();
+
+        public IGrain GetGrain(Type grainInterfaceType, string grainPrimaryKey)
+            => ThrowUnsupported<IGrain>();
+
+        public IGrain GetGrain(Type grainInterfaceType, Guid grainPrimaryKey, string keyExtension)
+            => ThrowUnsupported<IGrain>();
+
+        public IGrain GetGrain(Type grainInterfaceType, long grainPrimaryKey, string keyExtension)
+            => ThrowUnsupported<IGrain>();
+
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey, string grainClassNamePrefix)
+            => ThrowUnsupported<IAddressable>();
+
+        public IAddressable GetGrain(Type interfaceType, IdSpan grainKey)
+            => ThrowUnsupported<IAddressable>();
+
+        private static T ThrowUnsupported<T>() => throw new NotSupportedException(UnsupportedMessage);
+
+        private static void ThrowUnsupported() => throw new NotSupportedException(UnsupportedMessage);
+    }
+#endif
 }

@@ -14,4 +14,15 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Core.Abstractions\Orleans.Core.Abstractions.csproj" />
     <ProjectReference Include="..\Orleans.Sdk\Orleans.Sdk.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="LoadTestGrains" />
+    <InternalsVisibleTo Include="Orleans.AWS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="TestInternalGrains" />
+  </ItemGroup>
 </Project>
+
