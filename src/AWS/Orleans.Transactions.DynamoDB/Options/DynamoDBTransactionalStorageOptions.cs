@@ -1,11 +1,21 @@
-using System;
-using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Storage;
+#if CLUSTERING_DYNAMODB
+using Orleans.Clustering.DynamoDB;
+#elif PERSISTENCE_DYNAMODB
+using Orleans.Persistence.DynamoDB;
+#elif REMINDERS_DYNAMODB
+using Orleans.Reminders.DynamoDB;
+#elif AWSUTILS_TESTS
+using Orleans.AWSUtils.Tests;
+#elif TRANSACTIONS_DYNAMODB
+using Orleans.Transactions.DynamoDB;
+#else
+#endif
 
 namespace Orleans.Configuration
 {
-    public class DynamoDBStorageOptions : DynamoDBClientOptions, IStorageProviderSerializerOptions
+    public class DynamoDBTransactionalStorageOptions : DynamoDBClientOptions, IStorageProviderSerializerOptions
     {
         /// <summary>
         /// Gets or sets a unique identifier for this service, which should survive deployment and redeployment.
@@ -44,30 +54,20 @@ namespace Orleans.Configuration
         public string TableName { get; set; } = "OrleansGrainState";
 
         /// <summary>
-        /// Indicates if grain data should be deleted or reset to defaults when a grain clears it's state.
-        /// </summary>
-        public bool DeleteStateOnClear { get; set; } = false;
-
-        /// <summary>
         /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
         /// </summary>
         public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
         public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
-        /// <summary>
-        /// Specifies a time span in which the item would be expired in the future
-        /// every StateWrite will increase the TTL of the grain
-        /// </summary>
-        public TimeSpan? TimeToLive { get; set; }
         public IGrainStorageSerializer GrainStorageSerializer { get; set; }
     }
 
     /// <summary>
-    /// Configuration validator for DynamoDBStorageOptions
+    /// Configuration validator for DynamoDBTransactionalStorageOptions
     /// </summary>
-    public class DynamoDBGrainStorageOptionsValidator : IConfigurationValidator
+    public class DynamoDBTransactionalStorageOptionsValidator : IConfigurationValidator
     {
-        private readonly DynamoDBStorageOptions options;
+        private readonly DynamoDBTransactionalStorageOptions options;
         private readonly string name;
 
         /// <summary>
@@ -75,7 +75,7 @@ namespace Orleans.Configuration
         /// </summary>
         /// <param name="options">The option to be validated.</param>
         /// <param name="name">The option name to be validated.</param>
-        public DynamoDBGrainStorageOptionsValidator(DynamoDBStorageOptions options, string name)
+        public DynamoDBTransactionalStorageOptionsValidator(DynamoDBTransactionalStorageOptions options, string name)
         {
             this.options = options;
             this.name = name;

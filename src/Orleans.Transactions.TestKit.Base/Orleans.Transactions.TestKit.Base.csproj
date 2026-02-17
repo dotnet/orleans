@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Transactions.AzureStorage\Orleans.Transactions.AzureStorage.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Transactions.DynamoDB\Orleans.Transactions.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Transactions\Orleans.Transactions.csproj" />
   </ItemGroup>

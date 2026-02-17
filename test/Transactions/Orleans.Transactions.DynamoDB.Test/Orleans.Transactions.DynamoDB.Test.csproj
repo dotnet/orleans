@@ -1,0 +1,19 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>Orleans.Transactions.DynamoDB.Tests</RootNamespace>
+    <AssemblyName>Orleans.Transactions.DynamoDB.Tests</AssemblyName>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\Transactions\Orleans.Transactions.Tests\Orleans.Transactions.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Transactions.DynamoDB\Orleans.Transactions.DynamoDB.csproj" />
+    <ProjectReference Include="..\..\Extensions\AWSUtils.Tests\AWSUtils.Tests.csproj" />
+  </ItemGroup>
+</Project>

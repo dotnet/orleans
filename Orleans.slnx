@@ -75,6 +75,7 @@
     <Project Path="src/AWS/Orleans.Persistence.DynamoDB/Orleans.Persistence.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Reminders.DynamoDB/Orleans.Reminders.DynamoDB.csproj" />
     <Project Path="src/AWS/Orleans.Streaming.SQS/Orleans.Streaming.SQS.csproj" />
+    <Project Path="src/AWS/Orleans.Transactions.DynamoDB/Orleans.Transactions.DynamoDB.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/Azure/">
     <Project Path="src/Azure/Orleans.Clustering.AzureStorage/Orleans.Clustering.AzureStorage.csproj" />
@@ -148,6 +149,7 @@
     <Project Path="test/Extensions/TesterAdoNet/Tester.AdoNet.csproj" />
     <Project Path="test/Extensions/TesterAzureUtils/Tester.AzureUtils.csproj" />
     <Project Path="test/Extensions/TesterZooKeeperUtils/Tester.ZooKeeperUtils.csproj" />
+    <Project Path="test/Transactions/Orleans.Transactions.DynamoDB.Test/Orleans.Transactions.DynamoDB.Test.csproj" />
     <Project Path="test\Extensions\NATS.Tests\NATS.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Grains/">
