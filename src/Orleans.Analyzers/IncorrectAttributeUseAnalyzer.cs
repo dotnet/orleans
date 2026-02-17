@@ -4,6 +4,7 @@ using System.Collections.Immutable;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
 {

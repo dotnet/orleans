@@ -159,7 +159,7 @@ namespace Orleans.Messaging
         /// is in the same order every time.
         /// </summary>
         /// <returns></returns>
-                public SiloAddress? GetLiveGateway()
+        public SiloAddress? GetLiveGateway()
         #nullable disable
         {
             List<SiloAddress> live = GetLiveGateways();

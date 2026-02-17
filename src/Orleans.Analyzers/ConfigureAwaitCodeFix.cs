@@ -13,6 +13,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 /// <summary>
 /// A code fix provider that converts ConfigureAwait(false) to ConfigureAwait(true) and
 /// adds ContinueOnCapturedContext to ConfigureAwait(ConfigureAwaitOptions) calls.

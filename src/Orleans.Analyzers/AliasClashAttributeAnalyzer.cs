@@ -10,6 +10,7 @@ using System.Globalization;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 [DiagnosticAnalyzer(LanguageNames.CSharp)]
 public class AliasClashAttributeAnalyzer : DiagnosticAnalyzer
 {
