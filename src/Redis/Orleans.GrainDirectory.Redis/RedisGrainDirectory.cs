@@ -191,7 +191,7 @@ namespace Orleans.GrainDirectory.Redis
 
         private async Task Uninitialize(CancellationToken arg)
         {
-            if (_redis != null && _redis.IsConnected)
+            if (_redis != null)
             {
                 _disposed = true;
 
@@ -201,6 +201,11 @@ namespace Orleans.GrainDirectory.Redis
                 }
                 finally
                 {
+                    _redis.ConnectionRestored -= LogConnectionRestored;
+                    _redis.ConnectionFailed -= LogConnectionFailed;
+                    _redis.ErrorMessage -= LogErrorMessage;
+                    _redis.InternalError -= LogInternalError;
+
                     _redis = null!;
                     _database = null!;
                 }
