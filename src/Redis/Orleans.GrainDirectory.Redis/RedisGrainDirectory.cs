@@ -195,10 +195,15 @@ namespace Orleans.GrainDirectory.Redis
             {
                 _disposed = true;
 
-                await _redis.CloseAsync();
-                _redis.Dispose();
-                _redis = null!;
-                _database = null!;
+                try
+                {
+                    await _redis.DisposeAsync();
+                }
+                finally
+                {
+                    _redis = null!;
+                    _database = null!;
+                }
             }
         }
 
