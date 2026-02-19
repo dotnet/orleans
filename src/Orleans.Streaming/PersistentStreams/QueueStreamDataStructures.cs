@@ -33,6 +33,8 @@ namespace Orleans.Streams
 
         [NonSerialized]
         public bool IsRegistered = false;
+        [NonSerialized]
+        public StreamSequenceToken? PendingStartToken;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {

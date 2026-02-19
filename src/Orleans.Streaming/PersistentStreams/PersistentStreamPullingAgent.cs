@@ -243,6 +243,7 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
+                data.PendingStartToken = null;
                 data.IsRegistered = true;
                 if (data.State == StreamConsumerDataState.Inactive)
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
@@ -268,15 +269,17 @@ namespace Orleans.Streams
                          this.options.MaxEventDeliveryTime,
                          deliveryBackoffProvider);
 
-                    if (requestedHandshakeToken != null)
+                    var requestedToken = requestedHandshakeToken?.Token;
+                    if (requestedToken != null)
                     {
                         consumerData.SafeDisposeCursor(logger);
-                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedHandshakeToken.Token);
+                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, requestedToken);
                     }
                     else
                     {
+                        var registrationToken = cacheToken ?? consumerData.PendingStartToken;
                         if (consumerData.Cursor == null) // if the consumer did not ask for a specific token and we already have a cursor, just keep using it.
-                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
+                            consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, registrationToken);
                     }
                 }
                 catch (Exception exception)
@@ -298,7 +301,8 @@ namespace Orleans.Streams
             {
                 try
                 {
-                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, cacheToken);
+                    var registrationToken = cacheToken ?? consumerData.PendingStartToken;
+                    consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, registrationToken);
                 }
                 catch (Exception)
                 {
@@ -513,6 +517,10 @@ namespace Orleans.Streams
                 }
                 else
                 {
+                    if (consumerData.PendingStartToken is null || startToken.Older(consumerData.PendingStartToken))
+                    {
+                        consumerData.PendingStartToken = startToken;
+                    }
                     LogDebugPulledNewMessages(consumerData.StreamId);
                 }
             }
