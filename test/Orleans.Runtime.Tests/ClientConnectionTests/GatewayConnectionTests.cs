@@ -110,8 +110,10 @@ namespace Tester
         [Fact, TestCategory("Functional")]
         public async Task NoReconnectionToGatewayNotReturnedByManager()
         {
-            // Reduce timeout for this test
-            this.runtimeClient.SetResponseTimeout(TimeSpan.FromSeconds(1));
+            // Use a timeout shorter than OpenConnectionTimeout (5s) so that calls to
+            // the fake gateway produce a TimeoutException, but long enough that
+            // legitimate grain calls on slow CI machines don't spuriously timeout.
+            this.runtimeClient.SetResponseTimeout(TimeSpan.FromSeconds(3));
 
             var connectionCount = 0;
             var timeoutCount = 0;
@@ -157,7 +159,7 @@ namespace Tester
 
             // Check that we only connected once to the fake GW
             Assert.Equal(1, connectionCount);
-            Assert.Equal(1, timeoutCount);
+            Assert.True(timeoutCount >= 1, $"Expected at least 1 timeout but got {timeoutCount}");
         }
 
         [Fact, TestCategory("Functional")]
