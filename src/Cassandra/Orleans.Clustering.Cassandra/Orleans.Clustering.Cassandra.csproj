@@ -18,7 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <InternalsVisibleTo Include="Tester.Cassandra"/>
+    <InternalsVisibleTo Include="Orleans.Clustering.Cassandra.Tests"/>
   </ItemGroup>
 
 </Project>

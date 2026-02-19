@@ -15,4 +15,11 @@
     <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrainInterfaces\TestInternalGrainInterfaces.csproj" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+  </ItemGroup>
 </Project>
+
