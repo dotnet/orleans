@@ -1,11 +1,7 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -17,18 +13,15 @@ public interface IDurableValue<T>
 [DebuggerDisplay("{Value}")]
 internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
 {
-    private const byte VersionByte = 0;
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<T> _codec;
+    private readonly ILogEntryCodec<DurableValueEntry<T>> _entryCodec;
     private IStateMachineLogWriter? _storage;
     private T? _value;
     private bool _isDirty;
 
-    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    public DurableValue([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableValueEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codec;
-        _serializerSessionPool = serializerSessionPool;
+        _entryCodec = entryCodec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -59,32 +52,13 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != VersionByte)
+        var entry = _entryCodec.Read(logEntry);
+        switch (entry)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableValue<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
-        }
-
-        var commandType = (CommandType)reader.ReadVarUInt32();
-        switch (commandType)
-        {
-            case CommandType.SetValue:
-                SetValue(ref reader);
+            case ValueSetEntry<T>(var value):
+                _value = value;
                 break;
-            default:
-                throw new NotSupportedException($"Command type {commandType} is not supported");
         }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        T ReadValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _codec.ReadValue(ref reader, field);
-        }
-
-        void SetValue(ref Reader<ReadOnlySequenceInput> reader) => _value = ReadValue(ref reader);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
@@ -104,12 +78,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
     {
         writer.AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.SetValue);
-            self._codec.WriteField(ref writer, 0, typeof(T), self._value!);
-            writer.Commit();
+            self._entryCodec.Write(new ValueSetEntry<T>(self._value!), bufferWriter);
         }, this);
     }
 
@@ -120,10 +89,5 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
     {
         Debug.Assert(_storage is not null);
         return _storage;
-    }
-
-    private enum CommandType
-    {
-        SetValue,
     }
 }

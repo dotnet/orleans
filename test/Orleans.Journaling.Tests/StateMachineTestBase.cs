@@ -51,7 +51,12 @@ public abstract class StateMachineTestBase
         provider ??= TimeProvider.System;
 
         var logger = LoggerFactory.CreateLogger<StateMachineManager>();
-        var manager = new StateMachineManager(storage, logger, Options.Create(ManagerOptions), SessionPool, provider);
+        var stringCodec = new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var uint64Codec = new OrleansLogDataCodec<ulong>(CodecProvider.GetCodec<ulong>(), SessionPool);
+        var dateTimeCodec = new OrleansLogDataCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
+        var stateMachineIdsCodec = new OrleansBinaryDictionaryEntryCodec<string, ulong>(stringCodec, uint64Codec);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryEntryCodec<string, DateTime>(stringCodec, dateTimeCodec);
+        var manager = new StateMachineManager(storage, logger, Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, provider);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

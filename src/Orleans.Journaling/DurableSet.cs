@@ -2,11 +2,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -27,17 +23,14 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 [DebuggerDisplay("Count = {Count}")]
 internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
 {
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<T> _codec;
-    private const byte VersionByte = 0;
+    private readonly ILogEntryCodec<DurableSetEntry<T>> _entryCodec;
     private readonly HashSet<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    public DurableSet([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    public DurableSet([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableSetEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codec;
-        _serializerSessionPool = serializerSessionPool;
+        _entryCodec = entryCodec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -52,49 +45,27 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != VersionByte)
+        var entry = _entryCodec.Read(logEntry);
+        switch (entry)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableSet<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
-        }
-
-        var commandType = (CommandType)reader.ReadVarUInt32();
-        switch (commandType)
-        {
-            case CommandType.Add:
-                ApplyAdd(ReadValue(ref reader));
+            case SetAddEntry<T>(var item):
+                ApplyAdd(item);
                 break;
-            case CommandType.Remove:
-                ApplyRemove(ReadValue(ref reader));
+            case SetRemoveEntry<T>(var item):
+                ApplyRemove(item);
                 break;
-            case CommandType.Clear:
+            case SetClearEntry<T>:
                 ApplyClear();
                 break;
-            case CommandType.Snapshot:
-                ApplySnapshot(ref reader);
+            case SetSnapshotEntry<T>(var items):
+                ApplyClear();
+                _items.EnsureCapacity(items.Count);
+                foreach (var item in items)
+                {
+                    ApplyAdd(item);
+                }
+
                 break;
-            default:
-                throw new NotSupportedException($"Command type {commandType} is not supported");
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        T ReadValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _codec.ReadValue(ref reader, field);
-        }
-
-        void ApplySnapshot(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var count = (int)reader.ReadVarUInt32();
-            ApplyClear();
-            _items.EnsureCapacity(count);
-            for (var i = 0; i < count; i++)
-            {
-                ApplyAdd(ReadValue(ref reader));
-            }
         }
     }
 
@@ -110,29 +81,16 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
 
     private static void WriteSnapshotToBufferWriter(DurableSet<T> self, IBufferWriter<byte> bufferWriter)
     {
-        using var session = self._serializerSessionPool.GetSession();
-        var writer = Writer.Create(bufferWriter, session);
-        writer.WriteByte(VersionByte);
-        writer.WriteVarUInt32((uint)CommandType.Snapshot);
-        writer.WriteVarUInt32((uint)self._items.Count);
-        foreach (var item in self._items)
-        {
-            self._codec.WriteField(ref writer, 0, typeof(T), item);
-        }
-
-        writer.Commit();
+        self._entryCodec.Write(
+            new SetSnapshotEntry<T>(self._items.ToList()), bufferWriter);
     }
 
     public void Clear()
     {
         ApplyClear();
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = state._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Clear);
-            writer.Commit();
+            self._entryCodec.Write(new SetClearEntry<T>(), bufferWriter);
         },
         this);
     }
@@ -147,12 +105,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
             GetStorage().AppendEntry(static (state, bufferWriter) =>
             {
                 var (self, item) = state;
-                using var session = self._serializerSessionPool.GetSession();
-                var writer = Writer.Create(bufferWriter, session);
-                writer.WriteByte(VersionByte);
-                writer.WriteVarUInt32((uint)CommandType.Add);
-                self._codec.WriteField(ref writer, 0, typeof(T), item!);
-                writer.Commit();
+                self._entryCodec.Write(new SetAddEntry<T>(item!), bufferWriter);
             },
             (this, item));
             return true;
@@ -168,12 +121,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
             GetStorage().AppendEntry(static (state, bufferWriter) =>
             {
                 var (self, item) = state;
-                using var session = self._serializerSessionPool.GetSession();
-                var writer = Writer.Create(bufferWriter, session);
-                writer.WriteByte(VersionByte);
-                writer.WriteVarUInt32((uint)CommandType.Remove);
-                self._codec.WriteField(ref writer, 0, typeof(T), item!);
-                writer.Commit();
+                self._entryCodec.Write(new SetRemoveEntry<T>(item!), bufferWriter);
             },
             (this, item));
             return true;
@@ -240,13 +188,5 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
         {
             Add(item);
         }
-    }
-
-    private enum CommandType
-    {
-        Add = 0,
-        Remove = 1,
-        Clear = 2,
-        Snapshot = 3,
     }
 }

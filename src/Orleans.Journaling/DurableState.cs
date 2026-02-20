@@ -2,27 +2,21 @@ using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
 internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine
 {
-    private const byte VersionByte = 0;
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<T> _codec;
+    private readonly ILogEntryCodec<DurableStateEntry<T>> _entryCodec;
     private readonly IStateMachineManager _manager;
     private T? _value;
     private ulong _version;
 
-    public DurableState([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    public DurableState([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableStateEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codec;
-        _serializerSessionPool = serializerSessionPool;
+        _entryCodec = entryCodec;
         manager.RegisterStateMachine(key, this);
         _manager = manager;
     }
@@ -47,38 +41,17 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != VersionByte)
+        var entry = _entryCodec.Read(logEntry);
+        switch (entry)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableState<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
-        }
-
-        var commandType = (CommandType)reader.ReadVarUInt32();
-        switch (commandType)
-        {
-            case CommandType.ClearValue:
-                ClearValue(ref reader);
+            case StateClearEntry<T>:
+                _value = default;
+                _version = 0;
                 break;
-            case CommandType.SetValue:
-                SetValue(ref reader);
+            case StateSetEntry<T>(var state, var version):
+                _value = state;
+                _version = version;
                 break;
-            default:
-                throw new NotSupportedException($"Command type {commandType} is not supported");
-        }
-
-        void SetValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            _value = _codec.ReadValue(ref reader, field);
-            _version = reader.ReadVarUInt64();
-        }
-
-        void ClearValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            _value = default;
-            _version = 0;
         }
     }
 
@@ -92,13 +65,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     {
         writer.AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.SetValue);
-            self._codec.WriteField(ref writer, 0, typeof(T), self._value!);
-            writer.WriteVarUInt64(self._version);
-            writer.Commit();
+            self._entryCodec.Write(new StateSetEntry<T>(self._value!, self._version), bufferWriter);
         }, this);
     }
 
@@ -114,10 +81,4 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     async Task IStorage.WriteStateAsync(CancellationToken cancellationToken) => await _manager.WriteStateAsync(cancellationToken);
     Task IStorage.ReadStateAsync() => ((IStorage)this).ReadStateAsync(CancellationToken.None);
     Task IStorage.ReadStateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    private enum CommandType
-    {
-        SetValue,
-        ClearValue,
-    }
 }

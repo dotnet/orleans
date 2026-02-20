@@ -29,9 +29,9 @@ public class StateMachineManagerTests : StateMachineTestBase
         var codec = CodecProvider.GetCodec<int>();
 
         // Act - Register state machines
-        var dictionary = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), codec, SessionPool);
-        var list = new DurableList<string>("list1", manager, CodecProvider.GetCodec<string>(), SessionPool);
-        var queue = new DurableQueue<int>("queue1", manager, codec, SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(codec, SessionPool)));
+        var list = new DurableList<string>("list1", manager, new OrleansBinaryListEntryCodec<string>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var queue = new DurableQueue<int>("queue1", manager, new OrleansBinaryQueueEntryCodec<int>(new OrleansLogDataCodec<int>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Add some data
@@ -60,8 +60,8 @@ public class StateMachineManagerTests : StateMachineTestBase
         var sut = CreateTestSystem();
 
         // Create and populate state machines
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var list = new DurableList<string>("list1", sut.Manager, CodecProvider.GetCodec<string>(), SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var list = new DurableList<string>("list1", sut.Manager, new OrleansBinaryListEntryCodec<string>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         dictionary.Add("key1", 1);
@@ -73,8 +73,8 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Act - Create new manager with same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var recoveredList = new DurableList<string>("list1", sut2.Manager, CodecProvider.GetCodec<string>(), SessionPool);
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var recoveredList = new DurableList<string>("list1", sut2.Manager, new OrleansBinaryListEntryCodec<string>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - State should be recovered
@@ -98,7 +98,7 @@ public class StateMachineManagerTests : StateMachineTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Multiple operations with WriteState in between
@@ -121,7 +121,7 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Create new manager to verify recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - Recovery should have final state
@@ -143,9 +143,9 @@ public class StateMachineManagerTests : StateMachineTestBase
         var manager = sut.Manager;
 
         // Create multiple state machines with different types
-        var intDict = new DurableDictionary<int, string>("intDict", manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
-        var stringList = new DurableList<string>("stringList", manager, CodecProvider.GetCodec<string>(), SessionPool);
-        var personValue = new DurableValue<TestPerson>("personValue", manager, CodecProvider.GetCodec<TestPerson>(), SessionPool);
+        var intDict = new DurableDictionary<int, string>("intDict", manager, new OrleansBinaryDictionaryEntryCodec<int, string>(new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var stringList = new DurableList<string>("stringList", manager, new OrleansBinaryListEntryCodec<string>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var personValue = new DurableValue<TestPerson>("personValue", manager, new OrleansBinaryValueEntryCodec<TestPerson>(new OrleansLogDataCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Populate all state machines
@@ -172,9 +172,9 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Create new manager to verify recovery of multiple state machines
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
-        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, CodecProvider.GetCodec<string>(), SessionPool);
-        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, CodecProvider.GetCodec<TestPerson>(), SessionPool);
+        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, new OrleansBinaryDictionaryEntryCodec<int, string>(new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, new OrleansBinaryListEntryCodec<string>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, new OrleansBinaryValueEntryCodec<TestPerson>(new OrleansLogDataCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All should be recovered with correct values
@@ -199,8 +199,8 @@ public class StateMachineManagerTests : StateMachineTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dict1 = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var dict2 = new DurableDictionary<string, int>("dict2", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var dict1 = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var dict2 = new DurableDictionary<string, int>("dict2", manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Simulate concurrent operations on different state machines
@@ -233,7 +233,7 @@ public class StateMachineManagerTests : StateMachineTestBase
     {
         // Arrange
         var sut = CreateTestSystem();
-        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, new OrleansBinaryDictionaryEntryCodec<int, string>(new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Add many items
@@ -247,7 +247,7 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Create new manager for recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, new OrleansBinaryDictionaryEntryCodec<int, string>(new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All items should be recovered
@@ -367,7 +367,7 @@ public class StateMachineManagerTests : StateMachineTestBase
         // Note: The retirement of state machines has the nice benefit of being able to reuse machine names.
 
         DurableDictionary<string, int> CreateTestMachine(string key, IStateMachineManager manager) =>
-            new(key, manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+            new(key, manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
 
         static async Task TriggerCompaction(IStateMachineManager manager, DurableDictionary<string, int> dict)
         {

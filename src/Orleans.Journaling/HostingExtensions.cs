@@ -11,6 +11,18 @@ public static class HostingExtensions
         builder.Services.AddOptions<StateMachineManagerOptions>();
         builder.Services.TryAddScoped<IStateMachineStorage>(sp => sp.GetRequiredService<IStateMachineStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<IStateMachineManager, StateMachineManager>();
+
+        // Register the default entry codec factory (Orleans binary format).
+        builder.Services.TryAddSingleton<ILogEntryCodecFactory, OrleansBinaryEntryCodec>();
+
+        // Register the default data codec (Orleans IFieldCodec adapter).
+        builder.Services.TryAddSingleton(typeof(ILogDataCodec<>), typeof(OrleansLogDataCodec<>));
+
+        // Register typed entry codecs for each durable type (Orleans binary format).
+        // Uses a resolver that dispatches to the correct binary codec at runtime,
+        // since the MS DI container cannot decompose composed generic type parameters.
+        builder.Services.TryAddSingleton(typeof(ILogEntryCodec<>), typeof(DefaultLogEntryCodecResolver<>));
+
         builder.Services.TryAddKeyedScoped(typeof(IDurableDictionary<,>), KeyedService.AnyKey, typeof(DurableDictionary<,>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableList<>), KeyedService.AnyKey, typeof(DurableList<>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableQueue<>), KeyedService.AnyKey, typeof(DurableQueue<>));

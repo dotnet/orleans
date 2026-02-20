@@ -1,0 +1,23 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <PackageId>Microsoft.Orleans.Journaling.Protobuf</PackageId>
+    <Title>Microsoft Orleans Journaling - Protocol Buffers Codec</Title>
+    <Description>Google Protocol Buffers-based serialization codec for Orleans.Journaling durable state machines.</Description>
+    <PackageTags>$(PackageTags) Persistence State Machines Protobuf</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
+    <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
+    <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Google.Protobuf" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
+  </ItemGroup>
+
+</Project>
