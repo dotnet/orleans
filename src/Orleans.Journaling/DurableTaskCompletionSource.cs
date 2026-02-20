@@ -1,11 +1,7 @@
 using System.Buffers;
 using System.Diagnostics;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -22,10 +18,7 @@ public interface IDurableTaskCompletionSource<T>
 [DebuggerDisplay("Status = {Status}")]
 internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine
 {
-    private const byte SupportedVersion = 0;
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<T> _codec;
-    private readonly IFieldCodec<Exception> _exceptionCodec;
+    private readonly ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> _entryCodec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
 
@@ -38,18 +31,14 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         IStateMachineManager manager,
-        IFieldCodec<T> codec,
+        ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> entryCodec,
         DeepCopier<T> copier,
-        IFieldCodec<Exception> exceptionCodec,
-        DeepCopier<Exception> exceptionCopier,
-        SerializerSessionPool serializerSessionPool)
+        DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codec;
+        _entryCodec = entryCodec;
         _copier = copier;
-        _exceptionCodec = exceptionCodec;
         _exceptionCopier = exceptionCopier;
-        _serializerSessionPool = serializerSessionPool;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -133,39 +122,23 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != SupportedVersion)
+        var entry = _entryCodec.Read(logEntry);
+        switch (entry)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableTaskCompletionSource<T>)} supports version {(uint)SupportedVersion} and not version {(uint)version}.");
-        }
-
-        _status = (DurableTaskCompletionSourceStatus)reader.ReadByte();
-        switch (_status)
-        {
-            case DurableTaskCompletionSourceStatus.Completed:
-                _value = ReadValue(ref reader);
+            case TcsCompletedEntry<T>(var value):
+                _status = DurableTaskCompletionSourceStatus.Completed;
+                _value = value;
                 break;
-            case DurableTaskCompletionSourceStatus.Faulted:
-                _exception = ReadException(ref reader);
+            case TcsFaultedEntry<T>(var exception):
+                _status = DurableTaskCompletionSourceStatus.Faulted;
+                _exception = exception;
                 break;
-            default:
+            case TcsCanceledEntry<T>:
+                _status = DurableTaskCompletionSourceStatus.Canceled;
                 break;
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        T ReadValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _codec.ReadValue(ref reader, field);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        Exception ReadException(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _exceptionCodec.ReadValue(ref reader, field);
+            case TcsPendingEntry<T>:
+                _status = DurableTaskCompletionSourceStatus.Pending;
+                break;
         }
     }
 
@@ -183,21 +156,14 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     {
         writer.AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(DurableTaskCompletionSource<T>.SupportedVersion);
-            var status = self._status;
-            writer.WriteByte((byte)status);
-            if (status is DurableTaskCompletionSourceStatus.Completed)
+            DurableTaskCompletionSourceEntry<T> entry = self._status switch
             {
-                self._codec.WriteField(ref writer, 0, typeof(T), self._value!);
-            }
-            else if (status is DurableTaskCompletionSourceStatus.Faulted)
-            {
-                self._exceptionCodec.WriteField(ref writer, 0, typeof(Exception), self._exception!);
-            }
-
-            writer.Commit();
+                DurableTaskCompletionSourceStatus.Completed => new TcsCompletedEntry<T>(self._value!),
+                DurableTaskCompletionSourceStatus.Faulted => new TcsFaultedEntry<T>(self._exception!),
+                DurableTaskCompletionSourceStatus.Canceled => new TcsCanceledEntry<T>(),
+                _ => new TcsPendingEntry<T>(),
+            };
+            self._entryCodec.Write(entry, bufferWriter);
         }, this);
     }
 

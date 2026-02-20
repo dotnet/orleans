@@ -2,11 +2,7 @@ using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -18,21 +14,16 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 [DebuggerDisplay("Count = {Count}")]
 internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine where K : notnull
 {
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<K> _keyCodec;
-    private readonly IFieldCodec<V> _valueCodec;
-    private const byte VersionByte = 0;
+    private readonly ILogEntryCodec<DurableDictionaryEntry<K, V>> _entryCodec;
     private readonly Dictionary<K, V> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    protected DurableDictionary(IFieldCodec<K> keyCodec, IFieldCodec<V> valueCodec, SerializerSessionPool serializerSessionPool)
+    protected DurableDictionary(ILogEntryCodec<DurableDictionaryEntry<K, V>> entryCodec)
     {
-        _keyCodec = keyCodec;
-        _valueCodec = valueCodec;
-        _serializerSessionPool = serializerSessionPool;
+        _entryCodec = entryCodec;
     }
 
-    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<K> keyCodec, IFieldCodec<V> valueCodec, SerializerSessionPool serializerSessionPool) : this(keyCodec, valueCodec, serializerSessionPool)
+    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableDictionaryEntry<K, V>> entryCodec) : this(entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
@@ -65,58 +56,27 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != VersionByte)
+        var entry = _entryCodec.Read(logEntry);
+        switch (entry)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableDictionary<K, V>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
-        }
-
-        var commandType = (CommandType)reader.ReadVarUInt32();
-        switch (commandType)
-        {
-            case CommandType.Set:
-                ApplySet(ReadKey(ref reader), ReadValue(ref reader));
+            case DictionarySetEntry<K, V>(var key, var value):
+                ApplySet(key, value);
                 break;
-            case CommandType.Remove:
-                ApplyRemove(ReadKey(ref reader));
+            case DictionaryRemoveEntry<K, V>(var key):
+                ApplyRemove(key);
                 break;
-            case CommandType.Clear:
+            case DictionaryClearEntry<K, V>:
                 ApplyClear();
                 break;
-            case CommandType.Snapshot:
-                ApplySnapshot(ref reader);
+            case DictionarySnapshotEntry<K, V>(var items):
+                _items.Clear();
+                _items.EnsureCapacity(items.Count);
+                foreach (var kv in items)
+                {
+                    ApplySet(kv.Key, kv.Value);
+                }
+
                 break;
-            default:
-                throw new NotSupportedException($"Command type {commandType} is not supported");
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        K ReadKey(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _keyCodec.ReadValue(ref reader, field);
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        V ReadValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _valueCodec.ReadValue(ref reader, field);
-        }
-
-        void ApplySnapshot(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var count = (int)reader.ReadVarUInt32();
-            _items.Clear();
-            _items.EnsureCapacity(count);
-            for (var i = 0; i < count; i++)
-            {
-                var key = ReadKey(ref reader);
-                var value = ReadValue(ref reader);
-                ApplySet(key, value);
-            }
         }
     }
 
@@ -129,31 +89,17 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     {
         snapshotWriter.AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Snapshot);
-            writer.WriteVarUInt32((uint)self._items.Count);
-            foreach (var (key, value) in self._items)
-            {
-                self._keyCodec.WriteField(ref writer, 0, typeof(K), key);
-                self._valueCodec.WriteField(ref writer, 0, typeof(V), value);
-            }
-
-            writer.Commit();
+            self._entryCodec.Write(
+                new DictionarySnapshotEntry<K, V>(self._items.ToList()), bufferWriter);
         }, this);
     }
 
     public void Clear()
     {
         ApplyClear();
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = state._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Clear);
-            writer.Commit();
+            self._entryCodec.Write(new DictionaryClearEntry<K, V>(), bufferWriter);
         },
         this);
     }
@@ -176,12 +122,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, key) = state;
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Remove);
-            self._keyCodec.WriteField(ref writer, 0, typeof(K), key);
-            writer.Commit();
+            self._entryCodec.Write(new DictionaryRemoveEntry<K, V>(key), bufferWriter);
         }, (this, key));
     }
 
@@ -192,13 +133,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, key, value) = state;
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Set);
-            self._keyCodec.WriteField(ref writer, 0, typeof(K), key);
-            self._valueCodec.WriteField(ref writer, 1, typeof(V), value);
-            writer.Commit();
+            self._entryCodec.Write(new DictionarySetEntry<K, V>(key, value), bufferWriter);
         },
         (this, key, value));
     }
@@ -245,14 +180,6 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     }
 
     public IEnumerator<KeyValuePair<K, V>> GetEnumerator() => ((IEnumerable<KeyValuePair<K, V>>)_items).GetEnumerator();
-
-    private enum CommandType
-    {
-        Set = 0,
-        Remove = 1,
-        Clear = 2,
-        Snapshot = 3 
-    }
 }
 
 [DebuggerDisplay("{Value}", Name = "[{Key}]")]

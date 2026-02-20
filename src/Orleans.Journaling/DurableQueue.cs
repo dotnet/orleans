@@ -2,11 +2,7 @@
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -26,17 +22,14 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 [DebuggerDisplay("Count = {Count}")]
 internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
 {
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<T> _codec;
-    private const byte VersionByte = 0;
+    private readonly ILogEntryCodec<DurableQueueEntry<T>> _entryCodec;
     private readonly Queue<T> _items = new();
     private IStateMachineLogWriter? _storage;
 
-    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableQueueEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codec;
-        _serializerSessionPool = serializerSessionPool;
+        _entryCodec = entryCodec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -50,49 +43,27 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != VersionByte)
+        var entry = _entryCodec.Read(logEntry);
+        switch (entry)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableQueue<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
-        }
-
-        var commandType = (CommandType)reader.ReadVarUInt32();
-        switch (commandType)
-        {
-            case CommandType.Enqueue:
-                ApplyEnqueue(ReadValue(ref reader));
+            case QueueEnqueueEntry<T>(var item):
+                ApplyEnqueue(item);
                 break;
-            case CommandType.Dequeue:
+            case QueueDequeueEntry<T>:
                 _ = ApplyDequeue();
                 break;
-            case CommandType.Clear:
+            case QueueClearEntry<T>:
                 ApplyClear();
                 break;
-            case CommandType.Snapshot:
-                ApplySnapshot(ref reader);
+            case QueueSnapshotEntry<T>(var items):
+                ApplyClear();
+                _items.EnsureCapacity(items.Count);
+                foreach (var item in items)
+                {
+                    ApplyEnqueue(item);
+                }
+
                 break;
-            default:
-                throw new NotSupportedException($"Command type {commandType} is not supported");
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        T ReadValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _codec.ReadValue(ref reader, field);
-        }
-
-        void ApplySnapshot(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var count = (int)reader.ReadVarUInt32();
-            ApplyClear();
-            _items.EnsureCapacity(count);
-            for (var i = 0; i < count; i++)
-            {
-                ApplyEnqueue(ReadValue(ref reader));
-            }
         }
     }
 
@@ -105,30 +76,17 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
     {
         snapshotWriter.AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Snapshot);
-            writer.WriteVarUInt32((uint)self._items.Count);
-            foreach (var item in self._items)
-            {
-                self._codec.WriteField(ref writer, 0, typeof(T), item);
-            }
-
-            writer.Commit();
+            self._entryCodec.Write(
+                new QueueSnapshotEntry<T>(self._items.ToList()), bufferWriter);
         }, this);
     }
 
     public void Clear()
     {
         ApplyClear();
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = state._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Clear);
-            writer.Commit();
+            self._entryCodec.Write(new QueueClearEntry<T>(), bufferWriter);
         },
         this);
     }
@@ -144,12 +102,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, value) = state;
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Enqueue);
-            self._codec.WriteField(ref writer, 0, typeof(T), value!);
-            writer.Commit();
+            self._entryCodec.Write(new QueueEnqueueEntry<T>(value!), bufferWriter);
         },
         (this, item));
     }
@@ -157,14 +110,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
     public T Dequeue()
     {
         var result = ApplyDequeue();
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            var self = state;
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Dequeue);
-            writer.Commit();
+            self._entryCodec.Write(new QueueDequeueEntry<T>(), bufferWriter);
         }, this);
         return result;
     }
@@ -173,14 +121,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
     {
         if (ApplyTryDequeue(out item))
         {
-            GetStorage().AppendEntry(static (state, bufferWriter) =>
+            GetStorage().AppendEntry(static (self, bufferWriter) =>
             {
-                var self = state;
-                using var session = self._serializerSessionPool.GetSession();
-                var writer = Writer.Create(bufferWriter, session);
-                writer.WriteByte(VersionByte);
-                writer.WriteVarUInt32((uint)CommandType.Dequeue);
-                writer.Commit();
+                self._entryCodec.Write(new QueueDequeueEntry<T>(), bufferWriter);
             }, this);
             return true;
         }
@@ -205,14 +148,6 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
     }
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
-
-    private enum CommandType
-    {
-        Enqueue = 0,
-        Dequeue = 1,
-        Clear = 2,
-        Snapshot = 3,
-    }
 }
 
 internal sealed class DurableQueueDebugView<T>

@@ -86,8 +86,13 @@ public abstract class LogSegmentTests : IAsyncLifetime
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var grainContext = new TestGrainContext(grainId); // Use provided GrainId
         var storage = _storageProvider.Create(grainContext);
-        var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, sessionPool, TimeProvider.System);
-        var list = new DurableList<T>(listName, manager, codecProvider.GetCodec<T>(), sessionPool);
+        var stringCodec = new OrleansLogDataCodec<string>(codecProvider.GetCodec<string>(), sessionPool);
+        var uint64Codec = new OrleansLogDataCodec<ulong>(codecProvider.GetCodec<ulong>(), sessionPool);
+        var dateTimeCodec = new OrleansLogDataCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
+        var stateMachineIdsCodec = new OrleansBinaryDictionaryEntryCodec<string, ulong>(stringCodec, uint64Codec);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryEntryCodec<string, DateTime>(stringCodec, dateTimeCodec);
+        var manager = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System);
+        var list = new DurableList<T>(listName, manager, new OrleansBinaryListEntryCodec<T>(new OrleansLogDataCodec<T>(codecProvider.GetCodec<T>(), sessionPool)));
         return (manager, list, storage);
     }
 
@@ -144,8 +149,13 @@ public abstract class LogSegmentTests : IAsyncLifetime
 
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, sessionPool, TimeProvider.System);
-        var list2 = new DurableList<string>(listName, manager2, codecProvider.GetCodec<string>(), sessionPool);
+        var stringCodec = new OrleansLogDataCodec<string>(codecProvider.GetCodec<string>(), sessionPool);
+        var uint64Codec = new OrleansLogDataCodec<ulong>(codecProvider.GetCodec<ulong>(), sessionPool);
+        var dateTimeCodec = new OrleansLogDataCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
+        var stateMachineIdsCodec = new OrleansBinaryDictionaryEntryCodec<string, ulong>(stringCodec, uint64Codec);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryEntryCodec<string, DateTime>(stringCodec, dateTimeCodec);
+        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System);
+        var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListEntryCodec<string>(new OrleansLogDataCodec<string>(codecProvider.GetCodec<string>(), sessionPool)));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(3, list2.Count);
@@ -343,8 +353,13 @@ public abstract class LogSegmentTests : IAsyncLifetime
         // Test recovery (potentially from snapshot)
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, sessionPool, TimeProvider.System);// Reuses the storage object linked via grainId
-        var list2 = new DurableList<int>(listName, manager2, codecProvider.GetCodec<int>(), sessionPool);
+        var stringCodec = new OrleansLogDataCodec<string>(codecProvider.GetCodec<string>(), sessionPool);
+        var uint64Codec = new OrleansLogDataCodec<ulong>(codecProvider.GetCodec<ulong>(), sessionPool);
+        var dateTimeCodec = new OrleansLogDataCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
+        var stateMachineIdsCodec = new OrleansBinaryDictionaryEntryCodec<string, ulong>(stringCodec, uint64Codec);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryEntryCodec<string, DateTime>(stringCodec, dateTimeCodec);
+        var manager2 = new StateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<StateMachineManager>>(), ManagerOptions, stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System);// Reuses the storage object linked via grainId
+        var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListEntryCodec<int>(new OrleansLogDataCodec<int>(codecProvider.GetCodec<int>(), sessionPool)));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(itemCount, list2.Count);

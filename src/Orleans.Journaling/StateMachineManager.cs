@@ -6,17 +6,12 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Internal;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
 internal sealed partial class StateMachineManager : IStateMachineManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationStateMachineId = 8;
-    private static readonly StringCodec StringCodec = new();
-    private static readonly UInt64Codec UInt64Codec = new();
-    private static readonly DateTimeCodec DateTimeCodec = new();
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -43,7 +38,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         IStateMachineStorage storage,
         ILogger<StateMachineManager> logger,
         IOptions<StateMachineManagerOptions> options,
-        SerializerSessionPool serializerSessionPool,
+        ILogEntryCodec<DurableDictionaryEntry<string, ulong>> stateMachineIdsCodec,
+        ILogEntryCodec<DurableDictionaryEntry<string, DateTime>> retirementTrackerCodec,
         TimeProvider timeProvider)
     {
         _storage = storage;
@@ -53,12 +49,12 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
         // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
         // This allows us to recover the list of state machines ids without having to store it separately.
-        _stateMachineIds = new StateMachineManagerState(this, StringCodec, UInt64Codec, serializerSessionPool);
+        _stateMachineIds = new StateMachineManagerState(this, stateMachineIdsCodec);
         _stateMachinesMap[StateMachineManagerState.Id] = _stateMachineIds;
 
         // The retirement tracker is a special internal state machine with a fixed id.
         // It is not stored in _stateMachineIds and does not participate in the general name->id mapping.
-        _retirementTracker = new StateMachinesRetirementTracker(this, StringCodec, DateTimeCodec, serializerSessionPool);
+        _retirementTracker = new StateMachinesRetirementTracker(this, retirementTrackerCodec);
         _stateMachinesMap[StateMachinesRetirementTracker.Id] = _retirementTracker;
     }
 
@@ -541,9 +537,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
     private sealed class StateMachineManagerState(
         StateMachineManager manager,
-        IFieldCodec<string> keyCodec,
-        IFieldCodec<ulong> valueCodec,
-        SerializerSessionPool serializerSessionPool) : DurableDictionary<string, ulong>(keyCodec, valueCodec, serializerSessionPool)
+        ILogEntryCodec<DurableDictionaryEntry<string, ulong>> entryCodec) : DurableDictionary<string, ulong>(entryCodec)
     {
         public const int Id = 0;
 
@@ -559,8 +553,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     /// </summary>
     /// <remarks>Resurrecting of retired machines is supported.</remarks>
     private sealed class StateMachinesRetirementTracker(
-        StateMachineManager manager, IFieldCodec<string> keyCodec, IFieldCodec<DateTime> valueCodec, SerializerSessionPool sessionPool)
-            : DurableDictionary<string, DateTime>(keyCodec, valueCodec, sessionPool)
+        StateMachineManager manager, ILogEntryCodec<DurableDictionaryEntry<string, DateTime>> entryCodec)
+            : DurableDictionary<string, DateTime>(entryCodec)
     {
         public const int Id = 1;
 

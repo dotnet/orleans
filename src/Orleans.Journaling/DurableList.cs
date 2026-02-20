@@ -1,13 +1,9 @@
-using System.Buffers;
+﻿using System.Buffers;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -21,17 +17,14 @@ public interface IDurableList<T> : IList<T>
 [DebuggerDisplay("Count = {Count}")]
 internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
 {
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<T> _codec;
-    private const byte VersionByte = 0;
+    private readonly ILogEntryCodec<DurableListEntry<T>> _entryCodec;
     private readonly List<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    public DurableList([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    public DurableList([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableListEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codec;
-        _serializerSessionPool = serializerSessionPool;
+        _entryCodec = entryCodec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -50,13 +43,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
             GetStorage().AppendEntry(static (state, bufferWriter) =>
             {
                 var (self, index, value) = state;
-                using var session = self._serializerSessionPool.GetSession();
-                var writer = Writer.Create(bufferWriter, session);
-                writer.WriteByte(VersionByte);
-                writer.WriteVarUInt32((uint)CommandType.Set);
-                writer.WriteVarUInt32((uint)index);
-                self._codec.WriteField(ref writer, 0, typeof(T), value!);
-                writer.Commit();
+                self._entryCodec.Write(new ListSetEntry<T>(index, value!), bufferWriter);
             },
             (this, index, value));
         }
@@ -74,63 +61,33 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != VersionByte)
+        var entry = _entryCodec.Read(logEntry);
+        switch (entry)
         {
-            throw new NotSupportedException($"This instance of {nameof(DurableList<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
-        }
-
-        var commandType = (CommandType)reader.ReadVarUInt32();
-        switch (commandType)
-        {
-            case CommandType.Add:
-                ApplyAdd(ReadValue(ref reader));
+            case ListAddEntry<T>(var item):
+                ApplyAdd(item);
                 break;
-            case CommandType.Set:
-                {
-                    var index = (int)reader.ReadVarUInt32();
-                    var value = ReadValue(ref reader);
-                    ApplySet(index, value);
-                }
+            case ListSetEntry<T>(var index, var value):
+                ApplySet(index, value);
                 break;
-            case CommandType.Insert:
-                {
-                    var index = (int)reader.ReadVarUInt32();
-                    var value = ReadValue(ref reader);
-                    ApplyInsert(index, value);
-                }
+            case ListInsertEntry<T>(var index, var value):
+                ApplyInsert(index, value);
                 break;
-            case CommandType.Remove:
-                ApplyRemoveAt((int)reader.ReadVarUInt32());
+            case ListRemoveAtEntry<T>(var index):
+                ApplyRemoveAt(index);
                 break;
-            case CommandType.Clear:
+            case ListClearEntry<T>:
                 ApplyClear();
                 break;
-            case CommandType.Snapshot:
-                ApplySnapshot(ref reader);
+            case ListSnapshotEntry<T>(var items):
+                ApplyClear();
+                _items.EnsureCapacity(items.Count);
+                foreach (var item in items)
+                {
+                    ApplyAdd(item);
+                }
+
                 break;
-            default:
-                throw new NotSupportedException($"Command type {commandType} is not supported");
-        }
-
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        T ReadValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var field = reader.ReadFieldHeader();
-            return _codec.ReadValue(ref reader, field);
-        }
-
-        void ApplySnapshot(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            var count = reader.ReadVarUInt32();
-            ApplyClear();
-            _items.EnsureCapacity((int)count);
-            for (var i = 0; i < count; i++)
-            {
-                ApplyAdd(ReadValue(ref reader));
-            }
         }
     }
 
@@ -143,17 +100,8 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
     {
         snapshotWriter.AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Snapshot);
-            writer.WriteVarUInt32((uint)self._items.Count);
-            foreach (var item in self._items)
-            {
-                self._codec.WriteField(ref writer, 0, typeof(T), item);
-            }
-
-            writer.Commit();
+            self._entryCodec.Write(
+                new ListSnapshotEntry<T>(self._items.ToList()), bufferWriter);
         }, this);
     }
 
@@ -163,12 +111,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, item) = state;
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Add);
-            self._codec.WriteField(ref writer, 0, typeof(T), item!);
-            writer.Commit();
+            self._entryCodec.Write(new ListAddEntry<T>(item!), bufferWriter);
         },
         (this, item));
     }
@@ -176,13 +119,9 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
     public void Clear()
     {
         ApplyClear();
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            using var session = state._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Clear);
-            writer.Commit();
+            self._entryCodec.Write(new ListClearEntry<T>(), bufferWriter);
         },
         this);
     }
@@ -197,13 +136,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, index, value) = state;
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Insert);
-            writer.WriteVarUInt32((uint)index);
-            self._codec.WriteField(ref writer, 0, typeof(T), value!);
-            writer.Commit();
+            self._entryCodec.Write(new ListInsertEntry<T>(index, value!), bufferWriter);
         },
         (this, index, item));
     }
@@ -227,12 +160,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, index) = state;
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.Remove);
-            writer.WriteVarUInt32((uint)index);
-            writer.Commit();
+            self._entryCodec.Write(new ListRemoveAtEntry<T>(index), bufferWriter);
         }, (this, index));
     }
 
@@ -263,16 +191,6 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
     }
 
     public ReadOnlyCollection<T> AsReadOnly() => _items.AsReadOnly();
-
-    private enum CommandType
-    {
-        Add = 0,
-        Set = 1,
-        Insert = 2,
-        Remove = 3,
-        Clear = 4,
-        Snapshot = 5
-    }
 }
 
 internal sealed class IDurableCollectionDebugView<T>
@@ -281,15 +199,7 @@ internal sealed class IDurableCollectionDebugView<T>
 
     public IDurableCollectionDebugView(ICollection<T> collection)
     {
-#if NET
         ArgumentNullException.ThrowIfNull(collection);
-#else
-            if (collection is null)
-            {
-                throw new ArgumentNullException(nameof(collection));
-            }
-#endif
-
         _collection = collection;
     }
 
