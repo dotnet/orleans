@@ -164,6 +164,14 @@ internal class InMemoryJobShardManager : JobShardManager
                 {
                     if (ownership.Shard.StartTime <= maxDueTime)
                     {
+                        // Respect the slow-start budget: skip claiming if we've exhausted the budget.
+                        // This must be checked before incrementing AdoptedCount to avoid
+                        // inflating the count when the shard isn't actually claimed.
+                        if (adoptedShards.Count >= maxNewClaims)
+                        {
+                            continue;
+                        }
+
                         // If adopted from dead silo, increment adopted count
                         if (isFromDeadSilo)
                         {
@@ -175,12 +183,6 @@ internal class InMemoryJobShardManager : JobShardManager
                                 // Shard is poisoned - don't assign it
                                 continue;
                             }
-                        }
-
-                        // Respect the slow-start budget: skip claiming if we've exhausted the budget
-                        if (adoptedShards.Count >= maxNewClaims)
-                        {
-                            continue;
                         }
 
                         ownership.OwnerSiloAddress = SiloAddress.ToString();
