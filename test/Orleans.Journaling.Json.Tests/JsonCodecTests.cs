@@ -4,7 +4,7 @@ using System.Text.Json;
 using Orleans.Journaling.Json;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Journaling.Json.Tests;
 
 /// <summary>
 /// Comprehensive round-trip and JSON-format tests for all JSON per-type entry codecs.

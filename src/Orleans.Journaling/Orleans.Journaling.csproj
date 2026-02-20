@@ -18,6 +18,8 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Protobuf.Tests" />
   </ItemGroup>
 
   <ItemGroup>
