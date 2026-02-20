@@ -12,9 +12,6 @@ public static class HostingExtensions
         builder.Services.TryAddScoped<IStateMachineStorage>(sp => sp.GetRequiredService<IStateMachineStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<IStateMachineManager, StateMachineManager>();
 
-        // Register the default entry codec factory (Orleans binary format).
-        builder.Services.TryAddSingleton<ILogEntryCodecFactory, OrleansBinaryEntryCodec>();
-
         // Register the default data codec (Orleans IFieldCodec adapter).
         builder.Services.TryAddSingleton(typeof(ILogDataCodec<>), typeof(OrleansLogDataCodec<>));
 
