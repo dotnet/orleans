@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Text;
 using Orleans.Journaling.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
@@ -9,7 +10,7 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 /// <summary>
-/// Tests for the ILogDataCodec implementations and ILogEntryCodecFactory implementations.
+/// Tests for the ILogDataCodec and ILogEntryCodec implementations.
 /// </summary>
 [TestCategory("BVT")]
 public class LogDataCodecTests
@@ -68,141 +69,136 @@ public class LogDataCodecTests
     }
 
     [Fact]
-    public void JsonLogDataCodec_RoundTrips_Int()
+    public void BinaryDictionaryCodec_RoundTrips()
     {
-        var codec = new JsonLogDataCodec<int>();
+        var keyCodec = new OrleansLogDataCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
+        var valueCodec = new OrleansLogDataCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var codec = new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec, valueCodec);
+
+        var entry = new DictionarySetEntry<string, int>("key1", 42);
         var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(42, buffer);
+        codec.Write(entry, buffer);
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory), out var consumed);
-
-        Assert.Equal(42, result);
-        Assert.True(consumed > 0);
+        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var setResult = Assert.IsType<DictionarySetEntry<string, int>>(result);
+        Assert.Equal("key1", setResult.Key);
+        Assert.Equal(42, setResult.Value);
     }
 
     [Fact]
-    public void JsonLogDataCodec_RoundTrips_String()
+    public void BinaryDictionaryCodec_RoundTrips_Snapshot()
     {
-        var codec = new JsonLogDataCodec<string>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write("hello world", buffer);
+        var keyCodec = new OrleansLogDataCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
+        var valueCodec = new OrleansLogDataCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var codec = new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec, valueCodec);
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory), out var consumed);
-
-        Assert.Equal("hello world", result);
-    }
-
-    [Fact]
-    public void JsonLogDataCodec_RoundTrips_ComplexObject()
-    {
-        var codec = new JsonLogDataCodec<TestRecord>();
-        var expected = new TestRecord("Alice", 30);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(expected, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory), out var consumed);
-
-        Assert.Equal(expected.Name, result.Name);
-        Assert.Equal(expected.Age, result.Age);
-    }
-
-    [Fact]
-    public void OrleansBinaryEntryCodec_WriterReader_RoundTrips_Command()
-    {
-        var factory = new OrleansBinaryEntryCodec();
-        Assert.Equal(0, factory.Version);
-
-        var buffer = new ArrayBufferWriter<byte>();
-        using (var writer = factory.CreateWriter())
+        var items = new List<KeyValuePair<string, int>>
         {
-            writer.WriteCommand(42);
-            writer.WriteUInt32(100);
-            writer.WriteUInt64(999UL);
-            writer.WriteByte(7);
-            writer.WriteTo(buffer);
-        }
+            new("alpha", 1),
+            new("beta", 2),
+        };
+        var entry = new DictionarySnapshotEntry<string, int>(items);
+        var buffer = new ArrayBufferWriter<byte>();
+        codec.Write(entry, buffer);
 
-        // Skip version byte (written by WriteTo)
-        var data = new ReadOnlySequence<byte>(buffer.WrittenMemory[1..]);
-        using var reader = factory.CreateReader(data);
-
-        Assert.Equal(42u, reader.ReadCommand());
-        Assert.Equal(100u, reader.ReadUInt32());
-        Assert.Equal(999UL, reader.ReadUInt64());
-        Assert.Equal(7, reader.ReadByte());
+        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var snapshot = Assert.IsType<DictionarySnapshotEntry<string, int>>(result);
+        Assert.Equal(2, snapshot.Items.Count);
+        Assert.Equal("alpha", snapshot.Items[0].Key);
+        Assert.Equal(2, snapshot.Items[1].Value);
     }
 
     [Fact]
-    public void OrleansBinaryEntryCodec_WriterReader_RoundTrips_Values()
+    public void JsonDictionaryCodec_RoundTrips_Set()
     {
-        var factory = new OrleansBinaryEntryCodec();
-        var intCodec = new OrleansLogDataCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
-        var stringCodec = new OrleansLogDataCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
-
+        var codec = new JsonDictionaryEntryCodec<string, int>();
+        var entry = new DictionarySetEntry<string, int>("alice", 42);
         var buffer = new ArrayBufferWriter<byte>();
-        using (var writer = factory.CreateWriter())
-        {
-            writer.WriteCommand(1);
-            writer.WriteValue(stringCodec, "key1");
-            writer.WriteValue(intCodec, 42);
-            writer.WriteTo(buffer);
-        }
+        codec.Write(entry, buffer);
 
-        var data = new ReadOnlySequence<byte>(buffer.WrittenMemory[1..]);
-        using var reader = factory.CreateReader(data);
+        // Verify JSON output contains "cmd":"set"
+        var json = Encoding.UTF8.GetString(buffer.WrittenSpan);
+        Assert.Contains("\"cmd\":\"set\"", json);
+        Assert.Contains("\"Key\"", json);
 
-        Assert.Equal(1u, reader.ReadCommand());
-        Assert.Equal("key1", reader.ReadValue(stringCodec));
-        Assert.Equal(42, reader.ReadValue(intCodec));
+        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var setResult = Assert.IsType<DictionarySetEntry<string, int>>(result);
+        Assert.Equal("alice", setResult.Key);
+        Assert.Equal(42, setResult.Value);
     }
 
     [Fact]
-    public void JsonEntryCodec_WriterReader_RoundTrips()
+    public void JsonDictionaryCodec_RoundTrips_Snapshot()
     {
-        var factory = new JsonEntryCodec(new System.Text.Json.JsonSerializerOptions());
-        Assert.Equal(1, factory.Version);
-
-        var intCodec = new JsonLogDataCodec<int>();
-        var stringCodec = new JsonLogDataCodec<string>();
-
-        var buffer = new ArrayBufferWriter<byte>();
-        using (var writer = factory.CreateWriter())
+        var codec = new JsonDictionaryEntryCodec<string, int>();
+        var items = new List<KeyValuePair<string, int>>
         {
-            writer.WriteCommand(3);
-            writer.WriteUInt32(10);
-            writer.WriteValue(stringCodec, "hello");
-            writer.WriteValue(intCodec, 99);
-            writer.WriteTo(buffer);
-        }
+            new("alice", 1),
+            new("bob", 7),
+        };
+        var entry = new DictionarySnapshotEntry<string, int>(items);
+        var buffer = new ArrayBufferWriter<byte>();
+        codec.Write(entry, buffer);
 
-        // Skip version byte
-        var data = new ReadOnlySequence<byte>(buffer.WrittenMemory[1..]);
-        using var reader = factory.CreateReader(data);
+        var json = Encoding.UTF8.GetString(buffer.WrittenSpan);
+        Assert.Contains("\"cmd\":\"snapshot\"", json);
 
-        Assert.Equal(3u, reader.ReadCommand());
-        Assert.Equal(10u, reader.ReadUInt32());
-        Assert.Equal("hello", reader.ReadValue(stringCodec));
-        Assert.Equal(99, reader.ReadValue(intCodec));
+        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var snapshot = Assert.IsType<DictionarySnapshotEntry<string, int>>(result);
+        Assert.Equal(2, snapshot.Items.Count);
+        Assert.Equal("alice", snapshot.Items[0].Key);
+        Assert.Equal(7, snapshot.Items[1].Value);
     }
 
     [Fact]
-    public void JsonEntryCodec_WriterReader_RoundTrips_ByteAndUInt64()
+    public void JsonListCodec_RoundTrips()
     {
-        var factory = new JsonEntryCodec(new System.Text.Json.JsonSerializerOptions());
-
+        var codec = new JsonListEntryCodec<string>();
+        var entry = new ListAddEntry<string>("hello");
         var buffer = new ArrayBufferWriter<byte>();
-        using (var writer = factory.CreateWriter())
-        {
-            writer.WriteByte(255);
-            writer.WriteUInt64(ulong.MaxValue);
-            writer.WriteTo(buffer);
-        }
+        codec.Write(entry, buffer);
 
-        var data = new ReadOnlySequence<byte>(buffer.WrittenMemory[1..]);
-        using var reader = factory.CreateReader(data);
+        var json = Encoding.UTF8.GetString(buffer.WrittenSpan);
+        Assert.Contains("\"cmd\":\"add\"", json);
 
-        Assert.Equal(255, reader.ReadByte());
-        Assert.Equal(ulong.MaxValue, reader.ReadUInt64());
+        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var addResult = Assert.IsType<ListAddEntry<string>>(result);
+        Assert.Equal("hello", addResult.Item);
+    }
+
+    [Fact]
+    public void JsonValueCodec_RoundTrips()
+    {
+        var codec = new JsonValueEntryCodec<int>();
+        var entry = new ValueSetEntry<int>(42);
+        var buffer = new ArrayBufferWriter<byte>();
+        codec.Write(entry, buffer);
+
+        var json = Encoding.UTF8.GetString(buffer.WrittenSpan);
+        Assert.Contains("\"cmd\":\"set\"", json);
+
+        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var setResult = Assert.IsType<ValueSetEntry<int>>(result);
+        Assert.Equal(42, setResult.Value);
+    }
+
+    [Fact]
+    public void JsonStateCodec_RoundTrips()
+    {
+        var codec = new JsonStateEntryCodec<TestRecord>();
+        var entry = new StateSetEntry<TestRecord>(new TestRecord("Alice", 30), 5);
+        var buffer = new ArrayBufferWriter<byte>();
+        codec.Write(entry, buffer);
+
+        var json = Encoding.UTF8.GetString(buffer.WrittenSpan);
+        Assert.Contains("\"cmd\":\"set\"", json);
+        Assert.Contains("\"Version\":5", json);
+
+        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var setResult = Assert.IsType<StateSetEntry<TestRecord>>(result);
+        Assert.Equal("Alice", setResult.State.Name);
+        Assert.Equal(30, setResult.State.Age);
+        Assert.Equal(5UL, setResult.Version);
     }
 
     private record TestRecord(string Name, int Age);

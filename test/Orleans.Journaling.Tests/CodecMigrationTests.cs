@@ -56,7 +56,7 @@ public class CodecMigrationTests : StateMachineTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new JsonLogDataCodec<string>(jsonOptions), new JsonLogDataCodec<int>(jsonOptions)));
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new JsonDictionaryEntryCodec<string, int>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -65,7 +65,7 @@ public class CodecMigrationTests : StateMachineTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(new JsonLogDataCodec<string>(jsonOptions), new JsonLogDataCodec<int>(jsonOptions)));
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new JsonDictionaryEntryCodec<string, int>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(2, dict2.Count);
@@ -84,7 +84,7 @@ public class CodecMigrationTests : StateMachineTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var list = new DurableList<string>("list", sut.Manager, new OrleansBinaryListEntryCodec<string>(new JsonLogDataCodec<string>(jsonOptions)));
+        var list = new DurableList<string>("list", sut.Manager, new JsonListEntryCodec<string>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         list.Add("one");
@@ -94,7 +94,7 @@ public class CodecMigrationTests : StateMachineTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var list2 = new DurableList<string>("list", sut2.Manager, new OrleansBinaryListEntryCodec<string>(new JsonLogDataCodec<string>(jsonOptions)));
+        var list2 = new DurableList<string>("list", sut2.Manager, new JsonListEntryCodec<string>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, list2.Count);
@@ -114,7 +114,7 @@ public class CodecMigrationTests : StateMachineTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var value = new DurableValue<int>("val", sut.Manager, new OrleansBinaryValueEntryCodec<int>(new JsonLogDataCodec<int>(jsonOptions)));
+        var value = new DurableValue<int>("val", sut.Manager, new JsonValueEntryCodec<int>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         value.Value = 42;
@@ -122,7 +122,7 @@ public class CodecMigrationTests : StateMachineTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var value2 = new DurableValue<int>("val", sut2.Manager, new OrleansBinaryValueEntryCodec<int>(new JsonLogDataCodec<int>(jsonOptions)));
+        var value2 = new DurableValue<int>("val", sut2.Manager, new JsonValueEntryCodec<int>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(42, value2.Value);
@@ -133,11 +133,8 @@ public class CodecMigrationTests : StateMachineTestBase
         storage ??= CreateStorage();
         jsonOptions ??= new System.Text.Json.JsonSerializerOptions();
 
-        var stringCodec = new JsonLogDataCodec<string>(jsonOptions);
-        var uint64Codec = new JsonLogDataCodec<ulong>(jsonOptions);
-        var dateTimeCodec = new JsonLogDataCodec<DateTime>(jsonOptions);
-        var stateMachineIdsCodec = new OrleansBinaryDictionaryEntryCodec<string, ulong>(stringCodec, uint64Codec);
-        var retirementTrackerCodec = new OrleansBinaryDictionaryEntryCodec<string, DateTime>(stringCodec, dateTimeCodec);
+        var stateMachineIdsCodec = new JsonDictionaryEntryCodec<string, ulong>(jsonOptions);
+        var retirementTrackerCodec = new JsonDictionaryEntryCodec<string, DateTime>(jsonOptions);
         var manager = new StateMachineManager(storage, LoggerFactory.CreateLogger<StateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System);
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);

@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -41,27 +42,52 @@ public static class JsonJournalingExtensions
         var options = new JsonJournalingOptions();
         configure?.Invoke(options);
 
-        builder.Services.AddSingleton<ILogEntryCodecFactory>(new JsonEntryCodec(options.SerializerOptions));
-        builder.Services.AddSingleton(typeof(ILogDataCodec<>), typeof(JsonLogDataCodecFactory<>));
+        // Register the shared JsonSerializerOptions.
+        builder.Services.AddSingleton(options.SerializerOptions);
+
+        // Replace the default codec resolver with the JSON codec resolver.
+        builder.Services.AddSingleton(typeof(ILogEntryCodec<>), typeof(JsonLogEntryCodecResolver<>));
 
         return builder;
     }
 }
 
 /// <summary>
-/// Internal factory that creates <see cref="JsonLogDataCodec{T}"/> instances using the configured options.
+/// Open-generic resolver that maps <c>ILogEntryCodec&lt;TEntry&gt;</c> to the appropriate JSON codec.
 /// </summary>
-internal sealed class JsonLogDataCodecFactory<T> : ILogDataCodec<T>
+internal sealed class JsonLogEntryCodecResolver<TEntry>(IServiceProvider serviceProvider) : ILogEntryCodec<TEntry>
 {
-    private readonly JsonLogDataCodec<T> _inner;
+    private readonly ILogEntryCodec<TEntry> _inner = ResolveCodec(serviceProvider);
 
-    public JsonLogDataCodecFactory(ILogEntryCodecFactory factory)
+    private static ILogEntryCodec<TEntry> ResolveCodec(IServiceProvider sp)
     {
-        // Resolve the JsonSerializerOptions from the factory if it's a JsonEntryCodec.
-        var options = factory is JsonEntryCodec ? JsonSerializerOptions.Default : JsonSerializerOptions.Default;
-        _inner = new JsonLogDataCodec<T>(options);
+        var jsonOptions = sp.GetService<JsonSerializerOptions>() ?? JsonSerializerOptions.Default;
+        var entryType = typeof(TEntry);
+
+        if (!entryType.IsGenericType)
+        {
+            throw new NotSupportedException($"No JSON entry codec found for non-generic entry type '{entryType}'.");
+        }
+
+        var def = entryType.GetGenericTypeDefinition();
+        var args = entryType.GetGenericArguments();
+
+        var codecType =
+            def == typeof(DurableDictionaryEntry<,>) ? typeof(JsonDictionaryEntryCodec<,>).MakeGenericType(args) :
+            def == typeof(DurableListEntry<>) ? typeof(JsonListEntryCodec<>).MakeGenericType(args) :
+            def == typeof(DurableQueueEntry<>) ? typeof(JsonQueueEntryCodec<>).MakeGenericType(args) :
+            def == typeof(DurableSetEntry<>) ? typeof(JsonSetEntryCodec<>).MakeGenericType(args) :
+            def == typeof(DurableValueEntry<>) ? typeof(JsonValueEntryCodec<>).MakeGenericType(args) :
+            def == typeof(DurableStateEntry<>) ? typeof(JsonStateEntryCodec<>).MakeGenericType(args) :
+            def == typeof(DurableTaskCompletionSourceEntry<>) ? typeof(JsonTcsEntryCodec<>).MakeGenericType(args) :
+            throw new NotSupportedException($"No JSON entry codec found for entry type '{entryType}'.");
+
+        return (ILogEntryCodec<TEntry>)Activator.CreateInstance(codecType, jsonOptions)!;
     }
 
-    public void Write(T value, System.Buffers.IBufferWriter<byte> output) => _inner.Write(value, output);
-    public T Read(System.Buffers.ReadOnlySequence<byte> input, out long bytesConsumed) => _inner.Read(input, out bytesConsumed);
+    /// <inheritdoc/>
+    public void Write(TEntry entry, IBufferWriter<byte> output) => _inner.Write(entry, output);
+
+    /// <inheritdoc/>
+    public TEntry Read(ReadOnlySequence<byte> input) => _inner.Read(input);
 }
