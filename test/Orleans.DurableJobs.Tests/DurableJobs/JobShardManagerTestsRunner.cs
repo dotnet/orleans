@@ -76,19 +76,19 @@ public class JobShardManagerTestsRunner
         Assert.Distinct([shard1.Id, shard2.Id, shard3.Id]);
 
         // All shards are now assigned to the creator silo
-        var assignedShards = await silo1Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
+        var assignedShards = await silo1Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Equal(3, assignedShards.Count);
         Assert.Contains(shard1.Id, assignedShards.Select(s => s.Id));
         Assert.Contains(shard2.Id, assignedShards.Select(s => s.Id));
         Assert.Contains(shard3.Id, assignedShards.Select(s => s.Id));
-        var emptyShards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
+        var emptyShards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Empty(emptyShards);
 
         // Mark the local silo as dead
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Now we can take over all three shards
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Equal(3, shards.Count);
         Assert.Contains(shard1.Id, shards.Select(s => s.Id));
         Assert.Contains(shard2.Id, shards.Select(s => s.Id));
@@ -100,7 +100,7 @@ public class JobShardManagerTestsRunner
         var silo3Manager = CreateManager(silo3Address);
 
         // No unassigned shards
-        Assert.Empty(await silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken));
+        Assert.Empty(await silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken));
     }
 
     /// <summary>
@@ -129,7 +129,7 @@ public class JobShardManagerTestsRunner
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
         shard1 = shards[0];
 
@@ -144,7 +144,7 @@ public class JobShardManagerTestsRunner
         await silo2Manager.UnregisterShardAsync(shard1, cancellationToken);
 
         // No unassigned shards
-        Assert.Empty(await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken));
+        Assert.Empty(await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken));
     }
 
     /// <summary>
@@ -182,7 +182,7 @@ public class JobShardManagerTestsRunner
         await manager.UnregisterShardAsync(shard1, cancellationToken);
 
         // No unassigned shards
-        Assert.Empty(await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken));
+        Assert.Empty(await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken));
     }
 
     /// <summary>
@@ -228,7 +228,7 @@ public class JobShardManagerTestsRunner
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard with the other silo
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
         shard = shards[0];
 
@@ -280,8 +280,8 @@ public class JobShardManagerTestsRunner
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Concurrently try to assign shards from silo2 and silo3
-        var assignTask2 = silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
-        var assignTask3 = silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), cancellationToken);
+        var assignTask2 = silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), maxNewClaims: int.MaxValue, cancellationToken);
+        var assignTask3 = silo3Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(3), maxNewClaims: int.MaxValue, cancellationToken);
 
         await Task.WhenAll(assignTask2, assignTask3);
 
@@ -335,7 +335,7 @@ public class JobShardManagerTestsRunner
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard from silo2 and verify the metadata is preserved
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
         shard = shards[0];
 
@@ -377,7 +377,7 @@ public class JobShardManagerTestsRunner
         Assert.Equal(2, counter);
         await manager.UnregisterShardAsync(shard1, cancellationToken);
 
-        var shards = await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
         Assert.Equal(shard1.Id, shards[0].Id);
     }
@@ -473,7 +473,7 @@ public class JobShardManagerTestsRunner
         // Mark the shard owner silo as dead and reassign to verify cancelled jobs are not in storage
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
         shard = shards[0];
 
@@ -510,6 +510,109 @@ public class JobShardManagerTestsRunner
     }
 
     /// <summary>
+    /// Tests that <c>maxNewClaims</c> limits the number of orphaned shards claimed,
+    /// while still returning all already-owned shards.
+    /// </summary>
+    public async Task SlowStart_LimitsOrphanedShardClaims(CancellationToken cancellationToken)
+    {
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
+
+        var date = DateTimeOffset.UtcNow;
+
+        // Create 5 shards owned by silo1
+        var createdShardIds = new List<string>();
+        for (var i = 0; i < 5; i++)
+        {
+            var shard = await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+            createdShardIds.Add(shard.Id);
+        }
+
+        // Kill silo1 so all 5 shards become orphaned
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
+
+        // Silo2 assigns with a budget of 2 — should claim at most 2 orphaned shards
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: 2, cancellationToken);
+        Assert.Equal(2, shards.Count);
+
+        // Assign again with budget of 2 — should claim 2 more
+        shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: 2, cancellationToken);
+        // The 2 already-owned from before + 2 newly claimed = 4
+        Assert.Equal(4, shards.Count);
+
+        // Assign with budget of 10 — should claim the last remaining 1 + return all 4 already-owned = 5
+        shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: 10, cancellationToken);
+        Assert.Equal(5, shards.Count);
+        Assert.All(createdShardIds, id => Assert.Contains(id, shards.Select(s => s.Id)));
+    }
+
+    /// <summary>
+    /// Tests that <c>maxNewClaims = 0</c> prevents claiming any orphaned shards
+    /// but still returns already-owned shards.
+    /// </summary>
+    public async Task SlowStart_ZeroBudgetClaimsNothing(CancellationToken cancellationToken)
+    {
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
+
+        var date = DateTimeOffset.UtcNow;
+
+        // Silo2 creates a shard that it owns
+        var ownedShard = await silo2Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+
+        // Silo1 creates 3 shards, then dies
+        for (var i = 0; i < 3; i++)
+        {
+            await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+        }
+
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
+
+        // Silo2 assigns with budget = 0: only its own shard returned
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: 0, cancellationToken);
+        Assert.Single(shards);
+        Assert.Equal(ownedShard.Id, shards[0].Id);
+    }
+
+    /// <summary>
+    /// Tests that <c>maxNewClaims = int.MaxValue</c> (unlimited) claims all orphaned shards.
+    /// </summary>
+    public async Task SlowStart_UnlimitedBudgetClaimsAll(CancellationToken cancellationToken)
+    {
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
+
+        var date = DateTimeOffset.UtcNow;
+
+        // Create 5 shards owned by silo1
+        for (var i = 0; i < 5; i++)
+        {
+            await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+        }
+
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
+
+        // Unlimited budget claims everything
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: int.MaxValue, cancellationToken);
+        Assert.Equal(5, shards.Count);
+    }
+
+    /// <summary>
     /// Tests that unregistering a shard with remaining jobs preserves the shard for reassignment.
     /// </summary>
     public async Task UnregisterShard_WithJobsRemaining(CancellationToken cancellationToken)
@@ -536,7 +639,7 @@ public class JobShardManagerTestsRunner
         SetSiloStatus(silo1Address, SiloStatus.Dead);
 
         // Take over the shard from silo2 and consume the jobs
-        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
         Assert.Equal(shard.Id, shards[0].Id);
 

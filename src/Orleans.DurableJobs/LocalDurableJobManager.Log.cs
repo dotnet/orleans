@@ -131,4 +131,22 @@ internal partial class LocalDurableJobManager
         Message = "Creating new shard for key {ShardKey}"
     )]
     private static partial void LogCreatingNewShard(ILogger logger, DateTimeOffset shardKey);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Claimed {NewClaims} new orphaned shard(s) this cycle (total claimed: {TotalClaimed})"
+    )]
+    private static partial void LogOrphanedShardsClaimed(ILogger logger, int newClaims, int totalClaimed);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Shard claim budget: {Budget} (totalBudget={TotalBudget}, alreadyClaimed={AlreadyClaimed}, elapsed={Elapsed}, rampUpDuration={RampUpDuration})"
+    )]
+    private static partial void LogShardClaimBudget(ILogger logger, int budget, int totalBudget, int alreadyClaimed, TimeSpan elapsed, TimeSpan rampUpDuration);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Silo is overloaded, pausing all new shard claims"
+    )]
+    private static partial void LogOverloadPausingShardClaims(ILogger logger);
 }

@@ -179,4 +179,37 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDi
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.UnregisterShard_WithJobsRemaining(cts.Token);
     }
+
+    /// <summary>
+    /// Tests that maxNewClaims limits the number of orphaned shards claimed.
+    /// This test is delegated to the runner for reuse across providers.
+    /// </summary>
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
+    public async Task AzureStorageJobShardManager_SlowStart_LimitsOrphanedShardClaims()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_LimitsOrphanedShardClaims(cts.Token);
+    }
+
+    /// <summary>
+    /// Tests that maxNewClaims = 0 prevents claiming orphaned shards but returns owned shards.
+    /// This test is delegated to the runner for reuse across providers.
+    /// </summary>
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
+    public async Task AzureStorageJobShardManager_SlowStart_ZeroBudgetClaimsNothing()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_ZeroBudgetClaimsNothing(cts.Token);
+    }
+
+    /// <summary>
+    /// Tests that maxNewClaims = int.MaxValue (unlimited) claims all orphaned shards.
+    /// This test is delegated to the runner for reuse across providers.
+    /// </summary>
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
+    public async Task AzureStorageJobShardManager_SlowStart_UnlimitedBudgetClaimsAll()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_UnlimitedBudgetClaimsAll(cts.Token);
+    }
 }

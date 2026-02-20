@@ -66,12 +66,13 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
     {
     }
 
-    public override async Task<List<Orleans.DurableJobs.IJobShard>> AssignJobShardsAsync(DateTimeOffset maxShardStartTime, CancellationToken cancellationToken)
+    public override async Task<List<Orleans.DurableJobs.IJobShard>> AssignJobShardsAsync(DateTimeOffset maxShardStartTime, int maxNewClaims, CancellationToken cancellationToken)
     {
         await InitializeIfNeeded(cancellationToken);
         LogAssigningShards(_logger, SiloAddress, maxShardStartTime, _containerName);
 
         var result = new List<Orleans.DurableJobs.IJobShard>();
+        var newClaimCount = 0;
         await foreach (var blob in _client.GetBlobsAsync(traits: BlobTraits.Metadata, states: BlobStates.None, cancellationToken: cancellationToken, prefix: _blobPrefix))
         {
             // Get the owner and creator of the shard
@@ -125,6 +126,12 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             // Determine if this is an adopted shard (taken from dead owner) vs orphaned (gracefully released)
             var isAdopted = owner is not null && ownerStatus == SiloStatus.Dead;
 
+            // Respect the slow-start budget: skip claiming if we've exhausted the budget
+            if (newClaimCount >= maxNewClaims)
+            {
+                continue;
+            }
+
             // Try to claim orphaned or adopted shard
             LogClaimingShard(_logger, blob.Name, SiloAddress, owner);
             var blobClient = _client.GetAppendBlobClient(blob.Name);
@@ -142,6 +149,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             _jobShardCache[blob.Name] = orphanedShard;
             LogShardAssigned(_logger, blob.Name, SiloAddress);
             result.Add(orphanedShard);
+            newClaimCount++;
         }
         
         LogAssignmentCompleted(_logger, result.Count, SiloAddress);
