@@ -6,7 +6,7 @@ using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Journaling.Protobuf.Tests;
 
 /// <summary>
 /// Round-trip tests for the Protocol Buffers log entry codecs.

@@ -1,8 +1,10 @@
 using Microsoft.Extensions.Logging;
 using Orleans.Journaling.Json;
+using Orleans.Journaling.Tests;
+using Orleans.Runtime;
 using Xunit;
 
-namespace Orleans.Journaling.Tests;
+namespace Orleans.Journaling.Json.Tests;
 
 /// <summary>
 /// Tests that verify backward compatibility and migration between serialization formats.

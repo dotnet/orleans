@@ -20,4 +20,8 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Journaling.Protobuf.Tests" />
+  </ItemGroup>
+
 </Project>

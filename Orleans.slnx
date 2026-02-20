@@ -119,6 +119,8 @@
     <Project Path="test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" />
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
+    <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />
+    <Project Path="test/Orleans.Journaling.Protobuf.Tests/Orleans.Journaling.Protobuf.Tests.csproj" />
     <Project Path="test/Orleans.Serialization.FSharp.Tests/Orleans.Serialization.FSharp.Tests.fsproj" />
     <Project Path="test/Orleans.Serialization.UnitTests/Orleans.Serialization.UnitTests.csproj" />
     <Project Path="test/Orleans.Runtime.Tests/Orleans.Runtime.Tests.csproj" />
