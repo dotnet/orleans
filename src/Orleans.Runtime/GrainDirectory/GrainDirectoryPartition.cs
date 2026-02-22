@@ -1,11 +1,6 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
@@ -35,6 +30,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         (previous, proposed) => proposed.Version >= previous.Version,
         _ => { });
 
+    private readonly TimeProvider _timeProvider;
+
     // Ranges which cannot be served currently, eg because the partition is currently transferring them from a previous owner.
     // Requests in these ranges must wait for the range to become available.
     private readonly List<(RingRange Range, MembershipVersion Version, TaskCompletionSource Completion)> _rangeLocks = [];
@@ -48,11 +45,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     private RingRange _currentRange;
 
+    private readonly TimeSpan _leaseHoldDuration;
+    private readonly List<(RingRange Range, DateTime Expiration)> _rangeLeaseHolds = [];
+    private readonly Dictionary<GrainId, (SiloAddress DeadSilo, DateTime LeaseExpiration)> _grainLeaseHolds = [];
+
     /// <param name="partitionIndex">The index of this partition on this silo. Each silo hosts a fixed number of dynamically sized partitions.</param>
     public GrainDirectoryPartition(
         int partitionIndex,
         DistributedGrainDirectory owner,
+        TimeSpan leaseHoldDuration,
         IInternalGrainFactory grainFactory,
+        TimeProvider timeProvider,
         SystemTargetShared shared) : base(CreateGrainId(shared.SiloAddress, partitionIndex), shared)
     {
         _partitionIndex = partitionIndex;
@@ -60,6 +63,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         _grainFactory = grainFactory;
         _id = shared.SiloAddress;
         _logger = shared.LoggerFactory.CreateLogger<GrainDirectoryPartition>();
+        _leaseHoldDuration = leaseHoldDuration;
+        _timeProvider = timeProvider;
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
@@ -239,21 +244,42 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             }
         });
     }
-    internal Task OnSiloRemovedFromClusterAsync(ClusterMember change) =>
+
+    internal Task OnSiloRemovedFromClusterAsync(ClusterMember change, SiloStatus previousStatus) =>
         this.QueueAction(
-            static state => state.Self.OnSiloRemovedFromCluster(state.Change),
-            (Self: this, Change: change),
+            static state => state.Self.OnSiloRemovedFromCluster(state.Change, state.PreviousStatus),
+            (Self: this, Change: change, PreviousStatus: previousStatus),
             nameof(OnSiloRemovedFromCluster));
 
-    private void OnSiloRemovedFromCluster(ClusterMember change)
+    private void OnSiloRemovedFromCluster(ClusterMember change, SiloStatus previousStatus)
     {
         GrainRuntime.CheckRuntimeContext(this);
+
+        // We need to detect the shutdown type:
+        // If it was ShuttingDown, it surrendered its ownership gracefully.
+        // If it was Active (or Joining) and suddenly became Dead, it crashed.
+
+        var isUngraceful = previousStatus is not SiloStatus.ShuttingDown;
+        var expiration = _timeProvider.GetUtcNow().UtcDateTime.Add(_leaseHoldDuration);
         var toRemove = new List<GrainAddress>();
+
         foreach (var entry in _directory)
         {
             if (change.SiloAddress.Equals(entry.Value.SiloAddress))
             {
                 toRemove.Add(entry.Value);
+
+                if (isUngraceful)
+                {
+                    // Instead of just deleting, we mark it as tombstoned.
+                    // This prevents a new activation on a healthy silo from registering 
+                    // until we are sure the dead silo has actually stopped processing.
+                    // So we block re-registration of this specific grain id if we did not already,
+                    // or extend based on the new expiration time.
+
+                    _grainLeaseHolds[entry.Key] = (change.SiloAddress, expiration);
+                    LogDebugLeaseHoldForGrain(_logger, entry.Key, change.SiloAddress, expiration);
+                }
             }
         }
 
@@ -465,10 +491,18 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             var recovered = false;
             if (!success)
             {
+                // We pessimistically asssume if snapshot transfer failed, than safety is needed.
+                var expiration = _timeProvider.GetUtcNow().UtcDateTime.Add(_leaseHoldDuration);
+                _rangeLeaseHolds.Add((addedRange, expiration));
+                LogWarningLeaseHoldForRange(_logger, addedRange, expiration);
+
                 // Wait for previous versions to be unlocked before proceeding.
                 await WaitForRange(addedRange, previous.Version);
 
+                // Proceed to recovery (fetching from other silos), 
+                // but register calls will now be blocked by range lease holds.
                 await RecoverPartitionRange(current, addedRange);
+
                 recovered = true;
             }
 
@@ -751,10 +785,83 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
+    internal void CleanupExpiredLeases() => this.QueueAction(static state =>
+        state.CleanupExpiredLeasesCore(), this, nameof(CleanupExpiredLeases));
+
+    private void CleanupExpiredLeasesCore()
+    {
+        GrainRuntime.CheckRuntimeContext(this);
+
+        try
+        {
+            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+
+            if (_rangeLeaseHolds.Count > 0)
+            {
+                var removed = _rangeLeaseHolds.RemoveAll(x => utcNow >= x.Expiration);
+                if (removed > 0)
+                {
+                    LogDebugPrunedExpiredRangeLeaseHolds(_logger, removed);
+                }
+            }
+
+            if (_grainLeaseHolds.Count > 0)
+            {
+                var expiredKeys = _grainLeaseHolds
+                    .Where(kvp => utcNow >= kvp.Value.LeaseExpiration)
+                    .Select(kvp => kvp.Key)
+                    .ToList();
+
+                foreach (var key in expiredKeys)
+                {
+                    _grainLeaseHolds.Remove(key);
+                }
+
+                if (expiredKeys.Count > 0)
+                {
+                    LogDebugPrunedExpiredGrainLeaseHolds(_logger, expiredKeys.Count);
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            LogErrorLeaseCleanup(_logger, ex, _id);
+        }
+    }
     private sealed record class PartitionSnapshotState(
         MembershipVersion DirectoryMembershipVersion,
         List<GrainAddress> GrainAddresses,
         HashSet<(SiloAddress SiloAddress, int PartitionIndex)> TransferPartners);
+
+    [LoggerMessage(
+      Level = LogLevel.Debug,
+      Message = "Grain {GrainId} from silo {Silo} has been put under a lease until {Expiration}."
+    )]
+    private static partial void LogDebugLeaseHoldForGrain(ILogger logger, GrainId grainId, SiloAddress silo, DateTime expiration);
+
+    [LoggerMessage(
+      Level = LogLevel.Warning,
+      Message = "Grains in the range {Range} have been put under a lease until {Expiration}."
+    )]
+    private static partial void LogWarningLeaseHoldForRange(ILogger logger, RingRange range, DateTime expiration);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Pruned {Count} expired grain lease holds."
+    )]
+    private static partial void LogDebugPrunedExpiredGrainLeaseHolds(ILogger logger, int count);
+
+    [LoggerMessage(
+      Level = LogLevel.Debug,
+      Message = "Pruned {Count} expired range lease holds."
+    )]
+    private static partial void LogDebugPrunedExpiredRangeLeaseHolds(ILogger logger, int count);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error during lease hold cleanup on silo '{Silo}'."
+    )]
+    private static partial void LogErrorLeaseCleanup(ILogger logger, Exception exception, SiloAddress silo);
 
     [LoggerMessage(
         Level = LogLevel.Trace,
