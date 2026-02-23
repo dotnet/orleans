@@ -5,37 +5,38 @@
   </PropertyGroup>
   <ItemGroup>
     <PackageVersion Include="Aspire.Azure.Storage.Queues" Version="13.0.0" />
-    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.0.0" />
-    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.0.0" />
-    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.0.0" />
-    <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.0.0" />
+    <PackageVersion Include="Aspire.Hosting.AppHost" Version="13.1.1" />
+    <PackageVersion Include="Aspire.Hosting.Orleans" Version="13.1.1" />
+    <PackageVersion Include="Aspire.Hosting.Redis" Version="13.1.1" />
+    <PackageVersion Include="Aspire.StackExchange.Redis" Version="13.1.1" />
     <PackageVersion Include="Autofac.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageVersion Include="AwesomeAssertions" Version="9.0.0" />
-    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.9.6" />
-    <PackageVersion Include="AWSSDK.SQS" Version="4.0.2.3" />
+    <PackageVersion Include="AwesomeAssertions" Version="9.3.0" />
+    <PackageVersion Include="AWSSDK.DynamoDBv2" Version="4.0.14" />
+    <PackageVersion Include="AWSSDK.SQS" Version="4.0.2.14" />
     <PackageVersion Include="Azure.Core" Version="1.50.0" />
     <PackageVersion Include="Azure.Data.Tables" Version="12.11.0" />
-    <PackageVersion Include="Azure.Identity" Version="1.17.0" />
+    <PackageVersion Include="Azure.Identity" Version="1.17.1" />
     <PackageVersion Include="Azure.Messaging.EventHubs" Version="5.12.2" />
     <PackageVersion Include="Azure.Security.KeyVault.Secrets" Version="4.5.0" />
-    <PackageVersion Include="Azure.Storage.Blobs" Version="12.26.0" />
-    <PackageVersion Include="Azure.Storage.Queues" Version="12.24.0" />
+    <PackageVersion Include="Azure.Storage.Blobs" Version="12.27.0" />
+    <PackageVersion Include="Azure.Storage.Queues" Version="12.25.0" />
     <PackageVersion Include="BenchmarkDotNet.Diagnostics.Windows" Version="0.13.12" />
     <PackageVersion Include="BenchmarkDotNet" Version="0.13.12" />
-    <PackageVersion Include="CassandraCSharpDriver" Version="3.20.1" />
-    <PackageVersion Include="Consul" Version="1.7.14.2" />
+    <PackageVersion Include="CassandraCSharpDriver" Version="3.22.0" />
+    <PackageVersion Include="Consul" Version="1.7.14.10" />
     <PackageVersion Include="coverlet.collector" Version="6.0.4" />
-    <PackageVersion Include="coverlet.msbuild" Version="6.0.0" />
-    <PackageVersion Include="CsCheck" Version="4.3.0" />
-    <PackageVersion Include="FSharp.Core" Version="9.0.100" />
+    <PackageVersion Include="coverlet.msbuild" Version="8.0.0" />
+    <PackageVersion Include="CsCheck" Version="4.5.0" />
+    <PackageVersion Include="FSharp.Core" Version="9.0.303" />
     <PackageVersion Include="Google.Cloud.PubSub.V1" Version="1.0.0-beta13" />
-    <PackageVersion Include="Google.Protobuf" Version="3.33.0" />
-    <PackageVersion Include="Grpc.Tools" Version="2.72.0" />
+    <PackageVersion Include="Google.Protobuf" Version="3.33.5" />
+    <PackageVersion Include="Grpc.Tools" Version="2.78.0" />
     <PackageVersion Include="Hyperion" Version="0.12.2" />
-    <PackageVersion Include="KubernetesClient" Version="18.0.5" />
+    <PackageVersion Include="KubernetesClient" Version="18.0.13" />
+    <PackageVersion Include="MemoryPack" Version="1.21.4" />
     <PackageVersion Include="MessagePack" Version="3.1.4" />
-    <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.11" />
-    <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.54.1" />
+    <PackageVersion Include="Microsoft.AspNetCore.Connections.Abstractions" Version="8.0.24" />
+    <PackageVersion Include="Microsoft.Azure.Cosmos" Version="3.57.0" />
     <PackageVersion Include="Microsoft.Build" Version="17.10.4" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Analyzers" Version="3.11.0" />
     <PackageVersion Include="Microsoft.CodeAnalysis.Common" Version="4.5.0" />
@@ -46,7 +47,8 @@
     <PackageVersion Include="Microsoft.CodeAnalysis" Version="4.5.0" />
     <PackageVersion Include="Microsoft.Crank.EventSources" Version="0.2.0-alpha.23422.5" />
     <PackageVersion Include="Microsoft.CSharp" Version="4.7.0" />
-    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.2" />
+    <PackageVersion Include="Microsoft.Data.SqlClient" Version="6.1.4" />
+    <PackageVersion Include="Microsoft.Data.Sqlite" Version="8.0.24" />
     <PackageVersion Include="Microsoft.DotNet.GenAPI.Task" Version="9.0.103-servicing.25065.25" />
     <PackageVersion Include="Microsoft.DotNet.PlatformAbstractions" Version="3.1.6" />
     <PackageVersion Include="Microsoft.Extensions.Configuration.Abstractions" Version="8.0.0" />
@@ -66,96 +68,101 @@
     <PackageVersion Include="Microsoft.Extensions.Logging.Console" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging.Debug" Version="8.0.1" />
     <PackageVersion Include="Microsoft.Extensions.Logging" Version="8.0.1" />
-    <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.22" />
+    <PackageVersion Include="Microsoft.Extensions.ObjectPool" Version="8.0.24" />
     <PackageVersion Include="Microsoft.Extensions.Options.ConfigurationExtensions" Version="8.0.0" />
     <PackageVersion Include="Microsoft.Extensions.Options" Version="8.0.2" />
-    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.0.0" />
-    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.5.0" />
-    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.0" />
+    <PackageVersion Include="Microsoft.Extensions.ServiceDiscovery" Version="10.3.0" />
+    <PackageVersion Include="Microsoft.Extensions.TimeProvider.Testing" Version="9.10.0" />
+    <PackageVersion Include="Microsoft.NET.Test.Sdk" Version="18.0.1" />
     <PackageVersion Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" />
     <PackageVersion Include="Microsoft.SourceLink.AzureRepos.Git" Version="8.0.0" />
     <PackageVersion Include="Microsoft.SourceLink.GitHub" Version="8.0.0" />
     <PackageVersion Include="MySql.Data" Version="8.0.31" />
-    <PackageVersion Include="NATS.Net" Version="2.6.11" />
+    <PackageVersion Include="NATS.Net" Version="2.7.2" />
     <PackageVersion Include="Newtonsoft.Json" Version="13.0.4" />
-    <PackageVersion Include="NodaTime" Version="3.1.10" />
-    <PackageVersion Include="Npgsql" Version="8.0.5" />
-    <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.16" />
-    <PackageVersion Include="NSubstitute" Version="5.1.0" />
+    <PackageVersion Include="NodaTime" Version="3.3.0" />
+    <PackageVersion Include="Npgsql" Version="8.0.8" />
+    <PackageVersion Include="NSubstitute.Analyzers.CSharp" Version="1.0.17" />
+    <PackageVersion Include="NSubstitute" Version="5.3.0" />
     <PackageVersion Include="OpenTelemetry" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Extensions.Hosting" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.AspNetCore" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Http" Version="1.9.0" />
     <PackageVersion Include="OpenTelemetry.Instrumentation.Runtime" Version="1.9.0" />
-    <PackageVersion Include="protobuf-net" Version="3.2.30" />
-    <PackageVersion Include="SpanJson" Version="4.0.1" />
-    <PackageVersion Include="StackExchange.Redis" Version="2.9.32" />
+    <PackageVersion Include="protobuf-net" Version="3.2.56" />
+    <PackageVersion Include="SpanJson" Version="4.2.1" />
+    <PackageVersion Include="SQLitePCLRaw.bundle_e_sqlite3" Version="2.1.11" />
+    <PackageVersion Include="StackExchange.Redis" Version="2.11.0" />
     <PackageVersion Include="StructureMap.Microsoft.DependencyInjection" Version="2.0.0" />
-    <PackageVersion Include="System.CodeDom" Version="10.0.0" />
+    <PackageVersion Include="System.CodeDom" Version="10.0.3" />
     <PackageVersion Include="System.Collections.Immutable" Version="8.0.0" />
     <PackageVersion Include="System.CommandLine" Version="2.0.0-beta1.21308.1" />
     <PackageVersion Include="System.Diagnostics.PerformanceCounter" Version="8.0.1" />
-    <PackageVersion Include="System.Drawing.Common" Version="8.0.11" />
-    <PackageVersion Include="System.IO.Hashing" Version="10.0.0" NoWarn="NU5104" />
+    <PackageVersion Include="System.Drawing.Common" Version="8.0.24" />
+    <PackageVersion Include="System.IO.Hashing" Version="10.0.3" NoWarn="NU5104" />
     <PackageVersion Include="System.IO.Pipelines" Version="8.0.0" />
     <PackageVersion Include="System.Memory.Data" Version="8.0.1" />
     <PackageVersion Include="System.Text.Json" Version="8.0.5" />
-    <PackageVersion Include="Testcontainers" Version="4.8.1" />
+    <PackageVersion Include="Testcontainers" Version="4.10.0" />
+    <PackageVersion Include="Testcontainers.Consul" Version="4.10.0" />
     <PackageVersion Include="Utf8Json" Version="1.3.7" />
-    <PackageVersion Include="Verify.Xunit" Version="29.3.1" />
+    <PackageVersion Include="Verify.Xunit" Version="29.5.0" />
     <PackageVersion Include="xunit.assert" Version="2.9.3" />
     <PackageVersion Include="xunit.core" Version="2.9.3" />
     <PackageVersion Include="xunit.extensibility.core" Version="2.9.3" />
     <PackageVersion Include="xunit.extensibility.execution" Version="2.9.3" />
     <PackageVersion Include="xunit.runner.visualstudio" Version="3.1.5" />
-    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.23" />
+    <PackageVersion Include="Xunit.SkippableFact" Version="1.5.61" />
     <PackageVersion Include="xunit" Version="2.9.3" />
     <PackageVersion Include="ZeroFormatter" Version="1.6.4" />
     <PackageVersion Include="ZooKeeperNetEx" Version="3.4.12.4" />
   </ItemGroup>
   <!-- Updates for later TFMs -->
   <ItemGroup Condition=" '$(TargetFramework)' == 'net10.0' ">
+    <PackageVersion Update="Aspire.Azure.Storage.Queues" Version="13.1.1" />
     <PackageVersion Update="BenchmarkDotNet" Version="0.15.6" />
-    <PackageVersion Update="FSharp.Core" Version="10.0.100" />
-    <PackageVersion Update="Microsoft.AspNetCore.Connections.Abstractions" Version="10.0.0" />
+    <PackageVersion Update="FSharp.Core" Version="10.0.103" />
+    <PackageVersion Update="Microsoft.AspNetCore.Connections.Abstractions" Version="10.0.3" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Common" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp.Workspaces" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.CSharp" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis.Workspaces.Common" Version="5.0.0" />
     <PackageVersion Update="Microsoft.CodeAnalysis" Version="5.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Configuration.Binder" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Configuration.Json" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Configuration" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.DependencyInjection" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.DependencyModel" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Diagnostics.Testing" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Hosting" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Http" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Http.Resilience" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Logging.Abstractions" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Logging.Console" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Logging.Debug" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Logging" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.ObjectPool" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.Options" Version="10.0.0" />
-    <PackageVersion Update="Microsoft.Extensions.TimeProvider.Testing" Version="10.0.0" />
-    <PackageVersion Update="OpenTelemetry" Version="1.13.1" />
-    <PackageVersion Update="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.13.1" />
-    <PackageVersion Update="OpenTelemetry.Extensions.Hosting" Version="1.13.1" />
-    <PackageVersion Update="OpenTelemetry.Instrumentation.AspNetCore" Version="1.13.0" />
-    <PackageVersion Update="OpenTelemetry.Instrumentation.Http" Version="1.13.0" />
-    <PackageVersion Update="OpenTelemetry.Instrumentation.Runtime" Version="1.13.0" />
+    <PackageVersion Update="Azure.Core" Version="1.51.1" />
+    <PackageVersion Update="Microsoft.Data.Sqlite" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.Abstractions" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.Binder" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration.Json" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Configuration" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.DependencyInjection" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.DependencyModel" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Diagnostics.Testing" Version="10.3.0" />
+    <PackageVersion Update="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Hosting" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Http" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Http.Resilience" Version="10.3.0" />
+    <PackageVersion Update="Microsoft.Extensions.Logging.Abstractions" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Logging.Console" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Logging.Debug" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Logging" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.ObjectPool" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Options.ConfigurationExtensions" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.Options" Version="10.0.3" />
+    <PackageVersion Update="Microsoft.Extensions.TimeProvider.Testing" Version="10.3.0" />
+    <PackageVersion Update="OpenTelemetry" Version="1.15.0" />
+    <PackageVersion Update="OpenTelemetry.Exporter.OpenTelemetryProtocol" Version="1.15.0" />
+    <PackageVersion Update="OpenTelemetry.Extensions.Hosting" Version="1.15.0" />
+    <PackageVersion Update="OpenTelemetry.Instrumentation.AspNetCore" Version="1.15.0" />
+    <PackageVersion Update="OpenTelemetry.Instrumentation.Http" Version="1.15.0" />
+    <PackageVersion Update="OpenTelemetry.Instrumentation.Runtime" Version="1.15.0" />
     <PackageVersion Update="System.Collections.Immutable" Version="10.0.0" />
     <PackageVersion Update="System.CommandLine" Version="2.0.0-beta1.21308.1" />
-    <PackageVersion Update="System.Diagnostics.PerformanceCounter" Version="10.0.0" />
-    <PackageVersion Update="System.Drawing.Common" Version="10.0.0" />
-    <PackageVersion Update="System.IO.Pipelines" Version="10.0.0" />
-    <PackageVersion Update="System.Memory.Data" Version="10.0.0" />
+    <PackageVersion Update="System.Diagnostics.PerformanceCounter" Version="10.0.3" />
+    <PackageVersion Update="System.Drawing.Common" Version="10.0.3" />
+    <PackageVersion Update="System.IO.Pipelines" Version="10.0.3" />
+    <PackageVersion Update="System.Memory.Data" Version="10.0.3" />
     <PackageVersion Update="System.Text.Json" Version="10.0.0" />
   </ItemGroup>
 </Project>

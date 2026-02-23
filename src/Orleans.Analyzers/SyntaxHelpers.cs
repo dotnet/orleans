@@ -12,7 +12,7 @@ namespace Orleans.Analyzers
 
     internal static class SyntaxHelpers
     {
-        public static bool TryGetTypeName(this AttributeSyntax attributeSyntax, out string typeName)
+        private static bool TryGetTypeName(this AttributeSyntax attributeSyntax, out string typeName)
         {
             typeName = attributeSyntax.Name switch
             {
@@ -65,25 +65,9 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static string GetMemberNameOrDefault(this MemberDeclarationSyntax member)
-        {
-            if (member is PropertyDeclarationSyntax property)
-            {
-                return property.ChildTokens().FirstOrDefault(token => token.IsKind(SyntaxKind.IdentifierToken)).ValueText;
-            }
-            else if (member is FieldDeclarationSyntax field)
-            {
-                return field.ChildNodes().OfType<VariableDeclarationSyntax>().FirstOrDefault()?.ChildNodes().OfType<VariableDeclaratorSyntax>().FirstOrDefault()?.Identifier.ValueText;
-            }
-
-            return null;
-        }
-
         public static bool IsAbstract(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.AbstractKeyword);
 
-        public static bool IsStatic(this MemberDeclarationSyntax member) => member.HasModifier(SyntaxKind.StaticKeyword);
-
-        public static bool HasModifier(this MemberDeclarationSyntax member, SyntaxKind modifierKind)
+        private static bool HasModifier(this MemberDeclarationSyntax member, SyntaxKind modifierKind)
         {
             foreach (var modifier in member.Modifiers)
             {
@@ -147,14 +131,8 @@ namespace Orleans.Analyzers
             return isFieldOrAutoProperty;
         }
 
-        public static bool ExtendsGrainInterface(this InterfaceDeclarationSyntax interfaceDeclaration, SemanticModel semanticModel)
+        public static bool ExtendsGrainInterface(this INamedTypeSymbol symbol)
         {
-            if (interfaceDeclaration is null)
-            {
-                return false;
-            }
-
-            var symbol = semanticModel.GetDeclaredSymbol(interfaceDeclaration);
             if (symbol is null || symbol.TypeKind != TypeKind.Interface)
             {
                 return false;
@@ -170,7 +148,6 @@ namespace Orleans.Analyzers
 
             return false;
         }
-
         public static bool InheritsGrainClass(this ClassDeclarationSyntax declaration, SemanticModel semanticModel)
         {
             var baseTypes = declaration.BaseList?.Types;
@@ -195,6 +172,27 @@ namespace Orleans.Analyzers
                     {
                         return true;
                     }
+                }
+            }
+
+            return false;
+        }
+
+        public static bool IsGrainClass(this INamedTypeSymbol typeSymbol)
+        {
+            if (typeSymbol is null || typeSymbol.TypeKind != TypeKind.Class)
+            {
+                return false;
+            }
+
+            // Check if the type implements IGrain or ISystemTarget interface
+            foreach (var interfaceSymbol in typeSymbol.AllInterfaces)
+            {
+                var interfaceName = interfaceSymbol.ToDisplayString(NullableFlowState.None);
+                if (Constants.IGrainFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal) ||
+                    Constants.ISystemTargetFullyQualifiedName.Equals(interfaceName, StringComparison.Ordinal))
+                {
+                    return true;
                 }
             }
 

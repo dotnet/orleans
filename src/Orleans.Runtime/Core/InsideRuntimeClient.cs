@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
@@ -40,6 +41,7 @@ namespace Orleans.Runtime
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private readonly DeepCopier _deepCopier;
+        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager;
         private HostedClient hostedClient;
 
@@ -62,11 +64,13 @@ namespace Orleans.Runtime
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier,
             TimeProvider timeProvider,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
+            OrleansInstruments orleansInstruments)
         {
             TimeProvider = timeProvider;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this._deepCopier = deepCopier;
+            this._applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
@@ -172,7 +176,7 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                var callbackData = new CallbackData(sharedData, context, message);
+                var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
@@ -313,7 +317,15 @@ namespace Orleans.Runtime
                         ise.IsSourceActivation = false;
 
                         LogDeactivatingInconsistentState(this.invokeExceptionLogger, target, invocationException);
-                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                        
+                        if (target is ActivationData ad && message.RequestContextData.TryGetActivityContext() is { } ac)
+                        {
+                            ad.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)), ac);
+                        }
+                        else
+                        {
+                            target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                        }
                     }
                 }
 

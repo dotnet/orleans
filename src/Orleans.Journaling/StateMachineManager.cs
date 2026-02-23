@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime.Internal;
@@ -16,7 +17,11 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     private static readonly StringCodec StringCodec = new();
     private static readonly UInt64Codec UInt64Codec = new();
     private static readonly DateTimeCodec DateTimeCodec = new();
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
     private readonly Dictionary<string, IDurableStateMachine> _stateMachines = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, IDurableStateMachine> _stateMachinesMap = [];
     private readonly IStateMachineStorage _storage;

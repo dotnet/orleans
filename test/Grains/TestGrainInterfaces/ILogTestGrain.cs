@@ -61,7 +61,8 @@ namespace UnitTests.GrainInterfaces
 
         // other operations
 
-            Task SynchronizeGlobalState();
+        Task SynchronizeGlobalState();
+        Task Clear();
         Task Deactivate();
     }
 

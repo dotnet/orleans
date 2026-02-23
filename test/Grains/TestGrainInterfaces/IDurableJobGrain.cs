@@ -21,7 +21,7 @@ public interface IDurableJobGrain : IGrainWithStringKey
 
     Task<DateTimeOffset> GetJobExecutionTime(string jobId);
 
-    Task<IDurableJobContext> GetJobContext(string jobId);
+    Task<IJobRunContext> GetJobRun(string jobId);
 
     Task<bool> WasCancellationTokenCancelled(string jobId);
 }

@@ -1,5 +1,6 @@
 using Orleans.Configuration;
 using Orleans.Dashboard;
+using Orleans.Runtime.MembershipService.SiloMetadata;
 using System.Net;
 using TestGrains;
 

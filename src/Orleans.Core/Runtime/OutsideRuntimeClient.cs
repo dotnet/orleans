@@ -32,6 +32,7 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
+        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager;
         private IClusterConnectionStatusObserver[] _statusObservers;
 
@@ -71,10 +72,12 @@ namespace Orleans
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider,
             TimeProvider timeProvider,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
+            OrleansInstruments orleansInstruments)
         {
             TimeProvider = timeProvider;
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
+            _applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -281,7 +284,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments);
                 callbackData.SubscribeForCancellation(cancellationToken);
                 callbacks.TryAdd(message.Id, callbackData);
             }

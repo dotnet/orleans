@@ -5,6 +5,7 @@ using System.Collections.Immutable;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -23,7 +24,11 @@ namespace Orleans.Runtime
     /// </summary>
     public sealed class GrainContextActivator
     {
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private readonly IGrainContextActivatorProvider[] _activatorProviders;
         private readonly IConfigureGrainContextProvider[] _configuratorProviders;
         private readonly GrainPropertiesResolver _resolver;

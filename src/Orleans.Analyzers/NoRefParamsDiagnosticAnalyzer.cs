@@ -10,7 +10,6 @@ namespace Orleans.Analyzers
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class NoRefParamsDiagnosticAnalyzer : DiagnosticAnalyzer
     {
-        private const string BaseInterfaceName = "IAddressable";
         public const string DiagnosticId = "ORLEANS0002";
         public const string Title = "Reference parameter modifiers are not allowed";
         public const string MessageFormat = Title;
@@ -18,20 +17,25 @@ namespace Orleans.Analyzers
 
         private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule];
 
         public override void Initialize(AnalysisContext context)
         {
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze | GeneratedCodeAnalysisFlags.ReportDiagnostics);
             context.EnableConcurrentExecution();
-            context.RegisterSyntaxNodeAction(AnalyzeSyntax, SyntaxKind.MethodDeclaration);
+            context.RegisterCompilationStartAction(context =>
+            {
+                var baseInterface = context.Compilation.GetTypeByMetadataName("Orleans.Runtime.IAddressable");
+                if (baseInterface is not null)
+                {
+                    context.RegisterSymbolAction(context => AnalyzeMethodSymbol(context, baseInterface), SymbolKind.Method);
+                }
+            });
         }
 
-        private static void AnalyzeSyntax(SyntaxNodeAnalysisContext context)
+        private static void AnalyzeMethodSymbol(SymbolAnalysisContext context, INamedTypeSymbol baseInterface)
         {
-            if (!(context.Node is MethodDeclarationSyntax syntax)) return;
-
-            var symbol = context.SemanticModel.GetDeclaredSymbol(syntax, context.CancellationToken);
+            var symbol = (IMethodSymbol)context.Symbol;
 
             if (symbol.ContainingType.TypeKind != TypeKind.Interface) return;
 
@@ -41,7 +45,7 @@ namespace Orleans.Analyzers
             var implementedInterfaces = symbol.ContainingType
                                               .AllInterfaces
                                               .Select(interfaceDef => interfaceDef.Name);
-            if (!implementedInterfaces.Contains(BaseInterfaceName)) return;
+            if (!symbol.ContainingType.AllInterfaces.Contains(baseInterface)) return;
 
             foreach(var param in symbol.Parameters)
             {

@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
+using Orleans.Diagnostics;
 using Orleans.Invocation;
 using Orleans.Serialization.Invocation;
 
@@ -199,6 +200,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
     private int _batchIndex;
     private bool _disposed;
     private bool _isInitialized;
+    private Activity? _sessionActivity;
 
     private bool IsBatch => (_current.State & EnumerationResult.Batch) != 0;
     private bool IsElement => (_current.State & EnumerationResult.Element) != 0;
@@ -270,6 +272,9 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 
         if (_isInitialized)
         {
+            // Restore the session activity as the current activity so that DisposeAsync RPC is parented to it
+            var previousActivity = Activity.Current;
+            Activity.Current = _sessionActivity;
             try
             {
                 await _target.DisposeAsync(_requestId);
@@ -279,9 +284,18 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
                 var logger = ((GrainReference)_target).Shared.ServiceProvider.GetRequiredService<ILogger<AsyncEnumerableRequest<T>>>();
                 logger.LogWarning(exception, "Failed to dispose async enumerator.");
             }
+            finally
+            {
+                Activity.Current = previousActivity;
+            }
         }
 
         _cancellationTokenSource?.Dispose();
+
+        // Stop the session activity after DisposeAsync completes
+        _sessionActivity?.Stop();
+        _sessionActivity?.Dispose();
+
         _disposed = true;
     }
 
@@ -302,6 +316,14 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
         }
 
         var isActive = _isInitialized;
+
+        // Restore the session activity as the current activity so that RPC calls are parented to it
+        var previousActivity = Activity.Current;
+        if (_sessionActivity is not null)
+        {
+            Activity.Current = _sessionActivity;
+        }
+
         try
         {
             (EnumerationResult Status, object Value) result;
@@ -311,6 +333,11 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 
                 if (!_isInitialized)
                 {
+                    // Start the session activity on first enumeration call
+                    // This span wraps the entire enumeration session
+                    _sessionActivity = ActivitySources.ApplicationGrainSource.StartActivity(_request.GetActivityName(), ActivityKind.Client);
+                    _sessionActivity?.SetTag(ActivityTagKeys.AsyncEnumerableRequestId, _requestId.ToString());
+
                     // Assume the enumerator is active as soon as the call begins.
                     isActive = true;
                     result = await _target.StartEnumeration(_requestId, _request, _cancellationToken);
@@ -324,10 +351,12 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
                 isActive = result.Status.IsActive();
                 if (result.Status is EnumerationResult.Error)
                 {
+                    _sessionActivity?.SetStatus(ActivityStatusCode.Error);
                     ExceptionDispatchInfo.Capture((Exception)result.Value).Throw();
                 }
                 else if (result.Status is EnumerationResult.Canceled)
                 {
+                    _sessionActivity?.SetStatus(ActivityStatusCode.Error, "Canceled");
                     throw new OperationCanceledException();
                 }
 
@@ -339,6 +368,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 
             if (result.Status is EnumerationResult.MissingEnumeratorError)
             {
+                _sessionActivity?.SetStatus(ActivityStatusCode.Error, "MissingEnumerator");
                 throw new EnumerationAbortedException("Enumeration aborted: the remote target does not have a record of this enumerator."
                     + " This likely indicates that the remote grain was deactivated since enumeration begun or that the enumerator was idle for longer than the expiration period.");
             }
@@ -355,6 +385,11 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             await _target.DisposeAsync(_requestId).AsTask()
                 .ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.SuppressThrowing);
             throw;
+        }
+        finally
+        {
+            // Restore the previous activity after each call
+            Activity.Current = previousActivity;
         }
     }
 }

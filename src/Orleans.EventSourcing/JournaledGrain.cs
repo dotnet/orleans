@@ -191,6 +191,15 @@ namespace Orleans.EventSourcing
         }
 
         /// <summary>
+        /// Clears the log of all confirmed events. Reset the state to the initial state, and discards all unconfirmed events.
+        /// Throws <see cref="NotSupportedException"/> if the log cannot be cleared.
+        /// </summary>
+        protected Task ClearLogAsync(CancellationToken cancellationToken = default)
+        { 
+            return LogViewAdaptor.ClearLogAsync(cancellationToken);
+        }
+
+        /// <summary>
         /// Called when the underlying persistence or replication protocol is running into some sort of connection trouble.
         /// <para>Override this to monitor the health of the log-consistency protocol and/or
         /// to customize retry delays.

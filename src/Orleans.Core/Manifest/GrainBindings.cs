@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Threading;
 using Orleans.Runtime;
 
 namespace Orleans.Metadata
@@ -43,7 +44,11 @@ namespace Orleans.Metadata
     {
         private const string BindingPrefix = WellKnownGrainTypeProperties.BindingPrefix + ".";
         private const char BindingIndexEnd = '.';
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private readonly ConcurrentDictionary<GenericGrainType, GrainType> _genericMapping = new ConcurrentDictionary<GenericGrainType, GrainType>();
         private readonly IClusterManifestProvider _clusterManifestProvider;
         private Cache _cache;

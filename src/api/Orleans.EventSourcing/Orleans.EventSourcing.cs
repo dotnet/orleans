@@ -108,6 +108,7 @@ namespace Orleans.EventSourcing
 
     public partial interface ILogViewUpdate<TLogEntry>
     {
+        System.Threading.Tasks.Task ClearLogAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task ConfirmSubmittedEntries();
         void Submit(TLogEntry entry);
         void SubmitRange(System.Collections.Generic.IEnumerable<TLogEntry> entries);

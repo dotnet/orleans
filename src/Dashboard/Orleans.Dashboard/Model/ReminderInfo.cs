@@ -3,6 +3,7 @@ using System;
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.ReminderInfo")]
 internal sealed class ReminderInfo
 {
     [Id(0)]

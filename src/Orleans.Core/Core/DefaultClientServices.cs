@@ -1,31 +1,32 @@
 #nullable enable
-using Orleans.Configuration;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
 using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
 using Orleans.GrainReferences;
+using Orleans.Hosting;
 using Orleans.Messaging;
 using Orleans.Metadata;
 using Orleans.Networking.Shared;
+using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Runtime.Messaging;
 using Orleans.Runtime.Versions;
 using Orleans.Serialization;
-using Orleans.Statistics;
-using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
-using Microsoft.Extensions.Hosting;
-using System.Collections.Generic;
 using Orleans.Serialization.Internal;
-using System;
-using Orleans.Hosting;
-using System.Reflection;
-using Microsoft.Extensions.Configuration;
-using Orleans.Placement.Repartitioning;
+using Orleans.Serialization.Serializers;
+using Orleans.Statistics;
 
 namespace Orleans
 {
@@ -53,7 +54,9 @@ namespace Orleans
             // Common services
             services.AddLogging();
             services.AddOptions();
+            services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+            services.TryAddSingleton<OrleansInstruments>();
 
             // Options logging
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
@@ -61,6 +64,11 @@ namespace Orleans
 
             services.AddSingleton<ClientOptionsLogger>();
             services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ClientOptionsLogger>();
+
+            // Lifecycle
+            services.AddSingleton<ServiceLifecycle<IClusterClientLifecycle>>();
+            services.TryAddFromExisting<IServiceLifecycle, ServiceLifecycle<IClusterClientLifecycle>>();
+            services.AddFromExisting<ILifecycleParticipant<IClusterClientLifecycle>, ServiceLifecycle<IClusterClientLifecycle>>();
 
             // Statistics
             services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
@@ -210,7 +218,17 @@ namespace Orleans
                         ?? throw new InvalidOperationException($"{kind} provider, '{name}', of type {type}, does not implement {typeof(IProviderBuilder<IClientBuilder>)}.");
                 }
 
-                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' package the provider's package are not referenced by your application.");
+                var knownProvidersOfKind = knownProviderTypes
+                    .Where(kvp => string.Equals(kvp.Key.Kind, kind, StringComparison.OrdinalIgnoreCase))
+                    .Select(kvp => kvp.Key.Name)
+                    .OrderBy(n => n)
+                    .ToList();
+
+                var knownProvidersMessage = knownProvidersOfKind.Count > 0
+                    ? $" Known {kind} providers: {string.Join(", ", knownProvidersOfKind)}."
+                    : string.Empty;
+
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.{knownProvidersMessage}");
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()

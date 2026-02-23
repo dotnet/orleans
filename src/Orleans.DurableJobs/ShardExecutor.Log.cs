@@ -43,6 +43,18 @@ internal sealed partial class ShardExecutor
     private static partial void LogRetryingJob(ILogger logger, string jobId, string jobName, DateTimeOffset retryTime, int dequeueCount);
 
     [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Polling job {JobId} (Name: '{JobName}') - will check status again in {PollDelay}"
+    )]
+    private static partial void LogPollingJob(ILogger logger, string jobId, string jobName, TimeSpan pollDelay);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Job {JobId} (Name: '{JobName}') returned Failed status"
+    )]
+    private static partial void LogJobFailedWithResult(ILogger logger, string jobId, string jobName);
+
+    [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Job {JobId} (Name: '{JobName}') failed after {DequeueCount} attempts and will not be retried"
     )]
@@ -71,4 +83,28 @@ internal sealed partial class ShardExecutor
         Message = "Overload cleared for shard {ShardId}, resuming job processing"
     )]
     private static partial void LogOverloadCleared(ILogger logger, string shardId);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Slow start initiated: initial concurrency {InitialConcurrency}, target {TargetConcurrency}, interval {Interval}"
+    )]
+    private static partial void LogSlowStartBegin(ILogger logger, int initialConcurrency, int targetConcurrency, TimeSpan interval);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Slow start: concurrency increased to {CurrentConcurrency} (target: {TargetConcurrency})"
+    )]
+    private static partial void LogSlowStartConcurrencyIncreased(ILogger logger, int currentConcurrency, int targetConcurrency);
+
+    [LoggerMessage(
+        Level = LogLevel.Information,
+        Message = "Slow start complete: concurrency reached target {TargetConcurrency}"
+    )]
+    private static partial void LogSlowStartComplete(ILogger logger, int targetConcurrency);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Slow start ramp-up failed; all remaining concurrency has been released"
+    )]
+    private static partial void LogSlowStartError(ILogger logger, Exception exception);
 }

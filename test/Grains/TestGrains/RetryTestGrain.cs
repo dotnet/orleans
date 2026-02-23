@@ -13,7 +13,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
     private readonly Dictionary<string, TaskCompletionSource> _jobSuccessStatus = new();
     private readonly Dictionary<string, int> _jobExecutionAttempts = new();
     private readonly Dictionary<string, List<int>> _jobDequeueCountHistory = new();
-    private readonly Dictionary<string, IDurableJobContext> _finalJobContexts = new();
+    private readonly Dictionary<string, IJobRunContext> _finalJobContexts = new();
     private readonly ILocalDurableJobManager _localDurableJobManager;
     private readonly ILogger<RetryTestGrain> _logger;
 
@@ -28,7 +28,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
         return Task.FromResult(_jobSuccessStatus.TryGetValue(jobId, out var tcs) && tcs.Task.IsCompleted);
     }
 
-    public Task ExecuteJobAsync(IDurableJobContext ctx, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext ctx, CancellationToken cancellationToken)
     {
         var jobId = ctx.Job.Id;
         
@@ -78,12 +78,14 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
 
     public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
     {
-        var job = await _localDurableJobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            jobName,
-            scheduledTime,
-            metadata,
-            CancellationToken.None);
+        var request = new ScheduleJobRequest
+        {
+            Target = this.GetGrainId(),
+            JobName = jobName,
+            DueTime = scheduledTime,
+            Metadata = metadata
+        };
+        var job = await _localDurableJobManager.ScheduleJobAsync(request, CancellationToken.None);
         
         _jobSuccessStatus[job.Id] = new TaskCompletionSource();
         
@@ -122,7 +124,7 @@ public class RetryTestGrain : Grain, IRetryTestGrain, IDurableJobHandler
         return Task.FromResult(history);
     }
 
-    public Task<IDurableJobContext> GetFinalJobContext(string jobId)
+    public Task<IJobRunContext> GetFinalJobRun(string jobId)
     {
         if (!_finalJobContexts.TryGetValue(jobId, out var ctx))
         {

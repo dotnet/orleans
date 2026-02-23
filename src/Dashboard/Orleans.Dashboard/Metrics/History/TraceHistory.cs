@@ -142,12 +142,15 @@ internal sealed class TraceHistory(int capacity = 100) : ITraceHistory
         });
     }
 
-    public IEnumerable<GrainMethodAggregate> AggregateByGrainMethod()
+    public IEnumerable<GrainMethodAggregate> AggregateByGrainMethod(string[] exclusions)
     {
         var time = GetRetirementWindow(DateTime.UtcNow);
         var periodStart = time.ToPeriodNumber();
+        var history = exclusions != null && exclusions.Length > 0
+            ? _history.Where(x => !exclusions.Any(f => x.Key.Grain.StartsWith(f, StringComparison.OrdinalIgnoreCase)))
+            : _history;
 
-        return _history.GroupBy(x => (x.Key.Grain, x.Key.Method)).Select(group =>
+        return history.GroupBy(x => (x.Key.Grain, x.Key.Method)).Select(group =>
         {
             var result = new GrainMethodAggregate
             {

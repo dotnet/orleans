@@ -21,6 +21,8 @@ internal sealed partial class ShardExecutor
     private readonly DurableJobsOptions _options;
     private readonly SemaphoreSlim _jobConcurrencyLimiter;
     private readonly IOverloadDetector _overloadDetector;
+    private int _currentCapacity;
+    private int _slowStartRampUpStarted;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ShardExecutor"/> class.
@@ -38,8 +40,13 @@ internal sealed partial class ShardExecutor
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
-        _jobConcurrencyLimiter = new SemaphoreSlim(_options.MaxConcurrentJobsPerSilo);
         _overloadDetector = overloadDetector;
+
+        _currentCapacity = _options.ConcurrencySlowStartEnabled && _options.SlowStartInitialConcurrency < _options.MaxConcurrentJobsPerSilo
+            ? _options.SlowStartInitialConcurrency
+            : _options.MaxConcurrentJobsPerSilo;
+
+        _jobConcurrencyLimiter = new SemaphoreSlim(_currentCapacity);
     }
 
     /// <summary>
@@ -51,6 +58,12 @@ internal sealed partial class ShardExecutor
     public async Task RunShardAsync(IJobShard shard, CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+        if (Volatile.Read(ref _currentCapacity) < _options.MaxConcurrentJobsPerSilo
+            && Interlocked.CompareExchange(ref _slowStartRampUpStarted, 1, 0) == 0)
+        {
+            _ = Task.Run(SlowStartRampUpAsync);
+        }
 
         var tasks = new ConcurrentDictionary<string, Task>();
         try
@@ -99,41 +112,126 @@ internal sealed partial class ShardExecutor
         }
     }
 
+    private async Task SlowStartRampUpAsync()
+    {
+        var targetCapacity = _options.MaxConcurrentJobsPerSilo;
+        LogSlowStartBegin(_logger, Volatile.Read(ref _currentCapacity), targetCapacity, _options.SlowStartInterval);
+
+        try
+        {
+            while (Volatile.Read(ref _currentCapacity) < targetCapacity)
+            {
+                await Task.Delay(_options.SlowStartInterval);
+
+                while (true)
+                {
+                    var currentCapacity = Volatile.Read(ref _currentCapacity);
+                    if (currentCapacity >= targetCapacity)
+                    {
+                        break;
+                    }
+
+                    var newCapacity = (int)Math.Min((long)currentCapacity * 2, targetCapacity);
+                    var toRelease = newCapacity - currentCapacity;
+                    if (toRelease <= 0)
+                    {
+                        break;
+                    }
+
+                    if (Interlocked.CompareExchange(ref _currentCapacity, newCapacity, currentCapacity) == currentCapacity)
+                    {
+                        _jobConcurrencyLimiter.Release(toRelease);
+                        LogSlowStartConcurrencyIncreased(_logger, newCapacity, targetCapacity);
+                        break;
+                    }
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            // If the ramp-up fails for any reason, release all remaining capacity to avoid being stuck at low concurrency.
+            var currentCapacity = Volatile.Read(ref _currentCapacity);
+            var remaining = targetCapacity - currentCapacity;
+            if (remaining > 0)
+            {
+                _jobConcurrencyLimiter.Release(remaining);
+                Interlocked.Exchange(ref _currentCapacity, targetCapacity);
+            }
+
+            LogSlowStartError(_logger, ex);
+            return;
+        }
+
+        LogSlowStartComplete(_logger, Volatile.Read(ref _currentCapacity));
+    }
+
     private async Task RunJobAsync(
-        IDurableJobContext jobContext,
+        IJobRunContext jobContext,
         IJobShard shard,
         ConcurrentDictionary<string, Task> runningTasks,
         CancellationToken cancellationToken)
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
+        Exception? failureException = null;
+
         try
         {
-            LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
-
-            var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
-
-            await target.DeliverDurableJobAsync(jobContext, cancellationToken);
-            await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
-
-            LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
-        }
-        catch (Exception ex) when (ex is not TaskCanceledException)
-        {
-            LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
-            var retryTime = _options.ShouldRetry(jobContext, ex);
-            if (retryTime is not null)
+            try
             {
-                LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
-                await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
+                LogExecutingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.Job.TargetGrainId, jobContext.Job.DueTime);
+
+                var target = _grainFactory.GetGrain<IDurableJobReceiverExtension>(jobContext.Job.TargetGrainId);
+
+                var result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+
+                // Handle the result based on status
+                while (result.IsPending)
+                {
+                    // Enter polling loop
+                    LogPollingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, result.PollAfterDelay.Value);
+
+                    await Task.Delay(result.PollAfterDelay.Value, cancellationToken);
+
+                    result = await target.HandleDurableJobAsync(jobContext, cancellationToken);
+                }
+
+                if (result.Status == DurableJobRunStatus.Completed)
+                {
+                    await shard.RemoveJobAsync(jobContext.Job.Id, cancellationToken);
+                    LogJobExecutedSuccessfully(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                }
+                else if (result.IsFailed)
+                {
+                    // Handle failed result through retry policy
+                    LogJobFailedWithResult(_logger, jobContext.Job.Id, jobContext.Job.Name);
+                    failureException = result.Exception;
+                }
             }
-            else
+            catch (Exception ex) when (ex is not OperationCanceledException)
             {
-                LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
+                LogErrorExecutingJob(_logger, ex, jobContext.Job.Id);
+                failureException = ex;
+            }
+
+            // Cancellation is handled by shard takeover, so only non-cancellation failures are retried here.
+            if (failureException is not null)
+            {
+                var retryTime = _options.ShouldRetry(jobContext, failureException);
+                if (retryTime is not null)
+                {
+                    LogRetryingJob(_logger, jobContext.Job.Id, jobContext.Job.Name, retryTime.Value, jobContext.DequeueCount);
+                    await shard.RetryJobLaterAsync(jobContext, retryTime.Value, cancellationToken);
+                }
+                else
+                {
+                    LogJobFailedNoRetry(_logger, jobContext.Job.Id, jobContext.Job.Name, jobContext.DequeueCount);
+                }
             }
         }
         finally
         {
+            // Cleanup must happen even when retry persistence throws, otherwise slots leak and shard processing can stall.
             _jobConcurrencyLimiter.Release();
             runningTasks.TryRemove(jobContext.Job.Id, out _);
         }

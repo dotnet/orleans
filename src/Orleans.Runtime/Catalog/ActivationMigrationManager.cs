@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using System.Threading.Tasks.Sources;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.ObjectPool;
+using Orleans.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
@@ -63,7 +64,11 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     private readonly IInternalGrainFactory _grainFactory;
     private readonly Catalog _catalog;
     private readonly IClusterMembershipService _clusterMembershipService;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
 
 #pragma warning disable IDE0052 // Remove unread private members. Justification: this field is only for diagnostic purposes.
     private readonly Task? _membershipUpdatesTask;
@@ -98,6 +103,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
     public async ValueTask AcceptMigratingGrains(List<GrainMigrationPackage> migratingGrains)
     {
         var activations = new List<ActivationData>();
+        var currentActivity = Activity.Current;
         foreach (var package in migratingGrains)
         {
             // If the activation does not exist, create it and provide it with the migration context while doing so.
@@ -107,12 +113,15 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             {
                 activations.Add(activation);
             }
+
+            Activity.Current = currentActivity;
         }
 
         // Wait for all activations to become active or reach a terminal state.
         // This ensures that the activation has completed registration in the directory (or is abandoned) before we return.
         // Otherwise, there could be a race where the original silo removes the activation from its catalog, receives a new message for that activation,
         // and re-activates it before the new activation on this silo has been registered with the directory.
+        using var waitActivity = ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.WaitMigration);
         while (true)
         {
             var allActiveOrTerminal = true;

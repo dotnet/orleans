@@ -10,13 +10,17 @@ namespace Orleans.DurableJobs;
 /// Provides an in-memory priority queue for managing durable jobs based on their due times.
 /// Jobs are organized into time-based buckets and enumerated asynchronously as they become due.
 /// </summary>
-internal sealed class InMemoryJobQueue : IAsyncEnumerable<IDurableJobContext>
+internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 {
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
     private bool _isComplete;
+#if NET9_0_OR_GREATER
+    private readonly Lock _syncLock = new();
+#else
     private readonly object _syncLock = new();
+#endif
 
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
@@ -91,7 +95,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IDurableJobContext>
     /// The job is removed from its current bucket and added to a new bucket based on the specified due time.
     /// The dequeue count from the context is preserved.
     /// </remarks>
-    public void RetryJobLater(IDurableJobContext jobContext, DateTimeOffset newDueTime)
+    public void RetryJobLater(IJobRunContext jobContext, DateTimeOffset newDueTime)
     {
         var jobId = jobContext.Job.Id;
         var newJob = new DurableJob
@@ -122,10 +126,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IDurableJobContext>
     /// </summary>
     /// <param name="cancellationToken">A token to monitor for cancellation requests.</param>
     /// <returns>
-    /// An async enumerator that returns <see cref="IDurableJobContext"/> instances for jobs that are due.
+    /// An async enumerator that returns <see cref="IJobRunContext"/> instances for jobs that are due.
     /// The enumerator checks for due jobs every second and terminates when the queue is marked complete and empty.
     /// </returns>
-    public async IAsyncEnumerator<IDurableJobContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
+    public async IAsyncEnumerator<IJobRunContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
         using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
         while (true)
@@ -169,7 +173,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IDurableJobContext>
 
                     if (shouldYield)
                     {
-                        yield return new DurableJobContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
+                        yield return new JobRunContext(job, Guid.NewGuid().ToString(), dequeueCount + 1);
                     }
                 }
 

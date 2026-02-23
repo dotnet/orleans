@@ -271,7 +271,7 @@ namespace Orleans.CodeGenerator
         private BaseCopierFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription)
         {
             var baseType = serializableTypeDescription.BaseType;
-            if (baseType.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+            if (baseType.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
                 && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, LibraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                 && baseType is not INamedTypeSymbol { IsGenericType: true })
             {
@@ -302,14 +302,14 @@ namespace Orleans.CodeGenerator
                     if (SymbolEqualityComparer.Default.Equals(c.UnderlyingType, t))
                         goto skip;
 
-                if (member.Symbol.HasAnyAttribute(LibraryTypes.ImmutableAttributes))
+                if (member.Symbol.HasAttribute(LibraryTypes.ImmutableAttribute))
                     continue;
 
                 if (!uniqueTypes.Add(member))
                     continue;
 
                 TypeSyntax copierType;
-                if (t.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+                if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
                     && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                     && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
