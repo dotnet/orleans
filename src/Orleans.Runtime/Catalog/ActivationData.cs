@@ -487,8 +487,14 @@ internal sealed partial class ActivationData :
         }
         else if (timespan <= TimeSpan.Zero)
         {
-            // reset any current keepAliveUntil
+            // If there was an active keep-alive, reschedule collection so the grain can be collected
+            // after CollectionAgeLimit rather than waiting for the previously scheduled far-future time.
+            var hadActiveKeepAlive = KeepAliveUntil > GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
             ResetKeepAliveRequest();
+            if (hadActiveKeepAlive)
+            {
+                _shared.InternalRuntime.ActivationCollector.TryRescheduleCollection(this);
+            }
         }
         else
         {

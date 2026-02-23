@@ -529,6 +529,38 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }
 
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorShouldCollectAfterCancellingKeepAlive()
+        {
+            // Use a short collection age and quantum so the test completes quickly.
+            var collectionAge = TimeSpan.FromSeconds(5);
+            var quantum = TimeSpan.FromSeconds(2);
+            await Initialize(collectionAge, quantum);
+
+            var mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
+
+            // Activate the grain and extend its lifetime to 5 minutes.
+            var grain = this.testCluster.GrainFactory.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            await grain.SetKeepAlive(TimeSpan.FromMinutes(5));
+
+            // Force collection should NOT collect the grain since it has an active keep-alive.
+            await Task.Delay(collectionAge + quantum); // idle longer than collectionAge
+            await mgmtGrain.ForceActivationCollection(collectionAge);
+            int activationsWithKeepAlive = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(1, activationsWithKeepAlive);
+
+            // Cancel the keep-alive. After this, force collection should be able to collect the grain.
+            await grain.CancelKeepAlive();
+
+            // Wait for the grain to idle beyond collectionAge, then force collect.
+            await Task.Delay(collectionAge + quantum);
+            await mgmtGrain.ForceActivationCollection(collectionAge);
+
+            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(0, activationsNotCollected);
+        }
+
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_NoKeepAlive_Test()
         {

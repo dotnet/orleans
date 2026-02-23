@@ -94,4 +94,19 @@ namespace UnitTests.Grains
         }
 
     }
+
+    public class KeepAliveActivationGcTestGrain : Grain, IKeepAliveActivationGcTestGrain
+    {
+        public Task SetKeepAlive(TimeSpan keepAlive)
+        {
+            DelayDeactivation(keepAlive);
+            return Task.CompletedTask;
+        }
+
+        public Task CancelKeepAlive()
+        {
+            DelayDeactivation(TimeSpan.FromMilliseconds(-1));
+            return Task.CompletedTask;
+        }
+    }
 }
