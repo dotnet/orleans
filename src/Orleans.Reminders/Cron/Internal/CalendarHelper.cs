@@ -39,14 +39,12 @@ namespace Orleans.Reminders.Cron.Internal
 
             minute = value.Minute;
             hour = value.Hour;
-            day = value.Day;
-            month = value.Month;
-            year = value.Year;
+            (year, month, day) = value;
         }
 
         public static DayOfWeek GetDayOfWeek(int year, int month, int day)
         {
-            return new DateTime(year, month, day, 0, 0, 0, DateTimeKind.Utc).DayOfWeek;
+            return new DateTime(year, month, day).DayOfWeek;
         }
 
         public static int GetDaysInMonth(int year, int month)

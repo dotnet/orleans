@@ -13,8 +13,8 @@ internal static class ReminderCronParser
 
     public static CronFormat DetectFormat(string expression)
     {
-        var trimmed = expression.Trim();
-        if (trimmed.StartsWith("@", StringComparison.Ordinal))
+        var trimmed = expression.AsSpan().Trim();
+        if (trimmed is ['@', ..])
         {
             return CronFormat.Standard;
         }

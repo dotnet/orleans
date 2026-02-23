@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
-using System.Runtime.CompilerServices;
+using System.Numerics;
 using System.Text;
 
 namespace Orleans.Reminders.Cron.Internal
@@ -58,18 +58,6 @@ namespace Orleans.Reminders.Cron.Internal
         public static readonly CronExpression EverySecond = Parse("* * * * * *", CronFormat.IncludeSeconds);
 
         private static readonly TimeZoneInfo UtcTimeZone = TimeZoneInfo.Utc;
-
-        private static readonly int[] DeBruijnPositions =
-        {
-            0, 1, 2, 53, 3, 7, 54, 27,
-            4, 38, 41, 8, 34, 55, 48, 28,
-            62, 5, 39, 46, 44, 42, 22, 9,
-            24, 35, 59, 56, 49, 18, 29, 11,
-            63, 52, 6, 26, 37, 40, 33, 47,
-            61, 45, 43, 21, 23, 58, 17, 10,
-            51, 25, 36, 32, 60, 20, 57, 16,
-            50, 31, 19, 15, 30, 14, 13, 12
-        };
 
         private readonly ulong  _second;     // 60 bits -> from 0 bit to 59 bit
         private readonly ulong  _minute;     // 60 bits -> from 0 bit to 59 bit
@@ -198,10 +186,8 @@ namespace Orleans.Reminders.Cron.Internal
                 return new DateTime(found, DateTimeKind.Utc);
             }
 
-            var fromOffset = new DateTimeOffset(fromUtc);
-
 #pragma warning disable CA1062
-            var occurrence = GetOccurrenceConsideringTimeZone(fromOffset, zone, inclusive);
+            var occurrence = GetOccurrenceConsideringTimeZone(fromUtc, zone, inclusive);
 #pragma warning restore CA1062
 
             return occurrence?.UtcDateTime;
@@ -224,8 +210,12 @@ namespace Orleans.Reminders.Cron.Internal
             }
 
 #pragma warning disable CA1062
-            return GetOccurrenceConsideringTimeZone(from, zone, inclusive);
+            var occurrenceUtc = GetNextOccurrence(from.UtcDateTime, zone, inclusive);
 #pragma warning restore CA1062
+
+            if (!occurrenceUtc.HasValue) return null;
+
+            return TimeZoneInfo.ConvertTime(new DateTimeOffset(occurrenceUtc.Value, TimeSpan.Zero), zone);
         }
 
         /// <summary>
@@ -390,7 +380,7 @@ namespace Orleans.Reminders.Cron.Internal
         /// </summary>
         public static bool operator !=(CronExpression? left, CronExpression? right) => !Equals(left, right);
 
-        private DateTimeOffset? GetOccurrenceConsideringTimeZone(DateTimeOffset fromUtc, TimeZoneInfo zone, bool inclusive)
+        private DateTimeOffset? GetOccurrenceConsideringTimeZone(DateTime fromUtc, TimeZoneInfo zone, bool inclusive)
         {
             if (!DateTimeHelper.IsRound(fromUtc))
             {
@@ -403,13 +393,11 @@ namespace Orleans.Reminders.Cron.Internal
                 inclusive = false;
             }
 
-            var from = TimeZoneInfo.ConvertTime(fromUtc, zone);
-
-            var fromLocal = from.DateTime;
+            var fromLocal = TimeZoneInfo.ConvertTimeFromUtc(fromUtc, zone);
 
             if (TimeZoneHelper.IsAmbiguousTime(zone, fromLocal))
             {
-                var currentOffset = from.Offset;
+                var currentOffset = zone.GetUtcOffset(fromUtc);
                 var standardOffset = zone.GetUtcOffset(fromLocal);
                
                 if (standardOffset != currentOffset)
@@ -578,9 +566,8 @@ namespace Orleans.Reminders.Cron.Internal
 
         private static int GetFirstSet(ulong value)
         {
-            // TODO: Add description and source
-            ulong res = unchecked((ulong)((long)value & -(long)value) * 0x022fdd63cc95386d) >> 58;
-            return DeBruijnPositions[res];
+            if (value == 0) return 0;
+            return BitOperations.TrailingZeroCount(value);
         }
 
         private bool HasFlag(CronExpressionFlag value)
@@ -630,21 +617,18 @@ namespace Orleans.Reminders.Cron.Internal
             else if (HasFlag(CronExpressionFlag.NthDayOfWeek)) expressionBuilder.Append(String.Format(CultureInfo.InvariantCulture, "#{0}", _nthDayOfWeek));
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         [DoesNotReturn]
         private static void ThrowFromShouldBeLessThanToException(string fromName, string toName)
         {
             throw new ArgumentException($"The value of the {fromName} argument should be less than the value of the {toName} argument.", fromName);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         [DoesNotReturn]
         private static void ThrowWrongDateTimeKindException(string paramName)
         {
             throw new ArgumentException("The supplied DateTime must have the Kind property set to Utc", paramName);
         }
 
-        [MethodImpl(MethodImplOptions.NoInlining)]
         [DoesNotReturn]
         private static void ThrowArgumentNullException(string paramName)
         {

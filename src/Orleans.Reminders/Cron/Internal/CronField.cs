@@ -15,8 +15,10 @@ namespace Orleans.Reminders.Cron.Internal
             "SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"
         };
 
-        private static readonly int[] MonthNamesArray = new int[MonthNames.Length];
-        private static readonly int[] DayOfWeekNamesArray = new int[DayOfWeekNames.Length];
+        private static readonly int[] MonthNamesArray = Array.ConvertAll(MonthNames, static name =>
+            name == String.Empty ? 0 : name[0] | (name[1] << 8) | (name[2] << 16));
+        private static readonly int[] DayOfWeekNamesArray = Array.ConvertAll(DayOfWeekNames, static name =>
+            name[0] | (name[1] << 8) | (name[2] << 16));
 
         // 0 and 7 are both Sunday, for compatibility reasons.
         public static readonly CronField DaysOfWeek = new CronField("Days of week", 0, 7, DayOfWeekNamesArray, false);
@@ -26,25 +28,6 @@ namespace Orleans.Reminders.Cron.Internal
         public static readonly CronField Hours = new CronField("Hours", 0, 23, null, true);
         public static readonly CronField Minutes = new CronField("Minutes", 0, 59, null, true);
         public static readonly CronField Seconds = new CronField("Seconds", 0, 59, null, true);
-
-        static CronField()
-        {
-            for (var i = 1; i < MonthNames.Length; i++)
-            {
-                var name = MonthNames[i].ToUpperInvariant();
-                var combined = name[0] | (name[1] << 8) | (name[2] << 16);
-
-                MonthNamesArray[i] = combined;
-            }
-
-            for (var i = 0; i < DayOfWeekNames.Length; i++)
-            {
-                var name = DayOfWeekNames[i].ToUpperInvariant();
-                var combined = name[0] | (name[1] << 8) | (name[2] << 16);
-
-                DayOfWeekNamesArray[i] = combined;
-            }
-        }
 
         public readonly string Name;
         public readonly int First;

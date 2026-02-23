@@ -7,14 +7,14 @@ namespace Orleans.Reminders.Cron.Internal
     {
         private static readonly TimeSpan OneSecond = TimeSpan.FromSeconds(1);
 
-        public static DateTimeOffset FloorToSeconds(DateTimeOffset dateTimeOffset)
+        public static DateTime FloorToSeconds(DateTime dateTime)
         {
-            return dateTimeOffset.AddTicks(-GetExtraTicks(dateTimeOffset.Ticks));
+            return dateTime.AddTicks(-GetExtraTicks(dateTime.Ticks));
         }
 
-        public static bool IsRound(DateTimeOffset dateTimeOffset)
+        public static bool IsRound(DateTime dateTime)
         {
-            return GetExtraTicks(dateTimeOffset.Ticks) == 0;
+            return GetExtraTicks(dateTime.Ticks) == 0;
         }
 
         private static long GetExtraTicks(long ticks)
