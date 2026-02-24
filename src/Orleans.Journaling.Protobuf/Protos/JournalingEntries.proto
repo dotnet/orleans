@@ -1,0 +1,162 @@
+syntax = "proto3";
+option csharp_namespace = "Orleans.Journaling.Protobuf.Messages";
+
+// Dictionary entries
+message DictionaryEntry {
+  oneof command {
+    DictionarySet set = 1;
+    DictionaryRemove remove = 2;
+    DictionaryClear clear = 3;
+    DictionarySnapshot snapshot = 4;
+  }
+}
+
+message DictionarySet {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+message DictionaryRemove {
+  bytes key = 1;
+}
+
+message DictionaryClear {}
+
+message DictionarySnapshot {
+  repeated DictionarySnapshotItem items = 1;
+}
+
+message DictionarySnapshotItem {
+  bytes key = 1;
+  bytes value = 2;
+}
+
+// List entries
+message ListEntry {
+  oneof command {
+    ListAdd add = 1;
+    ListSet set = 2;
+    ListInsert insert = 3;
+    ListRemoveAt remove_at = 4;
+    ListClear clear = 5;
+    ListSnapshot snapshot = 6;
+  }
+}
+
+message ListAdd {
+  bytes item = 1;
+}
+
+message ListSet {
+  uint32 index = 1;
+  bytes item = 2;
+}
+
+message ListInsert {
+  uint32 index = 1;
+  bytes item = 2;
+}
+
+message ListRemoveAt {
+  uint32 index = 1;
+}
+
+message ListClear {}
+
+message ListSnapshot {
+  repeated bytes items = 1;
+}
+
+// Queue entries
+message QueueEntry {
+  oneof command {
+    QueueEnqueue enqueue = 1;
+    QueueDequeue dequeue = 2;
+    QueueClear clear = 3;
+    QueueSnapshot snapshot = 4;
+  }
+}
+
+message QueueEnqueue {
+  bytes item = 1;
+}
+
+message QueueDequeue {}
+
+message QueueClear {}
+
+message QueueSnapshot {
+  repeated bytes items = 1;
+}
+
+// Set entries
+message SetEntry {
+  oneof command {
+    SetAdd add = 1;
+    SetRemove remove = 2;
+    SetClear clear = 3;
+    SetSnapshot snapshot = 4;
+  }
+}
+
+message SetAdd {
+  bytes item = 1;
+}
+
+message SetRemove {
+  bytes item = 1;
+}
+
+message SetClear {}
+
+message SetSnapshot {
+  repeated bytes items = 1;
+}
+
+// Value entries
+message ValueEntry {
+  oneof command {
+    ValueSet set = 1;
+  }
+}
+
+message ValueSet {
+  bytes value = 1;
+}
+
+// State entries
+message StateEntry {
+  oneof command {
+    StateSet set = 1;
+    StateClear clear = 2;
+  }
+}
+
+message StateSet {
+  bytes state = 1;
+  uint64 version = 2;
+}
+
+message StateClear {}
+
+// TaskCompletionSource entries
+message TcsEntry {
+  oneof command {
+    TcsCompleted completed = 1;
+    TcsFaulted faulted = 2;
+    TcsCanceled canceled = 3;
+    TcsPending pending = 4;
+  }
+}
+
+message TcsCompleted {
+  bytes value = 1;
+}
+
+message TcsFaulted {
+  string exception = 1;
+}
+
+message TcsCanceled {}
+
+message TcsPending {}
