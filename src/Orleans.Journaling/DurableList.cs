@@ -21,7 +21,14 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
     private readonly List<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    public DurableList([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableListEntry<T>> entryCodec)
+    public DurableList([ServiceKey] string key, IStateMachineManager manager, IDurableListCodecProvider codecProvider)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _entryCodec = codecProvider.GetCodec<T>();
+        manager.RegisterStateMachine(key, this);
+    }
+
+    internal DurableList(string key, IStateMachineManager manager, ILogEntryCodec<DurableListEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _entryCodec = entryCodec;

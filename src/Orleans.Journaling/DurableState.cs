@@ -13,7 +13,15 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     private T? _value;
     private ulong _version;
 
-    public DurableState([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableStateEntry<T>> entryCodec)
+    public DurableState([ServiceKey] string key, IStateMachineManager manager, IDurableStateCodecProvider codecProvider)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _entryCodec = codecProvider.GetCodec<T>();
+        manager.RegisterStateMachine(key, this);
+        _manager = manager;
+    }
+
+    internal DurableState(string key, IStateMachineManager manager, ILogEntryCodec<DurableStateEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _entryCodec = entryCodec;

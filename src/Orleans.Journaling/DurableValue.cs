@@ -18,7 +18,14 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
     private T? _value;
     private bool _isDirty;
 
-    public DurableValue([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableValueEntry<T>> entryCodec)
+    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IDurableValueCodecProvider codecProvider)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _entryCodec = codecProvider.GetCodec<T>();
+        manager.RegisterStateMachine(key, this);
+    }
+
+    internal DurableValue(string key, IStateMachineManager manager, ILogEntryCodec<DurableValueEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _entryCodec = entryCodec;

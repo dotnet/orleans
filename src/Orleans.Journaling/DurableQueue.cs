@@ -26,7 +26,14 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
     private readonly Queue<T> _items = new();
     private IStateMachineLogWriter? _storage;
 
-    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableQueueEntry<T>> entryCodec)
+    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, IDurableQueueCodecProvider codecProvider)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _entryCodec = codecProvider.GetCodec<T>();
+        manager.RegisterStateMachine(key, this);
+    }
+
+    internal DurableQueue(string key, IStateMachineManager manager, ILogEntryCodec<DurableQueueEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _entryCodec = entryCodec;

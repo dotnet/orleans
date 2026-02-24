@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections.Concurrent;
 using System.Text.Json;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
@@ -45,49 +46,78 @@ public static class JsonJournalingExtensions
         // Register the shared JsonSerializerOptions.
         builder.Services.AddSingleton(options.SerializerOptions);
 
-        // Replace the default codec resolver with the JSON codec resolver.
-        builder.Services.AddSingleton(typeof(ILogEntryCodec<>), typeof(JsonLogEntryCodecResolver<>));
+        // Replace the default codec providers with the JSON codec provider.
+        builder.Services.AddSingleton<JsonLogEntryCodecProvider>();
+        builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddSingleton<IDurableSetCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddSingleton<IDurableValueCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddSingleton<IDurableStateCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddSingleton<IDurableTaskCompletionSourceCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
 
         return builder;
     }
 }
 
 /// <summary>
-/// Open-generic resolver that maps <c>ILogEntryCodec&lt;TEntry&gt;</c> to the appropriate JSON codec.
+/// JSON format implementation of the durable type codec providers.
 /// </summary>
-internal sealed class JsonLogEntryCodecResolver<TEntry>(IServiceProvider serviceProvider) : ILogEntryCodec<TEntry>
+/// <remarks>
+/// Each <c>GetCodec</c> method constructs the appropriate JSON codec using <c>new</c> and
+/// the shared <see cref="JsonSerializerOptions"/> — no reflection required. Codec instances
+/// are cached per closed generic combination so they behave as singletons.
+/// </remarks>
+internal sealed class JsonLogEntryCodecProvider(JsonSerializerOptions jsonOptions) :
+    IDurableDictionaryCodecProvider,
+    IDurableListCodecProvider,
+    IDurableQueueCodecProvider,
+    IDurableSetCodecProvider,
+    IDurableValueCodecProvider,
+    IDurableStateCodecProvider,
+    IDurableTaskCompletionSourceCodecProvider
 {
-    private readonly ILogEntryCodec<TEntry> _inner = ResolveCodec(serviceProvider);
-
-    private static ILogEntryCodec<TEntry> ResolveCodec(IServiceProvider sp)
-    {
-        var jsonOptions = sp.GetService<JsonSerializerOptions>() ?? JsonSerializerOptions.Default;
-        var entryType = typeof(TEntry);
-
-        if (!entryType.IsGenericType)
-        {
-            throw new NotSupportedException($"No JSON entry codec found for non-generic entry type '{entryType}'.");
-        }
-
-        var def = entryType.GetGenericTypeDefinition();
-        var args = entryType.GetGenericArguments();
-
-        var codecType =
-            def == typeof(DurableDictionaryEntry<,>) ? typeof(JsonDictionaryEntryCodec<,>).MakeGenericType(args) :
-            def == typeof(DurableListEntry<>) ? typeof(JsonListEntryCodec<>).MakeGenericType(args) :
-            def == typeof(DurableQueueEntry<>) ? typeof(JsonQueueEntryCodec<>).MakeGenericType(args) :
-            def == typeof(DurableSetEntry<>) ? typeof(JsonSetEntryCodec<>).MakeGenericType(args) :
-            def == typeof(DurableValueEntry<>) ? typeof(JsonValueEntryCodec<>).MakeGenericType(args) :
-            def == typeof(DurableStateEntry<>) ? typeof(JsonStateEntryCodec<>).MakeGenericType(args) :
-            def == typeof(DurableTaskCompletionSourceEntry<>) ? typeof(JsonTcsEntryCodec<>).MakeGenericType(args) :
-            throw new NotSupportedException($"No JSON entry codec found for entry type '{entryType}'.");
-
-        return (ILogEntryCodec<TEntry>)Activator.CreateInstance(codecType, jsonOptions)!;
-    }
+    private readonly ConcurrentDictionary<Type, object> _codecs = new();
 
     /// <inheritdoc/>
-    public void Write(TEntry entry, IBufferWriter<byte> output) => _inner.Write(entry, output);
+    public ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>> GetCodec<TKey, TValue>() where TKey : notnull
+        => (ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>>)_codecs.GetOrAdd(
+            typeof(DurableDictionaryEntry<TKey, TValue>),
+            _ => new JsonDictionaryEntryCodec<TKey, TValue>(jsonOptions));
 
     /// <inheritdoc/>
-    public TEntry Read(ReadOnlySequence<byte> input) => _inner.Read(input);
+    public ILogEntryCodec<DurableListEntry<T>> GetCodec<T>()
+        => (ILogEntryCodec<DurableListEntry<T>>)_codecs.GetOrAdd(
+            typeof(DurableListEntry<T>),
+            _ => new JsonListEntryCodec<T>(jsonOptions));
+
+    /// <inheritdoc/>
+    ILogEntryCodec<DurableQueueEntry<T>> IDurableQueueCodecProvider.GetCodec<T>()
+        => (ILogEntryCodec<DurableQueueEntry<T>>)_codecs.GetOrAdd(
+            typeof(DurableQueueEntry<T>),
+            _ => new JsonQueueEntryCodec<T>(jsonOptions));
+
+    /// <inheritdoc/>
+    ILogEntryCodec<DurableSetEntry<T>> IDurableSetCodecProvider.GetCodec<T>()
+        => (ILogEntryCodec<DurableSetEntry<T>>)_codecs.GetOrAdd(
+            typeof(DurableSetEntry<T>),
+            _ => new JsonSetEntryCodec<T>(jsonOptions));
+
+    /// <inheritdoc/>
+    ILogEntryCodec<DurableValueEntry<T>> IDurableValueCodecProvider.GetCodec<T>()
+        => (ILogEntryCodec<DurableValueEntry<T>>)_codecs.GetOrAdd(
+            typeof(DurableValueEntry<T>),
+            _ => new JsonValueEntryCodec<T>(jsonOptions));
+
+    /// <inheritdoc/>
+    ILogEntryCodec<DurableStateEntry<T>> IDurableStateCodecProvider.GetCodec<T>()
+        => (ILogEntryCodec<DurableStateEntry<T>>)_codecs.GetOrAdd(
+            typeof(DurableStateEntry<T>),
+            _ => new JsonStateEntryCodec<T>(jsonOptions));
+
+    /// <inheritdoc/>
+    ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
+        => (ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>)_codecs.GetOrAdd(
+            typeof(DurableTaskCompletionSourceEntry<T>),
+            _ => new JsonTcsEntryCodec<T>(jsonOptions));
 }
