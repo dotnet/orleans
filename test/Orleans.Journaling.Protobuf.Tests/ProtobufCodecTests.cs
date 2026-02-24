@@ -26,15 +26,17 @@ public class ProtobufCodecTests
         _codecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
     }
 
-    private OrleansLogDataCodec<T> CreateDataCodec<T>()
-        => new(_codecProvider.GetCodec<T>(), _sessionPool);
+    private ProtobufValueConverter<T> CreateConverter<T>()
+        => ProtobufValueConverter<T>.IsNativeType
+            ? new ProtobufValueConverter<T>()
+            : new ProtobufValueConverter<T>(new OrleansLogDataCodec<T>(_codecProvider.GetCodec<T>(), _sessionPool));
 
     #region Dictionary
 
     [Fact]
     public void ProtobufDictionaryCodec_RoundTrips_Set()
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateDataCodec<string>(), CreateDataCodec<int>());
+        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
 
         var entry = new DictionarySetEntry<string, int>("key", 42);
         var buffer = new ArrayBufferWriter<byte>();
@@ -49,7 +51,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufDictionaryCodec_RoundTrips_Remove()
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateDataCodec<string>(), CreateDataCodec<int>());
+        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
 
         var entry = new DictionaryRemoveEntry<string, int>("removeMe");
         var buffer = new ArrayBufferWriter<byte>();
@@ -63,7 +65,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufDictionaryCodec_RoundTrips_Clear()
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateDataCodec<string>(), CreateDataCodec<int>());
+        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
 
         var entry = new DictionaryClearEntry<string, int>();
         var buffer = new ArrayBufferWriter<byte>();
@@ -76,7 +78,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufDictionaryCodec_RoundTrips_Snapshot()
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateDataCodec<string>(), CreateDataCodec<int>());
+        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
 
         var items = new List<KeyValuePair<string, int>>
         {
@@ -106,7 +108,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_RoundTrips_Add()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
 
         var entry = new ListAddEntry<string>("hello");
         var buffer = new ArrayBufferWriter<byte>();
@@ -120,7 +122,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_RoundTrips_Set()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
 
         var entry = new ListSetEntry<string>(3, "updated");
         var buffer = new ArrayBufferWriter<byte>();
@@ -135,7 +137,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_RoundTrips_Insert()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
 
         var entry = new ListInsertEntry<string>(1, "inserted");
         var buffer = new ArrayBufferWriter<byte>();
@@ -150,7 +152,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_RoundTrips_RemoveAt()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
 
         var entry = new ListRemoveAtEntry<string>(5);
         var buffer = new ArrayBufferWriter<byte>();
@@ -164,7 +166,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_RoundTrips_Clear()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
 
         var entry = new ListClearEntry<string>();
         var buffer = new ArrayBufferWriter<byte>();
@@ -177,7 +179,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_RoundTrips_Snapshot()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
 
         var entry = new ListSnapshotEntry<string>(["one", "two", "three"]);
         var buffer = new ArrayBufferWriter<byte>();
@@ -198,7 +200,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufQueueCodec_RoundTrips_Enqueue()
     {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
 
         var entry = new QueueEnqueueEntry<int>(99);
         var buffer = new ArrayBufferWriter<byte>();
@@ -212,7 +214,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufQueueCodec_RoundTrips_Dequeue()
     {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
 
         var entry = new QueueDequeueEntry<int>();
         var buffer = new ArrayBufferWriter<byte>();
@@ -225,7 +227,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufQueueCodec_RoundTrips_Clear()
     {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
 
         var entry = new QueueClearEntry<int>();
         var buffer = new ArrayBufferWriter<byte>();
@@ -238,7 +240,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufQueueCodec_RoundTrips_Snapshot()
     {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
 
         var entry = new QueueSnapshotEntry<int>([10, 20, 30]);
         var buffer = new ArrayBufferWriter<byte>();
@@ -259,7 +261,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufSetCodec_RoundTrips_Add()
     {
-        var codec = new ProtobufSetEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
 
         var entry = new SetAddEntry<string>("item1");
         var buffer = new ArrayBufferWriter<byte>();
@@ -273,7 +275,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufSetCodec_RoundTrips_Remove()
     {
-        var codec = new ProtobufSetEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
 
         var entry = new SetRemoveEntry<string>("item2");
         var buffer = new ArrayBufferWriter<byte>();
@@ -287,7 +289,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufSetCodec_RoundTrips_Clear()
     {
-        var codec = new ProtobufSetEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
 
         var entry = new SetClearEntry<string>();
         var buffer = new ArrayBufferWriter<byte>();
@@ -300,7 +302,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufSetCodec_RoundTrips_Snapshot()
     {
-        var codec = new ProtobufSetEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
 
         var entry = new SetSnapshotEntry<string>(["a", "b", "c"]);
         var buffer = new ArrayBufferWriter<byte>();
@@ -321,7 +323,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufValueCodec_RoundTrips_Set()
     {
-        var codec = new ProtobufValueEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
 
         var entry = new ValueSetEntry<int>(42);
         var buffer = new ArrayBufferWriter<byte>();
@@ -339,7 +341,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufStateCodec_RoundTrips_Set()
     {
-        var codec = new ProtobufStateEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufStateEntryCodec<string>(CreateConverter<string>());
 
         var entry = new StateSetEntry<string>("myState", 7);
         var buffer = new ArrayBufferWriter<byte>();
@@ -354,7 +356,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufStateCodec_RoundTrips_Clear()
     {
-        var codec = new ProtobufStateEntryCodec<string>(CreateDataCodec<string>());
+        var codec = new ProtobufStateEntryCodec<string>(CreateConverter<string>());
 
         var entry = new StateClearEntry<string>();
         var buffer = new ArrayBufferWriter<byte>();
@@ -371,7 +373,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufTcsCodec_RoundTrips_Completed()
     {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
 
         var entry = new TcsCompletedEntry<int>(100);
         var buffer = new ArrayBufferWriter<byte>();
@@ -385,7 +387,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufTcsCodec_RoundTrips_Faulted()
     {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
 
         var entry = new TcsFaultedEntry<int>(new InvalidOperationException("test error"));
         var buffer = new ArrayBufferWriter<byte>();
@@ -399,7 +401,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufTcsCodec_RoundTrips_Canceled()
     {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
 
         var entry = new TcsCanceledEntry<int>();
         var buffer = new ArrayBufferWriter<byte>();
@@ -412,7 +414,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufTcsCodec_RoundTrips_Pending()
     {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateDataCodec<int>());
+        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
 
         var entry = new TcsPendingEntry<int>();
         var buffer = new ArrayBufferWriter<byte>();

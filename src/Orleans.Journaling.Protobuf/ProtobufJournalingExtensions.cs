@@ -16,9 +16,10 @@ public static class ProtobufJournalingExtensions
     /// <returns>The silo builder for chaining.</returns>
     /// <remarks>
     /// <para>
-    /// Each entry type is serialized using per-type codecs that use the protobuf wire format
-    /// with <c>CodedOutputStream</c> and <c>CodedInputStream</c>. User values (keys, items)
-    /// are serialized via <see cref="ILogDataCodec{T}"/> and embedded as length-delimited byte fields.
+    /// Each entry type is serialized as a generated protobuf message. User values are wrapped in
+    /// <see cref="Messages.TypedValue"/> which uses native protobuf encoding for well-known types
+    /// (scalars and <see cref="Google.Protobuf.IMessage"/>) and falls back to
+    /// <see cref="ILogDataCodec{T}"/> for all other types.
     /// </para>
     /// </remarks>
     /// <example>
@@ -38,9 +39,12 @@ public static class ProtobufJournalingExtensions
 /// Open-generic resolver that maps <c>ILogEntryCodec&lt;TEntry&gt;</c> to the appropriate Protocol Buffers codec.
 /// </summary>
 /// <remarks>
+/// <para>
 /// This class resolves the correct protobuf codec for the given entry type at construction time.
-/// It uses <see cref="ActivatorUtilities"/> to create codec instances, allowing the DI container
-/// to inject the required <see cref="ILogDataCodec{T}"/> dependencies for each type argument.
+/// For each type argument, it creates a <see cref="ProtobufValueConverter{T}"/> that uses native
+/// protobuf encoding for well-known types and falls back to <see cref="ILogDataCodec{T}"/> only
+/// when needed.
+/// </para>
 /// </remarks>
 internal sealed class ProtobufLogEntryCodecResolver<TEntry>(IServiceProvider serviceProvider) : ILogEntryCodec<TEntry>
 {
@@ -68,7 +72,30 @@ internal sealed class ProtobufLogEntryCodecResolver<TEntry>(IServiceProvider ser
             def == typeof(DurableTaskCompletionSourceEntry<>) ? typeof(ProtobufTcsEntryCodec<>).MakeGenericType(args) :
             throw new NotSupportedException($"No Protobuf entry codec found for entry type '{entryType}'.");
 
-        return (ILogEntryCodec<TEntry>)ActivatorUtilities.CreateInstance(sp, codecType);
+        // Build constructor arguments: one ProtobufValueConverter<T> per type argument.
+        var converterArgs = new object[args.Length];
+        for (var i = 0; i < args.Length; i++)
+        {
+            converterArgs[i] = CreateConverter(sp, args[i]);
+        }
+
+        return (ILogEntryCodec<TEntry>)Activator.CreateInstance(codecType, converterArgs)!;
+    }
+
+    private static object CreateConverter(IServiceProvider sp, Type valueType)
+    {
+        var converterType = typeof(ProtobufValueConverter<>).MakeGenericType(valueType);
+        var isNative = (bool)converterType.GetProperty(nameof(ProtobufValueConverter<int>.IsNativeType))!.GetValue(null)!;
+
+        if (isNative)
+        {
+            return Activator.CreateInstance(converterType)!;
+        }
+
+        // Resolve ILogDataCodec<T> from DI for the fallback path.
+        var codecType = typeof(ILogDataCodec<>).MakeGenericType(valueType);
+        var codec = sp.GetRequiredService(codecType);
+        return Activator.CreateInstance(converterType, codec)!;
     }
 
     /// <inheritdoc/>
