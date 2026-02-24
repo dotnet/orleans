@@ -8,42 +8,42 @@ namespace Orleans.Journaling.Protobuf;
 /// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableListEntry{T}"/>.
 /// </summary>
 /// <remarks>
-/// Serialized as a <see cref="Messages.ListEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
+/// Serialized as a <see cref="ListEntry"/> protobuf message with a <c>oneof command</c> discriminator.
+/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
 /// </remarks>
 public sealed class ProtobufListEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableListEntry<T>>
+    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableListEntry<T>>
 {
     /// <inheritdoc/>
     public void Write(DurableListEntry<T> entry, IBufferWriter<byte> output)
     {
         var proto = entry switch
         {
-            ListAddEntry<T>(var item) => new Messages.ListEntry
+            ListAddEntry<T>(var item) => new ListEntry
             {
-                Add = new ListAdd { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+                Add = new ListAdd { Item = converter.ToTypedValue(item) }
             },
-            ListSetEntry<T>(var index, var item) => new Messages.ListEntry
+            ListSetEntry<T>(var index, var item) => new ListEntry
             {
-                Set = new Messages.ListSet
+                Set = new ListSet
                 {
                     Index = (uint)index,
-                    Item = ProtobufCodecHelper.SerializeValue(codec, item)
+                    Item = converter.ToTypedValue(item)
                 }
             },
-            ListInsertEntry<T>(var index, var item) => new Messages.ListEntry
+            ListInsertEntry<T>(var index, var item) => new ListEntry
             {
                 Insert = new ListInsert
                 {
                     Index = (uint)index,
-                    Item = ProtobufCodecHelper.SerializeValue(codec, item)
+                    Item = converter.ToTypedValue(item)
                 }
             },
-            ListRemoveAtEntry<T>(var index) => new Messages.ListEntry
+            ListRemoveAtEntry<T>(var index) => new ListEntry
             {
                 RemoveAt = new ListRemoveAt { Index = (uint)index }
             },
-            ListClearEntry<T> => new Messages.ListEntry { Clear = new ListClear() },
+            ListClearEntry<T> => new ListEntry { Clear = new ListClear() },
             ListSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
             _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
         };
@@ -54,35 +54,35 @@ public sealed class ProtobufListEntryCodec<T>(
     /// <inheritdoc/>
     public DurableListEntry<T> Read(ReadOnlySequence<byte> input)
     {
-        var proto = Messages.ListEntry.Parser.ParseFrom(input);
+        var proto = ListEntry.Parser.ParseFrom(input);
 
         return proto.CommandCase switch
         {
-            Messages.ListEntry.CommandOneofCase.Add =>
-                new ListAddEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Add.Item)),
-            Messages.ListEntry.CommandOneofCase.Set =>
-                new ListSetEntry<T>((int)proto.Set.Index, ProtobufCodecHelper.DeserializeValue(codec, proto.Set.Item)),
-            Messages.ListEntry.CommandOneofCase.Insert =>
-                new ListInsertEntry<T>((int)proto.Insert.Index, ProtobufCodecHelper.DeserializeValue(codec, proto.Insert.Item)),
-            Messages.ListEntry.CommandOneofCase.RemoveAt =>
+            ListEntry.CommandOneofCase.Add =>
+                new ListAddEntry<T>(converter.FromTypedValue(proto.Add.Item)),
+            ListEntry.CommandOneofCase.Set =>
+                new ListSetEntry<T>((int)proto.Set.Index, converter.FromTypedValue(proto.Set.Item)),
+            ListEntry.CommandOneofCase.Insert =>
+                new ListInsertEntry<T>((int)proto.Insert.Index, converter.FromTypedValue(proto.Insert.Item)),
+            ListEntry.CommandOneofCase.RemoveAt =>
                 new ListRemoveAtEntry<T>((int)proto.RemoveAt.Index),
-            Messages.ListEntry.CommandOneofCase.Clear =>
+            ListEntry.CommandOneofCase.Clear =>
                 new ListClearEntry<T>(),
-            Messages.ListEntry.CommandOneofCase.Snapshot =>
-                new ListSnapshotEntry<T>(proto.Snapshot.Items.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
+            ListEntry.CommandOneofCase.Snapshot =>
+                new ListSnapshotEntry<T>(proto.Snapshot.Items.Select(converter.FromTypedValue).ToList()),
             _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
         };
     }
 
-    private Messages.ListEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    private ListEntry CreateSnapshotMessage(IReadOnlyList<T> items)
     {
         var snapshot = new ListSnapshot();
         foreach (var item in items)
         {
-            snapshot.Items.Add(ProtobufCodecHelper.SerializeValue(codec, item));
+            snapshot.Items.Add(converter.ToTypedValue(item));
         }
 
-        return new Messages.ListEntry { Snapshot = snapshot };
+        return new ListEntry { Snapshot = snapshot };
     }
 }
 
@@ -90,23 +90,23 @@ public sealed class ProtobufListEntryCodec<T>(
 /// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableQueueEntry{T}"/>.
 /// </summary>
 /// <remarks>
-/// Serialized as a <see cref="Messages.QueueEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
+/// Serialized as a <see cref="QueueEntry"/> protobuf message with a <c>oneof command</c> discriminator.
+/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
 /// </remarks>
 public sealed class ProtobufQueueEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableQueueEntry<T>>
+    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableQueueEntry<T>>
 {
     /// <inheritdoc/>
     public void Write(DurableQueueEntry<T> entry, IBufferWriter<byte> output)
     {
         var proto = entry switch
         {
-            QueueEnqueueEntry<T>(var item) => new Messages.QueueEntry
+            QueueEnqueueEntry<T>(var item) => new QueueEntry
             {
-                Enqueue = new QueueEnqueue { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+                Enqueue = new QueueEnqueue { Item = converter.ToTypedValue(item) }
             },
-            QueueDequeueEntry<T> => new Messages.QueueEntry { Dequeue = new QueueDequeue() },
-            QueueClearEntry<T> => new Messages.QueueEntry { Clear = new QueueClear() },
+            QueueDequeueEntry<T> => new QueueEntry { Dequeue = new QueueDequeue() },
+            QueueClearEntry<T> => new QueueEntry { Clear = new QueueClear() },
             QueueSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
             _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
         };
@@ -117,31 +117,31 @@ public sealed class ProtobufQueueEntryCodec<T>(
     /// <inheritdoc/>
     public DurableQueueEntry<T> Read(ReadOnlySequence<byte> input)
     {
-        var proto = Messages.QueueEntry.Parser.ParseFrom(input);
+        var proto = QueueEntry.Parser.ParseFrom(input);
 
         return proto.CommandCase switch
         {
-            Messages.QueueEntry.CommandOneofCase.Enqueue =>
-                new QueueEnqueueEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Enqueue.Item)),
-            Messages.QueueEntry.CommandOneofCase.Dequeue =>
+            QueueEntry.CommandOneofCase.Enqueue =>
+                new QueueEnqueueEntry<T>(converter.FromTypedValue(proto.Enqueue.Item)),
+            QueueEntry.CommandOneofCase.Dequeue =>
                 new QueueDequeueEntry<T>(),
-            Messages.QueueEntry.CommandOneofCase.Clear =>
+            QueueEntry.CommandOneofCase.Clear =>
                 new QueueClearEntry<T>(),
-            Messages.QueueEntry.CommandOneofCase.Snapshot =>
-                new QueueSnapshotEntry<T>(proto.Snapshot.Items.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
+            QueueEntry.CommandOneofCase.Snapshot =>
+                new QueueSnapshotEntry<T>(proto.Snapshot.Items.Select(converter.FromTypedValue).ToList()),
             _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
         };
     }
 
-    private Messages.QueueEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    private QueueEntry CreateSnapshotMessage(IReadOnlyList<T> items)
     {
         var snapshot = new QueueSnapshot();
         foreach (var item in items)
         {
-            snapshot.Items.Add(ProtobufCodecHelper.SerializeValue(codec, item));
+            snapshot.Items.Add(converter.ToTypedValue(item));
         }
 
-        return new Messages.QueueEntry { Snapshot = snapshot };
+        return new QueueEntry { Snapshot = snapshot };
     }
 }
 
@@ -149,26 +149,26 @@ public sealed class ProtobufQueueEntryCodec<T>(
 /// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableSetEntry{T}"/>.
 /// </summary>
 /// <remarks>
-/// Serialized as a <see cref="Messages.SetEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
+/// Serialized as a <see cref="SetEntry"/> protobuf message with a <c>oneof command</c> discriminator.
+/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
 /// </remarks>
 public sealed class ProtobufSetEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableSetEntry<T>>
+    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableSetEntry<T>>
 {
     /// <inheritdoc/>
     public void Write(DurableSetEntry<T> entry, IBufferWriter<byte> output)
     {
         var proto = entry switch
         {
-            SetAddEntry<T>(var item) => new Messages.SetEntry
+            SetAddEntry<T>(var item) => new SetEntry
             {
-                Add = new SetAdd { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+                Add = new SetAdd { Item = converter.ToTypedValue(item) }
             },
-            SetRemoveEntry<T>(var item) => new Messages.SetEntry
+            SetRemoveEntry<T>(var item) => new SetEntry
             {
-                Remove = new SetRemove { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+                Remove = new SetRemove { Item = converter.ToTypedValue(item) }
             },
-            SetClearEntry<T> => new Messages.SetEntry { Clear = new SetClear() },
+            SetClearEntry<T> => new SetEntry { Clear = new SetClear() },
             SetSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
             _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
         };
@@ -179,30 +179,30 @@ public sealed class ProtobufSetEntryCodec<T>(
     /// <inheritdoc/>
     public DurableSetEntry<T> Read(ReadOnlySequence<byte> input)
     {
-        var proto = Messages.SetEntry.Parser.ParseFrom(input);
+        var proto = SetEntry.Parser.ParseFrom(input);
 
         return proto.CommandCase switch
         {
-            Messages.SetEntry.CommandOneofCase.Add =>
-                new SetAddEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Add.Item)),
-            Messages.SetEntry.CommandOneofCase.Remove =>
-                new SetRemoveEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Remove.Item)),
-            Messages.SetEntry.CommandOneofCase.Clear =>
+            SetEntry.CommandOneofCase.Add =>
+                new SetAddEntry<T>(converter.FromTypedValue(proto.Add.Item)),
+            SetEntry.CommandOneofCase.Remove =>
+                new SetRemoveEntry<T>(converter.FromTypedValue(proto.Remove.Item)),
+            SetEntry.CommandOneofCase.Clear =>
                 new SetClearEntry<T>(),
-            Messages.SetEntry.CommandOneofCase.Snapshot =>
-                new SetSnapshotEntry<T>(proto.Snapshot.Items.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
+            SetEntry.CommandOneofCase.Snapshot =>
+                new SetSnapshotEntry<T>(proto.Snapshot.Items.Select(converter.FromTypedValue).ToList()),
             _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
         };
     }
 
-    private Messages.SetEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    private SetEntry CreateSnapshotMessage(IReadOnlyList<T> items)
     {
         var snapshot = new SetSnapshot();
         foreach (var item in items)
         {
-            snapshot.Items.Add(ProtobufCodecHelper.SerializeValue(codec, item));
+            snapshot.Items.Add(converter.ToTypedValue(item));
         }
 
-        return new Messages.SetEntry { Snapshot = snapshot };
+        return new SetEntry { Snapshot = snapshot };
     }
 }

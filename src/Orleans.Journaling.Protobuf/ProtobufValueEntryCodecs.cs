@@ -9,10 +9,10 @@ namespace Orleans.Journaling.Protobuf;
 /// </summary>
 /// <remarks>
 /// Serialized as a <see cref="ValueEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
+/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
 /// </remarks>
 public sealed class ProtobufValueEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableValueEntry<T>>
+    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableValueEntry<T>>
 {
     /// <inheritdoc/>
     public void Write(DurableValueEntry<T> entry, IBufferWriter<byte> output)
@@ -21,7 +21,7 @@ public sealed class ProtobufValueEntryCodec<T>(
         {
             ValueSetEntry<T>(var value) => new ValueEntry
             {
-                Set = new ValueSet { Value = ProtobufCodecHelper.SerializeValue(codec, value) }
+                Set = new ValueSet { Value = converter.ToTypedValue(value) }
             },
             _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
         };
@@ -37,7 +37,7 @@ public sealed class ProtobufValueEntryCodec<T>(
         return proto.CommandCase switch
         {
             ValueEntry.CommandOneofCase.Set =>
-                new ValueSetEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Set.Value)),
+                new ValueSetEntry<T>(converter.FromTypedValue(proto.Set.Value)),
             _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
         };
     }
@@ -48,10 +48,10 @@ public sealed class ProtobufValueEntryCodec<T>(
 /// </summary>
 /// <remarks>
 /// Serialized as a <see cref="StateEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
+/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
 /// </remarks>
 public sealed class ProtobufStateEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableStateEntry<T>>
+    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableStateEntry<T>>
 {
     /// <inheritdoc/>
     public void Write(DurableStateEntry<T> entry, IBufferWriter<byte> output)
@@ -62,7 +62,7 @@ public sealed class ProtobufStateEntryCodec<T>(
             {
                 Set = new StateSet
                 {
-                    State = ProtobufCodecHelper.SerializeValue(codec, state),
+                    State = converter.ToTypedValue(state),
                     Version = version
                 }
             },
@@ -81,7 +81,7 @@ public sealed class ProtobufStateEntryCodec<T>(
         return proto.CommandCase switch
         {
             StateEntry.CommandOneofCase.Set =>
-                new StateSetEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Set.State), proto.Set.Version),
+                new StateSetEntry<T>(converter.FromTypedValue(proto.Set.State), proto.Set.Version),
             StateEntry.CommandOneofCase.Clear =>
                 new StateClearEntry<T>(),
             _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
@@ -98,7 +98,7 @@ public sealed class ProtobufStateEntryCodec<T>(
 /// a new <see cref="Exception"/> is created with the stored message.
 /// </remarks>
 public sealed class ProtobufTcsEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>
+    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>
 {
     /// <inheritdoc/>
     public void Write(DurableTaskCompletionSourceEntry<T> entry, IBufferWriter<byte> output)
@@ -107,7 +107,7 @@ public sealed class ProtobufTcsEntryCodec<T>(
         {
             TcsCompletedEntry<T>(var value) => new TcsEntry
             {
-                Completed = new TcsCompleted { Value = ProtobufCodecHelper.SerializeValue(codec, value) }
+                Completed = new TcsCompleted { Value = converter.ToTypedValue(value) }
             },
             TcsFaultedEntry<T>(var exception) => new TcsEntry
             {
@@ -129,7 +129,7 @@ public sealed class ProtobufTcsEntryCodec<T>(
         return proto.CommandCase switch
         {
             TcsEntry.CommandOneofCase.Completed =>
-                new TcsCompletedEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Completed.Value)),
+                new TcsCompletedEntry<T>(converter.FromTypedValue(proto.Completed.Value)),
             TcsEntry.CommandOneofCase.Faulted =>
                 new TcsFaultedEntry<T>(new Exception(proto.Faulted.Exception)),
             TcsEntry.CommandOneofCase.Canceled =>

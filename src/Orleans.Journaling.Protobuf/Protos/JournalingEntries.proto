@@ -1,6 +1,22 @@
 syntax = "proto3";
 option csharp_namespace = "Orleans.Journaling.Protobuf.Messages";
 
+// A value wrapper that uses native protobuf encoding for well-known types.
+// The codec selects the appropriate oneof arm at construction time based on T.
+message TypedValue {
+  oneof kind {
+    int32 int32_value = 1;
+    int64 int64_value = 2;
+    uint32 uint32_value = 3;
+    uint64 uint64_value = 4;
+    float float_value = 5;
+    double double_value = 6;
+    bool bool_value = 7;
+    string string_value = 8;
+    bytes bytes_value = 9;
+  }
+}
+
 // Dictionary entries
 message DictionaryEntry {
   oneof command {
@@ -12,12 +28,12 @@ message DictionaryEntry {
 }
 
 message DictionarySet {
-  bytes key = 1;
-  bytes value = 2;
+  TypedValue key = 1;
+  TypedValue value = 2;
 }
 
 message DictionaryRemove {
-  bytes key = 1;
+  TypedValue key = 1;
 }
 
 message DictionaryClear {}
@@ -27,8 +43,8 @@ message DictionarySnapshot {
 }
 
 message DictionarySnapshotItem {
-  bytes key = 1;
-  bytes value = 2;
+  TypedValue key = 1;
+  TypedValue value = 2;
 }
 
 // List entries
@@ -44,17 +60,17 @@ message ListEntry {
 }
 
 message ListAdd {
-  bytes item = 1;
+  TypedValue item = 1;
 }
 
 message ListSet {
   uint32 index = 1;
-  bytes item = 2;
+  TypedValue item = 2;
 }
 
 message ListInsert {
   uint32 index = 1;
-  bytes item = 2;
+  TypedValue item = 2;
 }
 
 message ListRemoveAt {
@@ -64,7 +80,7 @@ message ListRemoveAt {
 message ListClear {}
 
 message ListSnapshot {
-  repeated bytes items = 1;
+  repeated TypedValue items = 1;
 }
 
 // Queue entries
@@ -78,7 +94,7 @@ message QueueEntry {
 }
 
 message QueueEnqueue {
-  bytes item = 1;
+  TypedValue item = 1;
 }
 
 message QueueDequeue {}
@@ -86,7 +102,7 @@ message QueueDequeue {}
 message QueueClear {}
 
 message QueueSnapshot {
-  repeated bytes items = 1;
+  repeated TypedValue items = 1;
 }
 
 // Set entries
@@ -100,17 +116,17 @@ message SetEntry {
 }
 
 message SetAdd {
-  bytes item = 1;
+  TypedValue item = 1;
 }
 
 message SetRemove {
-  bytes item = 1;
+  TypedValue item = 1;
 }
 
 message SetClear {}
 
 message SetSnapshot {
-  repeated bytes items = 1;
+  repeated TypedValue items = 1;
 }
 
 // Value entries
@@ -121,7 +137,7 @@ message ValueEntry {
 }
 
 message ValueSet {
-  bytes value = 1;
+  TypedValue value = 1;
 }
 
 // State entries
@@ -133,7 +149,7 @@ message StateEntry {
 }
 
 message StateSet {
-  bytes state = 1;
+  TypedValue state = 1;
   uint64 version = 2;
 }
 
@@ -150,7 +166,7 @@ message TcsEntry {
 }
 
 message TcsCompleted {
-  bytes value = 1;
+  TypedValue value = 1;
 }
 
 message TcsFaulted {
