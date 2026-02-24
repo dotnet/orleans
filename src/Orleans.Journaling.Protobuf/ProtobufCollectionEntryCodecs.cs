@@ -1,5 +1,6 @@
 using System.Buffers;
 using Google.Protobuf;
+using Orleans.Journaling.Protobuf.Messages;
 
 namespace Orleans.Journaling.Protobuf;
 
@@ -7,141 +8,81 @@ namespace Orleans.Journaling.Protobuf;
 /// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableListEntry{T}"/>.
 /// </summary>
 /// <remarks>
-/// <para>
-/// Each entry is encoded as a protobuf message using the following field layout:
-/// </para>
-/// <list type="bullet">
-/// <item><description>Field 1 (uint32): command (0 = add, 1 = set, 2 = insert, 3 = removeAt, 4 = clear, 5 = snapshot)</description></item>
-/// <item><description>Field 2 (bytes): item value</description></item>
-/// <item><description>Field 3 (uint32): index</description></item>
-/// <item><description>Field 4 (uint32): item count (for snapshot)</description></item>
-/// <item><description>Field 5 (bytes): repeated items (for snapshot)</description></item>
-/// </list>
+/// Serialized as a <see cref="Messages.ListEntry"/> protobuf message with a <c>oneof command</c> discriminator.
+/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
 /// </remarks>
 public sealed class ProtobufListEntryCodec<T>(
     ILogDataCodec<T> codec) : ILogEntryCodec<DurableListEntry<T>>
 {
-    private const uint AddCommand = 0;
-    private const uint SetCommand = 1;
-    private const uint InsertCommand = 2;
-    private const uint RemoveAtCommand = 3;
-    private const uint ClearCommand = 4;
-    private const uint SnapshotCommand = 5;
-
-    private const uint TagCommand = (1 << 3) | 0;   // Field 1, varint
-    private const uint TagItem = (2 << 3) | 2;      // Field 2, length-delimited
-    private const uint TagIndex = (3 << 3) | 0;     // Field 3, varint
-    private const uint TagCount = (4 << 3) | 0;     // Field 4, varint
-    private const uint TagItems = (5 << 3) | 2;     // Field 5, length-delimited
-
     /// <inheritdoc/>
     public void Write(DurableListEntry<T> entry, IBufferWriter<byte> output)
     {
-        var stream = new MemoryStream();
-        var cos = new CodedOutputStream(stream, leaveOpen: true);
-
-        switch (entry)
+        var proto = entry switch
         {
-            case ListAddEntry<T>(var item):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(AddCommand);
-                cos.WriteTag(TagItem);
-                cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                break;
-            case ListSetEntry<T>(var index, var item):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(SetCommand);
-                cos.WriteTag(TagIndex);
-                cos.WriteUInt32((uint)index);
-                cos.WriteTag(TagItem);
-                cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                break;
-            case ListInsertEntry<T>(var index, var item):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(InsertCommand);
-                cos.WriteTag(TagIndex);
-                cos.WriteUInt32((uint)index);
-                cos.WriteTag(TagItem);
-                cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                break;
-            case ListRemoveAtEntry<T>(var index):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(RemoveAtCommand);
-                cos.WriteTag(TagIndex);
-                cos.WriteUInt32((uint)index);
-                break;
-            case ListClearEntry<T>:
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(ClearCommand);
-                break;
-            case ListSnapshotEntry<T>(var items):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(SnapshotCommand);
-                cos.WriteTag(TagCount);
-                cos.WriteUInt32((uint)items.Count);
-                foreach (var item in items)
+            ListAddEntry<T>(var item) => new Messages.ListEntry
+            {
+                Add = new ListAdd { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+            },
+            ListSetEntry<T>(var index, var item) => new Messages.ListEntry
+            {
+                Set = new Messages.ListSet
                 {
-                    cos.WriteTag(TagItems);
-                    cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
+                    Index = (uint)index,
+                    Item = ProtobufCodecHelper.SerializeValue(codec, item)
                 }
+            },
+            ListInsertEntry<T>(var index, var item) => new Messages.ListEntry
+            {
+                Insert = new ListInsert
+                {
+                    Index = (uint)index,
+                    Item = ProtobufCodecHelper.SerializeValue(codec, item)
+                }
+            },
+            ListRemoveAtEntry<T>(var index) => new Messages.ListEntry
+            {
+                RemoveAt = new ListRemoveAt { Index = (uint)index }
+            },
+            ListClearEntry<T> => new Messages.ListEntry { Clear = new ListClear() },
+            ListSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
+            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
+        };
 
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
-        }
-
-        cos.Flush();
-        ProtobufCodecHelper.CopyToBufferWriter(stream, output);
+        proto.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public DurableListEntry<T> Read(ReadOnlySequence<byte> input)
     {
-        var cis = new CodedInputStream(input.ToArray());
+        var proto = Messages.ListEntry.Parser.ParseFrom(input);
 
-        uint command = 0;
-        ByteString? itemBytes = null;
-        uint index = 0;
-        uint count = 0;
-        var itemsBytesList = new List<ByteString>();
-
-        while (!cis.IsAtEnd)
+        return proto.CommandCase switch
         {
-            var tag = cis.ReadTag();
-            switch (tag)
-            {
-                case TagCommand:
-                    command = cis.ReadUInt32();
-                    break;
-                case TagItem:
-                    itemBytes = cis.ReadBytes();
-                    break;
-                case TagIndex:
-                    index = cis.ReadUInt32();
-                    break;
-                case TagCount:
-                    count = cis.ReadUInt32();
-                    break;
-                case TagItems:
-                    itemsBytesList.Add(cis.ReadBytes());
-                    break;
-                default:
-                    ProtobufCodecHelper.SkipField(cis, WireFormat.GetTagWireType(tag));
-                    break;
-            }
+            Messages.ListEntry.CommandOneofCase.Add =>
+                new ListAddEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Add.Item)),
+            Messages.ListEntry.CommandOneofCase.Set =>
+                new ListSetEntry<T>((int)proto.Set.Index, ProtobufCodecHelper.DeserializeValue(codec, proto.Set.Item)),
+            Messages.ListEntry.CommandOneofCase.Insert =>
+                new ListInsertEntry<T>((int)proto.Insert.Index, ProtobufCodecHelper.DeserializeValue(codec, proto.Insert.Item)),
+            Messages.ListEntry.CommandOneofCase.RemoveAt =>
+                new ListRemoveAtEntry<T>((int)proto.RemoveAt.Index),
+            Messages.ListEntry.CommandOneofCase.Clear =>
+                new ListClearEntry<T>(),
+            Messages.ListEntry.CommandOneofCase.Snapshot =>
+                new ListSnapshotEntry<T>(proto.Snapshot.Items.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
+            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
+        };
+    }
+
+    private Messages.ListEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    {
+        var snapshot = new ListSnapshot();
+        foreach (var item in items)
+        {
+            snapshot.Items.Add(ProtobufCodecHelper.SerializeValue(codec, item));
         }
 
-        return command switch
-        {
-            AddCommand => new ListAddEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, itemBytes!)),
-            SetCommand => new ListSetEntry<T>((int)index, ProtobufCodecHelper.DeserializeValue(codec, itemBytes!)),
-            InsertCommand => new ListInsertEntry<T>((int)index, ProtobufCodecHelper.DeserializeValue(codec, itemBytes!)),
-            RemoveAtCommand => new ListRemoveAtEntry<T>((int)index),
-            ClearCommand => new ListClearEntry<T>(),
-            SnapshotCommand => new ListSnapshotEntry<T>(
-                itemsBytesList.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+        return new Messages.ListEntry { Snapshot = snapshot };
     }
 }
 
@@ -149,113 +90,58 @@ public sealed class ProtobufListEntryCodec<T>(
 /// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableQueueEntry{T}"/>.
 /// </summary>
 /// <remarks>
-/// <para>
-/// Each entry is encoded as a protobuf message using the following field layout:
-/// </para>
-/// <list type="bullet">
-/// <item><description>Field 1 (uint32): command (0 = enqueue, 1 = dequeue, 2 = clear, 3 = snapshot)</description></item>
-/// <item><description>Field 2 (bytes): item value</description></item>
-/// <item><description>Field 3 (uint32): item count (for snapshot)</description></item>
-/// <item><description>Field 4 (bytes): repeated items (for snapshot)</description></item>
-/// </list>
+/// Serialized as a <see cref="Messages.QueueEntry"/> protobuf message with a <c>oneof command</c> discriminator.
+/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
 /// </remarks>
 public sealed class ProtobufQueueEntryCodec<T>(
     ILogDataCodec<T> codec) : ILogEntryCodec<DurableQueueEntry<T>>
 {
-    private const uint EnqueueCommand = 0;
-    private const uint DequeueCommand = 1;
-    private const uint ClearCommand = 2;
-    private const uint SnapshotCommand = 3;
-
-    private const uint TagCommand = (1 << 3) | 0;   // Field 1, varint
-    private const uint TagItem = (2 << 3) | 2;      // Field 2, length-delimited
-    private const uint TagCount = (3 << 3) | 0;     // Field 3, varint
-    private const uint TagItems = (4 << 3) | 2;     // Field 4, length-delimited
-
     /// <inheritdoc/>
     public void Write(DurableQueueEntry<T> entry, IBufferWriter<byte> output)
     {
-        var stream = new MemoryStream();
-        var cos = new CodedOutputStream(stream, leaveOpen: true);
-
-        switch (entry)
+        var proto = entry switch
         {
-            case QueueEnqueueEntry<T>(var item):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(EnqueueCommand);
-                cos.WriteTag(TagItem);
-                cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                break;
-            case QueueDequeueEntry<T>:
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(DequeueCommand);
-                break;
-            case QueueClearEntry<T>:
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(ClearCommand);
-                break;
-            case QueueSnapshotEntry<T>(var items):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(SnapshotCommand);
-                cos.WriteTag(TagCount);
-                cos.WriteUInt32((uint)items.Count);
-                foreach (var item in items)
-                {
-                    cos.WriteTag(TagItems);
-                    cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                }
+            QueueEnqueueEntry<T>(var item) => new Messages.QueueEntry
+            {
+                Enqueue = new QueueEnqueue { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+            },
+            QueueDequeueEntry<T> => new Messages.QueueEntry { Dequeue = new QueueDequeue() },
+            QueueClearEntry<T> => new Messages.QueueEntry { Clear = new QueueClear() },
+            QueueSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
+            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
+        };
 
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
-        }
-
-        cos.Flush();
-        ProtobufCodecHelper.CopyToBufferWriter(stream, output);
+        proto.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public DurableQueueEntry<T> Read(ReadOnlySequence<byte> input)
     {
-        var cis = new CodedInputStream(input.ToArray());
+        var proto = Messages.QueueEntry.Parser.ParseFrom(input);
 
-        uint command = 0;
-        ByteString? itemBytes = null;
-        uint count = 0;
-        var itemsBytesList = new List<ByteString>();
-
-        while (!cis.IsAtEnd)
+        return proto.CommandCase switch
         {
-            var tag = cis.ReadTag();
-            switch (tag)
-            {
-                case TagCommand:
-                    command = cis.ReadUInt32();
-                    break;
-                case TagItem:
-                    itemBytes = cis.ReadBytes();
-                    break;
-                case TagCount:
-                    count = cis.ReadUInt32();
-                    break;
-                case TagItems:
-                    itemsBytesList.Add(cis.ReadBytes());
-                    break;
-                default:
-                    ProtobufCodecHelper.SkipField(cis, WireFormat.GetTagWireType(tag));
-                    break;
-            }
+            Messages.QueueEntry.CommandOneofCase.Enqueue =>
+                new QueueEnqueueEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Enqueue.Item)),
+            Messages.QueueEntry.CommandOneofCase.Dequeue =>
+                new QueueDequeueEntry<T>(),
+            Messages.QueueEntry.CommandOneofCase.Clear =>
+                new QueueClearEntry<T>(),
+            Messages.QueueEntry.CommandOneofCase.Snapshot =>
+                new QueueSnapshotEntry<T>(proto.Snapshot.Items.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
+            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
+        };
+    }
+
+    private Messages.QueueEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    {
+        var snapshot = new QueueSnapshot();
+        foreach (var item in items)
+        {
+            snapshot.Items.Add(ProtobufCodecHelper.SerializeValue(codec, item));
         }
 
-        return command switch
-        {
-            EnqueueCommand => new QueueEnqueueEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, itemBytes!)),
-            DequeueCommand => new QueueDequeueEntry<T>(),
-            ClearCommand => new QueueClearEntry<T>(),
-            SnapshotCommand => new QueueSnapshotEntry<T>(
-                itemsBytesList.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+        return new Messages.QueueEntry { Snapshot = snapshot };
     }
 }
 
@@ -263,114 +149,60 @@ public sealed class ProtobufQueueEntryCodec<T>(
 /// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableSetEntry{T}"/>.
 /// </summary>
 /// <remarks>
-/// <para>
-/// Each entry is encoded as a protobuf message using the following field layout:
-/// </para>
-/// <list type="bullet">
-/// <item><description>Field 1 (uint32): command (0 = add, 1 = remove, 2 = clear, 3 = snapshot)</description></item>
-/// <item><description>Field 2 (bytes): item value</description></item>
-/// <item><description>Field 3 (uint32): item count (for snapshot)</description></item>
-/// <item><description>Field 4 (bytes): repeated items (for snapshot)</description></item>
-/// </list>
+/// Serialized as a <see cref="Messages.SetEntry"/> protobuf message with a <c>oneof command</c> discriminator.
+/// User values are embedded as <c>bytes</c> fields serialized via <see cref="ILogDataCodec{T}"/>.
 /// </remarks>
 public sealed class ProtobufSetEntryCodec<T>(
     ILogDataCodec<T> codec) : ILogEntryCodec<DurableSetEntry<T>>
 {
-    private const uint AddCommand = 0;
-    private const uint RemoveCommand = 1;
-    private const uint ClearCommand = 2;
-    private const uint SnapshotCommand = 3;
-
-    private const uint TagCommand = (1 << 3) | 0;   // Field 1, varint
-    private const uint TagItem = (2 << 3) | 2;      // Field 2, length-delimited
-    private const uint TagCount = (3 << 3) | 0;     // Field 3, varint
-    private const uint TagItems = (4 << 3) | 2;     // Field 4, length-delimited
-
     /// <inheritdoc/>
     public void Write(DurableSetEntry<T> entry, IBufferWriter<byte> output)
     {
-        var stream = new MemoryStream();
-        var cos = new CodedOutputStream(stream, leaveOpen: true);
-
-        switch (entry)
+        var proto = entry switch
         {
-            case SetAddEntry<T>(var item):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(AddCommand);
-                cos.WriteTag(TagItem);
-                cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                break;
-            case SetRemoveEntry<T>(var item):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(RemoveCommand);
-                cos.WriteTag(TagItem);
-                cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                break;
-            case SetClearEntry<T>:
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(ClearCommand);
-                break;
-            case SetSnapshotEntry<T>(var items):
-                cos.WriteTag(TagCommand);
-                cos.WriteUInt32(SnapshotCommand);
-                cos.WriteTag(TagCount);
-                cos.WriteUInt32((uint)items.Count);
-                foreach (var item in items)
-                {
-                    cos.WriteTag(TagItems);
-                    cos.WriteBytes(ProtobufCodecHelper.SerializeValue(codec, item));
-                }
+            SetAddEntry<T>(var item) => new Messages.SetEntry
+            {
+                Add = new SetAdd { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+            },
+            SetRemoveEntry<T>(var item) => new Messages.SetEntry
+            {
+                Remove = new SetRemove { Item = ProtobufCodecHelper.SerializeValue(codec, item) }
+            },
+            SetClearEntry<T> => new Messages.SetEntry { Clear = new SetClear() },
+            SetSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
+            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
+        };
 
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
-        }
-
-        cos.Flush();
-        ProtobufCodecHelper.CopyToBufferWriter(stream, output);
+        proto.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public DurableSetEntry<T> Read(ReadOnlySequence<byte> input)
     {
-        var cis = new CodedInputStream(input.ToArray());
+        var proto = Messages.SetEntry.Parser.ParseFrom(input);
 
-        uint command = 0;
-        ByteString? itemBytes = null;
-        uint count = 0;
-        var itemsBytesList = new List<ByteString>();
-
-        while (!cis.IsAtEnd)
+        return proto.CommandCase switch
         {
-            var tag = cis.ReadTag();
-            switch (tag)
-            {
-                case TagCommand:
-                    command = cis.ReadUInt32();
-                    break;
-                case TagItem:
-                    itemBytes = cis.ReadBytes();
-                    break;
-                case TagCount:
-                    count = cis.ReadUInt32();
-                    break;
-                case TagItems:
-                    itemsBytesList.Add(cis.ReadBytes());
-                    break;
-                default:
-                    ProtobufCodecHelper.SkipField(cis, WireFormat.GetTagWireType(tag));
-                    break;
-            }
+            Messages.SetEntry.CommandOneofCase.Add =>
+                new SetAddEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Add.Item)),
+            Messages.SetEntry.CommandOneofCase.Remove =>
+                new SetRemoveEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, proto.Remove.Item)),
+            Messages.SetEntry.CommandOneofCase.Clear =>
+                new SetClearEntry<T>(),
+            Messages.SetEntry.CommandOneofCase.Snapshot =>
+                new SetSnapshotEntry<T>(proto.Snapshot.Items.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
+            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
+        };
+    }
+
+    private Messages.SetEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    {
+        var snapshot = new SetSnapshot();
+        foreach (var item in items)
+        {
+            snapshot.Items.Add(ProtobufCodecHelper.SerializeValue(codec, item));
         }
 
-        return command switch
-        {
-            AddCommand => new SetAddEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, itemBytes!)),
-            RemoveCommand => new SetRemoveEntry<T>(ProtobufCodecHelper.DeserializeValue(codec, itemBytes!)),
-            ClearCommand => new SetClearEntry<T>(),
-            SnapshotCommand => new SetSnapshotEntry<T>(
-                itemsBytesList.Select(b => ProtobufCodecHelper.DeserializeValue(codec, b)).ToList()),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+        return new Messages.SetEntry { Snapshot = snapshot };
     }
 }

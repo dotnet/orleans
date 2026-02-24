@@ -14,6 +14,11 @@
 
   <ItemGroup>
     <PackageReference Include="Google.Protobuf" />
+    <PackageReference Include="Grpc.Tools" PrivateAssets="All" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Protobuf Include="Protos\JournalingEntries.proto" GrpcServices="None" />
   </ItemGroup>
 
   <ItemGroup>

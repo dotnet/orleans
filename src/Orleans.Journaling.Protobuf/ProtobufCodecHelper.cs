@@ -25,39 +25,4 @@ internal static class ProtobufCodecHelper
     {
         return codec.Read(new ReadOnlySequence<byte>(bytes.Memory), out _);
     }
-
-    /// <summary>
-    /// Copies the content of a <see cref="MemoryStream"/> to an <see cref="IBufferWriter{T}"/>.
-    /// </summary>
-    internal static void CopyToBufferWriter(MemoryStream stream, IBufferWriter<byte> output)
-    {
-        var data = stream.GetBuffer().AsSpan(0, (int)stream.Length);
-        var dest = output.GetSpan(data.Length);
-        data.CopyTo(dest);
-        output.Advance(data.Length);
-    }
-
-    /// <summary>
-    /// Skips an unknown field in the protobuf stream based on its wire type.
-    /// </summary>
-    internal static void SkipField(CodedInputStream cis, WireFormat.WireType wireType)
-    {
-        switch (wireType)
-        {
-            case WireFormat.WireType.Varint:
-                cis.ReadUInt64();
-                break;
-            case WireFormat.WireType.Fixed64:
-                cis.ReadFixed64();
-                break;
-            case WireFormat.WireType.LengthDelimited:
-                cis.ReadBytes();
-                break;
-            case WireFormat.WireType.Fixed32:
-                cis.ReadFixed32();
-                break;
-            default:
-                throw new InvalidOperationException($"Unknown wire type: {wireType}");
-        }
-    }
 }
