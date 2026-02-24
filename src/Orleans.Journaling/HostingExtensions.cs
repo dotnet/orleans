@@ -15,10 +15,17 @@ public static class HostingExtensions
         // Register the default data codec (Orleans IFieldCodec adapter).
         builder.Services.TryAddSingleton(typeof(ILogDataCodec<>), typeof(OrleansLogDataCodec<>));
 
-        // Register typed entry codecs for each durable type (Orleans binary format).
-        // Uses a resolver that dispatches to the correct binary codec at runtime,
-        // since the MS DI container cannot decompose composed generic type parameters.
-        builder.Services.TryAddSingleton(typeof(ILogEntryCodec<>), typeof(DefaultLogEntryCodecResolver<>));
+        // Register the binary codec providers for each durable type.
+        // Each durable type injects its specific provider interface and calls GetCodec<...>() with
+        // its known type arguments, avoiding reflection (MakeGenericType/GetGenericTypeDefinition).
+        builder.Services.TryAddSingleton<OrleansBinaryLogEntryCodecProvider>();
+        builder.Services.TryAddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryLogEntryCodecProvider>());
+        builder.Services.TryAddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryLogEntryCodecProvider>());
+        builder.Services.TryAddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryLogEntryCodecProvider>());
+        builder.Services.TryAddSingleton<IDurableSetCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryLogEntryCodecProvider>());
+        builder.Services.TryAddSingleton<IDurableValueCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryLogEntryCodecProvider>());
+        builder.Services.TryAddSingleton<IDurableStateCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryLogEntryCodecProvider>());
+        builder.Services.TryAddSingleton<IDurableTaskCompletionSourceCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryLogEntryCodecProvider>());
 
         builder.Services.TryAddKeyedScoped(typeof(IDurableDictionary<,>), KeyedService.AnyKey, typeof(DurableDictionary<,>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableList<>), KeyedService.AnyKey, typeof(DurableList<>));

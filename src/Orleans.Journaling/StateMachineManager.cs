@@ -38,8 +38,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         IStateMachineStorage storage,
         ILogger<StateMachineManager> logger,
         IOptions<StateMachineManagerOptions> options,
-        ILogEntryCodec<DurableDictionaryEntry<string, ulong>> stateMachineIdsCodec,
-        ILogEntryCodec<DurableDictionaryEntry<string, DateTime>> retirementTrackerCodec,
+        IDurableDictionaryCodecProvider dictionaryCodecProvider,
         TimeProvider timeProvider)
     {
         _storage = storage;
@@ -49,11 +48,31 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
         // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
         // This allows us to recover the list of state machines ids without having to store it separately.
-        _stateMachineIds = new StateMachineManagerState(this, stateMachineIdsCodec);
+        _stateMachineIds = new StateMachineManagerState(this, dictionaryCodecProvider.GetCodec<string, ulong>());
         _stateMachinesMap[StateMachineManagerState.Id] = _stateMachineIds;
 
         // The retirement tracker is a special internal state machine with a fixed id.
         // It is not stored in _stateMachineIds and does not participate in the general name->id mapping.
+        _retirementTracker = new StateMachinesRetirementTracker(this, dictionaryCodecProvider.GetCodec<string, DateTime>());
+        _stateMachinesMap[StateMachinesRetirementTracker.Id] = _retirementTracker;
+    }
+
+    internal StateMachineManager(
+        IStateMachineStorage storage,
+        ILogger<StateMachineManager> logger,
+        IOptions<StateMachineManagerOptions> options,
+        ILogEntryCodec<DurableDictionaryEntry<string, ulong>> stateMachineIdsCodec,
+        ILogEntryCodec<DurableDictionaryEntry<string, DateTime>> retirementTrackerCodec,
+        TimeProvider timeProvider)
+    {
+        _storage = storage;
+        _logger = logger;
+        _timeProvider = timeProvider;
+        _retirementGracePeriod = options.Value.RetirementGracePeriod;
+
+        _stateMachineIds = new StateMachineManagerState(this, stateMachineIdsCodec);
+        _stateMachinesMap[StateMachineManagerState.Id] = _stateMachineIds;
+
         _retirementTracker = new StateMachinesRetirementTracker(this, retirementTrackerCodec);
         _stateMachinesMap[StateMachinesRetirementTracker.Id] = _retirementTracker;
     }

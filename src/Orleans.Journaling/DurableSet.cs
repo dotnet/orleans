@@ -27,7 +27,14 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
     private readonly HashSet<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    public DurableSet([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableSetEntry<T>> entryCodec)
+    public DurableSet([ServiceKey] string key, IStateMachineManager manager, IDurableSetCodecProvider codecProvider)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _entryCodec = codecProvider.GetCodec<T>();
+        manager.RegisterStateMachine(key, this);
+    }
+
+    internal DurableSet(string key, IStateMachineManager manager, ILogEntryCodec<DurableSetEntry<T>> entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _entryCodec = entryCodec;

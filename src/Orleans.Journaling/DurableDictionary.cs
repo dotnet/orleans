@@ -23,7 +23,13 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         _entryCodec = entryCodec;
     }
 
-    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, ILogEntryCodec<DurableDictionaryEntry<K, V>> entryCodec) : this(entryCodec)
+    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, IDurableDictionaryCodecProvider codecProvider) : this(codecProvider.GetCodec<K, V>())
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        manager.RegisterStateMachine(key, this);
+    }
+
+    internal DurableDictionary(string key, IStateMachineManager manager, ILogEntryCodec<DurableDictionaryEntry<K, V>> entryCodec) : this(entryCodec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);

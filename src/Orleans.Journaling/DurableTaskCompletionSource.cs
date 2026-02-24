@@ -31,6 +31,20 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         IStateMachineManager manager,
+        IDurableTaskCompletionSourceCodecProvider codecProvider,
+        DeepCopier<T> copier,
+        DeepCopier<Exception> exceptionCopier)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _entryCodec = codecProvider.GetCodec<T>();
+        _copier = copier;
+        _exceptionCopier = exceptionCopier;
+        manager.RegisterStateMachine(key, this);
+    }
+
+    internal DurableTaskCompletionSource(
+        string key,
+        IStateMachineManager manager,
         ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> entryCodec,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)

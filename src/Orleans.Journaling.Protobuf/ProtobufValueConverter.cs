@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using Google.Protobuf;
 using Orleans.Journaling.Protobuf.Messages;
@@ -20,7 +21,7 @@ namespace Orleans.Journaling.Protobuf;
 /// </list>
 /// </remarks>
 /// <typeparam name="T">The value type to convert.</typeparam>
-public sealed class ProtobufValueConverter<T>
+public sealed class ProtobufValueConverter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>
 {
     private readonly Func<T, TypedValue> _toTypedValue;
     private readonly Func<TypedValue, T> _fromTypedValue;
