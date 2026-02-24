@@ -235,7 +235,7 @@ namespace Orleans
         /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.
         /// </summary>
         /// <returns>The <see cref="IGrainReminder"/>.</returns>
-        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag, CronExpression, Priority, Action);
+        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag, CronExpression, Priority, Action, CronTimeZoneId);
     }
 
     [Serializable, GenerateSerializer, Immutable]
@@ -253,6 +253,8 @@ namespace Orleans
         public Runtime.ReminderPriority Priority { get; }
         [Id(5)]
         public Runtime.MissedReminderAction Action { get; }
+        [Id(6)]
+        public string CronTimeZone { get; }
 
         internal ReminderData(
             GrainId grainId,
@@ -260,7 +262,8 @@ namespace Orleans
             string eTag,
             string cronExpression = "",
             Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal,
-            Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip)
+            Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip,
+            string cronTimeZoneId = "")
         {
             GrainId = grainId;
             ReminderName = reminderName;
@@ -268,8 +271,9 @@ namespace Orleans
             CronExpression = cronExpression ?? string.Empty;
             Priority = priority;
             Action = action;
+            CronTimeZone = cronTimeZoneId ?? string.Empty;
         }
 
-        public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag} CronExpression={CronExpression} Priority={Priority} Action={Action}>";
+        public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag} CronExpression={CronExpression} CronTimeZone={CronTimeZone} Priority={Priority} Action={Action}>";
     }
 }

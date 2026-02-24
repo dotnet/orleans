@@ -90,6 +90,12 @@ namespace Orleans
             string CronExpression { get; }
 
             /// <summary>
+            /// Gets the cron time zone identifier for this reminder.
+            /// Returns <see cref="string.Empty"/> for UTC scheduling or interval-based reminders.
+            /// </summary>
+            string CronTimeZone { get; }
+
+            /// <summary>
             /// Gets the priority of this reminder.
             /// </summary>
             ReminderPriority Priority { get; }

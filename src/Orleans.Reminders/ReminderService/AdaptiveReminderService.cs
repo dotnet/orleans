@@ -325,7 +325,7 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
 
         entry.ETag = etag;
         TryQueueReminder(entry, UtcNow.Add(_options.LookAheadWindow));
-        return new ReminderData(grainId, reminderName, etag, entry.CronExpression, priority, action);
+        return new ReminderData(grainId, reminderName, etag, entry.CronExpression, priority, action, entry.CronTimeZoneId);
     }
 
     public async Task UnregisterReminder(IGrainReminder reminder)

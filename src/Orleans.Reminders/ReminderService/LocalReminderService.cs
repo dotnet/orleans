@@ -229,7 +229,7 @@ namespace Orleans.Runtime.ReminderService
                 entry.ETag = newEtag;
                 StartAndAddTimer(entry);
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
-                return new ReminderData(grainId, reminderName, newEtag, entry.CronExpression, entry.Priority, entry.Action);
+                return new ReminderData(grainId, reminderName, newEtag, entry.CronExpression, entry.Priority, entry.Action, entry.CronTimeZoneId);
             }
 
             LogErrorRegisterReminder(entry);
@@ -311,7 +311,7 @@ namespace Orleans.Runtime.ReminderService
                 entry.ETag = newEtag;
                 StartAndAddTimer(entry);
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
-                return new ReminderData(grainId, reminderName, newEtag, entry.CronExpression, entry.Priority, entry.Action);
+                return new ReminderData(grainId, reminderName, newEtag, entry.CronExpression, entry.Priority, entry.Action, entry.CronTimeZoneId);
             }
 
             LogErrorRegisterReminder(entry);
