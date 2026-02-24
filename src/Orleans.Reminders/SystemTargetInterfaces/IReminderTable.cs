@@ -197,6 +197,13 @@ namespace Orleans
         public string CronExpression { get; set; }
 
         /// <summary>
+        /// Gets or sets the time zone id used to evaluate <see cref="CronExpression"/>.
+        /// Null or empty indicates UTC scheduling.
+        /// </summary>
+        [Id(10)]
+        public string CronTimeZoneId { get; set; }
+
+        /// <summary>
         /// Gets or sets the next due timestamp for this reminder in UTC.
         /// </summary>
         [Id(6)]
@@ -222,7 +229,7 @@ namespace Orleans
 
         /// <inheritdoc/>
         public override string ToString()
-            => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period} Cron={CronExpression} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action}>";
+            => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period} Cron={CronExpression} CronTimeZoneId={CronTimeZoneId} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action}>";
 
         /// <summary>
         /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.

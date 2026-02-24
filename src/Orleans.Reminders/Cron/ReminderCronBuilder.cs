@@ -1,5 +1,6 @@
 #nullable enable
 using System;
+using System.Collections.Generic;
 
 namespace Orleans;
 
@@ -9,25 +10,33 @@ namespace Orleans;
 public sealed class ReminderCronBuilder
 {
     private readonly string _expression;
+    private readonly TimeZoneInfo _timeZone;
 
-    private ReminderCronBuilder(string expression)
+    private ReminderCronBuilder(string expression, TimeZoneInfo timeZone)
     {
         _expression = expression;
+        _timeZone = timeZone;
     }
 
     /// <summary>
     /// Uses a raw cron expression string.
     /// </summary>
     public static ReminderCronBuilder FromExpression(string expression)
+        => FromExpression(expression, TimeZoneInfo.Utc);
+
+    /// <summary>
+    /// Uses a raw cron expression string and scheduling time zone.
+    /// </summary>
+    public static ReminderCronBuilder FromExpression(string expression, TimeZoneInfo? timeZone)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expression);
-        return new ReminderCronBuilder(expression.Trim());
+        return new ReminderCronBuilder(expression.Trim(), timeZone ?? TimeZoneInfo.Utc);
     }
 
     /// <summary>
     /// Every minute.
     /// </summary>
-    public static ReminderCronBuilder EveryMinute() => new("* * * * *");
+    public static ReminderCronBuilder EveryMinute() => new("* * * * *", TimeZoneInfo.Utc);
 
     /// <summary>
     /// At the specified minute of every hour.
@@ -35,7 +44,7 @@ public sealed class ReminderCronBuilder
     public static ReminderCronBuilder HourlyAt(int minute)
     {
         ValidateMinute(minute);
-        return new($"{minute} * * * *");
+        return new($"{minute} * * * *", TimeZoneInfo.Utc);
     }
 
     /// <summary>
@@ -45,7 +54,7 @@ public sealed class ReminderCronBuilder
     {
         ValidateHour(hour);
         ValidateMinute(minute);
-        return new($"{minute} {hour} * * *");
+        return new($"{minute} {hour} * * *", TimeZoneInfo.Utc);
     }
 
     /// <summary>
@@ -55,7 +64,7 @@ public sealed class ReminderCronBuilder
     {
         ValidateHour(hour);
         ValidateMinute(minute);
-        return new($"{minute} {hour} * * MON-FRI");
+        return new($"{minute} {hour} * * MON-FRI", TimeZoneInfo.Utc);
     }
 
     /// <summary>
@@ -65,7 +74,7 @@ public sealed class ReminderCronBuilder
     {
         ValidateHour(hour);
         ValidateMinute(minute);
-        return new($"{minute} {hour} * * {ToCronDay(dayOfWeek)}");
+        return new($"{minute} {hour} * * {ToCronDay(dayOfWeek)}", TimeZoneInfo.Utc);
     }
 
     /// <summary>
@@ -76,7 +85,7 @@ public sealed class ReminderCronBuilder
         ValidateDayOfMonth(dayOfMonth);
         ValidateHour(hour);
         ValidateMinute(minute);
-        return new($"{minute} {hour} {dayOfMonth} * *");
+        return new($"{minute} {hour} {dayOfMonth} * *", TimeZoneInfo.Utc);
     }
 
     /// <summary>
@@ -86,7 +95,57 @@ public sealed class ReminderCronBuilder
     {
         ValidateHour(hour);
         ValidateMinute(minute);
-        return new($"{minute} {hour} L * *");
+        return new($"{minute} {hour} L * *", TimeZoneInfo.Utc);
+    }
+
+    /// <summary>
+    /// Returns a copy of this builder configured to evaluate occurrences in the provided time zone.
+    /// </summary>
+    public ReminderCronBuilder InTimeZone(TimeZoneInfo timeZone)
+    {
+        ArgumentNullException.ThrowIfNull(timeZone);
+        return new ReminderCronBuilder(_expression, timeZone);
+    }
+
+    /// <summary>
+    /// Returns a copy of this builder configured to evaluate occurrences in the provided time zone id.
+    /// </summary>
+    public ReminderCronBuilder InTimeZone(string timeZoneId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(timeZoneId);
+        var zone = ResolveTimeZone(timeZoneId);
+        return InTimeZone(zone);
+    }
+
+    /// <summary>
+    /// Gets the time zone used by this builder for occurrence calculations.
+    /// </summary>
+    public TimeZoneInfo TimeZone => _timeZone;
+
+    /// <summary>
+    /// Gets the next occurrence in UTC, evaluated using this builder's time zone.
+    /// </summary>
+    public DateTime? GetNextOccurrence(DateTime fromUtc, bool inclusive = false)
+    {
+        var expression = ReminderCronExpression.Parse(_expression);
+        return IsUtcTimeZone(_timeZone)
+            ? expression.GetNextOccurrence(fromUtc, inclusive)
+            : expression.GetNextOccurrence(fromUtc, _timeZone, inclusive);
+    }
+
+    /// <summary>
+    /// Gets all occurrences in UTC for the provided range, evaluated using this builder's time zone.
+    /// </summary>
+    public IEnumerable<DateTime> GetOccurrences(
+        DateTime fromUtc,
+        DateTime toUtc,
+        bool fromInclusive = true,
+        bool toInclusive = false)
+    {
+        var expression = ReminderCronExpression.Parse(_expression);
+        return IsUtcTimeZone(_timeZone)
+            ? expression.GetOccurrences(fromUtc, toUtc, fromInclusive, toInclusive)
+            : expression.GetOccurrences(fromUtc, toUtc, _timeZone, fromInclusive, toInclusive);
     }
 
     /// <summary>
@@ -119,6 +178,31 @@ public sealed class ReminderCronBuilder
             _ => throw new ArgumentOutOfRangeException(nameof(dayOfWeek), dayOfWeek, null)
         };
     }
+
+    private static TimeZoneInfo ResolveTimeZone(string timeZoneId)
+    {
+        try
+        {
+            return TimeZoneInfo.FindSystemTimeZoneById(timeZoneId);
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            if (TimeZoneInfo.TryConvertIanaIdToWindowsId(timeZoneId, out var windowsId))
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(windowsId);
+            }
+
+            if (TimeZoneInfo.TryConvertWindowsIdToIanaId(timeZoneId, out var ianaId))
+            {
+                return TimeZoneInfo.FindSystemTimeZoneById(ianaId);
+            }
+
+            throw;
+        }
+    }
+
+    private static bool IsUtcTimeZone(TimeZoneInfo zone)
+        => string.Equals(zone.Id, TimeZoneInfo.Utc.Id, StringComparison.Ordinal);
 
     private static void ValidateMinute(int minute)
     {

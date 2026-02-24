@@ -1,6 +1,7 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Reminders.Cron.Internal;
 using Orleans.Runtime;
 using Orleans.Timers;
 
@@ -28,25 +29,95 @@ public static class GrainReminderCronExtensions
     /// Registers or updates a persistent cron reminder.
     /// </summary>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, ReminderCronExpression cronExpression)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronExpression?.ToExpressionString());
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, timeZone: null);
 
     /// <summary>
     /// Registers or updates a persistent cron reminder.
     /// </summary>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, ReminderCronExpression cronExpression)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronExpression?.ToExpressionString());
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, timeZone: null);
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this Grain grain,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression?.ToExpressionString(),
+            GetCronTimeZoneId(timeZone));
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IGrainBase grain,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression?.ToExpressionString(),
+            GetCronTimeZoneId(timeZone));
 
     /// <summary>
     /// Registers or updates a persistent cron reminder.
     /// </summary>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, ReminderCronBuilder cronBuilder)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronBuilder?.ToExpressionString());
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronBuilder?.ToExpressionString(),
+            GetCronTimeZoneId(cronBuilder?.TimeZone));
 
     /// <summary>
     /// Registers or updates a persistent cron reminder.
     /// </summary>
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, ReminderCronBuilder cronBuilder)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronBuilder?.ToExpressionString());
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronBuilder?.ToExpressionString(),
+            GetCronTimeZoneId(cronBuilder?.TimeZone));
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder using the provided time zone.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this Grain grain,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression,
+            GetCronTimeZoneId(timeZone));
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder using the provided time zone.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IGrainBase grain,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression,
+            GetCronTimeZoneId(timeZone));
 
     /// <summary>
     /// Registers or updates a persistent cron reminder with adaptive delivery options.
@@ -57,7 +128,7 @@ public static class GrainReminderCronExtensions
         string cronExpression,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronExpression, priority, action);
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, priority, action, timeZone: null);
 
     /// <summary>
     /// Registers or updates a persistent cron reminder with adaptive delivery options.
@@ -68,7 +139,45 @@ public static class GrainReminderCronExtensions
         string cronExpression,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronExpression, priority, action);
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, priority, action, timeZone: null);
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder with adaptive delivery options.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this Grain grain,
+        string reminderName,
+        string cronExpression,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression,
+            GetCronTimeZoneId(timeZone),
+            priority,
+            action);
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder with adaptive delivery options.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IGrainBase grain,
+        string reminderName,
+        string cronExpression,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression,
+            GetCronTimeZoneId(timeZone),
+            priority,
+            action);
 
     /// <summary>
     /// Registers or updates a persistent cron reminder with adaptive delivery options.
@@ -79,7 +188,7 @@ public static class GrainReminderCronExtensions
         ReminderCronExpression cronExpression,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronExpression?.ToExpressionString(), priority, action);
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, priority, action, timeZone: null);
 
     /// <summary>
     /// Registers or updates a persistent cron reminder with adaptive delivery options.
@@ -90,7 +199,45 @@ public static class GrainReminderCronExtensions
         ReminderCronExpression cronExpression,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronExpression?.ToExpressionString(), priority, action);
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, priority, action, timeZone: null);
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder with adaptive delivery options.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this Grain grain,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression?.ToExpressionString(),
+            GetCronTimeZoneId(timeZone),
+            priority,
+            action);
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder with adaptive delivery options.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IGrainBase grain,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action,
+        TimeZoneInfo? timeZone)
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronExpression?.ToExpressionString(),
+            GetCronTimeZoneId(timeZone),
+            priority,
+            action);
 
     /// <summary>
     /// Registers or updates a persistent cron reminder with adaptive delivery options.
@@ -101,7 +248,14 @@ public static class GrainReminderCronExtensions
         ReminderCronBuilder cronBuilder,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronBuilder?.ToExpressionString(), priority, action);
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronBuilder?.ToExpressionString(),
+            GetCronTimeZoneId(cronBuilder?.TimeZone),
+            priority,
+            action);
 
     /// <summary>
     /// Registers or updates a persistent cron reminder with adaptive delivery options.
@@ -112,16 +266,60 @@ public static class GrainReminderCronExtensions
         ReminderCronBuilder cronBuilder,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
-        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, cronBuilder?.ToExpressionString(), priority, action);
+        => RegisterOrUpdateReminder(
+            grain is IRemindable,
+            grain?.GrainContext,
+            reminderName,
+            cronBuilder?.ToExpressionString(),
+            GetCronTimeZoneId(cronBuilder?.TimeZone),
+            priority,
+            action);
 
-    private static Task<IGrainReminder> RegisterOrUpdateReminder(bool remindable, IGrainContext? grainContext, string reminderName, string? cronExpression)
-        => RegisterOrUpdateReminder(remindable, grainContext, reminderName, cronExpression, Runtime.ReminderPriority.Normal, Runtime.MissedReminderAction.Skip);
+    /// <summary>
+    /// Registers or updates a persistent cron reminder using the provided time zone and adaptive delivery options.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this Grain grain,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, priority, action, timeZone);
+
+    /// <summary>
+    /// Registers or updates a persistent cron reminder using the provided time zone and adaptive delivery options.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IGrainBase grain,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(grain, reminderName, cronExpression, priority, action, timeZone);
 
     private static Task<IGrainReminder> RegisterOrUpdateReminder(
         bool remindable,
         IGrainContext? grainContext,
         string reminderName,
         string? cronExpression,
+        string? cronTimeZoneId = null)
+        => RegisterOrUpdateReminder(
+            remindable,
+            grainContext,
+            reminderName,
+            cronExpression,
+            cronTimeZoneId,
+            Runtime.ReminderPriority.Normal,
+            Runtime.MissedReminderAction.Skip);
+
+    private static Task<IGrainReminder> RegisterOrUpdateReminder(
+        bool remindable,
+        IGrainContext? grainContext,
+        string reminderName,
+        string? cronExpression,
+        string? cronTimeZoneId,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
     {
@@ -135,6 +333,9 @@ public static class GrainReminderCronExtensions
         }
 
         return grainContext.ActivationServices.GetRequiredService<IReminderRegistry>()
-            .RegisterOrUpdateReminder(grainContext.GrainId, reminderName, cronExpression, priority, action);
+            .RegisterOrUpdateReminder(grainContext.GrainId, reminderName, cronExpression, priority, action, cronTimeZoneId);
     }
+
+    private static string? GetCronTimeZoneId(TimeZoneInfo? timeZone)
+        => ReminderCronSchedule.NormalizeTimeZoneIdForStorage(timeZone);
 }

@@ -1,6 +1,7 @@
 #nullable enable
 using System;
 using System.Threading.Tasks;
+using Orleans.Reminders.Cron.Internal;
 using Orleans.Runtime;
 using Orleans.Timers;
 
@@ -19,10 +20,25 @@ public static class ReminderCronRegistrationExtensions
         GrainId callingGrainId,
         string reminderName,
         ReminderCronExpression cronExpression)
+        => RegisterOrUpdateReminder(registry, callingGrainId, reminderName, cronExpression, timeZone: null);
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderRegistry"/> using a typed cron expression.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderRegistry registry,
+        GrainId callingGrainId,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        TimeZoneInfo? timeZone)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(cronExpression);
-        return registry.RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression.ToExpressionString());
+        return registry.RegisterOrUpdateReminder(
+            callingGrainId,
+            reminderName,
+            cronExpression.ToExpressionString(),
+            NormalizeTimeZoneId(timeZone));
     }
 
     /// <summary>
@@ -36,7 +52,30 @@ public static class ReminderCronRegistrationExtensions
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(cronBuilder);
-        return registry.RegisterOrUpdateReminder(callingGrainId, reminderName, cronBuilder.ToExpressionString());
+        return RegisterOrUpdateReminder(
+            registry,
+            callingGrainId,
+            reminderName,
+            cronBuilder.ToExpressionString(),
+            cronBuilder.TimeZone);
+    }
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderRegistry"/> using an expression and time zone.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderRegistry registry,
+        GrainId callingGrainId,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        return registry.RegisterOrUpdateReminder(
+            callingGrainId,
+            reminderName,
+            cronExpression,
+            NormalizeTimeZoneId(timeZone));
     }
 
     /// <summary>
@@ -49,10 +88,29 @@ public static class ReminderCronRegistrationExtensions
         ReminderCronExpression cronExpression,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(registry, callingGrainId, reminderName, cronExpression, priority, action, timeZone: null);
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderRegistry"/> using a typed cron expression.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderRegistry registry,
+        GrainId callingGrainId,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action,
+        TimeZoneInfo? timeZone)
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(cronExpression);
-        return registry.RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression.ToExpressionString(), priority, action);
+        return registry.RegisterOrUpdateReminder(
+            callingGrainId,
+            reminderName,
+            cronExpression.ToExpressionString(),
+            priority,
+            action,
+            NormalizeTimeZoneId(timeZone));
     }
 
     /// <summary>
@@ -68,7 +126,36 @@ public static class ReminderCronRegistrationExtensions
     {
         ArgumentNullException.ThrowIfNull(registry);
         ArgumentNullException.ThrowIfNull(cronBuilder);
-        return registry.RegisterOrUpdateReminder(callingGrainId, reminderName, cronBuilder.ToExpressionString(), priority, action);
+        return RegisterOrUpdateReminder(
+            registry,
+            callingGrainId,
+            reminderName,
+            cronBuilder.ToExpressionString(),
+            cronBuilder.TimeZone,
+            priority,
+            action);
+    }
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderRegistry"/> using an expression and time zone.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderRegistry registry,
+        GrainId callingGrainId,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+    {
+        ArgumentNullException.ThrowIfNull(registry);
+        return registry.RegisterOrUpdateReminder(
+            callingGrainId,
+            reminderName,
+            cronExpression,
+            priority,
+            action,
+            NormalizeTimeZoneId(timeZone));
     }
 
     /// <summary>
@@ -79,10 +166,25 @@ public static class ReminderCronRegistrationExtensions
         GrainId grainId,
         string reminderName,
         ReminderCronExpression cronExpression)
+        => RegisterOrUpdateReminder(service, grainId, reminderName, cronExpression, timeZone: null);
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderService"/> using a typed cron expression.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderService service,
+        GrainId grainId,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        TimeZoneInfo? timeZone)
     {
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(cronExpression);
-        return service.RegisterOrUpdateReminder(grainId, reminderName, cronExpression.ToExpressionString());
+        return service.RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cronExpression.ToExpressionString(),
+            NormalizeTimeZoneId(timeZone));
     }
 
     /// <summary>
@@ -96,7 +198,30 @@ public static class ReminderCronRegistrationExtensions
     {
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(cronBuilder);
-        return service.RegisterOrUpdateReminder(grainId, reminderName, cronBuilder.ToExpressionString());
+        return RegisterOrUpdateReminder(
+            service,
+            grainId,
+            reminderName,
+            cronBuilder.ToExpressionString(),
+            cronBuilder.TimeZone);
+    }
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderService"/> using an expression and time zone.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderService service,
+        GrainId grainId,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        return service.RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cronExpression,
+            NormalizeTimeZoneId(timeZone));
     }
 
     /// <summary>
@@ -109,10 +234,29 @@ public static class ReminderCronRegistrationExtensions
         ReminderCronExpression cronExpression,
         Runtime.ReminderPriority priority,
         Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(service, grainId, reminderName, cronExpression, priority, action, timeZone: null);
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderService"/> using a typed cron expression.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderService service,
+        GrainId grainId,
+        string reminderName,
+        ReminderCronExpression cronExpression,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action,
+        TimeZoneInfo? timeZone)
     {
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(cronExpression);
-        return service.RegisterOrUpdateReminder(grainId, reminderName, cronExpression.ToExpressionString(), priority, action);
+        return service.RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cronExpression.ToExpressionString(),
+            priority,
+            action,
+            NormalizeTimeZoneId(timeZone));
     }
 
     /// <summary>
@@ -128,6 +272,38 @@ public static class ReminderCronRegistrationExtensions
     {
         ArgumentNullException.ThrowIfNull(service);
         ArgumentNullException.ThrowIfNull(cronBuilder);
-        return service.RegisterOrUpdateReminder(grainId, reminderName, cronBuilder.ToExpressionString(), priority, action);
+        return RegisterOrUpdateReminder(
+            service,
+            grainId,
+            reminderName,
+            cronBuilder.ToExpressionString(),
+            cronBuilder.TimeZone,
+            priority,
+            action);
     }
+
+    /// <summary>
+    /// Registers or updates a cron reminder via <see cref="IReminderService"/> using an expression and time zone.
+    /// </summary>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IReminderService service,
+        GrainId grainId,
+        string reminderName,
+        string cronExpression,
+        TimeZoneInfo? timeZone,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+    {
+        ArgumentNullException.ThrowIfNull(service);
+        return service.RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cronExpression,
+            priority,
+            action,
+            NormalizeTimeZoneId(timeZone));
+    }
+
+    private static string? NormalizeTimeZoneId(TimeZoneInfo? timeZone)
+        => ReminderCronSchedule.NormalizeTimeZoneIdForStorage(timeZone);
 }

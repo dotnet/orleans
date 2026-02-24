@@ -1,14 +1,14 @@
 -- Run this migration for upgrading MySQL reminder tables created before 10.0.0.
 
 ALTER TABLE OrleansRemindersTable
-    ADD COLUMN IF NOT EXISTS CronExpression NVARCHAR(200) NULL,
-    ADD COLUMN IF NOT EXISTS NextDueUtc DATETIME NULL,
-    ADD COLUMN IF NOT EXISTS LastFireUtc DATETIME NULL,
-    ADD COLUMN IF NOT EXISTS Priority TINYINT NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS Action TINYINT NOT NULL DEFAULT 0;
+    ADD COLUMN CronExpression NVARCHAR(200) NULL,
+    ADD COLUMN CronTimeZoneId NVARCHAR(200) NULL,
+    ADD COLUMN NextDueUtc DATETIME NULL,
+    ADD COLUMN LastFireUtc DATETIME NULL,
+    ADD COLUMN Priority TINYINT NOT NULL DEFAULT 0,
+    ADD COLUMN Action TINYINT NOT NULL DEFAULT 0;
 
-CREATE INDEX IF NOT EXISTS IX_RemindersTable_NextDueUtc_Priority
-    ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
+CREATE INDEX IX_RemindersTable_NextDueUtc_Priority ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
 
 UPDATE OrleansQuery
 SET QueryText = '
@@ -20,6 +20,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -35,6 +36,7 @@ SET QueryText = '
         @StartTime,
         @Period,
         @CronExpression,
+        @CronTimeZoneId,
         @NextDueUtc,
         @LastFireUtc,
         @Priority,
@@ -47,6 +49,7 @@ SET QueryText = '
         StartTime = @StartTime,
         Period = @Period,
         CronExpression = @CronExpression,
+        CronTimeZoneId = @CronTimeZoneId,
         NextDueUtc = @NextDueUtc,
         LastFireUtc = @LastFireUtc,
         Priority = @Priority,
@@ -67,6 +70,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -87,6 +91,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -108,6 +113,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -129,6 +135,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,

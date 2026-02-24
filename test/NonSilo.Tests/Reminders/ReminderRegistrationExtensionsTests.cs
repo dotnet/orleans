@@ -19,12 +19,12 @@ public class ReminderRegistrationExtensionsTests
         var registry = Substitute.For<IReminderRegistry>();
         var grainId = GrainId.Create("test", "registry-builder");
         var reminder = Substitute.For<IGrainReminder>();
-        registry.RegisterOrUpdateReminder(grainId, "r", "30 9 * * MON-FRI").Returns(Task.FromResult(reminder));
+        registry.RegisterOrUpdateReminder(grainId, "r", "30 9 * * MON-FRI", null).Returns(Task.FromResult(reminder));
 
         var result = await registry.RegisterOrUpdateReminder(grainId, "r", ReminderCronBuilder.WeekdaysAt(9, 30));
 
         Assert.Same(reminder, result);
-        await registry.Received(1).RegisterOrUpdateReminder(grainId, "r", "30 9 * * MON-FRI");
+        await registry.Received(1).RegisterOrUpdateReminder(grainId, "r", "30 9 * * MON-FRI", null);
     }
 
     [Fact]
@@ -39,7 +39,8 @@ public class ReminderRegistrationExtensionsTests
                 "r",
                 "*/5 * * * *",
                 ReminderPriority.High,
-                MissedReminderAction.Notify)
+                MissedReminderAction.Notify,
+                null)
             .Returns(Task.FromResult(reminder));
 
         var result = await registry.RegisterOrUpdateReminder(
@@ -55,7 +56,8 @@ public class ReminderRegistrationExtensionsTests
             "r",
             "*/5 * * * *",
             ReminderPriority.High,
-            MissedReminderAction.Notify);
+            MissedReminderAction.Notify,
+            null);
     }
 
     [Fact]
@@ -64,12 +66,12 @@ public class ReminderRegistrationExtensionsTests
         var service = Substitute.For<IReminderService>();
         var grainId = GrainId.Create("test", "service-builder");
         var reminder = Substitute.For<IGrainReminder>();
-        service.RegisterOrUpdateReminder(grainId, "r", "0 7 * * *").Returns(Task.FromResult(reminder));
+        service.RegisterOrUpdateReminder(grainId, "r", "0 7 * * *", null).Returns(Task.FromResult(reminder));
 
         var result = await service.RegisterOrUpdateReminder(grainId, "r", ReminderCronBuilder.DailyAt(7, 0));
 
         Assert.Same(reminder, result);
-        await service.Received(1).RegisterOrUpdateReminder(grainId, "r", "0 7 * * *");
+        await service.Received(1).RegisterOrUpdateReminder(grainId, "r", "0 7 * * *", null);
     }
 
     [Fact]
@@ -84,7 +86,8 @@ public class ReminderRegistrationExtensionsTests
                 "r",
                 "0 */2 * * * *",
                 ReminderPriority.Normal,
-                MissedReminderAction.Skip)
+                MissedReminderAction.Skip,
+                null)
             .Returns(Task.FromResult(reminder));
 
         var result = await service.RegisterOrUpdateReminder(
@@ -100,7 +103,8 @@ public class ReminderRegistrationExtensionsTests
             "r",
             "0 */2 * * * *",
             ReminderPriority.Normal,
-            MissedReminderAction.Skip);
+            MissedReminderAction.Skip,
+            null);
     }
 
     [Fact]
@@ -114,7 +118,8 @@ public class ReminderRegistrationExtensionsTests
                 "r",
                 "15 10 * * *",
                 ReminderPriority.Normal,
-                MissedReminderAction.Skip)
+                MissedReminderAction.Skip,
+                null)
             .Returns(Task.FromResult(reminder));
         var grain = CreateRemindableGrain(grainId, registry);
 
@@ -126,7 +131,8 @@ public class ReminderRegistrationExtensionsTests
             "r",
             "15 10 * * *",
             ReminderPriority.Normal,
-            MissedReminderAction.Skip);
+            MissedReminderAction.Skip,
+            null);
     }
 
     [Fact]
@@ -140,7 +146,8 @@ public class ReminderRegistrationExtensionsTests
                 "r",
                 "0 0 * * *",
                 ReminderPriority.High,
-                MissedReminderAction.FireImmediately)
+                MissedReminderAction.FireImmediately,
+                null)
             .Returns(Task.FromResult(reminder));
         var grain = CreateRemindableGrain(grainId, registry);
 
@@ -156,7 +163,8 @@ public class ReminderRegistrationExtensionsTests
             "r",
             "0 0 * * *",
             ReminderPriority.High,
-            MissedReminderAction.FireImmediately);
+            MissedReminderAction.FireImmediately,
+            null);
     }
 
     [Fact]

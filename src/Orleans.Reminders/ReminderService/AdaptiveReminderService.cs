@@ -12,6 +12,7 @@ using Orleans.CodeGeneration;
 using Orleans.GrainReferences;
 using Orleans.Hosting;
 using Orleans.Metadata;
+using Orleans.Reminders.Cron.Internal;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
@@ -39,7 +40,7 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
 
     private readonly Channel<ReminderEntry> _deliveryQueue;
     private readonly ConcurrentDictionary<ReminderIdentity, EnqueuedReminderState> _enqueuedReminders = new();
-    private readonly ConcurrentDictionary<string, ReminderCronExpression> _cronCache = new(StringComparer.Ordinal);
+    private readonly ConcurrentDictionary<CronScheduleCacheKey, ReminderCronSchedule> _cronCache = new();
     private readonly List<Task> _workerTasks = new();
 
     private Task? _pollingTask;
@@ -260,7 +261,22 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
     }
 
     public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, string cronExpression)
-        => RegisterOrUpdateReminder(grainId, reminderName, cronExpression, ReminderPriority.Normal, MissedReminderAction.Skip);
+        => RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cronExpression,
+            priority: ReminderPriority.Normal,
+            action: MissedReminderAction.Skip,
+            cronTimeZoneId: null);
+
+    public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, string cronExpression, string? cronTimeZoneId)
+        => RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cronExpression,
+            priority: ReminderPriority.Normal,
+            action: MissedReminderAction.Skip,
+            cronTimeZoneId: cronTimeZoneId);
 
     public async Task<IGrainReminder> RegisterOrUpdateReminder(
         GrainId grainId,
@@ -268,10 +284,19 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
         string cronExpression,
         ReminderPriority priority,
         MissedReminderAction action)
+        => await RegisterOrUpdateReminder(grainId, reminderName, cronExpression, priority, action, cronTimeZoneId: null);
+
+    public async Task<IGrainReminder> RegisterOrUpdateReminder(
+        GrainId grainId,
+        string reminderName,
+        string cronExpression,
+        ReminderPriority priority,
+        MissedReminderAction action,
+        string? cronTimeZoneId)
     {
-        var cron = GetCronExpression(cronExpression);
+        var cronSchedule = GetCronSchedule(cronExpression, cronTimeZoneId);
         var now = UtcNow;
-        var nextDue = cron.GetNextOccurrence(now);
+        var nextDue = cronSchedule.GetNextOccurrence(now);
         if (nextDue is null)
         {
             throw new ReminderException($"The cron expression '{cronExpression}' for reminder '{reminderName}' has no future occurrences.");
@@ -287,7 +312,8 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
             Action = action,
             NextDueUtc = nextDue,
             LastFireUtc = null,
-            CronExpression = cronExpression.Trim(),
+            CronExpression = cronSchedule.Expression.ToExpressionString(),
+            CronTimeZoneId = cronSchedule.TimeZoneId,
         };
 
         await DoResponsibilitySanityCheck(grainId, "RegisterOrUpdateReminderCron");
@@ -798,8 +824,8 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
     {
         if (!string.IsNullOrWhiteSpace(entry.CronExpression))
         {
-            var cron = GetCronExpression(entry.CronExpression);
-            return cron.GetNextOccurrence(now);
+            var cronSchedule = GetCronSchedule(entry.CronExpression, entry.CronTimeZoneId);
+            return cronSchedule.GetNextOccurrence(now);
         }
 
         var period = entry.Period;
@@ -819,10 +845,12 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
         return next;
     }
 
-    private ReminderCronExpression GetCronExpression(string expression)
+    private ReminderCronSchedule GetCronSchedule(string expression, string? cronTimeZoneId)
     {
-        var normalized = expression.Trim();
-        return _cronCache.GetOrAdd(normalized, static value => ReminderCronExpression.Parse(value));
+        var key = new CronScheduleCacheKey(expression.Trim(), string.IsNullOrWhiteSpace(cronTimeZoneId) ? null : cronTimeZoneId.Trim());
+        return _cronCache.GetOrAdd(
+            key,
+            static value => ReminderCronSchedule.Parse(value.Expression, value.TimeZoneId));
     }
 
     private IRemindable GetGrain(GrainId grainId)
@@ -980,6 +1008,7 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
             Period = entry.Period,
             ETag = entry.ETag,
             CronExpression = entry.CronExpression,
+            CronTimeZoneId = entry.CronTimeZoneId,
             NextDueUtc = entry.NextDueUtc,
             LastFireUtc = entry.LastFireUtc,
             Priority = entry.Priority,
@@ -990,6 +1019,8 @@ internal sealed class AdaptiveReminderService : GrainService, IReminderService, 
     private readonly record struct EnqueuedReminderState(string? ETag, DateTime DueUtc);
 
     private readonly record struct ReminderIdentity(GrainId GrainId, string ReminderName);
+
+    private readonly record struct CronScheduleCacheKey(string Expression, string? TimeZoneId);
 
     private sealed class ReverseReminderEntryComparer(bool enablePriority) : IComparer<ReminderEntry>
     {

@@ -73,6 +73,16 @@ public sealed class ReminderCronExpression : IEquatable<ReminderCronExpression>
     }
 
     /// <summary>
+    /// Gets the next occurrence in UTC using the provided scheduling time zone.
+    /// </summary>
+    internal DateTime? GetNextOccurrence(DateTime fromUtc, TimeZoneInfo zone, bool inclusive = false)
+    {
+        EnsureUtc(fromUtc, nameof(fromUtc));
+        ArgumentNullException.ThrowIfNull(zone);
+        return _expression.GetNextOccurrence(fromUtc, zone, inclusive);
+    }
+
+    /// <summary>
     /// Gets all occurrences in the specified UTC range.
     /// </summary>
     public IEnumerable<DateTime> GetOccurrences(DateTime fromUtc, DateTime toUtc, bool fromInclusive = true, bool toInclusive = false)
@@ -80,6 +90,22 @@ public sealed class ReminderCronExpression : IEquatable<ReminderCronExpression>
         EnsureUtc(fromUtc, nameof(fromUtc));
         EnsureUtc(toUtc, nameof(toUtc));
         return _expression.GetOccurrences(fromUtc, toUtc, fromInclusive, toInclusive);
+    }
+
+    /// <summary>
+    /// Gets all occurrences in the specified UTC range using the provided scheduling time zone.
+    /// </summary>
+    internal IEnumerable<DateTime> GetOccurrences(
+        DateTime fromUtc,
+        DateTime toUtc,
+        TimeZoneInfo zone,
+        bool fromInclusive = true,
+        bool toInclusive = false)
+    {
+        EnsureUtc(fromUtc, nameof(fromUtc));
+        EnsureUtc(toUtc, nameof(toUtc));
+        ArgumentNullException.ThrowIfNull(zone);
+        return _expression.GetOccurrences(fromUtc, toUtc, zone, fromInclusive, toInclusive);
     }
 
     internal static ReminderCronExpression FromValidatedString(string expression)

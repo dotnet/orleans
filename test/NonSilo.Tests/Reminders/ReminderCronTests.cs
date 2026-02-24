@@ -262,6 +262,53 @@ public class ReminderCronTests
     }
 
     [Fact]
+    public void GetNextOccurrence_WithTimeZone_UsesLocalScheduleAndReturnsUtc()
+    {
+        var expression = ReminderCronExpression.Parse("0 9 * * *");
+        var fromUtc = new DateTime(2026, 1, 1, 6, 30, 0, DateTimeKind.Utc);
+        var zone = TimeZoneInfo.CreateCustomTimeZone(
+            id: "UTC+02",
+            baseUtcOffset: TimeSpan.FromHours(2),
+            displayName: "UTC+02",
+            standardDisplayName: "UTC+02");
+
+        var next = expression.GetNextOccurrence(fromUtc, zone);
+
+        Assert.Equal(new DateTime(2026, 1, 1, 7, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void GetOccurrences_WithTimeZone_UsesLocalScheduleAndReturnsUtc()
+    {
+        var expression = ReminderCronExpression.Parse("0 9 * * *");
+        var fromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var toUtc = new DateTime(2026, 1, 3, 0, 0, 0, DateTimeKind.Utc);
+        var zone = TimeZoneInfo.CreateCustomTimeZone(
+            id: "UTC+02",
+            baseUtcOffset: TimeSpan.FromHours(2),
+            displayName: "UTC+02",
+            standardDisplayName: "UTC+02");
+
+        var occurrences = expression.GetOccurrences(fromUtc, toUtc, zone).ToArray();
+
+        Assert.Equal(
+            [
+                new DateTime(2026, 1, 1, 7, 0, 0, DateTimeKind.Utc),
+                new DateTime(2026, 1, 2, 7, 0, 0, DateTimeKind.Utc),
+            ],
+            occurrences);
+    }
+
+    [Fact]
+    public void GetNextOccurrence_WithTimeZone_ThrowsOnNullZone()
+    {
+        var expression = ReminderCronExpression.Parse("0 9 * * *");
+        var fromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        Assert.Throws<ArgumentNullException>(() => expression.GetNextOccurrence(fromUtc, zone: null!));
+    }
+
+    [Fact]
     public void GetOccurrences_ThrowsWhenFromIsAfterTo()
     {
         var expression = ReminderCronExpression.Parse("* * * * *");

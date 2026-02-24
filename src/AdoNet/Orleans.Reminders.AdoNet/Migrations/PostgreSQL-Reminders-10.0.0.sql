@@ -1,13 +1,14 @@
 -- Run this migration for upgrading PostgreSQL reminder tables created before 10.0.0.
 
 ALTER TABLE OrleansRemindersTable
-    ADD COLUMN IF NOT EXISTS CronExpression varchar(200),
-    ADD COLUMN IF NOT EXISTS NextDueUtc timestamptz(3),
-    ADD COLUMN IF NOT EXISTS LastFireUtc timestamptz(3),
-    ADD COLUMN IF NOT EXISTS Priority smallint NOT NULL DEFAULT 0,
-    ADD COLUMN IF NOT EXISTS Action smallint NOT NULL DEFAULT 0;
+    ADD COLUMN CronExpression varchar(200),
+    ADD COLUMN CronTimeZoneId varchar(200),
+    ADD COLUMN NextDueUtc timestamptz(3),
+    ADD COLUMN LastFireUtc timestamptz(3),
+    ADD COLUMN Priority smallint NOT NULL DEFAULT 0,
+    ADD COLUMN Action smallint NOT NULL DEFAULT 0;
 
-CREATE INDEX IF NOT EXISTS IX_RemindersTable_NextDueUtc_Priority
+CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
     ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
 
 CREATE OR REPLACE FUNCTION upsert_reminder_row(
@@ -17,6 +18,7 @@ CREATE OR REPLACE FUNCTION upsert_reminder_row(
     StartTimeArg    OrleansRemindersTable.StartTime%TYPE,
     PeriodArg       OrleansRemindersTable.Period%TYPE,
     CronExpressionArg OrleansRemindersTable.CronExpression%TYPE,
+    CronTimeZoneIdArg OrleansRemindersTable.CronTimeZoneId%TYPE,
     NextDueUtcArg   OrleansRemindersTable.NextDueUtc%TYPE,
     LastFireUtcArg  OrleansRemindersTable.LastFireUtc%TYPE,
     PriorityArg     OrleansRemindersTable.Priority%TYPE,
@@ -37,6 +39,7 @@ BEGIN
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -51,6 +54,7 @@ BEGIN
         StartTimeArg,
         PeriodArg,
         CronExpressionArg,
+        CronTimeZoneIdArg,
         NextDueUtcArg,
         LastFireUtcArg,
         PriorityArg,
@@ -62,6 +66,7 @@ BEGIN
             StartTime = excluded.StartTime,
             Period = excluded.Period,
             CronExpression = excluded.CronExpression,
+            CronTimeZoneId = excluded.CronTimeZoneId,
             NextDueUtc = excluded.NextDueUtc,
             LastFireUtc = excluded.LastFireUtc,
             Priority = excluded.Priority,
@@ -85,6 +90,7 @@ SET QueryText = '
         @StartTime,
         @Period::bigint,
         @CronExpression,
+        @CronTimeZoneId,
         @NextDueUtc,
         @LastFireUtc,
         @Priority::smallint,
@@ -102,6 +108,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -122,6 +129,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -143,6 +151,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,
@@ -164,6 +173,7 @@ SET QueryText = '
         StartTime,
         Period,
         CronExpression,
+        CronTimeZoneId,
         NextDueUtc,
         LastFireUtc,
         Priority,

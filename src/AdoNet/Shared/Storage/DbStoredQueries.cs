@@ -463,6 +463,11 @@ namespace Orleans.Tests.SqlUtils
                 set { Add(nameof(CronExpression), value, dbType: DbType.String); }
             }
 
+            internal string CronTimeZoneId
+            {
+                set { Add(nameof(CronTimeZoneId), value, dbType: DbType.String); }
+            }
+
             internal DateTime? NextDueUtc
             {
                 set { Add(nameof(NextDueUtc), value); }

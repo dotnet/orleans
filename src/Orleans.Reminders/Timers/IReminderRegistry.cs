@@ -77,6 +77,20 @@ namespace Orleans.Timers
         Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, string cronExpression);
 
         /// <summary>
+        /// Register or update the cron reminder with the specified name and time zone for the currently active grain.
+        /// </summary>
+        /// <param name="callingGrainId">The ID of the currently executing grain.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <param name="cronExpression">The cron expression.</param>
+        /// <param name="cronTimeZoneId">The optional cron time zone id. Null or empty means UTC.</param>
+        /// <returns>The reminder.</returns>
+        Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            string cronTimeZoneId);
+
+        /// <summary>
         /// Register or update the cron reminder with adaptive delivery options for the currently active grain.
         /// </summary>
         /// <param name="callingGrainId">The ID of the currently executing grain.</param>
@@ -91,6 +105,24 @@ namespace Orleans.Timers
             string cronExpression,
             Runtime.ReminderPriority priority,
             Runtime.MissedReminderAction action);
+
+        /// <summary>
+        /// Register or update the cron reminder with adaptive delivery options for the currently active grain.
+        /// </summary>
+        /// <param name="callingGrainId">The ID of the currently executing grain.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// <param name="cronExpression">The cron expression.</param>
+        /// <param name="priority">The reminder priority.</param>
+        /// <param name="action">The missed reminder action.</param>
+        /// <param name="cronTimeZoneId">The optional cron time zone id. Null or empty means UTC.</param>
+        /// <returns>The reminder.</returns>
+        Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            Runtime.ReminderPriority priority,
+            Runtime.MissedReminderAction action,
+            string cronTimeZoneId);
 
         /// <summary>
         /// Unregisters a reminder from the currently active grain.

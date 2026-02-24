@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Globalization;
 using System.Text;
 using System.Threading.Tasks;
+using Orleans.Reminders.Cron.Internal;
 using Orleans.Runtime.ReminderService;
 
 #nullable enable
@@ -503,8 +504,8 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable, TimePr
     {
         if (!string.IsNullOrWhiteSpace(entry.CronExpression))
         {
-            var cron = ReminderCronExpression.Parse(entry.CronExpression);
-            return cron.GetNextOccurrence(now);
+            var schedule = ReminderCronSchedule.Parse(entry.CronExpression, entry.CronTimeZoneId);
+            return schedule.GetNextOccurrence(now);
         }
 
         if (entry.Period <= TimeSpan.Zero)

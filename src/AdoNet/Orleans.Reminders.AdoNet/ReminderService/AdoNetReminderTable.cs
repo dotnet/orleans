@@ -54,6 +54,7 @@ namespace Orleans.Runtime.ReminderService
                 entry.StartAt,
                 entry.Period,
                 entry.CronExpression,
+                entry.CronTimeZoneId,
                 entry.NextDueUtc,
                 entry.LastFireUtc,
                 entry.Priority,

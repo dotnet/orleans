@@ -33,6 +33,10 @@ internal class ReminderEntity : BaseEntity
     [JsonPropertyName(nameof(CronExpression))]
     public string? CronExpression { get; set; }
 
+    [JsonProperty(nameof(CronTimeZoneId))]
+    [JsonPropertyName(nameof(CronTimeZoneId))]
+    public string? CronTimeZoneId { get; set; }
+
     [JsonProperty(nameof(NextDueUtc))]
     [JsonPropertyName(nameof(NextDueUtc))]
     public DateTimeOffset? NextDueUtc { get; set; }

@@ -68,6 +68,25 @@ public class RedisReminderTableSerializationTests
     }
 
     [Fact]
+    public void ConvertFromEntry_WritesCronTimeZoneAtTailSegment()
+    {
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("test", "redis-timezone-tail"),
+            ReminderName = "r",
+            StartAt = DateTime.UtcNow,
+            Period = TimeSpan.FromMinutes(1),
+            CronExpression = "0 9 * * *",
+            CronTimeZoneId = "America/New_York",
+        };
+
+        var (_, payload) = InvokeConvertFromEntry(entry);
+        var segments = ParseSegments(payload);
+
+        Assert.Equal(entry.CronTimeZoneId, segments[11]!.Value<string>());
+    }
+
+    [Fact]
     public void ConvertToEntry_PreservesUtcTimestampsWithoutTimezoneShift()
     {
         var grainId = GrainId.Create("test", "redis-utc-roundtrip");
@@ -101,7 +120,28 @@ public class RedisReminderTableSerializationTests
     }
 
     [Fact]
-    public void ConvertToEntry_ParsesLegacyStringPriorityAndAction()
+    public void ConvertToEntry_ParsesCronTimeZoneFromCurrentLayout()
+    {
+        var grainId = GrainId.Create("test", "redis-parse-timezone-current");
+        var payload = BuildPayloadWithAppendedTimeZone(grainId, "Europe/Kyiv");
+
+        var entry = InvokeConvertToEntry(payload);
+
+        Assert.Equal("Europe/Kyiv", entry.CronTimeZoneId);
+    }
+
+    [Fact]
+    public void ConvertToEntry_RejectsNonCanonicalTimeZoneSegmentOrder()
+    {
+        var grainId = GrainId.Create("test", "redis-parse-timezone-wrong-order");
+        var payload = BuildPayloadWithInsertedTimeZone(grainId, "Europe/Kyiv");
+
+        var exception = Assert.Throws<TargetInvocationException>(() => InvokeConvertToEntry(payload));
+        Assert.IsType<FormatException>(exception.InnerException);
+    }
+
+    [Fact]
+    public void ConvertToEntry_ParsesStringEncodedPriorityAndAction()
     {
         var grainId = GrainId.Create("test", "redis-parse-string");
         var payload = BuildPayload(
@@ -224,6 +264,30 @@ public class RedisReminderTableSerializationTests
             segments.Add(actionToken);
         }
 
+        return JsonConvert.SerializeObject(segments)[1..^1];
+    }
+
+    private static string BuildPayloadWithAppendedTimeZone(GrainId grainId, string timeZoneId)
+    {
+        var payload = BuildPayload(
+            grainId,
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip,
+            numericEnums: true);
+        var segments = ParseSegments(payload);
+        segments.Add(timeZoneId);
+        return JsonConvert.SerializeObject(segments)[1..^1];
+    }
+
+    private static string BuildPayloadWithInsertedTimeZone(GrainId grainId, string timeZoneId)
+    {
+        var payload = BuildPayload(
+            grainId,
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip,
+            numericEnums: true);
+        var segments = ParseSegments(payload);
+        segments.Insert(7, timeZoneId);
         return JsonConvert.SerializeObject(segments)[1..^1];
     }
 

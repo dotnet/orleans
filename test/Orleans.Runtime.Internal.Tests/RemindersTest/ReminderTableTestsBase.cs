@@ -153,6 +153,32 @@ namespace UnitTests.RemindersTest
             Assert.Equal(reminder.Action, readReminder.Action);
         }
 
+        protected async Task ReminderCronTimeZoneRoundTrip()
+        {
+            var reminder = CreateReminder(MakeTestGrainReference(), "cron_timezone_roundtrip");
+            reminder.CronExpression = "0 */5 * * * *";
+            reminder.CronTimeZoneId = "Europe/Warsaw";
+            reminder.Period = TimeSpan.Zero;
+
+            await remindersTable.UpsertRow(reminder);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            Assert.Equal(reminder.CronTimeZoneId, readReminder.CronTimeZoneId);
+            Assert.Equal(TimeSpan.Zero, readReminder.Period);
+
+            reminder.ETag = readReminder.ETag;
+            reminder.CronExpression = "0 */10 * * * *";
+            reminder.CronTimeZoneId = "America/New_York";
+            await remindersTable.UpsertRow(reminder);
+
+            readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            Assert.Equal(reminder.CronTimeZoneId, readReminder.CronTimeZoneId);
+        }
+
         protected async Task RemindersRange(int iterations = 1000)
         {
             await Task.WhenAll(Enumerable.Range(1, iterations).Select(async i =>

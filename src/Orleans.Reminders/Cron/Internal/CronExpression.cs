@@ -190,32 +190,7 @@ namespace Orleans.Reminders.Cron.Internal
             var occurrence = GetOccurrenceConsideringTimeZone(fromUtc, zone, inclusive);
 #pragma warning restore CA1062
 
-            return occurrence?.UtcDateTime;
-        }
-
-        /// <summary>
-        /// Calculates next occurrence starting with <paramref name="from"/> (optionally <paramref name="inclusive"/>) in given <paramref name="zone"/>
-        /// </summary>
-        /// <exception cref="ArgumentException"/>
-        public DateTimeOffset? GetNextOccurrence(DateTimeOffset from, TimeZoneInfo zone, bool inclusive = false)
-        {
-            if (ReferenceEquals(zone, null)) ThrowArgumentNullException(nameof(zone));
-
-            if (ReferenceEquals(zone, UtcTimeZone))
-            {
-                var found = FindOccurrence(from.UtcTicks, inclusive);
-                if (found == NotFound) return null;
-
-                return new DateTimeOffset(found, TimeSpan.Zero);
-            }
-
-#pragma warning disable CA1062
-            var occurrenceUtc = GetNextOccurrence(from.UtcDateTime, zone, inclusive);
-#pragma warning restore CA1062
-
-            if (!occurrenceUtc.HasValue) return null;
-
-            return TimeZoneInfo.ConvertTime(new DateTimeOffset(occurrenceUtc.Value, TimeSpan.Zero), zone);
+            return occurrence;
         }
 
         /// <summary>
@@ -260,31 +235,6 @@ namespace Orleans.Reminders.Cron.Internal
 
             for (var occurrence = GetNextOccurrence(fromUtc, zone, fromInclusive);
                 occurrence < toUtc || occurrence == toUtc && toInclusive;
-                // ReSharper disable once RedundantArgumentDefaultValue
-                // ReSharper disable once ArgumentsStyleLiteral
-                occurrence = GetNextOccurrence(occurrence.Value, zone, inclusive: false))
-            {
-                yield return occurrence.Value;
-            }
-        }
-
-        /// <summary>
-        /// Returns the list of occurrences within the given date/time offset range,
-        /// including <paramref name="from"/> and excluding <paramref name="to"/> by
-        /// default. When none of the occurrences found, an empty list is returned.
-        /// </summary>
-        /// <exception cref="ArgumentException"/>
-        public IEnumerable<DateTimeOffset> GetOccurrences(
-            DateTimeOffset from,
-            DateTimeOffset to,
-            TimeZoneInfo zone,
-            bool fromInclusive = true,
-            bool toInclusive = false)
-        {
-            if (from > to) ThrowFromShouldBeLessThanToException(nameof(from), nameof(to));
-
-            for (var occurrence = GetNextOccurrence(from, zone, fromInclusive);
-                occurrence < to || occurrence == to && toInclusive;
                 // ReSharper disable once RedundantArgumentDefaultValue
                 // ReSharper disable once ArgumentsStyleLiteral
                 occurrence = GetNextOccurrence(occurrence.Value, zone, inclusive: false))
@@ -380,7 +330,7 @@ namespace Orleans.Reminders.Cron.Internal
         /// </summary>
         public static bool operator !=(CronExpression? left, CronExpression? right) => !Equals(left, right);
 
-        private DateTimeOffset? GetOccurrenceConsideringTimeZone(DateTime fromUtc, TimeZoneInfo zone, bool inclusive)
+        private DateTime? GetOccurrenceConsideringTimeZone(DateTime fromUtc, TimeZoneInfo zone, bool inclusive)
         {
             if (!DateTimeHelper.IsRound(fromUtc))
             {
@@ -407,7 +357,7 @@ namespace Orleans.Reminders.Cron.Internal
 
                     // Early period, try to find anything here.
                     var foundInDaylightOffset = FindOccurrence(fromLocal.Ticks, daylightTimeLocalEnd.Ticks, inclusive);
-                    if (foundInDaylightOffset != NotFound) return new DateTimeOffset(foundInDaylightOffset, daylightOffset);
+                    if (foundInDaylightOffset != NotFound) return new DateTime(foundInDaylightOffset - daylightOffset.Ticks, DateTimeKind.Utc);
 
                     fromLocal = TimeZoneHelper.GetStandardTimeStart(zone, fromLocal, daylightOffset).DateTime;
                     inclusive = true;
@@ -419,7 +369,7 @@ namespace Orleans.Reminders.Cron.Internal
                 if (HasFlag(CronExpressionFlag.Interval))
                 {
                     var foundInStandardOffset = FindOccurrence(fromLocal.Ticks, ambiguousIntervalLocalEnd.Ticks - 1, inclusive);
-                    if (foundInStandardOffset != NotFound) return new DateTimeOffset(foundInStandardOffset, standardOffset);
+                    if (foundInStandardOffset != NotFound) return new DateTime(foundInStandardOffset - standardOffset.Ticks, DateTimeKind.Utc);
                 }
 
                 fromLocal = ambiguousIntervalLocalEnd;
@@ -434,16 +384,16 @@ namespace Orleans.Reminders.Cron.Internal
             if (zone.IsInvalidTime(occurrence))
             {
                 var nextValidTime = TimeZoneHelper.GetDaylightTimeStart(zone, occurrence);
-                return nextValidTime;
+                return nextValidTime.UtcDateTime;
             }
 
             if (TimeZoneHelper.IsAmbiguousTime(zone, occurrence))
             {
                 var daylightOffset = TimeZoneHelper.GetDaylightOffset(zone, occurrence);
-                return new DateTimeOffset(occurrence, daylightOffset);
+                return new DateTime(occurrenceTicks - daylightOffset.Ticks, DateTimeKind.Utc);
             }
 
-            return new DateTimeOffset(occurrence, zone.GetUtcOffset(occurrence));
+            return new DateTime(occurrenceTicks - zone.GetUtcOffset(occurrence).Ticks, DateTimeKind.Utc);
         }
 
         private long FindOccurrence(long startTimeTicks, long endTimeTicks, bool startInclusive)

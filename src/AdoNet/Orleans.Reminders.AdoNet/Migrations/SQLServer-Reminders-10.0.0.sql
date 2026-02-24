@@ -1,69 +1,14 @@
 -- Run this migration for upgrading SQL Server reminder tables created before 10.0.0.
 
-IF COL_LENGTH('OrleansRemindersTable', 'CronExpression') IS NULL
-BEGIN
-    ALTER TABLE OrleansRemindersTable ADD CronExpression NVARCHAR(200) NULL;
-END;
+ALTER TABLE OrleansRemindersTable ADD CronExpression NVARCHAR(200) NULL;
+ALTER TABLE OrleansRemindersTable ADD CronTimeZoneId NVARCHAR(200) NULL;
+ALTER TABLE OrleansRemindersTable ADD NextDueUtc DATETIME2(3) NULL;
+ALTER TABLE OrleansRemindersTable ADD LastFireUtc DATETIME2(3) NULL;
+ALTER TABLE OrleansRemindersTable ADD Priority TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (0);
+ALTER TABLE OrleansRemindersTable ADD Action TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (0);
 
-IF COL_LENGTH('OrleansRemindersTable', 'NextDueUtc') IS NULL
-BEGIN
-    ALTER TABLE OrleansRemindersTable ADD NextDueUtc DATETIME2(3) NULL;
-END;
-
-IF COL_LENGTH('OrleansRemindersTable', 'LastFireUtc') IS NULL
-BEGIN
-    ALTER TABLE OrleansRemindersTable ADD LastFireUtc DATETIME2(3) NULL;
-END;
-
-IF COL_LENGTH('OrleansRemindersTable', 'Priority') IS NULL
-BEGIN
-    ALTER TABLE OrleansRemindersTable ADD Priority TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (0);
-END;
-
-IF COL_LENGTH('OrleansRemindersTable', 'Action') IS NULL
-BEGIN
-    ALTER TABLE OrleansRemindersTable ADD Action TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (0);
-END;
-
-DECLARE @priorityConstraintName SYSNAME;
-DECLARE @actionConstraintName SYSNAME;
-
-SELECT
-    @priorityConstraintName = dc.name
-FROM sys.default_constraints dc
-INNER JOIN sys.columns c ON c.default_object_id = dc.object_id
-INNER JOIN sys.tables t ON t.object_id = c.object_id
-WHERE t.name = 'OrleansRemindersTable' AND c.name = 'Priority';
-
-SELECT
-    @actionConstraintName = dc.name
-FROM sys.default_constraints dc
-INNER JOIN sys.columns c ON c.default_object_id = dc.object_id
-INNER JOIN sys.tables t ON t.object_id = c.object_id
-WHERE t.name = 'OrleansRemindersTable' AND c.name = 'Action';
-
-IF @priorityConstraintName IS NULL
-BEGIN
-    ALTER TABLE OrleansRemindersTable
-        ADD CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (0) FOR Priority;
-END;
-
-IF @actionConstraintName IS NULL
-BEGIN
-    ALTER TABLE OrleansRemindersTable
-        ADD CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (0) FOR Action;
-END;
-
-IF NOT EXISTS (
-    SELECT 1
-    FROM sys.indexes
-    WHERE name = 'IX_RemindersTable_NextDueUtc_Priority'
-      AND object_id = OBJECT_ID('OrleansRemindersTable')
-)
-BEGIN
-    CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
-    ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
-END;
+CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
+ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
 
 UPDATE OrleansQuery
 SET QueryText = 'DECLARE @Version AS INT = 0;
@@ -74,6 +19,7 @@ SET QueryText = 'DECLARE @Version AS INT = 0;
 		StartTime = @StartTime,
 		Period = @Period,
 		CronExpression = @CronExpression,
+		CronTimeZoneId = @CronTimeZoneId,
 		NextDueUtc = @NextDueUtc,
 		LastFireUtc = @LastFireUtc,
 		Priority = @Priority,
@@ -93,6 +39,7 @@ SET QueryText = 'DECLARE @Version AS INT = 0;
 		StartTime,
 		Period,
 		CronExpression,
+		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
 		Priority,
@@ -107,6 +54,7 @@ SET QueryText = 'DECLARE @Version AS INT = 0;
 		@StartTime,
 		@Period,
 		@CronExpression,
+		@CronTimeZoneId,
 		@NextDueUtc,
 		@LastFireUtc,
 		@Priority,
@@ -127,6 +75,7 @@ SET QueryText = 'SELECT
 		StartTime,
 		Period,
 		CronExpression,
+		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
 		Priority,
@@ -146,6 +95,7 @@ SET QueryText = 'SELECT
 		StartTime,
 		Period,
 		CronExpression,
+		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
 		Priority,
@@ -166,6 +116,7 @@ SET QueryText = 'SELECT
 		StartTime,
 		Period,
 		CronExpression,
+		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
 		Priority,
@@ -186,6 +137,7 @@ SET QueryText = 'SELECT
 		StartTime,
 		Period,
 		CronExpression,
+		CronTimeZoneId,
 		NextDueUtc,
 		LastFireUtc,
 		Priority,

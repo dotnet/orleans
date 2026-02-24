@@ -241,8 +241,22 @@ namespace Orleans.Runtime.ReminderService
                 grainId,
                 reminderName,
                 cronExpression,
-                ReminderPriority.Normal,
-                MissedReminderAction.Skip);
+                priority: ReminderPriority.Normal,
+                action: MissedReminderAction.Skip,
+                cronTimeZoneId: null);
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            string cronExpression,
+            string cronTimeZoneId)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                cronExpression,
+                priority: ReminderPriority.Normal,
+                action: MissedReminderAction.Skip,
+                cronTimeZoneId: cronTimeZoneId);
 
         public async Task<IGrainReminder> RegisterOrUpdateReminder(
             GrainId grainId,
@@ -250,10 +264,25 @@ namespace Orleans.Runtime.ReminderService
             string cronExpression,
             ReminderPriority priority,
             MissedReminderAction action)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                cronExpression,
+                priority: priority,
+                action: action,
+                cronTimeZoneId: null);
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority,
+            MissedReminderAction action,
+            string cronTimeZoneId)
         {
-            var parsedCron = ReminderCronParser.Parse(cronExpression);
+            var cronSchedule = ReminderCronSchedule.Parse(cronExpression, cronTimeZoneId);
             var now = UtcNow;
-            var nextTick = parsedCron.GetNextOccurrence(now);
+            var nextTick = cronSchedule.GetNextOccurrence(now);
             if (nextTick is null)
             {
                 throw new ReminderException($"The cron expression '{cronExpression}' for reminder '{reminderName}' has no future occurrences.");
@@ -265,7 +294,8 @@ namespace Orleans.Runtime.ReminderService
                 ReminderName = reminderName,
                 StartAt = nextTick.Value,
                 Period = TimeSpan.Zero,
-                CronExpression = cronExpression.Trim(),
+                CronExpression = cronSchedule.Expression.ToExpressionString(),
+                CronTimeZoneId = cronSchedule.TimeZoneId,
                 Priority = priority,
                 Action = action,
                 NextDueUtc = nextTick.Value
@@ -686,7 +716,7 @@ namespace Orleans.Runtime.ReminderService
             private readonly ILogger logger;
             private readonly IAsyncTimer timer;
             private readonly TimeProvider timeProvider;
-            private readonly CronExpression cronExpression;
+            private readonly ReminderCronSchedule cronSchedule;
 
             private ValueStopwatch stopwatch;
             private Task runTask;
@@ -705,12 +735,13 @@ namespace Orleans.Runtime.ReminderService
                 if (!string.IsNullOrWhiteSpace(entry.CronExpression))
                 {
                     scheduleKind = ReminderScheduleKind.Cron;
-                    cronExpression = ReminderCronParser.Parse(entry.CronExpression);
+                    cronSchedule = ReminderCronSchedule.Parse(entry.CronExpression, entry.CronTimeZoneId);
                     this.timer = reminderService.asyncTimerFactory.Create(TimeSpan.FromSeconds(1), "");
                 }
                 else
                 {
                     scheduleKind = ReminderScheduleKind.Interval;
+                    cronSchedule = null!;
                     this.timer = reminderService.asyncTimerFactory.Create(period, "");
                 }
             }
@@ -771,7 +802,7 @@ namespace Orleans.Runtime.ReminderService
                         logger,
                         Identity.ReminderName,
                         Identity.GrainId,
-                        cronExpression.ToString());
+                        cronSchedule.Expression.ToString());
                     reminderService.ScheduleRemoveLocalReminder(Identity, this);
                 }
             }
@@ -781,7 +812,7 @@ namespace Orleans.Runtime.ReminderService
                 if (scheduleKind == ReminderScheduleKind.Cron)
                 {
                     var currentUtc = timeProvider.GetUtcNow().UtcDateTime;
-                    var next = cronExpression.GetNextOccurrence(currentUtc);
+                    var next = cronSchedule.GetNextOccurrence(currentUtc);
                     if (next is null)
                     {
                         return null;

@@ -134,6 +134,9 @@ namespace Orleans.Tests.SqlUtils
             string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
             if (grainId != null)
             {
+                var cronExpression = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronExpression));
+                var cronTimeZoneId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronTimeZoneId));
+
                 return new ReminderEntry
                 {
                     GrainId = GrainId.Parse(grainId),
@@ -143,7 +146,8 @@ namespace Orleans.Tests.SqlUtils
                     //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                     //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
                     Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(DbStoredQueries.Columns.Period))),
-                    CronExpression = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronExpression)),
+                    CronExpression = cronExpression,
+                    CronTimeZoneId = cronTimeZoneId,
                     NextDueUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.NextDueUtc)),
                     LastFireUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.LastFireUtc)),
                     Priority = ParsePriority(record.GetInt32(nameof(DbStoredQueries.Columns.Priority))),
@@ -188,6 +192,7 @@ namespace Orleans.Tests.SqlUtils
             DateTime startTime,
             TimeSpan period,
             string cronExpression,
+            string cronTimeZoneId,
             DateTime? nextDueUtc,
             DateTime? lastFireUtc,
             ReminderPriority priority,
@@ -203,11 +208,13 @@ namespace Orleans.Tests.SqlUtils
                     StartTime = startTime,
                     Period = period,
                     CronExpression = cronExpression,
+                    CronTimeZoneId = cronTimeZoneId,
                     NextDueUtc = nextDueUtc,
                     LastFireUtc = lastFireUtc,
                     Priority = (int)priority,
                     Action = (int)action
-                }, ret => ret.First().ToString());
+                },
+                ret => ret.First().ToString());
         }
 
         private static ReminderPriority ParsePriority(int value) => value switch

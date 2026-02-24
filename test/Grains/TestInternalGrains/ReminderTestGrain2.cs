@@ -614,6 +614,11 @@ namespace UnitTests.Grains
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression);
         }
 
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, string cronExpression, string cronTimeZoneId)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, cronTimeZoneId);
+        }
+
         public Task<IGrainReminder> RegisterOrUpdateReminder(
             GrainId callingGrainId,
             string reminderName,
@@ -622,6 +627,17 @@ namespace UnitTests.Grains
             MissedReminderAction action)
         {
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, priority, action);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority,
+            MissedReminderAction action,
+            string cronTimeZoneId)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, priority, action, cronTimeZoneId);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)

@@ -683,6 +683,117 @@ public class AdaptiveReminderServiceFunctionalTests
     }
 
     [Fact]
+    public async Task RegisterOrUpdateReminder_Cron_UpdateFromUtcToUsEastern_RecomputesNextDueInLocalTime()
+    {
+        var now = new DateTimeOffset(2026, 1, 15, 12, 30, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider();
+        timeProvider.SetUtcNow(now);
+        var usEastern = GetUsEasternTimeZone();
+
+        var table = new InMemoryReminderTable();
+        var service = CreateOperationalService(reminderTable: table, timeProvider: timeProvider);
+        var grainId = GrainId.Create("test", "cron-utc-to-us");
+        const string reminderName = "cron-utc-to-us";
+        const string cron = "0 9 * * *";
+
+        await service.RegisterOrUpdateReminder(grainId, reminderName, cron);
+        var utcRow = await table.ReadRow(grainId, reminderName);
+        Assert.NotNull(utcRow);
+        Assert.Null(utcRow.CronTimeZoneId);
+        Assert.Equal(new DateTime(2026, 1, 16, 9, 0, 0, DateTimeKind.Utc), utcRow.NextDueUtc);
+
+        await service.RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cron,
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip,
+            usEastern.Id);
+
+        var usRow = await table.ReadRow(grainId, reminderName);
+        Assert.NotNull(usRow);
+        Assert.False(string.IsNullOrWhiteSpace(usRow.CronTimeZoneId));
+        Assert.Equal(new DateTime(2026, 1, 15, 14, 0, 0, DateTimeKind.Utc), usRow.NextDueUtc);
+
+        var storedZone = ResolveTimeZone(usRow.CronTimeZoneId!);
+        var localNextDue = TimeZoneInfo.ConvertTimeFromUtc(usRow.NextDueUtc!.Value, storedZone);
+        Assert.Equal(9, localNextDue.Hour);
+        Assert.Equal(0, localNextDue.Minute);
+    }
+
+    [Fact]
+    public async Task RegisterOrUpdateReminder_Cron_UpdateFromUtcToUsEastern_SpringForward_PreservesNineAmLocal()
+    {
+        var now = new DateTimeOffset(2026, 3, 7, 12, 30, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider();
+        timeProvider.SetUtcNow(now);
+        var usEastern = GetUsEasternTimeZone();
+
+        var table = new InMemoryReminderTable();
+        var service = CreateOperationalService(reminderTable: table, timeProvider: timeProvider);
+        var grainId = GrainId.Create("test", "cron-spring-forward");
+        const string reminderName = "cron-spring-forward";
+        const string cron = "0 9 * * *";
+
+        await service.RegisterOrUpdateReminder(grainId, reminderName, cron);
+        await service.RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cron,
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip,
+            usEastern.Id);
+
+        var row = await table.ReadRow(grainId, reminderName);
+        Assert.NotNull(row);
+        Assert.Equal(new DateTime(2026, 3, 7, 14, 0, 0, DateTimeKind.Utc), row.NextDueUtc);
+
+        var afterFirstTick = row.NextDueUtc!.Value.AddSeconds(1);
+        var nextDue = InvokePrivate<DateTime?>(service, "CalculateNextDue", row, afterFirstTick);
+
+        Assert.Equal(new DateTime(2026, 3, 8, 13, 0, 0, DateTimeKind.Utc), nextDue);
+        var localNextDue = TimeZoneInfo.ConvertTimeFromUtc(nextDue!.Value, usEastern);
+        Assert.Equal(9, localNextDue.Hour);
+        Assert.Equal(0, localNextDue.Minute);
+    }
+
+    [Fact]
+    public async Task RegisterOrUpdateReminder_Cron_UpdateFromUtcToUsEastern_FallBack_PreservesNineAmLocal()
+    {
+        var now = new DateTimeOffset(2026, 10, 31, 12, 30, 0, TimeSpan.Zero);
+        var timeProvider = new FakeTimeProvider();
+        timeProvider.SetUtcNow(now);
+        var usEastern = GetUsEasternTimeZone();
+
+        var table = new InMemoryReminderTable();
+        var service = CreateOperationalService(reminderTable: table, timeProvider: timeProvider);
+        var grainId = GrainId.Create("test", "cron-fall-back");
+        const string reminderName = "cron-fall-back";
+        const string cron = "0 9 * * *";
+
+        await service.RegisterOrUpdateReminder(grainId, reminderName, cron);
+        await service.RegisterOrUpdateReminder(
+            grainId,
+            reminderName,
+            cron,
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip,
+            usEastern.Id);
+
+        var row = await table.ReadRow(grainId, reminderName);
+        Assert.NotNull(row);
+        Assert.Equal(new DateTime(2026, 10, 31, 13, 0, 0, DateTimeKind.Utc), row.NextDueUtc);
+
+        var afterFirstTick = row.NextDueUtc!.Value.AddSeconds(1);
+        var nextDue = InvokePrivate<DateTime?>(service, "CalculateNextDue", row, afterFirstTick);
+
+        Assert.Equal(new DateTime(2026, 11, 1, 14, 0, 0, DateTimeKind.Utc), nextDue);
+        var localNextDue = TimeZoneInfo.ConvertTimeFromUtc(nextDue!.Value, usEastern);
+        Assert.Equal(9, localNextDue.Hour);
+        Assert.Equal(0, localNextDue.Minute);
+    }
+
+    [Fact]
     public async Task RegisterOrUpdateReminder_WhenServiceStopped_Throws()
     {
         var service = CreateOperationalService(statusName: "Stopped");
@@ -1302,6 +1413,51 @@ public class AdaptiveReminderServiceFunctionalTests
         return null;
     }
 
+    private static TimeZoneInfo GetUsEasternTimeZone()
+        => ResolveTimeZone("America/New_York", "Eastern Standard Time");
+
+    private static TimeZoneInfo ResolveTimeZone(params string[] ids)
+    {
+        foreach (var id in ids)
+        {
+            if (TryFindTimeZoneById(id, out var zone))
+            {
+                return zone;
+            }
+        }
+
+        throw new InvalidOperationException($"Could not resolve any of the requested time zones: {string.Join(", ", ids)}.");
+    }
+
+    private static bool TryFindTimeZoneById(string id, out TimeZoneInfo zone)
+    {
+        try
+        {
+            zone = TimeZoneInfo.FindSystemTimeZoneById(id);
+            return true;
+        }
+        catch (TimeZoneNotFoundException)
+        {
+            if (TimeZoneInfo.TryConvertIanaIdToWindowsId(id, out var windowsId))
+            {
+                return TryFindTimeZoneById(windowsId, out zone);
+            }
+
+            if (TimeZoneInfo.TryConvertWindowsIdToIanaId(id, out var ianaId))
+            {
+                return TryFindTimeZoneById(ianaId, out zone);
+            }
+
+            zone = null!;
+            return false;
+        }
+        catch (InvalidTimeZoneException)
+        {
+            zone = null!;
+            return false;
+        }
+    }
+
     private sealed class ConstantRingRange(bool value) : IRingRange
     {
         public bool InRange(uint _) => value;
@@ -1462,6 +1618,7 @@ public class AdaptiveReminderServiceFunctionalTests
                 Period = entry.Period,
                 ETag = entry.ETag,
                 CronExpression = entry.CronExpression,
+                CronTimeZoneId = entry.CronTimeZoneId,
                 NextDueUtc = entry.NextDueUtc,
                 LastFireUtc = entry.LastFireUtc,
                 Priority = entry.Priority,

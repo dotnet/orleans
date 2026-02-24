@@ -206,6 +206,7 @@ namespace Orleans.Reminders.Redis
                 LastFireUtc = ReadNullableDateTime(segments, 8),
                 Priority = ReadReminderPriority(segments, 9),
                 Action = ReadMissedReminderAction(segments, 10),
+                CronTimeZoneId = ReadNullableString(segments, 11),
             };
         }
 
@@ -342,7 +343,8 @@ namespace Orleans.Reminders.Redis
                 entry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
                 entry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
                 (int)entry.Priority,
-                (int)entry.Action
+                (int)entry.Action,
+                entry.CronTimeZoneId ?? string.Empty
             };
 
             return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);

@@ -82,5 +82,11 @@ namespace UnitTests.RemindersTest
         {
             await ReminderAdaptiveFieldsRoundTrip();
         }
+
+        [SkippableFact]
+        public async Task RemindersTable_PostgreSql_ReminderCronTimeZoneRoundTrip()
+        {
+            await ReminderCronTimeZoneRoundTrip();
+        }
     }
 }

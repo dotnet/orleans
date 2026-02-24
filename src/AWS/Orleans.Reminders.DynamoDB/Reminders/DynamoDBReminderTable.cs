@@ -22,6 +22,7 @@ namespace Orleans.Reminders.DynamoDB
         private const string START_TIME_PROPERTY_NAME = "StartTime";
         private const string PERIOD_PROPERTY_NAME = "Period";
         private const string CRON_EXPRESSION_PROPERTY_NAME = "CronExpression";
+        private const string CRON_TIME_ZONE_ID_PROPERTY_NAME = "CronTimeZoneId";
         private const string NEXT_DUE_UTC_PROPERTY_NAME = "NextDueUtc";
         private const string LAST_FIRE_UTC_PROPERTY_NAME = "LastFireUtc";
         private const string PRIORITY_PROPERTY_NAME = "Priority";
@@ -227,6 +228,7 @@ namespace Orleans.Reminders.DynamoDB
                 GrainId = GrainId.Parse(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
                 Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S, CultureInfo.InvariantCulture),
                 CronExpression = ReadOptionalString(item, CRON_EXPRESSION_PROPERTY_NAME),
+                CronTimeZoneId = ReadOptionalString(item, CRON_TIME_ZONE_ID_PROPERTY_NAME),
                 NextDueUtc = ReadOptionalDateTime(item, NEXT_DUE_UTC_PROPERTY_NAME),
                 LastFireUtc = ReadOptionalDateTime(item, LAST_FIRE_UTC_PROPERTY_NAME),
                 Priority = ReadPriority(item),
@@ -391,6 +393,11 @@ namespace Orleans.Reminders.DynamoDB
             if (!string.IsNullOrWhiteSpace(entry.CronExpression))
             {
                 fields[CRON_EXPRESSION_PROPERTY_NAME] = new AttributeValue(entry.CronExpression);
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.CronTimeZoneId))
+            {
+                fields[CRON_TIME_ZONE_ID_PROPERTY_NAME] = new AttributeValue(entry.CronTimeZoneId);
             }
 
             if (entry.NextDueUtc is { } nextDueUtc)

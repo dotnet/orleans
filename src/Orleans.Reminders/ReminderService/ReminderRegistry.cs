@@ -110,8 +110,22 @@ namespace Orleans.Runtime.ReminderService
                 callingGrainId,
                 reminderName,
                 cronExpression,
-                Runtime.ReminderPriority.Normal,
-                Runtime.MissedReminderAction.Skip);
+                priority: Runtime.ReminderPriority.Normal,
+                action: Runtime.MissedReminderAction.Skip,
+                cronTimeZoneId: null);
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            string? cronTimeZoneId)
+            => RegisterOrUpdateReminder(
+                callingGrainId,
+                reminderName,
+                cronExpression,
+                priority: Runtime.ReminderPriority.Normal,
+                action: Runtime.MissedReminderAction.Skip,
+                cronTimeZoneId: cronTimeZoneId);
 
         public Task<IGrainReminder> RegisterOrUpdateReminder(
             GrainId callingGrainId,
@@ -119,6 +133,21 @@ namespace Orleans.Runtime.ReminderService
             string cronExpression,
             Runtime.ReminderPriority priority,
             Runtime.MissedReminderAction action)
+            => RegisterOrUpdateReminder(
+                callingGrainId,
+                reminderName,
+                cronExpression,
+                priority: priority,
+                action: action,
+                cronTimeZoneId: null);
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            Runtime.ReminderPriority priority,
+            Runtime.MissedReminderAction action,
+            string? cronTimeZoneId)
         {
             if (string.IsNullOrWhiteSpace(reminderName))
                 throw new ArgumentException("Cannot use null or empty name for the reminder", nameof(reminderName));
@@ -126,13 +155,18 @@ namespace Orleans.Runtime.ReminderService
             if (string.IsNullOrWhiteSpace(cronExpression))
                 throw new ArgumentException("Cannot use null or empty cron expression for the reminder", nameof(cronExpression));
 
-            // Parse once here to fail fast with a deterministic validation message.
-            _ = ReminderCronParser.Parse(cronExpression);
+            var schedule = ReminderCronSchedule.Parse(cronExpression, cronTimeZoneId);
 
             ValidatePriorityAndAction(priority, action);
 
             EnsureReminderServiceRegisteredAndInGrainContext();
-            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, priority, action);
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(
+                callingGrainId,
+                reminderName,
+                schedule.Expression.ToExpressionString(),
+                priority,
+                action,
+                schedule.TimeZoneId);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)
