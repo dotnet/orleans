@@ -3,11 +3,13 @@ using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Streams.Filtering;
@@ -547,6 +549,15 @@ namespace Orleans.Streams
                             break;
                         }
                     }
+                    catch (QueueCacheMissException exc)
+                    {
+                        exceptionOccured = exc;
+                        consumerData.SafeDisposeCursor(logger);
+                        // start from the entry at the low token, which is the first entry we know is still in the cache.
+                        var match = SequenceNumberEventIndexRegex().Match(exc.Low);
+                        var lowToken = match.Success ? new EventSequenceToken(long.Parse(match.Groups[1].Value), int.Parse(match.Groups[2].Value)) : null;
+                        consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, lowToken);
+                    }
                     catch (Exception exc)
                     {
                         exceptionOccured = exc;
@@ -1001,5 +1012,8 @@ namespace Orleans.Streams
             Message = "Ignoring exception while trying to evaluate subscription filter '{Filter}' with data '{FilterData}' on stream {StreamId}"
         )]
         private partial void LogWarningFilterEvaluation(string filter, string filterData, StreamId streamId, Exception exception);
+
+        [GeneratedRegex(@"SeqNum=(\d+), EventIndex=(\d+)")]
+        private static partial Regex SequenceNumberEventIndexRegex();
     }
 }
