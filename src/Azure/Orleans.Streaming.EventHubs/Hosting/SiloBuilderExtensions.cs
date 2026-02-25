@@ -1,4 +1,6 @@
 using System;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
 namespace Orleans.Hosting
@@ -30,6 +32,22 @@ namespace Orleans.Hosting
             {
                 b.ConfigureEventHub(ob => ob.Configure(configureEventHub));
                 b.UseAzureTableCheckpointer(ob => ob.Configure(configureDefaultCheckpointer));
+            });
+        }
+
+        /// <summary>
+        /// Configure silo to use event hub persistent streams with default check pointer and other settings
+        /// </summary>
+        public static ISiloBuilder AddEventHubsStreams(
+            this ISiloBuilder builder,
+            string name,
+            Action<OptionsBuilder<EventHubOptions>> configureOptions,
+            Action<OptionsBuilder<AzureTableStreamCheckpointerOptions>> configureDefaultCheckpointer)
+        {
+            return builder.AddEventHubStreams(name, b =>
+            {
+                b.ConfigureEventHub(configureOptions);
+                b.UseAzureTableCheckpointer(configureDefaultCheckpointer);
             });
         }
     }
