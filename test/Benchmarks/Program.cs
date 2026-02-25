@@ -260,6 +260,18 @@ internal class Program
             benchmark => benchmark.RunAsync().GetAwaiter().GetResult(),
             benchmark => benchmark.Teardown());
         },
+        ["GrainStorage.AzureBlob.ReadState"] = _ =>
+        {
+            BenchmarkRunner.Run<AzureBlobReadStateBenchmark>();
+        },
+        ["GrainStorage.AzureBlob.ReadState.Streaming"] = _ =>
+        {
+            BenchmarkRunner.Run<AzureBlobReadStateStreamingBenchmark>();
+        },
+        ["GrainStorage.AzureBlob.WriteState.Streaming"] = _ =>
+        {
+            BenchmarkRunner.Run<AzureBlobWriteStateStreamingBenchmark>();
+        },
         ["GrainStorage.AdoNet"] = _ =>
         {
             RunBenchmark(
