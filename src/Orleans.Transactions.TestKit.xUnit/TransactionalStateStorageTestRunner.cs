@@ -5,6 +5,7 @@ using Orleans.Transactions.Abstractions;
 using Xunit;
 using Xunit.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit.xUnit
 {
     public abstract class TransactionalStateStorageTestRunnerxUnit<TState> : TransactionalStateStorageTestRunner<TState>

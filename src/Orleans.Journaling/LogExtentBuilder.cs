@@ -3,6 +3,7 @@ using System.Diagnostics;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
 
+#nullable disable
 namespace Orleans.Journaling;
 
 /// <summary>

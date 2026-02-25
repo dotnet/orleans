@@ -10,6 +10,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Providers.Streams.Generator
 {
     /// <summary>

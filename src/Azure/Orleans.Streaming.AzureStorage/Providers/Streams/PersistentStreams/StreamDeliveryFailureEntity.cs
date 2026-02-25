@@ -4,6 +4,7 @@ using Azure.Data.Tables;
 using Orleans.Serialization;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Providers.Streams.PersistentStreams
 {
     /// <summary>

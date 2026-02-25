@@ -1,10 +1,11 @@
-﻿using System;
+using System;
 using Newtonsoft.Json;
 using System.Net;
 using Orleans.Runtime;
 using Newtonsoft.Json.Linq;
 using System.Globalization;
 
+#nullable disable
 namespace Orleans.Clustering.Redis
 {
     internal static class JsonSettings

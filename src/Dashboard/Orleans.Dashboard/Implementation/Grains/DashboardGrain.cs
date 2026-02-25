@@ -17,6 +17,7 @@ using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
 using Orleans.Dashboard.Core;
 
+#nullable disable
 namespace Orleans.Dashboard.Implementation.Grains;
 
 [Reentrant]

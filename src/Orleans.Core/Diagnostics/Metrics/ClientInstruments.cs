@@ -1,6 +1,7 @@
 using System;
 using System.Diagnostics.Metrics;
 
+#nullable disable
 namespace Orleans.Runtime;
 
 public static class ClientInstruments

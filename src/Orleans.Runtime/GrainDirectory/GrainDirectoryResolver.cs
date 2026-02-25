@@ -7,6 +7,7 @@ using Orleans.GrainDirectory;
 using Orleans.Metadata;
 using Orleans.Runtime.Hosting;
 
+#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal class GrainDirectoryResolver

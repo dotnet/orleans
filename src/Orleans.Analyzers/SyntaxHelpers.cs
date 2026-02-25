@@ -8,6 +8,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
 {
+#nullable disable
     internal readonly record struct AttributeArgumentBag<T>(T Value, Location Location);
 
     internal static class SyntaxHelpers

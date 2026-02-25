@@ -8,6 +8,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Storage;
 
+#nullable disable
 [assembly: RegisterProvider("AdoNet", "GrainStorage", "Silo", typeof(AdoNetGrainStorageProviderBuilder))]
 
 namespace Orleans.Hosting;

@@ -10,6 +10,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Storage;
 
+#nullable disable
 [assembly: RegisterProvider("AzureTableStorage", "GrainStorage", "Silo", typeof(AzureTableStorageGrainStorageProviderBuilder))]
 
 namespace Orleans.Hosting;

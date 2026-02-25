@@ -13,6 +13,7 @@ using System.Net;
 using System.Text;
 using System.Threading.Tasks;
 
+#nullable disable
 namespace Orleans.Clustering.DynamoDB
 {
     internal partial class DynamoDBMembershipTable : IMembershipTable

@@ -7,6 +7,7 @@ using System.Collections.Immutable;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 /// <summary>
 /// An analyzer that warns when grain code uses ConfigureAwait(false) or ConfigureAwait(ConfigureAwaitOptions)
 /// without the ContinueOnCapturedContext flag.

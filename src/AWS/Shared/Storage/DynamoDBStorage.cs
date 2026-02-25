@@ -11,6 +11,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Amazon.Runtime.CredentialManagement;
 
+#nullable disable
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
 #elif PERSISTENCE_DYNAMODB

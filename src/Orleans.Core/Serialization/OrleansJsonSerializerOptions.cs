@@ -2,6 +2,7 @@ using System;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 
+#nullable disable
 namespace Orleans.Serialization
 {
     public class OrleansJsonSerializerOptions

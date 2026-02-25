@@ -3,6 +3,7 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 
+#nullable disable
 [assembly: RegisterProvider("Memory", "Streaming", "Client", typeof(MemoryStreamProviderBuilder))]
 [assembly: RegisterProvider("Memory", "Streaming", "Silo", typeof(MemoryStreamProviderBuilder))]
 namespace Orleans.Providers;

@@ -1,6 +1,7 @@
 using System;
 using Orleans.Serialization.TypeSystem;
 
+#nullable disable
 namespace Orleans.BroadcastChannel
 {
     /// <summary>

@@ -7,6 +7,7 @@ using Microsoft.CodeAnalysis.Diagnostics;
 
 namespace Orleans.Analyzers
 {
+    #nullable disable
     [DiagnosticAnalyzer(LanguageNames.CSharp)]
     public class GrainInterfaceMethodReturnTypeDiagnosticAnalyzer : DiagnosticAnalyzer
     {

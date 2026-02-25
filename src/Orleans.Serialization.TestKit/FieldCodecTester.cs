@@ -16,6 +16,7 @@ using Orleans.Serialization.Serializers;
 using Xunit.Abstractions;
 using Orleans.Serialization.GeneratedCodeHelpers;
 
+#nullable disable
 namespace Orleans.Serialization.TestKit
 {
     /// <summary>

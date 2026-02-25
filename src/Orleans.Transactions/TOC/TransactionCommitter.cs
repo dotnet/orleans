@@ -11,6 +11,7 @@ using Orleans.Transactions.Abstractions;
 using Orleans.Transactions.State;
 using Orleans.Transactions.TOC;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     public partial class TransactionCommitter<TService> : ITransactionCommitter<TService>, ILifecycleParticipant<IGrainLifecycle>

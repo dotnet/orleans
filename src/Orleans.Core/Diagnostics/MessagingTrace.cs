@@ -5,6 +5,7 @@ using System.IO;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal class MessagingTrace : DiagnosticListener, ILogger

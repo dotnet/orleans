@@ -1,5 +1,6 @@
 using System;
 
+#nullable disable
 namespace Orleans.Runtime.Scheduler
 {
     internal abstract class WorkItemBase : IWorkItem, ISpanFormattable

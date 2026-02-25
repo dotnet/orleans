@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal class SocketAwaitableEventArgs : SocketAsyncEventArgs, ICriticalNotifyCompletion

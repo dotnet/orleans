@@ -3,6 +3,7 @@ using Orleans.Persistence.DynamoDB;
 using Orleans.Runtime;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     public class DynamoDBStorageOptions : DynamoDBClientOptions, IStorageProviderSerializerOptions

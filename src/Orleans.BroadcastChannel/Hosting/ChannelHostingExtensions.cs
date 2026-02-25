@@ -5,6 +5,7 @@ using Orleans.BroadcastChannel;
 using Orleans.BroadcastChannel.SubscriberTable;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     public static class ChannelHostingExtensions

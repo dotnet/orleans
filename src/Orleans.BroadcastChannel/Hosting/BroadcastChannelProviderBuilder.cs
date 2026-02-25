@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 
+#nullable disable
 [assembly: RegisterProvider("Default", "BroadcastChannel", "Client", typeof(BroadcastChannelProviderBuilder))]
 [assembly: RegisterProvider("Default", "BroadcastChannel", "Silo", typeof(BroadcastChannelProviderBuilder))]
 

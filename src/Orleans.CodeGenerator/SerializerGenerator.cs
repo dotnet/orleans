@@ -8,6 +8,7 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.InvokableGenerator;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     internal class SerializerGenerator

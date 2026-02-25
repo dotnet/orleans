@@ -2,6 +2,7 @@ using Orleans.Runtime;
 using System;
 using System.Runtime.Serialization;
 
+#nullable disable
 namespace Orleans.Transactions
 {
     /// <summary>

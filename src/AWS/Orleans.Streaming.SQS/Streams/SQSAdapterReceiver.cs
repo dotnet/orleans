@@ -9,6 +9,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 using SQSMessage = Amazon.SQS.Model.Message;
 
+#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     /// <summary>

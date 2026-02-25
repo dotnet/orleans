@@ -5,7 +5,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal sealed partial class RemoteGrainDirectory : SystemTarget, IRemoteGrainDirectory

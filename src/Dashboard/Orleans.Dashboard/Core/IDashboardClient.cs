@@ -5,6 +5,7 @@ using Orleans.Runtime;
 using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
 
+#nullable disable
 namespace Orleans.Dashboard.Core;
 
 internal interface IDashboardClient

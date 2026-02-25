@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.AzureStorage
 {
     public class AzureTableTransactionalStateStorageFactory : ITransactionalStateStorageFactory, ILifecycleParticipant<ISiloLifecycle>

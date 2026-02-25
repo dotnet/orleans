@@ -3,6 +3,7 @@ using Orleans.Serialization.Serializers;
 using System;
 using System.Collections.Generic;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

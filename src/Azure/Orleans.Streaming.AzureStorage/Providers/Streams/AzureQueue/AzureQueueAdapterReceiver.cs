@@ -9,6 +9,7 @@ using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Providers.Streams.AzureQueue
 {
     /// <summary>

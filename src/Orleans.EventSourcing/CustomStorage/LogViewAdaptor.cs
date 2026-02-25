@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
 
+#nullable disable
 namespace Orleans.EventSourcing.CustomStorage
 {
     /// <summary>

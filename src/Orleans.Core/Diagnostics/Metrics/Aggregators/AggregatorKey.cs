@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 
+#nullable disable
 namespace Orleans.Runtime;
 
 internal readonly struct AggregatorKey : IEquatable<AggregatorKey>

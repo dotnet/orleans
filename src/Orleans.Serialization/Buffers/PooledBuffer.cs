@@ -13,6 +13,7 @@ using Orleans.Serialization.Utilities;
 
 namespace Orleans.Serialization.Buffers;
 
+#nullable disable
 /// <summary>
 /// A <see cref="IBufferWriter{T}"/> implementation implemented using pooled arrays which is specialized for creating <see cref="ReadOnlySequence{T}"/> instances.
 /// </summary>

@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Versions.Compatibility;
 
+#nullable disable
 namespace Orleans.Runtime.Versions.Compatibility
 {
     internal class CompatibilityDirectorManager

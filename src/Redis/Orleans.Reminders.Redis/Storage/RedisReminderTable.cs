@@ -16,6 +16,7 @@ using Orleans.Runtime;
 using StackExchange.Redis;
 using static System.FormattableString;
 
+#nullable disable
 namespace Orleans.Reminders.Redis
 {
     internal partial class RedisReminderTable : IReminderTable
