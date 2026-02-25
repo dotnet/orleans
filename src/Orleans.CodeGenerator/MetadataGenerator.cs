@@ -109,6 +109,22 @@ namespace Orleans.CodeGenerator
                     ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type)) })))));
             }
 
+            var addRegisteredProviderMethod = configParam.Member("RegisteredProviders").Member("Add");
+            foreach (var provider in MetadataModel.RegisteredProviders)
+            {
+                body.Add(ExpressionStatement(InvocationExpression(addRegisteredProviderMethod,
+                    ArgumentList(SeparatedList(new[]
+                    {
+                        Argument(TupleExpression(SeparatedList(new ArgumentSyntax[]
+                        {
+                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target))),
+                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
+                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name)))
+                        }))),
+                        Argument(TypeOfExpression(provider.Type))
+                    })))));
+            }
+
             AddCompoundTypeAliases(configParam, body);
 
             var configType = _codeGenerator.LibraryTypes.TypeManifestOptions;
