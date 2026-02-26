@@ -349,7 +349,7 @@ namespace Orleans
             }
             else
             {
-                LogWarningNoCallbackForResponseMessage(logger, response);
+                LogDebugNoCallbackForResponseMessage(logger, response);
             }
         }
 
@@ -565,11 +565,11 @@ namespace Orleans
         private static partial void LogErrorWhileProcessingCallbackExpiry(ILogger logger, Exception ex);
 
         [LoggerMessage(
-            Level = LogLevel.Warning,
+            Level = LogLevel.Debug,
             EventId = (int)ErrorCode.Runtime_Error_100011,
             Message = "No callback for response message '{ResponseMessage}'"
         )]
-        private static partial void LogWarningNoCallbackForResponseMessage(ILogger logger, Message responseMessage);
+        private static partial void LogDebugNoCallbackForResponseMessage(ILogger logger, Message responseMessage);
 
         private readonly struct DiagnosticsLogData(List<string> diagnostics)
         {
