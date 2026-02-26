@@ -482,7 +482,7 @@ internal sealed partial class ActivationData :
     {
         if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
         {
-            // otherwise creates negative time.
+            // Adding these values to the current time would overflow, so use DateTime.MaxValue directly.
             KeepAliveUntil = DateTime.MaxValue;
         }
         else if (timespan <= TimeSpan.Zero)
