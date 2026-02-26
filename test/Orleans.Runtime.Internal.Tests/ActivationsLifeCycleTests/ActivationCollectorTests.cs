@@ -548,8 +548,13 @@ namespace UnitTests.ActivationsLifeCycleTests
             // Cancel the keep-alive. The grain should now be collectable after the standard idle timeout.
             await grain.CancelKeepAlive();
 
-            // Wait for the grain to be collected.
-            await Task.Delay(WAIT_TIME);
+            // Wait for the grain to become idle past the collection age limit.
+            await Task.Delay(DEFAULT_IDLE_TIMEOUT + DEFAULT_COLLECTION_QUANTUM);
+
+            // Force collection to deterministically verify the grain is now collectable.
+            var mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceActivationCollection(DEFAULT_IDLE_TIMEOUT);
+
             int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
             Assert.Equal(0, activationsNotCollected);
         }
