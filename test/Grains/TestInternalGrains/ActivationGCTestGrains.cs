@@ -105,7 +105,7 @@ namespace UnitTests.Grains
 
         public Task CancelKeepAlive()
         {
-            DelayDeactivation(TimeSpan.FromMilliseconds(-1));
+            DelayDeactivation(TimeSpan.Zero);
             return Task.CompletedTask;
         }
     }

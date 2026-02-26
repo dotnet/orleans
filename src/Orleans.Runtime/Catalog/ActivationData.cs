@@ -480,10 +480,14 @@ internal sealed partial class ActivationData :
 
     public void DelayDeactivation(TimeSpan timespan)
     {
-        if (timespan <= TimeSpan.Zero)
+        if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
         {
-            // A non-positive timespan means "cancel the previous DelayDeactivation and revert to
-            // normal collection behavior".
+            // otherwise creates negative time.
+            KeepAliveUntil = DateTime.MaxValue;
+        }
+        else if (timespan <= TimeSpan.Zero)
+        {
+            // Cancel the previous DelayDeactivation and revert to normal collection behavior.
             // If there was an active keep-alive, reschedule collection so the grain can be collected
             // after CollectionAgeLimit rather than waiting for the previously scheduled far-future time.
             var hadActiveKeepAlive = KeepAliveUntil > GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
@@ -492,11 +496,6 @@ internal sealed partial class ActivationData :
             {
                 _shared.InternalRuntime.ActivationCollector.TryRescheduleCollection(this);
             }
-        }
-        else if (timespan == TimeSpan.MaxValue)
-        {
-            // otherwise creates negative time.
-            KeepAliveUntil = DateTime.MaxValue;
         }
         else
         {
