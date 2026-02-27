@@ -217,6 +217,7 @@ namespace Orleans.Hosting
             // Placement filters
             services.AddSingleton<PlacementFilterStrategyResolver>();
             services.AddSingleton<PlacementFilterDirectorResolver>();
+            services.AddPlacementFilter<PreferLocalPlacementFilterStrategy, PreferLocalPlacementFilterDirector>(ServiceLifetime.Singleton);
 
             // Placement directors
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
