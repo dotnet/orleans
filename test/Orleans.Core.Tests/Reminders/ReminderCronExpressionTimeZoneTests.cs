@@ -215,4 +215,33 @@ public class ReminderCronExpressionTimeZoneTests
 
         Assert.Throws<ArgumentNullException>(() => expression.GetNextOccurrence(fromUtc, zone: null!));
     }
+
+    [Fact]
+    public void GetNextOccurrence_WithUsEastern_WhenLocalTimeIsInvalid_MovesToNextValidInstant()
+    {
+        var expression = ReminderCronExpression.Parse("30 2 * * *");
+        var zone = TimeZoneTestHelper.GetUsEasternTimeZone();
+        var fromUtc = new DateTime(2025, 3, 8, 13, 0, 0, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc, zone);
+
+        // 2025-03-09 02:30 local does not exist in US Eastern due to spring-forward transition.
+        // Scheduler should move to the DST start instant (03:00 local).
+        Assert.Equal(new DateTime(2025, 3, 9, 7, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void GetNextOccurrence_WithUsEastern_WhenLocalTimeIsAmbiguous_UsesFirstOccurrenceOnly()
+    {
+        var expression = ReminderCronExpression.Parse("30 1 * * *");
+        var zone = TimeZoneTestHelper.GetUsEasternTimeZone();
+        var fromUtc = new DateTime(2025, 11, 2, 0, 0, 0, DateTimeKind.Utc);
+
+        var first = expression.GetNextOccurrence(fromUtc, zone);
+        var second = expression.GetNextOccurrence(first!.Value.AddSeconds(1), zone);
+
+        // 2025-11-02 01:30 local occurs twice. Scheduler should pick the earlier (daylight) instant.
+        Assert.Equal(new DateTime(2025, 11, 2, 5, 30, 0, DateTimeKind.Utc), first);
+        Assert.Equal(new DateTime(2025, 11, 3, 6, 30, 0, DateTimeKind.Utc), second);
+    }
 }

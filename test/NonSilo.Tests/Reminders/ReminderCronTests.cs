@@ -1,5 +1,6 @@
 using System;
 using System.Linq;
+using System.Reflection;
 using Orleans;
 using Xunit;
 
@@ -440,5 +441,171 @@ public class ReminderCronTests
         var fromToCronExpression = builder.ToCronExpression();
 
         Assert.Equal(fromToCronExpression, fromBuild);
+    }
+
+    [Theory]
+    [InlineData("0,5,10 * * * * *", "0,5,10 * * * * *")]
+    [InlineData("* 0,15,30,45 * * * *", "* 0,15,30,45 * * * *")]
+    [InlineData("0 0,12 0,23 1,15 1,12 0,7", "0 0,12 0,23 1,15 1,12 0")]
+    public void CronExpression_ToString_CanonicalizesListsWithoutLooping(string input, string expectedCanonical)
+    {
+        var expression = ReminderCronExpression.Parse(input);
+
+        var canonical = GetInternalCronExpressionText(expression);
+
+        Assert.Equal(expectedCanonical, canonical);
+    }
+
+    [Fact]
+    public void GetNextOccurrence_WhenSecondListWrapsMinute_RollsOverToZeroSecond()
+    {
+        var expression = ReminderCronExpression.Parse("0,30 * * * * *");
+        var fromUtc = new DateTime(2026, 1, 1, 10, 0, 31, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2026, 1, 1, 10, 1, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void GetNextOccurrence_WhenDayOfMonthRollsOver_SelectsFirstDay()
+    {
+        var expression = ReminderCronExpression.Parse("0 0 0 1 * *");
+        var fromUtc = new DateTime(2026, 1, 31, 23, 59, 59, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void GetNextOccurrence_WhenMonthRollsOver_SelectsJanuary()
+    {
+        var expression = ReminderCronExpression.Parse("0 0 0 1 1 *");
+        var fromUtc = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2027, 1, 1, 0, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Theory]
+    [InlineData(2024, 6, 1, 2024, 6, 3)] // 1st is Saturday -> move forward to Monday.
+    [InlineData(2024, 9, 1, 2024, 9, 2)] // 1st is Sunday -> move forward to Monday.
+    public void Parse_FirstDayNearestWeekday_HandlesWeekendAtStartOfMonth(
+        int fromYear,
+        int fromMonth,
+        int fromDay,
+        int expectedYear,
+        int expectedMonth,
+        int expectedDay)
+    {
+        var expression = ReminderCronExpression.Parse("0 9 1W * *");
+        var fromUtc = new DateTime(fromYear, fromMonth, fromDay, 0, 0, 0, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(expectedYear, expectedMonth, expectedDay, 9, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Theory]
+    [InlineData(2026, 1, 1, 2026, 1, 30)] // Last day is Saturday -> Friday.
+    [InlineData(2026, 5, 1, 2026, 5, 29)] // Last day is Sunday -> Friday.
+    public void Parse_LastDayNearestWeekday_HandlesWeekendAtEndOfMonth(
+        int fromYear,
+        int fromMonth,
+        int fromDay,
+        int expectedYear,
+        int expectedMonth,
+        int expectedDay)
+    {
+        var expression = ReminderCronExpression.Parse("0 9 LW * *");
+        var fromUtc = new DateTime(fromYear, fromMonth, fromDay, 0, 0, 0, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(expectedYear, expectedMonth, expectedDay, 9, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void Parse_LastDayOffset_RespectsLeapYearLength()
+    {
+        var expression = ReminderCronExpression.Parse("0 9 L-1 * *");
+        var fromUtc = new DateTime(2028, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2028, 2, 28, 9, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void Parse_NthWeekday_WhenMissingInCurrentMonth_SkipsToNextMatchingMonth()
+    {
+        var expression = ReminderCronExpression.Parse("0 9 ? * MON#5");
+        var fromUtc = new DateTime(2026, 2, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2026, 3, 30, 9, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
+    public void Parse_SundayAliases_SevenAndZeroHaveSameScheduleAndCanonicalForm()
+    {
+        var zeroSunday = ReminderCronExpression.Parse("0 9 ? * 0");
+        var sevenSunday = ReminderCronExpression.Parse("0 9 ? * 7");
+        var fromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var zeroNext = zeroSunday.GetNextOccurrence(fromUtc);
+        var sevenNext = sevenSunday.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(zeroNext, sevenNext);
+        Assert.Equal("0 9 * * 0", GetInternalCronExpressionText(sevenSunday));
+    }
+
+    [Fact]
+    public void Parse_ReversedDayOfWeekRangeWithStep_WrapsAcrossSundayCorrectly()
+    {
+        var expression = ReminderCronExpression.Parse("0 9 ? * 5-1/2");
+        var fromUtc = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc); // Thursday
+
+        var first = expression.GetNextOccurrence(fromUtc);
+        var second = expression.GetNextOccurrence(first!.Value.AddSeconds(1));
+
+        Assert.Equal(new DateTime(2026, 1, 2, 9, 0, 0, DateTimeKind.Utc), first); // Friday
+        Assert.Equal(new DateTime(2026, 1, 4, 9, 0, 0, DateTimeKind.Utc), second); // Sunday
+    }
+
+    [Fact]
+    public void GetNextOccurrence_NearDateTimeMaxValue_ReturnsNullWhenNoFutureMatch()
+    {
+        var expression = ReminderCronExpression.Parse("0 0 1 1 *");
+        var fromUtc = new DateTime(9999, 12, 31, 23, 59, 59, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Null(next);
+    }
+
+    [Fact]
+    public void GetOccurrences_WhenBoundsEqualAndBothInclusive_ReturnsSingleOccurrence()
+    {
+        var expression = ReminderCronExpression.Parse("0 * * * * *");
+        var atUtc = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+
+        var occurrences = expression.GetOccurrences(atUtc, atUtc, fromInclusive: true, toInclusive: true).ToArray();
+
+        Assert.Equal([atUtc], occurrences);
+    }
+
+    private static string GetInternalCronExpressionText(ReminderCronExpression expression)
+    {
+        var field = typeof(ReminderCronExpression).GetField("_expression", BindingFlags.Instance | BindingFlags.NonPublic);
+        Assert.NotNull(field);
+
+        var internalExpression = field!.GetValue(expression);
+        Assert.NotNull(internalExpression);
+
+        return internalExpression!.ToString()!;
     }
 }
