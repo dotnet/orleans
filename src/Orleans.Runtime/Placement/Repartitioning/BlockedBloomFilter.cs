@@ -1,10 +1,11 @@
-using System;
 using System.Diagnostics;
 using System.IO.Hashing;
 using System.Numerics;
 using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
+
+#nullable enable
 
 /// <summary>
 /// A tuned version of a blocked bloom filter implementation.
@@ -126,4 +127,81 @@ internal sealed class BlockedBloomFilter
     /// <param name="hash">The rotated hash</param>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static int ComputeMask2(ulong hash) => (1 << ((int)hash >> 12)) | (1 << ((int)hash >> 18));
+}
+
+/// <summary>
+/// Implemented as a set of <see cref="BlockedBloomFilter"/>(s) that rotate anchored grains.
+/// If a grain is "hot" it will likely survive multiple cycles, otherwise it gets dropped out.
+/// </summary>
+internal sealed class AnchoredGrainsFilter
+{
+    // Index 0 is the "active" filter.
+    // Indexes 1 through N-1 are the "retiring" filters.
+    private readonly BlockedBloomFilter[] _filters;
+
+    public AnchoredGrainsFilter(int capacity, double fpRate, int generations)
+    {
+        if (generations < 1)
+        {
+            throw new ArgumentOutOfRangeException(nameof(generations), "Must have at least 1 generation.");
+        }
+
+        _filters = new BlockedBloomFilter[generations];
+
+        for (var i = 0; i < generations; i++)
+        {
+            _filters[i] = new BlockedBloomFilter(capacity, fpRate);
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Add(GrainId id) => _filters[0].Add(id);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool Contains(GrainId id)
+    {
+        for (var i = 0; i < _filters.Length; i++)
+        {
+            if (_filters[i].Contains(id))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    public void Rotate()
+    {
+        // Idea is to rotate the inner filters to implement a sort of sliding window.
+        // The previous active (index 0) shifts down, remaining "checkable" for n-1 more cycles, then fades unless re-added.
+        // This ensures "cold" grains eventually drop out, while "hot" ones stay anchored.
+
+        var length = _filters.Length;
+
+        // We grab the oldest filter and reset it so it becomes the new active one.
+        var nextActive = _filters[length - 1];
+        nextActive.Reset();
+
+        // Need to shift all existing generations down by 1. We iterate backwards
+        // so we dont overwrite elements we havent shifted yet.
+
+        for (var i = length - 1; i > 0; i--)
+        {
+            _filters[i] = _filters[i - 1];
+        }
+
+        // The newly reset filter goes at the front.
+        _filters[0] = nextActive;
+    }
+
+    public void Reset()
+    {
+        var filters = _filters;
+
+        for (var i = 0; i < filters.Length; i++)
+        {
+            filters[i].Reset();
+        }
+    }
 }
