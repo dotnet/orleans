@@ -1918,7 +1918,7 @@ namespace Orleans.Streams.PubSub
 
 namespace OrleansCodeGen.Orleans.Hosting
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_SimpleGeneratorOptions : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Hosting.SimpleGeneratorOptions>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1934,7 +1934,7 @@ namespace OrleansCodeGen.Orleans.Hosting
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_SimpleGeneratorOptions : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Hosting.SimpleGeneratorOptions>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -1945,7 +1945,7 @@ namespace OrleansCodeGen.Orleans.Hosting
 
 namespace OrleansCodeGen.Orleans.Providers
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_DefaultMemoryMessageBodySerializer : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.DefaultMemoryMessageBodySerializer>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1963,7 +1963,7 @@ namespace OrleansCodeGen.Orleans.Providers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1981,7 +1981,7 @@ namespace OrleansCodeGen.Orleans.Providers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -1997,7 +1997,7 @@ namespace OrleansCodeGen.Orleans.Providers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_MemoryMessageBody : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.MemoryMessageBody>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2015,7 +2015,7 @@ namespace OrleansCodeGen.Orleans.Providers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_MemoryMessageData : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.MemoryMessageData>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Providers.MemoryMessageData>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -2033,7 +2033,7 @@ namespace OrleansCodeGen.Orleans.Providers
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2043,7 +2043,7 @@ namespace OrleansCodeGen.Orleans.Providers
         public Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 DeepCopy(Invokable_IMemoryStreamQueueGrain_GrainReference_74D60341 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2051,7 +2051,7 @@ namespace OrleansCodeGen.Orleans.Providers
         public Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A DeepCopy(Invokable_IMemoryStreamQueueGrain_GrainReference_7A8F8C1A original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_MemoryMessageBody : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.MemoryMessageBody>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2061,7 +2061,7 @@ namespace OrleansCodeGen.Orleans.Providers
         public global::Orleans.Providers.MemoryMessageBody DeepCopy(global::Orleans.Providers.MemoryMessageBody original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_MemoryMessageData : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.MemoryMessageData>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2071,7 +2071,7 @@ namespace OrleansCodeGen.Orleans.Providers
         public global::Orleans.Providers.MemoryMessageData DeepCopy(global::Orleans.Providers.MemoryMessageData result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "74D60341" })]
@@ -2103,7 +2103,7 @@ namespace OrleansCodeGen.Orleans.Providers
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Providers.IMemoryStreamQueueGrain), "7A8F8C1A" })]
@@ -2138,7 +2138,7 @@ namespace OrleansCodeGen.Orleans.Providers
 
 namespace OrleansCodeGen.Orleans.Providers.Streams.Common
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_EventSequenceToken : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.Streams.Common.EventSequenceToken>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Providers.Streams.Common.EventSequenceToken>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -2156,7 +2156,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Common
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_EventSequenceTokenV2 : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.Streams.Common.EventSequenceTokenV2>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Providers.Streams.Common.EventSequenceTokenV2>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -2174,7 +2174,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Common
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_EventSequenceToken : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.Streams.Common.EventSequenceToken>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Providers.Streams.Common.EventSequenceToken>, global::Orleans.Serialization.Cloning.IBaseCopier
@@ -2186,7 +2186,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Common
         public global::Orleans.Providers.Streams.Common.EventSequenceToken DeepCopy(global::Orleans.Providers.Streams.Common.EventSequenceToken original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_EventSequenceTokenV2 : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.Streams.Common.EventSequenceTokenV2>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Providers.Streams.Common.EventSequenceTokenV2>, global::Orleans.Serialization.Cloning.IBaseCopier
@@ -2201,7 +2201,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Common
 
 namespace OrleansCodeGen.Orleans.Providers.Streams.Generator
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_GeneratedBatchContainer : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.Streams.Generator.GeneratedBatchContainer>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2219,7 +2219,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Generator
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_GeneratedEvent : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Providers.Streams.Generator.GeneratedEvent>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2237,7 +2237,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Generator
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_GeneratedBatchContainer : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.Streams.Generator.GeneratedBatchContainer>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2247,7 +2247,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Generator
         public global::Orleans.Providers.Streams.Generator.GeneratedBatchContainer DeepCopy(global::Orleans.Providers.Streams.Generator.GeneratedBatchContainer original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_GeneratedEvent : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Providers.Streams.Generator.GeneratedEvent>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2260,7 +2260,7 @@ namespace OrleansCodeGen.Orleans.Providers.Streams.Generator
 
 namespace OrleansCodeGen.Orleans.Runtime
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_QualifiedStreamId : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.QualifiedStreamId>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Runtime.QualifiedStreamId>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -2278,7 +2278,7 @@ namespace OrleansCodeGen.Orleans.Runtime
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_StreamId : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Runtime.StreamId>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Runtime.StreamId>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -2297,7 +2297,7 @@ namespace OrleansCodeGen.Orleans.Runtime
 
 namespace OrleansCodeGen.Orleans.Streams
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_BatchContainerBatch : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.BatchContainerBatch>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2315,7 +2315,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_CacheFullException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.CacheFullException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2333,7 +2333,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_DataNotAvailableException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.DataNotAvailableException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Streams.DataNotAvailableException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -2351,7 +2351,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FaultedSubscriptionException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.FaultedSubscriptionException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2369,7 +2369,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ProviderStartException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.ProviderStartException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2387,7 +2387,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_PubSubSubscriptionState : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.PubSubSubscriptionState>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2405,7 +2405,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_QueueCacheMissException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.QueueCacheMissException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2423,7 +2423,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_QueueId : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.QueueId>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Streams.QueueId>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -2439,7 +2439,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_StreamEventDeliveryFailureException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.StreamEventDeliveryFailureException>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2457,7 +2457,7 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_StreamIdentity : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.StreamIdentity>, global::Orleans.Serialization.Codecs.IFieldCodec
@@ -2475,21 +2475,21 @@ namespace OrleansCodeGen.Orleans.Streams
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_StreamSequenceToken : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.Streams.StreamSequenceToken>
     {
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_StreamSubscriptionHandle<T> : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::Orleans.Streams.StreamSubscriptionHandle<T>>
     {
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_BatchContainerBatch : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Streams.BatchContainerBatch>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2499,7 +2499,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public global::Orleans.Streams.BatchContainerBatch DeepCopy(global::Orleans.Streams.BatchContainerBatch original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_CacheFullException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Streams.CacheFullException, global::Orleans.Runtime.OrleansException>
@@ -2507,7 +2507,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public Copier_CacheFullException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DataNotAvailableException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Streams.DataNotAvailableException, global::Orleans.Runtime.OrleansException>
@@ -2515,7 +2515,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public Copier_DataNotAvailableException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FaultedSubscriptionException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Streams.FaultedSubscriptionException, global::Orleans.Runtime.OrleansException>
@@ -2523,7 +2523,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public Copier_FaultedSubscriptionException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_ProviderStartException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Streams.ProviderStartException, global::Orleans.Runtime.OrleansException>
@@ -2531,7 +2531,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public Copier_ProviderStartException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_PubSubSubscriptionState : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Streams.PubSubSubscriptionState>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -2541,7 +2541,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public global::Orleans.Streams.PubSubSubscriptionState DeepCopy(global::Orleans.Streams.PubSubSubscriptionState original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_QueueCacheMissException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Streams.QueueCacheMissException, global::Orleans.Streams.DataNotAvailableException>
@@ -2551,7 +2551,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public override void DeepCopy(global::Orleans.Streams.QueueCacheMissException input, global::Orleans.Streams.QueueCacheMissException output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_StreamEventDeliveryFailureException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Streams.StreamEventDeliveryFailureException, global::Orleans.Runtime.OrleansException>
@@ -2559,7 +2559,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public Copier_StreamEventDeliveryFailureException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_StreamSequenceToken : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Streams.StreamSequenceToken>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Streams.StreamSequenceToken>, global::Orleans.Serialization.Cloning.IBaseCopier
@@ -2569,7 +2569,7 @@ namespace OrleansCodeGen.Orleans.Streams
         public void DeepCopy(global::Orleans.Streams.StreamSequenceToken input, global::Orleans.Streams.StreamSequenceToken output, global::Orleans.Serialization.Cloning.CopyContext context) { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_StreamSubscriptionHandle<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Streams.StreamSubscriptionHandle<T>>, global::Orleans.Serialization.Cloning.IDeepCopier, global::Orleans.Serialization.Cloning.IBaseCopier<global::Orleans.Streams.StreamSubscriptionHandle<T>>, global::Orleans.Serialization.Cloning.IBaseCopier
@@ -2582,7 +2582,7 @@ namespace OrleansCodeGen.Orleans.Streams
 
 namespace OrleansCodeGen.Orleans.Streams.Core
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_StreamSubscription : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Streams.Core.StreamSubscription>, global::Orleans.Serialization.Codecs.IFieldCodec
