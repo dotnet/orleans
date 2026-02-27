@@ -482,13 +482,20 @@ internal sealed partial class ActivationData :
     {
         if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
         {
-            // otherwise creates negative time.
+            // Adding these values to the current time would overflow, so use DateTime.MaxValue directly.
             KeepAliveUntil = DateTime.MaxValue;
         }
         else if (timespan <= TimeSpan.Zero)
         {
-            // reset any current keepAliveUntil
+            // Cancel the previous DelayDeactivation and revert to normal collection behavior.
+            // If there was an active keep-alive, reschedule collection so the grain can be collected
+            // after CollectionAgeLimit rather than waiting for the previously scheduled far-future time.
+            var hadActiveKeepAlive = KeepAliveUntil > GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
             ResetKeepAliveRequest();
+            if (hadActiveKeepAlive)
+            {
+                _shared.InternalRuntime.ActivationCollector.TryRescheduleCollection(this);
+            }
         }
         else
         {

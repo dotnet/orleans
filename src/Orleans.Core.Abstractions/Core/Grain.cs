@@ -135,10 +135,11 @@ public abstract partial class Grain : IGrainBase, IAddressable
 
     /// <summary>
     /// Delay Deactivation of this activation at least for the specified time duration.
-    /// A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.
-    /// A negative <c>timeSpan</c> value means “cancel the previous setting of the DelayDeactivation call and make this activation behave based on the regular Activation Garbage Collection settings”.
-    /// DeactivateOnIdle method would undo / override any current “keep alive” setting,
-    /// making this grain immediately available for deactivation.
+    /// <para>A positive <c>timeSpan</c> value means “prevent GC of this activation for that time span”.</para>
+    /// <para>A <see cref="TimeSpan.Zero"/> value means “cancel the previous setting of the <see cref="DelayDeactivation(TimeSpan)"/> call and make this activation behave based on the regular Activation Garbage Collection settings”.</para>
+    /// <para>A <see cref="Timeout.InfiniteTimeSpan"/> value means “delay deactivation indefinitely”.</para>
+    /// <para><see cref="DeactivateOnIdle"/> would undo / override any current “keep alive” setting,
+    /// making this grain immediately available for deactivation.</para>
     /// </summary>
     protected void DelayDeactivation(TimeSpan timeSpan)
     {

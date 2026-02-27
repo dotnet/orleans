@@ -529,6 +529,36 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }
 
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorShouldCollectAfterCancellingKeepAlive()
+        {
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
+
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
+
+            // Activate the grain and extend its lifetime to 5 minutes.
+            var grain = this.testCluster.GrainFactory.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            await grain.SetKeepAlive(TimeSpan.FromMinutes(5));
+
+            // Verify the grain is not collected while it has an active keep-alive.
+            await Task.Delay(WAIT_TIME);
+            int activationsWithKeepAlive = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(1, activationsWithKeepAlive);
+
+            // Cancel the keep-alive. The grain should now be collectable after the standard idle timeout.
+            await grain.CancelKeepAlive();
+
+            // Wait for the grain to become idle past the collection age limit.
+            await Task.Delay(DEFAULT_IDLE_TIMEOUT + DEFAULT_COLLECTION_QUANTUM);
+
+            // Force collection to deterministically verify the grain is now collectable.
+            var mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceActivationCollection(DEFAULT_IDLE_TIMEOUT);
+
+            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(0, activationsNotCollected);
+        }
+
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_NoKeepAlive_Test()
         {
