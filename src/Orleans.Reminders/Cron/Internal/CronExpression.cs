@@ -532,11 +532,16 @@ namespace Orleans.Reminders.Cron.Internal
             // Unset 7 bit for Day of week field because both 0 and 7 stand for Sunday.
             if (field == CronField.DaysOfWeek) fieldValue &= ~(1U << field.Last);
 
-            for (var i = GetFirstSet(fieldValue);; i = GetFirstSet(fieldValue >> i << i))
+            var i = GetFirstSet(fieldValue);
+            while (true)
             {
                 expressionBuilder.Append(i);
-                if (fieldValue >> ++i == 0) break;
+
+                var nextBitStart = i + 1;
+                if (fieldValue >> nextBitStart == 0) break;
+
                 expressionBuilder.Append(',');
+                i = nextBitStart + GetFirstSet(fieldValue >> nextBitStart);
             }
 
             return expressionBuilder;
