@@ -24,7 +24,7 @@ namespace Orleans.Hosting
         /// </returns>
         public static IServiceCollection UseDynamoDBReminderService(this IServiceCollection services, Action<DynamoDBReminderStorageOptions> configure)
         {
-            services.AddReminders();
+            services.AddAdaptiveReminderService();
             services.AddSingleton<IReminderTable, DynamoDBReminderTable>();
             services.Configure<DynamoDBReminderStorageOptions>(configure);
             services.ConfigureFormatter<DynamoDBReminderStorageOptions>();

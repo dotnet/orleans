@@ -30,6 +30,31 @@ public sealed class ReminderOptions
     /// </summary>
     /// <value>Attempt to initialize for 5 minutes before giving up by default.</value>
     public TimeSpan InitializationTimeout { get; set; } = TimeSpan.FromMinutes(ReminderOptionsDefaults.InitializationTimeoutMinutes);
+
+    /// <summary>
+    /// Gets or sets the look-ahead window used by the adaptive reminder service.
+    /// </summary>
+    public TimeSpan LookAheadWindow { get; set; } = TimeSpan.FromMinutes(ReminderOptionsDefaults.LookAheadWindowMinutes);
+
+    /// <summary>
+    /// Gets or sets the base bucket size used by the adaptive reminder service.
+    /// </summary>
+    public uint BaseBucketSize { get; set; } = ReminderOptionsDefaults.BaseBucketSize;
+
+    /// <summary>
+    /// Gets or sets the reminder polling interval used by the adaptive reminder service.
+    /// </summary>
+    public TimeSpan PollInterval { get; set; } = TimeSpan.FromSeconds(ReminderOptionsDefaults.PollIntervalSeconds);
+
+    /// <summary>
+    /// Gets or sets a value indicating whether reminder priority is enabled in the adaptive reminder service.
+    /// </summary>
+    public bool EnablePriority { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets a value indicating whether the legacy local reminder service is enabled.
+    /// </summary>
+    public bool EnableLegacyReminderService { get; set; } = true;
 }
 
 /// <summary>
@@ -66,6 +91,26 @@ internal sealed partial class ReminderOptionsValidator : IConfigurationValidator
         if (options.Value.MinimumReminderPeriod.TotalMinutes < ReminderOptionsDefaults.MinimumReminderPeriodMinutes)
         {
             LogWarnFastReminderInterval(options.Value.MinimumReminderPeriod, ReminderOptionsDefaults.MinimumReminderPeriodMinutes);
+        }
+
+        if (options.Value.InitializationTimeout <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.InitializationTimeout)} must be greater than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.LookAheadWindow <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.LookAheadWindow)} must be greater than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.PollInterval <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.PollInterval)} must be greater than {TimeSpan.Zero}");
+        }
+
+        if (options.Value.BaseBucketSize == 0)
+        {
+            throw new OrleansConfigurationException($"{nameof(ReminderOptions)}.{nameof(ReminderOptions.BaseBucketSize)} must be greater than 0");
         }
     }
 

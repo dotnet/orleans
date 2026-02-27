@@ -19,6 +19,7 @@ namespace UnitTests.Grains
         private readonly IReminderRegistry unvalidatedReminderRegistry;
         private Dictionary<string, ReminderState> allReminders;
         private Dictionary<string, long> sequence;
+        private List<ReminderTickRecord> tickRecords;
         private TimeSpan period;
 
         private static readonly long aCCURACY = 50 * TimeSpan.TicksPerMillisecond; // when we use ticks to compute sequence numbers, we might get wrong results as timeouts don't happen with precision of ticks  ... we keep this as a leeway
@@ -43,6 +44,7 @@ namespace UnitTests.Grains
             this._id = Guid.NewGuid().ToString();
             this.allReminders = new Dictionary<string, ReminderState>();
             this.sequence = new Dictionary<string, long>();
+            this.tickRecords = new List<ReminderTickRecord>();
             this.period = GetDefaultPeriod(this.logger);
             this.logger.LogInformation("OnActivateAsync.");
             this.filePrefix = "g" + this.GrainId.ToString().Replace('/', '_') + "_";
@@ -66,22 +68,127 @@ namespace UnitTests.Grains
                 dueTime = TimeSpan.FromSeconds(2) - reminderOptions.Value.MinimumReminderPeriod;
             else dueTime = usePeriod - TimeSpan.FromSeconds(2);
 
-            IGrainReminder r;
-            if (validate)
-                r = await this.RegisterOrUpdateReminder(reminderName, dueTime, usePeriod);
-            else
-                r = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, usePeriod);
-
-            this.allReminders[reminderName] = new(r);
-            this.sequence[reminderName] = 0;
-
-            string fileName = GetFileName(reminderName);
-            File.Delete(fileName); // if successfully started, then remove any old data
-            this.logger.LogInformation("Started reminder {Reminder}", r);
-            return r;
+            return await StartReminderWithOptions(
+                reminderName,
+                dueTime,
+                usePeriod,
+                ReminderPriority.Normal,
+                MissedReminderAction.Skip,
+                validate);
         }
 
-        public Task ReceiveReminder(string reminderName, TickStatus status)
+        public async Task<IGrainReminder> StartReminderWithOptions(
+            string reminderName,
+            TimeSpan dueTime,
+            TimeSpan reminderPeriod,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false)
+        {
+            IGrainReminder reminder;
+            if (validate)
+            {
+                reminder = await this.RegisterOrUpdateReminder(reminderName, dueTime, reminderPeriod, priority, action);
+            }
+            else
+            {
+                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueTime, reminderPeriod, priority, action);
+            }
+
+            this.allReminders[reminderName] = new(reminder);
+            this.sequence[reminderName] = 0;
+
+            var fileName = GetFileName(reminderName);
+            File.Delete(fileName);
+            this.logger.LogInformation("Started reminder {Reminder}", reminder);
+            return reminder;
+        }
+
+        public async Task<IGrainReminder> StartReminderAtUtc(
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan reminderPeriod,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false)
+        {
+            IGrainReminder reminder;
+            if (validate)
+            {
+                reminder = await this.RegisterOrUpdateReminder(reminderName, dueAtUtc, reminderPeriod, priority, action);
+            }
+            else
+            {
+                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, dueAtUtc, reminderPeriod, priority, action);
+            }
+
+            this.allReminders[reminderName] = new(reminder);
+            this.sequence[reminderName] = 0;
+
+            var fileName = GetFileName(reminderName);
+            File.Delete(fileName);
+            this.logger.LogInformation("Started absolute-due reminder {Reminder}", reminder);
+            return reminder;
+        }
+
+        public async Task<IGrainReminder> StartCronReminder(
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority = ReminderPriority.Normal,
+            MissedReminderAction action = MissedReminderAction.Skip,
+            bool validate = false)
+        {
+            IGrainReminder reminder;
+            if (validate)
+            {
+                reminder = await this.RegisterOrUpdateReminder(reminderName, cronExpression, priority, action);
+            }
+            else
+            {
+                reminder = await this.unvalidatedReminderRegistry.RegisterOrUpdateReminder(GrainId, reminderName, cronExpression, priority, action);
+            }
+
+            this.allReminders[reminderName] = new(reminder);
+            this.sequence[reminderName] = 0;
+
+            var fileName = GetFileName(reminderName);
+            File.Delete(fileName);
+            this.logger.LogInformation("Started cron reminder {Reminder}", reminder);
+            return reminder;
+        }
+
+        public async Task UpsertRawReminderEntry(
+            string reminderName,
+            DateTime startAtUtc,
+            TimeSpan reminderPeriod,
+            string cronExpression,
+            DateTime? nextDueUtc,
+            ReminderPriority priority,
+            MissedReminderAction action)
+        {
+            var entry = new ReminderEntry
+            {
+                GrainId = this.GrainId,
+                ReminderName = reminderName,
+                StartAt = startAtUtc,
+                Period = reminderPeriod,
+                CronExpression = cronExpression,
+                NextDueUtc = nextDueUtc,
+                LastFireUtc = null,
+                Priority = priority,
+                Action = action,
+            };
+
+            await this.reminderTable.UpsertRow(entry);
+            this.sequence[reminderName] = 0;
+            this.allReminders.Remove(reminderName);
+
+            var fileName = GetFileName(reminderName);
+            File.Delete(fileName);
+            this.logger.LogInformation("Upserted raw reminder entry {ReminderName}.", reminderName);
+        }
+
+        public async Task ReceiveReminder(string reminderName, TickStatus status)
         {
             // it can happen that due to failure, when a new activation is created,
             // it doesn't know which reminders were registered against the grain
@@ -92,7 +199,26 @@ namespace UnitTests.Grains
                 this.sequence.Add(reminderName, 0); // we'll get upto date to the latest sequence number while processing this tick
             }
 
-            allReminders[reminderName].Fired.Add(status.CurrentTickTime);
+            if (!this.allReminders.TryGetValue(reminderName, out var reminderState))
+            {
+                var reminder = await this.GetReminder(reminderName);
+                if (reminder is null)
+                {
+                    this.logger.LogWarning("ReceiveReminder called for missing reminder {ReminderName}.", reminderName);
+                    return;
+                }
+
+                reminderState = new(reminder);
+            }
+
+            reminderState.Fired.Add(status.CurrentTickTime);
+            this.allReminders[reminderName] = reminderState;
+            this.tickRecords.Add(new ReminderTickRecord(
+                reminderName,
+                status.CurrentTickTime,
+                status.FirstTickTime,
+                status.Period,
+                status.ScheduleKind));
 
             // calculating tick sequence number
 
@@ -100,10 +226,18 @@ namespace UnitTests.Grains
             // using dateTime.Ticks is not accurate as between two invocations of ReceiveReminder(), there maybe < period.Ticks
             // if # of ticks between two consecutive ReceiveReminder() is larger than period.Ticks, everything is fine... the problem is when its less
             // thus, we reduce our accuracy by ACCURACY ... here, we are preparing all used variables for the given accuracy
-            long now = status.CurrentTickTime.Ticks / aCCURACY; //DateTime.UtcNow.Ticks / ACCURACY;
-            long first = status.FirstTickTime.Ticks / aCCURACY;
-            long per = status.Period.Ticks / aCCURACY;
-            long sequenceNumber = 1 + ((now - first) / per);
+            long sequenceNumber;
+            if (status.ScheduleKind == ReminderScheduleKind.Cron || status.Period <= TimeSpan.Zero)
+            {
+                sequenceNumber = this.sequence[reminderName] + 1;
+            }
+            else
+            {
+                long now = status.CurrentTickTime.Ticks / aCCURACY; //DateTime.UtcNow.Ticks / ACCURACY;
+                long first = status.FirstTickTime.Ticks / aCCURACY;
+                long per = status.Period.Ticks / aCCURACY;
+                sequenceNumber = 1 + ((now - first) / per);
+            }
 
             // end of calculating tick sequence number
 
@@ -111,7 +245,7 @@ namespace UnitTests.Grains
             if (sequenceNumber < this.sequence[reminderName])
             {
                 this.logger.LogInformation("ReceiveReminder: {Reminder} Incorrect tick {ExpectedSequenceNumber} vs. {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], sequenceNumber, status);
-                return Task.CompletedTask;
+                return;
             }
             this.sequence[reminderName] = sequenceNumber;
             this.logger.LogInformation("ReceiveReminder: {ReminderNAme} Sequence # {SequenceNumber} with status {Status}.", reminderName, this.sequence[reminderName], status);
@@ -120,7 +254,7 @@ namespace UnitTests.Grains
             string counterValue = this.sequence[reminderName].ToString(CultureInfo.InvariantCulture);
             File.WriteAllText(fileName, counterValue);
 
-            return Task.CompletedTask;
+            return;
         }
 
         public async Task StopReminder(string reminderName)
@@ -204,6 +338,21 @@ namespace UnitTests.Grains
         public async Task<List<IGrainReminder>> GetRemindersList()
         {
             return await this.GetReminders();
+        }
+
+        public Task<List<ReminderTickRecord>> GetTickRecords()
+        {
+            return Task.FromResult(this.tickRecords.ToList());
+        }
+
+        public Task<List<ReminderTickRecord>> GetTickRecords(string reminderName)
+        {
+            return Task.FromResult(this.tickRecords.Where(t => string.Equals(t.ReminderName, reminderName, StringComparison.Ordinal)).ToList());
+        }
+
+        public async Task<ReminderEntry> GetReminderEntry(string reminderName)
+        {
+            return await this.reminderTable.ReadRow(this.GrainId, reminderName);
         }
 
         private string GetFileName(string reminderName)
@@ -431,6 +580,64 @@ namespace UnitTests.Grains
         public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, TimeSpan dueTime, TimeSpan period)
         {
             return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueAtUtc, period);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            TimeSpan dueTime,
+            TimeSpan period,
+            ReminderPriority priority,
+            MissedReminderAction action)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueTime, period, priority, action);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            ReminderPriority priority,
+            MissedReminderAction action)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, dueAtUtc, period, priority, action);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, string cronExpression)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(GrainId callingGrainId, string reminderName, string cronExpression, string cronTimeZoneId)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, cronTimeZoneId);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority,
+            MissedReminderAction action)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, priority, action);
+        }
+
+        public Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId callingGrainId,
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority,
+            MissedReminderAction action,
+            string cronTimeZoneId)
+        {
+            return GetGrainService(callingGrainId).RegisterOrUpdateReminder(callingGrainId, reminderName, cronExpression, priority, action, cronTimeZoneId);
         }
 
         public Task UnregisterReminder(GrainId callingGrainId, IGrainReminder reminder)

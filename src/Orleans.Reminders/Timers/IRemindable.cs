@@ -21,6 +21,59 @@ namespace Orleans
     namespace Runtime
     {
         /// <summary>
+        /// Represents the schedule type of a reminder tick.
+        /// </summary>
+        public enum ReminderScheduleKind : byte
+        {
+            /// <summary>
+            /// A fixed interval reminder schedule.
+            /// </summary>
+            Interval = 0,
+
+            /// <summary>
+            /// A cron-based reminder schedule.
+            /// </summary>
+            Cron = 1
+        }
+
+        /// <summary>
+        /// Priority of reminder processing.
+        /// </summary>
+        public enum ReminderPriority : byte
+        {
+            /// <summary>
+            /// Default priority reminders.
+            /// </summary>
+            Normal = 0,
+
+            /// <summary>
+            /// High priority reminders.
+            /// </summary>
+            High = 1,
+        }
+
+        /// <summary>
+        /// Action to apply when a reminder tick was missed.
+        /// </summary>
+        public enum MissedReminderAction : byte
+        {
+            /// <summary>
+            /// Skip missed ticks and move to the next due occurrence.
+            /// </summary>
+            Skip = 0,
+
+            /// <summary>
+            /// Fire the reminder immediately.
+            /// </summary>
+            FireImmediately = 1,
+
+            /// <summary>
+            /// Notify about the miss without firing the reminder.
+            /// </summary>
+            Notify = 2,
+        }
+
+        /// <summary>
         /// Handle for a persistent Reminder.
         /// </summary>
         public interface IGrainReminder
@@ -29,6 +82,28 @@ namespace Orleans
             /// Gets the name of this reminder.
             /// </summary>
             string ReminderName { get; }
+
+            /// <summary>
+            /// Gets the cron expression for this reminder.
+            /// Returns <see cref="string.Empty"/> for interval-based reminders.
+            /// </summary>
+            string CronExpression { get; }
+
+            /// <summary>
+            /// Gets the cron time zone identifier for this reminder.
+            /// Returns <see cref="string.Empty"/> for UTC scheduling or interval-based reminders.
+            /// </summary>
+            string CronTimeZone { get; }
+
+            /// <summary>
+            /// Gets the priority of this reminder.
+            /// </summary>
+            ReminderPriority Priority { get; }
+
+            /// <summary>
+            /// Gets the missed-tick behavior for this reminder.
+            /// </summary>
+            MissedReminderAction Action { get; }
         }
 
         /// <summary>
@@ -61,21 +136,33 @@ namespace Orleans
             public DateTime CurrentTickTime { get; }
 
             /// <summary>
+            /// Gets the schedule kind for this reminder.
+            /// </summary>
+            [Id(3)]
+            public ReminderScheduleKind ScheduleKind { get; }
+
+            /// <summary>
             /// Creates a new <see cref="TickStatus"/> instance.
             /// </summary>
             /// <param name="firstTickTime">The time at which the first tick of the reminder is due.</param>
             /// <param name="period">The period of the reminder.</param>
             /// <param name="timeStamp">The time when delivery of the current tick was initiated.</param>
+            /// <param name="scheduleKind">The schedule kind.</param>
             /// <returns></returns>
-            public TickStatus(DateTime firstTickTime, TimeSpan period, DateTime timeStamp)
+            public TickStatus(
+                DateTime firstTickTime,
+                TimeSpan period,
+                DateTime timeStamp,
+                ReminderScheduleKind scheduleKind = ReminderScheduleKind.Interval)
             {
                 FirstTickTime = firstTickTime;
                 Period = period;
                 CurrentTickTime = timeStamp;
+                ScheduleKind = scheduleKind;
             }
 
             /// <inheritdoc/>
-            public override string ToString() => $"<{FirstTickTime}, {Period}, {CurrentTickTime}>";
+            public override string ToString() => $"<{FirstTickTime}, {Period}, {CurrentTickTime}, {ScheduleKind}>";
         }
 
         /// <summary>

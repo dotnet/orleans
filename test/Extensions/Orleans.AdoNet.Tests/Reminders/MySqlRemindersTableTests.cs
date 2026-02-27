@@ -72,5 +72,23 @@ namespace UnitTests.RemindersTest
         {
             await ReminderSimple();
         }
+
+        [SkippableFact]
+        public async Task RemindersTable_MySql_ReminderCronRoundTrip()
+        {
+            await ReminderCronRoundTrip();
+        }
+
+        [SkippableFact]
+        public async Task RemindersTable_MySql_ReminderAdaptiveFieldsRoundTrip()
+        {
+            await ReminderAdaptiveFieldsRoundTrip();
+        }
+
+        [SkippableFact]
+        public async Task RemindersTable_MySql_ReminderCronTimeZoneRoundTrip()
+        {
+            await ReminderCronTimeZoneRoundTrip();
+        }
     }
 }

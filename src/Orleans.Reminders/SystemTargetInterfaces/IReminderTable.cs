@@ -189,14 +189,53 @@ namespace Orleans
         [Id(4)]
         public string ETag { get; set; }
 
+        /// <summary>
+        /// Gets or sets the cron expression for this reminder.
+        /// If null or empty, the reminder uses <see cref="StartAt"/> and <see cref="Period"/> interval semantics.
+        /// </summary>
+        [Id(5)]
+        public string CronExpression { get; set; }
+
+        /// <summary>
+        /// Gets or sets the time zone id used to evaluate <see cref="CronExpression"/>.
+        /// Null or empty indicates UTC scheduling.
+        /// </summary>
+        [Id(10)]
+        public string CronTimeZoneId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the next due timestamp for this reminder in UTC.
+        /// </summary>
+        [Id(6)]
+        public DateTime? NextDueUtc { get; set; }
+
+        /// <summary>
+        /// Gets or sets the timestamp when this reminder was last fired in UTC.
+        /// </summary>
+        [Id(7)]
+        public DateTime? LastFireUtc { get; set; }
+
+        /// <summary>
+        /// Gets or sets the reminder priority.
+        /// </summary>
+        [Id(8)]
+        public Runtime.ReminderPriority Priority { get; set; } = Runtime.ReminderPriority.Normal;
+
+        /// <summary>
+        /// Gets or sets the missed reminder action.
+        /// </summary>
+        [Id(9)]
+        public Runtime.MissedReminderAction Action { get; set; } = Runtime.MissedReminderAction.Skip;
+
         /// <inheritdoc/>
-        public override string ToString() => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period}>";
+        public override string ToString()
+            => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period} Cron={CronExpression} CronTimeZoneId={CronTimeZoneId} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action}>";
 
         /// <summary>
         /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.
         /// </summary>
         /// <returns>The <see cref="IGrainReminder"/>.</returns>
-        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag);
+        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag, CronExpression, Priority, Action, CronTimeZoneId);
     }
 
     [Serializable, GenerateSerializer, Immutable]
@@ -208,14 +247,33 @@ namespace Orleans
         public string ReminderName { get; }
         [Id(2)]
         public readonly string ETag;
+        [Id(3)]
+        public string CronExpression { get; }
+        [Id(4)]
+        public Runtime.ReminderPriority Priority { get; }
+        [Id(5)]
+        public Runtime.MissedReminderAction Action { get; }
+        [Id(6)]
+        public string CronTimeZone { get; }
 
-        internal ReminderData(GrainId grainId, string reminderName, string eTag)
+        internal ReminderData(
+            GrainId grainId,
+            string reminderName,
+            string eTag,
+            string cronExpression = "",
+            Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal,
+            Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip,
+            string cronTimeZoneId = "")
         {
             GrainId = grainId;
             ReminderName = reminderName;
             ETag = eTag;
+            CronExpression = cronExpression ?? string.Empty;
+            Priority = priority;
+            Action = action;
+            CronTimeZone = cronTimeZoneId ?? string.Empty;
         }
 
-        public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag}>";
+        public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag} CronExpression={CronExpression} CronTimeZone={CronTimeZone} Priority={Priority} Action={Action}>";
     }
 }

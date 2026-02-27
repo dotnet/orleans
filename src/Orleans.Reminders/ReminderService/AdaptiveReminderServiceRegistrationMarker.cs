@@ -1,0 +1,3 @@
+namespace Orleans.Runtime.ReminderService;
+
+internal sealed class AdaptiveReminderServiceRegistrationMarker;

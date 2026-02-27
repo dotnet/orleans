@@ -10,6 +10,7 @@ using Orleans.GrainReferences;
 using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Metadata;
+using Orleans.Reminders.Cron.Internal;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
@@ -28,6 +29,8 @@ namespace Orleans.Runtime.ReminderService
         private readonly TaskCompletionSource<bool> startedTask;
         private readonly IAsyncTimerFactory asyncTimerFactory;
         private readonly IAsyncTimer listRefreshTimer; // timer that refreshes our list of reminders to reflect global reminder table
+        private readonly TimeProvider _timeProvider;
+        private readonly bool _legacyServiceSuppressed;
         private readonly GrainReferenceActivator _referenceActivator;
         private readonly GrainInterfaceType _grainInterfaceType;
         private long localTableSequence;
@@ -40,8 +43,10 @@ namespace Orleans.Runtime.ReminderService
             IReminderTable reminderTable,
             IAsyncTimerFactory asyncTimerFactory,
             IOptions<ReminderOptions> reminderOptions,
+            TimeProvider timeProvider,
             IConsistentRingProvider ringProvider,
-            SystemTargetShared shared)
+            SystemTargetShared shared,
+            AdaptiveReminderServiceRegistrationMarker adaptiveReminderServiceRegistrationMarker = null)
             : base(
                   SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, shared.SiloAddress),
                   ringProvider,
@@ -52,15 +57,29 @@ namespace Orleans.Runtime.ReminderService
             this.reminderOptions = reminderOptions.Value;
             this.reminderTable = reminderTable;
             this.asyncTimerFactory = asyncTimerFactory;
+            _timeProvider = timeProvider;
             ReminderInstruments.RegisterActiveRemindersObserve(() => localReminders.Count);
             startedTask = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
             this.logger = shared.LoggerFactory.CreateLogger<LocalReminderService>();
             this.listRefreshTimer = asyncTimerFactory.Create(this.reminderOptions.RefreshReminderListPeriod, "ReminderService.ReminderListRefresher");
-            shared.ActivationDirectory.RecordNewTarget(this);
+            _legacyServiceSuppressed = !this.reminderOptions.EnableLegacyReminderService
+                || adaptiveReminderServiceRegistrationMarker is not null;
+            if (!_legacyServiceSuppressed)
+            {
+                shared.ActivationDirectory.RecordNewTarget(this);
+            }
         }
+
+        private DateTime UtcNow => _timeProvider.GetUtcNow().UtcDateTime;
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle observer)
         {
+            if (_legacyServiceSuppressed)
+            {
+                LogInfoLegacyReminderServiceDisabled();
+                return;
+            }
+
             observer.Subscribe(
                 nameof(LocalReminderService),
                 ServiceLifecycleStage.BecomeActive,
@@ -147,13 +166,57 @@ namespace Orleans.Runtime.ReminderService
         }
 
         public async Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                dueTime,
+                period,
+                ReminderPriority.Normal,
+                MissedReminderAction.Skip);
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, DateTime dueAtUtc, TimeSpan period)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                dueAtUtc,
+                period,
+                ReminderPriority.Normal,
+                MissedReminderAction.Skip);
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            TimeSpan dueTime,
+            TimeSpan period,
+            ReminderPriority priority,
+            MissedReminderAction action)
         {
+            var dueAt = UtcNow.Add(dueTime);
+            return await RegisterOrUpdateReminder(grainId, reminderName, dueAt, period, priority, action);
+        }
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            DateTime dueAtUtc,
+            TimeSpan period,
+            ReminderPriority priority,
+            MissedReminderAction action)
+        {
+            if (dueAtUtc.Kind != DateTimeKind.Utc)
+            {
+                throw new ArgumentException("Due timestamp must use DateTimeKind.Utc.", nameof(dueAtUtc));
+            }
+
             var entry = new ReminderEntry
             {
                 GrainId = grainId,
                 ReminderName = reminderName,
-                StartAt = DateTime.UtcNow.Add(dueTime),
+                StartAt = dueAtUtc,
                 Period = period,
+                Priority = priority,
+                Action = action,
+                NextDueUtc = dueAtUtc,
             };
 
             LogDebugRegisterOrUpdateReminder(entry);
@@ -166,7 +229,89 @@ namespace Orleans.Runtime.ReminderService
                 entry.ETag = newEtag;
                 StartAndAddTimer(entry);
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
-                return new ReminderData(grainId, reminderName, newEtag);
+                return new ReminderData(grainId, reminderName, newEtag, entry.CronExpression, entry.Priority, entry.Action, entry.CronTimeZoneId);
+            }
+
+            LogErrorRegisterReminder(entry);
+            throw new ReminderException($"Could not register reminder {entry} to reminder table due to a race. Please try again later.");
+        }
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(GrainId grainId, string reminderName, string cronExpression)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                cronExpression,
+                priority: ReminderPriority.Normal,
+                action: MissedReminderAction.Skip,
+                cronTimeZoneId: null);
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            string cronExpression,
+            string cronTimeZoneId)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                cronExpression,
+                priority: ReminderPriority.Normal,
+                action: MissedReminderAction.Skip,
+                cronTimeZoneId: cronTimeZoneId);
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority,
+            MissedReminderAction action)
+            => await RegisterOrUpdateReminder(
+                grainId,
+                reminderName,
+                cronExpression,
+                priority: priority,
+                action: action,
+                cronTimeZoneId: null);
+
+        public async Task<IGrainReminder> RegisterOrUpdateReminder(
+            GrainId grainId,
+            string reminderName,
+            string cronExpression,
+            ReminderPriority priority,
+            MissedReminderAction action,
+            string cronTimeZoneId)
+        {
+            var cronSchedule = ReminderCronSchedule.Parse(cronExpression, cronTimeZoneId);
+            var now = UtcNow;
+            var nextTick = cronSchedule.GetNextOccurrence(now);
+            if (nextTick is null)
+            {
+                throw new ReminderException($"The cron expression '{cronExpression}' for reminder '{reminderName}' has no future occurrences.");
+            }
+
+            var entry = new ReminderEntry
+            {
+                GrainId = grainId,
+                ReminderName = reminderName,
+                StartAt = nextTick.Value,
+                Period = TimeSpan.Zero,
+                CronExpression = cronSchedule.Expression.ToExpressionString(),
+                CronTimeZoneId = cronSchedule.TimeZoneId,
+                Priority = priority,
+                Action = action,
+                NextDueUtc = nextTick.Value
+            };
+
+            LogDebugRegisterOrUpdateReminder(entry);
+            await DoResponsibilitySanityCheck(grainId, "RegisterReminderCron");
+            var newEtag = await reminderTable.UpsertRow(entry);
+
+            if (newEtag != null)
+            {
+                LogDebugRegisterReminder(entry, localTableSequence);
+                entry.ETag = newEtag;
+                StartAndAddTimer(entry);
+                if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
+                return new ReminderData(grainId, reminderName, newEtag, entry.CronExpression, entry.Priority, entry.Action, entry.CronTimeZoneId);
             }
 
             LogErrorRegisterReminder(entry);
@@ -483,6 +628,21 @@ namespace Orleans.Runtime.ReminderService
             return true;
         }
 
+        private void ScheduleRemoveLocalReminder(ReminderIdentity identity, LocalReminderData expectedReminder)
+        {
+            _ = this.QueueTask(() =>
+            {
+                if (localReminders.TryGetValue(identity, out var currentReminder)
+                    && ReferenceEquals(currentReminder, expectedReminder))
+                {
+                    currentReminder.StopReminder();
+                    localReminders.Remove(identity);
+                }
+
+                return Task.CompletedTask;
+            });
+        }
+
         private Task DoResponsibilitySanityCheck(GrainId grainId, string debugInfo)
         {
             switch (Status)
@@ -549,10 +709,14 @@ namespace Orleans.Runtime.ReminderService
         private sealed class LocalReminderData
         {
             private readonly IRemindable remindable;
+            private readonly LocalReminderService reminderService;
             private readonly DateTime firstTickTime; // time for the first tick of this reminder
             private readonly TimeSpan period;
+            private readonly ReminderScheduleKind scheduleKind;
             private readonly ILogger logger;
             private readonly IAsyncTimer timer;
+            private readonly TimeProvider timeProvider;
+            private readonly ReminderCronSchedule cronSchedule;
 
             private ValueStopwatch stopwatch;
             private Task runTask;
@@ -560,13 +724,26 @@ namespace Orleans.Runtime.ReminderService
             internal LocalReminderData(ReminderEntry entry, LocalReminderService reminderService)
             {
                 Identity = new ReminderIdentity(entry.GrainId, entry.ReminderName);
+                this.reminderService = reminderService;
                 firstTickTime = entry.StartAt;
                 period = entry.Period;
                 remindable = reminderService.GetGrain(entry.GrainId);
                 ETag = entry.ETag;
                 LocalSequenceNumber = -1;
                 logger = reminderService.logger;
-                this.timer = reminderService.asyncTimerFactory.Create(period, "");
+                timeProvider = reminderService._timeProvider;
+                if (!string.IsNullOrWhiteSpace(entry.CronExpression))
+                {
+                    scheduleKind = ReminderScheduleKind.Cron;
+                    cronSchedule = ReminderCronSchedule.Parse(entry.CronExpression, entry.CronTimeZoneId);
+                    this.timer = reminderService.asyncTimerFactory.Create(TimeSpan.FromSeconds(1), "");
+                }
+                else
+                {
+                    scheduleKind = ReminderScheduleKind.Interval;
+                    cronSchedule = null!;
+                    this.timer = reminderService.asyncTimerFactory.Create(period, "");
+                }
             }
 
             public ReminderIdentity Identity { get; }
@@ -604,7 +781,7 @@ namespace Orleans.Runtime.ReminderService
             private async Task RunAsync()
             {
                 TimeSpan? dueTimeSpan = CalculateDueTime();
-                while (await this.timer.NextTick(dueTimeSpan))
+                while (dueTimeSpan is not null && await this.timer.NextTick(dueTimeSpan))
                 {
                     try
                     {
@@ -618,12 +795,40 @@ namespace Orleans.Runtime.ReminderService
 
                     dueTimeSpan = CalculateDueTime();
                 }
+
+                if (dueTimeSpan is null)
+                {
+                    LogWarningCronReminderHasNoFutureOccurrence(
+                        logger,
+                        Identity.ReminderName,
+                        Identity.GrainId,
+                        cronSchedule.Expression.ToString());
+                    reminderService.ScheduleRemoveLocalReminder(Identity, this);
+                }
             }
 
-            private TimeSpan CalculateDueTime()
+            private TimeSpan? CalculateDueTime()
             {
+                if (scheduleKind == ReminderScheduleKind.Cron)
+                {
+                    var currentUtc = timeProvider.GetUtcNow().UtcDateTime;
+                    var next = cronSchedule.GetNextOccurrence(currentUtc);
+                    if (next is null)
+                    {
+                        return null;
+                    }
+
+                    var due = next.Value - currentUtc;
+                    if (due <= TimeSpan.Zero)
+                    {
+                        due = TimeSpan.FromMilliseconds(1);
+                    }
+
+                    return due;
+                }
+
                 TimeSpan dueTimeSpan;
-                var now = DateTime.UtcNow;
+                var now = timeProvider.GetUtcNow().UtcDateTime;
                 if (now < firstTickTime) // if the time for first tick hasn't passed yet
                 {
                     dueTimeSpan = firstTickTime.Subtract(now); // then duetime is duration between now and the first tick time
@@ -657,13 +862,17 @@ namespace Orleans.Runtime.ReminderService
 
             public async Task OnTimerTick()
             {
-                var before = DateTime.UtcNow;
-                var status = new TickStatus(firstTickTime, period, before);
+                var before = timeProvider.GetUtcNow().UtcDateTime;
+                var status = new TickStatus(
+                    firstTickTime,
+                    scheduleKind == ReminderScheduleKind.Cron ? TimeSpan.Zero : period,
+                    before,
+                    scheduleKind);
 
                 LogTraceTriggeringTick(logger, this, status, before);
                 try
                 {
-                    if (stopwatch.IsRunning)
+                    if (stopwatch.IsRunning && scheduleKind == ReminderScheduleKind.Interval)
                     {
                         stopwatch.Stop();
                         var tardiness = stopwatch.Elapsed - period;
@@ -674,13 +883,19 @@ namespace Orleans.Runtime.ReminderService
 
                     stopwatch.Restart();
 
-                    var after = DateTime.UtcNow;
-                    LogTraceTickTriggered(logger, this, (after - before).TotalSeconds, after + period);
+                    var after = timeProvider.GetUtcNow().UtcDateTime;
+                    var nextExpected = scheduleKind == ReminderScheduleKind.Interval
+                        ? after + period
+                        : after + (CalculateDueTime() ?? TimeSpan.Zero);
+                    LogTraceTickTriggered(logger, this, (after - before).TotalSeconds, nextExpected);
                 }
                 catch (Exception exc)
                 {
-                    var after = DateTime.UtcNow;
-                    LogErrorDeliveringReminderTick(logger, this, after + period, exc);
+                    var after = timeProvider.GetUtcNow().UtcDateTime;
+                    var nextExpected = scheduleKind == ReminderScheduleKind.Interval
+                        ? after + period
+                        : after + (CalculateDueTime() ?? TimeSpan.Zero);
+                    LogErrorDeliveringReminderTick(logger, this, nextExpected, exc);
                     // What to do with repeated failures to deliver a reminder's ticks?
                 }
             }
@@ -712,6 +927,12 @@ namespace Orleans.Runtime.ReminderService
 
             public override readonly int GetHashCode() => HashCode.Combine(GrainId, ReminderName);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Legacy reminder service is disabled and will not be started."
+        )]
+        private partial void LogInfoLegacyReminderServiceDisabled();
 
         [LoggerMessage(
             Level = LogLevel.Error,
@@ -942,6 +1163,12 @@ namespace Orleans.Runtime.ReminderService
             Message = "Exception firing reminder \"{ReminderName}\" for grain {GrainId}"
         )]
         private static partial void LogWarningFiringReminder(ILogger logger, string reminderName, GrainId grainId, Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Stopping cron reminder \"{ReminderName}\" for grain {GrainId}: expression \"{CronExpression}\" has no future occurrences."
+        )]
+        private static partial void LogWarningCronReminderHasNoFutureOccurrence(ILogger logger, string reminderName, GrainId grainId, string cronExpression);
 
         [LoggerMessage(
             Level = LogLevel.Trace,

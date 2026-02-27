@@ -29,6 +29,30 @@ internal class ReminderEntity : BaseEntity
     [JsonPropertyName(nameof(Period))]
     public TimeSpan Period { get; set; }
 
+    [JsonProperty(nameof(CronExpression))]
+    [JsonPropertyName(nameof(CronExpression))]
+    public string? CronExpression { get; set; }
+
+    [JsonProperty(nameof(CronTimeZoneId))]
+    [JsonPropertyName(nameof(CronTimeZoneId))]
+    public string? CronTimeZoneId { get; set; }
+
+    [JsonProperty(nameof(NextDueUtc))]
+    [JsonPropertyName(nameof(NextDueUtc))]
+    public DateTimeOffset? NextDueUtc { get; set; }
+
+    [JsonProperty(nameof(LastFireUtc))]
+    [JsonPropertyName(nameof(LastFireUtc))]
+    public DateTimeOffset? LastFireUtc { get; set; }
+
+    [JsonProperty(nameof(Priority))]
+    [JsonPropertyName(nameof(Priority))]
+    public int Priority { get; set; } = (int)Orleans.Runtime.ReminderPriority.Normal;
+
+    [JsonProperty(nameof(Action))]
+    [JsonPropertyName(nameof(Action))]
+    public int Action { get; set; } = (int)Orleans.Runtime.MissedReminderAction.Skip;
+
     [JsonProperty(nameof(GrainHash))]
     [JsonPropertyName(nameof(GrainHash))]
     public uint GrainHash { get; set; }

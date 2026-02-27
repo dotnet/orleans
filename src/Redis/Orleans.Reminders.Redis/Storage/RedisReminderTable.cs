@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.IO;
 using System.Text;
 using System.Threading.Tasks;
 
@@ -9,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -190,17 +192,114 @@ namespace Orleans.Reminders.Redis
 
         private static ReminderEntry ConvertToEntry(string reminderValue)
         {
-            string[] segments = JsonConvert.DeserializeObject<string[]>($"[{reminderValue}]");
+            var segments = ParseSegments(reminderValue);
 
             return new ReminderEntry
             {
-                GrainId = GrainId.Parse(segments[1]),
-                ReminderName = segments[2],
-                ETag = segments[3],
-                StartAt = DateTime.Parse(segments[4], null, DateTimeStyles.RoundtripKind),
-                Period = TimeSpan.Parse(segments[5]),
+                GrainId = GrainId.Parse(ReadRequiredString(segments, 1)),
+                ReminderName = ReadRequiredString(segments, 2),
+                ETag = ReadRequiredString(segments, 3),
+                StartAt = DateTime.Parse(ReadRequiredString(segments, 4), CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind),
+                Period = TimeSpan.Parse(ReadRequiredString(segments, 5), CultureInfo.InvariantCulture),
+                CronExpression = ReadNullableString(segments, 6),
+                NextDueUtc = ReadNullableDateTime(segments, 7),
+                LastFireUtc = ReadNullableDateTime(segments, 8),
+                Priority = ReadReminderPriority(segments, 9),
+                Action = ReadMissedReminderAction(segments, 10),
+                CronTimeZoneId = ReadNullableString(segments, 11),
             };
         }
+
+        private static JArray ParseSegments(string reminderValue)
+        {
+            // Keep timestamp segments as raw strings so DateTime parsing stays explicit and invariant.
+            using var stringReader = new StringReader($"[{reminderValue}]");
+            using var jsonReader = new JsonTextReader(stringReader)
+            {
+                DateParseHandling = DateParseHandling.None,
+            };
+            return JArray.Load(jsonReader);
+        }
+
+        private static string ReadRequiredString(JArray segments, int index)
+        {
+            if (segments.Count <= index)
+            {
+                throw new FormatException($"Reminder payload is missing segment {index}.");
+            }
+
+            return segments[index]?.ToString() ?? throw new FormatException($"Reminder payload segment {index} is null.");
+        }
+
+        private static string ReadNullableString(JArray segments, int index)
+        {
+            if (segments.Count <= index)
+            {
+                return null;
+            }
+
+            var value = segments[index]?.ToString();
+            return string.IsNullOrWhiteSpace(value) ? null : value;
+        }
+
+        private static DateTime? ReadNullableDateTime(JArray segments, int index)
+        {
+            var value = ReadNullableString(segments, index);
+            return value is null ? null : DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        }
+
+        private static ReminderPriority ReadReminderPriority(JArray segments, int index)
+        {
+            if (!TryReadInt32(segments, index, out var value))
+            {
+                return ReminderPriority.Normal;
+            }
+
+            return ParsePriority(value);
+        }
+
+        private static MissedReminderAction ReadMissedReminderAction(JArray segments, int index)
+        {
+            if (!TryReadInt32(segments, index, out var value))
+            {
+                return MissedReminderAction.Skip;
+            }
+
+            return ParseAction(value);
+        }
+
+        private static bool TryReadInt32(JArray segments, int index, out int value)
+        {
+            value = default;
+            if (segments.Count <= index || segments[index] is not { } token || token.Type is JTokenType.Null)
+            {
+                return false;
+            }
+
+            if (token.Type is JTokenType.Integer)
+            {
+                value = token.Value<int>();
+                return true;
+            }
+
+            var text = token.ToString();
+            return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static ReminderPriority ParsePriority(int value) => value switch
+        {
+            (int)ReminderPriority.High => ReminderPriority.High,
+            (int)ReminderPriority.Normal => ReminderPriority.Normal,
+            _ => ReminderPriority.Normal,
+        };
+
+        private static MissedReminderAction ParseAction(int value) => value switch
+        {
+            (int)MissedReminderAction.FireImmediately => MissedReminderAction.FireImmediately,
+            (int)MissedReminderAction.Skip => MissedReminderAction.Skip,
+            (int)MissedReminderAction.Notify => MissedReminderAction.Notify,
+            _ => MissedReminderAction.Skip,
+        };
 
         private (RedisValue from, RedisValue to) GetFilter(uint grainHash)
         {
@@ -232,14 +331,20 @@ namespace Orleans.Reminders.Redis
         {
             string grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
             string eTag = Guid.NewGuid().ToString();
-            string[] segments = new string[]
+            object[] segments = new object[]
             {
                 grainHash,
                 entry.GrainId.ToString(),
                 entry.ReminderName,
                 eTag,
-                entry.StartAt.ToString("O"),
-                entry.Period.ToString()
+                entry.StartAt.ToString("O", CultureInfo.InvariantCulture),
+                entry.Period.ToString("c", CultureInfo.InvariantCulture),
+                entry.CronExpression ?? string.Empty,
+                entry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+                entry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+                (int)entry.Priority,
+                (int)entry.Action,
+                entry.CronTimeZoneId ?? string.Empty
             };
 
             return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);

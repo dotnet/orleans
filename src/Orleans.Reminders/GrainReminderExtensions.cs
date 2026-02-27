@@ -43,13 +43,148 @@ public static class GrainReminderExtensions
     public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, TimeSpan dueTime, TimeSpan period)
         => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period);
 
+    /// <summary>
+    /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp.
+    /// The grain must implement the <c>Orleans.IRemindable</c> interface, and reminders for this grain will be sent to the <c>ReceiveReminder</c> callback method.
+    /// If the current grain is deactivated when the timer fires, a new activation of this grain will be created to receive this reminder.
+    /// If an existing reminder with the same name already exists, that reminder will be overwritten with this new reminder.
+    /// Reminders will always be received by one activation of this grain, even if multiple activations exist for this grain.
+    /// </summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">Name of this reminder</param>
+    /// <param name="dueAtUtc">UTC timestamp for this reminder's first tick.</param>
+    /// <param name="period">Frequency period for this reminder</param>
+    /// <returns>Promise for Reminder handle.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueAtUtc, period);
+
+    /// <summary>
+    /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp.
+    /// The grain must implement the <c>Orleans.IRemindable</c> interface, and reminders for this grain will be sent to the <c>ReceiveReminder</c> callback method.
+    /// If the current grain is deactivated when the timer fires, a new activation of this grain will be created to receive this reminder.
+    /// If an existing reminder with the same name already exists, that reminder will be overwritten with this new reminder.
+    /// Reminders will always be received by one activation of this grain, even if multiple activations exist for this grain.
+    /// </summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">Name of this reminder</param>
+    /// <param name="dueAtUtc">UTC timestamp for this reminder's first tick.</param>
+    /// <param name="period">Frequency period for this reminder</param>
+    /// <returns>Promise for Reminder handle.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueAtUtc, period);
+
+    /// <summary>
+    /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain with adaptive delivery options.
+    /// </summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">Name of this reminder.</param>
+    /// <param name="dueTime">Due time for this reminder.</param>
+    /// <param name="period">Frequency period for this reminder.</param>
+    /// <param name="priority">Reminder priority.</param>
+    /// <param name="action">Missed reminder action.</param>
+    /// <returns>Promise for Reminder handle.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this Grain grain,
+        string reminderName,
+        TimeSpan dueTime,
+        TimeSpan period,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period, priority, action);
+
+    /// <summary>
+    /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain with adaptive delivery options.
+    /// </summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">Name of this reminder.</param>
+    /// <param name="dueTime">Due time for this reminder.</param>
+    /// <param name="period">Frequency period for this reminder.</param>
+    /// <param name="priority">Reminder priority.</param>
+    /// <param name="action">Missed reminder action.</param>
+    /// <returns>Promise for Reminder handle.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IGrainBase grain,
+        string reminderName,
+        TimeSpan dueTime,
+        TimeSpan period,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueTime, period, priority, action);
+
+    /// <summary>
+    /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp with adaptive delivery options.
+    /// </summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">Name of this reminder.</param>
+    /// <param name="dueAtUtc">UTC timestamp for this reminder's first tick.</param>
+    /// <param name="period">Frequency period for this reminder.</param>
+    /// <param name="priority">Reminder priority.</param>
+    /// <param name="action">Missed reminder action.</param>
+    /// <returns>Promise for Reminder handle.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this Grain grain,
+        string reminderName,
+        DateTime dueAtUtc,
+        TimeSpan period,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueAtUtc, period, priority, action);
+
+    /// <summary>
+    /// Registers a persistent, reliable reminder to send regular notifications (reminders) to the grain using an absolute UTC due timestamp with adaptive delivery options.
+    /// </summary>
+    /// <param name="grain">The grain instance.</param>
+    /// <param name="reminderName">Name of this reminder.</param>
+    /// <param name="dueAtUtc">UTC timestamp for this reminder's first tick.</param>
+    /// <param name="period">Frequency period for this reminder.</param>
+    /// <param name="priority">Reminder priority.</param>
+    /// <param name="action">Missed reminder action.</param>
+    /// <returns>Promise for Reminder handle.</returns>
+    public static Task<IGrainReminder> RegisterOrUpdateReminder(
+        this IGrainBase grain,
+        string reminderName,
+        DateTime dueAtUtc,
+        TimeSpan period,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+        => RegisterOrUpdateReminder(grain is IRemindable, grain?.GrainContext, reminderName, dueAtUtc, period, priority, action);
+
     private static Task<IGrainReminder> RegisterOrUpdateReminder(bool remindable, IGrainContext? grainContext, string reminderName, TimeSpan dueTime, TimeSpan period)
+        => RegisterOrUpdateReminder(grainContext: grainContext, remindable: remindable, reminderName: reminderName, dueTime: dueTime, period: period, priority: Runtime.ReminderPriority.Normal, action: Runtime.MissedReminderAction.Skip);
+
+    private static Task<IGrainReminder> RegisterOrUpdateReminder(bool remindable, IGrainContext? grainContext, string reminderName, DateTime dueAtUtc, TimeSpan period)
+        => RegisterOrUpdateReminder(grainContext: grainContext, remindable: remindable, reminderName: reminderName, dueAtUtc: dueAtUtc, period: period, priority: Runtime.ReminderPriority.Normal, action: Runtime.MissedReminderAction.Skip);
+
+    private static Task<IGrainReminder> RegisterOrUpdateReminder(
+        bool remindable,
+        IGrainContext? grainContext,
+        string reminderName,
+        TimeSpan dueTime,
+        TimeSpan period,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
         if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{nameof(IRemindable)}'. A grain should implement {nameof(IRemindable)} to use the persistent reminder service");
 
-        return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueTime, period);
+        return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueTime, period, priority, action);
+    }
+
+    private static Task<IGrainReminder> RegisterOrUpdateReminder(
+        bool remindable,
+        IGrainContext? grainContext,
+        string reminderName,
+        DateTime dueAtUtc,
+        TimeSpan period,
+        Runtime.ReminderPriority priority,
+        Runtime.MissedReminderAction action)
+    {
+        ArgumentNullException.ThrowIfNull(grainContext, "grain");
+        if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
+        if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{nameof(IRemindable)}'. A grain should implement {nameof(IRemindable)} to use the persistent reminder service");
+
+        return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueAtUtc, period, priority, action);
     }
 
     /// <summary>

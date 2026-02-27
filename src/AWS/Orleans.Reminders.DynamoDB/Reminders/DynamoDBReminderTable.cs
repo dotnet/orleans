@@ -6,6 +6,7 @@ using Orleans.Configuration;
 using Orleans.Runtime;
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Threading.Tasks;
 
 namespace Orleans.Reminders.DynamoDB
@@ -20,6 +21,12 @@ namespace Orleans.Reminders.DynamoDB
         private const string SERVICE_ID_PROPERTY_NAME = "ServiceId";
         private const string START_TIME_PROPERTY_NAME = "StartTime";
         private const string PERIOD_PROPERTY_NAME = "Period";
+        private const string CRON_EXPRESSION_PROPERTY_NAME = "CronExpression";
+        private const string CRON_TIME_ZONE_ID_PROPERTY_NAME = "CronTimeZoneId";
+        private const string NEXT_DUE_UTC_PROPERTY_NAME = "NextDueUtc";
+        private const string LAST_FIRE_UTC_PROPERTY_NAME = "LastFireUtc";
+        private const string PRIORITY_PROPERTY_NAME = "Priority";
+        private const string ACTION_PROPERTY_NAME = "Action";
         private const string GRAIN_HASH_PROPERTY_NAME = "GrainHash";
         private const string REMINDER_ID_PROPERTY_NAME = "ReminderId";
         private const string ETAG_PROPERTY_NAME = "ETag";
@@ -219,11 +226,73 @@ namespace Orleans.Reminders.DynamoDB
             {
                 ETag = item[ETAG_PROPERTY_NAME].N,
                 GrainId = GrainId.Parse(item[GRAIN_REFERENCE_PROPERTY_NAME].S),
-                Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S),
+                Period = TimeSpan.Parse(item[PERIOD_PROPERTY_NAME].S, CultureInfo.InvariantCulture),
+                CronExpression = ReadOptionalString(item, CRON_EXPRESSION_PROPERTY_NAME),
+                CronTimeZoneId = ReadOptionalString(item, CRON_TIME_ZONE_ID_PROPERTY_NAME),
+                NextDueUtc = ReadOptionalDateTime(item, NEXT_DUE_UTC_PROPERTY_NAME),
+                LastFireUtc = ReadOptionalDateTime(item, LAST_FIRE_UTC_PROPERTY_NAME),
+                Priority = ReadPriority(item),
+                Action = ReadAction(item),
                 ReminderName = item[REMINDER_NAME_PROPERTY_NAME].S,
-                StartAt = DateTime.Parse(item[START_TIME_PROPERTY_NAME].S)
+                StartAt = DateTime.Parse(item[START_TIME_PROPERTY_NAME].S, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind)
             };
         }
+
+        private static string ReadOptionalString(Dictionary<string, AttributeValue> item, string propertyName)
+            => item.TryGetValue(propertyName, out var value) ? value.S : null;
+
+        private static DateTime? ReadOptionalDateTime(Dictionary<string, AttributeValue> item, string propertyName)
+        {
+            if (!item.TryGetValue(propertyName, out var value) || string.IsNullOrWhiteSpace(value.S))
+            {
+                return null;
+            }
+
+            return DateTime.Parse(value.S, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+        }
+
+        private static ReminderPriority ReadPriority(Dictionary<string, AttributeValue> item)
+        {
+            if (!TryReadInt32(item, PRIORITY_PROPERTY_NAME, out var value))
+            {
+                return ReminderPriority.Normal;
+            }
+
+            return ParsePriority(value);
+        }
+
+        private static MissedReminderAction ReadAction(Dictionary<string, AttributeValue> item)
+        {
+            if (!TryReadInt32(item, ACTION_PROPERTY_NAME, out var value))
+            {
+                return MissedReminderAction.Skip;
+            }
+
+            return ParseAction(value);
+        }
+
+        private static bool TryReadInt32(Dictionary<string, AttributeValue> item, string propertyName, out int value)
+        {
+            value = default;
+            return item.TryGetValue(propertyName, out var attributeValue)
+                && !string.IsNullOrWhiteSpace(attributeValue.N)
+                && int.TryParse(attributeValue.N, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
+        }
+
+        private static ReminderPriority ParsePriority(int value) => value switch
+        {
+            (int)ReminderPriority.High => ReminderPriority.High,
+            (int)ReminderPriority.Normal => ReminderPriority.Normal,
+            _ => ReminderPriority.Normal,
+        };
+
+        private static MissedReminderAction ParseAction(int value) => value switch
+        {
+            (int)MissedReminderAction.FireImmediately => MissedReminderAction.FireImmediately,
+            (int)MissedReminderAction.Skip => MissedReminderAction.Skip,
+            (int)MissedReminderAction.Notify => MissedReminderAction.Notify,
+            _ => MissedReminderAction.Skip,
+        };
 
         /// <summary>
         /// Remove one row from the reminder table
@@ -313,11 +382,33 @@ namespace Orleans.Reminders.DynamoDB
                     { GRAIN_HASH_PROPERTY_NAME, new AttributeValue { N = entry.GrainId.GetUniformHashCode().ToString() } },
                     { SERVICE_ID_PROPERTY_NAME, new AttributeValue(this.serviceId) },
                     { GRAIN_REFERENCE_PROPERTY_NAME, new AttributeValue( entry.GrainId.ToString()) },
-                    { PERIOD_PROPERTY_NAME, new AttributeValue(entry.Period.ToString()) },
-                    { START_TIME_PROPERTY_NAME, new AttributeValue(entry.StartAt.ToString()) },
+                    { PERIOD_PROPERTY_NAME, new AttributeValue(entry.Period.ToString("c", CultureInfo.InvariantCulture)) },
+                    { START_TIME_PROPERTY_NAME, new AttributeValue(entry.StartAt.ToString("O", CultureInfo.InvariantCulture)) },
                     { REMINDER_NAME_PROPERTY_NAME, new AttributeValue(entry.ReminderName) },
-                    { ETAG_PROPERTY_NAME, new AttributeValue { N = Random.Shared.Next().ToString() } }
+                    { PRIORITY_PROPERTY_NAME, new AttributeValue { N = ((int)entry.Priority).ToString(CultureInfo.InvariantCulture) } },
+                    { ACTION_PROPERTY_NAME, new AttributeValue { N = ((int)entry.Action).ToString(CultureInfo.InvariantCulture) } },
+                    { ETAG_PROPERTY_NAME, new AttributeValue { N = Random.Shared.Next().ToString(CultureInfo.InvariantCulture) } }
                 };
+
+            if (!string.IsNullOrWhiteSpace(entry.CronExpression))
+            {
+                fields[CRON_EXPRESSION_PROPERTY_NAME] = new AttributeValue(entry.CronExpression);
+            }
+
+            if (!string.IsNullOrWhiteSpace(entry.CronTimeZoneId))
+            {
+                fields[CRON_TIME_ZONE_ID_PROPERTY_NAME] = new AttributeValue(entry.CronTimeZoneId);
+            }
+
+            if (entry.NextDueUtc is { } nextDueUtc)
+            {
+                fields[NEXT_DUE_UTC_PROPERTY_NAME] = new AttributeValue(nextDueUtc.ToString("O"));
+            }
+
+            if (entry.LastFireUtc is { } lastFireUtc)
+            {
+                fields[LAST_FIRE_UTC_PROPERTY_NAME] = new AttributeValue(lastFireUtc.ToString("O"));
+            }
 
             try
             {

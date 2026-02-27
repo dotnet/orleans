@@ -91,6 +91,8 @@ namespace UnitTests.RemindersTest
             Assert.Equal(readReminder.Period, reminder.Period);
             Assert.Equal(readReminder.ReminderName, reminder.ReminderName);
             Assert.Equal(readReminder.StartAt, reminder.StartAt);
+            Assert.Equal(ReminderPriority.Normal, readReminder.Priority);
+            Assert.Equal(MissedReminderAction.Skip, readReminder.Action);
             Assert.NotNull(etagTemp);
 
             reminder.ETag = await remindersTable.UpsertRow(reminder);
@@ -103,6 +105,78 @@ namespace UnitTests.RemindersTest
             Assert.True(removeRowRes, "should have succeeded. Etag is right");
             removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag);
             Assert.False(removeRowRes, "should have failed. reminder shouldn't exist");
+        }
+
+        protected async Task ReminderCronRoundTrip()
+        {
+            var reminder = CreateReminder(MakeTestGrainReference(), "cron_roundtrip");
+            reminder.CronExpression = "0 */5 * * * *";
+            reminder.Period = TimeSpan.Zero;
+
+            await remindersTable.UpsertRow(reminder);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            Assert.Equal(TimeSpan.Zero, readReminder.Period);
+
+            reminder.ETag = readReminder.ETag;
+            reminder.CronExpression = null;
+            reminder.Period = TimeSpan.FromMinutes(2);
+
+            await remindersTable.UpsertRow(reminder);
+            readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Null(readReminder.CronExpression);
+            Assert.Equal(TimeSpan.FromMinutes(2), readReminder.Period);
+        }
+
+        protected async Task ReminderAdaptiveFieldsRoundTrip()
+        {
+            var reminder = CreateReminder(MakeTestGrainReference(), "adaptive_roundtrip");
+            reminder.CronExpression = "0 */10 * * * *";
+            reminder.Period = TimeSpan.Zero;
+            reminder.NextDueUtc = DateTime.UtcNow.AddMinutes(10);
+            reminder.LastFireUtc = DateTime.UtcNow.AddMinutes(-2);
+            reminder.Priority = ReminderPriority.High;
+            reminder.Action = MissedReminderAction.FireImmediately;
+
+            await remindersTable.UpsertRow(reminder);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            AssertTimestampClose(reminder.NextDueUtc?.ToUniversalTime(), readReminder.NextDueUtc?.ToUniversalTime());
+            AssertTimestampClose(reminder.LastFireUtc?.ToUniversalTime(), readReminder.LastFireUtc?.ToUniversalTime());
+            Assert.Equal(reminder.Priority, readReminder.Priority);
+            Assert.Equal(reminder.Action, readReminder.Action);
+        }
+
+        protected async Task ReminderCronTimeZoneRoundTrip()
+        {
+            var reminder = CreateReminder(MakeTestGrainReference(), "cron_timezone_roundtrip");
+            reminder.CronExpression = "0 */5 * * * *";
+            reminder.CronTimeZoneId = "Europe/Warsaw";
+            reminder.Period = TimeSpan.Zero;
+
+            await remindersTable.UpsertRow(reminder);
+            var readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            Assert.Equal(reminder.CronTimeZoneId, readReminder.CronTimeZoneId);
+            Assert.Equal(TimeSpan.Zero, readReminder.Period);
+
+            reminder.ETag = readReminder.ETag;
+            reminder.CronExpression = "0 */10 * * * *";
+            reminder.CronTimeZoneId = "America/New_York";
+            await remindersTable.UpsertRow(reminder);
+
+            readReminder = await remindersTable.ReadRow(reminder.GrainId, reminder.ReminderName);
+            Assert.NotNull(readReminder);
+            Assert.Equal(reminder.CronExpression, readReminder.CronExpression);
+            Assert.Equal(reminder.CronTimeZoneId, readReminder.CronTimeZoneId);
         }
 
         protected async Task RemindersRange(int iterations = 1000)
@@ -166,5 +240,19 @@ namespace UnitTests.RemindersTest
         }
 
         private static GrainId MakeTestGrainReference() => LegacyGrainId.GetGrainId(12345, Guid.NewGuid(), "foo/bar\\#baz?");
+
+        private static void AssertTimestampClose(DateTime? expected, DateTime? actual)
+        {
+            Assert.Equal(expected.HasValue, actual.HasValue);
+            if (!expected.HasValue)
+            {
+                return;
+            }
+
+            var difference = (expected.Value - actual!.Value).Duration();
+            Assert.True(
+                difference <= TimeSpan.FromSeconds(1),
+                $"Expected timestamps to be within 1 second. Expected: {expected.Value:O}, Actual: {actual.Value:O}, Difference: {difference}.");
+        }
     }
 }
