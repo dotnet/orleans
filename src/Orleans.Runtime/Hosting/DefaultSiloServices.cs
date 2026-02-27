@@ -21,12 +21,9 @@ using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Utilities;
-using System;
 using System.Reflection;
-using System.Linq;
 using Microsoft.Extensions.Options;
 using Orleans.Timers.Internal;
 using Microsoft.AspNetCore.Connections;
@@ -38,10 +35,10 @@ using Orleans.Storage;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Cloning;
-using System.Collections.Generic;
 using Microsoft.Extensions.Configuration;
 using Orleans.Serialization.Internal;
 using Orleans.Core;
+using Orleans.Placement;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Placement.Filtering;
 
@@ -210,6 +207,7 @@ namespace Orleans.Hosting
             // Placement filters
             services.AddSingleton<PlacementFilterStrategyResolver>();
             services.AddSingleton<PlacementFilterDirectorResolver>();
+            services.AddPlacementFilter<PreferLocalPlacementFilterStrategy, PreferLocalPlacementFilterDirector>(ServiceLifetime.Singleton);
 
             // Placement directors
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
