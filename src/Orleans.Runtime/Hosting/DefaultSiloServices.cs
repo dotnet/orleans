@@ -1,7 +1,4 @@
 #nullable enable
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Reflection;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
@@ -16,9 +13,9 @@ using Orleans.Core;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Networking.Shared;
+using Orleans.Placement;
 using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
-using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
@@ -217,6 +214,7 @@ namespace Orleans.Hosting
             // Placement filters
             services.AddSingleton<PlacementFilterStrategyResolver>();
             services.AddSingleton<PlacementFilterDirectorResolver>();
+            services.AddPlacementFilter<PreferLocalPlacementFilterStrategy, PreferLocalPlacementFilterDirector>(ServiceLifetime.Singleton);
 
             // Placement directors
             services.AddPlacementDirector<RandomPlacement, RandomPlacementDirector>();
