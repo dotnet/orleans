@@ -101,4 +101,25 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.UnregisterShard_WithJobsRemaining(cts.Token);
     }
+
+    [SkippableFact]
+    public async Task InMemoryJobShardManager_SlowStart_LimitsOrphanedShardClaims()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_LimitsOrphanedShardClaims(cts.Token);
+    }
+
+    [SkippableFact]
+    public async Task InMemoryJobShardManager_SlowStart_ZeroBudgetClaimsNothing()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_ZeroBudgetClaimsNothing(cts.Token);
+    }
+
+    [SkippableFact]
+    public async Task InMemoryJobShardManager_SlowStart_UnlimitedBudgetClaimsAll()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_UnlimitedBudgetClaimsAll(cts.Token);
+    }
 }

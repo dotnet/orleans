@@ -45,7 +45,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         var maxDueTime = minDueTime.AddHours(1);
 
         var createdShard = await manager.CreateShardAsync(minDueTime, maxDueTime, new Dictionary<string, string>(), CancellationToken.None);
-        var assignedShards = await manager.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
 
         Assert.Single(assignedShards);
         Assert.Equal(createdShard.Id, assignedShards[0].Id);
@@ -69,7 +69,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         // Silo2 picks up the orphaned shard
         var manager2 = new InMemoryJobShardManager(Silo2);
-        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
 
         Assert.Single(assignedShards);
         Assert.Equal(shard.Id, assignedShards[0].Id);
@@ -95,7 +95,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         // Silo2 adopts the shard from dead Silo1
         var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxAdoptedCount: 3);
-        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
 
         // Shard should be assigned (adopted count = 1, under threshold)
         Assert.Single(assignedShards);
@@ -124,17 +124,17 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         // Silo2 adopts from dead Silo1 (adopted count = 1)
         var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxAdoptedCount: 2);
-        var shards2 = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var shards2 = await manager2.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
         Assert.Single(shards2);
 
         // Silo3 adopts from dead Silo2 (adopted count = 2)
         var manager3 = new InMemoryJobShardManager(Silo3, membershipService, maxAdoptedCount: 2);
-        var shards3 = await manager3.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var shards3 = await manager3.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
         Assert.Single(shards3);
 
         // Silo4 tries to adopt from dead Silo3 (adopted count would be 3, exceeds max of 2)
         var manager4 = new InMemoryJobShardManager(Silo4, membershipService, maxAdoptedCount: 2);
-        var shards4 = await manager4.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var shards4 = await manager4.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
 
         // Shard is poisoned and should not be assigned
         Assert.Empty(shards4);
@@ -155,7 +155,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         // Silo2 tries to adopt from dead Silo1 with maxAdoptedCount=0
         var manager2 = new InMemoryJobShardManager(Silo2, membershipService, maxAdoptedCount: 0);
-        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
 
         // Shard should not be assigned (adopted count would be 1, exceeds max of 0)
         Assert.Empty(assignedShards);
@@ -183,7 +183,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         using var serviceProvider = services.BuildServiceProvider();
         var manager = serviceProvider.GetRequiredService<InMemoryJobShardManager>();
 
-        var assignedShards = await manager.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
         Assert.Empty(assignedShards);
     }
 
@@ -202,7 +202,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         // Silo2 tries to get shards - should not get Silo1's shard since Silo1 is active
         var manager2 = new InMemoryJobShardManager(Silo2, membershipService);
-        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
 
         Assert.Empty(assignedShards);
     }
@@ -220,7 +220,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         await manager.UnregisterShardAsync(shard, CancellationToken.None);
 
         // Shard should be removed, not reassignable
-        var assignedShards = await manager.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
         Assert.Empty(assignedShards);
     }
 
@@ -241,7 +241,7 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
 
         // Shard should be orphaned and available for another silo
         var manager2 = new InMemoryJobShardManager(Silo2);
-        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, CancellationToken.None);
+        var assignedShards = await manager2.AssignJobShardsAsync(maxDueTime, int.MaxValue, CancellationToken.None);
         Assert.Single(assignedShards);
     }
 
