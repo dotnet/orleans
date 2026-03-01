@@ -60,7 +60,11 @@ internal interface IMembershipManager
     /// For passive systems, this reads from the membership table.
     /// For active systems, this may be a no-op or request latest view.
     /// </summary>
-    Task Refresh();
+    /// <param name="targetVersion">
+    /// Optional target version to wait for. If specified, the method will
+    /// continue refreshing until the membership reaches at least this version.
+    /// </param>
+    Task Refresh(MembershipVersion? targetVersion = null);
 
     /// <summary>
     /// Processes a membership snapshot received via gossip.

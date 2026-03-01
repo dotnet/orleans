@@ -19,17 +19,17 @@ internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLi
     private readonly object _listenersLock = new();
 #endif
     private readonly CancellationTokenSource _cancellation = new();
-    private readonly MembershipTableManager _membershipTableManager;
+    private readonly IMembershipManager _membershipService;
     private readonly ILogger<SiloStatusListenerManager> _logger;
     private readonly IFatalErrorHandler _fatalErrorHandler;
     private ImmutableList<WeakReference<ISiloStatusListener>> _listeners = [];
 
     public SiloStatusListenerManager(
-        MembershipTableManager membershipTableManager,
+        IMembershipManager membershipTableManager,
         ILogger<SiloStatusListenerManager> log,
         IFatalErrorHandler fatalErrorHandler)
     {
-        _membershipTableManager = membershipTableManager;
+        _membershipService = membershipTableManager;
         _logger = log;
         _fatalErrorHandler = fatalErrorHandler;
     }
@@ -81,7 +81,7 @@ internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLi
         try
         {
             LogDebugStartingToProcessMembershipUpdates();
-            await foreach (var tableSnapshot in _membershipTableManager.MembershipTableUpdates.WithCancellation(_cancellation.Token))
+            await foreach (var tableSnapshot in _membershipService.MembershipUpdates.WithCancellation(_cancellation.Token))
             {
                 var snapshot = tableSnapshot.CreateClusterMembershipSnapshot();
 

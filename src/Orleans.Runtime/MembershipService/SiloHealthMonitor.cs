@@ -22,7 +22,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly IOptionsMonitor<ClusterMembershipOptions> _clusterMembershipOptions;
         private readonly IRemoteSiloProber _prober;
         private readonly ILocalSiloHealthMonitor _localSiloHealthMonitor;
-        private readonly MembershipTableManager _membershipService;
+        private readonly IMembershipManager _membershipService;
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly CancellationTokenSource _stoppingCancellation = new();
 #if NET9_0_OR_GREATER
@@ -63,7 +63,7 @@ namespace Orleans.Runtime.MembershipService
             IRemoteSiloProber remoteSiloProber,
             IAsyncTimerFactory asyncTimerFactory,
             ILocalSiloHealthMonitor localSiloHealthMonitor,
-            MembershipTableManager membershipService,
+            IMembershipManager membershipService,
             ILocalSiloDetails localSiloDetails)
         {
             TargetSiloAddress = siloAddress;
@@ -170,7 +170,7 @@ namespace Orleans.Runtime.MembershipService
                 try
                 {
                     // Discover the other active nodes in the cluster, if there are any.
-                    var membershipSnapshot = _membershipService.MembershipTableSnapshot;
+                    var membershipSnapshot = _membershipService.CurrentSnapshot;
                     if (otherNodes is null || !ReferenceEquals(activeMembersSnapshot, membershipSnapshot))
                     {
                         activeMembersSnapshot = membershipSnapshot;
