@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
 
@@ -21,46 +22,44 @@ internal sealed partial class GrainDirectoryPartition
 
         DebugAssertOwnership(address.GrainId);
 
-        var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
-        var rangeHash = address.GrainId.GetUniformHashCode();
-
-        // Range lease holds
-        for (var i = _rangeLeaseHolds.Count - 1; i >= 0; i--)
+        if (_leaseHoldDuration > TimeSpan.Zero)
         {
-            var (lockedRange, expiration) = _rangeLeaseHolds[i];
+            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+            var rangeHash = address.GrainId.GetUniformHashCode();
 
-            if (utcNow >= expiration)
+            // Range lease holds
+            for (var i = _rangeLeaseHolds.Count - 1; i >= 0; i--)
             {
-                // We use this opportunity to cleanup this expired range lease hold.
-                _rangeLeaseHolds.RemoveAt(i);
-                continue;
-            }
+                var (lockedRange, expiration) = _rangeLeaseHolds[i];
 
-            // If it is still active, does it block this request?
-            if (lockedRange.Contains(rangeHash))
-            {
-                // We reject, the client should retry!
-                throw new DirectoryLeaseHoldException($"Range {lockedRange} is under a lease hold until {expiration - utcNow}.");
-            }
-        }
-
-        // Grain lease holds
-        if (_grainLeaseHolds.TryGetValue(address.GrainId, out var tombstone))
-        {
-            if (utcNow >= tombstone.LeaseExpiration)
-            {
-                // We use this opportunity to cleanup this expired grain-specific lease hold.
-                _grainLeaseHolds.Remove(address.GrainId);
-            }
-            else
-            {
-                // Is the new registration trying to point to the same dead silo?
-                // If yes, it is consistent, but dead; otherwise we must block.
-                if (!tombstone.DeadSilo.Equals(address.SiloAddress))
+                if (utcNow >= expiration)
                 {
-                    // The previous owner is dead, but the lease hasnt expired yet, we must reject. 
-                    // We can not guarantee the old activation is gone yet. The client should retry!
-                    throw new DirectoryLeaseHoldException($"Grain {address.GrainId} is under a lease hold until {tombstone.LeaseExpiration - utcNow}.");
+                    // We use this opportunity to cleanup this expired range lease hold.
+                    _rangeLeaseHolds.RemoveAt(i);
+                    continue;
+                }
+
+                // If it is still active, does it block this request?
+                if (lockedRange.Contains(rangeHash))
+                {
+                    // We reject, the client should retry!
+                    throw new DirectoryLeaseHoldException($"Range {lockedRange} is under a lease hold until {expiration - utcNow}.");
+                }
+            }
+
+            // Grain lease holds
+            if (_directory.TryGetValue(address.GrainId, out var existingActivation))
+            {
+                if (_siloLeaseHolds.TryGetValue(existingActivation.SiloAddress!, out var expiration) && utcNow < expiration)
+                {
+                    // This grain belongs to this parition, and the activation is sitting on a silo that has an active lease hold.
+                    // We need to check if the request include sthe previous activation id, and if it does its a valid update/override,
+                    // otherwise it's a new activation trying to "steal" the id while the lease is active, so we reject it!
+
+                    if (currentRegistration is null || !existingActivation.Matches(currentRegistration))
+                    {
+                        throw new DirectoryLeaseHoldException($"Silo {existingActivation.SiloAddress} is under a lease hold until {expiration - utcNow}.");
+                    }
                 }
             }
         }

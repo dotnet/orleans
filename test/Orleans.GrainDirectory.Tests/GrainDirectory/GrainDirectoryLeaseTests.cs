@@ -24,7 +24,8 @@ public class LeaseTestGrain : Grain, ILeaseTestGrain
 public class GrainDirectoryLeaseTests
 {
     public static readonly FakeTimeProvider TimeProvider = new(DateTime.UtcNow);
-    public static readonly TimeSpan LeaseHoldDuration = TimeSpan.FromSeconds(5); // The value doesnt matter we will advance time manually.
+    // The value doesnt matter we will advance time manually.
+    public static readonly TimeSpan LeaseHoldDuration = TimeSpan.FromSeconds(5);
 
     [Fact]
     public async Task BlocksReactivations_AfterUngracefulShutdown()
