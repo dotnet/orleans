@@ -106,14 +106,12 @@ public class GrainDirectoryOptions
     /// Depending on the value of this, the duration is understood as:
     /// <list type="bullet">
     /// <item><c>SafetyLeaseHoldDuration > TimeSpan.Zero</c> - The lease duration is explicitly controlled by the user.</item>
-    /// <item><c>SafetyLeaseHoldDuration &lt;= TimeSpan.Zero</c> - The system computes a lease duration as:
-    /// <c>2 × <see cref="ClusterMembershipOptions.ProbeTimeout"/> × <see cref="ClusterMembershipOptions.NumMissedProbesLimit"/></c>.</item>
+    /// <item><c>SafetyLeaseHoldDuration = TimeSpan.Zero</c>. No leases are placed placed at all, effectively nullifying this safety option.</item>
+    /// <item><c>SafetyLeaseHoldDuration = null</c> - The system computes a lease duration as:
+    /// <c>2 × <see cref="ClusterMembershipOptions.ProbeTimeout"/> × <see cref="ClusterMembershipOptions.NumMissedProbesLimit"/></c>.
+    /// This is the default value, and is designed to be long enough to allow for failure detection and cluster stabilization.
+    /// </item>
     /// </list>
     /// </remarks>
-    public TimeSpan SafetyLeaseHoldDuration { get; set; }
-
-    /// <summary>
-    /// The default value for <see cref="SafetyLeaseHoldDuration"/>
-    /// </summary>
-    public static readonly TimeSpan DEFAULT_SAFETY_LEASE_HOLD_DURATION = TimeSpan.Zero;
+    public TimeSpan? SafetyLeaseHoldDuration { get; set; }
 }
