@@ -52,7 +52,7 @@ namespace Orleans.Runtime.MembershipService
     {
         private const int MaxScore = 8;
         private readonly List<IHealthCheckParticipant> _healthCheckParticipants;
-        private readonly MembershipTableManager _membershipTableManager;
+        private readonly IMembershipManager _membershipManager;
         private readonly IProbeHealthMonitor _probeHealthMonitor;
         private readonly ILocalSiloDetails _localSiloDetails;
         private readonly ILogger<LocalSiloHealthMonitor> _log;
@@ -66,7 +66,7 @@ namespace Orleans.Runtime.MembershipService
 
         public LocalSiloHealthMonitor(
             IEnumerable<IHealthCheckParticipant> healthCheckParticipants,
-            MembershipTableManager membershipTableManager,
+            IMembershipManager membershipManager,
             IProbeHealthMonitor probeHealthMonitor,
             ILocalSiloDetails localSiloDetails,
             ILogger<LocalSiloHealthMonitor> log,
@@ -75,7 +75,7 @@ namespace Orleans.Runtime.MembershipService
             ILoggerFactory loggerFactory)
         {
             _healthCheckParticipants = healthCheckParticipants.ToList();
-            _membershipTableManager = membershipTableManager;
+            _membershipManager = membershipManager;
             _probeHealthMonitor = probeHealthMonitor;
             _localSiloDetails = localSiloDetails;
             _log = log;
@@ -107,7 +107,7 @@ namespace Orleans.Runtime.MembershipService
 
             if (_isActive)
             {
-                var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
+                var membershipSnapshot = _membershipManager.CurrentSnapshot;
                 if (membershipSnapshot.ActiveNodeCount <= 1)
                 {
                     _clusteredDuration.Reset();
@@ -152,7 +152,7 @@ namespace Orleans.Runtime.MembershipService
         private int CheckSuspectingNodes(DateTime now, List<string>? complaints)
         {
             var score = 0;
-            var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
+            var membershipSnapshot = _membershipManager.CurrentSnapshot;
             if (membershipSnapshot.Entries.TryGetValue(_localSiloDetails.SiloAddress, out var membershipEntry))
             {
                 if (membershipEntry.Status != SiloStatus.Active)
@@ -190,7 +190,7 @@ namespace Orleans.Runtime.MembershipService
 
         private int CheckReceivedProbeRequests(DateTime now, List<string>? complaints)
         {
-            var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
+            var membershipSnapshot = _membershipManager.CurrentSnapshot;
             var score = _probeHealthMonitor.CheckReceivedProbeRequests(now, membershipSnapshot.ActiveNodeCount, out var complaint);
             if (complaint is not null)
             {
@@ -202,7 +202,7 @@ namespace Orleans.Runtime.MembershipService
 
         private int CheckReceivedProbeResponses(DateTime now, List<string>? complaints)
         {
-            var membershipSnapshot = _membershipTableManager.MembershipTableSnapshot;
+            var membershipSnapshot = _membershipManager.CurrentSnapshot;
             // Use ActiveNodeCount - 1 as a proxy for monitored node count (we don't monitor ourselves)
             var monitoredNodeCount = Math.Max(0, membershipSnapshot.ActiveNodeCount - 1);
             var score = _probeHealthMonitor.CheckReceivedProbeResponses(now, monitoredNodeCount, out var complaint);

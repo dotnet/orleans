@@ -24,7 +24,7 @@ namespace Orleans.Runtime.Management
         private readonly IInternalGrainFactory internalGrainFactory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IVersionStore versionStore;
-        private readonly MembershipTableManager membershipTableManager;
+        private readonly IMembershipManager membershipManager;
         private readonly GrainManifest siloManifest;
         private readonly ClusterManifest clusterManifest;
         private readonly ILogger logger;
@@ -36,12 +36,12 @@ namespace Orleans.Runtime.Management
             ISiloStatusOracle siloStatusOracle,
             IVersionStore versionStore,
             ILogger<ManagementGrain> logger,
-            MembershipTableManager membershipTableManager,
+            IMembershipManager membershipManager,
             IClusterManifestProvider clusterManifestProvider,
             Catalog catalog,
             GrainLocator grainLocator)
         {
-            this.membershipTableManager = membershipTableManager;
+            this.membershipManager = membershipManager;
             this.siloManifest = clusterManifestProvider.LocalGrainManifest;
             this.clusterManifest = clusterManifestProvider.Current;
             this.internalGrainFactory = internalGrainFactory;
@@ -54,15 +54,15 @@ namespace Orleans.Runtime.Management
 
         public async Task<Dictionary<SiloAddress, SiloStatus>> GetHosts(bool onlyActive = false)
         {
-            await this.membershipTableManager.Refresh();
+            await this.membershipManager.Refresh();
             return this.siloStatusOracle.GetApproximateSiloStatuses(onlyActive);
         }
 
         public async Task<MembershipEntry[]> GetDetailedHosts(bool onlyActive = false)
         {
-            await this.membershipTableManager.Refresh();
+            await this.membershipManager.Refresh();
 
-            var table = this.membershipTableManager.MembershipTableSnapshot;
+            var table = this.membershipManager.CurrentSnapshot;
 
             MembershipEntry[] result;
             if (onlyActive)

@@ -7,11 +7,11 @@ namespace Orleans.Runtime.Placement
 {
     internal class SiloRoleBasedPlacementDirector : IPlacementDirector
     {
-        private readonly MembershipTableManager membershipTableManager;
+        private readonly IMembershipManager membershipManager;
 
         public SiloRoleBasedPlacementDirector(MembershipTableManager membershipTableManager)
         {
-            this.membershipTableManager = membershipTableManager;
+            this.membershipManager = membershipTableManager;
         }
 
         public virtual Task<SiloAddress> OnAddActivation(
@@ -19,7 +19,7 @@ namespace Orleans.Runtime.Placement
         {
             var siloRole = target.GrainIdentity.Key.ToString();
 
-            var compatibleSilos = membershipTableManager.MembershipTableSnapshot.Entries
+            var compatibleSilos = membershipManager.CurrentSnapshot.Entries
                 .Where(s => s.Value.Status == SiloStatus.Active && s.Value.RoleName == siloRole)
                 .Select(s => s.Key)
                 .Intersect(context.GetCompatibleSilos(target))

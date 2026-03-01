@@ -104,15 +104,24 @@ namespace Orleans.Runtime.MembershipService
 
         private Task pendingRefresh;
 
-        public async Task Refresh()
+        public async Task Refresh(MembershipVersion? targetVersion = null)
         {
-            var pending = this.pendingRefresh;
-            if (pending == null || pending.IsCompleted)
+            while (!targetVersion.HasValue || this.snapshot.Version < targetVersion.Value)
             {
-                pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false);
-            }
+                var pending = this.pendingRefresh;
+                if (pending == null || pending.IsCompleted)
+                {
+                    pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false);
+                }
 
-            await pending;
+                await pending;
+
+                // If no target version specified, exit after single refresh
+                if (!targetVersion.HasValue)
+                {
+                    break;
+                }
+            }
         }
 
         public async Task RefreshFromSnapshot(MembershipTableSnapshot snapshot)

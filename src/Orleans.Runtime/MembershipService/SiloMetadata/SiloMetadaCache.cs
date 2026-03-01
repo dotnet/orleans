@@ -13,7 +13,7 @@ namespace Orleans.Runtime.MembershipService.SiloMetadata;
 
 internal partial class SiloMetadataCache(
     ISiloMetadataClient siloMetadataClient,
-    MembershipTableManager membershipTableManager,
+    IMembershipManager membershipManager,
     IOptions<ClusterMembershipOptions> clusterMembershipOptions,
     ILogger<SiloMetadataCache> logger)
     : ISiloMetadataCache, ILifecycleParticipant<ISiloLifecycle>, IDisposable
@@ -56,7 +56,7 @@ internal partial class SiloMetadataCache(
         try
         {
             LogDebugStartProcessingMembershipUpdates(logger);
-            await foreach (var update in membershipTableManager.MembershipTableUpdates.WithCancellation(ct))
+            await foreach (var update in membershipManager.MembershipUpdates.WithCancellation(ct))
             {
                 // Add entries for members that aren't already in the cache
                 var now = DateTime.UtcNow;

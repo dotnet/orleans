@@ -9,18 +9,18 @@ namespace Orleans.Runtime.MembershipService
 {
     internal sealed partial class MembershipSystemTarget : SystemTarget, IMembershipService, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly MembershipTableManager membershipTableManager;
+        private readonly IMembershipManager membershipManager;
         private readonly ILogger<MembershipSystemTarget> log;
         private readonly IInternalGrainFactory grainFactory;
 
         public MembershipSystemTarget(
-            MembershipTableManager membershipTableManager,
+            IMembershipManager membershipManager,
             ILogger<MembershipSystemTarget> log,
             IInternalGrainFactory grainFactory,
             SystemTargetShared shared)
             : base(Constants.MembershipServiceType, shared)
         {
-            this.membershipTableManager = membershipTableManager;
+            this.membershipManager = membershipManager;
             this.log = log;
             this.grainFactory = grainFactory;
             shared.ActivationDirectory.RecordNewTarget(this);
@@ -32,7 +32,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (snapshot.Version != MembershipVersion.MinValue)
             {
-                await this.membershipTableManager.RefreshFromSnapshot(snapshot);
+                await this.membershipManager.ProcessGossipSnapshot(snapshot);
             }
             else
             {
@@ -154,7 +154,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                await this.membershipTableManager.Refresh();
+                await this.membershipManager.Refresh();
             }
             catch (Exception exception)
             {
