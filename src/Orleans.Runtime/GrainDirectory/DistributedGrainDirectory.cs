@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Timers;
 using Microsoft.Extensions.DependencyInjection;
@@ -101,12 +102,13 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _logger = logger;
         _directoryInstruments = directoryInstruments;
         _clusterMemberCancellationTokens = new(_stoppedCts.Token);
-        _leaseHoldDuration = directoryOptions.Value.SafetyLeaseHoldDuration;
 
-        if (_leaseHoldDuration <= TimeSpan.Zero)
+        _leaseHoldDuration = directoryOptions.Value.SafetyLeaseHoldDuration switch
         {
-            _leaseHoldDuration = 2 * membershipOptions.Value.ProbeTimeout * membershipOptions.Value.NumMissedProbesLimit;
-        }
+            null => 2 * membershipOptions.Value.ProbeTimeout * membershipOptions.Value.NumMissedProbesLimit,
+            TimeSpan duration when duration >= TimeSpan.Zero => duration,
+            _ => throw new InvalidOperationException("Lease hold duration must be non-negative.")
+        };
 
         var partitionsPerSilo = membershipService.PartitionsPerSilo;
         var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
@@ -407,7 +409,11 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             WorkItemGroup.QueueAction(() =>
             {
                 _runTask = ProcessMembershipUpdates();
-                _leaseCleanupTask = RequestExpiredLeaseCleanups();
+
+                if (_leaseHoldDuration > TimeSpan.Zero)
+                {
+                    _leaseCleanupTask = RequestExpiredLeaseCleanups();
+                }
             });
 
             return Task.CompletedTask;
@@ -511,6 +517,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     private async Task RequestExpiredLeaseCleanups()
     {
+        Debug.Assert(_leaseHoldDuration > TimeSpan.Zero);
+
         // We request cleanups periodically to not let expired leases linger in the directory for too long.
         // We do it here as opposed to in the partitions to avoid having 30 (by default, maybe more) timers.
 
