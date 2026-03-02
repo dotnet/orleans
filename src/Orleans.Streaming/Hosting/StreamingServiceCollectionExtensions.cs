@@ -48,6 +48,7 @@ namespace Orleans.Hosting
                 new StreamSubscriptionManagerAdmin(sp.GetRequiredService<IStreamProviderRuntime>()));
             services.AddTransient<IStreamQueueBalancer, ConsistentRingQueueBalancer>();
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, StreamingConverterConfigurator>();
+            services.AddSingleton<IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>, SystemTextJsonStreamConverterConfigurator>();
 
             // One stream directory per activation
             services.AddScoped<StreamDirectory>();

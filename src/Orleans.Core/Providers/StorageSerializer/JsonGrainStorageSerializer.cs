@@ -6,7 +6,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Grain storage serializer that uses Newtonsoft.Json
     /// </summary>
-    public class JsonGrainStorageSerializer : IGrainStorageSerializer
+    public sealed class JsonGrainStorageSerializer : IGrainStorageSerializer
     {
         private readonly OrleansJsonSerializer _orleansJsonSerializer;
 

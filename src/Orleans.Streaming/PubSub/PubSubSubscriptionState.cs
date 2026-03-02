@@ -19,26 +19,32 @@ namespace Orleans.Streams
         // These fields have to be public non-readonly for JSonSerialization to work!
         // Implement ISerializable if changing any of them to readonly
         [JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(0)]
         public GuidId SubscriptionId;
 
         [JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(1)]
         public QualifiedStreamId Stream;
 
         [JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(2)]
         public GrainId Consumer; // the field needs to be of a public type, otherwise we will not generate an Orleans serializer for that class.
 
         [JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(3)]
         public string FilterData; // Serialized func info
 
         [JsonProperty]
+        [System.Text.Json.Serialization.JsonInclude]
         [Id(4)]
         public SubscriptionStates state;
 
         [JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public bool IsFaulted { get { return state == SubscriptionStates.Faulted; } }
 
         // This constructor has to be public for JSonSerialization to work!
@@ -52,6 +58,17 @@ namespace Orleans.Streams
             Stream = streamId;
             Consumer = streamConsumer;
             state = SubscriptionStates.Active;
+        }
+
+        [System.Text.Json.Serialization.JsonConstructor]
+        public PubSubSubscriptionState(
+            GuidId subscriptionId,
+            QualifiedStreamId stream,
+            GrainId consumer,
+            string filterData)
+            :this(subscriptionId,stream,consumer)
+        {
+            FilterData = filterData;
         }
 
         public void AddFilter(string filterData)

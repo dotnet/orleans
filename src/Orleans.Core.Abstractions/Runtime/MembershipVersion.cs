@@ -1,4 +1,7 @@
 using System;
+using System.Buffers;
+using System.Diagnostics.CodeAnalysis;
+using System.Globalization;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -100,10 +103,48 @@ namespace Orleans.Runtime
     /// </summary>
     public sealed class MembershipVersionConverter : JsonConverter<MembershipVersion>
     {
+        const int MaxStackallocLength = 64;
         /// <inheritdoc />
         public override MembershipVersion Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options) => new(reader.GetInt64());
 
         /// <inheritdoc />
         public override void Write(Utf8JsonWriter writer, MembershipVersion value, JsonSerializerOptions options) => writer.WriteNumberValue(value.Value);
+
+        /// <inheritdoc />
+        public override MembershipVersion ReadAsPropertyName(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+        {
+            if (reader.HasValueSequence)
+            {
+                var valueLength = checked((int)reader.ValueSequence.Length);
+                if (valueLength < MaxStackallocLength)
+                {
+                    Span<byte> number = stackalloc byte[valueLength];
+                    reader.ValueSequence.CopyTo(number);
+                    return new MembershipVersion(long.Parse(number, CultureInfo.InvariantCulture));
+                }
+                else
+                {
+                    return new MembershipVersion(long.Parse(reader.GetString()!, CultureInfo.InvariantCulture));
+                }
+            }
+            else
+            {
+                return new MembershipVersion(long.Parse(reader.ValueSpan, CultureInfo.InvariantCulture));
+            }
+
+        }
+        /// <inheritdoc />
+        public override void WriteAsPropertyName(Utf8JsonWriter writer, [DisallowNull] MembershipVersion value, JsonSerializerOptions options)
+        {
+            Span<byte> number = stackalloc byte[MaxStackallocLength];
+            if (value.Value.TryFormat(number, out var written, provider: CultureInfo.InvariantCulture))
+            {
+                writer.WritePropertyName(number[..written]);
+            }
+            else
+            {
+                writer.WritePropertyName(value.Value.ToString(CultureInfo.InvariantCulture));
+            }
+        }
     }
 }
