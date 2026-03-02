@@ -1,10 +1,9 @@
-using System;
 using System.Net;
+using System.Text;
+using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Orleans.Runtime;
 using Orleans.GrainReferences;
-using Microsoft.Extensions.Options;
 
 namespace Orleans.Serialization
 {
@@ -44,11 +43,39 @@ namespace Orleans.Serialization
         }
 
         /// <summary>
+        /// Deserializes an object of the specified expected type from the provided stream.
+        /// </summary>
+        /// <param name="expectedType">The expected type.</param>
+        /// <param name="input">The input stream.</param>
+        /// <returns>The deserialized object.</returns>
+        public object Deserialize(Type expectedType, Stream input)
+        {
+            using var reader = new StreamReader(input, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: 1024, leaveOpen: true);
+            using var jsonReader = new JsonTextReader(reader);
+            var serializer = JsonSerializer.Create(this.settings);
+            return serializer.Deserialize(jsonReader, expectedType);
+        }
+
+        /// <summary>
         /// Serializes an object to a JSON string.
         /// </summary>
         /// <param name="item">The object to serialize.</param>
         /// <param name="expectedType">The type the deserializer should expect.</param>
         public string Serialize(object item, Type expectedType) => JsonConvert.SerializeObject(item, expectedType, this.settings);
+
+        /// <summary>
+        /// Serializes an object to a stream.
+        /// </summary>
+        /// <param name="item">The object to serialize.</param>
+        /// <param name="expectedType">The type the deserializer should expect.</param>
+        /// <param name="destination">The destination stream.</param>
+        public void Serialize(object item, Type expectedType, Stream destination)
+        {
+            using var writer = new StreamWriter(destination, new UTF8Encoding(encoderShouldEmitUTF8Identifier: false), 1024, leaveOpen: true);
+            using var jsonWriter = new JsonTextWriter(writer);
+            var serializer = JsonSerializer.Create(this.settings);
+            serializer.Serialize(jsonWriter, item, expectedType);
+        }
     }
 
     /// <summary>
@@ -289,7 +316,7 @@ namespace Orleans.Serialization
         /// <inheritdoc/>
         public override void WriteJson(JsonWriter writer, object value, JsonSerializer serializer)
         {
-            var val = ((IAddressable)value).AsReference();  
+            var val = ((IAddressable)value).AsReference();
             writer.WriteStartObject();
             writer.WritePropertyName("Id");
             writer.WriteStartObject();
