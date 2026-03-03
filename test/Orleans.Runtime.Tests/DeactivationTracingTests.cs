@@ -7,7 +7,6 @@ using Orleans.Diagnostics;
 using Orleans.Placement;
 using Orleans.Runtime.Placement;
 using Orleans.Storage;
-using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -65,8 +64,9 @@ namespace UnitTests.General
                 var testParentTraceId = parent.TraceId.ToString();
                 Started.Clear();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 await grain.TriggerDeactivation();
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 _ = await grain.GetActivityId();
 
@@ -109,8 +109,9 @@ namespace UnitTests.General
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 await grain.TriggerDeactivation();
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 var wasDeactivated = await grain.WasDeactivated();
                 Assert.True(wasDeactivated, "Expected grain to have been deactivated");
@@ -147,8 +148,9 @@ namespace UnitTests.General
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 await grain.TriggerDeactivation();
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 _ = await grain.GetActivityId();
 
@@ -189,10 +191,11 @@ namespace UnitTests.General
 
                 Started.Clear();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 var newState = await grain.GetState();
                 Assert.Equal(expectedState, newState);
@@ -272,8 +275,9 @@ namespace UnitTests.General
 
                 var testParentTraceId = parent.TraceId.ToString();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 await grain.TriggerDeactivation();
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 _ = await grain.GetActivityId();
 
@@ -305,6 +309,7 @@ namespace UnitTests.General
                 var testParentTraceId = parent.TraceId.ToString();
                 const int elementCount = 3;
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 var values = new List<int>();
                 await foreach (var value in grain.GetValuesAndDeactivate(elementCount).WithBatchSize(1))
                 {
@@ -313,7 +318,7 @@ namespace UnitTests.General
 
                 Assert.Equal(elementCount, values.Count);
 
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 _ = await grain.GetActivityId();
 
@@ -367,10 +372,11 @@ namespace UnitTests.General
 
                 Started.Clear();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
                 await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
 
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 var onDeactivateSpans = Started.Where(a => a.OperationName == ActivityNames.OnDeactivate).ToList();
                 Assert.True(onDeactivateSpans.Count > 0, "Expected at least one OnDeactivate span during migration");
@@ -405,6 +411,7 @@ namespace UnitTests.General
 
                 _ = await grain.GetActivityId();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 try
                 {
                     await grain.ThrowInconsistentStateException();
@@ -414,7 +421,7 @@ namespace UnitTests.General
                     // Expected
                 }
 
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 _ = await grain.GetActivityId();
 
@@ -496,8 +503,9 @@ namespace UnitTests.General
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 await grain.DeactivateWithCustomReason("Custom deactivation reason for testing");
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 _ = await grain.GetActivityId();
 
@@ -540,8 +548,9 @@ namespace UnitTests.General
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
+                var deactivated = _fixture.HostedCluster.GetDeactivatedTask(grainId);
                 await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-                await DeactivationTestingGrain.DeactivationTasks.WaitForDeactivationAsync(grainId);
+                await deactivated;
 
                 _ = await grain.GetActivityId();
 
@@ -606,7 +615,7 @@ namespace UnitTests.General
     /// Test grain implementation for basic deactivation tracing tests.
     /// Implements a simple OnDeactivateAsync to verify the span is created.
     /// </summary>
-    public class DeactivationTracingTestGrain : DeactivationTestingGrain, IDeactivationTracingTestGrain
+    public class DeactivationTracingTestGrain : Grain, IDeactivationTracingTestGrain
     {
         public Task<ActivityData> GetActivityId()
         {
@@ -663,7 +672,7 @@ namespace UnitTests.General
     /// Test grain implementation that performs work during OnDeactivateAsync.
     /// Uses persistent state to track that deactivation occurred.
     /// </summary>
-    public class DeactivationWithWorkTracingTestGrain : DeactivationTestingGrain, IDeactivationWithWorkTracingTestGrain
+    public class DeactivationWithWorkTracingTestGrain : Grain, IDeactivationWithWorkTracingTestGrain
     {
         private readonly IPersistentState<DeactivationWorkState> _state;
 
@@ -718,7 +727,7 @@ namespace UnitTests.General
     /// Test grain implementation that throws an exception during OnDeactivateAsync.
     /// Used to verify that the OnDeactivate span captures errors correctly.
     /// </summary>
-    public class DeactivationWithExceptionTracingTestGrain : DeactivationTestingGrain, IDeactivationWithExceptionTracingTestGrain
+    public class DeactivationWithExceptionTracingTestGrain : Grain, IDeactivationWithExceptionTracingTestGrain
     {
         public Task<ActivityData> GetActivityId()
         {
@@ -764,7 +773,7 @@ namespace UnitTests.General
     /// Used to verify OnDeactivate span is created before dehydration during migration.
     /// </summary>
     [RandomPlacement]
-    public class DeactivationMigrationTracingTestGrain : DeactivationTestingGrain, IDeactivationMigrationTracingTestGrain, IGrainMigrationParticipant
+    public class DeactivationMigrationTracingTestGrain : Grain, IDeactivationMigrationTracingTestGrain, IGrainMigrationParticipant
     {
         private int _state;
         private bool _onDeactivateCalled;
@@ -817,7 +826,7 @@ namespace UnitTests.General
     /// Test grain implementation that throws InconsistentStateException.
     /// Used to verify OnDeactivate span is created with ApplicationError reason.
     /// </summary>
-    public class InconsistentStateDeactivationGrain : DeactivationTestingGrain, IInconsistentStateDeactivationGrain
+    public class InconsistentStateDeactivationGrain : Grain, IInconsistentStateDeactivationGrain
     {
         public Task<ActivityData> GetActivityId()
         {
@@ -905,7 +914,7 @@ namespace UnitTests.General
     /// Test grain implementation that uses GrainContext.Deactivate with custom reason.
     /// Used to verify OnDeactivate span is created with the custom reason.
     /// </summary>
-    public class GrainContextDeactivationGrain : DeactivationTestingGrain, IGrainContextDeactivationGrain
+    public class GrainContextDeactivationGrain : Grain, IGrainContextDeactivationGrain
     {
         public Task<ActivityData> GetActivityId()
         {
@@ -951,7 +960,7 @@ namespace UnitTests.General
     /// Test grain implementation that yields values via IAsyncEnumerable and then deactivates after DisposeAsync.
     /// Uses a grain call filter to trigger deactivation after the async enumerable is disposed.
     /// </summary>
-    public class AsyncEnumerableDeactivationGrain : DeactivationTestingGrain, IAsyncEnumerableDeactivationGrain
+    public class AsyncEnumerableDeactivationGrain : Grain, IAsyncEnumerableDeactivationGrain
     {
         public async IAsyncEnumerable<int> GetValuesAndDeactivate(int count)
         {
