@@ -22,6 +22,7 @@ namespace Orleans.CodeGenerator
         public CompoundTypeAliasTree CompoundTypeAliases { get; } = CompoundTypeAliasTree.Create();
         public List<(TypeSyntax Type, uint Id)> WellKnownTypeIds { get; } = new(1024);
         public HashSet<string> ApplicationParts { get; } = new();
+        public List<(string Target, string Kind, string Name, TypeSyntax Type)> RegisteredProviders { get; } = new();
         internal Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>> ProxyBaseTypeInvokableBaseTypes { get; } = new (SymbolEqualityComparer.Default);
     }
 

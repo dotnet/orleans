@@ -54,6 +54,7 @@ namespace Orleans.CodeGenerator
             RegisterActivatorAttribute = Type("Orleans.RegisterActivatorAttribute");
             RegisterConverterAttribute = Type("Orleans.RegisterConverterAttribute");
             RegisterCopierAttribute = Type("Orleans.RegisterCopierAttribute");
+            RegisterProviderAttribute = Type("Orleans.RegisterProviderAttribute");
             UseActivatorAttribute = Type("Orleans.UseActivatorAttribute");
             SuppressReferenceTrackingAttribute = Type("Orleans.SuppressReferenceTrackingAttribute");
             OmitDefaultMemberValuesAttribute = Type("Orleans.OmitDefaultMemberValuesAttribute");
@@ -255,6 +256,7 @@ namespace Orleans.CodeGenerator
         public INamedTypeSymbol ResponseTimeoutAttribute { get; private set; }
         public INamedTypeSymbol RegisterConverterAttribute { get; private set; }
         public INamedTypeSymbol RegisterActivatorAttribute { get; private set; }
+        public INamedTypeSymbol RegisterProviderAttribute { get; private set; }
         public INamedTypeSymbol UseActivatorAttribute { get; private set; }
         public INamedTypeSymbol SuppressReferenceTrackingAttribute { get; private set; }
         public INamedTypeSymbol OmitDefaultMemberValuesAttribute { get; private set; }

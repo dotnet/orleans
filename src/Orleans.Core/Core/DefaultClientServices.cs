@@ -234,17 +234,30 @@ namespace Orleans
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
             {
                 var result = new Dictionary<(string, string), Type>();
+                var options = new Orleans.Serialization.Configuration.TypeManifestOptions();
+                
+                // Collect providers from generated metadata
                 foreach (var asm in ReferencedAssemblyProvider.GetRelevantAssemblies())
                 {
-                    foreach (var attr in asm.GetCustomAttributes<RegisterProviderAttribute>())
+                    var attrs = asm.GetCustomAttributes<Orleans.Serialization.Configuration.TypeManifestProviderAttribute>();
+                    foreach (var attr in attrs)
                     {
-                        if (string.Equals(attr.Target, "Client"))
+                        if (Activator.CreateInstance(attr.ProviderType) is Orleans.Serialization.Configuration.ITypeManifestProvider provider)
                         {
-                            result[(attr.Kind, attr.Name)] = attr.Type;
+                            provider.Configure(options);
                         }
                     }
                 }
-
+                
+                // Extract client providers from the collected metadata
+                foreach (var kvp in options.RegisteredProviders)
+                {
+                    if (string.Equals(kvp.Key.Target, "Client", StringComparison.Ordinal))
+                    {
+                        result[(kvp.Key.Kind, kvp.Key.Name)] = kvp.Value;
+                    }
+                }
+                
                 return result;
             }
 

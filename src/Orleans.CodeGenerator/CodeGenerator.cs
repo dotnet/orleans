@@ -67,6 +67,10 @@ namespace Orleans.CodeGenerator
 
             // Expand the set of referenced assemblies
             MetadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
+            
+            // Scan the compilation assembly for RegisterProvider attributes
+            CollectRegisteredProviders(compilationAsm);
+            
             foreach (var reference in LibraryTypes.Compilation.References)
             {
                 if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
@@ -82,6 +86,8 @@ namespace Orleans.CodeGenerator
                         MetadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
                     }
                 }
+
+                CollectRegisteredProviders(asm);
             }
 
             // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
@@ -466,6 +472,28 @@ namespace Orleans.CodeGenerator
                 else
                 {
                     ComputeAssembliesToExamine(declaringAsm, expandedAssemblies);
+                }
+            }
+        }
+
+        private void CollectRegisteredProviders(IAssemblySymbol assembly)
+        {
+            if (assembly.GetAttributes(LibraryTypes.RegisterProviderAttribute, out var providerAttrs))
+            {
+                foreach (var attr in providerAttrs)
+                {
+                    if (attr.ConstructorArguments.Length >= 4)
+                    {
+                        var name = attr.ConstructorArguments[0].Value as string;
+                        var kind = attr.ConstructorArguments[1].Value as string;
+                        var target = attr.ConstructorArguments[2].Value as string;
+                        var type = attr.ConstructorArguments[3].Value as INamedTypeSymbol;
+
+                        if (name is not null && kind is not null && target is not null && type is not null)
+                        {
+                            MetadataModel.RegisteredProviders.Add((target, kind, name, type.ToOpenTypeSyntax()));
+                        }
+                    }
                 }
             }
         }
