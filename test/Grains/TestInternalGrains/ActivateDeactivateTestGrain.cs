@@ -1,12 +1,11 @@
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
-using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace UnitTests.Grains
 {
-    internal class SimpleActivateDeactivateTestGrain : DeactivationTestingGrain, ISimpleActivateDeactivateTestGrain
+    internal class SimpleActivateDeactivateTestGrain : Grain, ISimpleActivateDeactivateTestGrain
     {
         private readonly ILogger logger;
 
@@ -22,7 +21,6 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync(cancellationToken);
             logger.LogInformation("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
@@ -62,7 +60,7 @@ namespace UnitTests.Grains
         }
     }
 
-    internal class TailCallActivateDeactivateTestGrain : DeactivationTestingGrain, ITailCallActivateDeactivateTestGrain
+    internal class TailCallActivateDeactivateTestGrain : Grain, ITailCallActivateDeactivateTestGrain
     {
         private readonly ILogger logger;
 
@@ -78,7 +76,6 @@ namespace UnitTests.Grains
 
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            DeactivationTasks.Register(GrainContext);
             logger.LogInformation("OnActivateAsync");
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
             Assert.False(doingActivate, "Activate method should have finished");
@@ -126,7 +123,7 @@ namespace UnitTests.Grains
         }
     }
 
-    internal class LongRunningActivateDeactivateTestGrain : DeactivationTestingGrain, ILongRunningActivateDeactivateTestGrain
+    internal class LongRunningActivateDeactivateTestGrain : Grain, ILongRunningActivateDeactivateTestGrain
     {
         private readonly ILogger logger;
 
@@ -142,7 +139,6 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            await base.OnActivateAsync(cancellationToken);
             watcher = GrainFactory.GetGrain<IActivateDeactivateWatcherGrain>(0);
 
             Assert.False(doingActivate, "Not doing Activate yet");
@@ -212,7 +208,7 @@ namespace UnitTests.Grains
         }
     }
 
-    internal class TaskActionActivateDeactivateTestGrain : DeactivationTestingGrain, ITaskActionActivateDeactivateTestGrain
+    internal class TaskActionActivateDeactivateTestGrain : Grain, ITaskActionActivateDeactivateTestGrain
     {
         private readonly ILogger logger;
 
@@ -228,7 +224,6 @@ namespace UnitTests.Grains
 
         public override async Task OnActivateAsync(CancellationToken cancellationToken)
         {
-            DeactivationTasks.Register(GrainContext);
             Assert.NotNull(TaskScheduler.Current);
             Assert.NotEqual(TaskScheduler.Current, TaskScheduler.Default);
             var startMe =
@@ -379,7 +374,7 @@ namespace UnitTests.Grains
         }
     }
 
-    internal class DeactivatingWhileActivatingTestGrain : DeactivationTestingGrain, IDeactivatingWhileActivatingTestGrain
+    internal class DeactivatingWhileActivatingTestGrain : Grain, IDeactivatingWhileActivatingTestGrain
     {
         private readonly ILogger logger;
 
@@ -392,7 +387,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("OnActivateAsync");
             this.DeactivateOnIdle();
-            return base.OnActivateAsync(cancellationToken);
+            return Task.CompletedTask;
         }
 
         public override Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken)
@@ -408,7 +403,7 @@ namespace UnitTests.Grains
         }
     }
 
-    internal class CreateGrainReferenceTestGrain : DeactivationTestingGrain, ICreateGrainReferenceTestGrain
+    internal class CreateGrainReferenceTestGrain : Grain, ICreateGrainReferenceTestGrain
     {
         private readonly ILogger logger;
 
@@ -425,7 +420,7 @@ namespace UnitTests.Grains
             grain = GrainFactory.GetGrain<ITestGrain>(1);
             logger.LogInformation("OnActivateAsync");
             grain = GrainFactory.GetGrain<ITestGrain>(1);
-            return base.OnActivateAsync(cancellationToken);
+            return Task.CompletedTask;
         }
 
         public async Task<string> DoSomething()

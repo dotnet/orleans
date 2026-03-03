@@ -165,6 +165,58 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Attempts to find the <see cref="IGrainContext"/> for the grain with the specified <paramref name="grainId"/>
+        /// by searching all silos in the cluster.
+        /// </summary>
+        /// <param name="grainId">The ID of the grain to find.</param>
+        /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
+        /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
+        #nullable enable
+        public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
+        {
+            foreach (var silo in Silos)
+            {
+                var activationDirectory = ((InProcessSiloHandle)silo).SiloHost.Services.GetRequiredService<ActivationDirectory>();
+                grainContext = activationDirectory.FindTarget(grainId);
+                if (grainContext is not null)
+                {
+                    return true;
+                }
+            }
+
+            grainContext = null;
+            return false;
+        }
+#nullable restore
+
+        /// <summary>
+        /// Gets a <see cref="Task"/> that completes when the current activation of the specified grain
+        /// finishes deactivating. If the grain is not currently activated, returns <see cref="Task.CompletedTask"/>.
+        /// </summary>
+        /// <param name="grainId">The ID of the grain to observe.</param>
+        /// <returns>A task that completes when the grain's current activation has deactivated.</returns>
+        /// <remarks>
+        /// Call this method <em>before</em> triggering deactivation to avoid a race where the grain
+        /// deactivates and is reactivated before the returned task is awaited.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// var deactivated = cluster.GetDeactivatedTask(grain.GetGrainId());
+        /// await grain.DoDeactivate();
+        /// await deactivated;
+        /// </code>
+        /// </example>
+        public Task GetDeactivatedTask(GrainId grainId)
+        {
+            if (TryGetGrainContext(grainId, out var grainContext))
+            {
+                return grainContext.Deactivated;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
         /// Deploys the cluster using the specified configuration and starts the client in-process.
         /// It will start the number of silos defined in <see cref="TestClusterOptions.InitialSilosCount"/>.
         /// </summary>
