@@ -7,7 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
@@ -166,6 +168,65 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 
         return Task.CompletedTask;
     }
+
+    /// <summary>
+    /// Deactivates the current activation of the specified grain and waits for deactivation to complete.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to deactivate.</param>
+    /// <returns>A task that completes when the grain has been deactivated.</returns>
+    /// <example>
+    /// <code>
+    /// await cluster.DeactivateAsync(grain.GetGrainId());
+    /// </code>
+    /// </example>
+    public async Task DeactivateAsync(GrainId grainId)
+    {
+        var deactivated = WaitForDeactivationAsync(grainId);
+        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle();
+        await deactivated;
+    }
+
+    /// <summary>
+    /// Migrates the current activation of the specified grain to a different silo and waits for migration to complete.
+    /// If <paramref name="targetSilo"/> is specified, a placement hint is set to guide migration to that silo.
+    /// </summary>
+    /// <param name="grainId">The ID of the grain to migrate.</param>
+    /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+    /// <returns>A task that completes when the grain has been migrated (deactivated on the source silo).</returns>
+    /// <example>
+    /// <code>
+    /// var targetSilo = cluster.GetActiveSilos().First(s => s.SiloAddress != originalHost).SiloAddress;
+    /// await cluster.MigrateAsync(grain.GetGrainId(), targetSilo);
+    /// </code>
+    /// </example>
+#nullable enable
+    public async Task MigrateAsync(GrainId grainId, SiloAddress? targetSilo = null)
+    {
+        var deactivated = WaitForDeactivationAsync(grainId);
+        if (targetSilo is not null)
+        {
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+        }
+
+        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+        await deactivated;
+    }
+#nullable restore
+
+    /// <inheritdoc cref="WaitForDeactivationAsync(GrainId)"/>
+    /// <param name="grain">The grain to observe.</param>
+    public Task WaitForDeactivationAsync(IAddressable grain) => WaitForDeactivationAsync(grain.GetGrainId());
+
+    /// <inheritdoc cref="DeactivateAsync(GrainId)"/>
+    /// <param name="grain">The grain to deactivate.</param>
+    public Task DeactivateAsync(IAddressable grain) => DeactivateAsync(grain.GetGrainId());
+
+    /// <inheritdoc cref="MigrateAsync(GrainId, SiloAddress?)"/>
+    /// <param name="grain">The grain to migrate.</param>
+    /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+#nullable enable
+    public Task MigrateAsync(IAddressable grain, SiloAddress? targetSilo = null) => MigrateAsync(grain.GetGrainId(), targetSilo);
+#nullable restore
 
     /// <summary>
     /// Deploys the cluster using the specified configuration and starts the client in-process.
