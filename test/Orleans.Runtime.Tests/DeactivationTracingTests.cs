@@ -4,7 +4,6 @@ using System.Text;
 using Orleans.Core.Internal;
 using Orleans.Diagnostics;
 using Orleans.Placement;
-using Orleans.Runtime.Placement;
 using Orleans.Storage;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -56,15 +55,13 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationTracingTestGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
 
                 _ = await grain.GetActivityId();
 
                 var testParentTraceId = parent.TraceId.ToString();
                 Started.Clear();
 
-                await grain.TriggerDeactivation();
-                await _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                await _fixture.HostedCluster.DeactivateAsync(grain);
 
                 _ = await grain.GetActivityId();
 
@@ -102,13 +99,11 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationWithWorkTracingTestGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
 
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
-                await grain.TriggerDeactivation();
-                await _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                await _fixture.HostedCluster.DeactivateAsync(grain);
 
                 var wasDeactivated = await grain.WasDeactivated();
                 Assert.True(wasDeactivated, "Expected grain to have been deactivated");
@@ -140,13 +135,11 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationWithExceptionTracingTestGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
 
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
-                await grain.TriggerDeactivation();
-                await _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                await _fixture.HostedCluster.DeactivateAsync(grain);
 
                 _ = await grain.GetActivityId();
 
@@ -175,7 +168,6 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationMigrationTracingTestGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
                 var expectedState = Random.Shared.Next();
                 await grain.SetState(expectedState);
                 var originalAddress = await grain.GetGrainAddress();
@@ -187,11 +179,7 @@ namespace UnitTests.General
 
                 Started.Clear();
 
-                var deactivated = _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
-
-                await deactivated;
+                await _fixture.HostedCluster.MigrateAsync(grain, targetHost);
 
                 var newState = await grain.GetState();
                 Assert.Equal(expectedState, newState);
@@ -265,14 +253,12 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationTracingTestGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
 
                 _ = await grain.GetActivityId();
 
                 var testParentTraceId = parent.TraceId.ToString();
 
-                await grain.TriggerDeactivation();
-                await _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                await _fixture.HostedCluster.DeactivateAsync(grain);
 
                 _ = await grain.GetActivityId();
 
@@ -300,11 +286,10 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IAsyncEnumerableDeactivationGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
                 var testParentTraceId = parent.TraceId.ToString();
                 const int elementCount = 3;
 
-                var deactivated = _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                var deactivated = _fixture.HostedCluster.WaitForDeactivationAsync(grain);
                 var values = new List<int>();
                 await foreach (var value in grain.GetValuesAndDeactivate(elementCount).WithBatchSize(1))
                 {
@@ -355,7 +340,6 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationMigrationTracingTestGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
                 var testParentTraceId = parent.TraceId.ToString();
                 await grain.SetState(42);
                 var originalAddress = await grain.GetGrainAddress();
@@ -367,11 +351,7 @@ namespace UnitTests.General
 
                 Started.Clear();
 
-                var deactivated = _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
-                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
-                await grain.Cast<IGrainManagementExtension>().MigrateOnIdle();
-
-                await deactivated;
+                await _fixture.HostedCluster.MigrateAsync(grain, targetHost);
 
                 var onDeactivateSpans = Started.Where(a => a.OperationName == ActivityNames.OnDeactivate).ToList();
                 Assert.True(onDeactivateSpans.Count > 0, "Expected at least one OnDeactivate span during migration");
@@ -402,11 +382,10 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IInconsistentStateDeactivationGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
 
                 _ = await grain.GetActivityId();
 
-                var deactivated = _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                var deactivated = _fixture.HostedCluster.WaitForDeactivationAsync(grain);
                 try
                 {
                     await grain.ThrowInconsistentStateException();
@@ -492,14 +471,13 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IGrainContextDeactivationGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
                 var testParentTraceId = parent.TraceId.ToString();
 
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
                 await grain.DeactivateWithCustomReason("Custom deactivation reason for testing");
-                await _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                await _fixture.HostedCluster.WaitForDeactivationAsync(grain);
 
                 _ = await grain.GetActivityId();
 
@@ -536,14 +514,12 @@ namespace UnitTests.General
             try
             {
                 var grain = _fixture.GrainFactory.GetGrain<IDeactivationTracingTestGrain>(Random.Shared.Next());
-                var grainId = grain.GetGrainId();
                 var testParentTraceId = parent.TraceId.ToString();
 
                 _ = await grain.GetActivityId();
                 Started.Clear();
 
-                await grain.Cast<IGrainManagementExtension>().DeactivateOnIdle();
-                await _fixture.HostedCluster.WaitForDeactivationAsync(grainId);
+                await _fixture.HostedCluster.DeactivateAsync(grain);
 
                 _ = await grain.GetActivityId();
 
