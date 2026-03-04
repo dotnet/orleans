@@ -195,17 +195,17 @@ namespace Orleans.TestingHost
         /// <param name="grainId">The ID of the grain to observe.</param>
         /// <returns>A task that completes when the grain's current activation has deactivated.</returns>
         /// <remarks>
-        /// Call this method <em>before</em> triggering deactivation to avoid a race where the grain
-        /// deactivates and is reactivated before the returned task is awaited.
+        /// There may be scenarios where this task needs to be captured before calling DeactivateOnIdle/MigrateOnIdle in the test
+        /// to avoid a race where the grain deactivates and is reactivated before the returned task is obtained.
         /// </remarks>
         /// <example>
         /// <code>
-        /// var deactivated = cluster.GetDeactivatedTask(grain.GetGrainId());
+        /// var deactivated = cluster.WaitForDeactivationAsync(grain.GetGrainId());
         /// await grain.DoDeactivate();
         /// await deactivated;
         /// </code>
         /// </example>
-        public Task GetDeactivatedTask(GrainId grainId)
+        public Task WaitForDeactivationAsync(GrainId grainId)
         {
             if (TryGetGrainContext(grainId, out var grainContext))
             {
