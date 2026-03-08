@@ -820,11 +820,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                     // These are the grains which we were supposed to have removed when the silo was marked as dead,
                     // but we kept them around until we were sure the silo was actually dead.
 
-                    var toRemove = _directory.Where(kvp => expiredSilos.Contains(kvp.Value.SiloAddress!)).ToList();
+                    var removedCount = 0;
 
-                    foreach (var kvp in toRemove)
+                    foreach (var kvp in _directory)
                     {
-                        _directory.Remove(kvp.Key);
+                        if (expiredSilos.Contains(kvp.Value.SiloAddress!))
+                        {
+                            if (_directory.Remove(kvp.Key))
+                            {
+                                removedCount++;
+                            }
+                        }
                     }
 
                     foreach (var silo in expiredSilos)
@@ -832,7 +838,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                         _siloLeaseHolds.Remove(silo);
                     }
 
-                    LogDebugPrunedExpiredSiloLeaseHolds(_logger, expiredSilos.Count, toRemove.Count);
+                    LogDebugPrunedExpiredSiloLeaseHolds(_logger, expiredSilos.Count, removedCount);
                 }
             }
         }
