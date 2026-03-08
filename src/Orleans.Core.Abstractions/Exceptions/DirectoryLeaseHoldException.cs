@@ -8,7 +8,6 @@ namespace Orleans.Runtime;
 /// Initializes a new instance of the <see cref="DirectoryLeaseHoldException"/> class.
 /// </remarks>
 /// <param name="message">The message.</param>
-[Serializable]
 [GenerateSerializer]
 [Alias("DirectoryLeaseHoldException")]
 public class DirectoryLeaseHoldException(string message) : OrleansException(message);
