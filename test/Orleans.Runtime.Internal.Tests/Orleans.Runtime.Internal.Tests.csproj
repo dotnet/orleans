@@ -12,6 +12,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.DurableReminders\Orleans.DurableReminders.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.Persistence.AzureStorage\Orleans.Persistence.AzureStorage.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
   </ItemGroup>
@@ -26,4 +27,3 @@
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
   </ItemGroup>
 </Project>
-

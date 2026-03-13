@@ -6,20 +6,11 @@ CREATE TABLE OrleansRemindersTable
     ReminderName varchar(150) NOT NULL,
     StartTime timestamptz(3) NOT NULL,
     Period bigint NOT NULL,
-    CronExpression varchar(200) NULL,
-    CronTimeZoneId varchar(200) NULL,
-    NextDueUtc timestamptz(3) NULL,
-    LastFireUtc timestamptz(3) NULL,
-    Priority smallint NOT NULL DEFAULT 0,
-    Action smallint NOT NULL DEFAULT 0,
     GrainHash integer NOT NULL,
     Version integer NOT NULL,
 
     CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
 );
-
-CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
-    ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
 
 CREATE FUNCTION upsert_reminder_row(
     ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE,
@@ -27,12 +18,6 @@ CREATE FUNCTION upsert_reminder_row(
     ReminderNameArg OrleansRemindersTable.ReminderName%TYPE,
     StartTimeArg    OrleansRemindersTable.StartTime%TYPE,
     PeriodArg       OrleansRemindersTable.Period%TYPE,
-    CronExpressionArg OrleansRemindersTable.CronExpression%TYPE,
-    CronTimeZoneIdArg OrleansRemindersTable.CronTimeZoneId%TYPE,
-    NextDueUtcArg   OrleansRemindersTable.NextDueUtc%TYPE,
-    LastFireUtcArg  OrleansRemindersTable.LastFireUtc%TYPE,
-    PriorityArg     OrleansRemindersTable.Priority%TYPE,
-    ActionArg       OrleansRemindersTable.Action%TYPE,
     GrainHashArg    OrleansRemindersTable.GrainHash%TYPE
   )
   RETURNS TABLE(version integer) AS
@@ -48,12 +33,6 @@ BEGIN
         ReminderName,
         StartTime,
         Period,
-        CronExpression,
-        CronTimeZoneId,
-        NextDueUtc,
-        LastFireUtc,
-        Priority,
-        Action,
         GrainHash,
         Version
     )
@@ -63,30 +42,18 @@ BEGIN
         ReminderNameArg,
         StartTimeArg,
         PeriodArg,
-        CronExpressionArg,
-        CronTimeZoneIdArg,
-        NextDueUtcArg,
-        LastFireUtcArg,
-        PriorityArg,
-        ActionArg,
         GrainHashArg,
         0
     ON CONFLICT (ServiceId, GrainId, ReminderName)
         DO UPDATE SET
             StartTime = excluded.StartTime,
             Period = excluded.Period,
-            CronExpression = excluded.CronExpression,
-            CronTimeZoneId = excluded.CronTimeZoneId,
-            NextDueUtc = excluded.NextDueUtc,
-            LastFireUtc = excluded.LastFireUtc,
-            Priority = excluded.Priority,
-            Action = excluded.Action,
             GrainHash = excluded.GrainHash,
             Version = OrleansRemindersTable.Version + 1
     RETURNING
         OrleansRemindersTable.Version INTO STRICT VersionVar;
 
-    RETURN QUERY SELECT VersionVar AS version;
+    RETURN QUERY SELECT VersionVar AS versionr;
 
 END
 $func$ LANGUAGE plpgsql;
@@ -100,13 +67,7 @@ VALUES
         @GrainId,
         @ReminderName,
         @StartTime,
-        @Period::bigint,
-        @CronExpression,
-        @CronTimeZoneId,
-        @NextDueUtc,
-        @LastFireUtc,
-        @Priority::smallint,
-        @Action::smallint,
+        @Period,
         @GrainHash
     );
 ');
@@ -120,12 +81,6 @@ VALUES
         ReminderName,
         StartTime,
         Period,
-        CronExpression,
-        CronTimeZoneId,
-        NextDueUtc,
-        LastFireUtc,
-        Priority,
-        Action,
         Version
     FROM OrleansRemindersTable
     WHERE
@@ -142,12 +97,6 @@ VALUES
         ReminderName,
         StartTime,
         Period,
-        CronExpression,
-        CronTimeZoneId,
-        NextDueUtc,
-        LastFireUtc,
-        Priority,
-        Action,
         Version
     FROM OrleansRemindersTable
     WHERE
@@ -165,12 +114,6 @@ VALUES
         ReminderName,
         StartTime,
         Period,
-        CronExpression,
-        CronTimeZoneId,
-        NextDueUtc,
-        LastFireUtc,
-        Priority,
-        Action,
         Version
     FROM OrleansRemindersTable
     WHERE
@@ -188,12 +131,6 @@ VALUES
         ReminderName,
         StartTime,
         Period,
-        CronExpression,
-        CronTimeZoneId,
-        NextDueUtc,
-        LastFireUtc,
-        Priority,
-        Action,
         Version
     FROM OrleansRemindersTable
     WHERE

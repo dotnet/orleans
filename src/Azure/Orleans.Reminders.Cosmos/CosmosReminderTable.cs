@@ -1,6 +1,5 @@
 using System.Net;
 using System.Diagnostics;
-using Orleans.Runtime;
 using Orleans.Reminders.Cosmos.Models;
 
 namespace Orleans.Reminders.Cosmos;
@@ -348,12 +347,6 @@ internal partial class CosmosReminderTable : IReminderTable
             ReminderName = entity.Name,
             Period = entity.Period,
             StartAt = entity.StartAt.UtcDateTime,
-            CronExpression = entity.CronExpression,
-            CronTimeZoneId = entity.CronTimeZoneId,
-            NextDueUtc = entity.NextDueUtc?.UtcDateTime,
-            LastFireUtc = entity.LastFireUtc?.UtcDateTime,
-            Priority = ParsePriority(entity.Priority),
-            Action = ParseAction(entity.Action),
             ETag = entity.ETag
         };
     }
@@ -369,30 +362,9 @@ internal partial class CosmosReminderTable : IReminderTable
             GrainId = entry.GrainId.ToString(),
             Name = entry.ReminderName,
             StartAt = entry.StartAt,
-            Period = entry.Period,
-            CronExpression = entry.CronExpression,
-            CronTimeZoneId = entry.CronTimeZoneId,
-            NextDueUtc = entry.NextDueUtc,
-            LastFireUtc = entry.LastFireUtc,
-            Priority = (int)entry.Priority,
-            Action = (int)entry.Action,
+            Period = entry.Period
         };
     }
-
-    private static ReminderPriority ParsePriority(int value) => value switch
-    {
-        (int)ReminderPriority.High => ReminderPriority.High,
-        (int)ReminderPriority.Normal => ReminderPriority.Normal,
-        _ => ReminderPriority.Normal,
-    };
-
-    private static MissedReminderAction ParseAction(int value) => value switch
-    {
-        (int)MissedReminderAction.FireImmediately => MissedReminderAction.FireImmediately,
-        (int)MissedReminderAction.Skip => MissedReminderAction.Skip,
-        (int)MissedReminderAction.Notify => MissedReminderAction.Notify,
-        _ => MissedReminderAction.Skip,
-    };
 
     private readonly struct UIntLogValue(uint value)
     {

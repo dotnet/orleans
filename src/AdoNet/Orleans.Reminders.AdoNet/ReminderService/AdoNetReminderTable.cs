@@ -47,18 +47,7 @@ namespace Orleans.Runtime.ReminderService
                 entry.StartAt = new DateTime(entry.StartAt.Ticks, DateTimeKind.Utc);
             }
 
-            return this.orleansQueries.UpsertReminderRowAsync(
-                this.serviceId,
-                entry.GrainId,
-                entry.ReminderName,
-                entry.StartAt,
-                entry.Period,
-                entry.CronExpression,
-                entry.CronTimeZoneId,
-                entry.NextDueUtc,
-                entry.LastFireUtc,
-                entry.Priority,
-                entry.Action);
+            return this.orleansQueries.UpsertReminderRowAsync(this.serviceId, entry.GrainId, entry.ReminderName, entry.StartAt, entry.Period);            
         }
 
         public Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag)

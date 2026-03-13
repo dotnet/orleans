@@ -74,17 +74,5 @@ namespace Tester.Redis.Reminders
         {
             await ReminderSimple();
         }
-
-        [SkippableFact]
-        public async Task RemindersTable_Redis_ReminderCronRoundTrip()
-        {
-            await ReminderCronRoundTrip();
-        }
-
-        [SkippableFact]
-        public async Task RemindersTable_Redis_ReminderAdaptiveFieldsRoundTrip()
-        {
-            await ReminderAdaptiveFieldsRoundTrip();
-        }
     }
 }

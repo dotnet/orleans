@@ -6,6 +6,13 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
+#if DURABLE_REMINDERS_ADONET
+using ReminderEntry = Orleans.DurableReminders.ReminderEntry;
+using ReminderTableData = Orleans.DurableReminders.ReminderTableData;
+using ReminderPriority = Orleans.DurableReminders.Runtime.ReminderPriority;
+using MissedReminderAction = Orleans.DurableReminders.Runtime.MissedReminderAction;
+#endif
+
 #nullable disable
 
 #if CLUSTERING_ADONET
@@ -99,11 +106,23 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="serviceId">The service ID.</param>
         /// <param name="grainId">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, GrainId grainId)
+        internal Task<
+#if DURABLE_REMINDERS_ADONET
+            Orleans.DurableReminders.ReminderTableData
+#else
+            ReminderTableData
+#endif
+            > ReadReminderRowsAsync(string serviceId, GrainId grainId)
         {
             return ReadAsync(dbStoredQueries.ReadReminderRowsKey, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
-                ret => new ReminderTableData(ret.ToList()));
+                ret => new
+#if DURABLE_REMINDERS_ADONET
+                    Orleans.DurableReminders.ReminderTableData
+#else
+                    ReminderTableData
+#endif
+                    (ret.ToList()));
         }
 
         /// <summary>
@@ -113,13 +132,25 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="beginHash">The begin hash.</param>
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
-        internal Task<ReminderTableData> ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
+        internal Task<
+#if DURABLE_REMINDERS_ADONET
+            Orleans.DurableReminders.ReminderTableData
+#else
+            ReminderTableData
+#endif
+            > ReadReminderRowsAsync(string serviceId, uint beginHash, uint endHash)
         {
             var query = (int)beginHash < (int)endHash ? dbStoredQueries.ReadRangeRows1Key : dbStoredQueries.ReadRangeRows2Key;
 
             return ReadAsync(query, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
-                ret => new ReminderTableData(ret.ToList()));
+                ret => new
+#if DURABLE_REMINDERS_ADONET
+                    Orleans.DurableReminders.ReminderTableData
+#else
+                    ReminderTableData
+#endif
+                    (ret.ToList()));
         }
 
         internal static KeyValuePair<string, string> GetQueryKeyAndValue(IDataRecord record)
@@ -128,16 +159,29 @@ namespace Orleans.Tests.SqlUtils
                 record.GetValue<string>("QueryText"));
         }
 
-        internal static ReminderEntry GetReminderEntry(IDataRecord record)
+        internal static
+#if DURABLE_REMINDERS_ADONET
+            Orleans.DurableReminders.ReminderEntry
+#else
+            ReminderEntry
+#endif
+            GetReminderEntry(IDataRecord record)
         {
             //Having non-null field, GrainId, means with the query filter options, an entry was found.
             string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
             if (grainId != null)
             {
+#if DURABLE_REMINDERS_ADONET
                 var cronExpression = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronExpression));
                 var cronTimeZoneId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronTimeZoneId));
+#endif
 
-                return new ReminderEntry
+                return new
+#if DURABLE_REMINDERS_ADONET
+                    Orleans.DurableReminders.ReminderEntry
+#else
+                    ReminderEntry
+#endif
                 {
                     GrainId = GrainId.Parse(grainId),
                     ReminderName = record.GetValue<string>(nameof(DbStoredQueries.Columns.ReminderName)),
@@ -146,12 +190,14 @@ namespace Orleans.Tests.SqlUtils
                     //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                     //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
                     Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(DbStoredQueries.Columns.Period))),
+#if DURABLE_REMINDERS_ADONET
                     CronExpression = cronExpression,
                     CronTimeZoneId = cronTimeZoneId,
                     NextDueUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.NextDueUtc)),
                     LastFireUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.LastFireUtc)),
                     Priority = ParsePriority(record.GetInt32(nameof(DbStoredQueries.Columns.Priority))),
                     Action = ParseAction(record.GetInt32(nameof(DbStoredQueries.Columns.Action))),
+#endif
                     ETag = DbStoredQueries.Converters.GetVersion(record).ToString()
                 };
             }
@@ -164,7 +210,13 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="grainId">The grain reference (ID).</param>
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
-        internal Task<ReminderEntry> ReadReminderRowAsync(string serviceId, GrainId grainId,
+        internal Task<
+#if DURABLE_REMINDERS_ADONET
+            Orleans.DurableReminders.ReminderEntry
+#else
+            ReminderEntry
+#endif
+            > ReadReminderRowAsync(string serviceId, GrainId grainId,
             string reminderName)
         {
             return ReadAsync(dbStoredQueries.ReadReminderRowKey, GetReminderEntry, command =>
@@ -185,6 +237,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
+#if DURABLE_REMINDERS_ADONET
         internal Task<string> UpsertReminderRowAsync(
             string serviceId,
             GrainId grainId,
@@ -195,8 +248,19 @@ namespace Orleans.Tests.SqlUtils
             string cronTimeZoneId,
             DateTime? nextDueUtc,
             DateTime? lastFireUtc,
-            ReminderPriority priority,
-            MissedReminderAction action)
+            
+#if DURABLE_REMINDERS_ADONET
+            Orleans.DurableReminders.Runtime.ReminderPriority
+#else
+            ReminderPriority
+#endif
+            priority,
+#if DURABLE_REMINDERS_ADONET
+            Orleans.DurableReminders.Runtime.MissedReminderAction
+#else
+            MissedReminderAction
+#endif
+            action)
         {
             return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
                 new DbStoredQueries.Columns(command)
@@ -216,21 +280,68 @@ namespace Orleans.Tests.SqlUtils
                 },
                 ret => ret.First().ToString());
         }
-
-        private static ReminderPriority ParsePriority(int value) => value switch
+#else
+        internal Task<string> UpsertReminderRowAsync(string serviceId, GrainId grainId,
+            string reminderName, DateTime startTime, TimeSpan period)
         {
-            (int)ReminderPriority.High => ReminderPriority.High,
-            (int)ReminderPriority.Normal => ReminderPriority.Normal,
-            _ => ReminderPriority.Normal,
+            return ReadAsync(dbStoredQueries.UpsertReminderRowKey, DbStoredQueries.Converters.GetVersion, command =>
+                new DbStoredQueries.Columns(command)
+                {
+                    ServiceId = serviceId,
+                    GrainHash = grainId.GetUniformHashCode(),
+                    GrainId = grainId.ToString(),
+                    ReminderName = reminderName,
+                    StartTime = startTime,
+                    Period = period
+                },
+                ret => ret.First().ToString());
+        }
+#endif
+
+#if DURABLE_REMINDERS_ADONET
+        private static
+            Orleans.DurableReminders.Runtime.ReminderPriority
+            ParsePriority(int value) => value switch
+        {
+            (int)
+                Orleans.DurableReminders.Runtime.ReminderPriority
+                .High =>
+                Orleans.DurableReminders.Runtime.ReminderPriority
+                .High,
+            (int)
+                Orleans.DurableReminders.Runtime.ReminderPriority
+                .Normal =>
+                Orleans.DurableReminders.Runtime.ReminderPriority
+                .Normal,
+            _ =>
+                Orleans.DurableReminders.Runtime.ReminderPriority
+                .Normal,
         };
 
-        private static MissedReminderAction ParseAction(int value) => value switch
+        private static
+            Orleans.DurableReminders.Runtime.MissedReminderAction
+            ParseAction(int value) => value switch
         {
-            (int)MissedReminderAction.FireImmediately => MissedReminderAction.FireImmediately,
-            (int)MissedReminderAction.Skip => MissedReminderAction.Skip,
-            (int)MissedReminderAction.Notify => MissedReminderAction.Notify,
-            _ => MissedReminderAction.Skip,
+            (int)
+                Orleans.DurableReminders.Runtime.MissedReminderAction
+                .FireImmediately =>
+                Orleans.DurableReminders.Runtime.MissedReminderAction
+                .FireImmediately,
+            (int)
+                Orleans.DurableReminders.Runtime.MissedReminderAction
+                .Skip =>
+                Orleans.DurableReminders.Runtime.MissedReminderAction
+                .Skip,
+            (int)
+                Orleans.DurableReminders.Runtime.MissedReminderAction
+                .Notify =>
+                Orleans.DurableReminders.Runtime.MissedReminderAction
+                .Notify,
+            _ =>
+                Orleans.DurableReminders.Runtime.MissedReminderAction
+                .Skip,
         };
+#endif
 
         /// <summary>
         /// Deletes a reminder

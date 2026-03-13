@@ -7,28 +7,11 @@ CREATE TABLE OrleansRemindersTable
 	ReminderName NVARCHAR(150) NOT NULL,
 	StartTime DATETIME2(3) NOT NULL,
 	Period BIGINT NOT NULL,
-	CronExpression NVARCHAR(200) NULL,
-	CronTimeZoneId NVARCHAR(200) NULL,
-	NextDueUtc DATETIME2(3) NULL,
-	LastFireUtc DATETIME2(3) NULL,
-	Priority TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (0),
-	Action TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (0),
 	GrainHash INT NOT NULL,
 	Version INT NOT NULL,
 
 	CONSTRAINT PK_RemindersTable_ServiceId_GrainId_ReminderName PRIMARY KEY(ServiceId, GrainId, ReminderName)
 );
-
-IF NOT EXISTS (
-    SELECT 1
-    FROM sys.indexes
-    WHERE name = 'IX_RemindersTable_NextDueUtc_Priority'
-      AND object_id = OBJECT_ID('OrleansRemindersTable')
-)
-BEGIN
-    CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
-    ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
-END;
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 SELECT
@@ -40,12 +23,6 @@ SELECT
 	SET
 		StartTime = @StartTime,
 		Period = @Period,
-		CronExpression = @CronExpression,
-		CronTimeZoneId = @CronTimeZoneId,
-		NextDueUtc = @NextDueUtc,
-		LastFireUtc = @LastFireUtc,
-		Priority = @Priority,
-		Action = @Action,
 		GrainHash = @GrainHash,
 		@Version = Version = Version + 1
 	WHERE
@@ -60,12 +37,6 @@ SELECT
 		ReminderName,
 		StartTime,
 		Period,
-		CronExpression,
-		CronTimeZoneId,
-		NextDueUtc,
-		LastFireUtc,
-		Priority,
-		Action,
 		GrainHash,
 		Version
 	)
@@ -75,12 +46,6 @@ SELECT
 		@ReminderName,
 		@StartTime,
 		@Period,
-		@CronExpression,
-		@CronTimeZoneId,
-		@NextDueUtc,
-		@LastFireUtc,
-		@Priority,
-		@Action,
 		@GrainHash,
 		0
 	WHERE
@@ -103,12 +68,6 @@ SELECT
 		ReminderName,
 		StartTime,
 		Period,
-		CronExpression,
-		CronTimeZoneId,
-		NextDueUtc,
-		LastFireUtc,
-		Priority,
-		Action,
 		Version
 	FROM OrleansRemindersTable
 	WHERE
@@ -130,12 +89,6 @@ SELECT
 		ReminderName,
 		StartTime,
 		Period,
-		CronExpression,
-		CronTimeZoneId,
-		NextDueUtc,
-		LastFireUtc,
-		Priority,
-		Action,
 		Version
 	FROM OrleansRemindersTable
 	WHERE
@@ -158,12 +111,6 @@ SELECT
 		ReminderName,
 		StartTime,
 		Period,
-		CronExpression,
-		CronTimeZoneId,
-		NextDueUtc,
-		LastFireUtc,
-		Priority,
-		Action,
 		Version
 	FROM OrleansRemindersTable
 	WHERE
@@ -186,12 +133,6 @@ SELECT
 		ReminderName,
 		StartTime,
 		Period,
-		CronExpression,
-		CronTimeZoneId,
-		NextDueUtc,
-		LastFireUtc,
-		Priority,
-		Action,
 		Version
 	FROM OrleansRemindersTable
 	WHERE
