@@ -1,7 +1,7 @@
-# Microsoft Orleans Reminders for DynamoDB
+# Microsoft Orleans Advanced Reminders for DynamoDB
 
 ## Introduction
-Microsoft Orleans Reminders for DynamoDB provides persistence for Orleans reminders using Amazon's DynamoDB. This allows your Orleans applications to schedule persistent reminders that will be triggered even after silo restarts or grain deactivation.
+Microsoft Orleans Advanced Reminders for DynamoDB provides persistence for Orleans advanced reminders using Amazon DynamoDB.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -10,11 +10,13 @@ To use this package, install it via NuGet:
 dotnet add package Microsoft.Orleans.AdvancedReminders.DynamoDB
 ```
 
-## Example - Configuring DynamoDB Reminders
+## Example - Configuring DynamoDB Advanced Reminders
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
 using Orleans.Hosting;
 
 var builder = Host.CreateApplicationBuilder(args)
@@ -23,11 +25,11 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure DynamoDB as reminder storage
-            .UseDynamoDBReminderService(options =>
+            .UseDynamoDBAdvancedReminderService(options =>
             {
                 options.AccessKey = "YOUR_AWS_ACCESS_KEY";
                 options.SecretKey = "YOUR_AWS_SECRET_KEY";
-                options.Region = "us-east-1";
+                options.Service = "us-east-1";
                 options.TableName = "OrleansReminders";
                 options.CreateIfNotExists = true;
             });
@@ -54,7 +56,8 @@ await host.WaitForShutdownAsync();
 using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
 
 namespace ReminderExample;
 

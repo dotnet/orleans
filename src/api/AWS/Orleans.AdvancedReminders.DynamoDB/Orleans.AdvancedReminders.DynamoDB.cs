@@ -39,16 +39,16 @@ namespace Orleans.Hosting
 {
     public static partial class DynamoDBServiceCollectionReminderExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseDynamoDBReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.DynamoDBReminderStorageOptions> configure) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseDynamoDBAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.DynamoDBReminderStorageOptions> configure) { throw null; }
     }
 
     public static partial class DynamoDBSiloBuilderReminderExtensions
     {
-        public static ISiloBuilder UseDynamoDBReminderService(this ISiloBuilder builder, System.Action<Configuration.DynamoDBReminderStorageOptions> configure) { throw null; }
+        public static ISiloBuilder UseDynamoDBAdvancedReminderService(this ISiloBuilder builder, System.Action<Configuration.DynamoDBReminderStorageOptions> configure) { throw null; }
     }
 }
 
-namespace Orleans.AdvancedReminders.DynamoDB
+namespace Orleans.Reminders.DynamoDB
 {
     public partial class DynamoDBClientOptions
     {

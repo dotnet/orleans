@@ -2,8 +2,8 @@
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.AdvancedReminders.AdoNet</PackageId>
-    <Title>Microsoft Orleans ADO.NET Reminders Provider</Title>
-    <Description>Microsoft Orleans reminders provider backed by ADO.NET</Description>
+    <Title>Microsoft Orleans Advanced Reminders for ADO.NET</Title>
+    <Description>ADO.NET provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
@@ -12,7 +12,7 @@
   <PropertyGroup>
     <AssemblyName>Orleans.AdvancedReminders.AdoNet</AssemblyName>
     <RootNamespace>Orleans.AdvancedReminders.AdoNet</RootNamespace>
-    <DefineConstants>$(DefineConstants);REMINDERS_ADONET;DURABLE_REMINDERS_ADONET</DefineConstants>
+    <DefineConstants>$(DefineConstants);REMINDERS_ADONET;ADVANCED_REMINDERS_ADONET</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

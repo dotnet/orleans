@@ -6,7 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
 using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
@@ -107,7 +107,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="grainId">The grain reference (ID).</param>
         /// <returns>Reminder table data.</returns>
         internal Task<
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
             Orleans.AdvancedReminders.ReminderTableData
 #else
             ReminderTableData
@@ -117,7 +117,7 @@ namespace Orleans.Tests.SqlUtils
             return ReadAsync(dbStoredQueries.ReadReminderRowsKey, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
                 ret => new
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
                     Orleans.AdvancedReminders.ReminderTableData
 #else
                     ReminderTableData
@@ -133,7 +133,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="endHash">The end hash.</param>
         /// <returns>Reminder table data.</returns>
         internal Task<
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
             Orleans.AdvancedReminders.ReminderTableData
 #else
             ReminderTableData
@@ -145,7 +145,7 @@ namespace Orleans.Tests.SqlUtils
             return ReadAsync(query, GetReminderEntry, command =>
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
                     Orleans.AdvancedReminders.ReminderTableData
 #else
                     ReminderTableData
@@ -160,7 +160,7 @@ namespace Orleans.Tests.SqlUtils
         }
 
         internal static
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
             Orleans.AdvancedReminders.ReminderEntry
 #else
             ReminderEntry
@@ -171,13 +171,13 @@ namespace Orleans.Tests.SqlUtils
             string grainId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.GrainId));
             if (grainId != null)
             {
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
                 var cronExpression = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronExpression));
                 var cronTimeZoneId = record.GetValueOrDefault<string>(nameof(DbStoredQueries.Columns.CronTimeZoneId));
 #endif
 
                 return new
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
                     Orleans.AdvancedReminders.ReminderEntry
 #else
                     ReminderEntry
@@ -190,7 +190,7 @@ namespace Orleans.Tests.SqlUtils
                     //Use the GetInt64 method instead of the generic GetValue<TValue> version to retrieve the value from the data record
                     //GetValue<int> causes an InvalidCastException with oracle data provider. See https://github.com/dotnet/orleans/issues/3561
                     Period = TimeSpan.FromMilliseconds(record.GetInt64(nameof(DbStoredQueries.Columns.Period))),
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
                     CronExpression = cronExpression,
                     CronTimeZoneId = cronTimeZoneId,
                     NextDueUtc = record.GetDateTimeValueOrDefault(nameof(DbStoredQueries.Columns.NextDueUtc)),
@@ -211,7 +211,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="reminderName">The reminder name to retrieve.</param>
         /// <returns>A remainder entry.</returns>
         internal Task<
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
             Orleans.AdvancedReminders.ReminderEntry
 #else
             ReminderEntry
@@ -237,7 +237,7 @@ namespace Orleans.Tests.SqlUtils
         /// <param name="startTime">Start time of the reminder.</param>
         /// <param name="period">Period of the reminder.</param>
         /// <returns>The new etag of the either or updated or inserted reminder row.</returns>
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
         internal Task<string> UpsertReminderRowAsync(
             string serviceId,
             GrainId grainId,
@@ -249,13 +249,13 @@ namespace Orleans.Tests.SqlUtils
             DateTime? nextDueUtc,
             DateTime? lastFireUtc,
             
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
             Orleans.AdvancedReminders.Runtime.ReminderPriority
 #else
             ReminderPriority
 #endif
             priority,
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
             Orleans.AdvancedReminders.Runtime.MissedReminderAction
 #else
             MissedReminderAction
@@ -298,7 +298,7 @@ namespace Orleans.Tests.SqlUtils
         }
 #endif
 
-#if DURABLE_REMINDERS_ADONET
+#if ADVANCED_REMINDERS_ADONET
         private static
             Orleans.AdvancedReminders.Runtime.ReminderPriority
             ParsePriority(int value) => value switch

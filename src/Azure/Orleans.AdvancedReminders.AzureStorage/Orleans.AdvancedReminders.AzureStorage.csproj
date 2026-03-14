@@ -2,8 +2,8 @@
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.AdvancedReminders.AzureStorage</PackageId>
-    <Title>Microsoft Orleans Azure Table Storage Reminders Provider</Title>
-    <Description>Microsoft Orleans reminders provider backed by Azure Table Storage</Description>
+    <Title>Microsoft Orleans Advanced Reminders for Azure Table Storage</Title>
+    <Description>Azure Table Storage provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) Azure Table Storage</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.AdvancedReminders.AzureStorage</AssemblyName>
@@ -35,4 +35,3 @@
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
   </ItemGroup>
 </Project>
-

@@ -3,7 +3,7 @@ using System;
 namespace Orleans.AdvancedReminders.Runtime;
 
 /// <summary>
-/// The status of a durable reminder tick when it is delivered to a grain.
+/// The status of an advanced reminder tick when it is delivered to a grain.
 /// </summary>
 [Serializable]
 [GenerateSerializer]

@@ -5,7 +5,7 @@ using Orleans.Runtime;
 namespace Orleans.AdvancedReminders.Runtime;
 
 /// <summary>
-/// Represents the schedule type of a durable reminder.
+/// Represents the schedule type of an advanced reminder.
 /// </summary>
 public enum ReminderScheduleKind : byte
 {
@@ -33,7 +33,7 @@ public enum MissedReminderAction : byte
 }
 
 /// <summary>
-/// Exception related to Orleans durable reminder functions or reminder service.
+/// Exception related to Orleans advanced reminder functions or reminder service.
 /// </summary>
 [Serializable]
 [GenerateSerializer]

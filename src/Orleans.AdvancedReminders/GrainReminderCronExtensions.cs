@@ -329,7 +329,7 @@ public static class GrainReminderCronExtensions
         if (!remindable)
         {
             throw new InvalidOperationException(
-                $"Grain {grainContext.GrainId} is not '{typeof(IRemindable).FullName}'. A grain should implement {typeof(IRemindable).FullName} to use the persistent durable reminder service.");
+                $"Grain {grainContext.GrainId} is not '{typeof(IRemindable).FullName}'. A grain should implement {typeof(IRemindable).FullName} to use the advanced reminder service.");
         }
 
         return grainContext.ActivationServices.GetRequiredService<IReminderRegistry>()

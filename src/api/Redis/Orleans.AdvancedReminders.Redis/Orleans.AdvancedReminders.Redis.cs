@@ -6,37 +6,6 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-namespace Orleans.Configuration
-{
-    public partial class RedisReminderTableOptions
-    {
-        public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
-
-        public System.Func<RedisReminderTableOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>> CreateMultiplexer { get { throw null; } set { } }
-
-        public System.TimeSpan? EntryExpiry { get { throw null; } set { } }
-
-        public static System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer> DefaultCreateMultiplexer(RedisReminderTableOptions options) { throw null; }
-    }
-
-    public partial class RedisReminderTableOptionsValidator : IConfigurationValidator
-    {
-        public RedisReminderTableOptionsValidator(Microsoft.Extensions.Options.IOptions<RedisReminderTableOptions> options) { }
-
-        public void ValidateConfiguration() { }
-    }
-}
-
-namespace Orleans.Hosting
-{
-    public static partial class SiloBuilderReminderExtensions
-    {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseRedisReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.RedisReminderTableOptions> configure) { throw null; }
-
-        public static ISiloBuilder UseRedisReminderService(this ISiloBuilder builder, System.Action<Configuration.RedisReminderTableOptions> configure) { throw null; }
-    }
-}
-
 namespace Orleans.AdvancedReminders.Redis
 {
     [GenerateSerializer]
@@ -53,9 +22,41 @@ namespace Orleans.AdvancedReminders.Redis
     }
 }
 
+namespace Orleans.Configuration
+{
+    public partial class RedisReminderTableOptions
+    {
+        public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
+
+        public System.Func<RedisReminderTableOptions, System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer>> CreateMultiplexer { get { throw null; } set { } }
+
+        public System.TimeSpan? EntryExpiry { get { throw null; } set { } }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public static System.Threading.Tasks.Task<StackExchange.Redis.IConnectionMultiplexer> DefaultCreateMultiplexer(RedisReminderTableOptions options) { throw null; }
+    }
+
+    public partial class RedisReminderTableOptionsValidator : IConfigurationValidator
+    {
+        public RedisReminderTableOptionsValidator(Microsoft.Extensions.Options.IOptions<RedisReminderTableOptions> options) { }
+
+        public void ValidateConfiguration() { }
+    }
+}
+
+namespace Orleans.Hosting
+{
+    public static partial class SiloBuilderReminderExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseRedisAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.RedisReminderTableOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseRedisAdvancedReminderService(this ISiloBuilder builder, System.Action<Configuration.RedisReminderTableOptions> configure) { throw null; }
+    }
+}
+
 namespace OrleansCodeGen.Orleans.AdvancedReminders.Redis
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_RedisRemindersException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.AdvancedReminders.Redis.RedisRemindersException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.AdvancedReminders.Redis.RedisRemindersException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -73,7 +74,7 @@ namespace OrleansCodeGen.Orleans.AdvancedReminders.Redis
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_RedisRemindersException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.AdvancedReminders.Redis.RedisRemindersException, System.Exception>

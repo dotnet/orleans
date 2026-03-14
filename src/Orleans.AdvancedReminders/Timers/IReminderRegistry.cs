@@ -6,7 +6,7 @@ using Orleans.Runtime;
 namespace Orleans.AdvancedReminders.Timers;
 
 /// <summary>
-/// Functionality for managing durable reminders from grain code.
+/// Functionality for managing advanced reminders from grain code.
 /// </summary>
 public interface IReminderRegistry
 {

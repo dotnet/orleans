@@ -340,6 +340,17 @@ public class ReminderCronExpressionTimeZoneTests
     }
 
     [Fact]
+    public void GetNextOccurrence_WithLeapDaySchedule_SkipsToNextLeapYear()
+    {
+        var expression = ReminderCronExpression.Parse("0 9 29 2 *");
+        var fromUtc = new DateTime(2025, 3, 1, 0, 0, 0, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2028, 2, 29, 9, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
     public void GetNextOccurrence_WithTimeZone_ThrowsOnNullZone()
     {
         var expression = ReminderCronExpression.Parse("0 9 * * *");
@@ -818,6 +829,36 @@ public class ReminderCronTimeZoneEdgeCaseTests
                 AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 4, 6, 9, 0, 0),
                 AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 4, 7, 9, 0, 0),
                 AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 4, 8, 9, 0, 0),
+            ],
+            occurrences);
+    }
+
+    [Fact]
+    public void Builder_WithIndiaTimeZone_AcrossNewYear_PreservesLocalMidnightSchedule()
+    {
+        var zone = AdvancedReminderTimeZoneTestHelper.GetIndiaTimeZone();
+        var builder = ReminderCronBuilder.DailyAt(0, 15).InTimeZone(zone);
+        var fromUtc = new DateTime(2025, 12, 31, 18, 0, 0, DateTimeKind.Utc);
+
+        var next = builder.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2026, 1, 1, 0, 15, 0), next);
+    }
+
+    [Fact]
+    public void Schedule_WithNepalTimeZone_AcrossNewYear_PreservesQuarterHourOffset()
+    {
+        var zone = AdvancedReminderTimeZoneTestHelper.GetNepalTimeZone();
+        var schedule = ReminderCronSchedule.Parse("0 9 * * *", ReminderCronSchedule.NormalizeTimeZoneIdForStorage(zone));
+        var fromUtc = new DateTime(2025, 12, 31, 0, 0, 0, DateTimeKind.Utc);
+        var toUtc = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+
+        var occurrences = schedule.GetOccurrences(fromUtc, toUtc).ToArray();
+
+        Assert.Equal(
+            [
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 12, 31, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2026, 1, 1, 9, 0, 0),
             ],
             occurrences);
     }

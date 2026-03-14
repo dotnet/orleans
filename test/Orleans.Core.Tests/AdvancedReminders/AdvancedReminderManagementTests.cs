@@ -79,6 +79,58 @@ public class ReminderIteratorTests
     }
 
     [Fact]
+    public async Task EnumerateOverdueAsync_ReadsAllPages()
+    {
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(3), 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(3), 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var iterator = new ReminderIterator(managementGrain);
+        var names = new List<string>();
+        await foreach (var reminder in iterator.EnumerateOverdueAsync(TimeSpan.FromMinutes(3), pageSize: 2))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    [Fact]
+    public async Task EnumerateDueInRangeAsync_ReadsAllPages()
+    {
+        var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListDueInRangeAsync(from, to, 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListDueInRangeAsync(from, to, 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var iterator = new ReminderIterator(managementGrain);
+        var names = new List<string>();
+        await foreach (var reminder in iterator.EnumerateDueInRangeAsync(from, to, pageSize: 2))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    [Fact]
     public void Ctor_NullManagementGrain_Throws()
     {
         Assert.Throws<ArgumentNullException>(() => _ = new ReminderIterator(null!));
@@ -132,6 +184,56 @@ public class ReminderManagementGrainExtensionsTests
 
         Assert.NotNull(iterator);
         Assert.IsType<ReminderIterator>(iterator);
+    }
+
+    [Fact]
+    public async Task EnumerateOverdueAsync_Extension_ReadsAllPages()
+    {
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(2), 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListOverdueAsync(TimeSpan.FromMinutes(2), 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var names = new List<string>();
+        await foreach (var reminder in managementGrain.EnumerateOverdueAsync(TimeSpan.FromMinutes(2), pageSize: 2))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
+    }
+
+    [Fact]
+    public async Task EnumerateDueInRangeAsync_Extension_ReadsAllPages()
+    {
+        var from = new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        var to = new DateTime(2026, 1, 2, 0, 0, 0, DateTimeKind.Utc);
+        var managementGrain = Substitute.For<IReminderManagementGrain>();
+        managementGrain.ListDueInRangeAsync(from, to, 2, null).Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r1")],
+            ContinuationToken = "next",
+        }));
+        managementGrain.ListDueInRangeAsync(from, to, 2, "next").Returns(Task.FromResult(new ReminderManagementPage
+        {
+            Reminders = [CreateReminder("r2")],
+            ContinuationToken = null,
+        }));
+
+        var names = new List<string>();
+        await foreach (var reminder in managementGrain.EnumerateDueInRangeAsync(from, to, pageSize: 2))
+        {
+            names.Add(reminder.ReminderName);
+        }
+
+        Assert.Equal(["r1", "r2"], names);
     }
 
     private static ReminderEntry CreateReminder(string reminderName)
@@ -244,6 +346,168 @@ public class ReminderManagementGrainTests
 
         Assert.Single(page.Reminders);
         Assert.Equal("match", page.Reminders[0].ReminderName);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_StatusFilters_DistinguishDueUpcomingOverdueAndMissed()
+    {
+        var now = DateTime.UtcNow;
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "due"),
+                ReminderName = "due",
+                StartAt = now.AddMinutes(-1),
+                NextDueUtc = now.AddSeconds(-10),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = now,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "upcoming"),
+                ReminderName = "upcoming",
+                StartAt = now.AddMinutes(10),
+                NextDueUtc = now.AddMinutes(10),
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "overdue"),
+                ReminderName = "overdue",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = now.AddMinutes(-1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "missed"),
+                ReminderName = "missed",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = null,
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var due = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Due }, pageSize: 10);
+        var upcoming = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Upcoming }, pageSize: 10);
+        var overdue = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Overdue, OverdueBy = TimeSpan.FromMinutes(5) }, pageSize: 10);
+        var missed = await grain.ListFilteredAsync(new ReminderQueryFilter { Status = ReminderQueryStatus.Missed, MissedBy = TimeSpan.FromMinutes(5) }, pageSize: 10);
+
+        Assert.Equal(["missed", "overdue", "due"], due.Reminders.Select(x => x.ReminderName).ToArray());
+        Assert.Equal(["upcoming"], upcoming.Reminders.Select(x => x.ReminderName).ToArray());
+        Assert.Equal(["missed", "overdue"], overdue.Reminders.Select(x => x.ReminderName).ToArray());
+        Assert.Equal(["missed"], missed.Reminders.Select(x => x.ReminderName).ToArray());
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_MissedStatus_ExcludesReminderAlreadyFiredAfterDueTime()
+    {
+        var now = DateTime.UtcNow;
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "missed"),
+                ReminderName = "missed",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = null,
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "already-fired"),
+                ReminderName = "already-fired",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-6),
+                Period = TimeSpan.FromMinutes(1),
+                LastFireUtc = now.AddMinutes(-5),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var missed = await grain.ListFilteredAsync(
+            new ReminderQueryFilter
+            {
+                Status = ReminderQueryStatus.Missed,
+                MissedBy = TimeSpan.FromMinutes(5),
+            },
+            pageSize: 10);
+
+        Assert.Equal(["missed"], missed.Reminders.Select(x => x.ReminderName).ToArray());
+    }
+
+    [Fact]
+    public async Task ListOverdueAsync_UsesThreshold()
+    {
+        var now = DateTime.UtcNow;
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "old"),
+                ReminderName = "old",
+                StartAt = now.AddMinutes(-10),
+                NextDueUtc = now.AddMinutes(-8),
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "recent"),
+                ReminderName = "recent",
+                StartAt = now.AddMinutes(-1),
+                NextDueUtc = now.AddMinutes(-1),
+                Period = TimeSpan.FromMinutes(1),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var page = await grain.ListOverdueAsync(TimeSpan.FromMinutes(5), pageSize: 10);
+
+        Assert.Equal(["old"], page.Reminders.Select(x => x.ReminderName).ToArray());
+    }
+
+    [Fact]
+    public async Task ListDueInRangeAsync_UsesInclusiveBounds()
+    {
+        var lower = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc);
+        var upper = new DateTime(2026, 1, 1, 11, 0, 0, DateTimeKind.Utc);
+        var table = new InMemoryManagementReminderTable(
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "lower"),
+                ReminderName = "lower",
+                StartAt = lower,
+                NextDueUtc = lower,
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "middle"),
+                ReminderName = "middle",
+                StartAt = lower.AddMinutes(30),
+                NextDueUtc = lower.AddMinutes(30),
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "upper"),
+                ReminderName = "upper",
+                StartAt = upper,
+                NextDueUtc = upper,
+                Period = TimeSpan.FromMinutes(1),
+            },
+            new ReminderEntry
+            {
+                GrainId = GrainId.Create("test", "outside"),
+                ReminderName = "outside",
+                StartAt = upper.AddSeconds(1),
+                NextDueUtc = upper.AddSeconds(1),
+                Period = TimeSpan.FromMinutes(1),
+            });
+        var grain = new ReminderManagementGrain(table);
+
+        var page = await grain.ListDueInRangeAsync(lower, upper, pageSize: 10);
+
+        Assert.Equal(["lower", "middle", "upper"], page.Reminders.Select(x => x.ReminderName).ToArray());
     }
 
     [Fact]

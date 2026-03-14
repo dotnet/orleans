@@ -3,7 +3,7 @@ using System;
 namespace Orleans.AdvancedReminders;
 
 /// <summary>
-/// Describes the schedule of a durable reminder.
+/// Describes the schedule of an advanced reminder.
 /// </summary>
 public sealed class ReminderSchedule
 {

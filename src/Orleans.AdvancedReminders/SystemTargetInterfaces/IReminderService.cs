@@ -7,7 +7,7 @@ using Orleans.Runtime;
 namespace Orleans.AdvancedReminders;
 
 /// <summary>
-/// Functionality for managing durable reminders.
+/// Functionality for managing advanced reminders.
 /// </summary>
 public interface IReminderService
 {

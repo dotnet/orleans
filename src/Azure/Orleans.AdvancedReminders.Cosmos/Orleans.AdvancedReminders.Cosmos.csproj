@@ -1,8 +1,8 @@
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.AdvancedReminders.Cosmos</PackageId>
-    <Title>Microsoft Orleans Reminders Azure Cosmos DB</Title>
-    <Description>Microsoft Orleans reminders provider for Azure Cosmos DB</Description>
+    <Title>Microsoft Orleans Advanced Reminders for Azure Cosmos DB</Title>
+    <Description>Azure Cosmos DB provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) Azure Cosmos DB</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <AssemblyName>Orleans.AdvancedReminders.Cosmos</AssemblyName>

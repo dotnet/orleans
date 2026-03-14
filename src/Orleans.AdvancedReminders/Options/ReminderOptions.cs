@@ -116,7 +116,7 @@ internal sealed partial class ReminderOptionsValidator : IConfigurationValidator
     [LoggerMessage(
         Level = LogLevel.Warning,
         EventId = (int)RSErrorCode.RS_FastReminderInterval,
-        Message = $"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MinimumReminderPeriod)} is {{MinimumReminderPeriod}} (default {{MinimumReminderPeriodMinutes}}. High-Frequency reminders are unsuitable for production use."
+        Message = $"{nameof(ReminderOptions)}.{nameof(ReminderOptions.MinimumReminderPeriod)} is {{MinimumReminderPeriod}} (default {{MinimumReminderPeriodMinutes}}). High-Frequency reminders are unsuitable for production use."
     )]
     private partial void LogWarnFastReminderInterval(TimeSpan minimumReminderPeriod, uint minimumReminderPeriodMinutes);
 }

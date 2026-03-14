@@ -1,7 +1,7 @@
-# Microsoft Orleans Reminders for Azure Storage
+# Microsoft Orleans Advanced Reminders for Azure Storage
 
 ## Introduction
-Microsoft Orleans Reminders for Azure Storage provides persistence for Orleans reminders using Azure Table Storage. This allows your Orleans applications to schedule persistent reminders that will be triggered even after silo restarts or grain deactivation.
+Microsoft Orleans Advanced Reminders for Azure Storage provides persistence for Orleans advanced reminders using Azure Table Storage.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -10,9 +10,11 @@ To use this package, install it via NuGet:
 dotnet add package Microsoft.Orleans.AdvancedReminders.AzureStorage
 ```
 
-## Example - Configuring Azure Storage Reminders
+## Example - Configuring Azure Storage Advanced Reminders
 ```csharp
+using Azure.Data.Tables;
 using Microsoft.Extensions.Hosting;
+using Orleans.AdvancedReminders;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
@@ -22,9 +24,9 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Table Storage as reminder storage
-            .UseAzureTableReminderService(options =>
+            .UseAzureTableAdvancedReminderService(options =>
             {
-                options.ConnectionString = "YOUR_AZURE_STORAGE_CONNECTION_STRING";
+                options.TableServiceClient = new TableServiceClient("YOUR_AZURE_STORAGE_CONNECTION_STRING");
                 options.TableName = "OrleansReminders";
             });
     });
@@ -35,6 +37,10 @@ await builder.RunAsync();
 
 ## Example - Using Reminders in a Grain
 ```csharp
+using Orleans;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
+
 public interface IReminderGrain
 {
     Task StartReminder(string reminderName);

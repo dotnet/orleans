@@ -1,8 +1,6 @@
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
 using System.Threading;
-using System.Threading.Tasks;
 
 #nullable enable
 namespace Orleans.AdvancedReminders;
@@ -24,117 +22,53 @@ public static class ReminderManagementGrainExtensions
     /// <summary>
     /// Iterates all reminders across the reminder table using server-side paging.
     /// </summary>
-    public static async IAsyncEnumerable<ReminderEntry> EnumerateAllAsync(
+    public static IAsyncEnumerable<ReminderEntry> EnumerateAllAsync(
         this IReminderManagementGrain managementGrain,
         int pageSize = 256,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(managementGrain);
-
-        string? continuationToken = null;
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var page = await managementGrain.ListAllAsync(pageSize, continuationToken).WaitAsync(cancellationToken);
-
-            foreach (var reminder in page.Reminders)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return reminder;
-            }
-
-            continuationToken = page.ContinuationToken;
-        }
-        while (!string.IsNullOrEmpty(continuationToken));
+        return managementGrain.CreateIterator().EnumerateAllAsync(pageSize, cancellationToken);
     }
 
     /// <summary>
     /// Iterates overdue reminders across the reminder table using server-side paging.
     /// </summary>
-    public static async IAsyncEnumerable<ReminderEntry> EnumerateOverdueAsync(
+    public static IAsyncEnumerable<ReminderEntry> EnumerateOverdueAsync(
         this IReminderManagementGrain managementGrain,
         TimeSpan overdueBy,
         int pageSize = 256,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(managementGrain);
-
-        string? continuationToken = null;
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var page = await managementGrain.ListOverdueAsync(overdueBy, pageSize, continuationToken).WaitAsync(cancellationToken);
-
-            foreach (var reminder in page.Reminders)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return reminder;
-            }
-
-            continuationToken = page.ContinuationToken;
-        }
-        while (!string.IsNullOrEmpty(continuationToken));
+        return managementGrain.CreateIterator().EnumerateOverdueAsync(overdueBy, pageSize, cancellationToken);
     }
 
     /// <summary>
     /// Iterates reminders due in the provided UTC range using server-side paging.
     /// </summary>
-    public static async IAsyncEnumerable<ReminderEntry> EnumerateDueInRangeAsync(
+    public static IAsyncEnumerable<ReminderEntry> EnumerateDueInRangeAsync(
         this IReminderManagementGrain managementGrain,
         DateTime fromUtcInclusive,
         DateTime toUtcInclusive,
         int pageSize = 256,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(managementGrain);
-
-        string? continuationToken = null;
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var page = await managementGrain
-                .ListDueInRangeAsync(fromUtcInclusive, toUtcInclusive, pageSize, continuationToken)
-                .WaitAsync(cancellationToken);
-
-            foreach (var reminder in page.Reminders)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return reminder;
-            }
-
-            continuationToken = page.ContinuationToken;
-        }
-        while (!string.IsNullOrEmpty(continuationToken));
+        return managementGrain.CreateIterator().EnumerateDueInRangeAsync(fromUtcInclusive, toUtcInclusive, pageSize, cancellationToken);
     }
 
     /// <summary>
     /// Iterates reminders matching the provided server-side filter using paging.
     /// </summary>
-    public static async IAsyncEnumerable<ReminderEntry> EnumerateFilteredAsync(
+    public static IAsyncEnumerable<ReminderEntry> EnumerateFilteredAsync(
         this IReminderManagementGrain managementGrain,
         ReminderQueryFilter filter,
         int pageSize = 256,
-        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(managementGrain);
         ArgumentNullException.ThrowIfNull(filter);
-
-        string? continuationToken = null;
-        do
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            var page = await managementGrain
-                .ListFilteredAsync(filter, pageSize, continuationToken)
-                .WaitAsync(cancellationToken);
-
-            foreach (var reminder in page.Reminders)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                yield return reminder;
-            }
-
-            continuationToken = page.ContinuationToken;
-        }
-        while (!string.IsNullOrEmpty(continuationToken));
+        return managementGrain.CreateIterator().EnumerateFilteredAsync(filter, pageSize, cancellationToken);
     }
 }

@@ -70,7 +70,21 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
             throw new ArgumentException("Reminder handle was not created by Orleans.AdvancedReminders.", nameof(reminder));
         }
 
-        await _reminderTable.RemoveRow(data.GrainId, data.ReminderName, data.ETag);
+        if (await _reminderTable.RemoveRow(data.GrainId, data.ReminderName, data.ETag))
+        {
+            return;
+        }
+
+        var latest = await _reminderTable.ReadRow(data.GrainId, data.ReminderName);
+        if (latest is null)
+        {
+            return;
+        }
+
+        if (!await _reminderTable.RemoveRow(data.GrainId, data.ReminderName, latest.ETag))
+        {
+            throw new Runtime.ReminderException($"Could not unregister reminder {reminder} due to ETag mismatch.");
+        }
     }
 
     public async Task<IGrainReminder?> GetReminder(GrainId grainId, string reminderName)
@@ -96,7 +110,8 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
             return;
         }
 
-        if (!string.IsNullOrEmpty(expectedETag) && !string.Equals(entry.ETag, expectedETag, StringComparison.Ordinal))
+        var currentETag = entry.ETag;
+        if (!string.IsNullOrEmpty(expectedETag) && !string.Equals(currentETag, expectedETag, StringComparison.Ordinal))
         {
             return;
         }
@@ -137,12 +152,17 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
             entry.LastFireUtc = now;
         }
 
+        if (!await IsCurrentEntryAsync(entry.GrainId, entry.ReminderName, currentETag))
+        {
+            return;
+        }
+
         var nextDue = CalculateNextDue(entry, now);
         if (nextDue is null)
         {
-            if (!string.IsNullOrEmpty(entry.ETag))
+            if (!string.IsNullOrEmpty(currentETag))
             {
-                await _reminderTable.RemoveRow(entry.GrainId, entry.ReminderName, entry.ETag);
+                await _reminderTable.RemoveRow(entry.GrainId, entry.ReminderName, currentETag);
             }
 
             return;
@@ -169,7 +189,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
             new ScheduleJobRequest
             {
                 Target = dispatcher.GetGrainId(),
-                JobName = $"durable-reminder:{entry.ReminderName}",
+                JobName = $"advanced-reminder:{entry.ReminderName}",
                 DueTime = dueTime,
                 Metadata = new Dictionary<string, string>(StringComparer.Ordinal)
                 {
@@ -258,6 +278,17 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
         }
 
         return next;
+    }
+
+    private async Task<bool> IsCurrentEntryAsync(GrainId grainId, string reminderName, string? expectedETag)
+    {
+        if (string.IsNullOrEmpty(expectedETag))
+        {
+            return true;
+        }
+
+        var latest = await _reminderTable.ReadRow(grainId, reminderName);
+        return latest is not null && string.Equals(latest.ETag, expectedETag, StringComparison.Ordinal);
     }
 
     private Task StartAsync(CancellationToken cancellationToken) => _reminderTable.StartAsync(cancellationToken);

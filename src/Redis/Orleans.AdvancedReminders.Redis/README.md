@@ -1,7 +1,7 @@
-# Microsoft Orleans Reminders for Redis
+# Microsoft Orleans Advanced Reminders for Redis
 
 ## Introduction
-Microsoft Orleans Reminders for Redis provides persistence for Orleans reminders using Redis. This allows your Orleans applications to schedule persistent reminders that will be triggered even after silo restarts or grain deactivation.
+Microsoft Orleans Advanced Reminders for Redis provides persistence for Orleans advanced reminders using Redis.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -10,11 +10,13 @@ To use this package, install it via NuGet:
 dotnet add package Microsoft.Orleans.AdvancedReminders.Redis
 ```
 
-## Example - Configuring Redis Reminders
+## Example - Configuring Redis Advanced Reminders
 ```csharp
 using Microsoft.Extensions.Hosting;
+using Orleans.AdvancedReminders;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using StackExchange.Redis;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -22,11 +24,10 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Redis as reminder storage
-            .UseRedisReminderService(options =>
+            .UseRedisAdvancedReminderService(options =>
             {
-                options.ConnectionString = "localhost:6379";
-                options.Database = 0;
-                options.KeyPrefix = "reminder-"; // Optional prefix for Redis keys
+                options.ConfigurationOptions = ConfigurationOptions.Parse("localhost:6379");
+                options.ConfigurationOptions.DefaultDatabase = 0;
             });
     });
 
@@ -36,6 +37,10 @@ await builder.RunAsync();
 
 ## Example - Using Reminders in a Grain
 ```csharp
+using Orleans;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
+
 public class ReminderGrain : Grain, IReminderGrain, IRemindable
 {
     private string _reminderName = "MyReminder";

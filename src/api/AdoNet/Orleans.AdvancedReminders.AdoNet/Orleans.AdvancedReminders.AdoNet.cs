@@ -28,10 +28,10 @@ namespace Orleans.Hosting
 {
     public static partial class SiloBuilderReminderExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAdoNetReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetReminderTableOptions>> configureOptions) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAdoNetAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetReminderTableOptions>> configureOptions) { throw null; }
 
-        public static ISiloBuilder UseAdoNetReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetReminderTableOptions>> configureOptions) { throw null; }
+        public static ISiloBuilder UseAdoNetAdvancedReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetReminderTableOptions>> configureOptions) { throw null; }
 
-        public static ISiloBuilder UseAdoNetReminderService(this ISiloBuilder builder, System.Action<Configuration.AdoNetReminderTableOptions> configureOptions) { throw null; }
+        public static ISiloBuilder UseAdoNetAdvancedReminderService(this ISiloBuilder builder, System.Action<Configuration.AdoNetReminderTableOptions> configureOptions) { throw null; }
     }
 }

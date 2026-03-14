@@ -1,7 +1,7 @@
-# Microsoft Orleans Reminders for Azure Cosmos DB
+# Microsoft Orleans Advanced Reminders for Azure Cosmos DB
 
 ## Introduction
-Microsoft Orleans Reminders for Azure Cosmos DB provides persistence for Orleans reminders using Azure Cosmos DB. This allows your Orleans applications to schedule persistent reminders that will be triggered even after silo restarts or grain deactivation.
+Microsoft Orleans Advanced Reminders for Azure Cosmos DB provides persistence for Orleans advanced reminders using Azure Cosmos DB.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -10,9 +10,10 @@ To use this package, install it via NuGet:
 dotnet add package Microsoft.Orleans.AdvancedReminders.Cosmos
 ```
 
-## Example - Configuring Azure Cosmos DB Reminders
+## Example - Configuring Azure Cosmos DB Advanced Reminders
 ```csharp
 using Microsoft.Extensions.Hosting;
+using Orleans.AdvancedReminders;
 using Orleans.Configuration;
 using Orleans.Hosting;
 
@@ -22,12 +23,12 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Cosmos DB as reminder storage
-            .UseCosmosDBReminders(options =>
+            .UseCosmosAdvancedReminderService(options =>
             {
-                options.AccountEndpoint = "https://YOUR_COSMOS_ENDPOINT";
-                options.AccountKey = "YOUR_COSMOS_KEY";
-                options.DB = "YOUR_DATABASE_NAME";
-                options.CanCreateResources = true;
+                options.ConfigureCosmosClient("AccountEndpoint=https://YOUR_COSMOS_ENDPOINT/;AccountKey=YOUR_COSMOS_KEY;");
+                options.DatabaseName = "YOUR_DATABASE_NAME";
+                options.ContainerName = "OrleansReminders";
+                options.IsResourceCreationEnabled = true;
             });
     });
 
@@ -37,6 +38,10 @@ await builder.RunAsync();
 
 ## Example - Using Reminders in a Grain
 ```csharp
+using Orleans;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
+
 public interface IReminderGrain
 {
     Task StartReminder(string reminderName);

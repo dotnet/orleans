@@ -2,8 +2,8 @@
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.AdvancedReminders.DynamoDB</PackageId>
-    <Title>Microsoft Orleans AWS DynamoDB Reminders Provider</Title>
-    <Description>Microsoft Orleans reminders provider backed by AWS DynamoDB</Description>
+    <Title>Microsoft Orleans Advanced Reminders for DynamoDB</Title>
+    <Description>AWS DynamoDB provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) AWS DynamoDB</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
@@ -37,4 +37,3 @@
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
   </ItemGroup>
 </Project>
-

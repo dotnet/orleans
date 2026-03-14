@@ -3,8 +3,8 @@
   <PropertyGroup>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <PackageId>Microsoft.Orleans.AdvancedReminders.Redis</PackageId>
-    <Title>Microsoft Orleans Reminders Redis Provider</Title>
-    <Description>Microsoft Orleans Reminders implementation that uses Redis</Description>
+    <Title>Microsoft Orleans Advanced Reminders for Redis</Title>
+    <Description>Redis provider for Microsoft Orleans Advanced Reminders.</Description>
     <PackageTags>$(PackageTags) Redis Reminders</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
@@ -29,4 +29,3 @@
     <InternalsVisibleTo Include="Orleans.Redis.Tests" />
   </ItemGroup>
 </Project>
-

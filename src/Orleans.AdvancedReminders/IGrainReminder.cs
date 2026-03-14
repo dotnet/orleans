@@ -1,7 +1,7 @@
 namespace Orleans.AdvancedReminders;
 
 /// <summary>
-/// Handle for a persistent durable reminder.
+/// Handle for a persistent advanced reminder.
 /// </summary>
 public interface IGrainReminder
 {

@@ -6,28 +6,73 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
+namespace Orleans.AdvancedReminders.AzureStorage
+{
+    public partial class AzureTableReminderStorageOptions : Reminders.AzureStorage.AzureStorageOperationOptions
+    {
+        public const string DEFAULT_TABLE_NAME = "OrleansReminders";
+        public override string TableName { get { throw null; } set { } }
+    }
+
+    public partial class AzureTableReminderStorageOptionsValidator : Reminders.AzureStorage.AzureStorageOperationOptionsValidator<AzureTableReminderStorageOptions>
+    {
+        public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(default!, default!) { }
+    }
+}
+
+namespace Orleans.AdvancedReminders.Runtime.ReminderService
+{
+    public sealed partial class AzureBasedReminderTable : IReminderTable
+    {
+        public AzureBasedReminderTable(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<AzureStorage.AzureTableReminderStorageOptions> storageOptions) { }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<ReminderEntry> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(Orleans.Runtime.GrainId grainId) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry) { throw null; }
+    }
+}
+
 namespace Orleans.Hosting
 {
     public static partial class AzureStorageReminderServiceCollectionExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Reminders.AzureStorage.AzureTableReminderStorageOptions>> configureOptions) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.AzureStorage.AzureTableReminderStorageOptions>> configureOptions) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Reminders.AzureStorage.AzureTableReminderStorageOptions> configure) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AdvancedReminders.AzureStorage.AzureTableReminderStorageOptions> configure) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string connectionString) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAzureTableAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string connectionString) { throw null; }
     }
 
     public static partial class AzureStorageReminderSiloBuilderExtensions
     {
-        public static ISiloBuilder UseAzureTableReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Reminders.AzureStorage.AzureTableReminderStorageOptions>> configureOptions) { throw null; }
+        public static ISiloBuilder UseAzureTableAdvancedReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.AzureStorage.AzureTableReminderStorageOptions>> configureOptions) { throw null; }
 
-        public static ISiloBuilder UseAzureTableReminderService(this ISiloBuilder builder, System.Action<Reminders.AzureStorage.AzureTableReminderStorageOptions> configure) { throw null; }
+        public static ISiloBuilder UseAzureTableAdvancedReminderService(this ISiloBuilder builder, System.Action<AdvancedReminders.AzureStorage.AzureTableReminderStorageOptions> configure) { throw null; }
 
-        public static ISiloBuilder UseAzureTableReminderService(this ISiloBuilder builder, string connectionString) { throw null; }
+        public static ISiloBuilder UseAzureTableAdvancedReminderService(this ISiloBuilder builder, string connectionString) { throw null; }
     }
 }
 
-namespace Orleans.AdvancedReminders.AzureStorage
+namespace Orleans.Reminders.AzureStorage
 {
     public partial class AzureStorageOperationOptions
     {
@@ -84,40 +129,5 @@ namespace Orleans.AdvancedReminders.AzureStorage
         public System.TimeSpan PauseBetweenCreationRetries { get { throw null; } set { } }
 
         public System.TimeSpan PauseBetweenOperationRetries { get { throw null; } set { } }
-    }
-
-    public partial class AzureTableReminderStorageOptions : AzureStorageOperationOptions
-    {
-        public const string DEFAULT_TABLE_NAME = "OrleansReminders";
-        public override string TableName { get { throw null; } set { } }
-    }
-
-    public partial class AzureTableReminderStorageOptionsValidator : AzureStorageOperationOptionsValidator<AzureTableReminderStorageOptions>
-    {
-        public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(default!, default!) { }
-    }
-}
-
-namespace Orleans.AdvancedReminders.Runtime.ReminderService
-{
-    public sealed partial class AzureBasedReminderTable : IReminderTable
-    {
-        public AzureBasedReminderTable(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<Reminders.AzureStorage.AzureTableReminderStorageOptions> storageOptions) { }
-
-        public System.Threading.Tasks.Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName) { throw null; }
-
-        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(GrainId grainId) { throw null; }
-
-        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end) { throw null; }
-
-        public System.Threading.Tasks.Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag) { throw null; }
-
-        public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
-
-        public System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry) { throw null; }
     }
 }

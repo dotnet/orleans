@@ -1,7 +1,7 @@
-# Microsoft Orleans Reminders for ADO.NET
+# Microsoft Orleans Advanced Reminders for ADO.NET
 
 ## Introduction
-Microsoft Orleans Reminders for ADO.NET provides persistence for Orleans reminders using ADO.NET-compatible databases (SQL Server, MySQL, PostgreSQL, etc.). This allows your Orleans applications to schedule persistent reminders that will be triggered even after silo restarts or grain deactivation.
+Microsoft Orleans Advanced Reminders for ADO.NET provides persistence for Orleans advanced reminders using ADO.NET-compatible databases.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -23,11 +23,13 @@ dotnet add package MySql.Data
 dotnet add package Npgsql
 ```
 
-## Example - Configuring ADO.NET Reminders
+## Example - Configuring ADO.NET Advanced Reminders
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
 using Orleans.Hosting;
 using Example;
 
@@ -38,7 +40,7 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder
         .UseLocalhostClustering()
         // Configure ADO.NET as reminder storage
-        .UseAdoNetReminderService(options =>
+        .UseAdoNetAdvancedReminderService(options =>
         {
             options.Invariant = "Microsoft.Data.SqlClient";  // For SQL Server
             options.ConnectionString = "Server=localhost;Database=OrleansReminders;User ID=orleans;******;";
@@ -63,7 +65,8 @@ await host.WaitForShutdownAsync();
 using System;
 using System.Threading.Tasks;
 using Orleans;
-using Orleans.Runtime;
+using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime;
 
 namespace Example;
 

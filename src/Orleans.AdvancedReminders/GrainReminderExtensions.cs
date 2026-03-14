@@ -166,7 +166,7 @@ public static class GrainReminderExtensions
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
-        if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{typeof(IRemindable).FullName}'. A grain should implement {typeof(IRemindable).FullName} to use the persistent durable reminder service.");
+        if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{typeof(IRemindable).FullName}'. A grain should implement {typeof(IRemindable).FullName} to use the advanced reminder service.");
 
         return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueTime, period, priority, action);
     }
@@ -182,7 +182,7 @@ public static class GrainReminderExtensions
     {
         ArgumentNullException.ThrowIfNull(grainContext, "grain");
         if (string.IsNullOrWhiteSpace(reminderName)) throw new ArgumentNullException(nameof(reminderName));
-        if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{typeof(IRemindable).FullName}'. A grain should implement {typeof(IRemindable).FullName} to use the persistent durable reminder service.");
+        if (!remindable) throw new InvalidOperationException($"Grain {grainContext.GrainId} is not '{typeof(IRemindable).FullName}'. A grain should implement {typeof(IRemindable).FullName} to use the advanced reminder service.");
 
         return GetReminderRegistry(grainContext).RegisterOrUpdateReminder(grainContext.GrainId, reminderName, dueAtUtc, period, priority, action);
     }

@@ -9,7 +9,7 @@ using Orleans.Runtime;
 namespace Orleans.AdvancedReminders;
 
 /// <summary>
-/// Administrative management API for durable reminders.
+/// Administrative management API for advanced reminders.
 /// </summary>
 public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grain, IReminderManagementGrain
 {

@@ -34,7 +34,7 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         loggerFactory = TestingUtils.CreateDefaultLoggerFactory($"{GetType()}.log", filters);
         ClusterFixture = clusterFixture;
 
-        var serviceId = Guid.NewGuid() + "/durable";
+        var serviceId = Guid.NewGuid() + "/advanced-reminders";
         var clusterId = "test-" + serviceId + "/cluster";
         clusterOptions = Options.Create(new ClusterOptions { ClusterId = clusterId, ServiceId = serviceId });
 
