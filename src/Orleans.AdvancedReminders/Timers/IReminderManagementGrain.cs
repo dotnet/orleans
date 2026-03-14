@@ -4,7 +4,7 @@ using Orleans.Runtime;
 namespace Orleans.AdvancedReminders;
 
 /// <summary>
-/// Administrative management API for adaptive reminders.
+/// Administrative management API for advanced reminders.
 /// </summary>
 public interface IReminderManagementGrain : IGrainWithGuidKey
 {

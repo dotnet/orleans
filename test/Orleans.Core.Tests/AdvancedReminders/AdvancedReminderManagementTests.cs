@@ -3,12 +3,18 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans;
 using Orleans.AdvancedReminders;
 using Orleans.AdvancedReminders.Cron.Internal;
 using Orleans.AdvancedReminders.Runtime;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
+using Orleans.DurableJobs;
 using Orleans.Runtime;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
@@ -543,6 +549,61 @@ public class ReminderManagementGrainTests
     }
 
     [Fact]
+    public async Task MutationApis_WithReminderService_RescheduleReminderChain()
+    {
+        var due = DateTime.UtcNow.AddMinutes(2);
+        var grainId = GrainId.Create("test", "mutation-reschedule");
+        var entry = new ReminderEntry
+        {
+            GrainId = grainId,
+            ReminderName = "r",
+            StartAt = due,
+            NextDueUtc = due,
+            Period = TimeSpan.FromMinutes(5),
+            Priority = ReminderPriority.Normal,
+            Action = MissedReminderAction.Skip,
+            ETag = "etag-1",
+        };
+
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        reminderTable.ReadRow(grainId, "r").Returns(
+            Task.FromResult(CloneEntry(entry)),
+            Task.FromResult(CloneEntry(entry)),
+            Task.FromResult(CloneEntry(entry)));
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-2", "etag-3", "etag-4");
+
+        var grainFactory = Substitute.For<IGrainFactory>();
+        var dispatcher = new TestManagementDispatcherGrain(GrainId.Create("sys", "dispatcher"));
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(grainId.ToString(), null).Returns(dispatcher);
+
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        var service = new AdvancedReminderService(
+            reminderTable,
+            jobManager,
+            grainFactory,
+            Options.Create(new Orleans.AdvancedReminders.ReminderOptions()),
+            NullLogger<AdvancedReminderService>.Instance);
+        var grain = new ReminderManagementGrain(
+            reminderTable,
+            new ServiceCollection()
+                .AddSingleton(service)
+                .BuildServiceProvider());
+
+        await grain.SetPriorityAsync(grainId, "r", ReminderPriority.High);
+        await grain.SetActionAsync(grainId, "r", MissedReminderAction.Notify);
+        await grain.RepairAsync(grainId, "r");
+
+        await jobManager.Received(3).ScheduleJobAsync(
+            Arg.Is<ScheduleJobRequest>(request =>
+                request.JobName == "advanced-reminder:r"
+                && request.Target == dispatcher.GetGrainId()
+                && request.Metadata != null
+                && request.Metadata["grain-id"] == grainId.ToString()
+                && request.Metadata["reminder-name"] == "r"),
+            Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
     public async Task UpcomingAsync_UsesHorizon()
     {
         var now = DateTime.UtcNow;
@@ -642,28 +703,44 @@ public class ReminderManagementGrainTests
         Assert.Equal(normalizedTimeZoneId, repaired.CronTimeZoneId);
     }
 
+    private static ReminderEntry CloneEntry(ReminderEntry entry)
+        => new()
+        {
+            GrainId = entry.GrainId,
+            ReminderName = entry.ReminderName,
+            StartAt = entry.StartAt,
+            Period = entry.Period,
+            ETag = entry.ETag,
+            CronExpression = entry.CronExpression,
+            CronTimeZoneId = entry.CronTimeZoneId,
+            NextDueUtc = entry.NextDueUtc,
+            LastFireUtc = entry.LastFireUtc,
+            Priority = entry.Priority,
+            Action = entry.Action,
+        };
+
     private sealed class InMemoryManagementReminderTable(params ReminderEntry[] reminders) : Orleans.AdvancedReminders.IReminderTable
     {
         private readonly Dictionary<(GrainId GrainId, string ReminderName), ReminderEntry> _entries =
             reminders.ToDictionary(
                 reminder => (reminder.GrainId, reminder.ReminderName),
-                reminder => Clone(reminder));
+                reminder => CloneEntry(reminder));
 
         public Task<ReminderTableData> ReadRows(GrainId grainId)
-            => Task.FromResult(new ReminderTableData(_entries.Values.Where(entry => entry.GrainId.Equals(grainId)).Select(Clone).ToList()));
+            => Task.FromResult(new ReminderTableData(_entries.Values.Where(entry => entry.GrainId.Equals(grainId)).Select(CloneEntry).ToList()));
 
         public Task<ReminderTableData> ReadRows(uint begin, uint end)
-            => Task.FromResult(new ReminderTableData(_entries.Values.Select(Clone).ToList()));
+            => Task.FromResult(new ReminderTableData(_entries.Values.Select(CloneEntry).ToList()));
 
         public Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName)
         {
             _entries.TryGetValue((grainId, reminderName), out var entry);
-            return Task.FromResult(entry is null ? null! : Clone(entry));
+            return Task.FromResult(entry is null ? null! : CloneEntry(entry));
         }
 
         public Task<string> UpsertRow(ReminderEntry entry)
         {
-            var copy = Clone(entry);
+            var copy = CloneEntry(entry);
             copy.ETag = string.IsNullOrWhiteSpace(copy.ETag)
                 ? Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture)
                 : copy.ETag + "-next";
@@ -679,22 +756,20 @@ public class ReminderManagementGrainTests
             _entries.Clear();
             return Task.CompletedTask;
         }
+    }
 
-        private static ReminderEntry Clone(ReminderEntry entry)
-            => new()
-            {
-                GrainId = entry.GrainId,
-                ReminderName = entry.ReminderName,
-                StartAt = entry.StartAt,
-                Period = entry.Period,
-                ETag = entry.ETag,
-                CronExpression = entry.CronExpression,
-                CronTimeZoneId = entry.CronTimeZoneId,
-                NextDueUtc = entry.NextDueUtc,
-                LastFireUtc = entry.LastFireUtc,
-                Priority = entry.Priority,
-                Action = entry.Action,
-            };
+    private sealed class TestManagementDispatcherGrain : IAdvancedReminderDispatcherGrain, IGrainBase
+    {
+        public TestManagementDispatcherGrain(GrainId grainId)
+        {
+            var context = Substitute.For<IGrainContext>();
+            context.GrainId.Returns(grainId);
+            GrainContext = context;
+        }
+
+        public IGrainContext GrainContext { get; }
+
+        public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken) => Task.CompletedTask;
     }
 }
 

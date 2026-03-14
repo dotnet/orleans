@@ -9,7 +9,7 @@
     <AssemblyName>Orleans.AdvancedReminders.AzureStorage</AssemblyName>
     <RootNamespace>Orleans.AdvancedReminders.AzureStorage</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS</DefineConstants>
+    <DefineConstants>$(DefineConstants);ADVANCED_REMINDERS_AZURE</DefineConstants>
   </PropertyGroup>
 
   <ItemGroup>

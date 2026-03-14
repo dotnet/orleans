@@ -7,7 +7,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
         /// Table name for Azure Storage
         /// </summary>
         public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
-        public const string DEFAULT_TABLE_NAME = "OrleansReminders";
+        public const string DEFAULT_TABLE_NAME = "OrleansAdvancedReminders";
     }
 
     /// <summary>

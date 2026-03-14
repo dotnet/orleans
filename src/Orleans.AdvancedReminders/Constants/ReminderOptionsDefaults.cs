@@ -11,27 +11,12 @@ internal static class ReminderOptionsDefaults
     public const uint MinimumReminderPeriodMinutes = 1;
 
     /// <summary>
-    /// Period (in minutes) between refreshing local reminder list to reflect the global reminder table every <see cref="ReminderOptions.RefreshReminderListPeriod"/>.
-    /// </summary>
-    public const uint RefreshReminderListPeriodMinutes = 5;
-
-    /// <summary>
     /// The maximum amount of time (in minutes) to attempt to initialize reminders giving up <see cref="ReminderOptions.InitializationTimeout"/>.
     /// </summary>
     public const uint InitializationTimeoutMinutes = 5;
 
     /// <summary>
-    /// Look-ahead window in minutes for adaptive reminder scheduling.
+    /// Grace period in seconds before a reminder is considered missed.
     /// </summary>
-    public const uint LookAheadWindowMinutes = 5;
-
-    /// <summary>
-    /// Poll interval in seconds for adaptive reminder scheduling.
-    /// </summary>
-    public const uint PollIntervalSeconds = 30;
-
-    /// <summary>
-    /// Base adaptive bucket size.
-    /// </summary>
-    public const uint BaseBucketSize = 1024;
+    public const uint MissedReminderGracePeriodSeconds = 30;
 }

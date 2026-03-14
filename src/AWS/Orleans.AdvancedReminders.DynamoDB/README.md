@@ -30,7 +30,7 @@ var builder = Host.CreateApplicationBuilder(args)
                 options.AccessKey = "YOUR_AWS_ACCESS_KEY";
                 options.SecretKey = "YOUR_AWS_SECRET_KEY";
                 options.Service = "us-east-1";
-                options.TableName = "OrleansReminders";
+                options.TableName = "OrleansAdvancedReminders";
                 options.CreateIfNotExists = true;
             });
     });

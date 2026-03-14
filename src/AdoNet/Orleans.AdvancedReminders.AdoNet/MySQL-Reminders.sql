@@ -1,5 +1,5 @@
 -- Orleans Reminders table - https://learn.microsoft.com/dotnet/orleans/grains/timers-and-reminders
-CREATE TABLE OrleansRemindersTable
+CREATE TABLE OrleansAdvancedRemindersTable
 (
     ServiceId NVARCHAR(150) NOT NULL,
     GrainId VARCHAR(150) NOT NULL,
@@ -19,13 +19,13 @@ CREATE TABLE OrleansRemindersTable
 );
 
 CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
-ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
+ON OrleansAdvancedRemindersTable(ServiceId, NextDueUtc, Priority);
 
 INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'UpsertReminderRowKey','
-    INSERT INTO OrleansRemindersTable
+    INSERT INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
         GrainId,
@@ -90,7 +90,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL;
@@ -112,7 +112,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL
@@ -135,7 +135,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
@@ -158,7 +158,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)
@@ -169,7 +169,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'DeleteReminderRowKey','
-    DELETE FROM OrleansRemindersTable
+    DELETE FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL
@@ -182,7 +182,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'DeleteReminderRowsKey','
-    DELETE FROM OrleansRemindersTable
+    DELETE FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
 ');

@@ -1,2 +1,2 @@
 global using Orleans.AdvancedReminders.Runtime;
-global using Orleans.Reminders.AzureStorage;
+global using Orleans.AdvancedReminders.AzureStorage;

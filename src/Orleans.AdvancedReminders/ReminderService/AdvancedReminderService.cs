@@ -119,7 +119,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
         var now = DateTime.UtcNow;
         var due = entry.NextDueUtc ?? entry.StartAt;
         var overdueBy = now > due ? now - due : TimeSpan.Zero;
-        var isMissed = overdueBy > _options.PollInterval;
+        var isMissed = overdueBy > _options.MissedReminderGracePeriod;
 
         var shouldFire = true;
         if (isMissed)
@@ -143,7 +143,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
 
         if (shouldFire)
         {
-            var remindable = (IRemindable)_grainFactory.GetGrain(typeof(IRemindable), grainId.Key);
+            var remindable = _grainFactory.GetGrain<IRemindable>(grainId);
             var status = new Runtime.TickStatus(
                 entry.StartAt,
                 string.IsNullOrWhiteSpace(entry.CronExpression) ? entry.Period : TimeSpan.Zero,
@@ -175,9 +175,19 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
 
     private async Task<IGrainReminder> UpsertAndScheduleAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
-        entry.ETag = await _reminderTable.UpsertRow(entry);
-        await ScheduleReminderAsync(entry, cancellationToken);
+        await UpsertAndScheduleEntryAsync(entry, cancellationToken);
         return entry.ToIGrainReminder();
+    }
+
+    internal async Task<string> UpsertAndScheduleEntryAsync(ReminderEntry entry, CancellationToken cancellationToken)
+    {
+        entry.ETag = await _reminderTable.UpsertRow(entry);
+        if (entry.NextDueUtc is not null)
+        {
+            await ScheduleReminderAsync(entry, cancellationToken);
+        }
+
+        return entry.ETag;
     }
 
     private async Task ScheduleReminderAsync(ReminderEntry entry, CancellationToken cancellationToken)

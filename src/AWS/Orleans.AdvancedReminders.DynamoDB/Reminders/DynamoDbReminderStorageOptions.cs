@@ -34,8 +34,8 @@ namespace Orleans.Configuration
 
         /// <summary>
         /// DynamoDB table name.
-        /// Defaults to 'OrleansReminders'.
+        /// Defaults to 'OrleansAdvancedReminders'.
         /// </summary>
-        public string TableName { get; set; } = "OrleansReminders";
+        public string TableName { get; set; } = "OrleansAdvancedReminders";
     }
 }

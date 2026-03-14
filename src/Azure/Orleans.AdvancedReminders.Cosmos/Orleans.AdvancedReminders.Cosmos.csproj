@@ -8,7 +8,7 @@
     <AssemblyName>Orleans.AdvancedReminders.Cosmos</AssemblyName>
     <RootNamespace>Orleans.AdvancedReminders.Cosmos</RootNamespace>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
-    <DefineConstants>$(DefineConstants);ORLEANS_REMINDERS</DefineConstants>
+    <DefineConstants>$(DefineConstants);ADVANCED_REMINDERS_COSMOS</DefineConstants>
     <Nullable>enable</Nullable>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

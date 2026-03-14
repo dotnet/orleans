@@ -1,6 +1,6 @@
 -- Run this migration for upgrading PostgreSQL reminder tables created before 10.0.0.
 
-ALTER TABLE OrleansRemindersTable
+ALTER TABLE OrleansAdvancedRemindersTable
     ADD COLUMN CronExpression varchar(200),
     ADD COLUMN CronTimeZoneId varchar(200),
     ADD COLUMN NextDueUtc timestamptz(3),
@@ -9,21 +9,21 @@ ALTER TABLE OrleansRemindersTable
     ADD COLUMN Action smallint NOT NULL DEFAULT 0;
 
 CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
-    ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
+    ON OrleansAdvancedRemindersTable(ServiceId, NextDueUtc, Priority);
 
 CREATE OR REPLACE FUNCTION upsert_reminder_row(
-    ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE,
-    GrainIdArg      OrleansRemindersTable.GrainId%TYPE,
-    ReminderNameArg OrleansRemindersTable.ReminderName%TYPE,
-    StartTimeArg    OrleansRemindersTable.StartTime%TYPE,
-    PeriodArg       OrleansRemindersTable.Period%TYPE,
-    CronExpressionArg OrleansRemindersTable.CronExpression%TYPE,
-    CronTimeZoneIdArg OrleansRemindersTable.CronTimeZoneId%TYPE,
-    NextDueUtcArg   OrleansRemindersTable.NextDueUtc%TYPE,
-    LastFireUtcArg  OrleansRemindersTable.LastFireUtc%TYPE,
-    PriorityArg     OrleansRemindersTable.Priority%TYPE,
-    ActionArg       OrleansRemindersTable.Action%TYPE,
-    GrainHashArg    OrleansRemindersTable.GrainHash%TYPE
+    ServiceIdArg    OrleansAdvancedRemindersTable.ServiceId%TYPE,
+    GrainIdArg      OrleansAdvancedRemindersTable.GrainId%TYPE,
+    ReminderNameArg OrleansAdvancedRemindersTable.ReminderName%TYPE,
+    StartTimeArg    OrleansAdvancedRemindersTable.StartTime%TYPE,
+    PeriodArg       OrleansAdvancedRemindersTable.Period%TYPE,
+    CronExpressionArg OrleansAdvancedRemindersTable.CronExpression%TYPE,
+    CronTimeZoneIdArg OrleansAdvancedRemindersTable.CronTimeZoneId%TYPE,
+    NextDueUtcArg   OrleansAdvancedRemindersTable.NextDueUtc%TYPE,
+    LastFireUtcArg  OrleansAdvancedRemindersTable.LastFireUtc%TYPE,
+    PriorityArg     OrleansAdvancedRemindersTable.Priority%TYPE,
+    ActionArg       OrleansAdvancedRemindersTable.Action%TYPE,
+    GrainHashArg    OrleansAdvancedRemindersTable.GrainHash%TYPE
   )
   RETURNS TABLE(version integer) AS
 $func$
@@ -31,7 +31,7 @@ DECLARE
     VersionVar int := 0;
 BEGIN
 
-    INSERT INTO OrleansRemindersTable
+    INSERT INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
         GrainId,
@@ -72,9 +72,9 @@ BEGIN
             Priority = excluded.Priority,
             Action = excluded.Action,
             GrainHash = excluded.GrainHash,
-            Version = OrleansRemindersTable.Version + 1
+            Version = OrleansAdvancedRemindersTable.Version + 1
     RETURNING
-        OrleansRemindersTable.Version INTO STRICT VersionVar;
+        OrleansAdvancedRemindersTable.Version INTO STRICT VersionVar;
 
     RETURN QUERY SELECT VersionVar AS version;
 
@@ -114,7 +114,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL;
@@ -135,7 +135,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL
@@ -157,7 +157,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
@@ -179,7 +179,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)

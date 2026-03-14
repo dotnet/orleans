@@ -4,18 +4,18 @@ BEGIN;
 
 -- Change date type
 
-ALTER TABLE OrleansRemindersTable
+ALTER TABLE OrleansAdvancedRemindersTable
 ALTER COLUMN StartTime TYPE TIMESTAMPTZ(3) USING StartTime AT TIME ZONE 'UTC';
 
 -- Recreate routines
 
 CREATE OR REPLACE FUNCTION upsert_reminder_row(
-    ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE,
-    GrainIdArg      OrleansRemindersTable.GrainId%TYPE,
-    ReminderNameArg OrleansRemindersTable.ReminderName%TYPE,
-    StartTimeArg    OrleansRemindersTable.StartTime%TYPE,
-    PeriodArg       OrleansRemindersTable.Period%TYPE,
-    GrainHashArg    OrleansRemindersTable.GrainHash%TYPE
+    ServiceIdArg    OrleansAdvancedRemindersTable.ServiceId%TYPE,
+    GrainIdArg      OrleansAdvancedRemindersTable.GrainId%TYPE,
+    ReminderNameArg OrleansAdvancedRemindersTable.ReminderName%TYPE,
+    StartTimeArg    OrleansAdvancedRemindersTable.StartTime%TYPE,
+    PeriodArg       OrleansAdvancedRemindersTable.Period%TYPE,
+    GrainHashArg    OrleansAdvancedRemindersTable.GrainHash%TYPE
   )
   RETURNS TABLE(version integer) AS
 $func$
@@ -23,7 +23,7 @@ DECLARE
     VersionVar int := 0;
 BEGIN
 
-    INSERT INTO OrleansRemindersTable
+    INSERT INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
         GrainId,
@@ -46,9 +46,9 @@ BEGIN
             StartTime = excluded.StartTime,
             Period = excluded.Period,
             GrainHash = excluded.GrainHash,
-            Version = OrleansRemindersTable.Version + 1
+            Version = OrleansAdvancedRemindersTable.Version + 1
     RETURNING
-        OrleansRemindersTable.Version INTO STRICT VersionVar;
+        OrleansAdvancedRemindersTable.Version INTO STRICT VersionVar;
 
     RETURN QUERY SELECT VersionVar AS versionr;
 

@@ -27,7 +27,7 @@ var builder = Host.CreateApplicationBuilder(args)
             {
                 options.ConfigureCosmosClient("AccountEndpoint=https://YOUR_COSMOS_ENDPOINT/;AccountKey=YOUR_COSMOS_KEY;");
                 options.DatabaseName = "YOUR_DATABASE_NAME";
-                options.ContainerName = "OrleansReminders";
+                options.ContainerName = "OrleansAdvancedReminders";
                 options.IsResourceCreationEnabled = true;
             });
     });

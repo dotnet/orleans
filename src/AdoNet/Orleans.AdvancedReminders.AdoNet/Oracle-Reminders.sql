@@ -18,7 +18,7 @@ CREATE TABLE "ORLEANSREMINDERSTABLE"
     CONSTRAINT PK_REMINDERSTABLE PRIMARY KEY(SERVICEID, GRAINID, REMINDERNAME)
 );
 /
-CREATE INDEX IX_REMINDERS_NEXTDUE_PRIORITY ON OrleansRemindersTable(SERVICEID, NEXTDUEUTC, PRIORITY);
+CREATE INDEX IX_REMINDERS_NEXTDUE_PRIORITY ON OrleansAdvancedRemindersTable(SERVICEID, NEXTDUEUTC, PRIORITY);
 /
 
 CREATE OR REPLACE FUNCTION UpsertReminderRow(PARAM_SERVICEID IN NVARCHAR2, PARAM_GRAINHASH IN INT, PARAM_GRAINID IN VARCHAR2, PARAM_REMINDERNAME IN NVARCHAR2,
@@ -29,7 +29,7 @@ RETURN NUMBER IS
   currentVersion NUMBER := 0;
   PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
-    MERGE INTO OrleansRemindersTable ort
+    MERGE INTO OrleansAdvancedRemindersTable ort
     USING (
       SELECT PARAM_SERVICEID as SERVICEID,
         PARAM_GRAINID as GRAINID,
@@ -65,7 +65,7 @@ RETURN NUMBER IS
     INSERT (ort.ServiceId, ort.GrainId, ort.ReminderName, ort.StartTime, ort.Period, ort.CronExpression, ort.CronTimeZoneId, ort.NextDueUtc, ort.LastFireUtc, ort.Priority, ort.Action, ort.GrainHash, ort.Version)
     VALUES (n_ort.SERVICEID, n_ort.GRAINID, n_ort.REMINDERNAME, n_ort.STARTTIME, n_ort.PERIOD, n_ort.CRONEXPRESSION, n_ort.CRONTIMEZONEID, n_ort.NEXTDUEUTC, n_ort.LASTFIREUTC, n_ort.PRIORITY, n_ort.ACTION, n_ort.GRAINHASH, 0);
 
-    SELECT Version INTO currentVersion FROM OrleansRemindersTable
+    SELECT Version INTO currentVersion FROM OrleansAdvancedRemindersTable
         WHERE ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
         AND GrainId = PARAM_GRAINID AND PARAM_GRAINID IS NOT NULL
         AND ReminderName = PARAM_REMINDERNAME AND PARAM_REMINDERNAME IS NOT NULL;
@@ -80,7 +80,7 @@ RETURN NUMBER IS
   rowcount NUMBER;
   PRAGMA AUTONOMOUS_TRANSACTION;
   BEGIN
-    DELETE FROM OrleansRemindersTable
+    DELETE FROM OrleansAdvancedRemindersTable
       WHERE ServiceId = PARAM_SERVICEID AND PARAM_SERVICEID IS NOT NULL
         AND GrainId = PARAM_GRAINID AND PARAM_GRAINID IS NOT NULL
         AND ReminderName = PARAM_REMINDERNAME AND PARAM_REMINDERNAME IS NOT NULL
@@ -106,7 +106,7 @@ VALUES
 (
     'ReadReminderRowsKey','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = :ServiceId AND :ServiceId IS NOT NULL
         AND GrainId = :GrainId AND :GrainId IS NOT NULL
@@ -118,7 +118,7 @@ VALUES
 (
     'ReadReminderRowKey','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = :ServiceId AND :ServiceId IS NOT NULL
         AND GrainId = :GrainId AND :GrainId IS NOT NULL
@@ -131,7 +131,7 @@ VALUES
 (
     'ReadRangeRows1Key','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = :ServiceId AND :ServiceId IS NOT NULL
         AND GrainHash > :BeginHash AND :BeginHash IS NOT NULL
@@ -144,7 +144,7 @@ VALUES
 (
     'ReadRangeRows2Key','
     SELECT GrainId, ReminderName, StartTime, Period, CronExpression, CronTimeZoneId, NextDueUtc, LastFireUtc, Priority, Action, Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = :ServiceId AND :ServiceId IS NOT NULL
         AND ((GrainHash > :BeginHash AND :BeginHash IS NOT NULL)
@@ -164,7 +164,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'DeleteReminderRowsKey','
-    DELETE FROM OrleansRemindersTable
+    DELETE FROM OrleansAdvancedRemindersTable
     WHERE ServiceId = :ServiceId AND :ServiceId IS NOT NULL
 ');
 /

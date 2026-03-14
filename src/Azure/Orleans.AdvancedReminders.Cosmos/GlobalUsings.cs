@@ -1,2 +1,2 @@
 global using Orleans.AdvancedReminders.Runtime;
-global using Orleans.Reminders.Cosmos;
+global using Orleans.AdvancedReminders.Cosmos;

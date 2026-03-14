@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration.Internal;
 using Orleans.DurableJobs;
 using Orleans.AdvancedReminders;
+using Orleans.AdvancedReminders.Runtime.Hosting;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Runtime;
 
@@ -26,6 +27,7 @@ public static class SiloBuilderReminderExtensions
 
         services.AddDurableJobs();
         services.AddSingleton<IConfigurationValidator, ReminderOptionsValidator>();
+        services.AddSingleton<IConfigurationValidator, AdvancedReminderJobBackendValidator>();
         services.AddSingleton<AdvancedReminderService>();
         services.AddFromExisting<Orleans.AdvancedReminders.IReminderService, AdvancedReminderService>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AdvancedReminderService>();

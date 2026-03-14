@@ -3,7 +3,7 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-[assembly: RegisterProvider("DynamoDB", "Reminders", "Silo", typeof(DynamoDBRemindersProviderBuilder))]
+[assembly: RegisterProvider("DynamoDB", "AdvancedReminders", "Silo", typeof(DynamoDBRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 

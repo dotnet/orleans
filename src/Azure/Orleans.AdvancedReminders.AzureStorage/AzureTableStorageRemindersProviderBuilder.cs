@@ -10,7 +10,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.AdvancedReminders.AzureStorage;
 
-[assembly: RegisterProvider("AzureTableStorage", "Reminders", "Silo", typeof(AzureTableStorageRemindersProviderBuilder))]
+[assembly: RegisterProvider("AzureTableStorage", "AdvancedReminders", "Silo", typeof(AzureTableStorageRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 

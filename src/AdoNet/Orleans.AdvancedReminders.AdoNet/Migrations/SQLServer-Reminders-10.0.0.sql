@@ -1,20 +1,20 @@
 -- Run this migration for upgrading SQL Server reminder tables created before 10.0.0.
 
-ALTER TABLE OrleansRemindersTable ADD CronExpression NVARCHAR(200) NULL;
-ALTER TABLE OrleansRemindersTable ADD CronTimeZoneId NVARCHAR(200) NULL;
-ALTER TABLE OrleansRemindersTable ADD NextDueUtc DATETIME2(3) NULL;
-ALTER TABLE OrleansRemindersTable ADD LastFireUtc DATETIME2(3) NULL;
-ALTER TABLE OrleansRemindersTable ADD Priority TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Priority DEFAULT (0);
-ALTER TABLE OrleansRemindersTable ADD Action TINYINT NOT NULL CONSTRAINT DF_OrleansRemindersTable_Action DEFAULT (0);
+ALTER TABLE OrleansAdvancedRemindersTable ADD CronExpression NVARCHAR(200) NULL;
+ALTER TABLE OrleansAdvancedRemindersTable ADD CronTimeZoneId NVARCHAR(200) NULL;
+ALTER TABLE OrleansAdvancedRemindersTable ADD NextDueUtc DATETIME2(3) NULL;
+ALTER TABLE OrleansAdvancedRemindersTable ADD LastFireUtc DATETIME2(3) NULL;
+ALTER TABLE OrleansAdvancedRemindersTable ADD Priority TINYINT NOT NULL CONSTRAINT DF_OrleansAdvancedRemindersTable_Priority DEFAULT (0);
+ALTER TABLE OrleansAdvancedRemindersTable ADD Action TINYINT NOT NULL CONSTRAINT DF_OrleansAdvancedRemindersTable_Action DEFAULT (0);
 
 CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
-ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
+ON OrleansAdvancedRemindersTable(ServiceId, NextDueUtc, Priority);
 
 UPDATE OrleansQuery
 SET QueryText = 'DECLARE @Version AS INT = 0;
 	SET XACT_ABORT, NOCOUNT ON;
 	BEGIN TRANSACTION;
-	UPDATE OrleansRemindersTable WITH(UPDLOCK, ROWLOCK, HOLDLOCK)
+	UPDATE OrleansAdvancedRemindersTable WITH(UPDLOCK, ROWLOCK, HOLDLOCK)
 	SET
 		StartTime = @StartTime,
 		Period = @Period,
@@ -31,7 +31,7 @@ SET QueryText = 'DECLARE @Version AS INT = 0;
 		AND GrainId = @GrainId AND @GrainId IS NOT NULL
 		AND ReminderName = @ReminderName AND @ReminderName IS NOT NULL;
 
-	INSERT INTO OrleansRemindersTable
+	INSERT INTO OrleansAdvancedRemindersTable
 	(
 		ServiceId,
 		GrainId,
@@ -81,7 +81,7 @@ SET QueryText = 'SELECT
 		Priority,
 		Action,
 		Version
-	FROM OrleansRemindersTable
+	FROM OrleansAdvancedRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND GrainId = @GrainId AND @GrainId IS NOT NULL;
@@ -101,7 +101,7 @@ SET QueryText = 'SELECT
 		Priority,
 		Action,
 		Version
-	FROM OrleansRemindersTable
+	FROM OrleansAdvancedRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND GrainId = @GrainId AND @GrainId IS NOT NULL
@@ -122,7 +122,7 @@ SET QueryText = 'SELECT
 		Priority,
 		Action,
 		Version
-	FROM OrleansRemindersTable
+	FROM OrleansAdvancedRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
@@ -143,7 +143,7 @@ SET QueryText = 'SELECT
 		Priority,
 		Action,
 		Version
-	FROM OrleansRemindersTable
+	FROM OrleansAdvancedRemindersTable
 	WHERE
 		ServiceId = @ServiceId AND @ServiceId IS NOT NULL
 		AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)

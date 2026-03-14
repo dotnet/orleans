@@ -5,13 +5,13 @@ namespace Orleans.AdvancedReminders.Cosmos;
 /// </summary>
 public class CosmosReminderTableOptions : CosmosOptions
 {
-    private const string ORLEANS_REMINDERS_CONTAINER = "OrleansReminders";
+    private const string ADVANCED_REMINDERS_CONTAINER = "OrleansAdvancedReminders";
 
     /// <summary>
     /// Initializes a new <see cref="CosmosReminderTableOptions"/> instance.
     /// </summary>
     public CosmosReminderTableOptions()
     {
-        ContainerName = ORLEANS_REMINDERS_CONTAINER;
+        ContainerName = ADVANCED_REMINDERS_CONTAINER;
     }
 }

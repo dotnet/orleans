@@ -1,5 +1,5 @@
 -- Orleans Reminders table - https://learn.microsoft.com/dotnet/orleans/grains/timers-and-reminders
-CREATE TABLE OrleansRemindersTable
+CREATE TABLE OrleansAdvancedRemindersTable
 (
     ServiceId varchar(150) NOT NULL,
     GrainId varchar(150) NOT NULL,
@@ -19,21 +19,21 @@ CREATE TABLE OrleansRemindersTable
 );
 
 CREATE INDEX IX_RemindersTable_NextDueUtc_Priority
-    ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
+    ON OrleansAdvancedRemindersTable(ServiceId, NextDueUtc, Priority);
 
 CREATE FUNCTION upsert_reminder_row(
-    ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE,
-    GrainIdArg      OrleansRemindersTable.GrainId%TYPE,
-    ReminderNameArg OrleansRemindersTable.ReminderName%TYPE,
-    StartTimeArg    OrleansRemindersTable.StartTime%TYPE,
-    PeriodArg       OrleansRemindersTable.Period%TYPE,
-    CronExpressionArg OrleansRemindersTable.CronExpression%TYPE,
-    CronTimeZoneIdArg OrleansRemindersTable.CronTimeZoneId%TYPE,
-    NextDueUtcArg   OrleansRemindersTable.NextDueUtc%TYPE,
-    LastFireUtcArg  OrleansRemindersTable.LastFireUtc%TYPE,
-    PriorityArg     OrleansRemindersTable.Priority%TYPE,
-    ActionArg       OrleansRemindersTable.Action%TYPE,
-    GrainHashArg    OrleansRemindersTable.GrainHash%TYPE
+    ServiceIdArg    OrleansAdvancedRemindersTable.ServiceId%TYPE,
+    GrainIdArg      OrleansAdvancedRemindersTable.GrainId%TYPE,
+    ReminderNameArg OrleansAdvancedRemindersTable.ReminderName%TYPE,
+    StartTimeArg    OrleansAdvancedRemindersTable.StartTime%TYPE,
+    PeriodArg       OrleansAdvancedRemindersTable.Period%TYPE,
+    CronExpressionArg OrleansAdvancedRemindersTable.CronExpression%TYPE,
+    CronTimeZoneIdArg OrleansAdvancedRemindersTable.CronTimeZoneId%TYPE,
+    NextDueUtcArg   OrleansAdvancedRemindersTable.NextDueUtc%TYPE,
+    LastFireUtcArg  OrleansAdvancedRemindersTable.LastFireUtc%TYPE,
+    PriorityArg     OrleansAdvancedRemindersTable.Priority%TYPE,
+    ActionArg       OrleansAdvancedRemindersTable.Action%TYPE,
+    GrainHashArg    OrleansAdvancedRemindersTable.GrainHash%TYPE
   )
   RETURNS TABLE(version integer) AS
 $func$
@@ -41,7 +41,7 @@ DECLARE
     VersionVar int := 0;
 BEGIN
 
-    INSERT INTO OrleansRemindersTable
+    INSERT INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
         GrainId,
@@ -82,9 +82,9 @@ BEGIN
             Priority = excluded.Priority,
             Action = excluded.Action,
             GrainHash = excluded.GrainHash,
-            Version = OrleansRemindersTable.Version + 1
+            Version = OrleansAdvancedRemindersTable.Version + 1
     RETURNING
-        OrleansRemindersTable.Version INTO STRICT VersionVar;
+        OrleansAdvancedRemindersTable.Version INTO STRICT VersionVar;
 
     RETURN QUERY SELECT VersionVar AS version;
 
@@ -127,7 +127,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL;
@@ -149,7 +149,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL
@@ -172,7 +172,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
@@ -195,7 +195,7 @@ VALUES
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)
@@ -203,10 +203,10 @@ VALUES
 ');
 
 CREATE FUNCTION delete_reminder_row(
-    ServiceIdArg    OrleansRemindersTable.ServiceId%TYPE,
-    GrainIdArg      OrleansRemindersTable.GrainId%TYPE,
-    ReminderNameArg OrleansRemindersTable.ReminderName%TYPE,
-    VersionArg      OrleansRemindersTable.Version%TYPE
+    ServiceIdArg    OrleansAdvancedRemindersTable.ServiceId%TYPE,
+    GrainIdArg      OrleansAdvancedRemindersTable.GrainId%TYPE,
+    ReminderNameArg OrleansAdvancedRemindersTable.ReminderName%TYPE,
+    VersionArg      OrleansAdvancedRemindersTable.Version%TYPE
 )
   RETURNS TABLE(row_count integer) AS
 $func$
@@ -215,7 +215,7 @@ DECLARE
 BEGIN
 
 
-    DELETE FROM OrleansRemindersTable
+    DELETE FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = ServiceIdArg AND ServiceIdArg IS NOT NULL
         AND GrainId = GrainIdArg AND GrainIdArg IS NOT NULL
@@ -245,7 +245,7 @@ INSERT INTO OrleansQuery(QueryKey, QueryText)
 VALUES
 (
     'DeleteReminderRowsKey','
-    DELETE FROM OrleansRemindersTable
+    DELETE FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL;
 ');

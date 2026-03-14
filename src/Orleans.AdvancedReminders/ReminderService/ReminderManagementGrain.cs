@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Threading;
 using System.Threading.Tasks;
 using Orleans.AdvancedReminders.Cron.Internal;
 using Orleans.Runtime;
@@ -11,9 +12,10 @@ namespace Orleans.AdvancedReminders;
 /// <summary>
 /// Administrative management API for advanced reminders.
 /// </summary>
-public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grain, IReminderManagementGrain
+public sealed class ReminderManagementGrain(IReminderTable reminderTable, IServiceProvider? serviceProvider = null) : Grain, IReminderManagementGrain
 {
     private readonly IReminderTable _reminderTable = reminderTable;
+    private readonly IServiceProvider? _serviceProvider = serviceProvider;
 
     public Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string? continuationToken = null)
         => ListFilteredAsync(new ReminderQueryFilter(), pageSize, continuationToken);
@@ -86,21 +88,21 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
     {
         var entry = await GetEntryAsync(grainId, name);
         entry.Priority = priority;
-        entry.ETag = await _reminderTable.UpsertRow(entry);
+        await PersistMutationAsync(entry);
     }
 
     public async Task SetActionAsync(GrainId grainId, string name, Runtime.MissedReminderAction action)
     {
         var entry = await GetEntryAsync(grainId, name);
         entry.Action = action;
-        entry.ETag = await _reminderTable.UpsertRow(entry);
+        await PersistMutationAsync(entry);
     }
 
     public async Task RepairAsync(GrainId grainId, string name)
     {
         var entry = await GetEntryAsync(grainId, name);
         entry.NextDueUtc = CalculateNextDue(entry, DateTime.UtcNow);
-        entry.ETag = await _reminderTable.UpsertRow(entry);
+        await PersistMutationAsync(entry);
     }
 
     public async Task DeleteAsync(GrainId grainId, string name)
@@ -114,6 +116,24 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
 
     private async Task<ReminderEntry> GetEntryAsync(GrainId grainId, string name)
         => await _reminderTable.ReadRow(grainId, name) ?? throw new Runtime.ReminderException($"Reminder '{name}' for grain '{grainId}' was not found.");
+
+    private async Task PersistMutationAsync(ReminderEntry entry)
+    {
+        if (entry.NextDueUtc is null)
+        {
+            entry.ETag = await _reminderTable.UpsertRow(entry);
+            return;
+        }
+
+        var reminderService = _serviceProvider?.GetService(typeof(Runtime.ReminderService.AdvancedReminderService)) as Runtime.ReminderService.AdvancedReminderService;
+        if (reminderService is null)
+        {
+            entry.ETag = await _reminderTable.UpsertRow(entry);
+            return;
+        }
+
+        await reminderService.UpsertAndScheduleEntryAsync(entry, CancellationToken.None);
+    }
 
     private static bool MatchesFilter(ReminderEntry reminder, ReminderQueryFilter filter)
     {

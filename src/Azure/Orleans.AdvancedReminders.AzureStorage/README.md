@@ -27,7 +27,7 @@ var builder = Host.CreateApplicationBuilder(args)
             .UseAzureTableAdvancedReminderService(options =>
             {
                 options.TableServiceClient = new TableServiceClient("YOUR_AZURE_STORAGE_CONNECTION_STRING");
-                options.TableName = "OrleansReminders";
+                options.TableName = "OrleansAdvancedReminders";
             });
     });
 

@@ -8,27 +8,6 @@
 //------------------------------------------------------------------------------
 namespace Orleans.AdvancedReminders.Cosmos
 {
-    public partial class CosmosReminderTableOptions : Reminders.Cosmos.CosmosOptions
-    {
-    }
-}
-
-namespace Orleans.Hosting
-{
-    public static partial class HostingExtensions
-    {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseCosmosAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.Cosmos.CosmosReminderTableOptions>> configure) { throw null; }
-
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseCosmosAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AdvancedReminders.Cosmos.CosmosReminderTableOptions> configure) { throw null; }
-
-        public static ISiloBuilder UseCosmosAdvancedReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.Cosmos.CosmosReminderTableOptions>> configure) { throw null; }
-
-        public static ISiloBuilder UseCosmosAdvancedReminderService(this ISiloBuilder builder, System.Action<AdvancedReminders.Cosmos.CosmosReminderTableOptions> configure) { throw null; }
-    }
-}
-
-namespace Orleans.Reminders.Cosmos
-{
     public abstract partial class CosmosOptions
     {
         public bool CleanResourcesOnInitialization { get { throw null; } set { } }
@@ -65,8 +44,26 @@ namespace Orleans.Reminders.Cosmos
         public void ValidateConfiguration() { }
     }
 
+    public partial class CosmosReminderTableOptions : CosmosOptions
+    {
+    }
+
     public partial interface ICosmosOperationExecutor
     {
         System.Threading.Tasks.Task<TResult> ExecuteOperation<TArg, TResult>(System.Func<TArg, System.Threading.Tasks.Task<TResult>> func, TArg arg);
+    }
+}
+
+namespace Orleans.Hosting
+{
+    public static partial class HostingExtensions
+    {
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseCosmosAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.Cosmos.CosmosReminderTableOptions>> configure) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseCosmosAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AdvancedReminders.Cosmos.CosmosReminderTableOptions> configure) { throw null; }
+
+        public static ISiloBuilder UseCosmosAdvancedReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.Cosmos.CosmosReminderTableOptions>> configure) { throw null; }
+
+        public static ISiloBuilder UseCosmosAdvancedReminderService(this ISiloBuilder builder, System.Action<AdvancedReminders.Cosmos.CosmosReminderTableOptions> configure) { throw null; }
     }
 }

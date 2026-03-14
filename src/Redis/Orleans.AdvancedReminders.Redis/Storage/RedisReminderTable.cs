@@ -46,7 +46,7 @@ namespace Orleans.AdvancedReminders.Redis
             _clusterOptions = clusterOptions.Value;
             _logger = logger;
 
-            _hashSetKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/reminders");
+            _hashSetKey = Encoding.UTF8.GetBytes($"{_clusterOptions.ServiceId}/advanced-reminders");
         }
 
         public async Task Init()

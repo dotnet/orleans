@@ -1,6 +1,6 @@
 -- Run this migration for upgrading MySQL reminder tables created before 10.0.0.
 
-ALTER TABLE OrleansRemindersTable
+ALTER TABLE OrleansAdvancedRemindersTable
     ADD COLUMN CronExpression NVARCHAR(200) NULL,
     ADD COLUMN CronTimeZoneId NVARCHAR(200) NULL,
     ADD COLUMN NextDueUtc DATETIME NULL,
@@ -8,11 +8,11 @@ ALTER TABLE OrleansRemindersTable
     ADD COLUMN Priority TINYINT NOT NULL DEFAULT 0,
     ADD COLUMN Action TINYINT NOT NULL DEFAULT 0;
 
-CREATE INDEX IX_RemindersTable_NextDueUtc_Priority ON OrleansRemindersTable(ServiceId, NextDueUtc, Priority);
+CREATE INDEX IX_RemindersTable_NextDueUtc_Priority ON OrleansAdvancedRemindersTable(ServiceId, NextDueUtc, Priority);
 
 UPDATE OrleansQuery
 SET QueryText = '
-    INSERT INTO OrleansRemindersTable
+    INSERT INTO OrleansAdvancedRemindersTable
     (
         ServiceId,
         GrainId,
@@ -76,7 +76,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL;
@@ -97,7 +97,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainId = @GrainId AND @GrainId IS NOT NULL
@@ -119,7 +119,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND GrainHash > @BeginHash AND @BeginHash IS NOT NULL
@@ -141,7 +141,7 @@ SET QueryText = '
         Priority,
         Action,
         Version
-    FROM OrleansRemindersTable
+    FROM OrleansAdvancedRemindersTable
     WHERE
         ServiceId = @ServiceId AND @ServiceId IS NOT NULL
         AND ((GrainHash > @BeginHash AND @BeginHash IS NOT NULL)

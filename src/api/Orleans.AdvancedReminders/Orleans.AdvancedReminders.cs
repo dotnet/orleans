@@ -335,7 +335,7 @@ namespace Orleans.AdvancedReminders
 
     public sealed partial class ReminderManagementGrain : Grain, IReminderManagementGrain, IGrainWithGuidKey, IGrain, Orleans.Runtime.IAddressable
     {
-        public ReminderManagementGrain(IReminderTable reminderTable) { }
+        public ReminderManagementGrain(IReminderTable reminderTable, System.IServiceProvider? serviceProvider = null) { }
 
         [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<int> CountAllAsync() { throw null; }
@@ -393,21 +393,11 @@ namespace Orleans.AdvancedReminders
 
     public sealed partial class ReminderOptions
     {
-        public uint BaseBucketSize { get { throw null; } set { } }
-
-        public bool EnableLegacyReminderService { get { throw null; } set { } }
-
-        public bool EnablePriority { get { throw null; } set { } }
-
         public System.TimeSpan InitializationTimeout { get { throw null; } set { } }
-
-        public System.TimeSpan LookAheadWindow { get { throw null; } set { } }
 
         public System.TimeSpan MinimumReminderPeriod { get { throw null; } set { } }
 
-        public System.TimeSpan PollInterval { get { throw null; } set { } }
-
-        public System.TimeSpan RefreshReminderListPeriod { get { throw null; } set { } }
+        public System.TimeSpan MissedReminderGracePeriod { get { throw null; } set { } }
     }
 
     [GenerateSerializer]

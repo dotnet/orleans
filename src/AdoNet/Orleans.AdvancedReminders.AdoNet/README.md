@@ -43,7 +43,7 @@ builder.UseOrleans(siloBuilder =>
         .UseAdoNetAdvancedReminderService(options =>
         {
             options.Invariant = "Microsoft.Data.SqlClient";  // For SQL Server
-            options.ConnectionString = "Server=localhost;Database=OrleansReminders;User ID=orleans;******;";
+            options.ConnectionString = "Server=localhost;Database=OrleansAdvancedReminders;User ID=orleans;******;";
         });
 });
 

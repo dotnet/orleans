@@ -298,9 +298,7 @@ public class ReminderOptionsValidatorTests
         {
             MinimumReminderPeriod = TimeSpan.FromMinutes(1),
             InitializationTimeout = TimeSpan.FromSeconds(30),
-            LookAheadWindow = TimeSpan.FromMinutes(3),
-            PollInterval = TimeSpan.FromSeconds(5),
-            BaseBucketSize = 1,
+            MissedReminderGracePeriod = TimeSpan.FromSeconds(5),
         };
 
         var validator = new AdvancedReminderOptionsValidator(NullLogger<AdvancedReminderOptionsValidator>.Instance, Options.Create(options));
@@ -325,25 +323,9 @@ public class ReminderOptionsValidatorTests
     }
 
     [Fact]
-    public void ValidateConfiguration_RejectsNonPositiveLookAheadWindow()
+    public void ValidateConfiguration_RejectsNonPositiveMissedReminderGracePeriod()
     {
-        var validator = CreateValidator(new AdvancedReminderOptions { LookAheadWindow = TimeSpan.Zero });
-
-        Assert.Throws<OrleansConfigurationException>(() => validator.ValidateConfiguration());
-    }
-
-    [Fact]
-    public void ValidateConfiguration_RejectsNonPositivePollInterval()
-    {
-        var validator = CreateValidator(new AdvancedReminderOptions { PollInterval = TimeSpan.Zero });
-
-        Assert.Throws<OrleansConfigurationException>(() => validator.ValidateConfiguration());
-    }
-
-    [Fact]
-    public void ValidateConfiguration_RejectsZeroBaseBucketSize()
-    {
-        var validator = CreateValidator(new AdvancedReminderOptions { BaseBucketSize = 0 });
+        var validator = CreateValidator(new AdvancedReminderOptions { MissedReminderGracePeriod = TimeSpan.Zero });
 
         Assert.Throws<OrleansConfigurationException>(() => validator.ValidateConfiguration());
     }
@@ -809,14 +791,14 @@ public class SiloBuilderReminderExtensionsTests
 
         services.AddAdvancedReminders(options =>
         {
-            options.LookAheadWindow = TimeSpan.FromSeconds(9);
+            options.MissedReminderGracePeriod = TimeSpan.FromSeconds(9);
             options.MinimumReminderPeriod = TimeSpan.FromSeconds(3);
         });
 
         using var provider = services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptions<AdvancedReminderOptions>>().Value;
 
-        Assert.Equal(TimeSpan.FromSeconds(9), options.LookAheadWindow);
+        Assert.Equal(TimeSpan.FromSeconds(9), options.MissedReminderGracePeriod);
         Assert.Equal(TimeSpan.FromSeconds(3), options.MinimumReminderPeriod);
     }
 
@@ -825,12 +807,12 @@ public class SiloBuilderReminderExtensionsTests
     {
         var builder = new TestSiloBuilder();
 
-        builder.AddAdvancedReminders(options => options.LookAheadWindow = TimeSpan.FromSeconds(11));
+        builder.AddAdvancedReminders(options => options.MissedReminderGracePeriod = TimeSpan.FromSeconds(11));
 
         using var provider = builder.Services.BuildServiceProvider();
         var options = provider.GetRequiredService<IOptions<AdvancedReminderOptions>>().Value;
 
-        Assert.Equal(TimeSpan.FromSeconds(11), options.LookAheadWindow);
+        Assert.Equal(TimeSpan.FromSeconds(11), options.MissedReminderGracePeriod);
     }
 
     [Fact]
@@ -844,9 +826,39 @@ public class SiloBuilderReminderExtensionsTests
         Assert.Contains(builder.Services, descriptor => descriptor.ServiceType == typeof(Orleans.AdvancedReminders.IReminderTable));
     }
 
-    private sealed class TestSiloBuilder : ISiloBuilder
+    [Fact]
+    public void AddAdvancedReminders_WithoutDurableJobsBackend_FailsValidation()
     {
-        public IServiceCollection Services { get; } = new ServiceCollection();
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.AddAdvancedReminders();
+
+        using var provider = services.BuildServiceProvider();
+
+        var exception = Assert.Throws<OrleansConfigurationException>(() =>
+        {
+            foreach (var validator in provider.GetServices<IConfigurationValidator>())
+            {
+                validator.ValidateConfiguration();
+            }
+        });
+
+        Assert.Contains("durable jobs backend", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public void UseInMemoryAdvancedReminderService_RegistersDurableJobsBackend()
+    {
+        var builder = new TestSiloBuilder();
+
+        builder.UseInMemoryAdvancedReminderService();
+
+        Assert.Contains(builder.Services, descriptor => descriptor.ServiceType == typeof(JobShardManager));
+    }
+
+    private sealed class TestSiloBuilder(IServiceCollection? services = null) : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = services ?? new ServiceCollection();
 
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
@@ -1146,7 +1158,7 @@ public class AdvancedReminderServiceTests
         var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
         reminderTable.ReadRow(entry.GrainId, entry.ReminderName).Returns(Task.FromResult(entry));
 
-        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { PollInterval = TimeSpan.FromSeconds(1) });
+        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { MissedReminderGracePeriod = TimeSpan.FromSeconds(1) });
 
         await service.ProcessDueReminderAsync(entry.GrainId, entry.ReminderName, expectedETag: entry.ETag, CancellationToken.None);
 
@@ -1172,11 +1184,11 @@ public class AdvancedReminderServiceTests
 
         var remindable = Substitute.For<AdvancedRemindable>();
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
 
         var service = CreateService(
             reminderTable,
-            options: new AdvancedReminderOptions { PollInterval = TimeSpan.FromSeconds(1) },
+            options: new AdvancedReminderOptions { MissedReminderGracePeriod = TimeSpan.FromSeconds(1) },
             grainFactory: grainFactory);
 
         await service.ProcessDueReminderAsync(entry.GrainId, entry.ReminderName, expectedETag: entry.ETag, CancellationToken.None);
@@ -1207,7 +1219,7 @@ public class AdvancedReminderServiceTests
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var dispatcher = CreateDispatcherGrain(dispatcherGrainId);
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null).Returns(dispatcher);
 
         var jobManager = Substitute.For<ILocalDurableJobManager>();
@@ -1220,7 +1232,7 @@ public class AdvancedReminderServiceTests
                 return Task.FromResult(CreateDurableJob(request));
             });
 
-        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { PollInterval = TimeSpan.FromSeconds(1) }, jobManager: jobManager, grainFactory: grainFactory);
+        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { MissedReminderGracePeriod = TimeSpan.FromSeconds(1) }, jobManager: jobManager, grainFactory: grainFactory);
 
         await service.ProcessDueReminderAsync(entry.GrainId, entry.ReminderName, expectedETag: entry.ETag, CancellationToken.None);
 
@@ -1255,7 +1267,7 @@ public class AdvancedReminderServiceTests
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var dispatcher = CreateDispatcherGrain(dispatcherGrainId);
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null).Returns(dispatcher);
 
         var jobManager = Substitute.For<ILocalDurableJobManager>();
@@ -1268,7 +1280,7 @@ public class AdvancedReminderServiceTests
                 return Task.FromResult(CreateDurableJob(request));
             });
 
-        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { PollInterval = TimeSpan.FromSeconds(1) }, jobManager: jobManager, grainFactory: grainFactory);
+        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { MissedReminderGracePeriod = TimeSpan.FromSeconds(1) }, jobManager: jobManager, grainFactory: grainFactory);
 
         await service.ProcessDueReminderAsync(entry.GrainId, entry.ReminderName, expectedETag: entry.ETag, CancellationToken.None);
 
@@ -1300,8 +1312,8 @@ public class AdvancedReminderServiceTests
 
         var remindable = Substitute.For<AdvancedRemindable>();
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
-        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { PollInterval = TimeSpan.FromSeconds(1) }, grainFactory: grainFactory);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
+        var service = CreateService(reminderTable, options: new AdvancedReminderOptions { MissedReminderGracePeriod = TimeSpan.FromSeconds(1) }, grainFactory: grainFactory);
 
         await service.ProcessDueReminderAsync(entry.GrainId, entry.ReminderName, expectedETag: entry.ETag, CancellationToken.None);
 
@@ -1337,7 +1349,7 @@ public class AdvancedReminderServiceTests
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var dispatcher = CreateDispatcherGrain(dispatcherGrainId);
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null).Returns(dispatcher);
 
         var jobManager = Substitute.For<ILocalDurableJobManager>();
@@ -1352,7 +1364,7 @@ public class AdvancedReminderServiceTests
 
         var service = CreateService(
             reminderTable,
-            options: new AdvancedReminderOptions { PollInterval = TimeSpan.FromSeconds(1) },
+            options: new AdvancedReminderOptions { MissedReminderGracePeriod = TimeSpan.FromSeconds(1) },
             jobManager: jobManager,
             grainFactory: grainFactory);
 
@@ -1395,7 +1407,7 @@ public class AdvancedReminderServiceTests
         });
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
         var dispatcher = CreateDispatcherGrain(dispatcherGrainId);
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null)
             .Returns(dispatcher);
@@ -1447,7 +1459,7 @@ public class AdvancedReminderServiceTests
         });
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
         var dispatcher = CreateDispatcherGrain(dispatcherGrainId);
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null)
             .Returns(dispatcher);
@@ -1486,7 +1498,7 @@ public class AdvancedReminderServiceTests
         var reminderTable = new MutableReminderTable(current);
         var remindable = new CallbackRemindable(() => Task.CompletedTask);
         var grainFactory = Substitute.For<IGrainFactory>();
-        grainFactory.GetGrain(typeof(AdvancedRemindable), current.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(current.GrainId).Returns(remindable);
         var jobManager = Substitute.For<ILocalDurableJobManager>();
         var service = CreateService(reminderTable, jobManager: jobManager, grainFactory: grainFactory);
 
@@ -1496,6 +1508,43 @@ public class AdvancedReminderServiceTests
         Assert.Equal(0, reminderTable.UpsertCount);
         Assert.Equal(current.ETag, (await reminderTable.ReadRow(current.GrainId, current.ReminderName))!.ETag);
         await jobManager.DidNotReceive().ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>());
+    }
+
+    [Fact]
+    public async Task ProcessDueReminderAsync_UsesOriginalGrainIdWhenResolvingRemindable()
+    {
+        var now = DateTime.UtcNow;
+        var entry = new ReminderEntry
+        {
+            GrainId = GrainId.Create("custom-remindable-type", "grain-key"),
+            ReminderName = "typed",
+            StartAt = now.AddMinutes(-5),
+            NextDueUtc = now.AddSeconds(-5),
+            Period = TimeSpan.FromMinutes(1),
+            Action = MissedReminderAction.FireImmediately,
+            ETag = "etag-typed",
+        };
+
+        var reminderTable = Substitute.For<Orleans.AdvancedReminders.IReminderTable>();
+        reminderTable.ReadRow(entry.GrainId, entry.ReminderName).Returns(Task.FromResult(entry));
+        reminderTable.UpsertRow(Arg.Any<ReminderEntry>()).Returns("etag-typed-2");
+
+        var remindable = Substitute.For<AdvancedRemindable>();
+        var dispatcher = CreateDispatcherGrain(GrainId.Create("sys", "durable-reminder-dispatcher"));
+        var grainFactory = Substitute.For<IGrainFactory>();
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
+        grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null).Returns(dispatcher);
+
+        var jobManager = Substitute.For<ILocalDurableJobManager>();
+        jobManager.ScheduleJobAsync(Arg.Any<ScheduleJobRequest>(), Arg.Any<CancellationToken>())
+            .Returns(callInfo => Task.FromResult(CreateDurableJob(callInfo.Arg<ScheduleJobRequest>())));
+
+        var service = CreateService(reminderTable, jobManager: jobManager, grainFactory: grainFactory);
+
+        await service.ProcessDueReminderAsync(entry.GrainId, entry.ReminderName, expectedETag: entry.ETag, CancellationToken.None);
+
+        grainFactory.Received(1).GetGrain<AdvancedRemindable>(entry.GrainId);
+        AssertReminderReceived(remindable, "typed", status => Assert.Equal(entry.Period, status.Period));
     }
 
     [Fact]
@@ -1521,7 +1570,7 @@ public class AdvancedReminderServiceTests
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var grainFactory = Substitute.For<IGrainFactory>();
         var dispatcher = CreateDispatcherGrain(dispatcherGrainId);
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null)
             .Returns(dispatcher);
 
@@ -1583,7 +1632,7 @@ public class AdvancedReminderServiceTests
         var dispatcherGrainId = GrainId.Create("sys", "durable-reminder-dispatcher");
         var grainFactory = Substitute.For<IGrainFactory>();
         var dispatcher = CreateDispatcherGrain(dispatcherGrainId);
-        grainFactory.GetGrain(typeof(AdvancedRemindable), entry.GrainId.Key).Returns(remindable);
+        grainFactory.GetGrain<AdvancedRemindable>(entry.GrainId).Returns(remindable);
         grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(entry.GrainId.ToString(), null)
             .Returns(dispatcher);
 

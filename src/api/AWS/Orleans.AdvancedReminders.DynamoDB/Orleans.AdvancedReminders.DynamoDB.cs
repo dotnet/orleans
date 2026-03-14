@@ -6,9 +6,27 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
+namespace Orleans.AdvancedReminders.DynamoDB
+{
+    public partial class DynamoDBClientOptions
+    {
+        [Redact]
+        public string AccessKey { get { throw null; } set { } }
+
+        public string ProfileName { get { throw null; } set { } }
+
+        [Redact]
+        public string SecretKey { get { throw null; } set { } }
+
+        public string Service { get { throw null; } set { } }
+
+        public string Token { get { throw null; } set { } }
+    }
+}
+
 namespace Orleans.Configuration
 {
-    public partial class DynamoDBReminderStorageOptions : Reminders.DynamoDB.DynamoDBClientOptions
+    public partial class DynamoDBReminderStorageOptions : AdvancedReminders.DynamoDB.DynamoDBClientOptions
     {
         public bool CreateIfNotExists { get { throw null; } set { } }
 
@@ -45,23 +63,5 @@ namespace Orleans.Hosting
     public static partial class DynamoDBSiloBuilderReminderExtensions
     {
         public static ISiloBuilder UseDynamoDBAdvancedReminderService(this ISiloBuilder builder, System.Action<Configuration.DynamoDBReminderStorageOptions> configure) { throw null; }
-    }
-}
-
-namespace Orleans.Reminders.DynamoDB
-{
-    public partial class DynamoDBClientOptions
-    {
-        [Redact]
-        public string AccessKey { get { throw null; } set { } }
-
-        public string ProfileName { get { throw null; } set { } }
-
-        [Redact]
-        public string SecretKey { get { throw null; } set { } }
-
-        public string Service { get { throw null; } set { } }
-
-        public string Token { get { throw null; } set { } }
     }
 }

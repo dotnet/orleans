@@ -7,7 +7,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
-[assembly: RegisterProvider("AdoNet", "Reminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("AdoNet", "AdvancedReminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
