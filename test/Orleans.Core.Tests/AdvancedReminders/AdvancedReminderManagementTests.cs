@@ -13,6 +13,7 @@ using Orleans.Runtime;
 using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
+using AdvancedReminderException = Orleans.AdvancedReminders.Runtime.ReminderException;
 
 namespace UnitTests.AdvancedReminders;
 
@@ -314,6 +315,29 @@ public class ReminderManagementGrainTests
         var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(() => grain.UpcomingAsync(TimeSpan.FromMinutes(-1)));
 
         Assert.Equal("horizon", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_WithNonPositivePageSize_Throws()
+    {
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        var exception = await Assert.ThrowsAsync<ArgumentOutOfRangeException>(
+            () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: 0));
+
+        Assert.Equal("pageSize", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task MutationApis_WhenReminderIsMissing_ThrowReminderException()
+    {
+        var grainId = GrainId.Create("test", "missing-mutation");
+        var grain = new ReminderManagementGrain(new InMemoryManagementReminderTable());
+
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.SetPriorityAsync(grainId, "missing", ReminderPriority.High));
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.SetActionAsync(grainId, "missing", MissedReminderAction.Notify));
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.RepairAsync(grainId, "missing"));
+        await Assert.ThrowsAsync<AdvancedReminderException>(() => grain.DeleteAsync(grainId, "missing"));
     }
 
     [Fact]
