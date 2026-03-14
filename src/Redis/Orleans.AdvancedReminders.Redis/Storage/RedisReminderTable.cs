@@ -1,16 +1,14 @@
 using System;
+using System.Buffers;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
-using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
-
-using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
 
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -28,14 +26,6 @@ namespace Orleans.AdvancedReminders.Redis
         private readonly ILogger _logger;
         private IConnectionMultiplexer _muxer;
         private IDatabase _db;
-
-        private readonly JsonSerializerSettings _jsonSettings = new JsonSerializerSettings()
-        {
-            DateFormatHandling = DateFormatHandling.IsoDateFormat,
-            DefaultValueHandling = DefaultValueHandling.Ignore,
-            MissingMemberHandling = MissingMemberHandling.Ignore,
-            NullValueHandling = NullValueHandling.Ignore,
-        };
 
         public RedisReminderTable(
             ILogger<RedisReminderTable> logger,
@@ -192,7 +182,8 @@ namespace Orleans.AdvancedReminders.Redis
 
         private static ReminderEntry ConvertToEntry(string reminderValue)
         {
-            var segments = ParseSegments(reminderValue);
+            using var document = JsonDocument.Parse(CreatePayloadBuffer(reminderValue));
+            var segments = document.RootElement;
 
             return new ReminderEntry
             {
@@ -210,45 +201,51 @@ namespace Orleans.AdvancedReminders.Redis
             };
         }
 
-        private static JArray ParseSegments(string reminderValue)
-        {
-            // Keep timestamp segments as raw strings so DateTime parsing stays explicit and invariant.
-            using var stringReader = new StringReader($"[{reminderValue}]");
-            using var jsonReader = new JsonTextReader(stringReader)
-            {
-                DateParseHandling = DateParseHandling.None,
-            };
-            return JArray.Load(jsonReader);
-        }
+        private static byte[] CreatePayloadBuffer(string reminderValue)
+            => Encoding.UTF8.GetBytes(string.Concat("[", reminderValue, "]"));
 
-        private static string ReadRequiredString(JArray segments, int index)
+        private static string ReadRequiredString(JsonElement segments, int index)
         {
-            if (segments.Count <= index)
+            if (segments.GetArrayLength() <= index)
             {
                 throw new FormatException($"Reminder payload is missing segment {index}.");
             }
 
-            return segments[index]?.ToString() ?? throw new FormatException($"Reminder payload segment {index} is null.");
+            var segment = segments[index];
+            return segment.ValueKind switch
+            {
+                JsonValueKind.String => segment.GetString() ?? throw new FormatException($"Reminder payload segment {index} is null."),
+                JsonValueKind.Null => throw new FormatException($"Reminder payload segment {index} is null."),
+                _ => segment.ToString(),
+            };
         }
 
-        private static string ReadNullableString(JArray segments, int index)
+        private static string ReadNullableString(JsonElement segments, int index)
         {
-            if (segments.Count <= index)
+            if (segments.GetArrayLength() <= index)
             {
                 return null;
             }
 
-            var value = segments[index]?.ToString();
+            var segment = segments[index];
+            if (segment.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
+            {
+                return null;
+            }
+
+            var value = segment.ValueKind is JsonValueKind.String
+                ? segment.GetString()
+                : segment.ToString();
             return string.IsNullOrWhiteSpace(value) ? null : value;
         }
 
-        private static DateTime? ReadNullableDateTime(JArray segments, int index)
+        private static DateTime? ReadNullableDateTime(JsonElement segments, int index)
         {
             var value = ReadNullableString(segments, index);
             return value is null ? null : DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
         }
 
-        private static ReminderPriority ReadReminderPriority(JArray segments, int index)
+        private static ReminderPriority ReadReminderPriority(JsonElement segments, int index)
         {
             if (!TryReadInt32(segments, index, out var value))
             {
@@ -258,7 +255,7 @@ namespace Orleans.AdvancedReminders.Redis
             return ParsePriority(value);
         }
 
-        private static MissedReminderAction ReadMissedReminderAction(JArray segments, int index)
+        private static MissedReminderAction ReadMissedReminderAction(JsonElement segments, int index)
         {
             if (!TryReadInt32(segments, index, out var value))
             {
@@ -268,21 +265,28 @@ namespace Orleans.AdvancedReminders.Redis
             return ParseAction(value);
         }
 
-        private static bool TryReadInt32(JArray segments, int index, out int value)
+        private static bool TryReadInt32(JsonElement segments, int index, out int value)
         {
             value = default;
-            if (segments.Count <= index || segments[index] is not { } token || token.Type is JTokenType.Null)
+            if (segments.GetArrayLength() <= index)
             {
                 return false;
             }
 
-            if (token.Type is JTokenType.Integer)
+            var token = segments[index];
+            if (token.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
-                value = token.Value<int>();
-                return true;
+                return false;
             }
 
-            var text = token.ToString();
+            if (token.ValueKind is JsonValueKind.Number)
+            {
+                return token.TryGetInt32(out value);
+            }
+
+            var text = token.ValueKind is JsonValueKind.String
+                ? token.GetString()
+                : token.ToString();
             return int.TryParse(text, NumberStyles.Integer, CultureInfo.InvariantCulture, out value);
         }
 
@@ -323,31 +327,66 @@ namespace Orleans.AdvancedReminders.Redis
 
         private (RedisValue from, RedisValue to) GetFilter(params string[] segments)
         {
-            string prefix = JsonConvert.SerializeObject(segments, _jsonSettings);
-            return ($"{prefix[1..^1]},\"", $"{prefix[1..^1]},#");
+            string prefix = SerializeSegments(segments);
+            return ($"{prefix},\"", $"{prefix},#");
         }
 
         private (RedisValue eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
         {
             string grainHash = entry.GrainId.GetUniformHashCode().ToString("X8");
             string eTag = Guid.NewGuid().ToString();
-            object[] segments = new object[]
-            {
-                grainHash,
-                entry.GrainId.ToString(),
-                entry.ReminderName,
-                eTag,
-                entry.StartAt.ToString("O", CultureInfo.InvariantCulture),
-                entry.Period.ToString("c", CultureInfo.InvariantCulture),
-                entry.CronExpression ?? string.Empty,
-                entry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-                entry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
-                (int)entry.Priority,
-                (int)entry.Action,
-                entry.CronTimeZoneId ?? string.Empty
-            };
+            return (eTag, SerializeEntry(entry, grainHash, eTag));
+        }
 
-            return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);
+        private static string SerializeSegments(IReadOnlyList<string> segments)
+        {
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                writer.WriteStartArray();
+                for (var i = 0; i < segments.Count; i++)
+                {
+                    writer.WriteStringValue(segments[i]);
+                }
+
+                writer.WriteEndArray();
+            }
+
+            return TrimArrayDelimiters(buffer.WrittenSpan);
+        }
+
+        private static string SerializeEntry(ReminderEntry entry, string grainHash, string eTag)
+        {
+            var buffer = new ArrayBufferWriter<byte>();
+            using (var writer = new Utf8JsonWriter(buffer))
+            {
+                writer.WriteStartArray();
+                writer.WriteStringValue(grainHash);
+                writer.WriteStringValue(entry.GrainId.ToString());
+                writer.WriteStringValue(entry.ReminderName);
+                writer.WriteStringValue(eTag);
+                writer.WriteStringValue(entry.StartAt.ToString("O", CultureInfo.InvariantCulture));
+                writer.WriteStringValue(entry.Period.ToString("c", CultureInfo.InvariantCulture));
+                writer.WriteStringValue(entry.CronExpression ?? string.Empty);
+                writer.WriteStringValue(entry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty);
+                writer.WriteStringValue(entry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty);
+                writer.WriteNumberValue((int)entry.Priority);
+                writer.WriteNumberValue((int)entry.Action);
+                writer.WriteStringValue(entry.CronTimeZoneId ?? string.Empty);
+                writer.WriteEndArray();
+            }
+
+            return TrimArrayDelimiters(buffer.WrittenSpan);
+        }
+
+        private static string TrimArrayDelimiters(ReadOnlySpan<byte> json)
+        {
+            if (json.Length < 2 || json[0] != (byte)'[' || json[^1] != (byte)']')
+            {
+                throw new FormatException("Reminder payload is not a JSON array.");
+            }
+
+            return Encoding.UTF8.GetString(json[1..^1]);
         }
 
         private readonly struct ReminderEntryLogValue(ReminderEntry entry)

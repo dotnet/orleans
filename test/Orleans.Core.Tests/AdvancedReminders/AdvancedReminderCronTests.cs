@@ -796,6 +796,15 @@ public class ReminderCronScheduleTests
 
         Assert.Equal(expectedZoneId, schedule.TimeZoneId);
     }
+
+    [Fact]
+    public void Schedule_Parse_ReusesCachedScheduleForEquivalentInputs()
+    {
+        var first = ReminderCronSchedule.Parse(" 0 9 * * * ", " Europe/Berlin ");
+        var second = ReminderCronSchedule.Parse("0 9 * * *", "Europe/Berlin");
+
+        Assert.Same(first, second);
+    }
 }
 
 [TestCategory("Reminders")]

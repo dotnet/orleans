@@ -289,7 +289,7 @@ public class ReminderManagementGrainTests
 
         var first = await grain.ListAllAsync(pageSize: 2);
         Assert.Equal(["rA", "rB"], first.Reminders.Select(reminder => reminder.ReminderName).ToArray());
-        Assert.Equal("1", first.ContinuationToken);
+        Assert.False(string.IsNullOrWhiteSpace(first.ContinuationToken));
 
         var second = await grain.ListAllAsync(pageSize: 2, continuationToken: first.ContinuationToken);
         Assert.Single(second.Reminders);
@@ -653,6 +653,26 @@ public class ReminderManagementGrainTests
             () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: 0));
 
         Assert.Equal("pageSize", exception.ParamName);
+    }
+
+    [Fact]
+    public async Task ListFilteredAsync_WithMalformedContinuationToken_Throws()
+    {
+        var grain = new ReminderManagementGrain(
+            new InMemoryManagementReminderTable(
+                new ReminderEntry
+                {
+                    GrainId = GrainId.Create("test", "invalid-token"),
+                    ReminderName = "r1",
+                    StartAt = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                    NextDueUtc = new DateTime(2026, 1, 1, 10, 0, 0, DateTimeKind.Utc),
+                    Period = TimeSpan.FromMinutes(1),
+                }));
+
+        var exception = await Assert.ThrowsAsync<ArgumentException>(
+            () => grain.ListFilteredAsync(new ReminderQueryFilter(), pageSize: 1, continuationToken: "definitely-not-base64"));
+
+        Assert.Equal("continuationToken", exception.ParamName);
     }
 
     [Fact]

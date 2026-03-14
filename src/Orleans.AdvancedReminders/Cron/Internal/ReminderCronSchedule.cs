@@ -1,11 +1,14 @@
 #nullable enable
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 
 namespace Orleans.AdvancedReminders.Cron.Internal;
 
 internal sealed class ReminderCronSchedule
 {
+    private static readonly ConcurrentDictionary<CacheKey, ReminderCronSchedule> Cache = new();
+
     private ReminderCronSchedule(ReminderCronExpression expression, TimeZoneInfo timeZone, string? timeZoneId)
     {
         Expression = expression;
@@ -23,9 +26,15 @@ internal sealed class ReminderCronSchedule
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(expressionText);
 
-        var expression = ReminderCronExpression.Parse(expressionText);
-        var zone = ResolveTimeZoneOrDefault(timeZoneId);
-        return new ReminderCronSchedule(expression, zone, NormalizeTimeZoneIdForStorage(zone));
+        var key = new CacheKey(expressionText.Trim(), NormalizeInputTimeZoneId(timeZoneId));
+        return Cache.GetOrAdd(
+            key,
+            static cacheKey =>
+            {
+                var expression = ReminderCronExpression.Parse(cacheKey.ExpressionText);
+                var zone = ResolveTimeZoneOrDefault(cacheKey.TimeZoneId);
+                return new ReminderCronSchedule(expression, zone, NormalizeTimeZoneIdForStorage(zone));
+            });
     }
 
     public static ReminderCronSchedule Parse(ReminderCronExpression expression, TimeZoneInfo? timeZone = null)
@@ -109,4 +118,9 @@ internal sealed class ReminderCronSchedule
             throw;
         }
     }
+
+    private static string? NormalizeInputTimeZoneId(string? timeZoneId)
+        => string.IsNullOrWhiteSpace(timeZoneId) ? null : timeZoneId.Trim();
+
+    private readonly record struct CacheKey(string ExpressionText, string? TimeZoneId);
 }

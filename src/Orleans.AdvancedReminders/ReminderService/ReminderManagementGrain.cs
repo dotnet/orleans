@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Globalization;
 using System.Linq;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Orleans.AdvancedReminders.Cron.Internal;
@@ -61,19 +62,19 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
             throw new ArgumentOutOfRangeException(nameof(pageSize));
         }
 
-        var pageIndex = string.IsNullOrWhiteSpace(continuationToken)
-            ? 0
-            : int.Parse(continuationToken, CultureInfo.InvariantCulture);
-
-        var all = await GetAllAsync();
-        var filtered = all.Where(reminder => MatchesFilter(reminder, filter)).OrderBy(reminder => reminder, ReminderEntryComparer.Instance).ToList();
-        var page = filtered.Skip(pageIndex * pageSize).Take(pageSize).ToList();
-        var hasMore = (pageIndex + 1) * pageSize < filtered.Count;
+        var cursor = ReminderCursor.Parse(continuationToken);
+        var now = GetUtcNow();
+        var candidates = await SelectPageAsync(filter, cursor, pageSize + 1, now);
+        var hasMore = candidates.Count > pageSize;
+        if (hasMore)
+        {
+            candidates.RemoveRange(pageSize, candidates.Count - pageSize);
+        }
 
         return new ReminderManagementPage
         {
-            Reminders = page,
-            ContinuationToken = hasMore ? (pageIndex + 1).ToString(CultureInfo.InvariantCulture) : null,
+            Reminders = candidates,
+            ContinuationToken = hasMore && candidates.Count > 0 ? ReminderCursor.Create(candidates[^1]) : null,
         };
     }
 
@@ -85,13 +86,16 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
         }
 
         var upper = GetUtcNow().Add(horizon);
-        return (await GetAllAsync()).Where(reminder => (reminder.NextDueUtc ?? reminder.StartAt) <= upper).OrderBy(reminder => reminder, ReminderEntryComparer.Instance).ToList();
+        return (await GetAllAsync())
+            .Where(reminder => GetDueTime(reminder) <= upper)
+            .OrderBy(reminder => reminder, ReminderEntryComparer.Instance)
+            .ToList();
     }
 
     public async Task<IEnumerable<ReminderEntry>> ListForGrainAsync(GrainId grainId)
         => (await _reminderTable.ReadRows(grainId)).Reminders.OrderBy(reminder => reminder, ReminderEntryComparer.Instance).ToList();
 
-    public async Task<int> CountAllAsync() => (await GetAllAsync()).Count;
+    public async Task<int> CountAllAsync() => (await _reminderTable.ReadRows(0, 0)).Reminders.Count;
 
     public async Task SetPriorityAsync(GrainId grainId, string name, Runtime.ReminderPriority priority)
     {
@@ -145,10 +149,36 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
         await reminderService.UpsertAndScheduleEntryAsync(entry, CancellationToken.None);
     }
 
-    private bool MatchesFilter(ReminderEntry reminder, ReminderQueryFilter filter)
+    private async Task<List<ReminderEntry>> SelectPageAsync(ReminderQueryFilter filter, ReminderCursor? cursor, int take, DateTime now)
     {
-        var due = reminder.NextDueUtc ?? reminder.StartAt;
-        var now = GetUtcNow();
+        var queue = new PriorityQueue<ReminderEntry, ReminderEntry>(ReverseReminderEntryComparer.Instance);
+        foreach (var reminder in await GetAllAsync())
+        {
+            if (!MatchesFilter(reminder, filter, now) || !IsAfterCursor(reminder, cursor))
+            {
+                continue;
+            }
+
+            queue.Enqueue(reminder, reminder);
+            if (queue.Count > take)
+            {
+                _ = queue.Dequeue();
+            }
+        }
+
+        var result = new List<ReminderEntry>(queue.Count);
+        while (queue.Count > 0)
+        {
+            result.Add(queue.Dequeue());
+        }
+
+        result.Sort(ReminderEntryComparer.Instance);
+        return result;
+    }
+
+    private bool MatchesFilter(ReminderEntry reminder, ReminderQueryFilter filter, DateTime now)
+    {
+        var due = GetDueTime(reminder);
 
         if (filter.DueFromUtcInclusive is { } from && due < from)
         {
@@ -231,10 +261,89 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
 
     private DateTime GetUtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
 
+    private static bool IsAfterCursor(ReminderEntry reminder, ReminderCursor? cursor)
+        => cursor is null || ReminderCursor.Compare(reminder, cursor) > 0;
+
+    private static DateTime GetDueTime(ReminderEntry reminder) => reminder.NextDueUtc ?? reminder.StartAt;
+
     private static Runtime.ReminderScheduleKind GetScheduleKind(ReminderEntry reminder)
         => string.IsNullOrWhiteSpace(reminder.CronExpression)
             ? Runtime.ReminderScheduleKind.Interval
             : Runtime.ReminderScheduleKind.Cron;
+
+    private sealed class ReminderCursor
+    {
+        private ReminderCursor(DateTime dueUtc, GrainId grainId, string reminderName)
+        {
+            DueUtc = dueUtc;
+            GrainId = grainId;
+            ReminderName = reminderName;
+        }
+
+        public DateTime DueUtc { get; }
+
+        public GrainId GrainId { get; }
+
+        public string ReminderName { get; }
+
+        public static string Create(ReminderEntry entry)
+        {
+            var payload = string.Create(
+                CultureInfo.InvariantCulture,
+                $"{GetDueTime(entry).Ticks}\n{entry.GrainId}\n{entry.ReminderName}");
+            return Convert.ToBase64String(Encoding.UTF8.GetBytes(payload));
+        }
+
+        public static ReminderCursor? Parse(string? continuationToken)
+        {
+            if (string.IsNullOrWhiteSpace(continuationToken))
+            {
+                return null;
+            }
+
+            try
+            {
+                var payload = Encoding.UTF8.GetString(Convert.FromBase64String(continuationToken));
+                var firstSeparator = payload.IndexOf('\n');
+                var secondSeparator = firstSeparator >= 0 ? payload.IndexOf('\n', firstSeparator + 1) : -1;
+                if (firstSeparator <= 0 || secondSeparator <= firstSeparator + 1 || secondSeparator >= payload.Length - 1)
+                {
+                    throw new FormatException("Continuation token payload is incomplete.");
+                }
+
+                var ticksSpan = payload.AsSpan(0, firstSeparator);
+                if (!long.TryParse(ticksSpan, NumberStyles.Integer, CultureInfo.InvariantCulture, out var dueTicks))
+                {
+                    throw new FormatException("Continuation token due timestamp is invalid.");
+                }
+
+                var grainIdText = payload.Substring(firstSeparator + 1, secondSeparator - firstSeparator - 1);
+                var reminderName = payload[(secondSeparator + 1)..];
+                return new ReminderCursor(new DateTime(dueTicks, DateTimeKind.Utc), GrainId.Parse(grainIdText), reminderName);
+            }
+            catch (Exception exception) when (exception is FormatException or ArgumentException)
+            {
+                throw new ArgumentException("Invalid continuation token.", nameof(continuationToken), exception);
+            }
+        }
+
+        public static int Compare(ReminderEntry reminder, ReminderCursor cursor)
+        {
+            var dueCompare = GetDueTime(reminder).CompareTo(cursor.DueUtc);
+            if (dueCompare != 0)
+            {
+                return dueCompare;
+            }
+
+            var grainCompare = reminder.GrainId.CompareTo(cursor.GrainId);
+            if (grainCompare != 0)
+            {
+                return grainCompare;
+            }
+
+            return string.CompareOrdinal(reminder.ReminderName, cursor.ReminderName);
+        }
+    }
 
     private sealed class ReminderEntryComparer : IComparer<ReminderEntry>
     {
@@ -257,7 +366,7 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
                 return 1;
             }
 
-            var dueCompare = (x.NextDueUtc ?? x.StartAt).CompareTo(y.NextDueUtc ?? y.StartAt);
+            var dueCompare = GetDueTime(x).CompareTo(GetDueTime(y));
             if (dueCompare != 0)
             {
                 return dueCompare;
@@ -271,5 +380,12 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grai
 
             return string.CompareOrdinal(x.ReminderName, y.ReminderName);
         }
+    }
+
+    private sealed class ReverseReminderEntryComparer : IComparer<ReminderEntry>
+    {
+        public static ReverseReminderEntryComparer Instance { get; } = new();
+
+        public int Compare(ReminderEntry? x, ReminderEntry? y) => ReminderEntryComparer.Instance.Compare(y, x);
     }
 }
