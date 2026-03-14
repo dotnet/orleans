@@ -1,4 +1,4 @@
-namespace Orleans.Configuration
+namespace Orleans.AdvancedReminders.AdoNet
 {
     /// <summary>
     /// Options for ADO.NET reminder storage.

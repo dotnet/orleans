@@ -1,14 +1,11 @@
-extern alias AdvancedRemindersAzureStorage;
-
 #nullable enable
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.AzureStorage;
 using Tester;
 using Tester.AzureUtils;
 using TestExtensions;
 using Xunit;
-using AzureBasedReminderTable = AdvancedRemindersAzureStorage::Orleans.AdvancedReminders.Runtime.ReminderService.AzureBasedReminderTable;
-using AzureTableReminderStorageOptions = AdvancedRemindersAzureStorage::Orleans.AdvancedReminders.AzureStorage.AzureTableReminderStorageOptions;
 
 namespace UnitTests.AdvancedRemindersTest;
 

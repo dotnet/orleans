@@ -1,3 +1,5 @@
+using Azure.Storage.Blobs;
+
 namespace Orleans.AdvancedReminders.AzureStorage
 {
     /// <summary>Options for Azure Table based reminder table.</summary>
@@ -8,6 +10,16 @@ namespace Orleans.AdvancedReminders.AzureStorage
         /// </summary>
         public override string TableName { get; set; } = DEFAULT_TABLE_NAME;
         public const string DEFAULT_TABLE_NAME = "OrleansAdvancedReminders";
+
+        /// <summary>
+        /// Gets or sets the <see cref="BlobServiceClient"/> instance used to store advanced reminder jobs.
+        /// </summary>
+        public BlobServiceClient BlobServiceClient { get; set; } = null!;
+
+        /// <summary>
+        /// Gets or sets the container name used to store advanced reminder durable jobs.
+        /// </summary>
+        public string JobContainerName { get; set; } = "advanced-reminder-jobs";
     }
 
     /// <summary>

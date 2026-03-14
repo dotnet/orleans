@@ -2,7 +2,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
 
-namespace Orleans.Configuration
+namespace Orleans.AdvancedReminders.AdoNet
 {
     /// <summary>
     /// Validates <see cref="AdoNetReminderTableOptions"/> configuration.

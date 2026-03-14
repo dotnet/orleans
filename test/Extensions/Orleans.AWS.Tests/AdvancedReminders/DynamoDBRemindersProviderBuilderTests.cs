@@ -1,14 +1,10 @@
-extern alias AdvancedRemindersDynamoDB;
-
 using System.IO;
 using System.Text;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
+using Orleans.AdvancedReminders.DynamoDB;
 using Orleans.Hosting;
 using Xunit;
-using DynamoDBRemindersProviderBuilder = AdvancedRemindersDynamoDB::Orleans.Hosting.DynamoDBRemindersProviderBuilder;
-using AdvancedDynamoDBReminderStorageOptions = AdvancedRemindersDynamoDB::Orleans.Configuration.DynamoDBReminderStorageOptions;
 
 namespace AWSUtils.Tests.AdvancedReminders;
 
@@ -21,7 +17,7 @@ public class DynamoDBRemindersProviderBuilderTests
         const string json = """
         {
           "Orleans": {
-            "Reminders": {
+            "AdvancedReminders": {
               "DynamoDB": {
                 "ProviderType": "DynamoDB",
                 "AccessKey": "access",
@@ -37,12 +33,12 @@ public class DynamoDBRemindersProviderBuilderTests
         """;
 
         var siloBuilder = new TestSiloBuilder(json);
-        var providerBuilder = new DynamoDBRemindersProviderBuilder();
+        var providerBuilder = new AdvancedDynamoDBRemindersProviderBuilder();
 
-        providerBuilder.Configure(siloBuilder, "DynamoDB", siloBuilder.Configuration.GetSection("Orleans:Reminders:DynamoDB"));
+        providerBuilder.Configure(siloBuilder, "DynamoDB", siloBuilder.Configuration.GetSection("Orleans:AdvancedReminders:DynamoDB"));
 
         var options = siloBuilder.Services.BuildServiceProvider()
-            .GetRequiredService<Microsoft.Extensions.Options.IOptions<AdvancedDynamoDBReminderStorageOptions>>()
+            .GetRequiredService<Microsoft.Extensions.Options.IOptions<DynamoDBReminderStorageOptions>>()
             .Value;
 
         Assert.Equal("access", options.AccessKey);

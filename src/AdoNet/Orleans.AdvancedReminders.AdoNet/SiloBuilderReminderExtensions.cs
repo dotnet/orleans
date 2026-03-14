@@ -3,8 +3,10 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.AdvancedReminders.Runtime.ReminderService;
+using Orleans.AdvancedReminders.AdoNet;
 
 namespace Orleans.Hosting
 {

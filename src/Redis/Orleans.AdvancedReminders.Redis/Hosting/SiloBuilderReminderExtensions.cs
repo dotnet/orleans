@@ -2,6 +2,7 @@ using System;
 
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Hosting;
 using Orleans.AdvancedReminders.Redis;
 

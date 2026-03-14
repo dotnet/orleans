@@ -2,8 +2,8 @@ using System;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.AdvancedReminders.AzureStorage;
-using Orleans.AdvancedReminders.Runtime.ReminderService;
 namespace Orleans.Hosting
 {
     /// <summary>
@@ -26,6 +26,14 @@ namespace Orleans.Hosting
         public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, Action<AzureTableReminderStorageOptions> configure)
         {
             services.AddAdvancedReminders();
+            services.UseAzureBlobDurableJobs(options =>
+            {
+                options.Configure<IOptions<AzureTableReminderStorageOptions>>((jobOptions, storageOptions) =>
+                {
+                    jobOptions.BlobServiceClient = storageOptions.Value.BlobServiceClient;
+                    jobOptions.ContainerName = storageOptions.Value.JobContainerName;
+                });
+            });
             services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
             services.Configure<AzureTableReminderStorageOptions>(configure);
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();
@@ -47,6 +55,14 @@ namespace Orleans.Hosting
         public static IServiceCollection UseAzureTableAdvancedReminderService(this IServiceCollection services, Action<OptionsBuilder<AzureTableReminderStorageOptions>> configureOptions)
         {
             services.AddAdvancedReminders();
+            services.UseAzureBlobDurableJobs(options =>
+            {
+                options.Configure<IOptions<AzureTableReminderStorageOptions>>((jobOptions, storageOptions) =>
+                {
+                    jobOptions.BlobServiceClient = storageOptions.Value.BlobServiceClient;
+                    jobOptions.ContainerName = storageOptions.Value.JobContainerName;
+                });
+            });
             services.AddSingleton<Orleans.AdvancedReminders.IReminderTable, AzureBasedReminderTable>();
             configureOptions?.Invoke(services.AddOptions<AzureTableReminderStorageOptions>());
             services.ConfigureFormatter<AzureTableReminderStorageOptions>();
@@ -73,13 +89,30 @@ namespace Orleans.Hosting
                 if (Uri.TryCreate(connectionString, UriKind.Absolute, out var uri))
                 {
                     options.TableServiceClient = new(uri);
+                    options.BlobServiceClient = new(CreateBlobServiceUri(uri));
                 }
                 else
                 {
                     options.TableServiceClient = new(connectionString);
+                    options.BlobServiceClient = new(connectionString);
                 }
             });
             return services;
+        }
+
+        private static Uri CreateBlobServiceUri(Uri serviceUri)
+        {
+            if (serviceUri.Host.Contains(".table.", StringComparison.OrdinalIgnoreCase))
+            {
+                var builder = new UriBuilder(serviceUri)
+                {
+                    Host = serviceUri.Host.Replace(".table.", ".blob.", StringComparison.OrdinalIgnoreCase),
+                };
+
+                return builder.Uri;
+            }
+
+            return serviceUri;
         }
     }
 }

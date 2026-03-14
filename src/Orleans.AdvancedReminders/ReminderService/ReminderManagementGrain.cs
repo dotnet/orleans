@@ -12,10 +12,19 @@ namespace Orleans.AdvancedReminders;
 /// <summary>
 /// Administrative management API for advanced reminders.
 /// </summary>
-public sealed class ReminderManagementGrain(IReminderTable reminderTable, IServiceProvider? serviceProvider = null) : Grain, IReminderManagementGrain
+public sealed class ReminderManagementGrain(IReminderTable reminderTable) : Grain, IReminderManagementGrain
 {
     private readonly IReminderTable _reminderTable = reminderTable;
-    private readonly IServiceProvider? _serviceProvider = serviceProvider;
+    private readonly TimeProvider _timeProvider = TimeProvider.System;
+
+    internal ReminderManagementGrain(IReminderTable reminderTable, IServiceProvider? serviceProvider, TimeProvider? timeProvider = null)
+        : this(reminderTable)
+    {
+        _serviceProvider = serviceProvider;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
+
+    private readonly IServiceProvider? _serviceProvider;
 
     public Task<ReminderManagementPage> ListAllAsync(int pageSize = 256, string? continuationToken = null)
         => ListFilteredAsync(new ReminderQueryFilter(), pageSize, continuationToken);
@@ -75,7 +84,7 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable, IServi
             throw new ArgumentOutOfRangeException(nameof(horizon));
         }
 
-        var upper = DateTime.UtcNow.Add(horizon);
+        var upper = GetUtcNow().Add(horizon);
         return (await GetAllAsync()).Where(reminder => (reminder.NextDueUtc ?? reminder.StartAt) <= upper).OrderBy(reminder => reminder, ReminderEntryComparer.Instance).ToList();
     }
 
@@ -101,7 +110,7 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable, IServi
     public async Task RepairAsync(GrainId grainId, string name)
     {
         var entry = await GetEntryAsync(grainId, name);
-        entry.NextDueUtc = CalculateNextDue(entry, DateTime.UtcNow);
+        entry.NextDueUtc = CalculateNextDue(entry, GetUtcNow());
         await PersistMutationAsync(entry);
     }
 
@@ -125,7 +134,8 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable, IServi
             return;
         }
 
-        var reminderService = _serviceProvider?.GetService(typeof(Runtime.ReminderService.AdvancedReminderService)) as Runtime.ReminderService.AdvancedReminderService;
+        var serviceProvider = _serviceProvider ?? ServiceProvider;
+        var reminderService = serviceProvider?.GetService(typeof(Runtime.ReminderService.AdvancedReminderService)) as Runtime.ReminderService.AdvancedReminderService;
         if (reminderService is null)
         {
             entry.ETag = await _reminderTable.UpsertRow(entry);
@@ -135,10 +145,10 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable, IServi
         await reminderService.UpsertAndScheduleEntryAsync(entry, CancellationToken.None);
     }
 
-    private static bool MatchesFilter(ReminderEntry reminder, ReminderQueryFilter filter)
+    private bool MatchesFilter(ReminderEntry reminder, ReminderQueryFilter filter)
     {
         var due = reminder.NextDueUtc ?? reminder.StartAt;
-        var now = DateTime.UtcNow;
+        var now = GetUtcNow();
 
         if (filter.DueFromUtcInclusive is { } from && due < from)
         {
@@ -218,6 +228,8 @@ public sealed class ReminderManagementGrain(IReminderTable reminderTable, IServi
 
         return next;
     }
+
+    private DateTime GetUtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
 
     private static Runtime.ReminderScheduleKind GetScheduleKind(ReminderEntry reminder)
         => string.IsNullOrWhiteSpace(reminder.CronExpression)

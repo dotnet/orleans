@@ -2,18 +2,18 @@ using Orleans.Providers;
 using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
+using Orleans.AdvancedReminders.Redis;
 using StackExchange.Redis;
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 using System.Threading.Tasks;
 
-[assembly: RegisterProvider("Redis", "AdvancedReminders", "Silo", typeof(RedisRemindersProviderBuilder))]
-[assembly: RegisterProvider("AzureRedisCache", "AdvancedReminders", "Silo", typeof(RedisRemindersProviderBuilder))]
+[assembly: RegisterProvider("Redis", "AdvancedReminders", "Silo", typeof(AdvancedRedisRemindersProviderBuilder))]
+[assembly: RegisterProvider("AzureRedisCache", "AdvancedReminders", "Silo", typeof(AdvancedRedisRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
-internal sealed class RedisRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class AdvancedRedisRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
     {

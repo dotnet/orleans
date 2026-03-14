@@ -1,16 +1,14 @@
-extern alias AdvancedRemindersAdoNet;
-
 #nullable enable
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.AdoNet;
+using Orleans.AdvancedReminders.Runtime.ReminderService;
 using Orleans.Tests.SqlUtils;
 using TestExtensions;
 using UnitTests.General;
 using Xunit;
 using ClusterOptions = Orleans.Configuration.ClusterOptions;
 using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
-using AdoNetReminderTable = AdvancedRemindersAdoNet::Orleans.AdvancedReminders.Runtime.ReminderService.AdoNetReminderTable;
-using AdoNetReminderTableOptions = AdvancedRemindersAdoNet::Orleans.Configuration.AdoNetReminderTableOptions;
 
 namespace UnitTests.AdvancedRemindersTest;
 

@@ -1,7 +1,9 @@
 # Microsoft Orleans Advanced Reminders for Redis
 
 ## Introduction
-Microsoft Orleans Advanced Reminders for Redis provides persistence for Orleans advanced reminders using Redis.
+Microsoft Orleans Advanced Reminders for Redis stores reminder definitions in Redis.
+
+This package does not include a Redis-backed durable jobs implementation. You must also configure a durable jobs backend, for example `UseInMemoryDurableJobs()` for local development or `UseAzureBlobDurableJobs(...)` for persisted execution.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -15,6 +17,7 @@ dotnet add package Microsoft.Orleans.AdvancedReminders.Redis
 using Microsoft.Extensions.Hosting;
 using Orleans.AdvancedReminders;
 using Orleans.Configuration;
+using Orleans.DurableJobs;
 using Orleans.Hosting;
 using StackExchange.Redis;
 
@@ -23,7 +26,8 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            // Configure Redis as reminder storage
+            .UseInMemoryDurableJobs()
+            // Configure Redis for reminder definitions
             .UseRedisAdvancedReminderService(options =>
             {
                 options.ConfigurationOptions = ConfigurationOptions.Parse("localhost:6379");
@@ -77,7 +81,7 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
 
 ## Configuration via Microsoft.Extensions.Configuration
 
-You can configure Orleans Redis reminders using `Microsoft.Extensions.Configuration` (such as `appsettings.json`) instead of configuring it in code. When using this approach, Orleans will automatically read the configuration from the `Orleans` section.
+You can configure Orleans Redis advanced reminders using `Microsoft.Extensions.Configuration` (such as `appsettings.json`) instead of configuring it in code. When using this approach, Orleans will automatically read the configuration from the `Orleans` section. You still need to configure a durable jobs backend separately.
 
 > **Note**: You can use either `"ProviderType": "Redis"` or `"ProviderType": "AzureRedisCache"` - both are supported and functionally equivalent.
 
@@ -90,7 +94,7 @@ You can configure Orleans Redis reminders using `Microsoft.Extensions.Configurat
   "Orleans": {
     "ClusterId": "my-cluster",
     "ServiceId": "MyOrleansService",
-    "Reminders": {
+    "AdvancedReminders": {
       "ProviderType": "Redis",
       "ServiceKey": "redis",
       "Database": 0,
@@ -119,7 +123,10 @@ builder.AddServiceDefaults();
 builder.AddKeyedRedisClient("redis");
 
 // Add Orleans
-builder.UseOrleans();
+builder.UseOrleans(siloBuilder =>
+{
+    siloBuilder.UseInMemoryDurableJobs();
+});
 
 var host = builder.Build();
 await host.StartAsync();

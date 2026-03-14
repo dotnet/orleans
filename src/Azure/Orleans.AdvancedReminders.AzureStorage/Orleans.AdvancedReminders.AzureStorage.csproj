@@ -23,8 +23,10 @@
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Azure\Orleans.DurableJobs.AzureStorage\Orleans.DurableJobs.AzureStorage.csproj" />
     <PackageReference Include="Azure.Core" />
     <PackageReference Include="Azure.Data.Tables" />
+    <PackageReference Include="Azure.Storage.Blobs" />
   </ItemGroup>
 
   <ItemGroup>

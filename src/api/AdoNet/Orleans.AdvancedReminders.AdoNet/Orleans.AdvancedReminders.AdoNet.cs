@@ -6,7 +6,7 @@
 //     the code is regenerated.
 // </auto-generated>
 //------------------------------------------------------------------------------
-namespace Orleans.Configuration
+namespace Orleans.AdvancedReminders.AdoNet
 {
     public partial class AdoNetReminderTableOptions
     {
@@ -28,10 +28,10 @@ namespace Orleans.Hosting
 {
     public static partial class SiloBuilderReminderExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAdoNetAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetReminderTableOptions>> configureOptions) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseAdoNetAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.AdoNet.AdoNetReminderTableOptions>> configureOptions) { throw null; }
 
-        public static ISiloBuilder UseAdoNetAdvancedReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<Configuration.AdoNetReminderTableOptions>> configureOptions) { throw null; }
+        public static ISiloBuilder UseAdoNetAdvancedReminderService(this ISiloBuilder builder, System.Action<Microsoft.Extensions.Options.OptionsBuilder<AdvancedReminders.AdoNet.AdoNetReminderTableOptions>> configureOptions) { throw null; }
 
-        public static ISiloBuilder UseAdoNetAdvancedReminderService(this ISiloBuilder builder, System.Action<Configuration.AdoNetReminderTableOptions> configureOptions) { throw null; }
+        public static ISiloBuilder UseAdoNetAdvancedReminderService(this ISiloBuilder builder, System.Action<AdvancedReminders.AdoNet.AdoNetReminderTableOptions> configureOptions) { throw null; }
     }
 }

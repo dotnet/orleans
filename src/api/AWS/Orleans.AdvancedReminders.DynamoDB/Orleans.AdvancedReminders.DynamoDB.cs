@@ -22,11 +22,8 @@ namespace Orleans.AdvancedReminders.DynamoDB
 
         public string Token { get { throw null; } set { } }
     }
-}
 
-namespace Orleans.Configuration
-{
-    public partial class DynamoDBReminderStorageOptions : AdvancedReminders.DynamoDB.DynamoDBClientOptions
+    public partial class DynamoDBReminderStorageOptions : DynamoDBClientOptions
     {
         public bool CreateIfNotExists { get { throw null; } set { } }
 
@@ -57,11 +54,11 @@ namespace Orleans.Hosting
 {
     public static partial class DynamoDBServiceCollectionReminderExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseDynamoDBAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.DynamoDBReminderStorageOptions> configure) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseDynamoDBAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AdvancedReminders.DynamoDB.DynamoDBReminderStorageOptions> configure) { throw null; }
     }
 
     public static partial class DynamoDBSiloBuilderReminderExtensions
     {
-        public static ISiloBuilder UseDynamoDBAdvancedReminderService(this ISiloBuilder builder, System.Action<Configuration.DynamoDBReminderStorageOptions> configure) { throw null; }
+        public static ISiloBuilder UseDynamoDBAdvancedReminderService(this ISiloBuilder builder, System.Action<AdvancedReminders.DynamoDB.DynamoDBReminderStorageOptions> configure) { throw null; }
     }
 }

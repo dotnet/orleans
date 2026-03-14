@@ -1,11 +1,10 @@
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Options;
-using Orleans.AdvancedReminders.Redis;
 using Orleans.Runtime;
 using StackExchange.Redis;
 
-namespace Orleans.Configuration
+namespace Orleans.AdvancedReminders.Redis
 {
     /// <summary>
     /// Redis reminder options.

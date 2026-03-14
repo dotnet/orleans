@@ -1720,16 +1720,21 @@ public class AdvancedReminderServiceTests
         Orleans.AdvancedReminders.IReminderTable reminderTable,
         AdvancedReminderOptions? options = null,
         ILocalDurableJobManager? jobManager = null,
-        IGrainFactory? grainFactory = null)
+        IGrainFactory? grainFactory = null,
+        JobShardManager? jobShardManager = null,
+        TimeProvider? timeProvider = null)
     {
         jobManager ??= Substitute.For<ILocalDurableJobManager>();
         grainFactory ??= Substitute.For<IGrainFactory>();
+        jobShardManager ??= new TestJobShardManager();
         return new AdvancedReminderService(
             reminderTable,
             jobManager,
+            jobShardManager,
             grainFactory,
             Options.Create(options ?? new AdvancedReminderOptions()),
-            NullLogger<AdvancedReminderService>.Instance);
+            NullLogger<AdvancedReminderService>.Instance,
+            timeProvider ?? TimeProvider.System);
     }
 
     private static DurableJob CreateDurableJob(ScheduleJobRequest request)
@@ -1835,6 +1840,18 @@ public class AdvancedReminderServiceTests
             _current = null;
             return Task.CompletedTask;
         }
+    }
+
+    private sealed class TestJobShardManager() : JobShardManager(SiloAddress.Zero)
+    {
+        public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
+            => Task.FromResult(new List<IJobShard>());
+
+        public override Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
+            => Task.CompletedTask;
     }
 
     private sealed class CallbackRemindable(Func<Task> onReminder) : AdvancedRemindable

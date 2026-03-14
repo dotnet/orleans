@@ -3,15 +3,15 @@ using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans;
-using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.AdvancedReminders.AdoNet;
 
-[assembly: RegisterProvider("AdoNet", "AdvancedReminders", "Silo", typeof(AdoNetRemindersProviderBuilder))]
+[assembly: RegisterProvider("AdoNet", "AdvancedReminders", "Silo", typeof(AdvancedAdoNetRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
-internal sealed class AdoNetRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class AdvancedAdoNetRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
     {

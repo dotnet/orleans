@@ -10,7 +10,7 @@ using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
 using Orleans.AdvancedReminders.AzureStorage;
 
-namespace Orleans.AdvancedReminders.Runtime.ReminderService
+namespace Orleans.AdvancedReminders.AzureStorage
 {
     public sealed partial class AzureBasedReminderTable : IReminderTable
     {

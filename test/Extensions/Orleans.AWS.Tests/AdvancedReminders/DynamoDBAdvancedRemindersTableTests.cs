@@ -1,18 +1,14 @@
-extern alias AdvancedRemindersDynamoDB;
-
 #nullable enable
 using AWSUtils.Tests.StorageTests;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.DynamoDB;
 using TestExtensions;
 using UnitTests;
 using UnitTests.AdvancedRemindersTest;
 using Xunit;
 using ClusterOptions = Orleans.Configuration.ClusterOptions;
 using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
-using DynamoDBReminderTable = AdvancedRemindersDynamoDB::Orleans.AdvancedReminders.DynamoDB.DynamoDBReminderTable;
-using DynamoDBReminderStorageOptions = AdvancedRemindersDynamoDB::Orleans.Configuration.DynamoDBReminderStorageOptions;
-using DynamoDBReminderStorageOptionsExtensions = AdvancedRemindersDynamoDB::Orleans.Configuration.DynamoDBReminderStorageOptionsExtensions;
 
 namespace AWSUtils.Tests.AdvancedReminders;
 

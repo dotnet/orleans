@@ -20,10 +20,7 @@ namespace Orleans.AdvancedReminders.Redis
 
         public RedisRemindersException(string message) { }
     }
-}
 
-namespace Orleans.Configuration
-{
     public partial class RedisReminderTableOptions
     {
         public StackExchange.Redis.ConfigurationOptions ConfigurationOptions { get { throw null; } set { } }
@@ -48,9 +45,9 @@ namespace Orleans.Hosting
 {
     public static partial class SiloBuilderReminderExtensions
     {
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseRedisAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<Configuration.RedisReminderTableOptions> configure) { throw null; }
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseRedisAdvancedReminderService(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, System.Action<AdvancedReminders.Redis.RedisReminderTableOptions> configure) { throw null; }
 
-        public static ISiloBuilder UseRedisAdvancedReminderService(this ISiloBuilder builder, System.Action<Configuration.RedisReminderTableOptions> configure) { throw null; }
+        public static ISiloBuilder UseRedisAdvancedReminderService(this ISiloBuilder builder, System.Action<AdvancedReminders.Redis.RedisReminderTableOptions> configure) { throw null; }
     }
 }
 

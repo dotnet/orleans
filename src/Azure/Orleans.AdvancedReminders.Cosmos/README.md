@@ -1,7 +1,9 @@
 # Microsoft Orleans Advanced Reminders for Azure Cosmos DB
 
 ## Introduction
-Microsoft Orleans Advanced Reminders for Azure Cosmos DB provides persistence for Orleans advanced reminders using Azure Cosmos DB.
+Microsoft Orleans Advanced Reminders for Azure Cosmos DB stores reminder definitions in Azure Cosmos DB.
+
+This package does not include a Cosmos-backed durable jobs implementation. You must also configure a durable jobs backend, for example `UseInMemoryDurableJobs()` for local development or `UseAzureBlobDurableJobs(...)` for persisted execution.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -16,13 +18,15 @@ using Microsoft.Extensions.Hosting;
 using Orleans.AdvancedReminders;
 using Orleans.Configuration;
 using Orleans.Hosting;
+using Orleans.DurableJobs;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
             .UseLocalhostClustering()
-            // Configure Azure Cosmos DB as reminder storage
+            .UseInMemoryDurableJobs()
+            // Configure Azure Cosmos DB for reminder definitions
             .UseCosmosAdvancedReminderService(options =>
             {
                 options.ConfigureCosmosClient("AccountEndpoint=https://YOUR_COSMOS_ENDPOINT/;AccountKey=YOUR_COSMOS_KEY;");

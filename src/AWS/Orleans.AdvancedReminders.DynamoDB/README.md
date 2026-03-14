@@ -1,7 +1,9 @@
 # Microsoft Orleans Advanced Reminders for DynamoDB
 
 ## Introduction
-Microsoft Orleans Advanced Reminders for DynamoDB provides persistence for Orleans advanced reminders using Amazon DynamoDB.
+Microsoft Orleans Advanced Reminders for DynamoDB stores reminder definitions in Amazon DynamoDB.
+
+This package does not include a DynamoDB-backed durable jobs implementation. You must also configure a durable jobs backend, for example `UseInMemoryDurableJobs()` for local development or `UseAzureBlobDurableJobs(...)` for persisted execution.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -16,15 +18,16 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.AdvancedReminders;
-using Orleans.AdvancedReminders.Runtime;
 using Orleans.Hosting;
+using Orleans.DurableJobs;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
             .UseLocalhostClustering()
-            // Configure DynamoDB as reminder storage
+            .UseInMemoryDurableJobs()
+            // Configure DynamoDB for reminder definitions
             .UseDynamoDBAdvancedReminderService(options =>
             {
                 options.AccessKey = "YOUR_AWS_ACCESS_KEY";

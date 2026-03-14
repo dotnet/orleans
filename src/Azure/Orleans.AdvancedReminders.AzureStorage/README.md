@@ -1,7 +1,7 @@
 # Microsoft Orleans Advanced Reminders for Azure Storage
 
 ## Introduction
-Microsoft Orleans Advanced Reminders for Azure Storage provides persistence for Orleans advanced reminders using Azure Table Storage.
+Microsoft Orleans Advanced Reminders for Azure Storage stores reminder definitions in Azure Table Storage and schedules reminder delivery using Azure Blob Storage durable jobs.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -13,6 +13,7 @@ dotnet add package Microsoft.Orleans.AdvancedReminders.AzureStorage
 ## Example - Configuring Azure Storage Advanced Reminders
 ```csharp
 using Azure.Data.Tables;
+using Azure.Storage.Blobs;
 using Microsoft.Extensions.Hosting;
 using Orleans.AdvancedReminders;
 using Orleans.Configuration;
@@ -23,11 +24,13 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            // Configure Azure Table Storage as reminder storage
+            // Configure Azure Table Storage for definitions and Azure Blob Storage for durable jobs
             .UseAzureTableAdvancedReminderService(options =>
             {
                 options.TableServiceClient = new TableServiceClient("YOUR_AZURE_STORAGE_CONNECTION_STRING");
+                options.BlobServiceClient = new BlobServiceClient("YOUR_AZURE_STORAGE_CONNECTION_STRING");
                 options.TableName = "OrleansAdvancedReminders";
+                options.JobContainerName = "orleans-advanced-reminder-jobs";
             });
     });
 
@@ -86,6 +89,8 @@ For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
 - [Reminders and Timers](https://learn.microsoft.com/en-us/dotnet/orleans/grains/timers-and-reminders)
 - [Reminder Services](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/reminder-services)
+
+The `UseAzureTableAdvancedReminderService(string connectionString)` overload configures both the table client and the blob durable-jobs backend from the same storage account connection string.
 
 ## Feedback & Contributing
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)

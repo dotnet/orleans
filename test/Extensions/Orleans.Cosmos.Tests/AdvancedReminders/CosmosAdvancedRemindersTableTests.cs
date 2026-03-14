@@ -1,15 +1,12 @@
-extern alias AdvancedRemindersCosmos;
-
 #nullable enable
 using Microsoft.Azure.Cosmos;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.Cosmos;
 using TestExtensions;
 using Tester.Cosmos;
 using UnitTests.AdvancedRemindersTest;
 using Xunit;
-using CosmosReminderTable = AdvancedRemindersCosmos::Orleans.AdvancedReminders.Cosmos.CosmosReminderTable;
-using CosmosReminderTableOptions = AdvancedRemindersCosmos::Orleans.AdvancedReminders.Cosmos.CosmosReminderTableOptions;
 
 namespace UnitTests.AdvancedRemindersTest;
 

@@ -1,13 +1,11 @@
-extern alias AdvancedRemindersDynamoDB;
-
 #nullable enable
 using System.Collections.Generic;
 using System.Reflection;
 using Amazon.DynamoDBv2.Model;
+using Orleans.AdvancedReminders.DynamoDB;
 using Xunit;
 using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
 using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
-using DynamoDBReminderTable = AdvancedRemindersDynamoDB::Orleans.AdvancedReminders.DynamoDB.DynamoDBReminderTable;
 
 namespace AWSUtils.Tests.AdvancedReminders;
 

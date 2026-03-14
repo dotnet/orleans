@@ -1,7 +1,9 @@
 # Microsoft Orleans Advanced Reminders for ADO.NET
 
 ## Introduction
-Microsoft Orleans Advanced Reminders for ADO.NET provides persistence for Orleans advanced reminders using ADO.NET-compatible databases.
+Microsoft Orleans Advanced Reminders for ADO.NET stores reminder definitions in ADO.NET-compatible databases.
+
+This package does not include an ADO.NET-backed durable jobs implementation. You must also configure a durable jobs backend, for example `UseInMemoryDurableJobs()` for local development or `UseAzureBlobDurableJobs(...)` for persisted execution.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -29,8 +31,8 @@ using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.AdvancedReminders;
-using Orleans.AdvancedReminders.Runtime;
 using Orleans.Hosting;
+using Orleans.DurableJobs;
 using Example;
 
 // Create a host builder
@@ -39,7 +41,8 @@ builder.UseOrleans(siloBuilder =>
 {
     siloBuilder
         .UseLocalhostClustering()
-        // Configure ADO.NET as reminder storage
+        .UseInMemoryDurableJobs()
+        // Configure ADO.NET for reminder definitions
         .UseAdoNetAdvancedReminderService(options =>
         {
             options.Invariant = "Microsoft.Data.SqlClient";  // For SQL Server

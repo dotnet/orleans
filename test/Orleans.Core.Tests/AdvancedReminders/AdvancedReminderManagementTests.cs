@@ -580,9 +580,11 @@ public class ReminderManagementGrainTests
         var service = new AdvancedReminderService(
             reminderTable,
             jobManager,
+            new TestJobShardManager(),
             grainFactory,
             Options.Create(new Orleans.AdvancedReminders.ReminderOptions()),
-            NullLogger<AdvancedReminderService>.Instance);
+            NullLogger<AdvancedReminderService>.Instance,
+            TimeProvider.System);
         var grain = new ReminderManagementGrain(
             reminderTable,
             new ServiceCollection()
@@ -770,6 +772,18 @@ public class ReminderManagementGrainTests
         public IGrainContext GrainContext { get; }
 
         public Task ExecuteJobAsync(IJobRunContext context, CancellationToken cancellationToken) => Task.CompletedTask;
+    }
+
+    private sealed class TestJobShardManager() : JobShardManager(SiloAddress.Zero)
+    {
+        public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
+            => Task.FromResult(new List<IJobShard>());
+
+        public override Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)
+            => throw new NotSupportedException();
+
+        public override Task UnregisterShardAsync(IJobShard shard, CancellationToken cancellationToken)
+            => Task.CompletedTask;
     }
 }
 

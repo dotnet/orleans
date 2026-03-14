@@ -2,12 +2,13 @@ using Microsoft.Extensions.Configuration;
 using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
+using Orleans.AdvancedReminders.DynamoDB;
 
-[assembly: RegisterProvider("DynamoDB", "AdvancedReminders", "Silo", typeof(DynamoDBRemindersProviderBuilder))]
+[assembly: RegisterProvider("DynamoDB", "AdvancedReminders", "Silo", typeof(AdvancedDynamoDBRemindersProviderBuilder))]
 
 namespace Orleans.Hosting;
 
-internal sealed class DynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
+internal sealed class AdvancedDynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
     public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
     {

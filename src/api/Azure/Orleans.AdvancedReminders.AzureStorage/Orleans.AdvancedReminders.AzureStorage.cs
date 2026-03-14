@@ -8,6 +8,34 @@
 //------------------------------------------------------------------------------
 namespace Orleans.AdvancedReminders.AzureStorage
 {
+    public sealed partial class AzureBasedReminderTable : IReminderTable
+    {
+        public AzureBasedReminderTable(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<AzureTableReminderStorageOptions> storageOptions) { }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<ReminderEntry> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(Orleans.Runtime.GrainId grainId) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
+
+        [System.Diagnostics.DebuggerStepThrough]
+        public System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry) { throw null; }
+    }
+
     public partial class AzureStorageOperationOptions
     {
         public Azure.Data.Tables.TableClientOptions ClientOptions { get { throw null; } set { } }
@@ -68,43 +96,16 @@ namespace Orleans.AdvancedReminders.AzureStorage
     public partial class AzureTableReminderStorageOptions : AzureStorageOperationOptions
     {
         public const string DEFAULT_TABLE_NAME = "OrleansAdvancedReminders";
+        public Azure.Storage.Blobs.BlobServiceClient BlobServiceClient { get { throw null; } set { } }
+
+        public string JobContainerName { get { throw null; } set { } }
+
         public override string TableName { get { throw null; } set { } }
     }
 
     public partial class AzureTableReminderStorageOptionsValidator : AzureStorageOperationOptionsValidator<AzureTableReminderStorageOptions>
     {
         public AzureTableReminderStorageOptionsValidator(AzureTableReminderStorageOptions options, string name) : base(default!, default!) { }
-    }
-}
-
-namespace Orleans.AdvancedReminders.Runtime.ReminderService
-{
-    public sealed partial class AzureBasedReminderTable : IReminderTable
-    {
-        public AzureBasedReminderTable(Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, Microsoft.Extensions.Options.IOptions<Configuration.ClusterOptions> clusterOptions, Microsoft.Extensions.Options.IOptions<AzureStorage.AzureTableReminderStorageOptions> storageOptions) { }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task<ReminderEntry> ReadRow(Orleans.Runtime.GrainId grainId, string reminderName) { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(Orleans.Runtime.GrainId grainId) { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task<ReminderTableData> ReadRows(uint begin, uint end) { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task<bool> RemoveRow(Orleans.Runtime.GrainId grainId, string reminderName, string eTag) { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task StartAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public System.Threading.Tasks.Task StopAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task TestOnlyClearTable() { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.Task<string> UpsertRow(ReminderEntry entry) { throw null; }
     }
 }
 

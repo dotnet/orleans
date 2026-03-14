@@ -1,5 +1,5 @@
-using Orleans.Configuration;
 using System;
+using Orleans.AdvancedReminders.DynamoDB;
 
 namespace Orleans.Hosting
 {

@@ -335,7 +335,7 @@ namespace Orleans.AdvancedReminders
 
     public sealed partial class ReminderManagementGrain : Grain, IReminderManagementGrain, IGrainWithGuidKey, IGrain, Orleans.Runtime.IAddressable
     {
-        public ReminderManagementGrain(IReminderTable reminderTable, System.IServiceProvider? serviceProvider = null) { }
+        public ReminderManagementGrain(IReminderTable reminderTable) { }
 
         [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<int> CountAllAsync() { throw null; }

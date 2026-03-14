@@ -1,5 +1,3 @@
-extern alias AdvancedRemindersRedis;
-
 #nullable enable
 using System;
 using System.Collections.Generic;
@@ -10,6 +8,7 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Orleans.AdvancedReminders.Redis;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using StackExchange.Redis;
@@ -17,8 +16,7 @@ using Xunit;
 using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
 using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
 using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
-using RedisReminderTable = AdvancedRemindersRedis::Orleans.AdvancedReminders.Redis.RedisReminderTable;
-using RedisReminderTableOptions = AdvancedRemindersRedis::Orleans.Configuration.RedisReminderTableOptions;
+using AdvancedRedisReminderTableOptions = Orleans.AdvancedReminders.Redis.RedisReminderTableOptions;
 
 namespace Tester.Redis.AdvancedReminders;
 
@@ -221,7 +219,7 @@ public class RedisReminderTableSerializationTests
         var table = new RedisReminderTable(
             NullLogger<RedisReminderTable>.Instance,
             Options.Create(new ClusterOptions { ClusterId = "cluster", ServiceId = "service" }),
-            Options.Create(new RedisReminderTableOptions()));
+            Options.Create(new AdvancedRedisReminderTableOptions()));
 
         var method = typeof(RedisReminderTable).GetMethod("ConvertFromEntry", BindingFlags.NonPublic | BindingFlags.Instance);
         Assert.NotNull(method);

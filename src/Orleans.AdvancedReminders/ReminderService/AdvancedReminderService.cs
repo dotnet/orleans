@@ -18,22 +18,28 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
 
     private readonly IReminderTable _reminderTable;
     private readonly ILocalDurableJobManager _jobManager;
+    private readonly JobShardManager _jobShardManager;
     private readonly IGrainFactory _grainFactory;
     private readonly ILogger<AdvancedReminderService> _logger;
     private readonly ReminderOptions _options;
+    private readonly TimeProvider _timeProvider;
 
     public AdvancedReminderService(
         IReminderTable reminderTable,
         ILocalDurableJobManager jobManager,
+        JobShardManager jobShardManager,
         IGrainFactory grainFactory,
         IOptions<ReminderOptions> options,
-        ILogger<AdvancedReminderService> logger)
+        ILogger<AdvancedReminderService> logger,
+        TimeProvider timeProvider)
     {
         _reminderTable = reminderTable;
         _jobManager = jobManager;
+        _jobShardManager = jobShardManager;
         _grainFactory = grainFactory;
         _logger = logger;
         _options = options.Value;
+        _timeProvider = timeProvider;
     }
 
     public void Participate(ISiloLifecycle lifecycle)
@@ -116,7 +122,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
             return;
         }
 
-        var now = DateTime.UtcNow;
+        var now = GetUtcNow();
         var due = entry.NextDueUtc ?? entry.StartAt;
         var overdueBy = now > due ? now - due : TimeSpan.Zero;
         var isMissed = overdueBy > _options.MissedReminderGracePeriod;
@@ -193,7 +199,8 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
     private async Task ScheduleReminderAsync(ReminderEntry entry, CancellationToken cancellationToken)
     {
         var due = entry.NextDueUtc ?? entry.StartAt;
-        var dueTime = new DateTimeOffset(due <= DateTime.UtcNow ? DateTime.UtcNow.AddMilliseconds(1) : due, TimeSpan.Zero);
+        var now = GetUtcNow();
+        var dueTime = new DateTimeOffset(due <= now ? now.AddMilliseconds(1) : due, TimeSpan.Zero);
         var dispatcher = _grainFactory.GetGrain<IAdvancedReminderDispatcherGrain>(GetDispatcherKey(entry.GrainId));
         await _jobManager.ScheduleJobAsync(
             new ScheduleJobRequest
@@ -213,7 +220,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
 
     private static string GetDispatcherKey(GrainId grainId) => grainId.ToString();
 
-    private static ReminderEntry CreateIntervalEntry(
+    private ReminderEntry CreateIntervalEntry(
         GrainId grainId,
         string reminderName,
         ReminderSchedule schedule,
@@ -225,7 +232,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
             throw new ArgumentException("Interval reminder schedule must define a period.", nameof(schedule));
         }
 
-        var dueAtUtc = schedule.DueAtUtc ?? DateTime.UtcNow.Add(schedule.DueTime ?? throw new ArgumentException("Interval reminder schedule must define dueTime or dueAtUtc.", nameof(schedule)));
+        var dueAtUtc = schedule.DueAtUtc ?? GetUtcNow().Add(schedule.DueTime ?? throw new ArgumentException("Interval reminder schedule must define dueTime or dueAtUtc.", nameof(schedule)));
         return new ReminderEntry
         {
             GrainId = grainId,
@@ -239,7 +246,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
         };
     }
 
-    private static ReminderEntry CreateCronEntry(
+    private ReminderEntry CreateCronEntry(
         GrainId grainId,
         string reminderName,
         ReminderSchedule schedule,
@@ -248,7 +255,7 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
     {
         var cronExpression = schedule.CronExpression ?? throw new ArgumentException("Cron reminder schedule must define a cron expression.", nameof(schedule));
         var cronSchedule = ReminderCronSchedule.Parse(cronExpression, schedule.CronTimeZoneId);
-        var nextDue = cronSchedule.GetNextOccurrence(DateTime.UtcNow, inclusive: true)
+        var nextDue = cronSchedule.GetNextOccurrence(GetUtcNow(), inclusive: true)
             ?? throw new Runtime.ReminderException($"Reminder '{reminderName}' has no future cron occurrences.");
 
         return new ReminderEntry
@@ -301,9 +308,32 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
         return latest is not null && string.Equals(latest.ETag, expectedETag, StringComparison.Ordinal);
     }
 
-    private Task StartAsync(CancellationToken cancellationToken) => _reminderTable.StartAsync(cancellationToken);
+    private async Task StartAsync(CancellationToken cancellationToken)
+    {
+        await _reminderTable.StartAsync(cancellationToken);
+        if (!UsesInMemoryDurableJobs())
+        {
+            return;
+        }
+
+        var all = await _reminderTable.ReadRows(0, 0);
+        foreach (var entry in all.Reminders)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (entry.NextDueUtc is null && entry.Period <= TimeSpan.Zero && string.IsNullOrWhiteSpace(entry.CronExpression))
+            {
+                continue;
+            }
+
+            await ScheduleReminderAsync(entry, cancellationToken);
+        }
+    }
 
     private Task StopAsync(CancellationToken cancellationToken) => _reminderTable.StopAsync(cancellationToken);
+
+    private DateTime GetUtcNow() => _timeProvider.GetUtcNow().UtcDateTime;
+
+    private bool UsesInMemoryDurableJobs() => string.Equals(_jobShardManager.GetType().Name, "InMemoryJobShardManager", StringComparison.Ordinal);
 
     internal static bool TryGetReminderMetadata(
         IReadOnlyDictionary<string, string>? metadata,

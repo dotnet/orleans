@@ -1,15 +1,12 @@
-extern alias AdvancedRemindersRedis;
-
 #nullable enable
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.AdvancedReminders.Redis;
 using StackExchange.Redis;
 using TestExtensions;
 using UnitTests;
 using UnitTests.AdvancedRemindersTest;
 using Xunit;
-using RedisReminderTable = AdvancedRemindersRedis::Orleans.AdvancedReminders.Redis.RedisReminderTable;
-using RedisReminderTableOptions = AdvancedRemindersRedis::Orleans.Configuration.RedisReminderTableOptions;
 using ClusterOptions = Orleans.Configuration.ClusterOptions;
 using LoggerFilterOptions = Microsoft.Extensions.Logging.LoggerFilterOptions;
 
