@@ -32,8 +32,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Clustering.AdoNet\Orleans.Clustering.AdoNet.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.DurableReminders.AdoNet\Orleans.DurableReminders.AdoNet.csproj">
-      <Aliases>DurableRemindersAdoNet</Aliases>
+    <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.AdvancedReminders.AdoNet\Orleans.AdvancedReminders.AdoNet.csproj">
+      <Aliases>AdvancedRemindersAdoNet</Aliases>
     </ProjectReference>
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />

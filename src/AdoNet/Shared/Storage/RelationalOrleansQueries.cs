@@ -7,10 +7,10 @@ using System.Threading.Tasks;
 using Orleans.Runtime;
 
 #if DURABLE_REMINDERS_ADONET
-using ReminderEntry = Orleans.DurableReminders.ReminderEntry;
-using ReminderTableData = Orleans.DurableReminders.ReminderTableData;
-using ReminderPriority = Orleans.DurableReminders.Runtime.ReminderPriority;
-using MissedReminderAction = Orleans.DurableReminders.Runtime.MissedReminderAction;
+using ReminderEntry = Orleans.AdvancedReminders.ReminderEntry;
+using ReminderTableData = Orleans.AdvancedReminders.ReminderTableData;
+using ReminderPriority = Orleans.AdvancedReminders.Runtime.ReminderPriority;
+using MissedReminderAction = Orleans.AdvancedReminders.Runtime.MissedReminderAction;
 #endif
 
 #nullable disable
@@ -108,7 +108,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal Task<
 #if DURABLE_REMINDERS_ADONET
-            Orleans.DurableReminders.ReminderTableData
+            Orleans.AdvancedReminders.ReminderTableData
 #else
             ReminderTableData
 #endif
@@ -118,7 +118,7 @@ namespace Orleans.Tests.SqlUtils
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, GrainId = grainId.ToString() },
                 ret => new
 #if DURABLE_REMINDERS_ADONET
-                    Orleans.DurableReminders.ReminderTableData
+                    Orleans.AdvancedReminders.ReminderTableData
 #else
                     ReminderTableData
 #endif
@@ -134,7 +134,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>Reminder table data.</returns>
         internal Task<
 #if DURABLE_REMINDERS_ADONET
-            Orleans.DurableReminders.ReminderTableData
+            Orleans.AdvancedReminders.ReminderTableData
 #else
             ReminderTableData
 #endif
@@ -146,7 +146,7 @@ namespace Orleans.Tests.SqlUtils
                 new DbStoredQueries.Columns(command) { ServiceId = serviceId, BeginHash = beginHash, EndHash = endHash },
                 ret => new
 #if DURABLE_REMINDERS_ADONET
-                    Orleans.DurableReminders.ReminderTableData
+                    Orleans.AdvancedReminders.ReminderTableData
 #else
                     ReminderTableData
 #endif
@@ -161,7 +161,7 @@ namespace Orleans.Tests.SqlUtils
 
         internal static
 #if DURABLE_REMINDERS_ADONET
-            Orleans.DurableReminders.ReminderEntry
+            Orleans.AdvancedReminders.ReminderEntry
 #else
             ReminderEntry
 #endif
@@ -178,7 +178,7 @@ namespace Orleans.Tests.SqlUtils
 
                 return new
 #if DURABLE_REMINDERS_ADONET
-                    Orleans.DurableReminders.ReminderEntry
+                    Orleans.AdvancedReminders.ReminderEntry
 #else
                     ReminderEntry
 #endif
@@ -212,7 +212,7 @@ namespace Orleans.Tests.SqlUtils
         /// <returns>A remainder entry.</returns>
         internal Task<
 #if DURABLE_REMINDERS_ADONET
-            Orleans.DurableReminders.ReminderEntry
+            Orleans.AdvancedReminders.ReminderEntry
 #else
             ReminderEntry
 #endif
@@ -250,13 +250,13 @@ namespace Orleans.Tests.SqlUtils
             DateTime? lastFireUtc,
             
 #if DURABLE_REMINDERS_ADONET
-            Orleans.DurableReminders.Runtime.ReminderPriority
+            Orleans.AdvancedReminders.Runtime.ReminderPriority
 #else
             ReminderPriority
 #endif
             priority,
 #if DURABLE_REMINDERS_ADONET
-            Orleans.DurableReminders.Runtime.MissedReminderAction
+            Orleans.AdvancedReminders.Runtime.MissedReminderAction
 #else
             MissedReminderAction
 #endif
@@ -300,45 +300,45 @@ namespace Orleans.Tests.SqlUtils
 
 #if DURABLE_REMINDERS_ADONET
         private static
-            Orleans.DurableReminders.Runtime.ReminderPriority
+            Orleans.AdvancedReminders.Runtime.ReminderPriority
             ParsePriority(int value) => value switch
         {
             (int)
-                Orleans.DurableReminders.Runtime.ReminderPriority
+                Orleans.AdvancedReminders.Runtime.ReminderPriority
                 .High =>
-                Orleans.DurableReminders.Runtime.ReminderPriority
+                Orleans.AdvancedReminders.Runtime.ReminderPriority
                 .High,
             (int)
-                Orleans.DurableReminders.Runtime.ReminderPriority
+                Orleans.AdvancedReminders.Runtime.ReminderPriority
                 .Normal =>
-                Orleans.DurableReminders.Runtime.ReminderPriority
+                Orleans.AdvancedReminders.Runtime.ReminderPriority
                 .Normal,
             _ =>
-                Orleans.DurableReminders.Runtime.ReminderPriority
+                Orleans.AdvancedReminders.Runtime.ReminderPriority
                 .Normal,
         };
 
         private static
-            Orleans.DurableReminders.Runtime.MissedReminderAction
+            Orleans.AdvancedReminders.Runtime.MissedReminderAction
             ParseAction(int value) => value switch
         {
             (int)
-                Orleans.DurableReminders.Runtime.MissedReminderAction
+                Orleans.AdvancedReminders.Runtime.MissedReminderAction
                 .FireImmediately =>
-                Orleans.DurableReminders.Runtime.MissedReminderAction
+                Orleans.AdvancedReminders.Runtime.MissedReminderAction
                 .FireImmediately,
             (int)
-                Orleans.DurableReminders.Runtime.MissedReminderAction
+                Orleans.AdvancedReminders.Runtime.MissedReminderAction
                 .Skip =>
-                Orleans.DurableReminders.Runtime.MissedReminderAction
+                Orleans.AdvancedReminders.Runtime.MissedReminderAction
                 .Skip,
             (int)
-                Orleans.DurableReminders.Runtime.MissedReminderAction
+                Orleans.AdvancedReminders.Runtime.MissedReminderAction
                 .Notify =>
-                Orleans.DurableReminders.Runtime.MissedReminderAction
+                Orleans.AdvancedReminders.Runtime.MissedReminderAction
                 .Notify,
             _ =>
-                Orleans.DurableReminders.Runtime.MissedReminderAction
+                Orleans.AdvancedReminders.Runtime.MissedReminderAction
                 .Skip,
         };
 #endif

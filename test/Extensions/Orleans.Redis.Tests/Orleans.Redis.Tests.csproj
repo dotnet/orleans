@@ -12,8 +12,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Clustering.Redis\Orleans.Clustering.Redis.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.DurableReminders.Redis\Orleans.DurableReminders.Redis.csproj">
-      <Aliases>DurableRemindersRedis</Aliases>
+    <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.AdvancedReminders.Redis\Orleans.AdvancedReminders.Redis.csproj">
+      <Aliases>AdvancedRemindersRedis</Aliases>
     </ProjectReference>
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Reminders.Redis\Orleans.Reminders.Redis.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Persistence.Redis\Orleans.Persistence.Redis.csproj" />

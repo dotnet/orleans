@@ -16,8 +16,8 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Clustering.DynamoDB\Orleans.Clustering.DynamoDB.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.DurableReminders.DynamoDB\Orleans.DurableReminders.DynamoDB.csproj">
-      <Aliases>DurableRemindersDynamoDB</Aliases>
+    <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.AdvancedReminders.DynamoDB\Orleans.AdvancedReminders.DynamoDB.csproj">
+      <Aliases>AdvancedRemindersDynamoDB</Aliases>
     </ProjectReference>
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Persistence.DynamoDB\Orleans.Persistence.DynamoDB.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AWS\Orleans.Reminders.DynamoDB\Orleans.Reminders.DynamoDB.csproj" />

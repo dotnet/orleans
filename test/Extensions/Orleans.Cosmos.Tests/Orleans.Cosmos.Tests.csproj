@@ -12,8 +12,8 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\src\Azure\Orleans.DurableReminders.Cosmos\Orleans.DurableReminders.Cosmos.csproj">
-      <Aliases>DurableRemindersCosmos</Aliases>
+    <ProjectReference Include="..\..\..\src\Azure\Orleans.AdvancedReminders.Cosmos\Orleans.AdvancedReminders.Cosmos.csproj">
+      <Aliases>AdvancedRemindersCosmos</Aliases>
     </ProjectReference>
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Reminders.Cosmos\Orleans.Reminders.Cosmos.csproj" />
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.Cosmos\Orleans.Clustering.Cosmos.csproj" />
