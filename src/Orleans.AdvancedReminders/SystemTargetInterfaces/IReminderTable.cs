@@ -1,0 +1,279 @@
+using System;
+using System.Collections.Generic;
+using System.Threading;
+using System.Threading.Tasks;
+using Orleans.Concurrency;
+using Orleans.Runtime;
+
+namespace Orleans.AdvancedReminders
+{
+    /// <summary>
+    /// Interface for implementations of the underlying storage for reminder data:
+    /// Azure Table, SQL, development emulator grain, and a mock implementation.
+    /// Defined as a grain interface for the development emulator grain case.
+    /// </summary>  
+    public interface IReminderTable
+    {
+        /// <summary>
+        /// Initializes this instance.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task StartAsync(CancellationToken cancellationToken = default)
+#pragma warning disable CS0618 // Type or member is obsolete
+            => Init();
+#pragma warning restore CS0618 // Type or member is obsolete
+
+        /// <summary>
+        /// Initializes this instance.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        [Obsolete("Implement and use StartAsync instead")]
+        Task Init() => Task.CompletedTask;
+
+        /// <summary>
+        /// Reads the reminder table entries associated with the specified grain.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <returns>The reminder table entries associated with the specified grain.</returns>
+        Task<ReminderTableData> ReadRows(GrainId grainId);
+
+        /// <summary>
+        /// Returns all rows that have their <see cref="GrainId.GetUniformHashCode"/> in the range (begin, end].
+        /// If begin is greater or equal to end, returns all entries with hash greater begin or hash less or equal to end.
+        /// </summary>
+        /// <param name="begin">The exclusive lower bound.</param>
+        /// <param name="end">The inclusive upper bound.</param>
+        /// <returns>The reminder table entries which fall within the specified range.</returns>
+        Task<ReminderTableData> ReadRows(uint begin, uint end);
+
+        /// <summary>
+        /// Reads the specified entry.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <param name="reminderName">Name of the reminder.</param>
+        /// <returns>The reminder table entry.</returns>
+        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
+
+        /// <summary>
+        /// Upserts the specified entry.
+        /// </summary>
+        /// <param name="entry">The entry.</param>
+        /// <returns>The row's new ETag.</returns>
+        Task<string> UpsertRow(ReminderEntry entry);
+
+        /// <summary>
+        /// Removes a row from the table.
+        /// </summary>
+        /// <param name="grainId">The grain ID.</param>
+        /// <param name="reminderName">The reminder name.</param>
+        /// /// <param name="eTag">The ETag.</param>
+        /// <returns>true if a row with <paramref name="grainId"/> and <paramref name="reminderName"/> existed and was removed successfully, false otherwise</returns>
+        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
+
+        /// <summary>
+        /// Clears the table.
+        /// </summary>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task TestOnlyClearTable();
+
+        /// <summary>
+        /// Stops the reminder table.
+        /// </summary>
+        /// <param name="cancellationToken">The cancellation token.</param>
+        /// <returns>A <see cref="Task"/> representing the work performed.</returns>
+        Task StopAsync(CancellationToken cancellationToken = default) => Task.CompletedTask;
+    }
+
+    /// <summary>
+    /// Reminder table interface for grain based implementation.
+    /// </summary>
+    internal interface IReminderTableGrain : IGrainWithIntegerKey
+    {
+        Task<ReminderTableData> ReadRows(GrainId grainId);
+
+        Task<ReminderTableData> ReadRows(uint begin, uint end);
+
+        Task<ReminderEntry> ReadRow(GrainId grainId, string reminderName);
+
+        Task<string> UpsertRow(ReminderEntry entry);
+
+        Task<bool> RemoveRow(GrainId grainId, string reminderName, string eTag);
+
+        Task TestOnlyClearTable();
+    }
+
+    /// <summary>
+    /// Represents a collection of reminder table entries.
+    /// </summary>
+    [Serializable]
+    [GenerateSerializer]
+    public sealed class ReminderTableData
+    {
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReminderTableData"/> class.
+        /// </summary>
+        /// <param name="list">The entries.</param>
+        public ReminderTableData(IEnumerable<ReminderEntry> list)
+        {
+            Reminders = new List<ReminderEntry>(list);
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReminderTableData"/> class.
+        /// </summary>
+        /// <param name="entry">The entry.</param>
+        public ReminderTableData(ReminderEntry entry)
+        {
+            Reminders = new[] { entry };
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ReminderTableData"/> class.
+        /// </summary>
+        public ReminderTableData()
+        {
+            Reminders = Array.Empty<ReminderEntry>();
+        }
+
+        /// <summary>
+        /// Gets the reminders.
+        /// </summary>
+        /// <value>The reminders.</value>
+        [Id(0)]
+        public IList<ReminderEntry> Reminders { get; private set; }
+
+        /// <summary>
+        /// Returns a <see cref="string" /> that represents this instance.
+        /// </summary>
+        /// <returns>A <see cref="string" /> that represents this instance.</returns>
+        public override string ToString() => $"[{Reminders.Count} reminders: {Utils.EnumerableToString(Reminders)}.";
+    }
+
+    /// <summary>
+    /// Represents a reminder table entry.
+    /// </summary>
+    [Serializable]
+    [GenerateSerializer]
+    public sealed class ReminderEntry
+    {
+        /// <summary>
+        /// Gets or sets the grain ID of the grain that created the reminder. Forms the reminder
+        /// primary key together with <see cref="ReminderName"/>.
+        /// </summary>
+        [Id(0)]
+        public GrainId GrainId { get; set; }
+
+        /// <summary>
+        /// Gets or sets the name of the reminder. Forms the reminder primary key together with 
+        /// <see cref="GrainId"/>.
+        /// </summary>
+        [Id(1)]
+        public string ReminderName { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the time when the reminder was supposed to tick in the first time
+        /// </summary>
+        [Id(2)]
+        public DateTime StartAt { get; set; }
+
+        /// <summary>
+        /// Gets or sets the time period for the reminder
+        /// </summary>
+        [Id(3)]
+        public TimeSpan Period { get; set; }
+
+        /// <summary>
+        /// Gets or sets the ETag.
+        /// </summary>
+        /// <value>The ETag.</value>
+        [Id(4)]
+        public string ETag { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the cron expression for this reminder.
+        /// If null or empty, the reminder uses <see cref="StartAt"/> and <see cref="Period"/> interval semantics.
+        /// </summary>
+        [Id(5)]
+        public string CronExpression { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the time zone id used to evaluate <see cref="CronExpression"/>.
+        /// Null or empty indicates UTC scheduling.
+        /// </summary>
+        [Id(10)]
+        public string CronTimeZoneId { get; set; } = string.Empty;
+
+        /// <summary>
+        /// Gets or sets the next due timestamp for this reminder in UTC.
+        /// </summary>
+        [Id(6)]
+        public DateTime? NextDueUtc { get; set; }
+
+        /// <summary>
+        /// Gets or sets the timestamp when this reminder was last fired in UTC.
+        /// </summary>
+        [Id(7)]
+        public DateTime? LastFireUtc { get; set; }
+
+        /// <summary>
+        /// Gets or sets the reminder priority.
+        /// </summary>
+        [Id(8)]
+        public Runtime.ReminderPriority Priority { get; set; } = Runtime.ReminderPriority.Normal;
+
+        /// <summary>
+        /// Gets or sets the missed reminder action.
+        /// </summary>
+        [Id(9)]
+        public Runtime.MissedReminderAction Action { get; set; } = Runtime.MissedReminderAction.Skip;
+
+        /// <inheritdoc/>
+        public override string ToString()
+            => $"<GrainId={GrainId} ReminderName={ReminderName} Period={Period} Cron={CronExpression} CronTimeZoneId={CronTimeZoneId} NextDueUtc={NextDueUtc} LastFireUtc={LastFireUtc} Priority={Priority} Action={Action}>";
+
+        /// <summary>
+        /// Returns an <see cref="IGrainReminder"/> representing the data in this instance.
+        /// </summary>
+        /// <returns>The <see cref="IGrainReminder"/>.</returns>
+        internal IGrainReminder ToIGrainReminder() => new ReminderData(GrainId, ReminderName, ETag, CronExpression, Priority, Action, CronTimeZoneId);
+    }
+
+    [Serializable, GenerateSerializer, Immutable]
+    internal sealed class ReminderData : IGrainReminder
+    {
+        [Id(0)]
+        public readonly GrainId GrainId;
+        [Id(1)]
+        public string ReminderName { get; }
+        [Id(2)]
+        public readonly string ETag;
+        [Id(3)]
+        public string CronExpression { get; }
+        [Id(4)]
+        public Runtime.ReminderPriority Priority { get; }
+        [Id(5)]
+        public Runtime.MissedReminderAction Action { get; }
+        [Id(6)]
+        public string CronTimeZone { get; }
+
+        internal ReminderData(
+            GrainId grainId,
+            string reminderName,
+            string eTag,
+            string cronExpression = "",
+            Runtime.ReminderPriority priority = Runtime.ReminderPriority.Normal,
+            Runtime.MissedReminderAction action = Runtime.MissedReminderAction.Skip,
+            string cronTimeZoneId = "")
+        {
+            GrainId = grainId;
+            ReminderName = reminderName;
+            ETag = eTag;
+            CronExpression = cronExpression ?? string.Empty;
+            Priority = priority;
+            Action = action;
+            CronTimeZone = cronTimeZoneId ?? string.Empty;
+        }
+
+        public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag} CronExpression={CronExpression} CronTimeZone={CronTimeZone} Priority={Priority} Action={Action}>";
+    }
+}
