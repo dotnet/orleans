@@ -29,6 +29,12 @@ internal static class AdvancedReminderTimeZoneTestHelper
     public static TimeZoneInfo GetCentralEuropeanTimeZone()
         => ResolveTimeZone("Europe/Berlin", "W. Europe Standard Time");
 
+    public static TimeZoneInfo GetParisTimeZone()
+        => ResolveTimeZone("Europe/Paris", "Romance Standard Time", "W. Europe Standard Time");
+
+    public static TimeZoneInfo GetKyivTimeZone()
+        => ResolveTimeZone("Europe/Kyiv", "FLE Standard Time", "E. Europe Standard Time");
+
     public static TimeZoneInfo GetIndiaTimeZone()
         => ResolveTimeZone("Asia/Kolkata", "India Standard Time");
 
@@ -151,6 +157,18 @@ public class ReminderCronTests
     }
 
     [Fact]
+    public void Parse_LargeMinuteList_ComputesExpectedNextOccurrence()
+    {
+        var minuteField = string.Join(",", Enumerable.Repeat("0", 4_096));
+        var expression = ReminderCronExpression.Parse($"{minuteField} * * * *");
+        var fromUtc = new DateTime(2026, 1, 1, 10, 0, 30, DateTimeKind.Utc);
+
+        var next = expression.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2026, 1, 1, 11, 0, 0, DateTimeKind.Utc), next);
+    }
+
+    [Fact]
     public void TryParse_InvalidExpression_ReturnsFalse()
     {
         var result = ReminderCronExpression.TryParse("not-a-cron", out var expression);
@@ -184,6 +202,56 @@ public class ReminderCronBuilderTimeZoneTests
         var builder = ReminderCronBuilder.DailyAt(9, 0);
 
         Assert.Equal(TimeZoneInfo.Utc.Id, builder.TimeZone.Id);
+    }
+
+    [Fact]
+    public void Builder_TimeZoneOverloads_ApplyTypedZone_ForCoreHelpers()
+    {
+        var zone = AdvancedReminderTimeZoneTestHelper.GetDubaiTimeZone();
+
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.EveryMinute(zone), "* * * * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.HourlyAt(15, zone), "15 * * * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.HourlyAt(15, 10, zone), "10 15 * * * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.HourlyAt(TimeSpan.FromMinutes(15), zone), "15 * * * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.DailyAt(9, 30, zone), "30 9 * * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.DailyAt(9, 30, 15, zone), "15 30 9 * * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.DailyAt(new TimeOnly(9, 30), zone), "30 9 * * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.DailyAt(new TimeSpan(9, 30, 15), zone), "15 30 9 * * *", zone);
+    }
+
+    [Fact]
+    public void Builder_TimeZoneOverloads_ApplyTypedZone_ForCalendarHelpers()
+    {
+        var zone = AdvancedReminderTimeZoneTestHelper.GetKyivTimeZone();
+
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekdaysAt(9, 30, zone), "30 9 * * MON-FRI", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekdaysAt(9, 30, 15, zone), "15 30 9 * * MON-FRI", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekdaysAt(new TimeOnly(9, 30), zone), "30 9 * * MON-FRI", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekdaysAt(new TimeSpan(9, 30, 15), zone), "15 30 9 * * MON-FRI", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekendsAt(9, 30, zone), "30 9 * * SAT,SUN", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekendsAt(9, 30, 15, zone), "15 30 9 * * SAT,SUN", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekendsAt(new TimeOnly(9, 30), zone), "30 9 * * SAT,SUN", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeekendsAt(new TimeSpan(9, 30, 15), zone), "15 30 9 * * SAT,SUN", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeeklyOn(DayOfWeek.Monday, 4, 5, zone), "5 4 * * 1", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeeklyOn(DayOfWeek.Monday, 4, 5, 6, zone), "6 5 4 * * 1", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeeklyOn(DayOfWeek.Tuesday, new TimeOnly(4, 5, 6), zone), "6 5 4 * * 2", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.WeeklyOn(DayOfWeek.Tuesday, new TimeSpan(4, 5, 6), zone), "6 5 4 * * 2", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOn(31, 23, 59, zone), "59 23 31 * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOn(31, 23, 59, 58, zone), "58 59 23 31 * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOn(31, new TimeOnly(23, 59, 58), zone), "58 59 23 31 * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOn(31, new TimeSpan(23, 59, 58), zone), "58 59 23 31 * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOnLastDay(23, 59, zone), "59 23 L * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOnLastDay(23, 59, 58, zone), "58 59 23 L * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOnLastDay(new TimeOnly(23, 59, 58), zone), "58 59 23 L * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.MonthlyOnLastDay(new TimeSpan(23, 59, 58), zone), "58 59 23 L * *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(3, 15, 6, 45, zone), "45 6 15 3 *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(3, 15, 6, 45, 30, zone), "30 45 6 15 3 *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(3, 15, new TimeOnly(6, 45, 30), zone), "30 45 6 15 3 *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(3, 15, new TimeSpan(6, 45, 30), zone), "30 45 6 15 3 *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), 12, 34, zone), "34 12 29 2 *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), 12, 34, 56, zone), "56 34 12 29 2 *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), new TimeOnly(12, 34, 56), zone), "56 34 12 29 2 *", zone);
+        AssertTypedTimeZoneBuilder(ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), new TimeSpan(12, 34, 56), zone), "56 34 12 29 2 *", zone);
     }
 
     [Fact]
@@ -289,6 +357,12 @@ public class ReminderCronBuilderTimeZoneTests
                 && schedule.CronTimeZoneId == expectedTimeZoneId),
             ReminderPriority.Normal,
             MissedReminderAction.Skip);
+    }
+
+    private static void AssertTypedTimeZoneBuilder(ReminderCronBuilder builder, string expectedExpression, TimeZoneInfo expectedZone)
+    {
+        Assert.Equal(expectedExpression, builder.ToExpressionString());
+        Assert.Equal(expectedZone.Id, builder.TimeZone.Id);
     }
 }
 
@@ -580,9 +654,44 @@ public class ReminderCronBuilderTests
     {
         Assert.Equal("* * * * *", ReminderCronBuilder.EveryMinute().ToExpressionString());
         Assert.Equal("15 * * * *", ReminderCronBuilder.HourlyAt(15).ToExpressionString());
+        Assert.Equal("10 15 * * * *", ReminderCronBuilder.HourlyAt(15, 10).ToExpressionString());
+        Assert.Equal("0 9 * * *", ReminderCronBuilder.DailyAt(9, 0).ToExpressionString());
+        Assert.Equal("15 30 9 * * *", ReminderCronBuilder.DailyAt(9, 30, 15).ToExpressionString());
         Assert.Equal("30 9 * * MON-FRI", ReminderCronBuilder.WeekdaysAt(9, 30).ToExpressionString());
+        Assert.Equal("15 30 9 * * MON-FRI", ReminderCronBuilder.WeekdaysAt(9, 30, 15).ToExpressionString());
+        Assert.Equal("30 9 * * SAT,SUN", ReminderCronBuilder.WeekendsAt(9, 30).ToExpressionString());
+        Assert.Equal("5 4 * * 1", ReminderCronBuilder.WeeklyOn(DayOfWeek.Monday, 4, 5).ToExpressionString());
+        Assert.Equal("6 5 4 * * 1", ReminderCronBuilder.WeeklyOn(DayOfWeek.Monday, 4, 5, 6).ToExpressionString());
         Assert.Equal("59 23 31 * *", ReminderCronBuilder.MonthlyOn(31, 23, 59).ToExpressionString());
+        Assert.Equal("58 59 23 31 * *", ReminderCronBuilder.MonthlyOn(31, 23, 59, 58).ToExpressionString());
         Assert.Equal("59 23 L * *", ReminderCronBuilder.MonthlyOnLastDay(23, 59).ToExpressionString());
+        Assert.Equal("58 59 23 L * *", ReminderCronBuilder.MonthlyOnLastDay(23, 59, 58).ToExpressionString());
+        Assert.Equal("45 6 15 3 *", ReminderCronBuilder.YearlyOn(3, 15, 6, 45).ToExpressionString());
+        Assert.Equal("30 45 6 15 3 *", ReminderCronBuilder.YearlyOn(3, 15, 6, 45, 30).ToExpressionString());
+    }
+
+    [Fact]
+    public void Builder_TimeOnlyAndTimeSpanHelpers_EmitExpectedExpressions()
+    {
+        Assert.Equal("15 * * * *", ReminderCronBuilder.HourlyAt(TimeSpan.FromMinutes(15)).ToExpressionString());
+        Assert.Equal("30 9 * * *", ReminderCronBuilder.DailyAt(new TimeOnly(9, 30)).ToExpressionString());
+        Assert.Equal("15 30 9 * * MON-FRI", ReminderCronBuilder.WeekdaysAt(new TimeSpan(9, 30, 15)).ToExpressionString());
+        Assert.Equal("15 30 9 * * SAT,SUN", ReminderCronBuilder.WeekendsAt(new TimeSpan(9, 30, 15)).ToExpressionString());
+        Assert.Equal("6 5 4 * * 2", ReminderCronBuilder.WeeklyOn(DayOfWeek.Tuesday, new TimeOnly(4, 5, 6)).ToExpressionString());
+        Assert.Equal("59 23 31 * *", ReminderCronBuilder.MonthlyOn(31, TimeSpan.FromHours(23) + TimeSpan.FromMinutes(59)).ToExpressionString());
+        Assert.Equal("58 59 23 L * *", ReminderCronBuilder.MonthlyOnLastDay(new TimeOnly(23, 59, 58)).ToExpressionString());
+        Assert.Equal("34 12 29 2 *", ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), new TimeOnly(12, 34)).ToExpressionString());
+        Assert.Equal("34 12 29 2 *", ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), 12, 34).ToExpressionString());
+        Assert.Equal("56 34 12 29 2 *", ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), 12, 34, 56).ToExpressionString());
+    }
+
+    [Fact]
+    public void Builder_YearlyOn_DateOnly_IgnoresYear()
+    {
+        var first = ReminderCronBuilder.YearlyOn(new DateOnly(2024, 2, 29), new TimeOnly(12, 34));
+        var second = ReminderCronBuilder.YearlyOn(new DateOnly(2032, 2, 29), new TimeOnly(12, 34));
+
+        Assert.Equal(first.ToExpressionString(), second.ToExpressionString());
     }
 
     [Theory]
@@ -657,6 +766,37 @@ public class ReminderCronBuilderTests
         Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.DailyAt(hour, minute));
     }
 
+    [Fact]
+    public void Builder_HourlyAt_InvalidOffset_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.HourlyAt(TimeSpan.FromHours(1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.HourlyAt(TimeSpan.FromMilliseconds(1)));
+    }
+
+    [Theory]
+    [InlineData(-1)]
+    [InlineData(60)]
+    public void Builder_SecondBasedHelpers_InvalidSecond_Throws(int second)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.HourlyAt(0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.DailyAt(0, 0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.WeekdaysAt(0, 0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.WeekendsAt(0, 0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.WeeklyOn(DayOfWeek.Monday, 0, 0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.MonthlyOn(1, 0, 0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.MonthlyOnLastDay(0, 0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.YearlyOn(1, 1, 0, 0, second));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.YearlyOn(new DateOnly(2024, 1, 1), 0, 0, second));
+    }
+
+    [Fact]
+    public void Builder_DailyAt_InvalidTimeOnlyOrTimeSpan_Throws()
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.DailyAt(new TimeOnly(9, 0, 0, 1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.DailyAt(TimeSpan.FromDays(1)));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.DailyAt(TimeSpan.FromMilliseconds(1)));
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(32)]
@@ -669,6 +809,15 @@ public class ReminderCronBuilderTests
     public void Builder_WeeklyOn_InvalidDayOfWeek_Throws()
     {
         Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.WeeklyOn((DayOfWeek)99, 0, 0));
+    }
+
+    [Theory]
+    [InlineData(0, 1)]
+    [InlineData(13, 1)]
+    [InlineData(4, 31)]
+    public void Builder_YearlyOn_InvalidMonthOrDay_Throws(int month, int dayOfMonth)
+    {
+        Assert.Throws<ArgumentOutOfRangeException>(() => ReminderCronBuilder.YearlyOn(month, dayOfMonth, 0, 0));
     }
 
     [Fact]
@@ -823,6 +972,27 @@ public class ReminderCronTimeZoneEdgeCaseTests
     }
 
     [Fact]
+    public void Builder_WithKyivTimeZoneOverload_AcrossEuropeanSpringForward_PreservesNineAmLocal()
+    {
+        var zone = AdvancedReminderTimeZoneTestHelper.GetKyivTimeZone();
+        var builder = ReminderCronBuilder.DailyAt(9, 0, zone);
+        var fromUtc = new DateTime(2025, 3, 28, 0, 0, 0, DateTimeKind.Utc);
+        var toUtc = new DateTime(2025, 4, 2, 0, 0, 0, DateTimeKind.Utc);
+
+        var occurrences = builder.GetOccurrences(fromUtc, toUtc).ToArray();
+
+        Assert.Equal(
+            [
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 28, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 29, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 30, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 31, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 4, 1, 9, 0, 0),
+            ],
+            occurrences);
+    }
+
+    [Fact]
     public void Builder_WithLordHoweAcrossDstTransition_PreservesNineAmLocal()
     {
         var zone = AdvancedReminderTimeZoneTestHelper.GetLordHoweTimeZone();
@@ -852,6 +1022,99 @@ public class ReminderCronTimeZoneEdgeCaseTests
         var next = builder.GetNextOccurrence(fromUtc);
 
         Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2026, 1, 1, 0, 15, 0), next);
+    }
+
+    [Fact]
+    public void Builder_WithDubaiTimeZoneOverload_DoesNotShiftAcrossDstWindows()
+    {
+        var zone = AdvancedReminderTimeZoneTestHelper.GetDubaiTimeZone();
+        var builder = ReminderCronBuilder.DailyAt(9, 0, zone);
+        var fromUtc = new DateTime(2025, 3, 7, 0, 0, 0, DateTimeKind.Utc);
+        var toUtc = new DateTime(2025, 3, 12, 0, 0, 0, DateTimeKind.Utc);
+
+        var occurrences = builder.GetOccurrences(fromUtc, toUtc).ToArray();
+
+        Assert.Equal(
+            [
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 7, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 8, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 9, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 10, 9, 0, 0),
+                AdvancedReminderTimeZoneTestHelper.ToUtc(zone, 2025, 3, 11, 9, 0, 0),
+            ],
+            occurrences);
+    }
+
+    [Fact]
+    public void Builder_WithKyivAndNewYork_WhenUsAlreadyOnDst_ReturnExpectedUtcOffsets()
+    {
+        var kyiv = AdvancedReminderTimeZoneTestHelper.GetKyivTimeZone();
+        var newYork = AdvancedReminderTimeZoneTestHelper.GetUsEasternTimeZone();
+        var kyivBuilder = ReminderCronBuilder.DailyAt(9, 0, kyiv);
+        var newYorkBuilder = ReminderCronBuilder.DailyAt(9, 0, newYork);
+        var fromUtc = new DateTime(2025, 3, 10, 0, 0, 0, DateTimeKind.Utc);
+
+        var kyivNext = kyivBuilder.GetNextOccurrence(fromUtc);
+        var newYorkNext = newYorkBuilder.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2025, 3, 10, 7, 0, 0, DateTimeKind.Utc), kyivNext);
+        Assert.Equal(new DateTime(2025, 3, 10, 13, 0, 0, DateTimeKind.Utc), newYorkNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(kyiv, 2025, 3, 10, 9, 0, 0), kyivNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(newYork, 2025, 3, 10, 9, 0, 0), newYorkNext);
+    }
+
+    [Fact]
+    public void Builder_WithParisAndNewYork_WhenEuropeAlreadyStandardButUsStillOnDst_ReturnExpectedUtcOffsets()
+    {
+        var paris = AdvancedReminderTimeZoneTestHelper.GetParisTimeZone();
+        var newYork = AdvancedReminderTimeZoneTestHelper.GetUsEasternTimeZone();
+        var parisBuilder = ReminderCronBuilder.DailyAt(9, 0, paris);
+        var newYorkBuilder = ReminderCronBuilder.DailyAt(9, 0, newYork);
+        var fromUtc = new DateTime(2025, 10, 27, 0, 0, 0, DateTimeKind.Utc);
+
+        var parisNext = parisBuilder.GetNextOccurrence(fromUtc);
+        var newYorkNext = newYorkBuilder.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2025, 10, 27, 8, 0, 0, DateTimeKind.Utc), parisNext);
+        Assert.Equal(new DateTime(2025, 10, 27, 13, 0, 0, DateTimeKind.Utc), newYorkNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(paris, 2025, 10, 27, 9, 0, 0), parisNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(newYork, 2025, 10, 27, 9, 0, 0), newYorkNext);
+    }
+
+    [Fact]
+    public void Builder_WithDubaiAndNewYork_WhenUsAlreadyOnDst_DubaiRemainsFixed()
+    {
+        var dubai = AdvancedReminderTimeZoneTestHelper.GetDubaiTimeZone();
+        var newYork = AdvancedReminderTimeZoneTestHelper.GetUsEasternTimeZone();
+        var dubaiBuilder = ReminderCronBuilder.DailyAt(9, 0, dubai);
+        var newYorkBuilder = ReminderCronBuilder.DailyAt(9, 0, newYork);
+        var fromUtc = new DateTime(2025, 3, 10, 0, 0, 0, DateTimeKind.Utc);
+
+        var dubaiNext = dubaiBuilder.GetNextOccurrence(fromUtc);
+        var newYorkNext = newYorkBuilder.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2025, 3, 10, 5, 0, 0, DateTimeKind.Utc), dubaiNext);
+        Assert.Equal(new DateTime(2025, 3, 10, 13, 0, 0, DateTimeKind.Utc), newYorkNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(dubai, 2025, 3, 10, 9, 0, 0), dubaiNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(newYork, 2025, 3, 10, 9, 0, 0), newYorkNext);
+    }
+
+    [Fact]
+    public void Builder_WithIndiaAndParis_WhenEuropeAlreadyStandard_IndiaRemainsFixed()
+    {
+        var india = AdvancedReminderTimeZoneTestHelper.GetIndiaTimeZone();
+        var paris = AdvancedReminderTimeZoneTestHelper.GetParisTimeZone();
+        var indiaBuilder = ReminderCronBuilder.DailyAt(9, 0, india);
+        var parisBuilder = ReminderCronBuilder.DailyAt(9, 0, paris);
+        var fromUtc = new DateTime(2025, 10, 27, 0, 0, 0, DateTimeKind.Utc);
+
+        var indiaNext = indiaBuilder.GetNextOccurrence(fromUtc);
+        var parisNext = parisBuilder.GetNextOccurrence(fromUtc);
+
+        Assert.Equal(new DateTime(2025, 10, 27, 3, 30, 0, DateTimeKind.Utc), indiaNext);
+        Assert.Equal(new DateTime(2025, 10, 27, 8, 0, 0, DateTimeKind.Utc), parisNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(india, 2025, 10, 27, 9, 0, 0), indiaNext);
+        Assert.Equal(AdvancedReminderTimeZoneTestHelper.ToUtc(paris, 2025, 10, 27, 9, 0, 0), parisNext);
     }
 
     [Fact]

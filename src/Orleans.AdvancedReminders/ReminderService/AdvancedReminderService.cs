@@ -129,22 +129,17 @@ internal sealed class AdvancedReminderService : IReminderService, ILifecyclePart
         var isMissed = overdueBy > _options.MissedReminderGracePeriod;
 
         var shouldFire = true;
-        if (isMissed)
+        if (isMissed && entry.Action != Runtime.MissedReminderAction.FireImmediately)
         {
-            switch (entry.Action)
+            shouldFire = false;
+            if (entry.Action == Runtime.MissedReminderAction.Notify)
             {
-                case Runtime.MissedReminderAction.Skip:
-                    shouldFire = false;
-                    break;
-                case Runtime.MissedReminderAction.Notify:
-                    shouldFire = false;
-                    _logger.LogWarning(
-                        "Reminder {ReminderName} for grain {GrainId} missed due window at {Due}. Current time {Now}.",
-                        reminderName,
-                        grainId,
-                        due,
-                        now);
-                    break;
+                _logger.LogWarning(
+                    "Reminder {ReminderName} for grain {GrainId} missed due window at {Due}. Current time {Now}.",
+                    reminderName,
+                    grainId,
+                    due,
+                    now);
             }
         }
 

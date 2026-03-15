@@ -69,6 +69,10 @@ namespace Orleans.AdvancedReminders
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period) { throw null; }
 
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, ReminderSchedule schedule) { throw null; }
+
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this Grain grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period) { throw null; }
@@ -76,6 +80,10 @@ namespace Orleans.AdvancedReminders
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, System.DateTime dueAtUtc, System.TimeSpan period) { throw null; }
+
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, ReminderSchedule schedule, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
+
+        public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, ReminderSchedule schedule) { throw null; }
 
         public static System.Threading.Tasks.Task<IGrainReminder> RegisterOrUpdateReminder(this IGrainBase grain, string reminderName, System.TimeSpan dueTime, System.TimeSpan period, Runtime.ReminderPriority priority, Runtime.MissedReminderAction action) { throw null; }
 
@@ -180,7 +188,23 @@ namespace Orleans.AdvancedReminders
 
         public static ReminderCronBuilder DailyAt(int hour, int minute) { throw null; }
 
+        public static ReminderCronBuilder DailyAt(int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder DailyAt(int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder DailyAt(int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder DailyAt(System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder DailyAt(System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder DailyAt(System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder DailyAt(System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
+
         public static ReminderCronBuilder EveryMinute() { throw null; }
+
+        public static ReminderCronBuilder EveryMinute(System.TimeZoneInfo timeZone) { throw null; }
 
         public static ReminderCronBuilder FromExpression(string expression, System.TimeZoneInfo? timeZone) { throw null; }
 
@@ -192,13 +216,51 @@ namespace Orleans.AdvancedReminders
 
         public static ReminderCronBuilder HourlyAt(int minute) { throw null; }
 
+        public static ReminderCronBuilder HourlyAt(int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder HourlyAt(int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder HourlyAt(int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder HourlyAt(System.TimeSpan offset) { throw null; }
+
+        public static ReminderCronBuilder HourlyAt(System.TimeSpan offset, System.TimeZoneInfo timeZone) { throw null; }
+
         public ReminderCronBuilder InTimeZone(string timeZoneId) { throw null; }
 
         public ReminderCronBuilder InTimeZone(System.TimeZoneInfo timeZone) { throw null; }
 
         public static ReminderCronBuilder MonthlyOn(int dayOfMonth, int hour, int minute) { throw null; }
 
+        public static ReminderCronBuilder MonthlyOn(int dayOfMonth, int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOn(int dayOfMonth, int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOn(int dayOfMonth, int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOn(int dayOfMonth, System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOn(int dayOfMonth, System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOn(int dayOfMonth, System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOn(int dayOfMonth, System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
+
         public static ReminderCronBuilder MonthlyOnLastDay(int hour, int minute) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOnLastDay(int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOnLastDay(int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOnLastDay(int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOnLastDay(System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOnLastDay(System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOnLastDay(System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder MonthlyOnLastDay(System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
 
         public ReminderCronExpression ToCronExpression() { throw null; }
 
@@ -206,7 +268,83 @@ namespace Orleans.AdvancedReminders
 
         public static ReminderCronBuilder WeekdaysAt(int hour, int minute) { throw null; }
 
+        public static ReminderCronBuilder WeekdaysAt(int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeekdaysAt(int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder WeekdaysAt(int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeekdaysAt(System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder WeekdaysAt(System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeekdaysAt(System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder WeekdaysAt(System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(int hour, int minute) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder WeekendsAt(System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
+
         public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, int hour, int minute) { throw null; }
+
+        public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder WeeklyOn(System.DayOfWeek dayOfWeek, System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, int hour, int minute) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(int month, int dayOfMonth, System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, int hour, int minute) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, int hour, int minute, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, int hour, int minute, int second) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, int hour, int minute, int second, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, System.TimeOnly time) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, System.TimeOnly time, System.TimeZoneInfo timeZone) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, System.TimeSpan timeOfDay) { throw null; }
+
+        public static ReminderCronBuilder YearlyOn(System.DateOnly date, System.TimeSpan timeOfDay, System.TimeZoneInfo timeZone) { throw null; }
     }
 
     public sealed partial class ReminderCronExpression : System.IEquatable<ReminderCronExpression>

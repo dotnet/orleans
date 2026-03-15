@@ -261,15 +261,15 @@ namespace Orleans.AdvancedReminders.Cron.Internal
 
         private static unsafe ulong ParseList(CronField field, ref char* pointer, ref CronExpressionFlag flags)
         {
-            var num = ParseValue(field, ref pointer);
-            var bits = ParseRange(field, ref pointer, num, ref flags);
+            var bits = 0UL;
 
             do
             {
-                if (!Accept(ref pointer, ',')) return bits;
+                var num = ParseValue(field, ref pointer);
+                bits |= ParseRange(field, ref pointer, num, ref flags);
+            } while (Accept(ref pointer, ','));
 
-                bits |= ParseList(field, ref pointer, ref flags);
-            } while (true);
+            return bits;
         }
 
         private static unsafe ulong ParseRange(CronField field, ref char* pointer, int low, ref CronExpressionFlag flags)

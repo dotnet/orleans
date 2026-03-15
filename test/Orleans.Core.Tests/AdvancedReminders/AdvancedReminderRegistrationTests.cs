@@ -530,6 +530,60 @@ public class ReminderRegistrationExtensionsTests
     }
 
     [Fact]
+    public async Task GrainExtension_WithSchedule_DelegatesToRegistry()
+    {
+        var grainId = GrainId.Create("test", "grain-schedule");
+        var registry = Substitute.For<IReminderRegistry>();
+        var reminder = Substitute.For<IGrainReminder>();
+        var schedule = ReminderSchedule.Cron("15 10 * * *", "Europe/Paris");
+        registry.RegisterOrUpdateReminder(
+                grainId,
+                "r",
+                Arg.Any<ReminderSchedule>(),
+                ReminderPriority.Normal,
+                MissedReminderAction.Skip)
+            .Returns(Task.FromResult(reminder));
+        var grain = CreateRemindableGrain(grainId, registry);
+
+        var result = await grain.RegisterOrUpdateReminder("r", schedule);
+
+        Assert.Same(reminder, result);
+        _ = registry.Received(1).RegisterOrUpdateReminder(
+            grainId,
+            "r",
+            Arg.Is<ReminderSchedule>(value => ReferenceEquals(value, schedule)),
+            ReminderPriority.Normal,
+            MissedReminderAction.Skip);
+    }
+
+    [Fact]
+    public async Task GrainExtension_WithScheduleAndPriority_DelegatesToRegistry()
+    {
+        var grainId = GrainId.Create("test", "grain-schedule-priority");
+        var registry = Substitute.For<IReminderRegistry>();
+        var reminder = Substitute.For<IGrainReminder>();
+        var schedule = ReminderSchedule.Interval(TimeSpan.FromSeconds(5), TimeSpan.FromMinutes(2));
+        registry.RegisterOrUpdateReminder(
+                grainId,
+                "r",
+                Arg.Any<ReminderSchedule>(),
+                ReminderPriority.High,
+                MissedReminderAction.Notify)
+            .Returns(Task.FromResult(reminder));
+        var grain = CreateRemindableGrain(grainId, registry);
+
+        var result = await grain.RegisterOrUpdateReminder("r", schedule, ReminderPriority.High, MissedReminderAction.Notify);
+
+        Assert.Same(reminder, result);
+        _ = registry.Received(1).RegisterOrUpdateReminder(
+            grainId,
+            "r",
+            Arg.Is<ReminderSchedule>(value => ReferenceEquals(value, schedule)),
+            ReminderPriority.High,
+            MissedReminderAction.Notify);
+    }
+
+    [Fact]
     public async Task GrainExtension_ThrowsWhenGrainIsNotRemindable()
     {
         var grainId = GrainId.Create("test", "non-remindable");
