@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Metadata;
 using Orleans.Runtime;
 using Orleans.Streams;
@@ -73,6 +74,16 @@ namespace Orleans
         /// <inheritdoc />
         public IEnumerable<Dictionary<string, string>> GetBindings(IServiceProvider services, Type grainClass, GrainType grainType)
         {
+            // Register the predicate type so the constructor provider will accept it.
+            foreach (var provider in services.GetServices<IStreamNamespacePredicateProvider>())
+            {
+                if (provider is ConstructorStreamNamespacePredicateProvider ctorProvider)
+                {
+                    ctorProvider.RegisterPredicateType(Predicate.GetType());
+                    break;
+                }
+            }
+
             var binding = new Dictionary<string, string>
             {
                 [WellKnownGrainTypeProperties.BindingTypeKey] = WellKnownGrainTypeProperties.StreamBindingTypeValue,
