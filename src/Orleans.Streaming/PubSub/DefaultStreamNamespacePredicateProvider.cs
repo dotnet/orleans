@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Serialization.TypeSystem;
 
 #nullable disable
@@ -8,7 +12,7 @@ namespace Orleans.Streams
     /// Default implementation of <see cref="IStreamNamespacePredicateProvider"/> for internally supported stream predicates.
     /// </summary>
     public class DefaultStreamNamespacePredicateProvider : IStreamNamespacePredicateProvider
-    {  
+    {
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, out IStreamNamespacePredicate predicate)
         {
@@ -35,10 +39,35 @@ namespace Orleans.Streams
     /// </summary>
     public class ConstructorStreamNamespacePredicateProvider : IStreamNamespacePredicateProvider
     {
+        private readonly FrozenSet<string> _allowedPredicateTypes;
+
         /// <summary>
         /// The prefix used to identify this predicate provider.
         /// </summary>
         public const string Prefix = "ctor";
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConstructorStreamNamespacePredicateProvider"/> class.
+        /// </summary>
+        /// <param name="grainTypeOptions">The grain type options containing known grain classes.</param>
+        public ConstructorStreamNamespacePredicateProvider(IOptions<GrainTypeOptions> grainTypeOptions)
+        {
+            HashSet<string> predicateTypes = new(StringComparer.Ordinal);
+            foreach (var grainClass in grainTypeOptions.Value.Classes)
+            {
+                foreach (var attr in grainClass.GetCustomAttributes(inherit: true))
+                {
+                    if (attr is ImplicitStreamSubscriptionAttribute streamSub)
+                    {
+                        var predicateType = streamSub.Predicate.GetType();
+                        var typeName = RuntimeTypeNameFormatter.Format(predicateType);
+                        predicateTypes.Add(typeName);
+                    }
+                }
+            }
+
+            _allowedPredicateTypes = predicateTypes.ToFrozenSet();
+        }
 
         /// <summary>
         /// Formats a stream namespace predicate which indicates a concrete <see cref="IStreamNamespacePredicate"/> type to be constructed, along with an optional argument.
@@ -77,7 +106,18 @@ namespace Orleans.Streams
                 arg = predicatePattern[(index + 1)..];
             }
 
+            if (!_allowedPredicateTypes.Contains(typeName))
+            {
+                throw new InvalidOperationException($"Type \"{typeName}\" is not a registered stream namespace predicate. Ensure the grain assembly is loaded and the predicate type is used in an [{nameof(ImplicitStreamSubscriptionAttribute)}].");
+            }
+
             var type = Type.GetType(typeName, throwOnError: true);
+
+            if (!typeof(IStreamNamespacePredicate).IsAssignableFrom(type))
+            {
+                throw new InvalidOperationException($"Type \"{type}\" is not a valid stream namespace predicate because it does not implement {nameof(IStreamNamespacePredicate)}.");
+            }
+
             if (string.IsNullOrEmpty(arg))
             {
                 predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type);

@@ -1,4 +1,8 @@
 using System;
+using System.Collections.Frozen;
+using System.Collections.Generic;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Serialization.TypeSystem;
 
 #nullable disable
@@ -8,7 +12,7 @@ namespace Orleans.BroadcastChannel
     /// Default implementation of <see cref="IChannelNamespacePredicateProvider"/> for internally supported stream predicates.
     /// </summary>
     public class DefaultChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
-    {  
+    {
         /// <inheritdoc/>
         public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate)
         {
@@ -31,17 +35,42 @@ namespace Orleans.BroadcastChannel
     }
 
     /// <summary>
-    /// Stream namespace predicate provider which supports objects which can be constructed and optionally accept a string as a constructor argument.
+    /// Channel namespace predicate provider which supports objects which can be constructed and optionally accept a string as a constructor argument.
     /// </summary>
     public class ConstructorChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
     {
+        private readonly FrozenSet<string> _allowedPredicateTypes;
+
         /// <summary>
         /// The prefix used to identify this predicate provider.
         /// </summary>
         public const string Prefix = "ctor";
 
         /// <summary>
-        /// Formats a stream namespace predicate which indicates a concrete <see cref="IChannelNamespacePredicate"/> type to be constructed, along with an optional argument.
+        /// Initializes a new instance of the <see cref="ConstructorChannelNamespacePredicateProvider"/> class.
+        /// </summary>
+        /// <param name="grainTypeOptions">The grain type options containing known grain classes.</param>
+        public ConstructorChannelNamespacePredicateProvider(IOptions<GrainTypeOptions> grainTypeOptions)
+        {
+            HashSet<string> predicateTypes = new(StringComparer.Ordinal);
+            foreach (var grainClass in grainTypeOptions.Value.Classes)
+            {
+                foreach (var attr in grainClass.GetCustomAttributes(inherit: true))
+                {
+                    if (attr is ImplicitChannelSubscriptionAttribute channelSub)
+                    {
+                        var predicateType = channelSub.Predicate.GetType();
+                        var typeName = RuntimeTypeNameFormatter.Format(predicateType);
+                        predicateTypes.Add(typeName);
+                    }
+                }
+            }
+
+            _allowedPredicateTypes = predicateTypes.ToFrozenSet();
+        }
+
+        /// <summary>
+        /// Formats a channel namespace predicate which indicates a concrete <see cref="IChannelNamespacePredicate"/> type to be constructed, along with an optional argument.
         /// </summary>
         public static string FormatPattern(Type predicateType, string constructorArgument)
         {
@@ -77,7 +106,18 @@ namespace Orleans.BroadcastChannel
                 arg = predicatePattern[(index + 1)..];
             }
 
+            if (!_allowedPredicateTypes.Contains(typeName))
+            {
+                throw new InvalidOperationException($"Type \"{typeName}\" is not a registered channel namespace predicate. Ensure the grain assembly is loaded and the predicate type is used in an [{nameof(ImplicitChannelSubscriptionAttribute)}].");
+            }
+
             var type = Type.GetType(typeName, throwOnError: true);
+
+            if (!typeof(IChannelNamespacePredicate).IsAssignableFrom(type))
+            {
+                throw new InvalidOperationException($"Type \"{type}\" is not a valid channel namespace predicate because it does not implement {nameof(IChannelNamespacePredicate)}.");
+            }
+
             if (string.IsNullOrEmpty(arg))
             {
                 predicate = (IChannelNamespacePredicate)Activator.CreateInstance(type);
