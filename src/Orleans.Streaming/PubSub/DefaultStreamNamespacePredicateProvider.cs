@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Serialization.TypeSystem;
 
 namespace Orleans.Streams
@@ -46,6 +48,24 @@ namespace Orleans.Streams
         /// The prefix used to identify this predicate provider.
         /// </summary>
         public const string Prefix = "ctor";
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="ConstructorStreamNamespacePredicateProvider"/> class.
+        /// </summary>
+        /// <param name="grainTypeOptions">The grain type options containing known grain classes.</param>
+        public ConstructorStreamNamespacePredicateProvider(IOptions<GrainTypeOptions> grainTypeOptions)
+        {
+            foreach (var grainClass in grainTypeOptions.Value.Classes)
+            {
+                foreach (var attr in grainClass.GetCustomAttributes(inherit: true))
+                {
+                    if (attr is ImplicitStreamSubscriptionAttribute streamSub)
+                    {
+                        RegisterPredicateType(streamSub.Predicate.GetType());
+                    }
+                }
+            }
+        }
 
         /// <summary>
         /// Registers a predicate type as allowed for construction.

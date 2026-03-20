@@ -1,4 +1,6 @@
 using System;
+using Microsoft.Extensions.Options;
+using Orleans.Configuration;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Streams;
 using Xunit;
@@ -11,11 +13,21 @@ namespace UnitTests;
 [TestCategory("BVT"), TestCategory("Predicates")]
 public class ConstructorStreamNamespacePredicateProviderTests
 {
+    private static ConstructorStreamNamespacePredicateProvider CreateProvider(params Type[] grainClasses)
+    {
+        var options = new GrainTypeOptions();
+        foreach (var grainClass in grainClasses)
+        {
+            options.Classes.Add(grainClass);
+        }
+
+        return new ConstructorStreamNamespacePredicateProvider(Options.Create(options));
+    }
+
     [Fact]
     public void RegisteredPredicateType_Succeeds()
     {
-        var provider = new ConstructorStreamNamespacePredicateProvider();
-        provider.RegisterPredicateType(typeof(TestStreamPredicate));
+        var provider = CreateProvider(typeof(TestGrainWithStreamPredicate));
         var pattern = ConstructorStreamNamespacePredicateProvider.FormatPattern(typeof(TestStreamPredicate), constructorArgument: null);
 
         var result = provider.TryGetPredicate(pattern, out var predicate);
@@ -28,7 +40,7 @@ public class ConstructorStreamNamespacePredicateProviderTests
     [Fact]
     public void RegisteredPredicateTypeWithArg_Succeeds()
     {
-        var provider = new ConstructorStreamNamespacePredicateProvider();
+        var provider = CreateProvider();
         provider.RegisterPredicateType(typeof(TestStreamPredicateWithArg));
         var pattern = ConstructorStreamNamespacePredicateProvider.FormatPattern(typeof(TestStreamPredicateWithArg), constructorArgument: "test-ns");
 
@@ -43,7 +55,7 @@ public class ConstructorStreamNamespacePredicateProviderTests
     [Fact]
     public void UnregisteredType_Throws()
     {
-        var provider = new ConstructorStreamNamespacePredicateProvider();
+        var provider = CreateProvider();
         var pattern = $"ctor:{RuntimeTypeNameFormatter.Format(typeof(System.IO.FileInfo))}:C:\\temp\\evil.txt";
 
         Assert.Throws<InvalidOperationException>(() => provider.TryGetPredicate(pattern, out _));
@@ -52,7 +64,7 @@ public class ConstructorStreamNamespacePredicateProviderTests
     [Fact]
     public void UnregisteredArbitraryType_Throws()
     {
-        var provider = new ConstructorStreamNamespacePredicateProvider();
+        var provider = CreateProvider();
         var pattern = $"ctor:{RuntimeTypeNameFormatter.Format(typeof(System.Collections.ArrayList))}";
 
         Assert.Throws<InvalidOperationException>(() => provider.TryGetPredicate(pattern, out _));
@@ -61,13 +73,18 @@ public class ConstructorStreamNamespacePredicateProviderTests
     [Fact]
     public void NonMatchingPrefix_ReturnsFalse()
     {
-        var provider = new ConstructorStreamNamespacePredicateProvider();
+        var provider = CreateProvider();
 
         var result = provider.TryGetPredicate("namespace:test", out var predicate);
 
         Assert.False(result);
         Assert.Null(predicate);
     }
+
+    [ImplicitStreamSubscription(typeof(TestStreamPredicate))]
+    private class TestGrainWithStreamPredicate { }
+
+    
 
     public class TestStreamPredicate : IStreamNamespacePredicate
     {
