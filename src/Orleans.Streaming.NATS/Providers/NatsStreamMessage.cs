@@ -25,6 +25,10 @@ internal class NatsStreamMessage
     [Id(3)]
     [JsonPropertyName("rpt")]
     public string? ReplyTo { get; set; }
+
+    [Id(4)]
+    [JsonPropertyName("seq")]
+    public ulong Sequence { get; set; }
 }
 
 [JsonSerializable(typeof(NatsStreamMessage))]
