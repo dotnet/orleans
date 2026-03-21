@@ -64,6 +64,11 @@ internal sealed class NatsStreamConsumer(
 
             messages[i] = streamMessage;
             messages[i].ReplyTo = msg.ReplyTo;
+            if (msg.Metadata.HasValue)
+            {
+                messages[i].Sequence = msg.Metadata.Value.Sequence.Stream;
+            }
+
             i++;
         }
 
