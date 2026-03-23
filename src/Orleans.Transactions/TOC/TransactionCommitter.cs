@@ -61,7 +61,7 @@ namespace Orleans.Transactions
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
-            return this.queue.RWLock.EnterLock<bool>(info.TransactionId, info.Priority, recordedaccesses, false,
+            return this.queue.RWLock.EnterLock<bool>(info.TransactionId, info.Priority, recordedaccesses, false, info.UseExclusiveLock,
                 () =>
                 {
                     // check if we expired while waiting

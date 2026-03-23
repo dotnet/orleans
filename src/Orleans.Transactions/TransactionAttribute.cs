@@ -38,6 +38,23 @@ namespace Orleans
         public bool ReadOnly { get; set; }
     }
 
+    /// <summary>
+    /// The UseExclusiveLock attribute is used to mark transactional methods that should acquire
+    /// exclusive locks even for read operations. This prevents frequent lock upgrade conflicts under high contention.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// [UseExclusiveLock]
+    /// [Transaction(TransactionOption.CreateOrJoin)]
+    /// Task&lt;uint&gt; GetBalance();
+    /// </code>
+    /// </example>
+    [InvokableCustomInitializer("SetExclusiveLock", true)]
+    [AttributeUsage(AttributeTargets.Method)]
+    public sealed class UseExclusiveLockAttribute : Attribute
+    {
+    }
+
     public enum TransactionOption
     {
         Suppress,     // Logic is not transactional but can be called from within a transaction.  If called within the context of a transaction, the context will not be passed to the call.
@@ -74,6 +91,9 @@ namespace Orleans
         [Id(1)]
         public TransactionInfo TransactionInfo { get; set; }
 
+        [Id(2)]
+        public bool UseExclusiveLock { get; set; }
+
         [GeneratedActivatorConstructor]
         protected TransactionRequestBase(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider)
         {
@@ -103,6 +123,11 @@ namespace Orleans
         protected void SetTransactionOptions(TransactionOption txOption)
         {
             this.TransactionOption = txOption;
+        }
+
+        protected void SetExclusiveLock(bool value)
+        {
+            this.UseExclusiveLock = value;
         }
 
         async Task IOutgoingGrainCallFilter.Invoke(IOutgoingGrainCallContext context)
@@ -183,6 +208,12 @@ namespace Orleans
                     var isReadOnly = this.Options.HasFlag(InvokeMethodOptions.ReadOnly);
                     transactionInfo = await TransactionAgent.StartTransaction(isReadOnly, transactionTimeout);
                     startedNewTransaction = true;
+                }
+
+                // Apply this flag if requested by Attribute
+                if (this.UseExclusiveLock && transactionInfo != null)
+                {
+                    transactionInfo.UseExclusiveLock = true;
                 }
 
                 TransactionContext.SetTransactionInfo(transactionInfo);

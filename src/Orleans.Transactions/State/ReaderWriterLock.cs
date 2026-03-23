@@ -59,7 +59,7 @@ namespace Orleans.Transactions.State
         }
 
         public async Task<TResult> EnterLock<TResult>(Guid transactionId, DateTime priority,
-                                   AccessCounter counter, bool isRead, Func<TResult> task)
+                                   AccessCounter counter, bool isRead, bool exclusiveLock, Func<TResult> task)
         {
             bool rollbacksOccurred = false;
             List<Task> cleanup = new List<Task>();
@@ -67,7 +67,7 @@ namespace Orleans.Transactions.State
             await this.queue.Ready();
 
             // search active transactions
-            if (Find(transactionId, isRead, out var group, out var record))
+            if (Find(transactionId, isRead && !exclusiveLock, out var group, out var record))
             {
                 // check if we lost some reads or writes already
                 if (counter.Reads > record.NumberReads || counter.Writes > record.NumberWrites)
@@ -76,7 +76,7 @@ namespace Orleans.Transactions.State
                 }
 
                 // check if the operation conflicts with other transactions in the group
-                if (HasConflict(isRead, priority, transactionId, group, out var resolvable))
+                if (HasConflict(isRead && !exclusiveLock, priority, transactionId, group, out var resolvable))
                 {
                     if (!resolvable)
                     {

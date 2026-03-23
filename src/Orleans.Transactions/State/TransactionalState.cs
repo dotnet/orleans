@@ -66,7 +66,7 @@ namespace Orleans.Transactions
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
             // schedule read access to happen under the lock
-            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true,
+            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, true, info.UseExclusiveLock,
                 () =>
                 {
                     // check if our record is gone because we expired while waiting
@@ -126,7 +126,7 @@ namespace Orleans.Transactions
 
             info.Participants.TryGetValue(this.participantId, out var recordedaccesses);
 
-            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false,
+            return this.queue.RWLock.EnterLock<TResult>(info.TransactionId, info.Priority, recordedaccesses, false, info.UseExclusiveLock,
                 () =>
                 {
                     // check if we expired while waiting
