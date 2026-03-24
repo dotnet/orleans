@@ -139,14 +139,14 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         {
             try
             {
-                await _workSignal.WaitAsync().ConfigureAwait(false);
+                await _workSignal.WaitAsync().ConfigureAwait(true);
                 cancellationToken.ThrowIfCancellationRequested();
 
                 while (true)
                 {
                     if (needsRecovery)
                     {
-                        await RecoverAsync(cancellationToken).ConfigureAwait(false);
+                        await RecoverAsync(cancellationToken).ConfigureAwait(true);
                         needsRecovery = false;
                     }
 
@@ -217,11 +217,11 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                             {
                                 if (isSnapshot)
                                 {
-                                    await _storage.ReplaceAsync(logSegment, cancellationToken).ConfigureAwait(false);
+                                    await _storage.ReplaceAsync(logSegment, cancellationToken).ConfigureAwait(true);
                                 }
                                 else
                                 {
-                                    await _storage.AppendAsync(logSegment, cancellationToken).ConfigureAwait(false);
+                                    await _storage.AppendAsync(logSegment, cancellationToken).ConfigureAwait(true);
                                 }
 
                                 // Notify all state machines that the operation completed.
@@ -237,7 +237,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                         else if (workItem.Type is WorkItemType.DeleteState)
                         {
                             // Clear storage.
-                            await _storage.DeleteAsync(cancellationToken).ConfigureAwait(false);
+                            await _storage.DeleteAsync(cancellationToken).ConfigureAwait(true);
 
                             lock (_lock)
                             {
@@ -372,7 +372,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             _stateMachineIds.ResetVolatileState();
         }
 
-        await foreach (var segment in _storage.ReadAsync(cancellationToken).ConfigureAwait(false))
+        await foreach (var segment in _storage.ReadAsync(cancellationToken).ConfigureAwait(true))
         {
             cancellationToken.ThrowIfCancellationRequested();
             try

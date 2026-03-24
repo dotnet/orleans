@@ -17,4 +17,17 @@
     <PackageReference Include="Azure.Identity" />
   </ItemGroup>
   
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="GoogleUtils.Tests" />
+    <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
+    <InternalsVisibleTo Include="Orleans.AWS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.Cosmos.Tests" />
+    <InternalsVisibleTo Include="Orleans.Redis.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
+  </ItemGroup>
 </Project>
+

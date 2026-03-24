@@ -22,4 +22,12 @@
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
+  </ItemGroup>
 </Project>
+

@@ -52,4 +52,38 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Benchmarks" />
+    <InternalsVisibleTo Include="CodeGenerator.Tests" />
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    <InternalsVisibleTo Include="GoogleUtils.Tests" />
+    <InternalsVisibleTo Include="LoadTestGrains" />
+    <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
+    <InternalsVisibleTo Include="Orleans.AWS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.BroadcastChannel" />
+    <InternalsVisibleTo Include="Orleans.Clustering.ZooKeeper.Tests" />
+    <InternalsVisibleTo Include="Orleans.CodeGeneration" />
+    <InternalsVisibleTo Include="Orleans.CodeGeneration.Build" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.Cosmos.Tests" />
+    <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs" />
+    <InternalsVisibleTo Include="Orleans.DurableJobs.Tests" />
+    <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
+    <InternalsVisibleTo Include="Orleans.Placement.Tests" />
+    <InternalsVisibleTo Include="Orleans.Redis.Tests" />
+    <InternalsVisibleTo Include="Orleans.Reminders" />
+    <InternalsVisibleTo Include="Orleans.Runtime" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming" />
+    <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming.Tests" />
+    <InternalsVisibleTo Include="Orleans.TestingHost" />
+    <InternalsVisibleTo Include="TestExtensions" />
+    <InternalsVisibleTo Include="TestInternalGrains" />
+  </ItemGroup>
 </Project>
+

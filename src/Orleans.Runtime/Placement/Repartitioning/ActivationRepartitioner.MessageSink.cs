@@ -1,7 +1,5 @@
 using System;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.Internal;
@@ -14,7 +12,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
 
     // This filter contains grain ids which will are anchored to the current silo.
     // Ids are inserted when a grain is found to have a negative transfer score.
-    private readonly BlockedBloomFilter? _anchoredFilter;
+    private readonly AnchoredGrainsFilter? _anchoredFilter;
     private Task? _processPendingEdgesTask;
 
     public void StartProcessingEdges()

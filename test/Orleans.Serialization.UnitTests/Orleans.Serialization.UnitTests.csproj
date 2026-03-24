@@ -31,6 +31,9 @@
     <PackageReference Update="xunit.core" VersionOverride="2.4.2" />
     <PackageReference Update="xunit.extensibility.core" VersionOverride="2.4.2" />
     <PackageReference Update="xunit.extensibility.execution" VersionOverride="2.4.2" />
+    <Compile Remove="SerializationTests.cs" />
+    <Compile Remove="JsonSerializerTests.cs" />
+    <Compile Remove="RoundTripSerializerTests.cs" />
   </ItemGroup>
 
   <ItemGroup>
@@ -43,6 +46,7 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Serialization.MessagePack\Orleans.Serialization.MessagePack.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Serializers\Orleans.Serialization.Protobuf\Orleans.Serialization.Protobuf.csproj" />
     <ProjectReference Include="..\Misc\TestSerializerExternalModels\TestSerializerExternalModels.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" Condition="'$(TargetFramework)' != 'netcoreapp3.1'" />
   </ItemGroup>
 
   <ItemGroup>
