@@ -109,20 +109,22 @@ namespace Orleans.CodeGenerator
                     ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type)) })))));
             }
 
-            var addRegisteredProviderMethod = configParam.Member("RegisteredProviders").Member("Add");
+            var registeredProvidersAccess = configParam.Member("RegisteredProviders");
             foreach (var provider in MetadataModel.RegisteredProviders)
             {
-                body.Add(ExpressionStatement(InvocationExpression(addRegisteredProviderMethod,
-                    ArgumentList(SeparatedList(new[]
-                    {
-                        Argument(TupleExpression(SeparatedList(new ArgumentSyntax[]
-                        {
-                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target))),
-                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
-                            Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name)))
-                        }))),
-                        Argument(TypeOfExpression(provider.Type))
-                    })))));
+                // Use indexer assignment to avoid duplicate key exceptions when multiple assemblies register the same provider.
+                var key = TupleExpression(SeparatedList(new ArgumentSyntax[]
+                {
+                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target))),
+                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
+                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name)))
+                }));
+                body.Add(ExpressionStatement(
+                    AssignmentExpression(
+                        SyntaxKind.SimpleAssignmentExpression,
+                        ElementAccessExpression(registeredProvidersAccess)
+                            .AddArgumentListArguments(Argument(key)),
+                        TypeOfExpression(provider.Type))));
             }
 
             AddCompoundTypeAliases(configParam, body);
