@@ -5,6 +5,12 @@ using Orleans.Serialization;
 
 namespace Orleans.Streaming.JsonConverters
 {
+    /// <summary>
+    /// Configures Newtonsoft.Json serializer options with streaming converters.
+    /// </summary>
+    /// <remarks>
+    /// This class is internal because it depends on <see cref="IRuntimeClient"/> which is an internal type.
+    /// </remarks>
     internal class StreamingConverterConfigurator : IPostConfigureOptions<OrleansJsonSerializerOptions>
     {
         private readonly IRuntimeClient _runtimeClient;
@@ -20,6 +26,12 @@ namespace Orleans.Streaming.JsonConverters
         }
     }
 
+    /// <summary>
+    /// Configures System.Text.Json serializer options with streaming converters.
+    /// </summary>
+    /// <remarks>
+    /// This class is internal because it depends on <see cref="IRuntimeClient"/> which is an internal type.
+    /// </remarks>
     internal sealed class SystemTextJsonStreamConverterConfigurator(IRuntimeClient runtimeClient) : IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>
     {
         public void PostConfigure(string? name, SystemTextJsonGrainStorageSerializerOptions options)

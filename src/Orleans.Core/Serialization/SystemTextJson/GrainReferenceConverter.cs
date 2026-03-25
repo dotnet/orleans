@@ -8,7 +8,10 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal sealed class GrainReferenceConverter(GrainReferenceActivator referenceActivator) : JsonConverter<IAddressable>
+    /// <summary>
+    /// A <see cref="JsonConverter{T}"/> for <see cref="IAddressable"/> types (grain references).
+    /// </summary>
+    public sealed class GrainReferenceConverter(GrainReferenceActivator referenceActivator) : JsonConverter<IAddressable>
     {
         private readonly Type _addressableType = typeof(IAddressable);
 

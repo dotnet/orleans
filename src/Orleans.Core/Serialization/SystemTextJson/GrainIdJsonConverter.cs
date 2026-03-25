@@ -8,7 +8,10 @@ using Orleans.Runtime;
 
 namespace Orleans.Serialization
 {
-    internal sealed class GrainIdJsonConverter : JsonConverter<GrainId>
+    /// <summary>
+    /// A <see cref="JsonConverter{T}"/> for <see cref="GrainId"/>.
+    /// </summary>
+    public sealed class GrainIdJsonConverter : JsonConverter<GrainId>
     {
         /// <inheritdoc />
         public override GrainId Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)

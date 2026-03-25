@@ -8,7 +8,10 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.JsonConverters
 {
-    internal sealed class EventSequenceTokenJsonConverter : JsonConverter<StreamSequenceToken>
+    /// <summary>
+    /// A <see cref="JsonConverter{T}"/> for <see cref="EventSequenceToken"/> and <see cref="EventSequenceTokenV2"/> types.
+    /// </summary>
+    public sealed class EventSequenceTokenJsonConverter : JsonConverter<StreamSequenceToken>
     {
         private readonly Type _eventSequenceTokenType = typeof(EventSequenceToken);
         private readonly Type _eventSequenceTokenTypeV2 = typeof(EventSequenceTokenV2);
