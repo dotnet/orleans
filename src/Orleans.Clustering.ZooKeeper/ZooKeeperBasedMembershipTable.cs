@@ -345,7 +345,7 @@ namespace Orleans.Runtime.Membership
                 foreach (var (entry, _) in rows)
                 {
                     if (entry.Status != SiloStatus.Active
-                        && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                        && Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks) < beforeDate.Ticks)
                     {
                         await ZKUtil.deleteRecursiveAsync(zk, ConvertToRowPath(entry.SiloAddress));
                     }

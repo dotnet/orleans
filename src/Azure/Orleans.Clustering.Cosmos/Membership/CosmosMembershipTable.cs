@@ -119,7 +119,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
             } while (iterator.HasMoreResults);
 
             var silos = nonActiveSilos
-                .Where(s => new DateTime(Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                .Where(s => Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks) < beforeDate.Ticks)
                 .ToList();
 
             if (silos.Count == 0)
