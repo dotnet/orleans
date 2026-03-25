@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Configuration
             {
                 // No IMembershipTable configured. A custom IMembershipManager must be present
                 // (MembershipTableManager requires IMembershipTable, so it cannot be used).
-                IMembershipManager membershipManager = null;
+                IMembershipManager? membershipManager = null;
                 try
                 {
                     membershipManager = this.serviceProvider.GetService<IMembershipManager>();
