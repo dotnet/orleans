@@ -3,8 +3,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans;
 
-#nullable enable
-
 /// <summary>
 /// Allows consumers to observe and participate in the client/silo's lifecycle.
 /// </summary>
