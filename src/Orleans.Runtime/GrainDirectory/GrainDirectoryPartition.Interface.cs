@@ -50,10 +50,9 @@ internal sealed partial class GrainDirectoryPartition
             {
                 if (_siloLeaseHolds.TryGetValue(existingActivation.SiloAddress!, out var expiration) && utcNow < expiration)
                 {
-                    // This grain belongs to this parition, and the activation is sitting on a silo that has an active lease hold.
-                    // We need to check if the request include sthe previous activation id, and if it does its a valid update/override,
+                    // This grain belongs to this partition, and the activation is sitting on a silo that has an active lease hold.
+                    // We need to check if the request includes the previous activation id, and if it does it's a valid update/override,
                     // otherwise it's a new activation trying to "steal" the id while the lease is active, so we reject it!
-
                     if (currentRegistration is null || !existingActivation.Matches(currentRegistration))
                     {
                         throw new DirectoryLeaseHoldException($"Silo {existingActivation.SiloAddress} is under a lease hold until {expiration - utcNow}.");

@@ -428,12 +428,11 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         // We request cleanups periodically to not let expired leases linger in the directory for too long.
         // We do it here as opposed to in the partitions to avoid having 30 (by default, maybe more) timers.
-
         var period = 1.1 * _leaseHoldDuration;
 
         if (period < TimeSpan.FromMinutes(1))
         {
-            // We create a lower-bound to avoid creting too much overhead in the partitions.
+            // We create a lower-bound to avoid creating too much overhead in the partitions.
             period = TimeSpan.FromMinutes(1);
         }
 
