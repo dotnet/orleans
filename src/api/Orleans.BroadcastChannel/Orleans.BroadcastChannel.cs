@@ -86,11 +86,7 @@ namespace Orleans.BroadcastChannel
     public partial class ConstructorChannelNamespacePredicateProvider : IChannelNamespacePredicateProvider
     {
         public const string Prefix = "ctor";
-        public ConstructorChannelNamespacePredicateProvider(Microsoft.Extensions.Options.IOptions<Configuration.GrainTypeOptions> grainTypeOptions) { }
-
         public static string FormatPattern(System.Type predicateType, string constructorArgument) { throw null; }
-
-        public void RegisterPredicateType(System.Type predicateType) { }
 
         public bool TryGetPredicate(string predicatePattern, out IChannelNamespacePredicate predicate) { throw null; }
     }

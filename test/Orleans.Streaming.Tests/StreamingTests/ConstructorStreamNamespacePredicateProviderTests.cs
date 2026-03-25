@@ -13,21 +13,12 @@ namespace UnitTests;
 [TestCategory("BVT"), TestCategory("Predicates")]
 public class ConstructorStreamNamespacePredicateProviderTests
 {
-    private static ConstructorStreamNamespacePredicateProvider CreateProvider(params Type[] grainClasses)
-    {
-        var options = new GrainTypeOptions();
-        foreach (var grainClass in grainClasses)
-        {
-            options.Classes.Add(grainClass);
-        }
-
-        return new ConstructorStreamNamespacePredicateProvider(Options.Create(options));
-    }
+    private static ConstructorStreamNamespacePredicateProvider CreateProvider() => new();
 
     [Fact]
     public void RegisteredPredicateType_Succeeds()
     {
-        var provider = CreateProvider(typeof(TestGrainWithStreamPredicate));
+        var provider = CreateProvider();
         var pattern = ConstructorStreamNamespacePredicateProvider.FormatPattern(typeof(TestStreamPredicate), constructorArgument: null);
 
         var result = provider.TryGetPredicate(pattern, out var predicate);
@@ -40,7 +31,7 @@ public class ConstructorStreamNamespacePredicateProviderTests
     [Fact]
     public void RegisteredPredicateTypeWithArg_Succeeds()
     {
-        var provider = CreateProvider(typeof(TestGrainWithRegexStreamPredicate));
+        var provider = CreateProvider();
         var pattern = ConstructorStreamNamespacePredicateProvider.FormatPattern(typeof(RegexStreamNamespacePredicate), constructorArgument: "str-[a-zA-Z]+");
 
         var result = provider.TryGetPredicate(pattern, out var predicate);

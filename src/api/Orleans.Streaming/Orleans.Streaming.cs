@@ -1180,11 +1180,7 @@ namespace Orleans.Streams
     public partial class ConstructorStreamNamespacePredicateProvider : IStreamNamespacePredicateProvider
     {
         public const string Prefix = "ctor";
-        public ConstructorStreamNamespacePredicateProvider(Microsoft.Extensions.Options.IOptions<Configuration.GrainTypeOptions> grainTypeOptions) { }
-
         public static string FormatPattern(System.Type predicateType, string constructorArgument) { throw null; }
-
-        public void RegisterPredicateType(System.Type predicateType) { }
 
         public bool TryGetPredicate(string predicatePattern, out IStreamNamespacePredicate predicate) { throw null; }
     }
