@@ -60,12 +60,15 @@ internal static class VarIntHelper
     /// <summary>
     /// Reads a LEB128-encoded <see cref="uint"/> from the provided sequence reader.
     /// </summary>
+    /// <remarks>A LEB128-encoded <see cref="uint"/> occupies at most 5 bytes.</remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static uint ReadVarUInt32(ref SequenceReader<byte> reader)
     {
+        const int maxBytes = 5; // ceil(32 / 7)
         uint result = 0;
         var shift = 0;
         byte b;
+        var count = 0;
         do
         {
             if (!reader.TryRead(out b))
@@ -75,6 +78,11 @@ internal static class VarIntHelper
 
             result |= (uint)(b & 0x7F) << shift;
             shift += 7;
+
+            if (++count > maxBytes)
+            {
+                ThrowOverflow();
+            }
         }
         while ((b & 0x80) != 0);
 
@@ -84,12 +92,15 @@ internal static class VarIntHelper
     /// <summary>
     /// Reads a LEB128-encoded <see cref="ulong"/> from the provided sequence reader.
     /// </summary>
+    /// <remarks>A LEB128-encoded <see cref="ulong"/> occupies at most 10 bytes.</remarks>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static ulong ReadVarUInt64(ref SequenceReader<byte> reader)
     {
+        const int maxBytes = 10; // ceil(64 / 7)
         ulong result = 0;
         var shift = 0;
         byte b;
+        var count = 0;
         do
         {
             if (!reader.TryRead(out b))
@@ -99,6 +110,11 @@ internal static class VarIntHelper
 
             result |= (ulong)(b & 0x7F) << shift;
             shift += 7;
+
+            if (++count > maxBytes)
+            {
+                ThrowOverflow();
+            }
         }
         while ((b & 0x80) != 0);
 
@@ -107,4 +123,7 @@ internal static class VarIntHelper
 
     private static void ThrowInsufficientData() =>
         throw new InvalidOperationException("Insufficient data while reading a variable-length integer.");
+
+    private static void ThrowOverflow() =>
+        throw new InvalidOperationException("Malformed variable-length integer: too many bytes.");
 }
