@@ -97,7 +97,9 @@ namespace Orleans.Runtime.MembershipService
         SiloStatus IMembershipManager.LocalSiloStatus => this.CurrentStatus;
         Task IMembershipManager.UpdateLocalStatus(SiloStatus status) => this.UpdateStatus(status);
         Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo) => this.TryKill(silo);
-        Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress indirectProbingSilo) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
+#nullable enable
+        Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
+#nullable disable
         Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot) => this.RefreshFromSnapshot(snapshot);
         Task IMembershipManager.UpdateIAmAlive() => this.UpdateIAmAlive();
 
