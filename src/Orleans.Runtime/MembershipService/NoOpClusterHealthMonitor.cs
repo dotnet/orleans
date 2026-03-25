@@ -8,12 +8,12 @@ namespace Orleans.Runtime.MembershipService;
 
 /// <summary>
 /// A no-op implementation of <see cref="IClusterHealthMonitor"/> for use with external
-/// failure detection systems like RapidCluster.
+/// failure detection systems.
 /// </summary>
 /// <remarks>
 /// <para>
 /// When using an external membership system that provides its own failure detection
-/// (such as RapidCluster's consensus-based detection), register this implementation
+/// (such as an external consensus-based detection system), register this implementation
 /// to disable Orleans' built-in probe-based monitoring.
 /// </para>
 /// <para>
@@ -53,7 +53,7 @@ internal sealed partial class NoOpClusterHealthMonitor : IClusterHealthMonitor
     bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string? reason)
     {
         // External failure detection is always considered healthy from Orleans' perspective.
-        // The external system (e.g., RapidCluster) is responsible for health monitoring.
+        // The external system is responsible for health monitoring.
         reason = null;
         return true;
     }

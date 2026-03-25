@@ -11,7 +11,7 @@ namespace Orleans.Runtime.MembershipService;
 /// <remarks>
 /// <para>
 /// When using an external membership system that provides its own failure detection
-/// (such as RapidCluster's consensus-based detection), register this implementation
+/// (such as an external consensus-based detection system), register this implementation
 /// to disable Orleans' probe-based health checks in <see cref="LocalSiloHealthMonitor"/>.
 /// </para>
 /// <para>

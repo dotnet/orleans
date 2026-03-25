@@ -26,7 +26,7 @@ namespace Orleans.Runtime.MembershipService;
 ///   <item>
 ///     <description>
 ///       <b>External failure detection</b>: When using an external membership system
-///       (such as RapidCluster) that provides its own failure detection protocol,
+///       that provides its own failure detection protocol,
 ///       a no-op or custom implementation should be registered. The external system's
 ///       probe/heartbeat activity can be surfaced through this interface.
 ///     </description>
