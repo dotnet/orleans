@@ -103,26 +103,24 @@ internal partial class CosmosMembershipTable : IMembershipTable
     {
         try
         {
+            // Filter by status server-side (Status is indexed); apply the date check in C#
+            // so that the Math.Max(IAmAliveTime, StartTime) semantics are preserved correctly.
             var activeStatus = (int)SiloStatus.Active;
-
-            // Push status and date filters to the server. Status is indexed; IAmAliveTime/StartTime
-            // are not, but the status filter already reduces the result set.
-            // Math.Max(IAmAliveTime, StartTime) < beforeDate ≡ IAmAliveTime < beforeDate && StartTime < beforeDate.
             var query = _container
                 .GetItemLinqQueryable<SiloEntity>(requestOptions: _queryRequestOptions)
-                .Where(g => g.EntityType == nameof(SiloEntity)
-                    && g.Status != activeStatus
-                    && g.IAmAliveTime < beforeDate
-                    && g.StartTime < beforeDate);
+                .Where(g => g.EntityType == nameof(SiloEntity) && g.Status != activeStatus);
 
             var iterator = query.ToFeedIterator();
-
-            var silos = new List<SiloEntity>();
+            var nonActiveSilos = new List<SiloEntity>();
             do
             {
                 var items = await iterator.ReadNextAsync().ConfigureAwait(false);
-                silos.AddRange(items);
+                nonActiveSilos.AddRange(items);
             } while (iterator.HasMoreResults);
+
+            var silos = nonActiveSilos
+                .Where(s => new DateTime(Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                .ToList();
 
             if (silos.Count == 0)
             {
