@@ -163,17 +163,9 @@ namespace Orleans.Hosting
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
 
-            // Register a no-op membership table as a fallback. This allows custom IMembershipManager
-            // implementations (like RapidCluster) to satisfy MembershipTableManager's dependency
-            // without providing a real IMembershipTable. The NoOpMembershipTable returns empty/minimal
-            // data and no-ops all writes, allowing MembershipTableManager to run without errors
-            // (though it won't provide meaningful membership data in this case).
-            services.TryAddSingleton<IMembershipTable, NoOpMembershipTable>();
-
-            services.AddSingleton<MembershipTableManager>();
-            services.TryAddFromExisting<IMembershipManager, MembershipTableManager>();
-            services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+            services.TryAddSingleton<IMembershipManager, MembershipTableManager>();
+            services.AddFromExisting<IHealthCheckParticipant, IMembershipManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IMembershipManager>();
             services.AddSingleton<MembershipSystemTarget>();
             services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipSystemTarget>();

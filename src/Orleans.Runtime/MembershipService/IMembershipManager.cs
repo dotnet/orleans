@@ -10,7 +10,13 @@ namespace Orleans.Runtime.MembershipService;
 /// This is the primary abstraction for membership management, supporting
 /// both passive (table-based) and active (consensus-based) implementations.
 /// </summary>
-internal interface IMembershipManager
+/// <remarks>
+/// <para>
+/// Implementations must participate in the silo lifecycle and health checks.
+/// This follows the same pattern as <see cref="IClusterHealthMonitor"/>.
+/// </para>
+/// </remarks>
+internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, IHealthCheckParticipant
 {
     /// <summary>
     /// Gets the current membership snapshot.

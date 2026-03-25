@@ -23,21 +23,26 @@ namespace Orleans.Runtime.Configuration
         /// <inheritdoc />
         public void ValidateConfiguration()
         {
-            // Check for either IMembershipTable (traditional) or IMembershipManager (native integration).
-            // External membership providers like RapidCluster may register IMembershipManager directly
-            // without providing an IMembershipTable.
             var clusteringTableProvider = this.serviceProvider.GetService<IMembershipTable>();
-            var membershipManager = this.serviceProvider.GetService<IMembershipManager>();
 
-            // If MembershipTableManager is registered, it requires IMembershipTable.
-            // But if a custom IMembershipManager is registered (not MembershipTableManager),
-            // then IMembershipTable is not required.
-            var hasMembershipTableManager = membershipManager is MembershipTableManager;
-            var hasCustomMembershipManager = membershipManager is not null && !hasMembershipTableManager;
-
-            if ((clusteringTableProvider is null || clusteringTableProvider is NoOpMembershipTable) && !hasCustomMembershipManager)
+            if (clusteringTableProvider is null)
             {
-                throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);
+                // No IMembershipTable configured. A custom IMembershipManager must be present
+                // (MembershipTableManager requires IMembershipTable, so it cannot be used).
+                IMembershipManager membershipManager = null;
+                try
+                {
+                    membershipManager = this.serviceProvider.GetService<IMembershipManager>();
+                }
+                catch
+                {
+                    // Resolution failed — MembershipTableManager requires IMembershipTable.
+                }
+
+                if (membershipManager is null or MembershipTableManager)
+                {
+                    throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);
+                }
             }
 
             var clusterMembershipOptions = this.serviceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;
