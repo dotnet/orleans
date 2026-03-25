@@ -105,17 +105,19 @@ namespace Orleans.Runtime.MembershipService
 
         private Task pendingRefresh;
 
-        public async Task Refresh(MembershipVersion? targetVersion = null)
+        public async Task Refresh(MembershipVersion? targetVersion = null, CancellationToken cancellationToken = default)
         {
             while (!targetVersion.HasValue || this.snapshot.Version < targetVersion.Value)
             {
+                cancellationToken.ThrowIfCancellationRequested();
+
                 var pending = this.pendingRefresh;
                 if (pending == null || pending.IsCompleted)
                 {
                     pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false);
                 }
 
-                await pending;
+                await pending.WaitAsync(cancellationToken);
 
                 // If no target version specified, exit after single refresh
                 if (!targetVersion.HasValue)

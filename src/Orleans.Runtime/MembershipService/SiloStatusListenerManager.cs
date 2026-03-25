@@ -25,11 +25,11 @@ internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLi
     private ImmutableList<WeakReference<ISiloStatusListener>> _listeners = [];
 
     public SiloStatusListenerManager(
-        IMembershipManager membershipTableManager,
+        IMembershipManager membershipManager,
         ILogger<SiloStatusListenerManager> log,
         IFatalErrorHandler fatalErrorHandler)
     {
-        _membershipService = membershipTableManager;
+        _membershipService = membershipManager;
         _logger = log;
         _fatalErrorHandler = fatalErrorHandler;
     }

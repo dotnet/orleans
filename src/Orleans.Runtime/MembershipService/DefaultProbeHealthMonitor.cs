@@ -91,7 +91,7 @@ internal sealed partial class DefaultProbeHealthMonitor : IProbeHealthMonitor
 
         // Only consider recency of the last successful ping if this node is monitoring more than one other node.
         // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-        if (siloMonitors.Count <= 1)
+        if (monitoredNodeCount <= 1)
         {
             return 0;
         }

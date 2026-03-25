@@ -9,9 +9,9 @@ namespace Orleans.Runtime.Placement
     {
         private readonly IMembershipManager membershipManager;
 
-        public SiloRoleBasedPlacementDirector(MembershipTableManager membershipTableManager)
+        public SiloRoleBasedPlacementDirector(IMembershipManager membershipManager)
         {
-            this.membershipManager = membershipTableManager;
+            this.membershipManager = membershipManager;
         }
 
         public virtual Task<SiloAddress> OnAddActivation(

@@ -33,9 +33,9 @@ namespace Orleans.Runtime.Configuration
             // But if a custom IMembershipManager is registered (not MembershipTableManager),
             // then IMembershipTable is not required.
             var hasMembershipTableManager = membershipManager is MembershipTableManager;
-            var hasCustomMembershipManager = membershipManager != null && !hasMembershipTableManager;
+            var hasCustomMembershipManager = membershipManager is not null && !hasMembershipTableManager;
 
-            if (clusteringTableProvider == null && !hasCustomMembershipManager)
+            if ((clusteringTableProvider is null || clusteringTableProvider is NoOpMembershipTable) && !hasCustomMembershipManager)
             {
                 throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);
             }

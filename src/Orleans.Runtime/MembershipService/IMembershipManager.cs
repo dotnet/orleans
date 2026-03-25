@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 
 namespace Orleans.Runtime.MembershipService;
@@ -53,7 +54,7 @@ internal interface IMembershipManager
     /// <param name="silo">The silo to suspect.</param>
     /// <param name="indirectProbingSilo">Optional: silo that also detected the failure.</param>
     /// <returns>True if action was taken.</returns>
-    Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress indirectProbingSilo = null!);
+    Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo = null);
 
     /// <summary>
     /// Refreshes the membership view from the source of truth.
@@ -64,7 +65,7 @@ internal interface IMembershipManager
     /// Optional target version to wait for. If specified, the method will
     /// continue refreshing until the membership reaches at least this version.
     /// </param>
-    Task Refresh(MembershipVersion? targetVersion = null);
+    Task Refresh(MembershipVersion? targetVersion = null, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Processes a membership snapshot received via gossip.
