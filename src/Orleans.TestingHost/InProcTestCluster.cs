@@ -182,9 +182,11 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </example>
     public async Task DeactivateAsync(GrainId grainId)
     {
-        var deactivated = WaitForDeactivationAsync(grainId);
-        await Client.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle();
-        await deactivated;
+        if (TryGetGrainContext(grainId, out var grainContext))
+        {
+            grainContext!.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationRequested, $"{nameof(DeactivateAsync)} was called."));
+            await grainContext.Deactivated;
+        }
     }
 
     /// <summary>
