@@ -405,7 +405,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="siloAddress">Silo address to be found.</param>
         /// <returns>SiloHandle of the appropriate silo, or <c>null</c> if not found.</returns>
-        public SiloHandle GetSiloForAddress(SiloAddress siloAddress)
+        public SiloHandle? GetSiloForAddress(SiloAddress siloAddress)
         {
             var activeSilos = GetActiveSilos().ToList();
             var ret = activeSilos.Find(s => s.SiloAddress.Equals(siloAddress));
@@ -645,9 +645,9 @@ namespace Orleans.TestingHost
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
-        public async Task<SiloHandle> RestartSiloAsync(SiloHandle instance)
+        public async Task<SiloHandle?> RestartSiloAsync(SiloHandle instance)
         {
-            if (instance != null)
+            if (instance is not null)
             {
                 var instanceNumber = instance.InstanceNumber;
                 var siloName = instance.Name;
@@ -717,7 +717,7 @@ namespace Orleans.TestingHost
                     gateways.Add(new IPEndPoint(IPAddress.Loopback, options.BaseGatewayPort));
                 }
 
-                var clustering = new Dictionary<string, string>();
+                var clustering = new Dictionary<string, string?>();
                 var i = 0;
                 foreach (var v in gateways)
                 {
@@ -834,7 +834,7 @@ namespace Orleans.TestingHost
         /// <param name="configurationOverrides">Configuration overrides.</param>
         /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the silo deployed</returns>
-        public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+        public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
             return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
@@ -848,7 +848,7 @@ namespace Orleans.TestingHost
         /// <param name="configurationOverrides">Configuration overrides.</param>
         /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the deployed silo.</returns>
-        public async Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+        public async Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             var configurationSources = this.ConfigurationSources.ToList();
 

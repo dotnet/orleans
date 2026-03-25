@@ -347,7 +347,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// </summary>
     /// <param name="siloAddress">Silo address to be found.</param>
     /// <returns>SiloHandle of the appropriate silo, or <c>null</c> if not found.</returns>
-    public InProcessSiloHandle GetSiloForAddress(SiloAddress siloAddress)
+    public InProcessSiloHandle? GetSiloForAddress(SiloAddress siloAddress)
     {
         var activeSilos = GetActiveSilos().ToList();
         var ret = activeSilos.Find(s => s.SiloAddress.Equals(siloAddress));
@@ -590,9 +590,9 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// Do a Stop or Kill of the specified silo, followed by a restart.
     /// </summary>
     /// <param name="instance">Silo to be restarted.</param>
-    public async Task<InProcessSiloHandle> RestartSiloAsync(InProcessSiloHandle instance)
+    public async Task<InProcessSiloHandle?> RestartSiloAsync(InProcessSiloHandle instance)
     {
-        if (instance != null)
+        if (instance is not null)
         {
             var instanceNumber = instance.InstanceNumber;
             await StopSiloAsync(instance);
