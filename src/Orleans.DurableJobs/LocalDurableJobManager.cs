@@ -38,7 +38,7 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
     // Slow-start state
     private long _startTimestamp;
-    private int _totalClaimedOrphanedShards;
+    private int _totalClaimedShards;
 
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
@@ -291,8 +291,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
 
                 if (newClaimsThisCycle > 0)
                 {
-                    _totalClaimedOrphanedShards += newClaimsThisCycle;
-                    LogOrphanedShardsClaimed(_logger, newClaimsThisCycle, _totalClaimedOrphanedShards);
+                    _totalClaimedShards += newClaimsThisCycle;
+                    LogOrphanedShardsClaimed(_logger, newClaimsThisCycle, _totalClaimedShards);
                 }
             }
             catch (OperationCanceledException)
@@ -321,29 +321,50 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
             return 0;
         }
 
-        // Slow-start disabled
-        if (_options.SlowStartRampUpDuration <= TimeSpan.Zero)
+        var elapsed = _timeProvider.GetElapsedTime(_startTimestamp);
+        var budget = ComputeClaimBudget(
+            _options.ShardClaimRampUpDuration,
+            _options.ShardClaimInitialBudget,
+            _options.ShardClaimMaxBudget,
+            elapsed,
+            _totalClaimedShards);
+
+        if (budget < int.MaxValue)
+        {
+            LogShardClaimBudget(_logger, budget, _options.ShardClaimInitialBudget + (int)(elapsed.TotalMilliseconds / _options.ShardClaimRampUpDuration.TotalMilliseconds * (_options.ShardClaimMaxBudget - _options.ShardClaimInitialBudget)), _totalClaimedShards, elapsed, _options.ShardClaimRampUpDuration);
+        }
+
+        return budget;
+    }
+
+    /// <summary>
+    /// Pure computation of shard-claim budget based on ramp-up parameters and elapsed time.
+    /// Returns <see cref="int.MaxValue"/> when unlimited (ramp-up complete or disabled).
+    /// </summary>
+    internal static int ComputeClaimBudget(
+        TimeSpan rampUpDuration,
+        int initialBudget,
+        int maxBudget,
+        TimeSpan elapsed,
+        int totalClaimedShards)
+    {
+        // Shard-claim ramp-up disabled
+        if (rampUpDuration <= TimeSpan.Zero)
         {
             return int.MaxValue;
         }
-
-        var elapsed = _timeProvider.GetElapsedTime(_startTimestamp);
 
         // After ramp-up period, no limit
-        if (elapsed >= _options.SlowStartRampUpDuration)
+        if (elapsed >= rampUpDuration)
         {
             return int.MaxValue;
         }
 
-        // Linear interpolation: InitialBudget at t=0, MaxBudget at t=RampUpDuration
-        var progress = elapsed.TotalMilliseconds / _options.SlowStartRampUpDuration.TotalMilliseconds;
-        var totalBudget = _options.SlowStartInitialBudget
-                        + (int)(progress * (_options.SlowStartMaxBudget - _options.SlowStartInitialBudget));
-        var remaining = totalBudget - _totalClaimedOrphanedShards;
-        var budget = Math.Max(0, remaining);
-
-        LogShardClaimBudget(_logger, budget, totalBudget, _totalClaimedOrphanedShards, elapsed, _options.SlowStartRampUpDuration);
-        return budget;
+        // Linear interpolation: initialBudget at t=0, maxBudget at t=rampUpDuration
+        var progress = elapsed.TotalMilliseconds / rampUpDuration.TotalMilliseconds;
+        var totalBudget = initialBudget + (int)(progress * (maxBudget - initialBudget));
+        var remaining = totalBudget - totalClaimedShards;
+        return Math.Max(0, remaining);
     }
 
     private void TryActivateShard(IJobShard shard)

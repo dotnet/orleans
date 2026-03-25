@@ -613,6 +613,48 @@ public class JobShardManagerTestsRunner
     }
 
     /// <summary>
+    /// Tests that when the slow-start budget prevents claiming a shard from a dead silo,
+    /// the shard's adopted count is not incremented. This ensures that budget exhaustion
+    /// does not cause false poison detection on subsequent attempts.
+    /// </summary>
+    public async Task SlowStart_BudgetExhaustion_DoesNotInflateAdoptedCount(CancellationToken cancellationToken)
+    {
+        var silo1Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5000), 0);
+        var silo2Address = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 0);
+
+        SetSiloStatus(silo1Address, SiloStatus.Active);
+        SetSiloStatus(silo2Address, SiloStatus.Active);
+        var silo1Manager = CreateManager(silo1Address);
+        var silo2Manager = CreateManager(silo2Address);
+
+        var date = DateTimeOffset.UtcNow;
+
+        // Create 3 shards on silo1
+        for (var i = 0; i < 3; i++)
+        {
+            await silo1Manager.CreateShardAsync(date, date.AddHours(1), _testMetadata, cancellationToken);
+        }
+
+        // Kill silo1 so all 3 shards become adopted (from dead silo)
+        SetSiloStatus(silo1Address, SiloStatus.Dead);
+
+        // Claim only 1 shard per cycle — the other 2 are skipped due to budget
+        var shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: 1, cancellationToken);
+        Assert.Single(shards);
+
+        // Claim 1 more — should succeed because adopted count was NOT inflated for skipped shards
+        shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: 1, cancellationToken);
+        Assert.Equal(2, shards.Count); // 1 already-owned + 1 newly claimed
+
+        // Claim the last one
+        shards = await silo2Manager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(2), maxNewClaims: 1, cancellationToken);
+        Assert.Equal(3, shards.Count); // all 3 now owned
+
+        // Verify all shards were successfully claimed (none falsely poisoned)
+        Assert.Equal(3, shards.Count);
+    }
+
+    /// <summary>
     /// Tests that unregistering a shard with remaining jobs preserves the shard for reassignment.
     /// </summary>
     public async Task UnregisterShard_WithJobsRemaining(CancellationToken cancellationToken)

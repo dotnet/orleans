@@ -122,4 +122,11 @@ public class InMemoryJobShardManagerTests : IAsyncLifetime
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.SlowStart_UnlimitedBudgetClaimsAll(cts.Token);
     }
+
+    [SkippableFact]
+    public async Task InMemoryJobShardManager_SlowStart_BudgetExhaustion_DoesNotInflateAdoptedCount()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_BudgetExhaustion_DoesNotInflateAdoptedCount(cts.Token);
+    }
 }

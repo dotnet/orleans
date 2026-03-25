@@ -212,4 +212,15 @@ public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDi
         using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
         await _runner.SlowStart_UnlimitedBudgetClaimsAll(cts.Token);
     }
+
+    /// <summary>
+    /// Tests that budget exhaustion does not inflate the adopted count, avoiding false poison detection.
+    /// This test is delegated to the runner for reuse across providers.
+    /// </summary>
+    [SkippableFact, TestCategory("Azure"), TestCategory("Functional")]
+    public async Task AzureStorageJobShardManager_SlowStart_BudgetExhaustion_DoesNotInflateAdoptedCount()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.SlowStart_BudgetExhaustion_DoesNotInflateAdoptedCount(cts.Token);
+    }
 }
