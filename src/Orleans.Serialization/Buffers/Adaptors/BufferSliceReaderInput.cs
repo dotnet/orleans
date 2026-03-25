@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using static Orleans.Serialization.Buffers.PooledBuffer;
 
+#nullable disable
 namespace Orleans.Serialization.Buffers.Adaptors;
 
 /// <summary>

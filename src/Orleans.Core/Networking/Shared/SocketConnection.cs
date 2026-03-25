@@ -9,6 +9,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal sealed partial class SocketConnection : TransportConnection

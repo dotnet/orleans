@@ -6,8 +6,6 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans;
 
-#nullable enable
-
 /// <summary>
 /// Represents a specific stage in the client / silo lifecycle.
 /// </summary>

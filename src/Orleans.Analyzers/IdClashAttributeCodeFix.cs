@@ -11,6 +11,7 @@ using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(IdClashAttributeCodeFix)), Shared]
 public class IdClashAttributeCodeFix : CodeFixProvider
 {

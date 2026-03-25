@@ -5,6 +5,7 @@ using System;
 using System.Buffers;
 using System.Runtime.CompilerServices;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

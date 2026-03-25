@@ -8,7 +8,6 @@ using Orleans.Runtime.Placement.Rebalancing;
 
 namespace Orleans.Hosting;
 
-#nullable enable
 
 /// <summary>
 /// Extensions for configuring activation rebalancing.

@@ -5,7 +5,6 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Timers;
 
-#nullable enable
 namespace Orleans;
 
 /// <summary>

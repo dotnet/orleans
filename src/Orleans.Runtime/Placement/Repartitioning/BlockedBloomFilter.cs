@@ -5,8 +5,6 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
-#nullable enable
-
 /// <summary>
 /// A tuned version of a blocked bloom filter implementation.
 /// </summary>

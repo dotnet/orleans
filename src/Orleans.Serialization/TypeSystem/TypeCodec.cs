@@ -10,6 +10,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Serialization.Buffers;
 
+#nullable disable
 namespace Orleans.Serialization.TypeSystem
 {
     /// <summary>

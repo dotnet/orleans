@@ -25,6 +25,7 @@ using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
 
+#nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>

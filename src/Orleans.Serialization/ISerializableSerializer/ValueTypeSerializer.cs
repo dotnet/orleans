@@ -5,6 +5,7 @@ using System.Buffers;
 using System.Runtime.Serialization;
 using System.Security;
 
+#nullable disable
 namespace Orleans.Serialization
 {
     internal abstract class ValueTypeSerializer

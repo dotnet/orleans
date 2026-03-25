@@ -1,5 +1,6 @@
 using System;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     [Id(102), GenerateSerializer, Immutable]

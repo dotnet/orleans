@@ -8,6 +8,7 @@ using Azure.Storage.Queues;
 using Orleans.AzureUtils;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>

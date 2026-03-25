@@ -17,6 +17,7 @@ using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
 
+#nullable disable
 namespace Orleans.GrainReferences
 {
     /// <summary>

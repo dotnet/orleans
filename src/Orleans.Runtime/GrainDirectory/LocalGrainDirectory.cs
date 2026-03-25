@@ -12,7 +12,6 @@ using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     internal sealed partial class LocalGrainDirectory : ILocalGrainDirectory, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>

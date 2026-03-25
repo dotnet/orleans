@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using Orleans.Caching;
 
+#nullable disable
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class LruGrainDirectoryCache(int maxCacheSize) : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>(capacity: maxCacheSize), IGrainDirectoryCache

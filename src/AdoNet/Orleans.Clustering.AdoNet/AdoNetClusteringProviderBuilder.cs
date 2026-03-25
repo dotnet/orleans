@@ -7,6 +7,7 @@ using Orleans.Configuration;
 using Orleans.Hosting;
 using Orleans.Providers;
 
+#nullable disable
 [assembly: RegisterProvider("AdoNet", "Clustering", "Silo", typeof(AdoNetClusteringProviderBuilder))]
 [assembly: RegisterProvider("AdoNet", "Clustering", "Client", typeof(AdoNetClusteringProviderBuilder))]
 

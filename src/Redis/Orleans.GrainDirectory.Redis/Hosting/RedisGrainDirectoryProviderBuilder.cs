@@ -9,6 +9,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading.Tasks;
 
+#nullable disable
 [assembly: RegisterProvider("Redis", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "GrainDirectory", "Silo", typeof(RedisGrainDirectoryProviderBuilder))]
 

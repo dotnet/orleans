@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Providers;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 
+#nullable disable
 namespace Orleans.Runtime.Hosting
 {
     public static class StorageProviderExtensions

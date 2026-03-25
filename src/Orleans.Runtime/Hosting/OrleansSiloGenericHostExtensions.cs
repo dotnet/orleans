@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Microsoft.Extensions.Hosting
 {
     /// <summary>

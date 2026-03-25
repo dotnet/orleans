@@ -4,6 +4,7 @@ using Microsoft.Extensions.Logging;
 
 #pragma warning disable IDE0069 // Disposable fields should be disposed
 
+#nullable disable
 namespace Orleans.Dashboard.Implementation;
 
 internal sealed class DashboardLogger : ILoggerProvider, ILogger

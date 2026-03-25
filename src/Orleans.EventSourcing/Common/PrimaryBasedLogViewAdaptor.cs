@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using System.Diagnostics;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.EventSourcing.Common
 {
     /// <summary>

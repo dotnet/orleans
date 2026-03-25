@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System;
 
+#nullable disable
 namespace Orleans.Placement.Repartitioning;
 
 [Alias("IActivationRepartitionerSystemTarget")]

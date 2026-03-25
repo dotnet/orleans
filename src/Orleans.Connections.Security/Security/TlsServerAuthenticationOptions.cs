@@ -3,6 +3,7 @@ using System.Net.Security;
 using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 
+#nullable disable
 namespace Orleans.Connections.Security
 {
     public delegate X509Certificate ServerCertificateSelectionCallback(object sender, string hostName);

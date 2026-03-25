@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 
+#nullable disable
 namespace Orleans.Metadata
 {
     /// <summary>

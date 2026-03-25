@@ -11,7 +11,6 @@ using Microsoft.CodeAnalysis;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class DirectoryMembershipSnapshot

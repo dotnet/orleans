@@ -2,6 +2,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.Analyzers
 {
+    #nullable disable
     internal static class SymbolHelpers
     {
         public static bool HasAttribute(this ISymbol symbol, INamedTypeSymbol attributeSymbol, out Location location)

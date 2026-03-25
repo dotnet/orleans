@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.TestingHost.Logging
 {
     /// <summary>

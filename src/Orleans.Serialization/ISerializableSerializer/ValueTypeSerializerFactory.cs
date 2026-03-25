@@ -4,6 +4,7 @@ using System.Reflection;
 using System.Runtime.Serialization;
 using System.Security;
 
+#nullable disable
 namespace Orleans.Serialization
 {
     internal class ValueTypeSerializerFactory

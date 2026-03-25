@@ -5,7 +5,6 @@ using System.Runtime.Serialization;
 using System.Text;
 using Orleans.Streams;
 
-#nullable enable
 namespace Orleans.Runtime
 {
     /// <summary>

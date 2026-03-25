@@ -6,6 +6,7 @@ using Azure;
 using Azure.Data.Tables;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.AzureUtils
 {
     internal class SiloInstanceTableEntry : ITableEntity

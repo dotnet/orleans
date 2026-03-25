@@ -7,6 +7,7 @@ using Orleans.Runtime;
 using Microsoft.Extensions.DependencyInjection;
 using System.Threading;
 
+#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>

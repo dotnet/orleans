@@ -9,6 +9,7 @@ using System;
 using System.Buffers;
 using System.IO;
 
+#nullable disable
 namespace Orleans.Serialization
 {
     /// <summary>

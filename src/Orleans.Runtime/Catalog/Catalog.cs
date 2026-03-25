@@ -6,6 +6,7 @@ using Orleans.Runtime.GrainDirectory;
 using System.Diagnostics;
 using Orleans.Diagnostics;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>

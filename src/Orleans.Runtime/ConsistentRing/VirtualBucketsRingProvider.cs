@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Runtime.ConsistentRing
 {
     /// <summary>
