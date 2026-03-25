@@ -372,7 +372,7 @@ namespace Orleans.Hosting
             services.AddSingleton<SystemTextJsonGrainStorageSerializerOptions>();
             services.AddSingleton<IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>, SystemTextJsonSerializerOptionsConfigure>();
 
-            // persistent state facet support      
+            // persistent state facet support
             services.TryAddSingleton<IGrainStorageSerializer, JsonGrainStorageSerializer>();
             services.TryAddSingleton<IPersistentStateFactory, PersistentStateFactory>();
             services.TryAddSingleton(typeof(IAttributeToFactoryMapper<PersistentStateAttribute>), typeof(PersistentStateAttributeMapper));

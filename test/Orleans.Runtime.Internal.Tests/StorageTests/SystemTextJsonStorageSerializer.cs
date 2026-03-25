@@ -135,7 +135,7 @@ namespace UnitTests.StorageTests
         public void GuidIdRoundtrip() => Roundtrip(GuidId.GetNewGuidId());
 
         [Fact]
-        public void PubSubSubscriptionStateRoundtrip() => new PubSubSubscriptionState(GuidId.GetNewGuidId(), new QualifiedStreamId("test", default), GrainId.Parse("test/test"));
+        public void PubSubSubscriptionStateRoundtrip() => Roundtrip(new PubSubSubscriptionState(GuidId.GetNewGuidId(), new QualifiedStreamId("test", default), GrainId.Parse("test/test")));
 
         [Fact]
         public async Task GrainReferenceJsonConverter()

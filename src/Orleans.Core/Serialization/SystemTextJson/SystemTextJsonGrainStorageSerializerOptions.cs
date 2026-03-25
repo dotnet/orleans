@@ -8,7 +8,7 @@ using Orleans.GrainReferences;
 namespace Orleans.Serialization
 {
     /// <summary>
-    /// Configures <see cref="JsonSerializerOptions"/> for the System.Text.Json grain storage serialzier
+    /// Configures <see cref="JsonSerializerOptions"/> for the System.Text.Json grain storage serializer.
     /// </summary>
     public sealed class SystemTextJsonGrainStorageSerializerOptions
     {

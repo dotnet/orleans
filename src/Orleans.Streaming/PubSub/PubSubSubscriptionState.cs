@@ -65,10 +65,12 @@ namespace Orleans.Streams
             GuidId subscriptionId,
             QualifiedStreamId stream,
             GrainId consumer,
-            string filterData)
-            :this(subscriptionId,stream,consumer)
+            string filterData,
+            SubscriptionStates state)
+            : this(subscriptionId, stream, consumer)
         {
             FilterData = filterData;
+            this.state = state;
         }
 
         public void AddFilter(string filterData)
