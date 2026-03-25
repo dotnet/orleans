@@ -43,11 +43,12 @@ public static class JsonJournalingExtensions
         var options = new JsonJournalingOptions();
         configure?.Invoke(options);
 
-        // Register the shared JsonSerializerOptions.
-        builder.Services.AddSingleton(options.SerializerOptions);
+        // Capture the serializer options directly — avoid registering a bare
+        // JsonSerializerOptions singleton that could collide with other components.
+        var jsonOptions = options.SerializerOptions;
 
         // Replace the default codec providers with the JSON codec provider.
-        builder.Services.AddSingleton<JsonLogEntryCodecProvider>();
+        builder.Services.AddSingleton<JsonLogEntryCodecProvider>(_ => new JsonLogEntryCodecProvider(jsonOptions));
         builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
