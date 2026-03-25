@@ -418,7 +418,7 @@ namespace Orleans.Runtime.MembershipService
 
             bool ok;
             TableVersion next = table.Version.Next();
-            if (myEtag is not null) // no previous etag for my entry -> its the first write to this entry, so insert instead of update.
+            if (myEtag is not null) // existing etag for my entry -> there is a previous row, so update instead of insert.
             {
                 ok = await membershipTableProvider.UpdateRow(myEntry, myEtag, next);
             }
@@ -550,15 +550,24 @@ namespace Orleans.Runtime.MembershipService
 
             LogDebugCleanupTableEntriesAboutToDeclareDead(this.log, silosToDeclareDead.Count, Utils.EnumerableToString(silosToDeclareDead.Select(tuple => tuple.Item1)));
 
-            var completions = new List<Task<bool>>(silosToDeclareDead.Count);
+            var completions = new List<Task>(silosToDeclareDead.Count);
             foreach (var siloData in silosToDeclareDead)
             {
                 var (request, completion) = SuspectOrKillRequest.CreateAcknowledgedKillRequest(siloData.Item1.SiloAddress);
-                await _trySuspectOrKillChannel.Writer.WriteAsync(request);
-                completions.Add(completion);
+                await _trySuspectOrKillChannel.Writer.WaitToWriteAsync(_shutdownCts.Token);
+                if (_trySuspectOrKillChannel.Writer.TryWrite(request))
+                {
+                    completions.Add(completion);
+                }
             }
 
-            await Task.WhenAll(completions);
+            try
+            {
+                await Task.WhenAll(completions).WaitAsync(_shutdownCts.Token);
+            }
+            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
+            {
+            }
             return true;
         }
 
@@ -602,13 +611,10 @@ namespace Orleans.Runtime.MembershipService
 
         private class SuspectOrKillRequest
         {
-            private const int MaxAttempts = 3;
-
             public required SiloAddress SiloAddress { get; init; }
             public SiloAddress? OtherSilo { get; init; }
             public required RequestType Type { get; init; }
-            public TaskCompletionSource<bool>? Completion { get; init; }
-            public int RemainingAttempts { get; set; } = MaxAttempts;
+            public TaskCompletionSource? Completion { get; init; }
 
             public enum RequestType
             {
@@ -626,9 +632,9 @@ namespace Orleans.Runtime.MembershipService
                 };
             }
 
-            public static (SuspectOrKillRequest Request, Task<bool> Completion) CreateAcknowledgedKillRequest(SiloAddress silo)
+            public static (SuspectOrKillRequest Request, Task Completion) CreateAcknowledgedKillRequest(SiloAddress silo)
             {
-                var completion = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+                var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 var request = new SuspectOrKillRequest
                 {
                     SiloAddress = silo,
@@ -679,20 +685,13 @@ namespace Orleans.Runtime.MembershipService
                                 break;
                         }
                         runningFailureCount = 0;
-                        request.Completion?.TrySetResult(true);
+                        request.Completion?.TrySetResult();
                     }
                     catch (Exception ex)
                     {
                         runningFailureCount += 1;
                         LogErrorProcessingSuspectOrKillLists(this.log, ex, runningFailureCount);
-                        if (request.Completion is not null)
-                        {
-                            request.Completion.TrySetException(ex);
-                        }
-                        else if (--request.RemainingAttempts > 0)
-                        {
-                            await _trySuspectOrKillChannel.Writer.WriteAsync(request, _shutdownCts.Token);
-                        }
+                        await _trySuspectOrKillChannel.Writer.WriteAsync(request, _shutdownCts.Token);
                     }
 
                     if (!reader.TryPeek(out _))
