@@ -489,7 +489,8 @@ namespace Orleans.CodeGenerator
                         var target = attr.ConstructorArguments[2].Value as string;
                         var type = attr.ConstructorArguments[3].Value as INamedTypeSymbol;
 
-                        if (name is not null && kind is not null && target is not null && type is not null)
+                        if (name is not null && kind is not null && target is not null && type is not null
+                            && Compilation.IsSymbolAccessibleWithin(type, Compilation.Assembly))
                         {
                             MetadataModel.RegisteredProviders.Add((target, kind, name, type.ToOpenTypeSyntax()));
                         }
