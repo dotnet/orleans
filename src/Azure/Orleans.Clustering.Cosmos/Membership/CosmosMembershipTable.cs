@@ -103,7 +103,10 @@ internal partial class CosmosMembershipTable : IMembershipTable
     {
         try
         {
-            var silos = (await ReadSilos(SiloStatus.Dead).ConfigureAwait(false)).Where(s => s.IAmAliveTime < beforeDate).ToList();
+            var silos = (await ReadSilos().ConfigureAwait(false))
+                .Where(s => (SiloStatus)s.Status != SiloStatus.Active
+                    && new DateTime(Math.Max(s.IAmAliveTime.Ticks, s.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
+                .ToList();
             if (silos.Count == 0)
             {
                 return;
