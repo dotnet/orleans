@@ -20,4 +20,15 @@ namespace Orleans.Streaming.JsonConverters
             options.JsonSerializerSettings.Converters.Add(new StreamImplConverter(_runtimeClient));
         }
     }
+
+    internal sealed class SystemTextJsonStreamConverterConfigurator(IRuntimeClient runtimeClient) : IPostConfigureOptions<SystemTextJsonGrainStorageSerializerOptions>
+    {
+        public void PostConfigure(string? name, SystemTextJsonGrainStorageSerializerOptions options)
+        {
+            options.JsonSerializerOptions.Converters.Add(new AsyncStreamConverter(runtimeClient));
+            options.JsonSerializerOptions.Converters.Add(new StreamIdJsonConverter());
+            options.JsonSerializerOptions.Converters.Add(new EventSequenceTokenJsonConverter());
+            options.JsonSerializerOptions.Converters.Add(new QualifiedStreamIdJsonConverter());
+        }
+    }
 }
