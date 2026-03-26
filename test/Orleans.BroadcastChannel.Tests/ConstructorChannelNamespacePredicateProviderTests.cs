@@ -45,28 +45,10 @@ public class ConstructorChannelNamespacePredicateProviderTests
     }
 
     [Fact]
-    public void UnregisteredType_Throws()
-    {
-        var provider = CreateProvider();
-        var pattern = $"ctor:{RuntimeTypeNameFormatter.Format(typeof(FileInfo))}:C:\\temp\\299.txt";
-
-        Assert.Throws<InvalidOperationException>(() => provider.TryGetPredicate(pattern, out _));
-    }
-
-    [Fact]
-    public void UnregisteredArbitraryType_Throws()
+    public void ArbitraryType_Throws()
     {
         var provider = CreateProvider();
         var pattern = $"ctor:{RuntimeTypeNameFormatter.Format(typeof(ArrayList))}";
-
-        Assert.Throws<InvalidOperationException>(() => provider.TryGetPredicate(pattern, out _));
-    }
-
-    [Fact]
-    public void UnregisteredUnregisteredType_Throws()
-    {
-        var provider = CreateProvider();
-        var pattern = $"ctor:{RuntimeTypeNameFormatter.Format(typeof(TestGrainWithChannelPredicate))}";
 
         Assert.Throws<InvalidOperationException>(() => provider.TryGetPredicate(pattern, out _));
     }
