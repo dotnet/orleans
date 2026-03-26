@@ -49,20 +49,22 @@ public class GrainDirectoryLeaseTests
 
             await cluster.KillSiloAsync(secondary);
 
-            // To test that the lease hold is working, we need to attempt to register a new activation for the grain
-            // on the primary silo, which should fail with a lease hold exception since the secondary silo has not
-            // yet released its registration for the grain. We need to bypass the catalog and hit the directory
-            // directly so Orleans doesnt mask the lease hold exception with retries.
-
+            // Bypass the catalog and hit the directory directly to observe lease hold behavior.
             var directory = ((InProcessSiloHandle)primary).SiloHost.Services.GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
             var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
 
-            await Assert.ThrowsAnyAsync<DirectoryLeaseHoldException>(() => directory.Register(fakeAddress));
+            // The registration should block while the lease hold is active.
+            var registerTask = directory.Register(fakeAddress);
+            await Task.Delay(200);
+            Assert.False(registerTask.IsCompleted, "Registration should be blocked by the lease hold.");
 
+            // Advance time past the lease duration so the retry succeeds.
             TimeProvider.Advance(LeaseHoldDuration);
+            var result = await registerTask;
+            Assert.NotNull(result);
 
-            // Time has expired, we can place it now, and it will be the primary as its the only one alive.
-            Assert.Equal(await leaseGrain.GetAddress(), primary.SiloAddress);
+            // The grain should now reactivate on the primary since it's the only silo alive.
+            Assert.Equal(primary.SiloAddress, await leaseGrain.GetAddress());
         }
         finally
         {
@@ -213,15 +215,17 @@ public class GrainDirectoryLeaseTests
                 .GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
 
             // All grains on the dead silo should be blocked by the lease hold.
-            await Assert.ThrowsAnyAsync<DirectoryLeaseHoldException>(
-                () => directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain1.GetGrainId())));
-            await Assert.ThrowsAnyAsync<DirectoryLeaseHoldException>(
-                () => directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain2.GetGrainId())));
-            await Assert.ThrowsAnyAsync<DirectoryLeaseHoldException>(
-                () => directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain3.GetGrainId())));
+            var task1 = directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain1.GetGrainId()));
+            var task2 = directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain2.GetGrainId()));
+            var task3 = directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain3.GetGrainId()));
+            await Task.Delay(200);
+            Assert.False(task1.IsCompleted, "Registration for grain1 should be blocked by the lease hold.");
+            Assert.False(task2.IsCompleted, "Registration for grain2 should be blocked by the lease hold.");
+            Assert.False(task3.IsCompleted, "Registration for grain3 should be blocked by the lease hold.");
 
-            // After the lease expires, all grains should reactivate on the primary.
+            // After the lease expires, all registrations should complete.
             TimeProvider.Advance(LeaseHoldDuration);
+            await Task.WhenAll(task1, task2, task3);
 
             Assert.Equal(primary.SiloAddress, await grain1.GetAddress());
             Assert.Equal(primary.SiloAddress, await grain2.GetAddress());
