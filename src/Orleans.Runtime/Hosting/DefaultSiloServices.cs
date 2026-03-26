@@ -174,8 +174,8 @@ namespace Orleans.Hosting
             services.AddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
             services.TryAddSingleton<IClusterHealthMonitor, ClusterHealthMonitor>();
-            services.TryAddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IClusterHealthMonitor>();
-            services.TryAddFromExisting<IHealthCheckParticipant, IClusterHealthMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IClusterHealthMonitor>();
+            services.AddFromExisting<IHealthCheckParticipant, IClusterHealthMonitor>();
             services.AddSingleton<ProbeRequestMonitor>();
             services.TryAddSingleton<IProbeHealthMonitor, DefaultProbeHealthMonitor>();
             services.AddSingleton<LocalSiloHealthMonitor>();
