@@ -561,13 +561,7 @@ namespace Orleans.Runtime.MembershipService
                 }
             }
 
-            try
-            {
-                await Task.WhenAll(completions).WaitAsync(_shutdownCts.Token);
-            }
-            catch (OperationCanceledException) when (_shutdownCts.IsCancellationRequested)
-            {
-            }
+            await Task.WhenAll(completions).WaitAsync(_shutdownCts.Token);
             return true;
         }
 
@@ -691,7 +685,14 @@ namespace Orleans.Runtime.MembershipService
                     {
                         runningFailureCount += 1;
                         LogErrorProcessingSuspectOrKillLists(this.log, ex, runningFailureCount);
-                        await _trySuspectOrKillChannel.Writer.WriteAsync(request, _shutdownCts.Token);
+                        if (request.Completion is not null)
+                        {
+                            request.Completion.TrySetException(ex);
+                        }
+                        else
+                        {
+                            await _trySuspectOrKillChannel.Writer.WriteAsync(request, _shutdownCts.Token);
+                        }
                     }
 
                     if (!reader.TryPeek(out _))
