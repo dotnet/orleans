@@ -63,6 +63,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private readonly ImmutableArray<GrainDirectoryPartition> _partitions;
     private readonly CancellationTokenSource _stoppedCts = new();
     private readonly TimeSpan _leaseHoldDuration;
+    private readonly TimeProvider _timeProvider;
 
     internal CancellationToken OnStoppedToken => _stoppedCts.Token;
     internal ClusterMembershipSnapshot ClusterMembershipSnapshot => _membershipService.CurrentView.ClusterMembershipSnapshot;
@@ -94,6 +95,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;
         _logger = logger;
+        _timeProvider = timeProvider;
 
         _leaseHoldDuration = directoryOptions.Value.SafetyLeaseHoldDuration switch
         {
@@ -193,7 +195,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 // A safety lease hold is active for this grain or range.
                 // Wait for the suggested duration before retrying.
-                await Task.Delay(invokeResult.RetryAfterDelay, cancellationToken);
+                await Task.Delay(invokeResult.RetryAfterDelay, _timeProvider, cancellationToken);
                 continue;
             }
 

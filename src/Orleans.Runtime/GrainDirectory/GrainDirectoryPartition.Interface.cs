@@ -40,8 +40,7 @@ internal sealed partial class GrainDirectoryPartition
                 // If it is still active, does it block this request?
                 if (lockedRange.Contains(rangeHash))
                 {
-                    // We reject, the client should retry!
-                    throw new DirectoryLeaseHoldException($"Range {lockedRange} is under a lease hold until {expiration - utcNow}.");
+                    return DirectoryResult.RetryAfter<GrainAddress>(expiration - utcNow);
                 }
             }
 
@@ -55,7 +54,7 @@ internal sealed partial class GrainDirectoryPartition
                     // otherwise it's a new activation trying to "steal" the id while the lease is active, so we reject it!
                     if (currentRegistration is null || !existingActivation.Matches(currentRegistration))
                     {
-                        throw new DirectoryLeaseHoldException($"Silo {existingActivation.SiloAddress} is under a lease hold until {expiration - utcNow}.");
+                        return DirectoryResult.RetryAfter<GrainAddress>(expiration - utcNow);
                     }
                 }
             }
