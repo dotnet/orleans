@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Logging;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
-using Xunit;
 
 namespace DefaultCluster.Tests.ActivationsLifeCycleTests
 {
@@ -67,8 +66,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             string activation = await grain.DoSomething();
 
             // Deactivate
-            await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await HostedCluster.DeactivateAsync(grain);
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
@@ -87,8 +85,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             // Activate
             string activation = await grain.DoSomething();
             // Deactivate
-            await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await HostedCluster.DeactivateAsync(grain);
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
@@ -128,8 +125,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             string activation = await grain.DoSomething();
 
             // Deactivate
-            await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await HostedCluster.DeactivateAsync(grain);
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
         }
@@ -147,8 +143,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             // Activate
             string activation = await grain.DoSomething();
             // Deactivate
-            await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await HostedCluster.DeactivateAsync(grain);
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
@@ -176,8 +171,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             await CheckNumActivateDeactivateCalls(1, 0, activation, "Before deactivation");
 
             // Deactivate
-            await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await HostedCluster.DeactivateAsync(grain);
 
             await CheckNumActivateDeactivateCalls(1, 1, activation, "After deactivation");
 
@@ -313,8 +307,7 @@ namespace DefaultCluster.Tests.ActivationsLifeCycleTests
             string activation = await grain.DoSomething();
 
             // Deactivate
-            await grain.DoDeactivate();
-            Thread.Sleep(TimeSpan.FromSeconds(2)); // Allow some time for deactivate to happen
+            await HostedCluster.DeactivateAsync(grain);
 
             await CheckNumActivateDeactivateCalls(1, 1, activation.ToString());
         }
