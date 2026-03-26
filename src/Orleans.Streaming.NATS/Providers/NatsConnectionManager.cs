@@ -111,6 +111,7 @@ internal sealed class NatsConnectionManager
                 var streamConfig = new StreamConfig(this._options.StreamName, [$"{this._providerName}.>"])
                 {
                     Retention = StreamConfigRetention.Workqueue,
+                    NumReplicas = this._options.NumReplicas,
                     SubjectTransform = new SubjectTransform
                     {
                         Src = $"{this._providerName}.*.*",
@@ -124,6 +125,28 @@ internal sealed class NatsConnectionManager
             catch (NatsJSApiException e) when (e.Error.ErrCode == 10065)
             {
                 // ignore, stream already exists
+            }
+            catch (NatsJSApiException e) when (e.Error.ErrCode == 10058)
+            {
+                // Stream exists with different config — attempt in-place update
+                // (safe for NumReplicas changes; NATS allows replica count upgrades)
+                this._logger.LogInformation(
+                    "Stream {Stream} exists with different config — updating.",
+                    this._options.StreamName);
+
+                var streamConfig = new StreamConfig(this._options.StreamName, [$"{this._providerName}.>"])
+                {
+                    Retention = StreamConfigRetention.Workqueue,
+                    NumReplicas = this._options.NumReplicas,
+                    SubjectTransform = new SubjectTransform
+                    {
+                        Src = $"{this._providerName}.*.*",
+                        Dest =
+                            @$"{this._providerName}.{{{{partition({this._options.PartitionCount},1,2)}}}}.{{{{wildcard(1)}}}}.{{{{wildcard(2)}}}}"
+                    }
+                };
+
+                await this._natsContext.UpdateStreamAsync(streamConfig, cancellationToken);
             }
 
             this._logger.LogTrace(

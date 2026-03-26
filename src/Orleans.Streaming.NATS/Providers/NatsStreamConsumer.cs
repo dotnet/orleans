@@ -38,10 +38,30 @@ internal sealed class NatsStreamConsumer(
     {
         if (this._consumer is null)
         {
-            this._logger.LogError(
-                "Internal NATS Consumer is not initialized. Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
-                provider, stream, partition);
-            return ([], 0);
+            // Lazy retry: attempt re-initialization on each poll cycle.
+            // This handles transient failures during initial Initialize()
+            // (leader election, timeout, network blip).
+            try
+            {
+                this._logger.LogWarning(
+                    "NATS Consumer not initialized — attempting re-initialization. Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
+                    provider, stream, partition);
+
+                await Initialize(cancellationToken);
+            }
+            catch (Exception ex)
+            {
+                this._logger.LogWarning(ex,
+                    "NATS Consumer re-initialization failed. Provider: {Provider} | Stream: {Stream} | Partition: {Partition}. Will retry on next poll.",
+                    provider, stream, partition);
+                return ([], 0);
+            }
+
+            // If still null after retry, bail (next poll will retry again)
+            if (this._consumer is null)
+            {
+                return ([], 0);
+            }
         }
 
         var batchCount = messageCount > 0 && messageCount < batchSize ? messageCount : batchSize;
