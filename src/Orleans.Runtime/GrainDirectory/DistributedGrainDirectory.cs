@@ -189,6 +189,14 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 continue;
             }
 
+            if (invokeResult.RetryAfterDelay > TimeSpan.Zero)
+            {
+                // A safety lease hold is active for this grain or range.
+                // Wait for the suggested duration before retrying.
+                await Task.Delay(invokeResult.RetryAfterDelay, cancellationToken);
+                continue;
+            }
+
             if (initialRecoveryMembershipVersion != _recoveryMembershipVersion)
             {
                 // If the recovery version changed, perform a view refresh and re-issue the operation.
