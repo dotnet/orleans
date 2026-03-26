@@ -1,6 +1,6 @@
 #nullable enable
 
-using System.Collections.Immutable;
+using System.Collections.Generic;
 
 namespace Orleans.Runtime.MembershipService;
 
@@ -44,5 +44,5 @@ internal interface IClusterHealthMonitor : ILifecycleParticipant<ISiloLifecycle>
     /// For external failure detection systems, this returns an empty dictionary since
     /// monitoring is handled externally.
     /// </remarks>
-    ImmutableDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors { get; }
+    IReadOnlyDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors { get; }
 }

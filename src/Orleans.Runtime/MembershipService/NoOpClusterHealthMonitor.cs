@@ -32,7 +32,7 @@ internal sealed partial class NoOpClusterHealthMonitor : IClusterHealthMonitor
     }
 
     /// <inheritdoc/>
-    public ImmutableDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors
+    public IReadOnlyDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors
         => ImmutableDictionary<SiloAddress, SiloHealthMonitor>.Empty;
 
     /// <inheritdoc/>

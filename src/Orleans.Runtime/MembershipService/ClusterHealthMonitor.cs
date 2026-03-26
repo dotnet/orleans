@@ -72,7 +72,7 @@ namespace Orleans.Runtime.MembershipService
         /// <summary>
         /// Gets the collection of monitored silos.
         /// </summary>
-        public ImmutableDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors => this.monitoredSilos;
+        public IReadOnlyDictionary<SiloAddress, SiloHealthMonitor> SiloMonitors => this.monitoredSilos;
 
         private async Task ProcessMembershipUpdates()
         {
