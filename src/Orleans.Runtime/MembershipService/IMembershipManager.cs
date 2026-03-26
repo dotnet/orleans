@@ -39,9 +39,10 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// Updates the local silo's status in the cluster.
     /// </summary>
     /// <param name="status">The new status.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>A task that completes when the status is updated.</returns>
     /// <exception cref="OrleansException">If the update fails.</exception>
-    Task UpdateLocalStatus(SiloStatus status);
+    Task UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken);
 
     /// <summary>
     /// Requests that a silo be declared dead.
@@ -49,8 +50,9 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// For active systems, this may trigger a view change proposal.
     /// </summary>
     /// <param name="silo">The silo to kill.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>True if the silo was killed, false otherwise.</returns>
-    Task<bool> TryKillSilo(SiloAddress silo);
+    Task<bool> TryKillSilo(SiloAddress silo, CancellationToken cancellationToken);
 
     /// <summary>
     /// Requests that a silo be suspected (may lead to killing).
@@ -58,9 +60,10 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// For active systems, this may be a no-op (FD handles this).
     /// </summary>
     /// <param name="silo">The silo to suspect.</param>
-    /// <param name="indirectProbingSilo">Optional: silo that also detected the failure.</param>
+    /// <param name="indirectProbingSilo">The silo that also detected the failure, or <see langword="null"/>.</param>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
     /// <returns>True if action was taken.</returns>
-    Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo = null);
+    Task<bool> TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken);
 
     /// <summary>
     /// Refreshes the membership view from the source of truth.
@@ -68,21 +71,25 @@ internal interface IMembershipManager : ILifecycleParticipant<ISiloLifecycle>, I
     /// For active systems, this may be a no-op or request latest view.
     /// </summary>
     /// <param name="targetVersion">
-    /// Optional target version to wait for. If specified, the method will
-    /// continue refreshing until the membership reaches at least this version.
+    /// Target version to wait for, or <see langword="null"/> for a single refresh.
+    /// If specified, the method will continue refreshing until the membership
+    /// reaches at least this version.
     /// </param>
-    Task Refresh(MembershipVersion? targetVersion = null, CancellationToken cancellationToken = default);
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    Task Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken);
 
     /// <summary>
     /// Processes a membership snapshot received via gossip.
     /// </summary>
     /// <param name="snapshot">The gossiped snapshot.</param>
-    Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot);
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    Task ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken);
 
     /// <summary>
     /// Updates the "I Am Alive" timestamp for the local silo.
     /// For passive systems, this writes to the membership table.
     /// For active systems, this may be a no-op (heartbeats handled differently).
     /// </summary>
-    Task UpdateIAmAlive();
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    Task UpdateIAmAlive(CancellationToken cancellationToken);
 }

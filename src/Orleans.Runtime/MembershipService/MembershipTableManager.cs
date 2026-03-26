@@ -95,13 +95,14 @@ namespace Orleans.Runtime.MembershipService
         MembershipTableSnapshot IMembershipManager.CurrentSnapshot => this.snapshot;
         IAsyncEnumerable<MembershipTableSnapshot> IMembershipManager.MembershipUpdates => this.updates;
         SiloStatus IMembershipManager.LocalSiloStatus => this.CurrentStatus;
-        Task IMembershipManager.UpdateLocalStatus(SiloStatus status) => this.UpdateStatus(status);
-        Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo) => this.TryKill(silo);
+        Task IMembershipManager.UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => this.UpdateStatus(status);
+        Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo);
 #nullable enable
-        Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
+        Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
 #nullable disable
-        Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot) => this.RefreshFromSnapshot(snapshot);
-        Task IMembershipManager.UpdateIAmAlive() => this.UpdateIAmAlive();
+        Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
+        Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
+        Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive();
 
         private bool IsStopping => this.siloLifecycle.LowestStoppedStage <= ServiceLifecycleStage.Active;
 

@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -32,7 +33,7 @@ namespace Orleans.Runtime.MembershipService
         {
             if (snapshot.Version != MembershipVersion.MinValue)
             {
-                await this.membershipManager.ProcessGossipSnapshot(snapshot);
+                await this.membershipManager.ProcessGossipSnapshot(snapshot, CancellationToken.None);
             }
             else
             {
@@ -154,7 +155,7 @@ namespace Orleans.Runtime.MembershipService
         {
             try
             {
-                await this.membershipManager.Refresh();
+                await this.membershipManager.Refresh(null, CancellationToken.None);
             }
             catch (Exception exception)
             {

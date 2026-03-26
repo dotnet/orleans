@@ -73,7 +73,7 @@ namespace Orleans.Runtime.MembershipService
                     {
                         var stopwatch = ValueStopwatch.StartNew();
                         ((ITestAccessor)this).OnUpdateIAmAlive?.Invoke();
-                        await this.membershipManager.UpdateIAmAlive();
+                        await this.membershipManager.UpdateIAmAlive(this.cancellation.Token);
                         LogTraceUpdatingIAmAliveTook(stopwatch.Elapsed);
                         overrideDelayPeriod = default;
                         runningFailures = 0;
@@ -158,7 +158,7 @@ namespace Orleans.Runtime.MembershipService
 
                     // Refresh membership after some delay and retry.
                     await Task.Delay(TimeSpan.FromSeconds(5));
-                    await this.membershipManager.Refresh();
+                    await this.membershipManager.Refresh(null, this.cancellation.Token);
                 }
                 catch (Exception exception) when (canContinue)
                 {
@@ -284,7 +284,7 @@ namespace Orleans.Runtime.MembershipService
 
         private async Task UpdateStatus(SiloStatus status)
         {
-            await this.membershipManager.UpdateLocalStatus(status);
+            await this.membershipManager.UpdateLocalStatus(status, this.cancellation.Token);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)

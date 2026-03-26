@@ -132,7 +132,7 @@ namespace Orleans.Runtime.MembershipService
                     try
                     {
                         LogDebugStaleSiloFound(log);
-                        await this.membershipManager.TrySuspectSilo(member.Key);
+                        await this.membershipManager.TrySuspectSilo(member.Key, null, this.shutdownCancellation.Token);
                     }
                     catch (Exception exception)
                     {
@@ -317,12 +317,12 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
                 {
-                    await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress).ConfigureAwait(false);
+                    await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, null, this.shutdownCancellation.Token).ConfigureAwait(false);
                 }
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
-                await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, probeResult.Intermediary).ConfigureAwait(false);
+                await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, probeResult.Intermediary, this.shutdownCancellation.Token).ConfigureAwait(false);
             }
         }
 

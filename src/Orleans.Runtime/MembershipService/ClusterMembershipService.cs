@@ -66,7 +66,7 @@ namespace Orleans.Runtime
                     cancellationToken.ThrowIfCancellationRequested();
                     if (!didRefresh || this.membershipManager.CurrentSnapshot.Version < v)
                     {
-                        await this.membershipManager.Refresh();
+                        await this.membershipManager.Refresh(null, cancellationToken);
                         didRefresh = true;
                     }
 
@@ -75,7 +75,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipManager.TryKillSilo(siloAddress);
+        public async Task<bool> TryKill(SiloAddress siloAddress) => await this.membershipManager.TryKillSilo(siloAddress, CancellationToken.None);
 
         private async Task ProcessMembershipUpdates(CancellationToken ct)
         {
