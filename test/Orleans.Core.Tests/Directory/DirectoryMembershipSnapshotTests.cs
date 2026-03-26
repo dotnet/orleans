@@ -31,7 +31,7 @@ public sealed class DirectoryMembershipSnapshotTests
         GenClusterMembershipSnapshot.SelectMany(snapshot => Gen.UInt.Array[ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS].Array[snapshot.Members.Count].Select(hashes => 
     {
         var i = 0;
-        return new DirectoryMembershipSnapshot(snapshot, null!, (_, _) => hashes[i++]);
+        return new DirectoryMembershipSnapshot(snapshot, null!, ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS, (_, _) => hashes[i++]);
     }));
 
     [Fact]

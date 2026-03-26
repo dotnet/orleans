@@ -8,25 +8,37 @@ using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
-using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class DirectoryMembershipSnapshot
 {
-    internal const int PartitionsPerSilo = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+    /// <summary>
+    /// The default hash function for directory ring boundaries, matching the <see cref="LocalGrainDirectory"/> partitioning scheme.
+    /// </summary>
+    internal static readonly Func<SiloAddress, int, uint[]> DefaultGetRingBoundaries = static (silo, count) =>
+    {
+        if (count == 1)
+        {
+            return [unchecked((uint)silo.GetConsistentHashCode())];
+        }
+
+        return silo.GetUniformHashCodes(count);
+    };
+
     private readonly ImmutableArray<(uint Start, int MemberIndex, int PartitionIndex)> _ringBoundaries;
     private readonly RingRangeCollection[] _rangesByMember;
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
-    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory) : this(snapshot, grainFactory, static (silo, count) => silo.GetUniformHashCodes(count))
+    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionsPerSilo = 1) : this(snapshot, grainFactory, partitionsPerSilo, DefaultGetRingBoundaries)
     {
     }
 
-    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, int, uint[]> getRingBoundaries)
+    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionsPerSilo, Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
+        PartitionsPerSilo = partitionsPerSilo;
         var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
         foreach (var member in snapshot.Members)
         {
@@ -38,15 +50,15 @@ internal sealed class DirectoryMembershipSnapshot
         }
 
         sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
-        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(PartitionsPerSilo * sortedActiveMembers.Count);
+        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(partitionsPerSilo * sortedActiveMembers.Count);
         var memberPartitions = ImmutableArray.CreateBuilder<ImmutableArray<IGrainDirectoryPartition>>();
         for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
         {
             var activeMember = sortedActiveMembers[memberIndex];
-            var hashCodes = getRingBoundaries(activeMember, PartitionsPerSilo).ToList();
+            var hashCodes = getRingBoundaries(activeMember, partitionsPerSilo).ToList();
             hashCodes.Sort();
-            Debug.Assert(hashCodes.Count == PartitionsPerSilo);
-            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(PartitionsPerSilo);
+            Debug.Assert(hashCodes.Count == partitionsPerSilo);
+            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(partitionsPerSilo);
             for (var partitionIndex = 0; partitionIndex < hashCodes.Count; partitionIndex++)
             {
                 var hashCode = hashCodes[partitionIndex];
@@ -81,7 +93,7 @@ internal sealed class DirectoryMembershipSnapshot
         {
             var (_, memberIndex, _) = hashIndexPairs[i];
             ref var builder = ref CollectionsMarshal.GetValueRefOrAddDefault(rangesByMemberPartitionBuilders, memberIndex, out _);
-            builder ??= ImmutableArray.CreateBuilder<RingRange>(PartitionsPerSilo);
+            builder ??= ImmutableArray.CreateBuilder<RingRange>(partitionsPerSilo);
             var (entryStart, _, _) = hashIndexPairs[i];
             var (nextStart, _, _) = hashIndexPairs[(i + 1) % hashIndexPairs.Count];
             var range = (entryStart == nextStart) switch
@@ -126,9 +138,14 @@ internal sealed class DirectoryMembershipSnapshot
     }
 
     public static DirectoryMembershipSnapshot Default { get; } = new DirectoryMembershipSnapshot(
-        new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue), null!);
+        new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue), null!, partitionsPerSilo: 1);
 
     public MembershipVersion Version => ClusterMembershipSnapshot.Version;
+
+    /// <summary>
+    /// The number of directory partitions per silo in this snapshot.
+    /// </summary>
+    public int PartitionsPerSilo { get; }
 
     public ImmutableArray<SiloAddress> Members { get; }
 
