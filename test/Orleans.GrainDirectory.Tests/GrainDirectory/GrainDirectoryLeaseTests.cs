@@ -71,12 +71,186 @@ public class GrainDirectoryLeaseTests
         }
     }
 
+    [Fact]
+    public async Task GracefulShutdown_DoesNotCreateLeaseHold()
+    {
+        var builder = new TestClusterBuilder(2);
+        builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+
+        var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        try
+        {
+            var primary = cluster.Primary;
+            var secondary = cluster.SecondarySilos[0];
+
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
+
+            var leaseGrain = cluster.GrainFactory.GetGrain<ILeaseTestGrain>(10);
+            Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
+
+            // Graceful shutdown transitions through ShuttingDown → Dead,
+            // which does not create a silo lease hold.
+            await cluster.StopSiloAsync(secondary);
+
+            var directory = ((InProcessSiloHandle)primary).SiloHost.Services
+                .GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
+
+            // Should succeed immediately — no lease hold for graceful shutdown.
+            var result = await directory.Register(fakeAddress);
+            Assert.NotNull(result);
+            Assert.Equal(primary.SiloAddress, result.SiloAddress);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DisabledLeaseHold_AllowsImmediateReregistration()
+    {
+        var builder = new TestClusterBuilder(2);
+        builder.AddSiloBuilderConfigurator<DisabledLeaseSiloConfigurator>();
+
+        var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        try
+        {
+            var primary = cluster.Primary;
+            var secondary = cluster.SecondarySilos[0];
+
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
+
+            var leaseGrain = cluster.GrainFactory.GetGrain<ILeaseTestGrain>(20);
+            Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
+
+            // Ungraceful kill, but leases are disabled (duration = Zero).
+            await cluster.KillSiloAsync(secondary);
+
+            var directory = ((InProcessSiloHandle)primary).SiloHost.Services
+                .GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+            var fakeAddress = GrainAddress.NewActivationAddress(primary.SiloAddress, leaseGrain.GetGrainId());
+
+            // Should succeed immediately — lease holds are disabled.
+            var result = await directory.Register(fakeAddress);
+            Assert.NotNull(result);
+            Assert.Equal(primary.SiloAddress, result.SiloAddress);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task LookupReturnsNull_DuringActiveLeaseHold()
+    {
+        var builder = new TestClusterBuilder(2);
+        builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+
+        var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        try
+        {
+            var primary = cluster.Primary;
+            var secondary = cluster.SecondarySilos[0];
+
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
+
+            var leaseGrain = cluster.GrainFactory.GetGrain<ILeaseTestGrain>(30);
+            Assert.Equal(secondary.SiloAddress, await leaseGrain.GetAddress());
+
+            await cluster.KillSiloAsync(secondary);
+
+            var directory = ((InProcessSiloHandle)primary).SiloHost.Services
+                .GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+
+            // Lookup should return null: the entry is retained for the lease hold,
+            // but the silo is dead so the directory filters it out.
+            var result = await directory.Lookup(leaseGrain.GetGrainId());
+            Assert.Null(result);
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task BlocksMultipleGrains_AfterUngracefulShutdown()
+    {
+        var builder = new TestClusterBuilder(2);
+        builder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+
+        var cluster = builder.Build();
+        await cluster.DeployAsync();
+
+        try
+        {
+            var primary = cluster.Primary;
+            var secondary = cluster.SecondarySilos[0];
+
+            // Place multiple grains on the secondary silo.
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, secondary.SiloAddress);
+            var grain1 = cluster.GrainFactory.GetGrain<ILeaseTestGrain>(41);
+            var grain2 = cluster.GrainFactory.GetGrain<ILeaseTestGrain>(42);
+            var grain3 = cluster.GrainFactory.GetGrain<ILeaseTestGrain>(43);
+            Assert.Equal(secondary.SiloAddress, await grain1.GetAddress());
+            Assert.Equal(secondary.SiloAddress, await grain2.GetAddress());
+            Assert.Equal(secondary.SiloAddress, await grain3.GetAddress());
+
+            await cluster.KillSiloAsync(secondary);
+
+            var directory = ((InProcessSiloHandle)primary).SiloHost.Services
+                .GetRequiredService<GrainDirectoryResolver>().DefaultGrainDirectory;
+
+            // All grains on the dead silo should be blocked by the lease hold.
+            await Assert.ThrowsAnyAsync<DirectoryLeaseHoldException>(
+                () => directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain1.GetGrainId())));
+            await Assert.ThrowsAnyAsync<DirectoryLeaseHoldException>(
+                () => directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain2.GetGrainId())));
+            await Assert.ThrowsAnyAsync<DirectoryLeaseHoldException>(
+                () => directory.Register(GrainAddress.NewActivationAddress(primary.SiloAddress, grain3.GetGrainId())));
+
+            // After the lease expires, all grains should reactivate on the primary.
+            TimeProvider.Advance(LeaseHoldDuration);
+
+            Assert.Equal(primary.SiloAddress, await grain1.GetAddress());
+            Assert.Equal(primary.SiloAddress, await grain2.GetAddress());
+            Assert.Equal(primary.SiloAddress, await grain3.GetAddress());
+        }
+        finally
+        {
+            await cluster.StopAllSilosAsync();
+            await cluster.DisposeAsync();
+        }
+    }
+
     private sealed class SiloBuilderConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder siloBuilder)
         {
             siloBuilder.ConfigureServices(sp => sp.AddSingleton<TimeProvider>(TimeProvider));
             siloBuilder.Configure<GrainDirectoryOptions>(o => o.SafetyLeaseHoldDuration = LeaseHoldDuration);
+#pragma warning disable ORLEANSEXP003
+            siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003
+        }
+    }
+
+    private sealed class DisabledLeaseSiloConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder siloBuilder)
+        {
+            siloBuilder.Configure<GrainDirectoryOptions>(o => o.SafetyLeaseHoldDuration = TimeSpan.Zero);
 #pragma warning disable ORLEANSEXP003
             siloBuilder.AddDistributedGrainDirectory();
 #pragma warning restore ORLEANSEXP003
