@@ -16,7 +16,7 @@ using Orleans.Serialization.TypeSystem;
 #nullable disable
 namespace Orleans.Runtime.MembershipService
 {
-    internal partial class MembershipTableManager : IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
+    internal partial class MembershipTableManager : IMembershipManager, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
     {
         private const int NUM_CONDITIONAL_WRITE_CONTENTION_ATTEMPTS = -1; // unlimited
         private const int NUM_CONDITIONAL_WRITE_ERROR_ATTEMPTS = -1;
@@ -91,19 +91,43 @@ namespace Orleans.Runtime.MembershipService
 
         public SiloStatus CurrentStatus { get; private set; } = SiloStatus.Created;
 
+        // IMembershipManager explicit interface implementations
+        MembershipTableSnapshot IMembershipManager.CurrentSnapshot => this.snapshot;
+        IAsyncEnumerable<MembershipTableSnapshot> IMembershipManager.MembershipUpdates => this.updates;
+        SiloStatus IMembershipManager.LocalSiloStatus => this.CurrentStatus;
+        Task IMembershipManager.UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => this.UpdateStatus(status);
+        Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo);
+#nullable enable
+        Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
+#nullable disable
+        Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
+        Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
+        Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive();
+
         private bool IsStopping => this.siloLifecycle.LowestStoppedStage <= ServiceLifecycleStage.Active;
 
         private Task pendingRefresh;
 
-        public async Task Refresh()
+        public async Task Refresh(MembershipVersion? targetVersion = null, CancellationToken cancellationToken = default)
         {
-            var pending = this.pendingRefresh;
-            if (pending == null || pending.IsCompleted)
+            while (!targetVersion.HasValue || this.snapshot.Version < targetVersion.Value)
             {
-                pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false);
-            }
+                cancellationToken.ThrowIfCancellationRequested();
 
-            await pending;
+                var pending = this.pendingRefresh;
+                if (pending == null || pending.IsCompleted)
+                {
+                    pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false);
+                }
+
+                await pending.WaitAsync(cancellationToken);
+
+                // If no target version specified, exit after single refresh
+                if (!targetVersion.HasValue)
+                {
+                    break;
+                }
+            }
         }
 
         public async Task RefreshFromSnapshot(MembershipTableSnapshot snapshot)
@@ -355,7 +379,7 @@ namespace Orleans.Runtime.MembershipService
                     throw new OrleansException($"Silo {myAddress} failed to update its status to {status} in the membership table due to write contention on the table after {numCalls} attempts.");
                 }
             }
-            catch (Exception exc)  when (!wasThrownLocally)
+            catch (Exception exc) when (!wasThrownLocally)
             {
                 LogWarningFailedToUpdateMyStatusDueToFailures(this.log, exc, myAddress, status, numCalls);
                 throw new OrleansException($"Silo {myAddress} failed to update its status to {status} in the table due to failures (socket failures or table read/write failures) after {numCalls} attempts", exc);

@@ -162,9 +162,10 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DeploymentLoadPublisher>();
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
-            services.AddSingleton<MembershipTableManager>();
-            services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+
+            services.TryAddSingleton<IMembershipManager, MembershipTableManager>();
+            services.AddFromExisting<IHealthCheckParticipant, IMembershipManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IMembershipManager>();
             services.AddSingleton<MembershipSystemTarget>();
             services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipSystemTarget>();
@@ -172,10 +173,11 @@ namespace Orleans.Hosting
             services.AddSingleton<IRemoteSiloProber, RemoteSiloProber>();
             services.AddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
-            services.AddSingleton<ClusterHealthMonitor>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
-            services.AddFromExisting<IHealthCheckParticipant, ClusterHealthMonitor>();
+            services.TryAddSingleton<IClusterHealthMonitor, ClusterHealthMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IClusterHealthMonitor>();
+            services.AddFromExisting<IHealthCheckParticipant, IClusterHealthMonitor>();
             services.AddSingleton<ProbeRequestMonitor>();
+            services.TryAddSingleton<IProbeHealthMonitor, ProbingSiloHealthMonitor>();
             services.AddSingleton<LocalSiloHealthMonitor>();
             services.AddFromExisting<ILocalSiloHealthMonitor, LocalSiloHealthMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalSiloHealthMonitor>();
@@ -535,7 +537,7 @@ namespace Orleans.Hosting
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0} && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
                 {
                     return true;
                 }
