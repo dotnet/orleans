@@ -177,7 +177,7 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IClusterHealthMonitor>();
             services.AddFromExisting<IHealthCheckParticipant, IClusterHealthMonitor>();
             services.AddSingleton<ProbeRequestMonitor>();
-            services.TryAddSingleton<IProbeHealthMonitor, DefaultProbeHealthMonitor>();
+            services.TryAddSingleton<IProbeHealthMonitor, ProbingSiloHealthMonitor>();
             services.AddSingleton<LocalSiloHealthMonitor>();
             services.AddFromExisting<ILocalSiloHealthMonitor, LocalSiloHealthMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalSiloHealthMonitor>();

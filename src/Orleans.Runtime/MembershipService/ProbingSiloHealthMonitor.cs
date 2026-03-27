@@ -19,18 +19,18 @@ namespace Orleans.Runtime.MembershipService;
 ///   <item><description>Received probe responses via <see cref="IClusterHealthMonitor.SiloMonitors"/></description></item>
 /// </list>
 /// </remarks>
-internal sealed partial class DefaultProbeHealthMonitor : IProbeHealthMonitor
+internal sealed partial class ProbingSiloHealthMonitor : IProbeHealthMonitor
 {
     private readonly ProbeRequestMonitor _probeRequestMonitor;
     private readonly IClusterHealthMonitor _clusterHealthMonitor;
     private readonly ClusterMembershipOptions _clusterMembershipOptions;
-    private readonly ILogger<DefaultProbeHealthMonitor> _logger;
+    private readonly ILogger<ProbingSiloHealthMonitor> _logger;
 
-    public DefaultProbeHealthMonitor(
+    public ProbingSiloHealthMonitor(
         ProbeRequestMonitor probeRequestMonitor,
         IClusterHealthMonitor clusterHealthMonitor,
         IOptions<ClusterMembershipOptions> clusterMembershipOptions,
-        ILogger<DefaultProbeHealthMonitor> logger)
+        ILogger<ProbingSiloHealthMonitor> logger)
     {
         _probeRequestMonitor = probeRequestMonitor;
         _clusterHealthMonitor = clusterHealthMonitor;
@@ -91,7 +91,7 @@ internal sealed partial class DefaultProbeHealthMonitor : IProbeHealthMonitor
 
         // Only consider recency of the last successful ping if this node is monitoring more than one other node.
         // Otherwise, it may fail to vote another node dead in a one or two node cluster.
-        if (monitoredNodeCount <= 1)
+        if (siloMonitors.Count <= 1)
         {
             return 0;
         }
