@@ -3,7 +3,6 @@ using Orleans.Streams;
 
 namespace Orleans.Streaming.Redis.Streams;
 
-#nullable disable
 [GenerateSerializer]
 [Alias(nameof(RedisStreamBatchContainer))]
 internal class RedisStreamBatchContainer : IBatchContainer
@@ -15,33 +14,37 @@ internal class RedisStreamBatchContainer : IBatchContainer
     public StreamSequenceToken SequenceToken { get; private set; }
 
     [Id(2)]
-    public List<object> Events { get; set; }
+    public List<object> Events { get; set; } = [];
 
     [Id(3)]
-    public Dictionary<string, object> RequestContext { get; set; }
+    public Dictionary<string, object>? RequestContext { get; set; }
 
     [NonSerialized]
-    internal EventSequenceTokenV2 sequenceTokenV2;
+    internal EventSequenceTokenV2? SequenceTokenV2;
 
     internal EventSequenceTokenV2 RealSequenceToken
     {
         get
         {
-            sequenceTokenV2 ??= (EventSequenceTokenV2)SequenceToken;
-            return sequenceTokenV2;
+            SequenceTokenV2 ??= (EventSequenceTokenV2)SequenceToken;
+            return SequenceTokenV2;
         }
         set
         {
-            sequenceTokenV2 = value;
-            SequenceToken = sequenceTokenV2;
+            SequenceTokenV2 = value;
+            SequenceToken = SequenceTokenV2;
         }
     }
 
-    public RedisStreamBatchContainer() { }
+    public RedisStreamBatchContainer()
+    {
 
-    public RedisStreamBatchContainer(StreamId streamId, List<object> events, Dictionary<string, object> requestContext)
+    }
+
+    public RedisStreamBatchContainer(StreamId streamId, StreamSequenceToken token, List<object> events, Dictionary<string, object> requestContext)
     {
         StreamId = streamId;
+        SequenceToken = token;
         Events = events ?? throw new ArgumentNullException(nameof(events), "Message contains no events");
         RequestContext = requestContext;
     }

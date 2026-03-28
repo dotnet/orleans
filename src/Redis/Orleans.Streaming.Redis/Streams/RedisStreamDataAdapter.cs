@@ -44,7 +44,7 @@ public class RedisStreamDataAdapterV1(Serializer serializer) : IQueueDataAdapter
 
     public StreamEntry ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
     {
-        var redisStreamBatchContainer = new RedisStreamBatchContainer(streamId, [.. events.Cast<object>()], requestContext);
+        var redisStreamBatchContainer = new RedisStreamBatchContainer(streamId, token, [.. events.Cast<object>()], requestContext);
         var rawBytes = _serializer.SerializeToArray(redisStreamBatchContainer);
         var base64String = Convert.ToBase64String(rawBytes);
 
