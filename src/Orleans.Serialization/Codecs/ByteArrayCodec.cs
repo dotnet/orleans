@@ -9,6 +9,7 @@ using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>
@@ -17,7 +18,8 @@ namespace Orleans.Serialization.Codecs
     [RegisterSerializer]
     public sealed partial class BitArrayCodec : IFieldCodec<BitArray>
     {
-#if NET8_0_OR_GREATER
+#if NET10_0_OR_GREATER
+#elif NET8_0_OR_GREATER
         [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_array")]
         extern static ref int[] GetSetArray(BitArray bitArray);
 #else
@@ -43,8 +45,12 @@ namespace Orleans.Serialization.Codecs
             field.EnsureWireType(WireType.LengthPrefixed);
             var numBytes = reader.ReadVarUInt32();
             var result = new BitArray((int)numBytes * 8, false);
+#if NET10_0_OR_GREATER
+            reader.ReadBytes(CollectionsMarshal.AsBytes(result)[..(int)numBytes]);
+#else
             var resultArray = GetSetArray(result);
             reader.ReadBytes(MemoryMarshal.AsBytes(resultArray.AsSpan()).Slice(0, (int)numBytes));
+#endif
 
             ReferenceCodec.RecordObject(reader.Session, result);
             return result;
@@ -58,16 +64,25 @@ namespace Orleans.Serialization.Codecs
             }
 
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(BitArray), WireType.LengthPrefixed);
+
+#if NET10_0_OR_GREATER
+            var bytes = CollectionsMarshal.AsBytes(value);
+            writer.WriteVarUInt32((uint)bytes.Length);
+            writer.Write(bytes);
+#else
             var numBytes = GetByteArrayLengthFromBitLength(value.Length);
             writer.WriteVarUInt32((uint)numBytes);
             writer.Write(MemoryMarshal.AsBytes(GetSetArray(value).AsSpan()).Slice(0, numBytes));
+#endif
 
+#if !NET10_0_OR_GREATER
             static int GetByteArrayLengthFromBitLength(int n)
             {
                 const int BitShiftPerByte = 3;
                 Debug.Assert(n >= 0);
                 return (int)((uint)(n - 1 + (1 << BitShiftPerByte)) >> BitShiftPerByte);
             }
+#endif
         }
     }
 
@@ -393,10 +408,7 @@ namespace Orleans.Serialization.Codecs
             ReferenceCodec.MarkValueField(writer.Session);
             writer.WriteFieldHeader(fieldIdDelta, expectedType, typeof(PooledBuffer), WireType.LengthPrefixed);
             writer.WriteVarUInt32((uint)value.Length);
-            foreach (var segment in value.GetEnumerator())
-            {
-                writer.Write(segment);
-            }
+            value.CopyTo(ref writer);
 
             // Dispose of the value after sending it.
             // PooledBuffer is special in this sense.

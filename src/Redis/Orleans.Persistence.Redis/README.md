@@ -71,6 +71,81 @@ public class MyGrain : Grain, IMyGrain, IGrainWithStringKey
 }
 ```
 
+## Configuration via Microsoft.Extensions.Configuration
+
+You can configure Orleans Redis persistence using `Microsoft.Extensions.Configuration` (such as `appsettings.json`) instead of configuring it in code. When using this approach, Orleans will automatically read the configuration from the `Orleans` section.
+
+> **Note**: You can use either `"ProviderType": "Redis"` or `"ProviderType": "AzureRedisCache"` - both are supported and functionally equivalent.
+
+### Example - appsettings.json
+```json
+{
+  "ConnectionStrings": {
+    "redis": "localhost:6379"
+  },
+  "Orleans": {
+    "ClusterId": "my-cluster",
+    "ServiceId": "MyOrleansService",
+    "GrainStorage": {
+      "redisStore": {
+        "ProviderType": "Redis",
+        "ServiceKey": "redis"
+      }
+    }
+  }
+}
+```
+
+### .NET Aspire Integration
+
+For applications using .NET Aspire, consider using the [.NET Aspire Redis integration](https://learn.microsoft.com/en-us/dotnet/aspire/caching/stackexchange-redis-integration) which provides simplified Redis configuration, automatic service discovery, health checks, and telemetry. The Aspire integration automatically configures connection strings that Orleans can consume via the configuration system.
+
+#### Example - Program.cs with Aspire Redis Integration
+```csharp
+using Microsoft.Extensions.Hosting;
+using Orleans.Hosting;
+using Microsoft.Extensions.DependencyInjection;
+
+var builder = Host.CreateApplicationBuilder(args);
+
+// Add service defaults (Aspire configurations)
+builder.AddServiceDefaults();
+
+// Add Redis via Aspire client integration
+builder.AddKeyedRedisClient("redis");
+
+// Add Orleans
+builder.UseOrleans();
+
+var host = builder.Build();
+await host.StartAsync();
+
+// Get a reference to a grain and call it
+var client = host.Services.GetRequiredService<IClusterClient>();
+var grain = client.GetGrain<IMyGrain>("user123");
+await grain.SetData("Hello from Aspire Redis!");
+var data = await grain.GetData();
+
+Console.WriteLine($"Grain data: {data}");
+await host.WaitForShutdownAsync();
+```
+
+This example assumes your AppHost project has configured Redis like this:
+```csharp
+// In your AppHost/Program.cs
+var builder = DistributedApplication.CreateBuilder(args);
+
+var redis = builder.AddRedis("redis");
+
+var orleans = builder.AddOrleans("orleans")
+    .WithGrainStorage("redisStore", redis);
+
+builder.AddProject<Projects.MyOrleansApp>("orleans-app")
+    .WithReference(orleans);
+
+builder.Build().Run();
+```
+
 ## Documentation
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)

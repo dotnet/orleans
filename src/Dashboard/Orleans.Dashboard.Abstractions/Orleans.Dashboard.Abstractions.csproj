@@ -4,7 +4,7 @@
     <PackageId>Microsoft.Orleans.Dashboard.Abstractions</PackageId>
     <Title>Microsoft Orleans Dashboard Abstractions</Title>
     <Description>Shared types used by the Orleans Dashboard package.</Description>
-    <TargetFramework>net8.0</TargetFramework>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <RootNamespace>Orleans.Dashboard</RootNamespace>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>

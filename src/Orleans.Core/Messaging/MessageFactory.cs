@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Serialization;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal partial class MessageFactory

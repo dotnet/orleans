@@ -4,180 +4,167 @@ using BenchmarkGrainInterfaces.Ping;
 using BenchmarkGrains.Ping;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 
-namespace Benchmarks.Ping
+namespace Benchmarks.Ping;
+
+/// <summary>
+/// Benchmarks grain-to-grain communication latency and throughput using simple ping operations.
+/// </summary>
+[MemoryDiagnoser]
+public class PingBenchmark : IDisposable
 {
-    /// <summary>
-    /// Benchmarks grain-to-grain communication latency and throughput using simple ping operations.
-    /// </summary>
-    [MemoryDiagnoser]
-    public class PingBenchmark : IDisposable
+    private readonly ConsoleCancelEventHandler _onCancelEvent;
+    private readonly List<IHost> hosts = new List<IHost>();
+    private readonly IPingGrain grain;
+    private readonly IClusterClient client;
+    private readonly IHost clientHost;
+
+    public PingBenchmark() : this(1, true) { }
+
+    public PingBenchmark(int numSilos, bool startClient, bool grainsOnSecondariesOnly = false)
     {
-        private readonly ConsoleCancelEventHandler _onCancelEvent;
-        private readonly List<IHost> hosts = new List<IHost>();
-        private readonly IPingGrain grain;
-        private readonly IClusterClient client;
-        private readonly IHost clientHost;
-
-        public PingBenchmark() : this(1, true) { }
-
-        public PingBenchmark(int numSilos, bool startClient, bool grainsOnSecondariesOnly = false)
+        for (var i = 0; i < numSilos; ++i)
         {
-            for (var i = 0; i < numSilos; ++i)
+            var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
+            var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
             {
-                var primary = i == 0 ? null : new IPEndPoint(IPAddress.Loopback, 11111);
-                var hostBuilder = new HostBuilder().UseOrleans((ctx, siloBuilder) =>
+                siloBuilder.UseLocalhostClustering(
+                    siloPort: 11111 + i,
+                    gatewayPort: 30000 + i,
+                    primarySiloEndpoint: primary);
+
+                if (i == 0 && grainsOnSecondariesOnly)
                 {
-#pragma warning disable ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-                    siloBuilder.AddActivationRepartitioner();
-#pragma warning restore ORLEANSEXP001 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
-                    siloBuilder.ConfigureLogging(l =>
-                    {
-                        l.AddConsole();
-                        l.AddFilter("Orleans.Runtime.Placement.Repartitioning", LogLevel.Debug);
-                    });
-                    siloBuilder.Configure<ActivationRepartitionerOptions>(o =>
-                    {
-                    });
-                    siloBuilder.UseLocalhostClustering(
-                        siloPort: 11111 + i,
-                        gatewayPort: 30000 + i,
-                        primarySiloEndpoint: primary);
+                    siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
+                }
+            });
 
-                    if (i == 0 && grainsOnSecondariesOnly)
-                    {
-                        siloBuilder.Configure<GrainTypeOptions>(options => options.Classes.Remove(typeof(PingGrain)));
-                    }
-                });
+            var host = hostBuilder.Build();
 
-                var host = hostBuilder.Build();
+            host.StartAsync().GetAwaiter().GetResult();
+            this.hosts.Add(host);
+        }
 
-                host.StartAsync().GetAwaiter().GetResult();
-                this.hosts.Add(host);
-            }
+        if (grainsOnSecondariesOnly) Thread.Sleep(4000);
 
-            if (grainsOnSecondariesOnly) Thread.Sleep(4000);
-
-            if (startClient)
+        if (startClient)
+        {
+            var hostBuilder = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
             {
-                var hostBuilder = new HostBuilder().UseOrleansClient((ctx, clientBuilder) =>
+                if (numSilos == 1)
                 {
-                    if (numSilos == 1)
-                    {
-                        clientBuilder.UseLocalhostClustering();
-                    }
-                    else
-                    {
-                        var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
-                        clientBuilder.UseStaticClustering(gateways);
-                    }
-                });
-
-                this.clientHost = hostBuilder.Build();
-                this.clientHost.StartAsync().GetAwaiter().GetResult();
-
-                this.client = this.clientHost.Services.GetRequiredService<IClusterClient>();
-                var grainFactory = this.client;
-
-                this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-                this.grain.Run().AsTask().GetAwaiter().GetResult();
-            }
-
-            _onCancelEvent = CancelPressed;
-            Console.CancelKeyPress += _onCancelEvent;
-        }
-
-        private void CancelPressed(object sender, ConsoleCancelEventArgs e)
-        {
-            Environment.Exit(0);
-        }
-
-        [Benchmark]
-        public ValueTask Ping() => grain.Run();
-
-        public async Task PingForever()
-        {
-            while (true)
-            {
-                await grain.Run();
-            }
-        }
-
-        public Task PingConcurrentForever() => this.Run(
-            runs: int.MaxValue,
-            grainFactory: this.client,
-            blocksPerWorker: 10);
-
-        public Task PingConcurrent() => this.Run(
-            runs: 3,
-            grainFactory: this.client,
-            blocksPerWorker: 10);
-
-        public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
-            runs: 3,
-            grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
-            blocksPerWorker: blocksPerWorker);
-
-        private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
-        {
-            var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
-                maxConcurrency: 250,
-                blocksPerWorker: blocksPerWorker,
-                requestsPerBlock: 500,
-                issueRequest: g => g.Run(),
-                getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
-            await loadGenerator.Warmup();
-            while (runs-- > 0) await loadGenerator.Run();
-        }
-
-        public async Task PingPongForever()
-        {
-            var other = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
-            while (true)
-            {
-                await grain.PingPongInterleave(other, 100);
-            }
-        }
-
-        public async Task Shutdown()
-        {
-            if (clientHost is { } client)
-            {
-                await client.StopAsync();
-                if (client is IAsyncDisposable asyncDisposable)
-                {
-                    await asyncDisposable.DisposeAsync();
+                    clientBuilder.UseLocalhostClustering();
                 }
                 else
                 {
-                    client.Dispose();
+                    var gateways = Enumerable.Range(30000, numSilos).Select(i => new IPEndPoint(IPAddress.Loopback, i)).ToArray();
+                    clientBuilder.UseStaticClustering(gateways);
                 }
-            }
+            });
 
-            this.hosts.Reverse();
-            foreach (var host in this.hosts)
-            {
-                await host.StopAsync();
-                if (host is IAsyncDisposable asyncDisposable)
-                {
-                    await asyncDisposable.DisposeAsync();
-                }
-                else
-                {
-                    host.Dispose();
-                }
-            }
+            this.clientHost = hostBuilder.Build();
+            this.clientHost.StartAsync().GetAwaiter().GetResult();
+
+            this.client = this.clientHost.Services.GetRequiredService<IClusterClient>();
+            var grainFactory = this.client;
+
+            this.grain = grainFactory.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+            this.grain.Run().AsTask().GetAwaiter().GetResult();
         }
 
-        [GlobalCleanup]
-        public void Dispose()
+        _onCancelEvent = CancelPressed;
+        Console.CancelKeyPress += _onCancelEvent;
+    }
+
+    private void CancelPressed(object sender, ConsoleCancelEventArgs e)
+    {
+        Environment.Exit(0);
+    }
+
+    [Benchmark]
+    public ValueTask Ping() => grain.Run();
+
+    public async Task PingForever()
+    {
+        while (true)
         {
-            (this.client as IDisposable)?.Dispose();
-            this.hosts.ForEach(h => h.Dispose());
-
-            Console.CancelKeyPress -= _onCancelEvent;
+            await grain.Run();
         }
+    }
+
+    public Task PingConcurrentForever() => this.Run(
+        runs: int.MaxValue,
+        grainFactory: this.client,
+        blocksPerWorker: 10);
+
+    public Task PingConcurrent() => this.Run(
+        runs: 3,
+        grainFactory: this.client,
+        blocksPerWorker: 10);
+
+    public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
+        runs: 3,
+        grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
+        blocksPerWorker: blocksPerWorker);
+
+    private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
+    {
+        var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
+            maxConcurrency: 250,
+            blocksPerWorker: blocksPerWorker,
+            requestsPerBlock: 500,
+            issueRequest: g => g.Run(),
+            getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId));
+        await loadGenerator.Warmup();
+        while (runs-- > 0) await loadGenerator.Run();
+    }
+
+    public async Task PingPongForever()
+    {
+        var other = this.client.GetGrain<IPingGrain>(Guid.NewGuid().GetHashCode());
+        while (true)
+        {
+            await grain.PingPongInterleave(other, 100);
+        }
+    }
+
+    public async Task Shutdown()
+    {
+        if (clientHost is { } client)
+        {
+            await client.StopAsync();
+            if (client is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
+            else
+            {
+                client.Dispose();
+            }
+        }
+
+        this.hosts.Reverse();
+        foreach (var host in this.hosts)
+        {
+            await host.StopAsync();
+            if (host is IAsyncDisposable asyncDisposable)
+            {
+                await asyncDisposable.DisposeAsync();
+            }
+            else
+            {
+                host.Dispose();
+            }
+        }
+    }
+
+    [GlobalCleanup]
+    public void Dispose()
+    {
+        (this.client as IDisposable)?.Dispose();
+        this.hosts.ForEach(h => h.Dispose());
+
+        Console.CancelKeyPress -= _onCancelEvent;
     }
 }

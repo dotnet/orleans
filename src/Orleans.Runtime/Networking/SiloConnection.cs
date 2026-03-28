@@ -1,4 +1,3 @@
-#nullable enable
 
 using System;
 using System.Diagnostics;
@@ -113,7 +112,7 @@ namespace Orleans.Runtime.Messaging
             if (!msg.TargetSilo.Endpoint.Equals(this.LocalSiloAddress.Endpoint))
             {
                 // If the message is for some other silo altogether, then we need to forward it.
-                LogTraceForwardingMessage(this.Log, msg.Id, msg.SendingSilo, msg.TargetSilo);
+                LogTraceForwardingMessage(this.Log, msg.Id, msg.SendingSilo!, msg.TargetSilo);
                 messageCenter.SendMessage(msg);
                 return;
             }
@@ -145,9 +144,9 @@ namespace Orleans.Runtime.Messaging
             MessagingInstruments.OnPingReceive(msg.SendingSilo);
 
             var objectId = RuntimeHelpers.GetHashCode(msg);
-            LogTraceRespondingToPing(this.Log, msg.SendingSilo, objectId, msg);
+            LogTraceRespondingToPing(this.Log, msg.SendingSilo!, objectId, msg);
 
-            if (!msg.TargetSilo.Equals(this.LocalSiloAddress))
+            if (!this.LocalSiloAddress.Equals(msg.TargetSilo))
             {
                 // Got ping that is not destined to me. For example, got a ping to my older incarnation.
                 MessagingInstruments.OnRejectedMessage(msg);

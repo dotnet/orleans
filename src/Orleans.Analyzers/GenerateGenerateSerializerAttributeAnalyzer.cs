@@ -1,9 +1,6 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
-using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using System.Collections.Immutable;
-using System.Linq;
 
 namespace Orleans.Analyzers
 {
@@ -18,23 +15,31 @@ namespace Orleans.Analyzers
 
         internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Info, isEnabledByDefault: true, description: Description);
 
-        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics => ImmutableArray.Create(Rule);
+        public override ImmutableArray<DiagnosticDescriptor> SupportedDiagnostics { get; } = [Rule];
 
         public override void Initialize(AnalysisContext context)
         {
             context.EnableConcurrentExecution();
-            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
-            context.RegisterSyntaxNodeAction(CheckSyntaxNode, SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration, SyntaxKind.RecordDeclaration, SyntaxKind.RecordStructDeclaration);
+            context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.None);
+            context.RegisterCompilationStartAction(context =>
+            {
+                var serializableAttributeSymbol = context.Compilation.GetTypeByMetadataName("System.SerializableAttribute");
+                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+                if (serializableAttributeSymbol is not null && generateSerializerAttributeSymbol is not null)
+                {
+                    context.RegisterSymbolAction(context => AnalyzeNamedType(context, serializableAttributeSymbol, generateSerializerAttributeSymbol), SymbolKind.NamedType);
+                }
+            });
         }
 
-        private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+        private static void AnalyzeNamedType(SymbolAnalysisContext context, INamedTypeSymbol serializableAttributeSymbol, INamedTypeSymbol generateSerializerAttributeSymbol)
         {
-            if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)))
+            var symbol = (INamedTypeSymbol)context.Symbol;
+            if (!symbol.IsStatic)
             {
-                if (declaration.TryGetAttribute(Constants.SerializableAttributeName, out var attribute) && !declaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+                if (symbol.HasAttribute(serializableAttributeSymbol) && !symbol.HasAttribute(generateSerializerAttributeSymbol))
                 {
-
-                    context.ReportDiagnostic(Diagnostic.Create(Rule, attribute.GetLocation(), new object[] { declaration.Identifier.ToString() }));
+                    context.ReportDiagnostic(Diagnostic.Create(Rule, symbol.Locations[0], symbol.Name));
                 }
             }
         }

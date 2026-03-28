@@ -19,5 +19,5 @@ public interface IRetryTestGrain : IGrainWithStringKey
 
     Task<List<int>> GetJobDequeueCountHistory(string jobId);
 
-    Task<IDurableJobContext> GetFinalJobContext(string jobId);
+    Task<IJobRunContext> GetFinalJobRun(string jobId);
 }

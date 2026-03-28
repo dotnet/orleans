@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 
 namespace Orleans.Transactions.TestKit
 {
@@ -145,7 +145,7 @@ namespace Orleans.Transactions.TestKit
             ITransactionCoordinatorGrain coordinator = this.grainFactory.GetGrain<ITransactionCoordinatorGrain>(Guid.NewGuid());
 
             await grain.Set(expected);
-            Func<Task> task = () => coordinator.OrphanCallTransaction(grain);
+            Func<Task> task = () => coordinator.OrphanCallTransaction();
             await task.Should().ThrowAsync<OrleansOrphanCallException>();
 
             //await Task.Delay(20000); // give time for GC

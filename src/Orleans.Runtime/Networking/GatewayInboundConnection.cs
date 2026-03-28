@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class GatewayInboundConnection : Connection

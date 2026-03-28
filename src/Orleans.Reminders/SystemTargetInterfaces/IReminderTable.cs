@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -87,7 +88,6 @@ namespace Orleans
     /// <summary>
     /// Reminder table interface for grain based implementation.
     /// </summary>
-    [Unordered]
     internal interface IReminderTableGrain : IGrainWithIntegerKey
     {
         Task<ReminderTableData> ReadRows(GrainId grainId);

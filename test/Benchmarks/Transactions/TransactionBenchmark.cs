@@ -4,150 +4,149 @@ using TestExtensions;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Transactions;
 
-namespace Benchmarks.Transactions
+namespace Benchmarks.Transactions;
+
+public class TransactionBenchmark : IDisposable
 {
-    public class TransactionBenchmark : IDisposable
+    private TestCluster host;
+    private readonly int runs;
+    private readonly int transactionsPerRun;
+    private readonly int concurrent;
+
+    public TransactionBenchmark(int runs, int transactionsPerRun, int concurrent)
     {
-        private TestCluster host;
-        private readonly int runs;
-        private readonly int transactionsPerRun;
-        private readonly int concurrent;
+        this.runs = runs;
+        this.transactionsPerRun = transactionsPerRun;
+        this.concurrent = concurrent;
+    }
 
-        public TransactionBenchmark(int runs, int transactionsPerRun, int concurrent)
+    public void MemorySetup()
+    {
+        var builder = new TestClusterBuilder(4);
+        builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
+        builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
+        this.host = builder.Build();
+        this.host.Deploy();
+    }
+
+    public void MemoryThrottledSetup()
+    {
+        var builder = new TestClusterBuilder(4);
+        builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
+        builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
+        builder.AddSiloBuilderConfigurator<SiloTransactionThrottlingConfigurator>();
+        this.host = builder.Build();
+        this.host.Deploy();
+    }
+
+    public void AzureSetup()
+    {
+        var builder = new TestClusterBuilder(4);
+        builder.AddSiloBuilderConfigurator<SiloAzureStorageConfigurator>();
+        builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
+        this.host = builder.Build();
+        this.host.Deploy();
+    }
+
+    public void AzureThrottledSetup()
+    {
+        var builder = new TestClusterBuilder(4);
+        builder.AddSiloBuilderConfigurator<SiloAzureStorageConfigurator>();
+        builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
+        builder.AddSiloBuilderConfigurator<SiloTransactionThrottlingConfigurator>();
+        this.host = builder.Build();
+        this.host.Deploy();
+    }
+
+    public class SiloMemoryStorageConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
         {
-            this.runs = runs;
-            this.transactionsPerRun = transactionsPerRun;
-            this.concurrent = concurrent;
+            hostBuilder.AddMemoryGrainStorageAsDefault();
         }
+    }
 
-        public void MemorySetup()
+    public class SiloAzureStorageConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
         {
-            var builder = new TestClusterBuilder(4);
-            builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
-        }
-
-        public void MemoryThrottledSetup()
-        {
-            var builder = new TestClusterBuilder(4);
-            builder.AddSiloBuilderConfigurator<SiloMemoryStorageConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloTransactionThrottlingConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
-        }
-
-        public void AzureSetup()
-        {
-            var builder = new TestClusterBuilder(4);
-            builder.AddSiloBuilderConfigurator<SiloAzureStorageConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
-        }
-
-        public void AzureThrottledSetup()
-        {
-            var builder = new TestClusterBuilder(4);
-            builder.AddSiloBuilderConfigurator<SiloAzureStorageConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloTransactionConfigurator>();
-            builder.AddSiloBuilderConfigurator<SiloTransactionThrottlingConfigurator>();
-            this.host = builder.Build();
-            this.host.Deploy();
-        }
-
-        public class SiloMemoryStorageConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
+            hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
             {
-                hostBuilder.AddMemoryGrainStorageAsDefault();
-            }
+                options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
+            });
         }
+    }
 
-        public class SiloAzureStorageConfigurator : ISiloConfigurator
+    public class SiloTransactionThrottlingConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
         {
-            public void Configure(ISiloBuilder hostBuilder)
+            hostBuilder.Configure<TransactionRateLoadSheddingOptions>(options =>
             {
-                hostBuilder.AddAzureTableTransactionalStateStorageAsDefault(options =>
-                {
-                    options.TableServiceClient = new(TestDefaultConfiguration.DataConnectionString);
-                });
-            }
+                options.Enabled = true;
+                options.Limit = 50;
+            });
         }
+    }
 
-        public class SiloTransactionThrottlingConfigurator : ISiloConfigurator
+    public async Task RunAsync()
+    {
+        Console.WriteLine($"Cold Run.");
+        await FullRunAsync();
+        for(int i=0; i<runs; i++)
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.Configure<TransactionRateLoadSheddingOptions>(options =>
-                {
-                    options.Enabled = true;
-                    options.Limit = 50;
-                });
-            }
-        }
-
-        public async Task RunAsync()
-        {
-            Console.WriteLine($"Cold Run.");
+            Console.WriteLine($"Warm Run {i+1}.");
             await FullRunAsync();
-            for(int i=0; i<runs; i++)
-            {
-                Console.WriteLine($"Warm Run {i+1}.");
-                await FullRunAsync();
-            }
         }
+    }
 
-        private async Task FullRunAsync()
+    private async Task FullRunAsync()
+    {
+        int runners = Math.Max(1,(int)Math.Sqrt(concurrent));
+        int transactionsPerRunner = Math.Max(1, this.transactionsPerRun / runners);
+        Report[] reports = await Task.WhenAll(Enumerable.Range(0, runners).Select(i => RunAsync(i, transactionsPerRunner, runners)));
+        Report finalReport = new Report();
+        foreach (Report report in reports)
         {
-            int runners = Math.Max(1,(int)Math.Sqrt(concurrent));
-            int transactionsPerRunner = Math.Max(1, this.transactionsPerRun / runners);
-            Report[] reports = await Task.WhenAll(Enumerable.Range(0, runners).Select(i => RunAsync(i, transactionsPerRunner, runners)));
-            Report finalReport = new Report();
-            foreach (Report report in reports)
-            {
-                finalReport.Succeeded += report.Succeeded;
-                finalReport.Failed += report.Failed;
-                finalReport.Throttled += report.Throttled;
-                finalReport.Elapsed = TimeSpan.FromMilliseconds(Math.Max(finalReport.Elapsed.TotalMilliseconds, report.Elapsed.TotalMilliseconds));
-            }
-            Console.WriteLine($"{finalReport.Succeeded} transactions in {finalReport.Elapsed.TotalMilliseconds}ms.");
-            Console.WriteLine($"{(int)(finalReport.Succeeded * 1000 / finalReport.Elapsed.TotalMilliseconds)} transactions per second.");
-            Console.WriteLine($"{finalReport.Failed} transactions failed.");
-            Console.WriteLine($"{finalReport.Throttled} transactions were throttled.");
+            finalReport.Succeeded += report.Succeeded;
+            finalReport.Failed += report.Failed;
+            finalReport.Throttled += report.Throttled;
+            finalReport.Elapsed = TimeSpan.FromMilliseconds(Math.Max(finalReport.Elapsed.TotalMilliseconds, report.Elapsed.TotalMilliseconds));
         }
+        Console.WriteLine($"{finalReport.Succeeded} transactions in {finalReport.Elapsed.TotalMilliseconds}ms.");
+        Console.WriteLine($"{(int)(finalReport.Succeeded * 1000 / finalReport.Elapsed.TotalMilliseconds)} transactions per second.");
+        Console.WriteLine($"{finalReport.Failed} transactions failed.");
+        Console.WriteLine($"{finalReport.Throttled} transactions were throttled.");
+    }
 
-        public async Task<Report> RunAsync(int run, int transactiosPerRun, int concurrentPerRun)
+    public async Task<Report> RunAsync(int run, int transactiosPerRun, int concurrentPerRun)
+    {
+        ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
+        await load.Generate(run, transactiosPerRun, concurrentPerRun);
+        Report report = null;
+        while (report == null)
         {
-            ILoadGrain load = this.host.Client.GetGrain<ILoadGrain>(Guid.NewGuid());
-            await load.Generate(run, transactiosPerRun, concurrentPerRun);
-            Report report = null;
-            while (report == null)
-            {
-                await Task.Delay(TimeSpan.FromSeconds(10));
-                report = await load.TryGetReport();
-            }
-            return report;
+            await Task.Delay(TimeSpan.FromSeconds(10));
+            report = await load.TryGetReport();
         }
+        return report;
+    }
 
-        public void Teardown()
-        {
-            host.StopAllSilos();
-        }
+    public void Teardown()
+    {
+        host.StopAllSilos();
+    }
 
-        public void Dispose()
-        {
-            host?.Dispose();
-        }
+    public void Dispose()
+    {
+        host?.Dispose();
+    }
 
-        public sealed class SiloTransactionConfigurator : ISiloConfigurator
+    public sealed class SiloTransactionConfigurator : ISiloConfigurator
+    {
+        public void Configure(ISiloBuilder hostBuilder)
         {
-            public void Configure(ISiloBuilder hostBuilder)
-            {
-                hostBuilder.UseTransactions();
-            }
+            hostBuilder.UseTransactions();
         }
     }
 }

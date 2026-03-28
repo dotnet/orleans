@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 
+#nullable disable
 namespace Orleans.Serialization.TestKit
 {
     [ExcludeFromCodeCoverage]

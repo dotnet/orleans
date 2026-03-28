@@ -10,6 +10,7 @@ using Orleans;
 using Orleans.Configuration.Overrides;
 using Orleans.Serialization;
 
+#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     /// <summary> Factory class for Azure Queue based stream provider.</summary>
@@ -37,6 +38,8 @@ namespace OrleansAWSUtils.Streams
             Orleans.Serialization.Serializer serializer, 
             ILoggerFactory loggerFactory)
         {
+            ArgumentNullException.ThrowIfNull(serializer);
+
             this.providerName = name;
             this.sqsOptions = sqsOptions;
             this.clusterOptions = clusterOptions.Value;

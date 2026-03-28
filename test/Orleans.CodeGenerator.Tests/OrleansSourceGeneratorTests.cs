@@ -1,6 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGenerator.Diagnostics;
@@ -103,7 +104,6 @@ public class DemoDataWithFields
     [Id(1)]
     private readonly string _stringValue;
 
-    [GeneratedActivatorConstructor]
     public DemoDataWithFields(int intValue, string stringValue)
     {
         _intValue = intValue;
@@ -139,7 +139,6 @@ public class DerivedData : BaseData
     [Id(1)]
     public string DerivedValue { get; set; } = string.Empty;
 
-    [OrleansConstructor]
     public DerivedData(string baseValue, string derivedValue) : base(baseValue)
     {
         DerivedValue = derivedValue;
@@ -576,7 +575,6 @@ namespace TestProject;
 [GenerateSerializer]
 public class NoPublicCtor
 {
-    [OrleansConstructor]
     private NoPublicCtor() { }
 
     [Id(0)]
@@ -630,12 +628,13 @@ public class InterfaceCtorParam
 }");
 
     [Fact]
-    public Task TestClassesWithOrleansConstructorAnnotation() => AssertSuccessfulSourceGeneration(
+    public Task TestClassesWithGeneratedActivatorConstructorAnnotation() => AssertSuccessfulSourceGeneration(
 @"using Orleans;
 
 namespace TestProject;
 
-public class ClassWithOrleansConstructor
+[GenerateSerializer]
+public class ClassWithGeneratedActivatorConstructor
 {
     [Id(0)]
     public int Value { get; set; }
@@ -643,14 +642,15 @@ public class ClassWithOrleansConstructor
     [Id(1)]
     public string Name { get; set; } = string.Empty;
 
-    [OrleansConstructor]
-    public ClassWithOrleansConstructor(int value, string name)
+    [GeneratedActivatorConstructor]
+    public ClassWithGeneratedActivatorConstructor()
     {
-        Value = value;
-        Name = name;
     }
 
-    public ClassWithOrleansConstructor() { }
+    public ClassWithGeneratedActivatorConstructor(int value)
+    {
+        Value = value;
+    }
 }");
 
     [Fact]
@@ -683,15 +683,8 @@ public enum MyCustomEnum
 [GenerateSerializer(GenerateFieldIds = GenerateFieldIds.PublicProperties), Immutable]
 public class ClassWithImplicitFieldIds
 {
-    public string StringValue { get; }
-    public MyCustomEnum EnumValue { get; }
-
-    [OrleansConstructor]
-    public ClassWithImplicitFieldIds(string stringValue, MyCustomEnum enumValue)
-    {
-        StringValue = stringValue;
-        EnumValue = enumValue;
-    }
+    public string StringValue { get; set; } = string.Empty;
+    public MyCustomEnum EnumValue { get; set; }
 }");
 
     /// <summary>
@@ -1009,7 +1002,6 @@ public class DemoClass
         // This triggers the Orleans code generator's logic to emit a diagnostic if [GenerateSerializer] is used in such an assembly.
         var compilation = await CreateCompilation(code, "TestProject");
         var referenceAssemblyAttribute = SyntaxFactory.Attribute(SyntaxFactory.ParseName("System.Runtime.CompilerServices.ReferenceAssemblyAttribute"));
-        var attrList = SyntaxFactory.AttributeList(SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute));
         var assemblyAttr = SyntaxFactory.AttributeList(
             SyntaxFactory.SingletonSeparatedList(referenceAssemblyAttribute))
             .WithTarget(SyntaxFactory.AttributeTargetSpecifier(SyntaxFactory.Token(SyntaxKind.AssemblyKeyword)));
@@ -1020,14 +1012,90 @@ public class DemoClass
         // leave only syntaxTree with the ReferenceAssemblyAttribute
         compilation = compilation.RemoveSyntaxTrees(compilation.SyntaxTrees[0]).AddSyntaxTrees(newTree);
 
+        var result = RunSourceGenerator(compilation);
+        Assert.Contains(result.Diagnostics, d => d.Id == DiagnosticRuleId.ReferenceAssemblyWithGenerateSerializer);
+    }
+
+    [Fact]
+    public async Task RemovedCustomAttributeBuildPropertiesAreIgnored()
+    {
+        var code = """
+            using System;
+            using Orleans;
+
+            namespace TestProject;
+
+            [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+            public sealed class CustomGenerateSerializerAttribute : Attribute
+            {
+            }
+
+            [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct | AttributeTargets.Field | AttributeTargets.Property)]
+            public sealed class CustomImmutableAttribute : Attribute
+            {
+            }
+
+            [AttributeUsage(AttributeTargets.Class | AttributeTargets.Struct)]
+            public sealed class CustomAliasAttribute : Attribute
+            {
+                public CustomAliasAttribute(string value)
+                {
+                }
+            }
+
+            [AttributeUsage(AttributeTargets.Field | AttributeTargets.Property)]
+            public sealed class CustomIdAttribute : Attribute
+            {
+                public CustomIdAttribute(uint id)
+                {
+                }
+            }
+
+            [CustomGenerateSerializer, CustomAlias("custom")]
+            public class DemoData
+            {
+                [CustomId(0), CustomImmutable]
+                public string Value { get; set; } = string.Empty;
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var baselineResult = RunSourceGenerator(compilation);
+        var configuredResult = RunSourceGenerator(
+            compilation,
+            new Dictionary<string, string>
+            {
+                ["build_property.orleans_immutableattributes"] = "TestProject.CustomImmutableAttribute",
+                ["build_property.orleans_idattributes"] = "TestProject.CustomIdAttribute",
+                ["build_property.orleans_aliasattributes"] = "TestProject.CustomAliasAttribute",
+                ["build_property.orleans_generateserializerattributes"] = "TestProject.CustomGenerateSerializerAttribute",
+            });
+
+        Assert.Single(baselineResult.GeneratedSources);
+        Assert.Single(configuredResult.GeneratedSources);
+        Assert.Equal(
+            baselineResult.GeneratedSources[0].SourceText.ToString(),
+            configuredResult.GeneratedSources[0].SourceText.ToString());
+        Assert.Equal(
+            baselineResult.Diagnostics.Select(d => d.Id).OrderBy(id => id),
+            configuredResult.Diagnostics.Select(d => d.Id).OrderBy(id => id));
+    }
+
+    private static GeneratorRunResult RunSourceGenerator(
+        CSharpCompilation compilation,
+        IReadOnlyDictionary<string, string>? globalOptions = null)
+    {
+        AnalyzerConfigOptionsProvider? optionsProvider = globalOptions is null
+            ? null
+            : new TestAnalyzerConfigOptionsProvider(globalOptions);
+
         var generator = new OrleansSerializationSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
+            optionsProvider: optionsProvider,
             driverOptions: new GeneratorDriverOptions(default));
         driver = driver.RunGenerators(compilation);
-
-        var result = driver.GetRunResult().Results.Single();
-        Assert.Contains(result.Diagnostics, d => d.Id == DiagnosticRuleId.ReferenceAssemblyWithGenerateSerializer);
+        return driver.GetRunResult().Results.Single();
     }
 
     /// <summary>
@@ -1040,16 +1108,7 @@ public class DemoClass
         var projectName = "TestProject";
         var compilation = await CreateCompilation(code, projectName);
         Assert.Empty(compilation.GetDiagnostics());
-        var generator = new OrleansSerializationSourceGenerator();
-
-        GeneratorDriver driver = CSharpGeneratorDriver.Create(
-            generators: [generator],
-            driverOptions: new GeneratorDriverOptions(default));
-
-        // Run the generator
-        driver = driver.RunGenerators(compilation);
-
-        var result = driver.GetRunResult().Results.Single();
+        var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
 
         Assert.Single(result.GeneratedSources);
@@ -1059,6 +1118,35 @@ public class DemoClass
         await Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
     }
 
+    private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
+    {
+        private static readonly AnalyzerConfigOptions EmptyOptions = new TestAnalyzerConfigOptions(new Dictionary<string, string>());
+        private readonly AnalyzerConfigOptions _globalOptions;
+
+        public TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string> globalOptions)
+        {
+            _globalOptions = new TestAnalyzerConfigOptions(globalOptions);
+        }
+
+        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => EmptyOptions;
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => EmptyOptions;
+    }
+
+    private sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
+    {
+        private readonly IReadOnlyDictionary<string, string> _options;
+
+        public TestAnalyzerConfigOptions(IReadOnlyDictionary<string, string> options)
+        {
+            _options = options;
+        }
+
+        public override bool TryGetValue(string key, out string value) => _options.TryGetValue(key, out value!);
+    }
+
     /// <summary>
     /// Creates a Roslyn compilation with the necessary Orleans references.
     /// This simulates the build environment where the source generator runs,
@@ -1066,7 +1154,17 @@ public class DemoClass
     /// </summary>
     private static async Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
     {
+#if NET10_0_OR_GREATER
+        // Manually construct .NET 10.0 reference assemblies
+        var net10References = new ReferenceAssemblies(
+            "net10.0",
+            new PackageIdentity("Microsoft.NETCore.App.Ref", "10.0.0"),
+            Path.Combine("ref", "net10.0"));
+        
+        var references = await net10References.ResolveAsync(LanguageNames.CSharp, default);
+#else
         var references = await ReferenceAssemblies.Net.Net80.ResolveAsync(LanguageNames.CSharp, default);
+#endif
 
         // Add the Orleans Orleans.Core.Abstractions assembly
         references = references.AddRange(

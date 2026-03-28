@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.AzureUtils.Utilities;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.AzureUtils
 {
     /// <summary>

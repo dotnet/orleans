@@ -4,6 +4,7 @@ using Orleans.Serialization.Serializers;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.AzureStorage
 {
     public partial class AzureTableTransactionalStateStorage<TState> : ITransactionalStateStorage<TState>

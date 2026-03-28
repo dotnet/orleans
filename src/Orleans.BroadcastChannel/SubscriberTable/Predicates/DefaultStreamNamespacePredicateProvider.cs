@@ -1,6 +1,7 @@
 using System;
 using Orleans.Serialization.TypeSystem;
 
+#nullable disable
 namespace Orleans.BroadcastChannel
 {
     /// <summary>
@@ -77,6 +78,12 @@ namespace Orleans.BroadcastChannel
             }
 
             var type = Type.GetType(typeName, throwOnError: true);
+
+            if (!typeof(IChannelNamespacePredicate).IsAssignableFrom(type))
+            {
+                throw new InvalidOperationException($"Type \"{type}\" is not a valid channel namespace predicate because it does not implement {nameof(IChannelNamespacePredicate)}.");
+            }
+
             if (string.IsNullOrEmpty(arg))
             {
                 predicate = (IChannelNamespacePredicate)Activator.CreateInstance(type);

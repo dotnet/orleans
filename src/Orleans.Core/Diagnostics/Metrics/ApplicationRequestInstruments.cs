@@ -1,34 +1,41 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 namespace Orleans.Runtime;
 
-internal static class ApplicationRequestInstruments
+internal class ApplicationRequestInstruments
 {
-    internal static Counter<long> TimedOutRequestsCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.APP_REQUESTS_TIMED_OUT);
-    internal static Counter<long> CanceledRequestsCounter = Instruments.Meter.CreateCounter<long>(InstrumentNames.APP_REQUESTS_CANCELED);
+    private readonly Counter<long> _timedOutRequestsCounter;
+    private readonly Counter<long> _canceledRequestsCounter;
 
-    private static readonly long[] AppRequestsLatencyHistogramBuckets = new long[] { 1, 2, 4, 6, 8, 10, 50, 100, 200, 400, 800, 1_000, 1_500, 2_000, 5_000, 10_000, 15_000 };
-    private static readonly HistogramAggregator AppRequestsLatencyHistogramAggregator = new(AppRequestsLatencyHistogramBuckets, Array.Empty<KeyValuePair<string, object>>(), value => new ("duration", $"{value}ms"));
-    private static readonly ObservableCounter<long> AppRequestsLatencyHistogramBucket = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-bucket", AppRequestsLatencyHistogramAggregator.CollectBuckets);
-    private static readonly ObservableCounter<long> AppRequestsLatencyHistogramCount = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-count", AppRequestsLatencyHistogramAggregator.CollectCount);
-    private static readonly ObservableCounter<long> AppRequestsLatencyHistogramSum = Instruments.Meter.CreateObservableCounter<long>(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-sum", AppRequestsLatencyHistogramAggregator.CollectSum);
+    private static readonly long[] AppRequestsLatencyHistogramBuckets = [1, 2, 4, 6, 8, 10, 50, 100, 200, 400, 800, 1_000, 1_500, 2_000, 5_000, 10_000, 15_000];
+    private readonly HistogramAggregator _appRequestsLatencyHistogramAggregator;
+    private readonly ObservableCounter<long> _appRequestsLatencyHistogramBucket;
+    private readonly ObservableCounter<long> _appRequestsLatencyHistogramCount;
+    private readonly ObservableCounter<long> _appRequestsLatencyHistogramSum;
 
-
-    internal static void OnAppRequestsEnd(long durationMilliseconds)
+    internal ApplicationRequestInstruments(OrleansInstruments instruments)
     {
-        if (AppRequestsLatencyHistogramSum.Enabled)
-            AppRequestsLatencyHistogramAggregator.Record(durationMilliseconds);
+        _timedOutRequestsCounter = instruments.Meter.CreateCounter<long>(InstrumentNames.APP_REQUESTS_TIMED_OUT);
+        _canceledRequestsCounter = instruments.Meter.CreateCounter<long>(InstrumentNames.APP_REQUESTS_CANCELED);
+        _appRequestsLatencyHistogramAggregator = new(AppRequestsLatencyHistogramBuckets, [], value => new("duration", $"{value}ms"));
+        _appRequestsLatencyHistogramBucket = instruments.Meter.CreateObservableCounter(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-bucket", _appRequestsLatencyHistogramAggregator.CollectBuckets);
+        _appRequestsLatencyHistogramCount = instruments.Meter.CreateObservableCounter(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-count", _appRequestsLatencyHistogramAggregator.CollectCount);
+        _appRequestsLatencyHistogramSum = instruments.Meter.CreateObservableCounter(InstrumentNames.APP_REQUESTS_LATENCY_HISTOGRAM + "-sum", _appRequestsLatencyHistogramAggregator.CollectSum);
     }
 
-    internal static void OnAppRequestsTimedOut()
+    internal void OnAppRequestsEnd(long durationMilliseconds)
     {
-        TimedOutRequestsCounter.Add(1);
+        if (_appRequestsLatencyHistogramSum.Enabled)
+            _appRequestsLatencyHistogramAggregator.Record(durationMilliseconds);
     }
 
-    internal static void OnAppRequestsCanceled()
+    internal void OnAppRequestsTimedOut()
     {
-        CanceledRequestsCounter.Add(1);
+        _timedOutRequestsCounter.Add(1);
+    }
+
+    internal void OnAppRequestsCanceled()
+    {
+        _canceledRequestsCounter.Add(1);
     }
 }

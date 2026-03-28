@@ -7,7 +7,9 @@ using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core.Internal;
 using Orleans.Runtime;
+using Orleans.Runtime.Placement;
 using Orleans.TestingHost.Utils;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Configuration.Memory;
@@ -19,6 +21,7 @@ using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
 using Orleans.Statistics;
 
+#nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
@@ -164,6 +167,117 @@ namespace Orleans.TestingHost
         }
 
         /// <summary>
+        /// Attempts to find the <see cref="IGrainContext"/> for the grain with the specified <paramref name="grainId"/>
+        /// by searching all silos in the cluster.
+        /// </summary>
+        /// <param name="grainId">The ID of the grain to find.</param>
+        /// <param name="grainContext">When this method returns, contains the grain context if found; otherwise, <see langword="null"/>.</param>
+        /// <returns><see langword="true"/> if the grain was found in one of the silos; otherwise, <see langword="false"/>.</returns>
+        #nullable enable
+        public bool TryGetGrainContext(GrainId grainId, [System.Diagnostics.CodeAnalysis.NotNullWhen(true)] out IGrainContext? grainContext)
+        {
+            foreach (var silo in Silos)
+            {
+                var activationDirectory = ((InProcessSiloHandle)silo).SiloHost.Services.GetRequiredService<ActivationDirectory>();
+                grainContext = activationDirectory.FindTarget(grainId);
+                if (grainContext is not null)
+                {
+                    return true;
+                }
+            }
+
+            grainContext = null;
+            return false;
+        }
+#nullable restore
+
+        /// <summary>
+        /// Gets a <see cref="Task"/> that completes when the current activation of the specified grain
+        /// finishes deactivating. If the grain is not currently activated, returns <see cref="Task.CompletedTask"/>.
+        /// </summary>
+        /// <param name="grainId">The ID of the grain to observe.</param>
+        /// <returns>A task that completes when the grain's current activation has deactivated.</returns>
+        /// <remarks>
+        /// There may be scenarios where this task needs to be captured before calling DeactivateOnIdle/MigrateOnIdle in the test
+        /// to avoid a race where the grain deactivates and is reactivated before the returned task is obtained.
+        /// </remarks>
+        /// <example>
+        /// <code>
+        /// var deactivated = cluster.WaitForDeactivationAsync(grain.GetGrainId());
+        /// await grain.DoDeactivate();
+        /// await deactivated;
+        /// </code>
+        /// </example>
+        public Task WaitForDeactivationAsync(GrainId grainId)
+        {
+            if (TryGetGrainContext(grainId, out var grainContext))
+            {
+                return grainContext.Deactivated;
+            }
+
+            return Task.CompletedTask;
+        }
+
+        /// <summary>
+        /// Deactivates the current activation of the specified grain and waits for deactivation to complete.
+        /// </summary>
+        /// <param name="grainId">The ID of the grain to deactivate.</param>
+        /// <returns>A task that completes when the grain has been deactivated.</returns>
+        /// <example>
+        /// <code>
+        /// await cluster.DeactivateAsync(grain.GetGrainId());
+        /// </code>
+        /// </example>
+        public async Task DeactivateAsync(GrainId grainId)
+        {
+            var deactivated = WaitForDeactivationAsync(grainId);
+            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().DeactivateOnIdle();
+            await deactivated;
+        }
+
+        /// <summary>
+        /// Migrates the current activation of the specified grain to a different silo and waits for migration to complete.
+        /// If <paramref name="targetSilo"/> is specified, a placement hint is set to guide migration to that silo.
+        /// </summary>
+        /// <param name="grainId">The ID of the grain to migrate.</param>
+        /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+        /// <returns>A task that completes when the grain has been migrated (deactivated on the source silo).</returns>
+        /// <example>
+        /// <code>
+        /// var targetSilo = cluster.GetActiveSilos().First(s => s.SiloAddress != originalHost).SiloAddress;
+        /// await cluster.MigrateAsync(grain.GetGrainId(), targetSilo);
+        /// </code>
+        /// </example>
+#nullable enable
+        public async Task MigrateAsync(GrainId grainId, SiloAddress? targetSilo = null)
+        {
+            var deactivated = WaitForDeactivationAsync(grainId);
+            if (targetSilo is not null)
+            {
+                RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+            }
+
+            await GrainFactory.GetGrain(grainId).Cast<IGrainManagementExtension>().MigrateOnIdle();
+            await deactivated;
+        }
+#nullable restore
+
+        /// <inheritdoc cref="WaitForDeactivationAsync(GrainId)"/>
+        /// <param name="grain">The grain to observe.</param>
+        public Task WaitForDeactivationAsync(IAddressable grain) => WaitForDeactivationAsync(grain.GetGrainId());
+
+        /// <inheritdoc cref="DeactivateAsync(GrainId)"/>
+        /// <param name="grain">The grain to deactivate.</param>
+        public Task DeactivateAsync(IAddressable grain) => DeactivateAsync(grain.GetGrainId());
+
+        /// <inheritdoc cref="MigrateAsync(GrainId, SiloAddress?)"/>
+        /// <param name="grain">The grain to migrate.</param>
+        /// <param name="targetSilo">The target silo address, or <see langword="null"/> to let the placement director choose.</param>
+#nullable enable
+        public Task MigrateAsync(IAddressable grain, SiloAddress? targetSilo = null) => MigrateAsync(grain.GetGrainId(), targetSilo);
+#nullable restore
+
+        /// <summary>
         /// Deploys the cluster using the specified configuration and starts the client in-process.
         /// It will start the number of silos defined in <see cref="TestClusterOptions.InitialSilosCount"/>.
         /// </summary>
@@ -291,7 +405,7 @@ namespace Orleans.TestingHost
         /// </summary>
         /// <param name="siloAddress">Silo address to be found.</param>
         /// <returns>SiloHandle of the appropriate silo, or <c>null</c> if not found.</returns>
-        public SiloHandle GetSiloForAddress(SiloAddress siloAddress)
+        public SiloHandle? GetSiloForAddress(SiloAddress siloAddress)
         {
             var activeSilos = GetActiveSilos().ToList();
             var ret = activeSilos.Find(s => s.SiloAddress.Equals(siloAddress));
@@ -531,9 +645,9 @@ namespace Orleans.TestingHost
         /// Do a Stop or Kill of the specified silo, followed by a restart.
         /// </summary>
         /// <param name="instance">Silo to be restarted.</param>
-        public async Task<SiloHandle> RestartSiloAsync(SiloHandle instance)
+        public async Task<SiloHandle?> RestartSiloAsync(SiloHandle instance)
         {
-            if (instance != null)
+            if (instance is not null)
             {
                 var instanceNumber = instance.InstanceNumber;
                 var siloName = instance.Name;
@@ -603,7 +717,7 @@ namespace Orleans.TestingHost
                     gateways.Add(new IPEndPoint(IPAddress.Loopback, options.BaseGatewayPort));
                 }
 
-                var clustering = new Dictionary<string, string>();
+                var clustering = new Dictionary<string, string?>();
                 var i = 0;
                 foreach (var v in gateways)
                 {
@@ -720,7 +834,7 @@ namespace Orleans.TestingHost
         /// <param name="configurationOverrides">Configuration overrides.</param>
         /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the silo deployed</returns>
-        public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+        public static async Task<SiloHandle> StartSiloAsync(TestCluster cluster, int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             if (cluster == null) throw new ArgumentNullException(nameof(cluster));
             return await cluster.StartSiloAsync(instanceNumber, clusterOptions, configurationOverrides, startSiloOnNewPort);
@@ -734,7 +848,7 @@ namespace Orleans.TestingHost
         /// <param name="configurationOverrides">Configuration overrides.</param>
         /// <param name="startSiloOnNewPort">Whether we start this silo on a new port, instead of the default one</param>
         /// <returns>A handle to the deployed silo.</returns>
-        public async Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource> configurationOverrides = null, bool startSiloOnNewPort = false)
+        public async Task<SiloHandle> StartSiloAsync(int instanceNumber, TestClusterOptions clusterOptions, IReadOnlyList<IConfigurationSource>? configurationOverrides = null, bool startSiloOnNewPort = false)
         {
             var configurationSources = this.ConfigurationSources.ToList();
 

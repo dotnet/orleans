@@ -2,6 +2,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -10,6 +11,7 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.GeneratedCodeHelpers;
 
+#nullable disable
 namespace Orleans.Serialization.Serializers
 {
     /// <summary>
@@ -19,7 +21,11 @@ namespace Orleans.Serialization.Serializers
     {
         private static readonly Type ObjectType = typeof(object);
 
+#if NET9_0_OR_GREATER
+        private readonly Lock _initializationLock = new();
+#else
         private readonly object _initializationLock = new();
+#endif
 
         private readonly ConcurrentDictionary<Type, IFieldCodec> _untypedCodecs = new();
         private readonly ConcurrentDictionary<Type, IFieldCodec> _typedCodecs = new();

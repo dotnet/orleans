@@ -2,6 +2,7 @@ using System;
 using Orleans.Providers;
 using Orleans.Streams;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     public static class ClientBuilderStreamingExtensions

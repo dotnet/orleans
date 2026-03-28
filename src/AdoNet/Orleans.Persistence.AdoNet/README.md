@@ -12,7 +12,7 @@ dotnet add package Microsoft.Orleans.Persistence.AdoNet
 
 You will also need to install the appropriate database driver package for your database system:
 
-- SQL Server: `Microsoft.Data.SqlClient` or `System.Data.SqlClient`
+- SQL Server: `Microsoft.Data.SqlClient`
 - MySQL: `MySql.Data` or `MySqlConnector`
 - PostgreSQL: `Npgsql`
 - Oracle: `Oracle.ManagedDataAccess.Core`
@@ -32,13 +32,12 @@ var builder = Host.CreateApplicationBuilder(args)
             .UseLocalhostClustering()
             // Configure ADO.NET as grain storage
             .AddAdoNetGrainStorage(
-                name: "AdoNetStore", 
+                name: "AdoNetStore",
                 configureOptions: options =>
                 {
-                    options.Invariant = "System.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
+                    options.Invariant = "Microsoft.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
                     options.ConnectionString = "Server=localhost;Database=OrleansStorage;User Id=myUsername;******;";
                     // Optional: Configure custom queries
-                    options.UseJsonFormat = true; // Store as JSON instead of binary
                 });
     });
 
@@ -93,6 +92,7 @@ Before using the ADO.NET provider, you need to set up the necessary database tab
 - [MySQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/MySQL-Persistence.sql)
 - [PostgreSQL Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/PostgreSQL-Persistence.sql)
 - [Oracle Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Oracle-Persistence.sql)
+- [SQLite Scripts](https://github.com/dotnet/orleans/tree/main/src/AdoNet/Orleans.Persistence.AdoNet/Sqlite-Persistence.sql)
 
 ## Documentation
 For more comprehensive documentation, please refer to:

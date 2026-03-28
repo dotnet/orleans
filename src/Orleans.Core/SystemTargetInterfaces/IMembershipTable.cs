@@ -8,6 +8,7 @@ using System.Threading.Tasks;
 using Orleans.Concurrency;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans
 {
     /// <summary>
@@ -104,7 +105,6 @@ namespace Orleans
     /// <summary>
     /// Membership table interface for system target based implementation.
     /// </summary>
-    [Unordered]
     public interface IMembershipTableSystemTarget : IMembershipTable, ISystemTarget
     {
     }

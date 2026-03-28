@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Threading;
@@ -116,6 +115,28 @@ public sealed class GrainTypeSharedContext
         if (_components is null) return default;
         _components.TryGetValue(typeof(TComponent), out var resultObj);
         return (TComponent?)resultObj;
+    }
+
+    /// <summary>
+    /// Gets a component.
+    /// </summary>
+    /// <param name="componentType">The type of the component.</param>
+    /// <returns>The component with the specified type.</returns>
+    public object? GetComponent(Type componentType)
+    {
+        if (componentType == typeof(PlacementStrategy))
+        {
+            return PlacementStrategy;
+        }
+
+        if (componentType == typeof(ILogger))
+        {
+            return Logger;
+        }
+
+        if (_components is null) return default;
+        _components.TryGetValue(componentType, out var resultObj);
+        return resultObj;
     }
 
     /// <summary>

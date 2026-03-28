@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -22,7 +21,11 @@ namespace Orleans.Messaging
     /// </summary>
     internal partial class GatewayManager : IDisposable
     {
-        private readonly object lockable = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockable = new();
+#else
+        private readonly object lockable = new();
+#endif
         private readonly Dictionary<SiloAddress, DateTime> knownDead = new Dictionary<SiloAddress, DateTime>();
         private readonly Dictionary<SiloAddress, DateTime> knownMasked = new Dictionary<SiloAddress, DateTime>();
         private readonly IGatewayListProvider gatewayListProvider;
@@ -64,7 +67,7 @@ namespace Orleans.Messaging
             }
 
             var knownGateways = await this.gatewayListProvider.GetGateways();
-            if (knownGateways.Count == 0)
+            if (knownGateways == null || knownGateways.Count == 0)
             {
                 // this situation can occur if the client starts faster than the silos.
                 var providerName = this.gatewayListProvider.GetType().FullName;
@@ -156,7 +159,6 @@ namespace Orleans.Messaging
         /// is in the same order every time.
         /// </summary>
         /// <returns></returns>
-        #nullable enable
         public SiloAddress? GetLiveGateway()
         #nullable disable
         {

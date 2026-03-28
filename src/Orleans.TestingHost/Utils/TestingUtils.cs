@@ -119,17 +119,5 @@ namespace Orleans.TestingHost.Utils
             long ticks = checked((long)ticksD);
             return TimeSpan.FromTicks(ticks);
         }
-
-        /// <summary>
-        /// Configures the <see cref="ThreadPool"/> and the <see cref="ServicePointManager"/> for tests.
-        /// </summary>
-        /// <param name="numDotNetPoolThreads">The minimum number of <see cref="ThreadPool"/> threads.</param>
-        public static void ConfigureThreadPoolSettingsForStorageTests(int numDotNetPoolThreads = 200)
-        {
-            ThreadPool.SetMinThreads(numDotNetPoolThreads, numDotNetPoolThreads);
-            ServicePointManager.Expect100Continue = false;
-            ServicePointManager.DefaultConnectionLimit = numDotNetPoolThreads; // 1000;
-            ServicePointManager.UseNagleAlgorithm = false;
-        }
     }
 }

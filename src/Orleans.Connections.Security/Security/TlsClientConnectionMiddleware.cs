@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Connections.Security
 {
     internal class TlsClientConnectionMiddleware
@@ -38,7 +39,7 @@ namespace Orleans.Connections.Security
 
         public Task OnConnectionAsync(ConnectionContext context)
         {
-            return Task.Run(() => InnerOnConnectionAsync(context));
+            return InnerOnConnectionAsync(context);
         }
 
         private async Task InnerOnConnectionAsync(ConnectionContext context)
@@ -159,12 +160,19 @@ namespace Orleans.Connections.Security
             context.Features.Set<ITlsApplicationProtocolFeature>(feature);
             feature.LocalCertificate = ConvertToX509Certificate2(sslStream.LocalCertificate);
             feature.RemoteCertificate = ConvertToX509Certificate2(sslStream.RemoteCertificate);
+            feature.NegotiatedCipherSuite = sslStream.NegotiatedCipherSuite;
+#if NET10_0_OR_GREATER
+#pragma warning disable SYSLIB0058
+#endif
             feature.CipherAlgorithm = sslStream.CipherAlgorithm;
             feature.CipherStrength = sslStream.CipherStrength;
             feature.HashAlgorithm = sslStream.HashAlgorithm;
             feature.HashStrength = sslStream.HashStrength;
             feature.KeyExchangeAlgorithm = sslStream.KeyExchangeAlgorithm;
             feature.KeyExchangeStrength = sslStream.KeyExchangeStrength;
+#if NET10_0_OR_GREATER
+#pragma warning restore SYSLIB0058
+#endif
             feature.Protocol = sslStream.SslProtocol;
 
             var originalTransport = context.Transport;

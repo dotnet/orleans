@@ -4,6 +4,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.EventSourcing
 {
     /// <summary>
@@ -188,6 +189,15 @@ namespace Orleans.EventSourcing
                 throw new ArgumentException("invalid range", nameof(toVersion));
 
             return LogViewAdaptor.RetrieveLogSegment(fromVersion, toVersion);
+        }
+
+        /// <summary>
+        /// Clears the log of all confirmed events. Reset the state to the initial state, and discards all unconfirmed events.
+        /// Throws <see cref="NotSupportedException"/> if the log cannot be cleared.
+        /// </summary>
+        protected Task ClearLogAsync(CancellationToken cancellationToken = default)
+        { 
+            return LogViewAdaptor.ClearLogAsync(cancellationToken);
         }
 
         /// <summary>

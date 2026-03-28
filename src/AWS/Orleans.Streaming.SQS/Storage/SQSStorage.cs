@@ -10,6 +10,7 @@ using Orleans;
 using Orleans.Streaming.SQS;
 using SQSMessage = Amazon.SQS.Model.Message;
 
+#nullable disable
 namespace OrleansAWSUtils.Storage
 {
     /// <summary>

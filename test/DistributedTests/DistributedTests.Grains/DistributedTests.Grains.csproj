@@ -11,5 +11,5 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />
     <ProjectReference Include="$(SourceRoot)test\DistributedTests\DistributedTests.Common\DistributedTests.Common.csproj" />
   </ItemGroup>
-  
+
 </Project>

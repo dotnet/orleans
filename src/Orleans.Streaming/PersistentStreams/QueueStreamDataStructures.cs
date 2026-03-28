@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-#nullable enable
 namespace Orleans.Streams
 {
     [Serializable]
@@ -33,6 +32,8 @@ namespace Orleans.Streams
 
         [NonSerialized]
         public bool IsRegistered = false;
+        [NonSerialized]
+        public StreamSequenceToken? PendingStartToken;
 
         public StreamConsumerData(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
         {

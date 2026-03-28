@@ -9,6 +9,7 @@ using System.Linq;
 
 namespace Orleans.Analyzers;
 
+#nullable disable
 [ExportCodeFixProvider(LanguageNames.CSharp, Name = nameof(IncorrectAttributeUseCodeFix)), Shared]
 public class IncorrectAttributeUseCodeFix : CodeFixProvider
 {

@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -51,7 +50,11 @@ internal partial class GrainCallCancellationManager : SystemTarget, IGrainCallCa
     private readonly Catalog _catalog;
     private readonly ActivationDirectory _activationDirectory;
     private readonly IClusterMembershipService _clusterMembershipService;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lock = new();
+#else
     private readonly object _lock = new();
+#endif
     private readonly Task? _membershipUpdatesTask;
     private IInternalGrainFactory? _grainFactory;
 

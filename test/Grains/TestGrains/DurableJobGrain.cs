@@ -14,7 +14,7 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
 {
     private Dictionary<string, TaskCompletionSource> jobRunStatus = new();
     private Dictionary<string, DateTimeOffset> jobExecutionTimes = new();
-    private Dictionary<string, IDurableJobContext> jobContexts = new();
+    private Dictionary<string, IJobRunContext> jobContexts = new();
     private Dictionary<string, bool> cancellationTokenStatus = new();
     private readonly ILocalDurableJobManager _localDurableJobManager;
     private readonly ILogger<DurableJobGrain> _logger;
@@ -30,7 +30,7 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
         return Task.FromResult(jobRunStatus.TryGetValue(jobId, out var taskResult) && taskResult.Task.IsCompleted);
     }
 
-    public Task ExecuteJobAsync(IDurableJobContext ctx, CancellationToken cancellationToken)
+    public Task ExecuteJobAsync(IJobRunContext ctx, CancellationToken cancellationToken)
     {
         _logger.LogInformation("Job {JobId} received at {ReceivedTime}", ctx.Job.Id, DateTime.UtcNow);
         jobExecutionTimes[ctx.Job.Id] = DateTimeOffset.UtcNow;
@@ -42,7 +42,14 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
 
     public async Task<DurableJob> ScheduleJobAsync(string jobName, DateTimeOffset scheduledTime, IReadOnlyDictionary<string, string> metadata = null)
     {
-        var job = await _localDurableJobManager.ScheduleJobAsync(this.GetGrainId(), jobName, scheduledTime, metadata, CancellationToken.None);
+        var request = new ScheduleJobRequest
+        {
+            Target = this.GetGrainId(),
+            JobName = jobName,
+            DueTime = scheduledTime,
+            Metadata = metadata
+        };
+        var job = await _localDurableJobManager.ScheduleJobAsync(request, CancellationToken.None);
         jobRunStatus[job.Id] = new TaskCompletionSource();
         return job;
     }
@@ -74,7 +81,7 @@ public class DurableJobGrain : Grain, IDurableJobGrain, IDurableJobHandler
         return Task.FromResult(time);
     }
 
-    public Task<IDurableJobContext> GetJobContext(string jobId)
+    public Task<IJobRunContext> GetJobRun(string jobId)
     {
         if (!jobContexts.TryGetValue(jobId, out var ctx))
         {

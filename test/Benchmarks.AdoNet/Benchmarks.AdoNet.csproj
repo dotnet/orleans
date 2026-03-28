@@ -12,12 +12,11 @@
   <ItemGroup>
     <PackageReference Include="BenchmarkDotNet" />
     <PackageReference Include="BenchmarkDotNet.Diagnostics.Windows" />
-    <PackageReference Include="Microsoft.CodeAnalysis" />
   </ItemGroup>
 
   <ItemGroup>
     <ProjectReference Include="..\..\src\AdoNet\Orleans.Streaming.AdoNet\Orleans.Streaming.AdoNet.csproj" />
-    <ProjectReference Include="..\Extensions\TesterAdoNet\Tester.AdoNet.csproj" />
+    <ProjectReference Include="..\Extensions\Orleans.AdoNet.Tests\Orleans.AdoNet.Tests.csproj" />
   </ItemGroup>
 
 </Project>

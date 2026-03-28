@@ -61,7 +61,7 @@ namespace Orleans.Tests.SqlUtils
 
                 },
                 {
-                    AdoNetInvariants.InvariantNameSqlServerDotnetCore,
+                    AdoNetInvariants.InvariantNameMySqlConnector,
                     new DbConstants(startEscapeIndicator: '[',
                                     endEscapeIndicator: ']',
                                     unionAllSelectTemplate: " UNION ALL SELECT ",
@@ -71,15 +71,15 @@ namespace Orleans.Tests.SqlUtils
                                     commandInterceptor: NoOpCommandInterceptor.Instance)
                 },
                 {
-                    AdoNetInvariants.InvariantNameMySqlConnector,
-                    new DbConstants(startEscapeIndicator: '[',
-                                    endEscapeIndicator: ']',
+                    AdoNetInvariants.InvariantNameSqlLite,
+                    new DbConstants(startEscapeIndicator: '\"',
+                                    endEscapeIndicator: '\"',
                                     unionAllSelectTemplate: " UNION ALL SELECT ",
                                     isSynchronousAdoNetImplementation: false,
-                                    supportsStreamNatively: true,
+                                    supportsStreamNatively: false,
                                     supportsCommandCancellation: true,
                                     commandInterceptor: NoOpCommandInterceptor.Instance)
-                }
+            }
             };
 
         public static DbConstants GetDbConstants(string invariantName)

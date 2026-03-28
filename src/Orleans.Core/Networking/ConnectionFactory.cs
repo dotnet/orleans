@@ -5,6 +5,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal abstract class ConnectionFactory

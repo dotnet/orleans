@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Generic;
 using System.Linq;
@@ -9,7 +8,6 @@ using System.Runtime.CompilerServices;
 using System.Diagnostics;
 using System.Collections.Immutable;
 using System.Data;
-using System.Threading;
 using Orleans.Internal;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
@@ -64,15 +62,16 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
         _activationDirectory = activationDirectory;
         _timeProvider = timeProvider;
         _edgeWeights = new(options.Value.MaxEdgeCount);
-        _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
-        _anchoredFilter = options.Value.AnchoringFilterEnabled ?
-            new BlockedBloomFilter(100_000, options.Value.ProbabilisticFilteringMaxAllowedErrorRate) :
-            null;
-       
         _lastExchangedStopwatch = CoarseStopwatch.StartNew();
+        _pendingMessages = new StripedMpscBuffer<Message>(Environment.ProcessorCount, options.Value.MaxUnprocessedEdges / Environment.ProcessorCount);
         shared.ActivationDirectory.RecordNewTarget(this);
         _siloStatusOracle.SubscribeToSiloStatusEvents(this);
         _timer = RegisterTimer(_ => TriggerExchangeRequest().AsTask(), null, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
+
+        if (options.Value.AnchoringFilterEnabled)
+        {
+            _anchoredFilter = new AnchoredGrainsFilter(100_000, options.Value.ProbabilisticFilteringMaxAllowedErrorRate, options.Value.AnchoringFilterGenerations);
+        }
     }
 
     private Task OnActiveStart(CancellationToken cancellationToken)
@@ -111,6 +110,11 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
     public async ValueTask TriggerExchangeRequest()
     {
+        if (_anchoredFilter is { } filter)
+        {
+            filter.Rotate();
+        }
+
         var coolDown = _options.RecoveryPeriod - _lastExchangedStopwatch.Elapsed;
         if (coolDown > TimeSpan.Zero)
         {
@@ -234,7 +238,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             var remoteActivations = request.ActivationCountSnapshot;
             var localActivations = GetLocalActivationCount();
 
-            var initialImbalance =  CalculateImbalance(remoteActivations, localActivations);
+            var initialImbalance = CalculateImbalance(remoteActivations, localActivations);
             int imbalance = initialImbalance;
             LogImbalance(imbalance, remoteActivations, localActivations);
 
@@ -650,7 +654,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
             if (accLocalScore > accRemoteScore)
             {
-               anchoredGrains.Add(grainEdges.Key);
+                anchoredGrains.Add(grainEdges.Key);
             }
         }
 

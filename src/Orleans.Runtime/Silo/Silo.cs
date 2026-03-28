@@ -16,6 +16,7 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using System.Net;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -33,7 +34,11 @@ namespace Orleans.Runtime
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-        private readonly object lockable = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockable = new();
+#else
+        private readonly object lockable = new();
+#endif
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly List<GrainService> grainServices = new List<GrainService>();
@@ -52,8 +57,6 @@ namespace Orleans.Runtime
         /// Gets a <see cref="Task"/> which completes once the silo has terminated.
         /// </summary>
         public Task SiloTerminated { get { return this.siloTerminatedTask.Task; } } // one event for all types of termination (shutdown, stop and fast kill).
-
-        private LifecycleSchedulingSystemTarget lifecycleSchedulingSystemTarget;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="Silo"/> class.
@@ -142,12 +145,9 @@ namespace Orleans.Runtime
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         public async Task StartAsync(CancellationToken cancellationToken)
         {
-            // SystemTarget for provider init calls
-            this.lifecycleSchedulingSystemTarget = Services.GetRequiredService<LifecycleSchedulingSystemTarget>();
-
             try
             {
-                await this.lifecycleSchedulingSystemTarget.WorkItemGroup.QueueTask(() => this.siloLifecycle.OnStart(cancellationToken), lifecycleSchedulingSystemTarget);
+                await Task.Run(() => this.siloLifecycle.OnStart(cancellationToken), cancellationToken);
             }
             catch (Exception exc)
             {
@@ -344,7 +344,7 @@ namespace Orleans.Runtime
 
             try
             {
-                await this.lifecycleSchedulingSystemTarget.QueueTask(() => this.siloLifecycle.OnStop(cancellationToken)).ConfigureAwait(false);
+                await Task.Run(() => this.siloLifecycle.OnStop(cancellationToken), CancellationToken.None).ConfigureAwait(false);
             }
             finally
             {
@@ -427,8 +427,7 @@ namespace Orleans.Runtime
             {
                 try
                 {
-                    await lifecycleSchedulingSystemTarget
-                        .QueueTask(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory)).WaitAsync(ct);
+                    await Task.Run(() => this.messageCenter.Gateway.SendStopSendMessages(this.grainFactory, ct), CancellationToken.None).WaitAsync(ct);
                 }
                 catch (Exception exception)
                 {
@@ -678,15 +677,5 @@ namespace Orleans.Runtime
             Message = "{GrainServiceType} Grain Service with Id {GrainServiceId} stopped successfully."
         )]
         private static partial void LogDebugGrainServiceStopped(ILogger logger, string grainServiceType, GrainId grainServiceId);
-    }
-
-    // A dummy system target for fallback scheduler
-    internal sealed class LifecycleSchedulingSystemTarget : SystemTarget
-    {
-        public LifecycleSchedulingSystemTarget(SystemTargetShared shared)
-            : base(Constants.LifecycleSchedulingSystemTargetType, shared)
-        {
-            shared.ActivationDirectory.RecordNewTarget(this);
-        }
     }
 }

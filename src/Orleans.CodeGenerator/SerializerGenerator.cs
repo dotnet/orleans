@@ -8,6 +8,7 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using static Orleans.CodeGenerator.InvokableGenerator;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     internal class SerializerGenerator
@@ -291,7 +292,7 @@ namespace Orleans.CodeGenerator
             {
                 var t = member.Type;
                 TypeSyntax codecType = null;
-                if (t.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+                if (t.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
                     && (SymbolEqualityComparer.Default.Equals(t.ContainingAssembly, LibraryTypes.Compilation.Assembly) || t.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                     && t is not INamedTypeSymbol { IsGenericType: true, TypeArguments.Length: 0 })
                 {
@@ -335,7 +336,7 @@ namespace Orleans.CodeGenerator
         private BaseCodecFieldDescription GetBaseTypeField(ISerializableTypeDescription serializableTypeDescription)
         {
             var baseType = serializableTypeDescription.BaseType;
-            if (baseType.HasAnyAttribute(LibraryTypes.GenerateSerializerAttributes)
+            if (baseType.HasAttribute(LibraryTypes.GenerateSerializerAttribute)
                 && (SymbolEqualityComparer.Default.Equals(baseType.ContainingAssembly, LibraryTypes.Compilation.Assembly) || baseType.ContainingAssembly.HasAttribute(LibraryTypes.TypeManifestProviderAttribute))
                 && baseType is not INamedTypeSymbol { IsGenericType: true })
             {
@@ -1178,7 +1179,7 @@ namespace Orleans.CodeGenerator
 
             private LibraryTypes LibraryTypes => _member.CodeGenerator.LibraryTypes;
 
-            public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
+            public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAttribute(LibraryTypes.ImmutableAttribute);
 
             /// <summary>
             /// Gets syntax representing the type of this field.
@@ -1237,8 +1238,8 @@ namespace Orleans.CodeGenerator
 
             public bool IsShallowCopyable =>
                 LibraryTypes.IsShallowCopyable(_member.Type)
-                || Property is { } prop && prop.HasAnyAttribute(LibraryTypes.ImmutableAttributes)
-                || _member.Symbol.HasAnyAttribute(LibraryTypes.ImmutableAttributes);
+                || Property is { } prop && prop.HasAttribute(LibraryTypes.ImmutableAttribute)
+                || _member.Symbol.HasAttribute(LibraryTypes.ImmutableAttribute);
 
             public bool IsValueType => Type.IsValueType;
 
@@ -1273,12 +1274,12 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible field.
             /// </summary>
-            private bool IsGettableField => Field is { } field && _codeGenerator.Compilation.IsSymbolAccessibleWithin(field, Compilation.Assembly) && !IsObsolete;
+            private bool IsGettableField => Field is { } fieldInfo && _codeGenerator.Compilation.IsSymbolAccessibleWithin(fieldInfo, Compilation.Assembly) && !IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible, mutable field.
             /// </summary>
-            private bool IsSettableField => Field is { } field && IsGettableField && !field.IsReadOnly;
+            private bool IsSettableField => Field is { } fieldInfo && IsGettableField && !fieldInfo.IsReadOnly;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents a property with an accessible, non-obsolete getter.

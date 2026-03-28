@@ -17,6 +17,7 @@ using Orleans.Dashboard.Model;
 using Orleans.Dashboard.Model.History;
 using Orleans.Dashboard.Core;
 
+#nullable disable
 namespace Orleans.Dashboard.Implementation.Grains;
 
 [Reentrant]
@@ -143,8 +144,7 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }
     }
 
-    internal void RecalculateCounters(int activationCount, SiloDetails[] hosts,
-        IList<SimpleGrainStatistic> simpleGrainStatistics)
+    internal void RecalculateCounters(int activationCount, SiloDetails[] hosts, IList<SimpleGrainStatistic> simpleGrainStatistics)
     {
         _counters.TotalActivationCount = activationCount;
 
@@ -181,15 +181,29 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
             }
 
             return result;
-        }).ToArray();
+        })
+        .ToArray();
     }
 
-    public async Task<Immutable<DashboardCounters>> GetCounters()
+    public async Task<Immutable<DashboardCounters>> GetCounters(string[] exclusions)
     {
         await EnsureIsActive();
         await EnsureCountersAreUpToDate();
 
-        return _counters.AsImmutable();
+        var simpleGrainStats = exclusions != null && exclusions.Length > 0
+            ? [.. _counters.SimpleGrainStats.Where(x => !exclusions.Any(f => x.GrainType.StartsWith(f, StringComparison.OrdinalIgnoreCase)))]
+            : _counters.SimpleGrainStats;
+
+        return new DashboardCounters
+        {
+            Hosts = _counters.Hosts,
+            SimpleGrainStats = simpleGrainStats,
+            TotalActiveHostCount = _counters.TotalActiveHostCount,
+            TotalActiveHostCountHistory = _counters.TotalActiveHostCountHistory,
+            TotalActivationCount = _counters.TotalActivationCount,
+            TotalActivationCountHistory = _counters.TotalActivationCountHistory,
+        }
+        .AsImmutable();
     }
 
     public async Task<Immutable<Dictionary<string, Dictionary<string, GrainTraceEntry>>>> GetGrainTracing(
@@ -217,12 +231,12 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         return _history.QuerySilo(address).AsImmutable();
     }
 
-    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take)
+    public async Task<Immutable<Dictionary<string, GrainMethodAggregate[]>>> TopGrainMethods(int take, string[] exclusions)
     {
         await EnsureIsActive();
         await EnsureCountersAreUpToDate();
 
-        var values = _history.AggregateByGrainMethod().ToList();
+        var values = _history.AggregateByGrainMethod(exclusions).ToList();
 
         GrainMethodAggregate[] GetTotalCalls()
         {
@@ -341,9 +355,11 @@ internal sealed class DashboardGrain : Grain, IDashboardGrain
         }).AsImmutable();
     }
 
-    public Task<Immutable<string[]>> GetGrainTypes()
+    public Task<Immutable<string[]>> GetGrainTypes(string[] exclusions)
     {
         return Task.FromResult(_typeManifestOptions.InterfaceImplementations
+            .Where(s => s.GetInterfaces().Any(i => i == typeof(IGrain) || i == typeof(ISystemTarget)))
+            .Where(s => exclusions == null || !exclusions.Any(e => s.FullName.StartsWith(e, StringComparison.OrdinalIgnoreCase)))
             .Select(s => s.FullName)
             .ToArray()
             .AsImmutable());

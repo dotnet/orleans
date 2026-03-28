@@ -62,7 +62,7 @@ dashboardBuilder.UseOrleansClient(clientBuilder =>
         options.Gateways.Add(new IPEndPoint(IPAddress.Loopback, 30000).ToGatewayUri()));
 
     // Add dashboard services
-    clientBuilder.AddOrleansDashboard();
+    clientBuilder.AddDashboard();
 });
 
 var app = dashboardBuilder.Build();
@@ -105,7 +105,7 @@ dashboardBuilder.UseOrleansClient(clientBuilder =>
         options.Gateways.Add(new IPEndPoint(IPAddress.Parse("10.0.0.2"), 30000).ToGatewayUri());
     });
 
-    clientBuilder.AddOrleansDashboard();
+    clientBuilder.AddDashboard();
 });
 ```
 

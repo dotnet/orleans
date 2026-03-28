@@ -50,16 +50,6 @@ namespace UnitTests.GrainInterfaces
         Task SetSelf(IMayInterleaveInstancedPredicateGrain self);
     }
 
-    [Unordered]
-    public interface IUnorderedNonReentrantGrain : IGrainWithIntegerKey
-    {
-        Task<string> One();
-
-        Task<string> Two();
-
-        Task SetSelf(IUnorderedNonReentrantGrain self);
-    }
-
     public interface IReentrantSelfManagedGrain : IGrainWithIntegerKey
     {
         Task<int> GetCounter();

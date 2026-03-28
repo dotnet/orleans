@@ -42,13 +42,6 @@ namespace UnitTests.GrainInterfaces
         Task Do(Outsider o);
     }
 
-    [Unordered]
-    public interface ISomeGrainWithInvocationOptions : IGrainWithIntegerKey
-    {
-        [AlwaysInterleave]
-        Task AlwaysInterleave();
-    }
-
     public interface ISerializationGenerationGrain : IGrainWithIntegerKey
     {
         Task<object> RoundTripObject(object input);

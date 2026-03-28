@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -51,21 +52,15 @@ namespace Orleans.Runtime.GrainDirectory
         }
     }
 
-    internal class NullGrainDirectoryCache : IGrainDirectoryCache
+    internal sealed class NullGrainDirectoryCache : IGrainDirectoryCache
     {
         public void AddOrUpdate(GrainAddress value, int version)
         {
         }
 
-        public bool Remove(GrainId key)
-        {
-            return false;
-        }
+        public bool Remove(GrainId key) => false;
 
-        public bool Remove(GrainAddress key)
-        {
-            return false;
-        }
+        public bool Remove(GrainAddress key) => false;
 
         public void Clear()
         {

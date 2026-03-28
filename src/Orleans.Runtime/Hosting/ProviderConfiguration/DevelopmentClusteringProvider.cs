@@ -5,6 +5,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Runtime.Hosting.ProviderConfiguration;
 
+#nullable disable
 [assembly: RegisterProvider("Development", "Clustering", "Silo", typeof(DevelopmentClusteringProvider))]
 
 namespace Orleans.Runtime.Hosting.ProviderConfiguration;

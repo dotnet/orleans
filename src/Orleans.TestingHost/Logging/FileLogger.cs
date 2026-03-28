@@ -7,6 +7,7 @@ using System.Threading;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.TestingHost.Logging
 {
     /// <summary>
@@ -16,7 +17,11 @@ namespace Orleans.TestingHost.Logging
     {
         private static readonly ConcurrentDictionary<FileLoggingOutput, object> Instances = new();
         private readonly TimeSpan flushInterval = Debugger.IsAttached ? TimeSpan.FromMilliseconds(10) : TimeSpan.FromSeconds(1);
-        private readonly object lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockObj = new();
+#else
+        private readonly object lockObj = new();
+#endif
         private readonly string logFileName;
         private DateTime lastFlush = DateTime.UtcNow;
         private StreamWriter logOutput;
@@ -90,7 +95,7 @@ namespace Orleans.TestingHost.Logging
             var exc = LogFormatter.PrintException(exception);
             var msg = string.Format("[{0} {1}\t{2}\t{3}\t{4}]\t{5}\t{6}",
                 LogFormatter.PrintDate(timestamp),           //0
-                Thread.CurrentThread.ManagedThreadId,   //1
+                Environment.CurrentManagedThreadId,   //1
                 logLevel.ToString(),    //2
                 errorCode.ToString(),                              //3
                 caller,                                 //4

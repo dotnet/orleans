@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
@@ -21,7 +20,11 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed partial class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
     {
-        private readonly object lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockObj = new();
+#else
+        private readonly object lockObj = new();
+#endif
         private readonly Channel<Message> incomingMessages;
         private readonly IGrainReferenceRuntime grainReferenceRuntime;
         private readonly InvokableObjectManager invokableObjects;
@@ -138,23 +141,23 @@ namespace Orleans.Runtime
             }
         }
 
-        public TComponent? GetComponent<TComponent>() where TComponent : class
+        public object? GetComponent(Type componentType)
         {
-            if (this is TComponent component) return component;
-            if (_components.TryGetValue(typeof(TComponent), out var result))
+            if (componentType.IsAssignableFrom(GetType())) return this;
+            if (_components.TryGetValue(componentType, out var result))
             {
-                return (TComponent)result;
+                return result;
             }
-            else if (typeof(TComponent) == typeof(PlacementStrategy))
+            else if (componentType == typeof(PlacementStrategy))
             {
-                return (TComponent)(object)ClientObserversPlacement.Instance;
+                return ClientObserversPlacement.Instance;
             }
 
             lock (lockObj)
             {
-                if (ActivationServices.GetService<TComponent>() is { } activatedComponent)
+                if (ActivationServices.GetService(componentType) is { } activatedComponent)
                 {
-                    return (TComponent)_components.GetOrAdd(typeof(TComponent), activatedComponent);
+                    return _components.GetOrAdd(componentType, activatedComponent);
                 }
             }
 
@@ -204,7 +207,7 @@ namespace Orleans.Runtime
 
             if (msg.Direction == Message.Directions.Response)
             {
-                // Requests are made through the runtime client, so deliver responses to the rutnime client so that the request callback can be executed.
+                // Requests are made through the runtime client, so deliver responses to the runtime client so that the request callback can be executed.
                 this.runtimeClient.ReceiveResponse(msg);
             }
             else
@@ -380,7 +383,7 @@ namespace Orleans.Runtime
             }
         }
 
-        public TTarget GetTarget<TTarget>() where TTarget : class => throw new NotImplementedException();
+        public object? GetTarget() => throw new NotImplementedException();
         public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) { }
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
         public Task Deactivated => Task.CompletedTask;

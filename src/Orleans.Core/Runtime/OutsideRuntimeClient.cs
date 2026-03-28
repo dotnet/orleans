@@ -16,6 +16,7 @@ using Orleans.Serialization;
 using Orleans.Serialization.Invocation;
 using static Orleans.Internal.StandardExtensions;
 
+#nullable disable
 namespace Orleans
 {
     internal partial class OutsideRuntimeClient : IRuntimeClient, IDisposable, IClusterConnectionStatusListener
@@ -32,6 +33,7 @@ namespace Orleans
 
         private readonly MessagingTrace messagingTrace;
         private readonly InterfaceToImplementationMappingCache _interfaceToImplementationMapping;
+        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager;
         private IClusterConnectionStatusObserver[] _statusObservers;
 
@@ -71,10 +73,12 @@ namespace Orleans
             MessagingTrace messagingTrace,
             IServiceProvider serviceProvider,
             TimeProvider timeProvider,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
+            OrleansInstruments orleansInstruments)
         {
             TimeProvider = timeProvider;
             _interfaceToImplementationMapping = interfaceToImplementationMapping;
+            _applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             _localClientDetails = localClientDetails;
             this.loggerFactory = loggerFactory;
@@ -281,7 +285,7 @@ namespace Orleans
 
             if (!oneWay)
             {
-                var callbackData = new CallbackData(this.sharedCallbackData, context, message);
+                var callbackData = new CallbackData(this.sharedCallbackData, context, message, _applicationRequestInstruments);
                 callbackData.SubscribeForCancellation(cancellationToken);
                 callbacks.TryAdd(message.Id, callbackData);
             }
@@ -315,7 +319,7 @@ namespace Orleans
                 }
                 else
                 {
-                    if (clientMessagingOptions.CancelRequestOnTimeout)
+                    if (clientMessagingOptions.CancelUnknownRequestOnStatusUpdate)
                     {
                         // Cancel the call since the caller has abandoned it.
                         // Note that the target and sender arguments are swapped because this is a response to the original request.
@@ -346,7 +350,7 @@ namespace Orleans
             }
             else
             {
-                LogWarningNoCallbackForResponseMessage(logger, response);
+                LogDebugNoCallbackForResponseMessage(logger, response);
             }
         }
 
@@ -562,11 +566,11 @@ namespace Orleans
         private static partial void LogErrorWhileProcessingCallbackExpiry(ILogger logger, Exception ex);
 
         [LoggerMessage(
-            Level = LogLevel.Warning,
+            Level = LogLevel.Debug,
             EventId = (int)ErrorCode.Runtime_Error_100011,
             Message = "No callback for response message '{ResponseMessage}'"
         )]
-        private static partial void LogWarningNoCallbackForResponseMessage(ILogger logger, Message responseMessage);
+        private static partial void LogDebugNoCallbackForResponseMessage(ILogger logger, Message responseMessage);
 
         private readonly struct DiagnosticsLogData(List<string> diagnostics)
         {

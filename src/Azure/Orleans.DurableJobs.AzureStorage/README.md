@@ -158,10 +158,14 @@ public class EmailGrain : Grain, IEmailGrain, IDurableJobHandler
         };
 
         _durableEmailJob = await _jobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            "SendEmail",
-            sendTime,
-            metadata);
+            new ScheduleJobRequest
+            {
+                Target = this.GetGrainId(),
+                JobName = "SendEmail",
+                DueTime = sendTime,
+                Metadata = metadata
+            },
+            CancellationToken.None);
 
         _logger.LogInformation(
             "Scheduled email to {EmailAddress} for {SendTime} (JobId: {JobId})",
@@ -253,25 +257,33 @@ public class OrderGrain : Grain, IOrderGrain, IDurableJobHandler
         // Schedule payment reminder after 1 hour
         var paymentReminderTime = DateTimeOffset.UtcNow.AddHours(1);
         await _jobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            "PaymentReminder",
-            paymentReminderTime,
-            new Dictionary<string, string>
+            new ScheduleJobRequest
             {
-                ["Step"] = "PaymentReminder",
-                ["CustomerEmail"] = order.CustomerEmail
-            });
+                Target = this.GetGrainId(),
+                JobName = "PaymentReminder",
+                DueTime = paymentReminderTime,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["Step"] = "PaymentReminder",
+                    ["CustomerEmail"] = order.CustomerEmail
+                }
+            },
+            CancellationToken.None);
 
         // Schedule order expiration after 24 hours
         var expirationTime = DateTimeOffset.UtcNow.AddHours(24);
         await _jobManager.ScheduleJobAsync(
-            this.GetGrainId(),
-            "OrderExpiration",
-            expirationTime,
-            new Dictionary<string, string>
+            new ScheduleJobRequest
             {
-                ["Step"] = "OrderExpiration"
-            });
+                Target = this.GetGrainId(),
+                JobName = "OrderExpiration",
+                DueTime = expirationTime,
+                Metadata = new Dictionary<string, string>
+                {
+                    ["Step"] = "OrderExpiration"
+                }
+            },
+            CancellationToken.None);
 
         _logger.LogInformation(
             "Scheduled payment reminder for {ReminderTime} and expiration for {ExpirationTime}",

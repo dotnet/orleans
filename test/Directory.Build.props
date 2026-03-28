@@ -13,21 +13,19 @@
     <NoWarn>$(NoWarn);FS2003;1591</NoWarn>
     <ServerGarbageCollection>true</ServerGarbageCollection>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>disable</Nullable>
   </PropertyGroup>
 
-  <!-- For test project we still need to target various desktop .Net versions instead of .Net Standard -->
   <PropertyGroup>
-    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net8.0</TestTargetFrameworks>
-    <MinTestTargetFramework Condition="'$(MinTestTargetFramework)' == ''">net8.0</MinTestTargetFramework>
+    <TestTargetFrameworks Condition="'$(TestTargetFrameworks)' == ''">net8.0;net10.0</TestTargetFrameworks>
   </PropertyGroup>
 
   <ItemGroup>
-    <None Include="*.xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
+    <None Include="$(MsBuildThisFileDirectory)xunit.runner.json" CopyToOutputDirectory="PreserveNewest" />
   </ItemGroup>
 
   <ItemGroup>
     <PackageReference Include="coverlet.collector" />
-    <PackageReference Include="GitHubActionsTestLogger" PrivateAssets="all" IncludeAssets="runtime; build; native; contentfiles; analyzers" />
   </ItemGroup>
 
 </Project>

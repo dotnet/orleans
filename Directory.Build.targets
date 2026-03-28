@@ -5,7 +5,10 @@
   </PropertyGroup>
 
   <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.CodeGenerator/build/Microsoft.Orleans.CodeGenerator.props" />
-  <Import Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' " Project="$(MSBuildThisFileDirectory)src/Orleans.Sdk/build/Microsoft.Orleans.Sdk.targets" />
+  <Import
+    Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' and '$(IsOrleansFrameworkPart)' != 'false' and '$(PackageId)' != 'Microsoft.Orleans.Core.Abstractions' "
+    Project="$(MSBuildThisFileDirectory)src/Orleans.Core/build/Microsoft.Orleans.Core.targets" />
+
   <ItemGroup>
     <!-- Enable code generator -->
     <ProjectReference

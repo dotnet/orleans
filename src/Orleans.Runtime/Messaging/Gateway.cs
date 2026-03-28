@@ -12,6 +12,7 @@ using Orleans.ClientObservers;
 using Orleans.Configuration;
 using Orleans.Runtime.Internal;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class Gateway : IConnectedClientCollection
@@ -84,7 +85,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory)
+        internal async Task SendStopSendMessages(IInternalGrainFactory grainFactory, CancellationToken cancellationToken = default)
         {
             lock (clients)
             {
@@ -98,7 +99,7 @@ namespace Orleans.Runtime.Messaging
                 }
             }
 
-            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout);
+            await Task.Delay(this.messagingOptions.ClientGatewayShutdownNotificationTimeout, cancellationToken);
         }
 
         internal async Task StopAsync()

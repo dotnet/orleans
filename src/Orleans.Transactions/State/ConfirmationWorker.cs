@@ -8,6 +8,7 @@ using Orleans.Configuration;
 using Orleans.Timers.Internal;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.State
 {
     internal partial class ConfirmationWorker<TState>

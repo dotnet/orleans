@@ -1,10 +1,9 @@
-namespace Benchmarks.Models
+namespace Benchmarks.Serialization.Models;
+
+[Serializable]
+[GenerateSerializer]
+public class SimpleClass
 {
-    [Serializable]
-    [GenerateSerializer]
-    public class SimpleClass
-    {
-        [Id(0)]
-        public int BaseInt { get; set; }
-    }
+    [Id(0)]
+    public int BaseInt { get; set; }
 }

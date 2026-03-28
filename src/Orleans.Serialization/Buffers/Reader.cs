@@ -15,6 +15,7 @@ using static Orleans.Serialization.Buffers.PooledBuffer;
 using Orleans.Serialization.Utilities;
 #endif
 
+#nullable disable
 namespace Orleans.Serialization.Buffers
 {
     /// <summary>

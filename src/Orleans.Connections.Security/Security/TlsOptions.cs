@@ -5,6 +5,7 @@ using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using Microsoft.AspNetCore.Connections;
 
+#nullable disable
 namespace Orleans.Connections.Security
 {
     public delegate bool RemoteCertificateValidator(X509Certificate2 certificate, X509Chain chain, SslPolicyErrors policyErrors);
@@ -93,6 +94,7 @@ namespace Orleans.Connections.Security
         /// <summary>
         /// Provides direct configuration of the <see cref="TlsClientAuthenticationOptions"/> on a per-connection basis.
         /// This is called after all of the other settings have already been applied.
+        /// Use this to set the target host name for SNI (Server Name Indication) via <see cref="TlsClientAuthenticationOptions.TargetHost"/>.
         /// </summary>
         public Action<ConnectionContext, TlsClientAuthenticationOptions> OnAuthenticateAsClient { get; set; }
 

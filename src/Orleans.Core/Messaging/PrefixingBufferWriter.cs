@@ -5,6 +5,7 @@ using System.Diagnostics;
 using System.IO.Pipelines;
 using System.Runtime.CompilerServices;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     /// <summary>
@@ -125,7 +126,7 @@ namespace Orleans.Runtime.Messaging
             if (privateWriter == null)
             {
                 var res = realMemory.Span[advanced..];
-                if ((uint)sizeHint < (uint)res.Length)
+                if (!res.IsEmpty && (uint)sizeHint <= (uint)res.Length)
                     return res;
             }
 

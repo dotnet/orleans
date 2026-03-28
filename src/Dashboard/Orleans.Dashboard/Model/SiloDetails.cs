@@ -1,8 +1,10 @@
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.SiloDetails")]
 internal class SiloDetails
 {
     [Id(0)]

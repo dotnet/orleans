@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal class SocketConnectionFactory : IConnectionFactory

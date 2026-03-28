@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
 
+#nullable disable
 namespace Orleans.EventSourcing.StateStorage
 {
     /// <summary>
@@ -53,6 +54,13 @@ namespace Orleans.EventSourcing.StateStorage
         protected override void InitializeConfirmedView(TLogView initialstate)
         {
             GlobalStateCache = new GrainStateWithMetaDataAndETag<TLogView>(initialstate);
+        }
+
+        protected override Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return this.globalGrainStorage.ClearStateAsync(grainTypeName, Services.GrainId, GlobalStateCache);
         }
 
         // no special tagging is required, thus we create a plain submission entry

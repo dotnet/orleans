@@ -14,7 +14,7 @@ You will also need to install the appropriate ADO.NET provider for your database
 
 ```shell
 # For SQL Server
-dotnet add package System.Data.SqlClient
+dotnet add package Microsoft.Data.SqlClient
 
 # For MySQL
 dotnet add package MySql.Data
@@ -40,7 +40,7 @@ builder.UseOrleans(siloBuilder =>
         // Configure ADO.NET as reminder storage
         .UseAdoNetReminderService(options =>
         {
-            options.Invariant = "System.Data.SqlClient";  // For SQL Server
+            options.Invariant = "Microsoft.Data.SqlClient";  // For SQL Server
             options.ConnectionString = "Server=localhost;Database=OrleansReminders;User ID=orleans;******;";
         });
 });
@@ -80,7 +80,7 @@ public class ReminderGrain : Grain, IReminderGrain, IRemindable
     public async Task StartReminder(string reminderName)
     {
         _reminderName = reminderName;
-        
+
         // Register a persistent reminder
         await RegisterOrUpdateReminder(
             reminderName,

@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.AspNetCore.Http.Features;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal interface IConnectionIdFeature
@@ -22,10 +23,6 @@ namespace Orleans.Networking.Shared
     internal interface IConnectionItemsFeature
     {
         IDictionary<object, object> Items { get; set; }
-    }
-    internal interface IMemoryPoolFeature
-    {
-        MemoryPool<byte> MemoryPool { get; }
     }
 
     internal partial class TransportConnection : IConnectionIdFeature,

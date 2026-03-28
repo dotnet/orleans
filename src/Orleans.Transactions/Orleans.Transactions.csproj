@@ -13,4 +13,10 @@
   <ItemGroup>
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
   </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Transactions.TestKit.Base" />
+    <InternalsVisibleTo Include="Orleans.Transactions.Tests" />
+  </ItemGroup>
 </Project>
+

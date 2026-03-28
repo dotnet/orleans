@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Validators;
+using Orleans.Runtime.MembershipService;
 
 namespace Orleans.Runtime.Configuration
 {
@@ -23,9 +24,25 @@ namespace Orleans.Runtime.Configuration
         public void ValidateConfiguration()
         {
             var clusteringTableProvider = this.serviceProvider.GetService<IMembershipTable>();
-            if (clusteringTableProvider == null)
+
+            if (clusteringTableProvider is null)
             {
-                throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);
+                // No IMembershipTable configured. A custom IMembershipManager must be present
+                // (MembershipTableManager requires IMembershipTable, so it cannot be used).
+                IMembershipManager? membershipManager = null;
+                try
+                {
+                    membershipManager = this.serviceProvider.GetService<IMembershipManager>();
+                }
+                catch
+                {
+                    // Resolution failed — MembershipTableManager requires IMembershipTable.
+                }
+
+                if (membershipManager is null or MembershipTableManager)
+                {
+                    throw new OrleansConfigurationException(ClientClusteringValidator.ClusteringNotConfigured);
+                }
             }
 
             var clusterMembershipOptions = this.serviceProvider.GetRequiredService<IOptions<ClusterMembershipOptions>>().Value;

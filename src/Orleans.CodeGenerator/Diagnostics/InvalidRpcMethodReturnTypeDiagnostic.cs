@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
+#nullable disable
 public static class InvalidRpcMethodReturnTypeDiagnostic
 {
     public const string RuleId = DiagnosticRuleId.InvalidRpcMethodReturnType; 

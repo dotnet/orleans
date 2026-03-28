@@ -1,49 +1,48 @@
-#nullable enable
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Reflection;
+using Microsoft.AspNetCore.Connections;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
+using Orleans.Core;
+using Orleans.GrainReferences;
+using Orleans.Metadata;
+using Orleans.Networking.Shared;
+using Orleans.Placement.Repartitioning;
+using Orleans.Providers;
+using Orleans.Runtime;
 using Orleans.Runtime.Configuration;
 using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.MembershipService;
-using Orleans.Metadata;
 using Orleans.Runtime.Messaging;
+using Orleans.Runtime.Metadata;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Placement.Filtering;
 using Orleans.Runtime.Providers;
+using Orleans.Runtime.Utilities;
 using Orleans.Runtime.Versions;
 using Orleans.Runtime.Versions.Compatibility;
 using Orleans.Runtime.Versions.Selector;
 using Orleans.Serialization;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Internal;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.TypeSystem;
 using Orleans.Statistics;
+using Orleans.Storage;
 using Orleans.Timers;
+using Orleans.Timers.Internal;
 using Orleans.Versions;
 using Orleans.Versions.Compatibility;
 using Orleans.Versions.Selector;
-using Orleans.Providers;
-using Orleans.Runtime;
-using Microsoft.Extensions.Logging;
-using Orleans.Runtime.Utilities;
-using System;
-using System.Reflection;
-using System.Linq;
-using Microsoft.Extensions.Options;
-using Orleans.Timers.Internal;
-using Microsoft.AspNetCore.Connections;
-using Orleans.Networking.Shared;
-using Orleans.Configuration.Internal;
-using Orleans.Runtime.Metadata;
-using Orleans.GrainReferences;
-using Orleans.Storage;
-using Orleans.Serialization.TypeSystem;
-using Orleans.Serialization.Serializers;
-using Orleans.Serialization.Cloning;
-using System.Collections.Generic;
-using Microsoft.Extensions.Configuration;
-using Orleans.Serialization.Internal;
-using Orleans.Core;
-using Orleans.Placement.Repartitioning;
-using Orleans.Runtime.Placement.Filtering;
 
 namespace Orleans.Hosting
 {
@@ -64,7 +63,9 @@ namespace Orleans.Hosting
             // Common services
             services.AddLogging();
             services.AddOptions();
+            services.AddMetrics();
             services.TryAddSingleton<TimeProvider>(TimeProvider.System);
+            services.TryAddSingleton<OrleansInstruments>();
 
             services.TryAddSingleton(typeof(IOptionFormatter<>), typeof(DefaultOptionsFormatter<>));
             services.TryAddSingleton(typeof(IOptionFormatterResolver<>), typeof(DefaultOptionsFormatterResolver<>));
@@ -82,6 +83,11 @@ namespace Orleans.Hosting
             services.AddSingleton<SiloControl>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloControl>();
 
+            // Lifecycle
+            services.AddSingleton<ServiceLifecycle<ISiloLifecycle>>();
+            services.TryAddFromExisting<IServiceLifecycle, ServiceLifecycle<ISiloLifecycle>>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ServiceLifecycle<ISiloLifecycle>>();
+
             // Statistics
             services.AddSingleton<IEnvironmentStatisticsProvider, EnvironmentStatisticsProvider>();
 #pragma warning disable 618
@@ -91,9 +97,9 @@ namespace Orleans.Hosting
 #pragma warning restore 618
 
             services.TryAddSingleton<OverloadDetector>();
+            services.TryAddFromExisting<IOverloadDetector, OverloadDetector>();
 
             services.AddSingleton<SystemTargetShared>();
-            services.AddSingleton<LifecycleSchedulingSystemTarget>();
 
             services.TryAddSingleton<ITimerRegistry, TimerRegistry>();
 
@@ -156,9 +162,10 @@ namespace Orleans.Hosting
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, DeploymentLoadPublisher>();
 
             services.AddSingleton<IAsyncTimerFactory, AsyncTimerFactory>();
-            services.AddSingleton<MembershipTableManager>();
-            services.AddFromExisting<IHealthCheckParticipant, MembershipTableManager>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipTableManager>();
+
+            services.TryAddSingleton<IMembershipManager, MembershipTableManager>();
+            services.AddFromExisting<IHealthCheckParticipant, IMembershipManager>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IMembershipManager>();
             services.AddSingleton<MembershipSystemTarget>();
             services.AddFromExisting<IMembershipService, MembershipSystemTarget>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, MembershipSystemTarget>();
@@ -166,10 +173,11 @@ namespace Orleans.Hosting
             services.AddSingleton<IRemoteSiloProber, RemoteSiloProber>();
             services.AddSingleton<SiloStatusOracle>();
             services.TryAddFromExisting<ISiloStatusOracle, SiloStatusOracle>();
-            services.AddSingleton<ClusterHealthMonitor>();
-            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ClusterHealthMonitor>();
-            services.AddFromExisting<IHealthCheckParticipant, ClusterHealthMonitor>();
+            services.TryAddSingleton<IClusterHealthMonitor, ClusterHealthMonitor>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IClusterHealthMonitor>();
+            services.AddFromExisting<IHealthCheckParticipant, IClusterHealthMonitor>();
             services.AddSingleton<ProbeRequestMonitor>();
+            services.TryAddSingleton<IProbeHealthMonitor, ProbingSiloHealthMonitor>();
             services.AddSingleton<LocalSiloHealthMonitor>();
             services.AddFromExisting<ILocalSiloHealthMonitor, LocalSiloHealthMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, LocalSiloHealthMonitor>();
@@ -264,6 +272,7 @@ namespace Orleans.Hosting
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
             services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
+            services.AddSingleton<ILocalActivationStatusChecker, Runtime.LocalActivationStatusChecker>();
 
             // Scoped to a grain activation
             services.AddScoped<IGrainContext>(sp => RuntimeContext.Current ?? throw new InvalidOperationException("No current grain context available."));
@@ -415,7 +424,6 @@ namespace Orleans.Hosting
             services.AddSingleton<SharedMemoryPool>();
 
             // Activation migration
-            services.AddSingleton<MigrationContext.SerializationHooks>();
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
@@ -475,7 +483,17 @@ namespace Orleans.Hosting
                         ?? throw new InvalidOperationException($"{kind} provider, '{name}', of type {type}, does not implement {typeof(IProviderBuilder<ISiloBuilder>)}.");
                 }
 
-                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.");
+                var knownProvidersOfKind = knownProviderTypes
+                    .Where(kvp => string.Equals(kvp.Key.Kind, kind, StringComparison.OrdinalIgnoreCase))
+                    .Select(kvp => kvp.Key.Name)
+                    .OrderBy(n => n)
+                    .ToList();
+
+                var knownProvidersMessage = knownProvidersOfKind.Count > 0
+                    ? $" Known {kind} providers: {string.Join(", ", knownProvidersOfKind)}."
+                    : string.Empty;
+
+                throw new InvalidOperationException($"Could not find {kind} provider named '{name}'. This can indicate that either the 'Microsoft.Orleans.Sdk' or the provider's package are not referenced by your application.{knownProvidersMessage}");
             }
 
             static Dictionary<(string Kind, string Name), Type> GetRegisteredProviders()
@@ -519,7 +537,7 @@ namespace Orleans.Hosting
         {
             public bool? IsTypeNameAllowed(string typeName, string assemblyName)
             {
-                if (assemblyName is { Length: > 0} && assemblyName.Contains("Orleans"))
+                if (assemblyName is { Length: > 0 } && assemblyName.Contains("Orleans"))
                 {
                     return true;
                 }

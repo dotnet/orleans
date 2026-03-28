@@ -8,6 +8,7 @@ using Orleans.Hosting;
 using Orleans.Providers;
 using Orleans.Storage;
 
+#nullable disable
 [assembly: RegisterProvider("DynamoDB", "GrainStorage", "Silo", typeof(DynamoDBGrainStorageProviderBuilder))]
 
 namespace Orleans.Hosting;

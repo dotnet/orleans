@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Buffers.Binary;
 using System.Collections.Generic;
@@ -38,7 +37,7 @@ internal class FieldIdAssignmentHelper
 
     public bool TryGetSymbolKey(ISymbol symbol, out (uint, bool) key) => _symbols.TryGetValue(symbol, out key);
 
-    private bool HasMemberWithIdAnnotation() => Array.Exists(_memberSymbols, member => member.HasAnyAttribute(_libraryTypes.IdAttributeTypes));
+    private bool HasMemberWithIdAnnotation() => Array.Exists(_memberSymbols, member => member.HasAttribute(_libraryTypes.IdAttributeType));
 
     private IEnumerable<ISymbol> GetMembers(INamedTypeSymbol symbol)
     {

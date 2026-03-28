@@ -11,6 +11,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Threading.Tasks;
 
+#nullable disable
 namespace Orleans.Clustering.DynamoDB
 {
     internal class DynamoDBGatewayListProvider : IGatewayListProvider

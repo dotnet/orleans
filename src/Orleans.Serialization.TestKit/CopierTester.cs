@@ -8,6 +8,7 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
 
+#nullable disable
 namespace Orleans.Serialization.TestKit
 {
     /// <summary>
@@ -189,7 +190,7 @@ namespace Orleans.Serialization.TestKit
         public void CanCopyUntypedTupleViaSerializer()
         {
             var copier = _serviceProvider.GetRequiredService<DeepCopier<(string, object, object, string)>>();
-            var value = TestValues.Reverse().Concat(new[] { CreateValue(), CreateValue() }).Take(2).ToArray();
+            var value = ((IEnumerable<TValue>)TestValues).Reverse().Concat(new[] { CreateValue(), CreateValue() }).Take(2).ToArray();
 
             var original = (Guid.NewGuid().ToString(), (object)value[0], (object)value[1], Guid.NewGuid().ToString());
 

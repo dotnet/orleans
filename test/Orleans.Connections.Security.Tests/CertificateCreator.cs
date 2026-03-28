@@ -52,7 +52,13 @@ namespace Orleans.Connections.Security.Tests
         public static X509Certificate2 ConvertFromBase64(string encodedCertificate)
         {
             var rawData = Convert.FromBase64String(encodedCertificate);
+#if NET10_0_OR_GREATER
+            return X509CertificateLoader.LoadPkcs12(rawData, "testing-only");
+#else
+#pragma warning disable SYSLIB0057
             return new X509Certificate2(rawData, "testing-only");
+#pragma warning restore SYSLIB0057
+#endif
         }
     }
 }

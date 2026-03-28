@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Serialization;
 
+#nullable disable
 namespace OrleansAWSUtils.Streams
 {
     internal class SQSAdapter : IQueueAdapter

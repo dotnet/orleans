@@ -23,5 +23,11 @@ namespace Orleans.EventSourcing.CustomStorage
         /// </summary>
         /// <returns>true if the deltas were applied, false otherwise</returns>
         Task<bool> ApplyUpdatesToStorage(IReadOnlyList<TDelta> updates, int expectedVersion);
+
+        /// <summary>
+        /// Clears the stored state in storage.
+        /// </summary>
+        /// <returns>A task that represents the asynchronous clear operation.</returns>
+        Task ClearStoredState() => throw new NotSupportedException();
     }
 }

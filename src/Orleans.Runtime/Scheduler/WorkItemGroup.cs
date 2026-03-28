@@ -1,4 +1,3 @@
-#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -24,7 +23,11 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     }
 
     private readonly ILogger _log;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lockObj = new();
+#else
     private readonly object _lockObj = new();
+#endif
     private readonly Queue<Task> _workItems = new();
     private readonly SchedulingOptions _schedulingOptions;
 
@@ -242,7 +245,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
             (int)ErrorCode.Runtime_Error_100032,
             ex,
             "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute",
-            Thread.CurrentThread.ManagedThreadId);
+            Environment.CurrentManagedThreadId);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -261,7 +264,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
             GrainContext.ToString(),
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,
-            Thread.CurrentThread.ManagedThreadId.ToString());
+            Environment.CurrentManagedThreadId.ToString());
     }
 
     public override string ToString() => $"{(GrainContext is SystemTarget ? "System*" : "")}WorkItemGroup:Name={GrainContext?.ToString() ?? "Unknown"},WorkGroupStatus={_state}";

@@ -1,3 +1,4 @@
+#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -7,7 +8,11 @@ namespace Orleans.Runtime
     {
         private readonly SiloAddress _localSilo;
         private readonly IClusterMembershipService _clusterMembershipService;
-        private readonly object _lockObj = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lockObj = new();
+#else
+        private readonly object _lockObj = new();
+#endif
         private VersionedSuccessor _successor = new VersionedSuccessor(MembershipVersion.MinValue, null);
 
         public SimpleConsistentRingProvider(ILocalSiloDetails localSiloDetails, IClusterMembershipService clusterMembershipService)

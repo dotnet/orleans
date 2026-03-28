@@ -6,14 +6,11 @@
   <Import Project="$(_ParentDirectoryBuildPropsPath)" Condition="Exists('$(_ParentDirectoryBuildPropsPath)')"/>
 
   <PropertyGroup>
-    <WarningLevel>3</WarningLevel>
-    <AnalysisLevel>preview</AnalysisLevel>
-    <Features>strict</Features>
   </PropertyGroup>
 
   <PropertyGroup>
     <CompatibilityTargetFrameworks>netstandard2.0</CompatibilityTargetFrameworks>
-    <DefaultTargetFrameworks>net8.0</DefaultTargetFrameworks>
+    <DefaultTargetFrameworks>net8.0;net10.0</DefaultTargetFrameworks>
   </PropertyGroup>
 
   <PropertyGroup>
@@ -21,7 +18,9 @@
   </PropertyGroup>
 
   <PropertyGroup>
-    <GenerateDocumentationFile>true</GenerateDocumentationFile>
+    <ReadMePath>$(MSBuildProjectDirectory)\README.md</ReadMePath>
+    <ReadMeExists Condition="Exists('$(ReadMePath)')">true</ReadMeExists>
+    <PackageReadmeFile Condition="'$(PackageReadmeFile)' == '' And '$(ReadMeExists)' == 'true'">README.md</PackageReadmeFile>
   </PropertyGroup>
 
   <PropertyGroup>

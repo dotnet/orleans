@@ -23,6 +23,10 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
     - uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -42,7 +46,7 @@ jobs:
     strategy:
       matrix:
         provider: ["Redis"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     services:
       redis:
         image: redis
@@ -64,9 +68,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Archive Test Results
@@ -86,7 +92,7 @@ jobs:
       matrix:
         provider: ["Cassandra"]
         dbversion: ["4.0", "4.1", "5.0"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -98,9 +104,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.dbversion }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
@@ -119,7 +127,7 @@ jobs:
     strategy:
       matrix:
         provider: ["PostgreSql"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     services:
       postgres:
         image: postgres
@@ -144,9 +152,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
@@ -166,7 +176,7 @@ jobs:
     strategy:
       matrix:
         provider: ["MySql"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     services:
       mariadb:
         image: mariadb:10.6
@@ -186,9 +196,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
@@ -208,7 +220,7 @@ jobs:
     strategy:
       matrix:
         provider: ["SqlServer"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     services:
       mssql:
         image: mcr.microsoft.com/mssql/server:latest
@@ -230,12 +242,14 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;"
+        ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -251,17 +265,23 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        framework: ["net8.0"]
+        framework: ["net8.0", "net10.0"]
         provider: ["AzureStorage"]
-    services:
-      azurite:
-        image: mcr.microsoft.com/azure-storage/azurite:latest
-        ports:
-          - 10000:10000
-          - 10001:10001
-          - 10002:10002
     steps:
     - uses: actions/checkout@v4
+    - name: Start Azurite
+      run: |
+        docker run -d --name azurite \
+          -p 10000:10000 \
+          -p 10001:10001 \
+          -p 10002:10002 \
+          mcr.microsoft.com/azure-storage/azurite:latest \
+          azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    - name: Wait for Azurite
+      run: |
+        echo "Waiting for Azurite to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
+        echo "Azurite is ready"
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -271,14 +291,93 @@ jobs:
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
 # [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
         ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+    - name: Clean up Azurite
+      if: always()
+      run: docker rm -f azurite
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
+  test-azure-eventhubs:
+    name: Azure Event Hubs provider tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        framework: ["net8.0", "net10.0"]
+        provider: ["EventHub"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Start Azurite
+      run: |
+        docker run -d --name azurite \
+          -p 10000:10000 \
+          -p 10001:10001 \
+          -p 10002:10002 \
+          mcr.microsoft.com/azure-storage/azurite:latest \
+          azurite --blobHost 0.0.0.0 --queueHost 0.0.0.0 --tableHost 0.0.0.0 --skipApiVersionCheck
+    - name: Wait for Azurite
+      run: |
+        echo "Waiting for Azurite to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
+        echo "Azurite is ready"
+    - name: Start Event Hubs emulator
+      run: |
+        docker run -d --name eventhubs-emulator \
+          -v ${{ github.workspace }}/.github/eventhubs-emulator/Config.json:/Eventhubs_Emulator/ConfigFiles/Config.json \
+          -p 5672:5672 \
+          -e BLOB_SERVER=host.docker.internal \
+          -e METADATA_SERVER=host.docker.internal \
+          -e ACCEPT_EULA=Y \
+          --add-host=host.docker.internal:host-gateway \
+          mcr.microsoft.com/azure-messaging/eventhubs-emulator:latest
+    - name: Wait for Event Hubs emulator
+      run: |
+        echo "Waiting for Event Hubs emulator to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 5672; do sleep 1; done'
+        echo "Event Hubs emulator is ready"
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+    - name: Test
+      run: dotnet test
+        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional|Category=Streaming)"
+        --framework ${{ matrix.framework }}
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+      env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
+# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
+        ORLEANSEVENTHUBCONNECTIONSTRING: "Endpoint=sb://localhost;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=SAS_KEY_VALUE;UseDevelopmentEmulator=true;"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDATACONNECTIONSTRING: "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;QueueEndpoint=http://127.0.0.1:10001/devstoreaccount1;TableEndpoint=http://127.0.0.1:10002/devstoreaccount1;"
+    - name: Clean up Event Hubs emulator
+      if: always()
+      run: docker rm -f eventhubs-emulator
+    - name: Clean up Azurite
+      if: always()
+      run: docker rm -f azurite
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -295,7 +394,7 @@ jobs:
     continue-on-error: true
     strategy:
       matrix:
-        framework: ["net8.0"]
+        framework: ["net8.0", "net10.0"]
         provider: ["Cosmos"]
     steps:
     - uses: actions/checkout@v4
@@ -324,9 +423,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://127.0.0.1:8081/"
@@ -348,15 +449,9 @@ jobs:
     strategy:
       matrix:
         provider: ["Consul"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@v4
-    - name: Start Consul
-      run: |
-        docker run -d --name consul -p 8500:8500 -p 8600:8600/tcp -p 8600:8600/udp \
-          hashicorp/consul:1.19 agent -dev -client=0.0.0.0
-    - name: Wait for Consul
-      run: sleep 5
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -366,17 +461,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
-      env:
-# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0090:ConfigFile", Justification="Not a secret")]
-# [SuppressMessage("Microsoft.Security", "CSCAN0220:DefaultPasswordContexts", Justification="Not a secret")]
-        ORLEANSCONSULCONNECTIONSTRING: "http://localhost:8500"
-    - name: Clean up Consul container
-      if: always()
-      run: docker rm -f consul
+        --
+        -parallel none -noshadow
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -393,7 +482,7 @@ jobs:
     strategy:
       matrix:
         provider: ["ZooKeeper"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     services:
       zookeeper:
         image: zookeeper:3.9
@@ -410,9 +499,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Archive Test Results
@@ -431,7 +522,7 @@ jobs:
     strategy:
       matrix:
         provider: ["DynamoDB"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     services:
       dynamodb:
         image: amazon/dynamodb-local:latest
@@ -454,9 +545,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
       env:
         ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
@@ -479,7 +572,7 @@ jobs:
     strategy:
       matrix:
         provider: ["NATS"]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
 #    services:
 #      nats:
 #        image: nats:latest
@@ -503,9 +596,11 @@ jobs:
         --framework ${{ matrix.framework }}
         --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
     - name: Clean up container
       if: always()
       run: docker rm -f nats
@@ -526,9 +621,13 @@ jobs:
       matrix:
         suite: [BVT, SlowBVT, Functional]
         os: [ubuntu-latest, windows-latest, macos-latest]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@v4
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20.x'
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -538,11 +637,13 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.suite }}"
+        --filter "Category=${{ matrix.suite }}&Category!=Consul"
         --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.suite }}_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
-        -- -parallel none -noshadow
+        --
+        -parallel none -noshadow
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
@@ -559,7 +660,7 @@ jobs:
     strategy:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
-        framework: [net8.0]
+        framework: ["net8.0", "net10.0"]
     steps:
     - uses: actions/checkout@v4
     - name: Setup .NET
@@ -570,5 +671,18 @@ jobs:
       run: dotnet test
         test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
         --framework ${{ matrix.framework }}
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
         --logger "trx;LogFileName=test_results_${{ matrix.framework }}.trx"
-        --logger "GitHubActions;summary.includePassedTests=true;summary.includeSkippedTests=true;summary.includeNotFoundTests=false"
+        --
+        -parallel none -noshadow
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*

@@ -1,13 +1,12 @@
-using System;
-using System.Collections.Generic;
 using System.Runtime.CompilerServices;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.GrainDirectory;
+using System.Diagnostics;
+using Orleans.Diagnostics;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     internal sealed partial class Catalog : SystemTarget, ICatalog, ILifecycleParticipant<ISiloLifecycle>
@@ -24,7 +23,11 @@ namespace Orleans.Runtime
         // Lock striping is used for activation creation to reduce contention
         private const int LockCount = 32; // Must be a power of 2
         private const int LockMask = LockCount - 1;
+#if NET9_0_OR_GREATER
+        private readonly Lock[] _locks = new Lock[LockCount];
+#else
         private readonly object[] _locks = new object[LockCount];
+#endif
 
         public Catalog(
             ILocalSiloDetails localSiloDetails,
@@ -48,7 +51,7 @@ namespace Orleans.Runtime
             // Initialize lock striping array
             for (var i = 0; i < LockCount; i++)
             {
-                _locks[i] = new object();
+                _locks[i] = new();
             }
 
             GC.GetTotalMemory(true); // need to call once w/true to ensure false returns OK value
@@ -75,7 +78,11 @@ namespace Orleans.Runtime
         /// <param name="grainId">The grain ID to get the lock for.</param>
         /// <returns>The lock object for the specified grain ID.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+#if NET9_0_OR_GREATER
+        private Lock GetStripedLock(in GrainId grainId)
+#else
         private object GetStripedLock(in GrainId grainId)
+#endif
         {
             var hash = grainId.GetUniformHashCode();
             var lockIndex = (int)(hash & LockMask);
@@ -147,7 +154,7 @@ namespace Orleans.Runtime
                     return result;
                 }
 
-                if (!_siloStatusOracle.CurrentStatus.IsTerminating())
+                if (_siloStatusOracle.CurrentStatus == SiloStatus.Active)
                 {
                     var address = new GrainAddress
                     {
@@ -168,6 +175,25 @@ namespace Orleans.Runtime
                 return UnableToCreateActivation(this, grainId);
             }
 
+            // Start activation span with parent context from request if available
+            var parentContext = requestContextData.TryGetActivityContext();
+            var activationActivity = parentContext.HasValue
+                ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal, parentContext.Value)
+                : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.ActivateGrain, ActivityKind.Internal);
+            if (activationActivity is not null)
+            {
+                activationActivity.SetTag(ActivityTagKeys.GrainId, grainId.ToString());
+                activationActivity.SetTag(ActivityTagKeys.GrainType, grainId.Type.ToString());
+                activationActivity.SetTag(ActivityTagKeys.SiloId, Silo.ToString());
+                activationActivity.SetTag(ActivityTagKeys.ActivationCause, rehydrationContext is null ? "new" : "rehydrate");
+                if (result is ActivationData act)
+                {
+                    activationActivity.SetTag(ActivityTagKeys.ActivationId, act.ActivationId.ToString());
+                    act.SetActivationActivity(activationActivity);
+                    activationActivity.AddEvent(new ActivityEvent("creating"));
+                }
+            }
+
             CatalogInstruments.ActivationsCreated.Add(1);
 
             // Rehydration occurs before activation.
@@ -184,10 +210,11 @@ namespace Orleans.Runtime
             static IGrainContext UnableToCreateActivation(Catalog self, GrainId grainId)
             {
                 // Did not find and did not start placing new
-                var isTerminating = self._siloStatusOracle.CurrentStatus.IsTerminating();
-                if (isTerminating)
+                var status = self._siloStatusOracle.CurrentStatus;
+                var isTerminating = status.IsTerminating();
+                if (status is not SiloStatus.Active)
                 {
-                    self.LogDebugUnableToCreateActivationTerminating(grainId);
+                    self.LogDebugUnableToCreateActivationWhenNotActive(grainId);
                 }
                 else
                 {
@@ -412,10 +439,9 @@ namespace Orleans.Runtime
         private partial void LogDebugDeactivateAllActivations();
 
         [LoggerMessage(
-            EventId = (int)ErrorCode.CatalogNonExistingActivation2,
             Level = LogLevel.Debug,
-            Message = "Unable to create activation for grain {GrainId} because this silo is terminating")]
-        private partial void LogDebugUnableToCreateActivationTerminating(GrainId grainId);
+            Message = "Unable to create activation for grain {GrainId} because this silo is not active.")]
+        private partial void LogDebugUnableToCreateActivationWhenNotActive(GrainId grainId);
 
         [LoggerMessage(
             EventId = (int)ErrorCode.CatalogNonExistingActivation2,
@@ -430,6 +456,5 @@ namespace Orleans.Runtime
             Message = "Failed to unregister non-existent activation {Address}"
         )]
         private partial void LogFailedToUnregisterNonExistingActivation(GrainAddress address, Exception exception);
-
     }
 }

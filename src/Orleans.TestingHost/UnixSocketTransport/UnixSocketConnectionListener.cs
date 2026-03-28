@@ -7,6 +7,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Connections;
 using Orleans.Networking.Shared;
 
+#nullable disable
 namespace Orleans.TestingHost.UnixSocketTransport;
 
 internal class UnixSocketConnectionListener : IConnectionListener

@@ -4,8 +4,9 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using FluentAssertions;
+using AwesomeAssertions;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit.Consistency
 {
     public class ConsistencyTestHarness

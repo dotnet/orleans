@@ -5,6 +5,7 @@ using Orleans.Concurrency;
 using Orleans.Dashboard.Core;
 using Orleans.Dashboard.Model;
 
+#nullable disable
 namespace Orleans.Dashboard.Implementation.Grains;
 
 internal sealed class DashboardRemindersGrain : Grain, IDashboardRemindersGrain

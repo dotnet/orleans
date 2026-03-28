@@ -1,7 +1,0 @@
-<Project Sdk="Microsoft.NET.Sdk">
-  <PropertyGroup>
-    <RootNamespace>UnitTests.Interfaces</RootNamespace>
-    <AssemblyName>TestInterfaces</AssemblyName>
-    <TargetFramework>$(TestTargetFrameworks)</TargetFramework>
-  </PropertyGroup>
-</Project>

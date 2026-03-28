@@ -12,7 +12,7 @@ dotnet add package Microsoft.Orleans.Clustering.AdoNet
 
 You will also need to install the appropriate database driver package for your database system:
 
-- SQL Server: `Microsoft.Data.SqlClient` or `System.Data.SqlClient`
+- SQL Server: `Microsoft.Data.SqlClient`
 - MySQL: `MySql.Data` or `MySqlConnector`
 - PostgreSQL: `Npgsql`
 - Oracle: `Oracle.ManagedDataAccess.Core`
@@ -93,7 +93,7 @@ var clientBuilder = Host.CreateApplicationBuilder(args)
             // Configure the client to use ADO.NET for clustering
             .UseAdoNetClustering(options =>
             {
-                options.Invariant = "System.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
+                options.Invariant = "Microsoft.Data.SqlClient";  // Or other providers like "MySql.Data.MySqlClient", "Npgsql", etc.
                 options.ConnectionString = "Server=localhost;Database=OrleansCluster;User Id=myUsername;******;";
             });
     });
