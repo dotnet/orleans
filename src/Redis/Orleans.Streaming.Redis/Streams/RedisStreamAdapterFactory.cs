@@ -20,10 +20,11 @@ public class RedisStreamAdapterFactory : IQueueAdapterFactory
     private readonly IQueueAdapterCache _queueAdapterCache;
     private readonly ILoggerFactory _loggerFactory;
 
-    /// <summary>
-    /// Application level failure handler override.
-    /// </summary>
-    protected Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory { private get; set; }
+    private Func<QueueId, Task<IStreamFailureHandler>>? _streamFailureHandlerFactory;
+
+    private Func<QueueId, Task<IStreamFailureHandler>> StreamFailureHandlerFactory =>
+        _streamFailureHandlerFactory ??=
+        (qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler()));
 
     public static RedisStreamAdapterFactory Create(IServiceProvider serviceProvider, string providerName)
     {
@@ -39,19 +40,16 @@ public class RedisStreamAdapterFactory : IQueueAdapterFactory
                 providerName, clusterOptions, redisStreamOptions, redisStreamReceiverOptions,
                 hashRingStreamQueueMapperOptions, simpleQueueCacheOptions,
                 queueDataAdapter);
-        factory.Init();
         return factory;
     }
 
     public static IServiceCollection PostConfigureDefaults(IServiceCollection services, string providerName)
     {
         services.
-            TryAddKeyedSingleton<IQueueDataAdapter<StreamEntry, IBatchContainer>, RedisStreamDataAdapter>(providerName);
+            TryAddKeyedSingleton<IQueueDataAdapter<StreamEntry, IBatchContainer>, RedisStreamDataAdapterV1>(providerName);
 
         return services;
     }
-
-    internal RedisStreamAdapterFactory() { }
 
     public RedisStreamAdapterFactory(
         string providerName,
@@ -75,13 +73,6 @@ public class RedisStreamAdapterFactory : IQueueAdapterFactory
         _queueAdapterCache = new SimpleQueueAdapterCache(simpleQueueCacheOptions, providerName, loggerFactory);
     }
 
-    /// <summary> Init the factory.</summary>
-    public virtual void Init()
-    {
-        StreamFailureHandlerFactory ??=
-                qid => Task.FromResult<IStreamFailureHandler>(new NoOpStreamDeliveryFailureHandler());
-    }
-
     public Task<IQueueAdapter> CreateAdapter()
     {
         var queueAdapter = new RedisStreamAdapter(_providerName, _clusterOptions, _redisStreamOptions,
@@ -93,13 +84,7 @@ public class RedisStreamAdapterFactory : IQueueAdapterFactory
     public Task<IStreamFailureHandler> GetDeliveryFailureHandler(QueueId queueId) =>
            StreamFailureHandlerFactory(queueId);
 
-    public IQueueAdapterCache GetQueueAdapterCache()
-    {
-        return _queueAdapterCache;
-    }
+    public IQueueAdapterCache GetQueueAdapterCache() => _queueAdapterCache;
 
-    public IStreamQueueMapper GetStreamQueueMapper()
-    {
-        return _streamQueueMapper;
-    }
+    public IStreamQueueMapper GetStreamQueueMapper() => _streamQueueMapper;
 }

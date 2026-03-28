@@ -5,7 +5,6 @@ using Orleans.Configuration;
 using Orleans.Providers;
 using StackExchange.Redis;
 
-#nullable disable
 [assembly: RegisterProvider("Redis", "Streaming", "Silo", typeof(RedisStreamProviderBuilder))]
 [assembly: RegisterProvider("AzureRedisCache", "Streaming", "Silo", typeof(RedisStreamProviderBuilder))]
 [assembly: RegisterProvider("Redis", "Streaming", "Client", typeof(RedisStreamProviderBuilder))]
@@ -15,8 +14,9 @@ namespace Orleans.Hosting;
 
 internal sealed class RedisStreamProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
+        ArgumentException.ThrowIfNullOrEmpty(name);
         builder.AddRedisStreams(name, streamsBuilder =>
         {
             streamsBuilder.ConfigureRedis(GetOptionsBuilder(configurationSection));
@@ -28,8 +28,9 @@ internal sealed class RedisStreamProviderBuilder : IProviderBuilder<ISiloBuilder
         });
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
+        ArgumentException.ThrowIfNullOrEmpty(name);
         builder.AddRedisStreams(name, streamsBuilder =>
         {
             streamsBuilder.ConfigureRedis(GetOptionsBuilder(configurationSection));

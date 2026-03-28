@@ -33,12 +33,12 @@
     <Project Path="src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj" />
     <Project Path="src/Orleans.Core.Abstractions/Orleans.Core.Abstractions.csproj" />
     <Project Path="src/Orleans.Core/Orleans.Core.csproj" />
+    <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
     <Project Path="src/Orleans.Journaling/Orleans.Journaling.csproj" />
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
     <Project Path="src/Orleans.Reminders/Orleans.Reminders.csproj" />
     <Project Path="src/Orleans.Runtime/Orleans.Runtime.csproj" />
-    <Project Path="src/Orleans.DurableJobs/Orleans.DurableJobs.csproj" Id="ab4cc723-b3cf-4c32-be4c-1a180a49797c" />
     <Project Path="src/Orleans.Sdk/Orleans.Sdk.csproj" />
     <Project Path="src/Orleans.Serialization.Abstractions/Orleans.Serialization.Abstractions.csproj" />
     <Project Path="src/Orleans.Serialization.FSharp/Orleans.Serialization.FSharp.csproj" />
@@ -79,13 +79,13 @@
   <Folder Name="/src/Extensions/Azure/">
     <Project Path="src/Azure/Orleans.Clustering.AzureStorage/Orleans.Clustering.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Clustering.Cosmos/Orleans.Clustering.Cosmos.csproj" />
+    <Project Path="src/Azure/Orleans.DurableJobs.AzureStorage/Orleans.DurableJobs.AzureStorage.csproj" Id="5bbb1058-9ab2-44e9-b237-49f5b6bee151" />
     <Project Path="src/Azure/Orleans.GrainDirectory.AzureStorage/Orleans.GrainDirectory.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Journaling.AzureStorage/Orleans.Journaling.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.AzureStorage/Orleans.Persistence.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Persistence.Cosmos/Orleans.Persistence.Cosmos.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.AzureStorage/Orleans.Reminders.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Reminders.Cosmos/Orleans.Reminders.Cosmos.csproj" />
-    <Project Path="src/Azure/Orleans.DurableJobs.AzureStorage/Orleans.DurableJobs.AzureStorage.csproj" Id="5bbb1058-9ab2-44e9-b237-49f5b6bee151" />
     <Project Path="src/Azure/Orleans.Streaming.AzureStorage/Orleans.Streaming.AzureStorage.csproj" />
     <Project Path="src/Azure/Orleans.Streaming.EventHubs/Orleans.Streaming.EventHubs.csproj" />
     <Project Path="src/Azure/Orleans.Transactions.AzureStorage/Orleans.Transactions.AzureStorage.csproj" />
@@ -101,7 +101,9 @@
     <Project Path="src/Redis/Orleans.GrainDirectory.Redis/Orleans.GrainDirectory.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Persistence.Redis/Orleans.Persistence.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Reminders.Redis/Orleans.Reminders.Redis.csproj" />
-    <Project Path="src/Redis/Orleans.Streaming.Redis/Orleans.Streaming.Redis.csproj" Id="c80f7266-4a58-4fcc-9355-6b14cbb50828" />
+    <Project Path="src/Redis/Orleans.Streaming.Redis/Orleans.Streaming.Redis.csproj" Id="c80f7266-4a58-4fcc-9355-6b14cbb50828">
+      <Build Solution="Debug|*" Project="false" />
+    </Project>
   </Folder>
   <Folder Name="/src/Transactions/">
     <Project Path="src/Orleans.Transactions.TestKit.Base/Orleans.Transactions.TestKit.Base.csproj" />
@@ -110,22 +112,22 @@
   </Folder>
   <Folder Name="/test/">
     <Project Path="test/Orleans.Analyzers.Tests/Orleans.Analyzers.Tests.csproj" />
-    <Project Path="test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" />
-    <Project Path="test/Orleans.DependencyInjection.Tests/Orleans.DependencyInjection.Tests.csproj" />
-    <Project Path="test/Orleans.Core.Tests/Orleans.Core.Tests.csproj" />
+    <Project Path="test/Orleans.BroadcastChannel.Tests/Orleans.BroadcastChannel.Tests.csproj" />
     <Project Path="test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj" />
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
+    <Project Path="test/Orleans.Core.Tests/Orleans.Core.Tests.csproj" />
+    <Project Path="test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj" />
+    <Project Path="test/Orleans.DependencyInjection.Tests/Orleans.DependencyInjection.Tests.csproj" />
+    <Project Path="test/Orleans.DurableJobs.Tests/Orleans.DurableJobs.Tests.csproj" />
+    <Project Path="test/Orleans.EventSourcing.Tests/Orleans.EventSourcing.Tests.csproj" />
+    <Project Path="test/Orleans.GrainDirectory.Tests/Orleans.GrainDirectory.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
+    <Project Path="test/Orleans.Placement.Tests/Orleans.Placement.Tests.csproj" />
+    <Project Path="test/Orleans.Runtime.Internal.Tests/Orleans.Runtime.Internal.Tests.csproj" />
+    <Project Path="test/Orleans.Runtime.Tests/Orleans.Runtime.Tests.csproj" />
     <Project Path="test/Orleans.Serialization.FSharp.Tests/Orleans.Serialization.FSharp.Tests.fsproj" />
     <Project Path="test/Orleans.Serialization.UnitTests/Orleans.Serialization.UnitTests.csproj" />
-    <Project Path="test/Orleans.Runtime.Tests/Orleans.Runtime.Tests.csproj" />
-    <Project Path="test/Orleans.Runtime.Internal.Tests/Orleans.Runtime.Internal.Tests.csproj" />
-    <Project Path="test/Orleans.Placement.Tests/Orleans.Placement.Tests.csproj" />
-    <Project Path="test/Orleans.GrainDirectory.Tests/Orleans.GrainDirectory.Tests.csproj" />
     <Project Path="test/Orleans.Streaming.Tests/Orleans.Streaming.Tests.csproj" />
-    <Project Path="test/Orleans.BroadcastChannel.Tests/Orleans.BroadcastChannel.Tests.csproj" />
-    <Project Path="test/Orleans.EventSourcing.Tests/Orleans.EventSourcing.Tests.csproj" />
-    <Project Path="test/Orleans.DurableJobs.Tests/Orleans.DurableJobs.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Dashboard/">
     <Project Path="test/Orleans.Dashboard.Tests/Orleans.Dashboard.TestGrains/Orleans.Dashboard.TestGrains.csproj" />
@@ -145,21 +147,21 @@
     <Project Path="test/DistributedTests/DistributedTests.Server/DistributedTests.Server.csproj" />
   </Folder>
   <Folder Name="/test/Extensions/">
+    <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Clustering.Consul.Tests/Orleans.Clustering.Consul.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Streaming.EventHubs.Tests/Orleans.Streaming.EventHubs.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Azure.Tests/Orleans.Azure.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Clustering.Cassandra.Tests/Orleans.Clustering.Cassandra.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Clustering.Consul.Tests/Orleans.Clustering.Consul.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Clustering.ZooKeeper.Tests/Orleans.Clustering.ZooKeeper.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Redis.Tests/Orleans.Redis.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.AdoNet.Tests/Orleans.AdoNet.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Azure.Tests/Orleans.Azure.Tests.csproj" />
-    <Project Path="test/Extensions/Orleans.Clustering.ZooKeeper.Tests/Orleans.Clustering.ZooKeeper.Tests.csproj" />
+    <Project Path="test/Extensions/Orleans.Streaming.EventHubs.Tests/Orleans.Streaming.EventHubs.Tests.csproj" />
     <Project Path="test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj" />
   </Folder>
   <Folder Name="/test/Grains/">
     <Project Path="test/Grains/TestFSharp/TestFSharp.fsproj" />
-    <Project Path="test/Grains/TestFSharpGrainInterfaces/TestFSharpGrainInterfaces.csproj" />
     <Project Path="test/Grains/TestFSharpGrainInterfaces/FSharpInterfaces/TestFSharpInterfaces.fsproj" />
+    <Project Path="test/Grains/TestFSharpGrainInterfaces/TestFSharpGrainInterfaces.csproj" />
     <Project Path="test/Grains/TestGrainInterfaces/TestGrainInterfaces.csproj" />
     <Project Path="test/Grains/TestGrains/TestGrains.csproj" />
     <Project Path="test/Grains/TestInternalGrainInterfaces/TestInternalGrainInterfaces.csproj" />

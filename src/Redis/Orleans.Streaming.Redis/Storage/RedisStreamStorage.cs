@@ -1,3 +1,4 @@
+using System;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
@@ -19,7 +20,7 @@ internal partial class RedisStreamStorage
     private readonly ILogger<RedisStreamStorage> _logger;
 
     private readonly RedisKey _streamRedisKey;
-    private IDatabase _database;
+    private IDatabase? _database;    
 
     public RedisStreamStorage(
         QueueId queueId,
@@ -35,6 +36,8 @@ internal partial class RedisStreamStorage
 
         _streamRedisKey = _redisStreamOptions.GetRedisKey(clusterOptions, queueId);
     }
+
+    private IDatabase Database => _database ?? throw new InvalidOperationException("Stream not initialized");
 
     public async Task InitializeAsync()
     {
@@ -58,7 +61,7 @@ internal partial class RedisStreamStorage
     {
         try
         {
-            await _database
+            await Database
                 .StreamCreateConsumerGroupAsync(_streamRedisKey, _redisStreamReceiverOptions.ConsumerGroupName, position: 0, createStream: true);
         }
         catch (Exception exc) when (exc.Message.Contains("name already exists"))
@@ -77,7 +80,7 @@ internal partial class RedisStreamStorage
 
         try
         {
-            id = await _database.StreamAddAsync(_streamRedisKey, entry.Values);
+            id = await Database.StreamAddAsync(_streamRedisKey, entry.Values);
         }
         catch (Exception exc)
         {
@@ -92,7 +95,7 @@ internal partial class RedisStreamStorage
         IEnumerable<StreamEntry> entriesResult = [];
         try
         {
-            var claimResult = await _database.StreamAutoClaimAsync(_streamRedisKey,
+            var claimResult = await Database.StreamAutoClaimAsync(_streamRedisKey,
                 _redisStreamReceiverOptions.ConsumerGroupName,
                 _redisStreamReceiverOptions.ConsumerName,
                 (long)_redisStreamReceiverOptions.DeliveredMessageIdleTimeout.TotalMilliseconds,
@@ -104,7 +107,7 @@ internal partial class RedisStreamStorage
             }
             else
             {
-                var entriesReadGroup = await _database.StreamReadGroupAsync(_streamRedisKey,
+                var entriesReadGroup = await Database.StreamReadGroupAsync(_streamRedisKey,
                     _redisStreamReceiverOptions.ConsumerGroupName,
                     _redisStreamReceiverOptions.ConsumerName, position: ">",
                     count - claimResult.ClaimedEntries.Length);
@@ -136,7 +139,7 @@ internal partial class RedisStreamStorage
         Array.Copy(streamEntriesId, 0, args, 1, streamEntriesId.Length);
         try
         {
-            await _database.ScriptEvaluateAsync(DeliveredScript, keys: [_streamRedisKey], values: args);
+            await Database.ScriptEvaluateAsync(DeliveredScript, keys: [_streamRedisKey], values: args);
         }
         catch (Exception exc)
         {

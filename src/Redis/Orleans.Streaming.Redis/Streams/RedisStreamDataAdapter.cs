@@ -3,6 +3,7 @@ using Orleans.Providers.Streams.Common;
 using Orleans.Serialization;
 using Orleans.Streams;
 using StackExchange.Redis;
+
 namespace Orleans.Streaming.Redis.Streams;
 
 [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
@@ -17,7 +18,7 @@ public class RedisStreamDataAdapterV1(Serializer serializer) : IQueueDataAdapter
         {
             throw new ArgumentException("Stream entry does not contain 'data' field.", nameof(queueMessage));
         }
-        var base64String = (string)dataEntry.Value;
+        var base64String = dataEntry.Value.ToString();
         var rawBytes = Convert.FromBase64String(base64String);
         var redisStreamBatchContainer = _serializer.Deserialize(rawBytes);
         redisStreamBatchContainer.RealSequenceToken = GetSequenceTokenFromStreamEntryId(queueMessage.Id);
@@ -39,10 +40,7 @@ public class RedisStreamDataAdapterV1(Serializer serializer) : IQueueDataAdapter
         return new EventSequenceTokenV2(sequenceNumber);
     }
 
-    public void OnDeserialized(DeserializationContext context)
-    {
-        _serializer = context.ServiceProvider.GetRequiredService<Serializer<RedisStreamBatchContainer>>();
-    }
+    public void OnDeserialized(DeserializationContext context) => _serializer = context.ServiceProvider.GetRequiredService<Serializer<RedisStreamBatchContainer>>();
 
     public StreamEntry ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
     {
