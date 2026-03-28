@@ -7,16 +7,7 @@ namespace Orleans.Serialization.Buffers.Adaptors;
 internal static class BufferWriterExtensions
 {
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Write<TBufferWriter>(this ref TBufferWriter writer, ReadOnlySequence<byte> input) where TBufferWriter : struct, IBufferWriter<byte>
-    {
-        foreach (var segment in input)
-        {
-            writer.Write(segment.Span);
-        }
-    }
-
-    [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public static void Write<TBufferWriter>(ref this TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : struct, IBufferWriter<byte>
+    public static void Write<TBufferWriter>(ref TBufferWriter writer, ReadOnlySpan<byte> value) where TBufferWriter : IBufferWriter<byte>
     {
         var destination = writer.GetSpan();
 
@@ -32,7 +23,7 @@ internal static class BufferWriterExtensions
         }
     }
 
-    private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : struct, IBufferWriter<byte>
+    private static void WriteMultiSegment<TBufferWriter>(ref TBufferWriter writer, in ReadOnlySpan<byte> source, Span<byte> destination) where TBufferWriter : IBufferWriter<byte>
     {
         var input = source;
         while (true)

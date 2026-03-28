@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
 
+#nullable disable
 namespace Orleans.Configuration.Internal
 {
     /// <summary>

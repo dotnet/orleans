@@ -40,14 +40,55 @@ public sealed class DurableJobsOptions
     public TimeSpan OverloadBackoffDelay { get; set; } = TimeSpan.FromSeconds(5);
 
     /// <summary>
+    /// Gets or sets whether concurrent job slow start is enabled.
+    /// When enabled, job concurrency is gradually increased during startup to avoid starvation
+    /// issues that can occur before caches, connection pools, and thread pool sizing have warmed up.
+    /// Concurrency starts at <see cref="SlowStartInitialConcurrency"/> and doubles every
+    /// <see cref="SlowStartInterval"/> until <see cref="MaxConcurrentJobsPerSilo"/> is reached.
+    /// Default: <see langword="true"/>.
+    /// </summary>
+    public bool ConcurrencySlowStartEnabled { get; set; } = true;
+
+    /// <summary>
+    /// Gets or sets the initial number of concurrent jobs allowed per silo when slow start is enabled.
+    /// Concurrency will exponentially increase from this value until <see cref="MaxConcurrentJobsPerSilo"/> is reached.
+    /// Default: <see cref="Environment.ProcessorCount"/>.
+    /// </summary>
+    public int SlowStartInitialConcurrency { get; set; } = Environment.ProcessorCount;
+
+    /// <summary>
+    /// Gets or sets the interval at which concurrency is doubled during slow start ramp-up.
+    /// Default: 10 seconds.
+    /// </summary>
+    public TimeSpan SlowStartInterval { get; set; } = TimeSpan.FromSeconds(10);
+
+    /// <summary>
     /// Gets or sets the function that determines whether a failed job should be retried and when.
     /// The function receives the job context and the exception that caused the failure, and returns
     /// the time when the job should be retried, or <see langword="null"/> if the job should not be retried.
     /// Default: Retry up to 5 times with exponential backoff (2^n seconds).
     /// </summary>
-    public Func<IDurableJobContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
+    public Func<IJobRunContext, Exception, DateTimeOffset?> ShouldRetry { get; set; } = DefaultShouldRetry;
 
-    private static DateTimeOffset? DefaultShouldRetry(IDurableJobContext jobContext, Exception ex)
+    /// <summary>
+    /// Gets or sets the maximum number of times a shard can be adopted from a dead owner before
+    /// being marked as poisoned. A shard that repeatedly causes silos to crash will exceed this
+    /// threshold as it bounces between owners. When the next adoption would cause the adopted count
+    /// to exceed this value, the shard is considered poisoned and will no longer be assigned to any silo.
+    /// Default: 3.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The adopted count is only incremented when a shard is taken from a dead silo (i.e., the previous
+    /// owner crashed). It is NOT incremented when a silo gracefully shuts down and releases ownership.
+    /// </para>
+    /// <para>
+    /// When a shard completes successfully (all jobs processed), the adopted count is reset to 0.
+    /// </para>
+    /// </remarks>
+    public int MaxAdoptedCount { get; set; } = 3;
+
+    private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, Exception ex)
     {
         // Default retry logic: retry up to 5 times with exponential backoff
         if (jobContext.DequeueCount >= 5)
@@ -77,9 +118,28 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardDuration must be greater than zero.");
         }
-        if (options.ShouldRetry == null)
+        if (options.ShouldRetry is null)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShouldRetry must not be null.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency <= 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInitialConcurrency must be greater than zero.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInterval <= TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.SlowStartInterval must be greater than zero when slow start is enabled.");
+        }
+        if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency > options.MaxConcurrentJobsPerSilo)
+        {
+            _logger.LogWarning(
+                "DurableJobsOptions.SlowStartInitialConcurrency ({SlowStartInitialConcurrency}) exceeds MaxConcurrentJobsPerSilo ({MaxConcurrentJobsPerSilo}); slow start will not be applied.",
+                options.SlowStartInitialConcurrency,
+                options.MaxConcurrentJobsPerSilo);
+        }
+        if (options.MaxAdoptedCount < 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.MaxAdoptedCount must be greater than or equal to zero.");
         }
         _logger.LogInformation("DurableJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
     }

@@ -17,7 +17,6 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
     private readonly uint _partition;
     private readonly string _providerName;
     private readonly Serializer _serializer;
-    private long lastReadMessage;
     private NatsConnectionManager? _nats;
     private NatsStreamConsumer? _consumer;
     private Task? _outstandingTask;
@@ -96,13 +95,13 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
             this._outstandingTask = task;
             var (messages, messageCount) = await task;
 
-            var containers = new List<IBatchContainer>();
+            var containers = new List<IBatchContainer>(messageCount);
 
             for (var i = 0; i < messageCount; i++)
             {
                 var natsMessage = messages[i];
                 var container = this._serializer.Deserialize<NatsBatchContainer>(natsMessage.Payload);
-                container.SequenceToken = new EventSequenceTokenV2(lastReadMessage++);
+                container.SequenceToken = new EventSequenceTokenV2((long)natsMessage.Sequence);
                 container.ReplyTo = natsMessage.ReplyTo;
 
                 containers.Add(container);

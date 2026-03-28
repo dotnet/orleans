@@ -4,6 +4,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
 
+#nullable disable
 namespace Orleans.Transactions.TestKit
 {
     public interface IFaultInjectionTransactionalStateConfiguration : ITransactionalStateConfiguration

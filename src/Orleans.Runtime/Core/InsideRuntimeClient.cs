@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
 using Orleans.Runtime.GrainDirectory;
@@ -19,6 +20,7 @@ using Orleans.Serialization.Invocation;
 using Orleans.Storage;
 using static Orleans.Internal.StandardExtensions;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -40,6 +42,7 @@ namespace Orleans.Runtime
         private MessageCenter messageCenter;
         private List<IIncomingGrainCallFilter> grainCallFilters;
         private readonly DeepCopier _deepCopier;
+        private readonly ApplicationRequestInstruments _applicationRequestInstruments;
         private IGrainCallCancellationManager _cancellationManager;
         private HostedClient hostedClient;
 
@@ -62,11 +65,13 @@ namespace Orleans.Runtime
             GrainInterfaceTypeToGrainTypeResolver interfaceToTypeResolver,
             DeepCopier deepCopier,
             TimeProvider timeProvider,
-            InterfaceToImplementationMappingCache interfaceToImplementationMapping)
+            InterfaceToImplementationMappingCache interfaceToImplementationMapping,
+            OrleansInstruments orleansInstruments)
         {
             TimeProvider = timeProvider;
             this.interfaceToImplementationMapping = interfaceToImplementationMapping;
             this._deepCopier = deepCopier;
+            this._applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
             this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
@@ -95,7 +100,7 @@ namespace Orleans.Runtime
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
-                waitForCancellationAcknowledgement: false,
+                waitForCancellationAcknowledgement: this.messagingOptions.WaitForCancellationAcknowledgement,
                 cancellationManager: null);
         }
 
@@ -172,7 +177,7 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                var callbackData = new CallbackData(sharedData, context, message);
+                var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
                 callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
@@ -313,7 +318,15 @@ namespace Orleans.Runtime
                         ise.IsSourceActivation = false;
 
                         LogDeactivatingInconsistentState(this.invokeExceptionLogger, target, invocationException);
-                        target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                        
+                        if (target is ActivationData ad && message.RequestContextData.TryGetActivityContext() is { } ac)
+                        {
+                            ad.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)), ac);
+                        }
+                        else
+                        {
+                            target.Deactivate(new DeactivationReason(DeactivationReasonCode.ApplicationError, LogFormatter.PrintException(invocationException)));
+                        }
                     }
                 }
 
@@ -421,7 +434,7 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    if (messagingOptions.CancelRequestOnTimeout)
+                    if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
                     {
                         // Cancel the call since the caller has abandoned it.
                         // Note that the target and sender arguments are swapped because this is a response to the original request.
@@ -527,6 +540,7 @@ namespace Orleans.Runtime
         {
             _cancellationManager = this.ServiceProvider.GetRequiredService<IGrainCallCancellationManager>();
             sharedCallbackData.CancellationManager = _cancellationManager;
+            systemSharedCallbackData.CancellationManager = _cancellationManager;
             lifecycle.Subscribe<InsideRuntimeClient>(ServiceLifecycleStage.RuntimeInitialize, OnRuntimeInitializeStart, OnRuntimeInitializeStop);
         }
 

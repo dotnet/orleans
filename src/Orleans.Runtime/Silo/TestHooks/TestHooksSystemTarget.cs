@@ -10,6 +10,7 @@ using Orleans.Storage;
 using Orleans.Statistics;
 using Orleans.Runtime.Messaging;
 
+#nullable disable
 namespace Orleans.Runtime.TestHooks
 {
     /// <summary>

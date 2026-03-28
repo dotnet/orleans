@@ -8,7 +8,6 @@ using Orleans.Internal;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Utilities;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed partial class DirectoryMembershipService : IAsyncDisposable

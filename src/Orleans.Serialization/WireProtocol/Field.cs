@@ -2,6 +2,7 @@ using System;
 using System.Runtime.CompilerServices;
 using System.Text;
 
+#nullable disable
 namespace Orleans.Serialization.WireProtocol
 {
     /// <summary>

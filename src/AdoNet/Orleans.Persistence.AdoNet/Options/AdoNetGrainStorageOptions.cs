@@ -3,6 +3,7 @@ using Orleans.Persistence.AdoNet.Storage;
 using Orleans.Runtime;
 using Orleans.Storage;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>
@@ -53,6 +54,11 @@ namespace Orleans.Configuration
             // content-aware hashing with different pickers, unable to use standard StorageHasherPicker
             this.HashPicker = new Orleans3CompatibleStorageHashPicker();
         }
+
+        /// <summary>
+        /// Delete record row from db when state is cleared.
+        /// </summary>
+        public bool DeleteStateOnClear { get; set; }
     }
 
     /// <summary>

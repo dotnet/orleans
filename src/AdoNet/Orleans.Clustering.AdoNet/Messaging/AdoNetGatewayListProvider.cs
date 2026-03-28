@@ -7,6 +7,7 @@ using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Messaging;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Runtime.Membership
 {
     public partial class AdoNetGatewayListProvider : IGatewayListProvider

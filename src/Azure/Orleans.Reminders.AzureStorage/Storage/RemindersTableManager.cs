@@ -9,6 +9,7 @@ using Azure.Data.Tables;
 using Microsoft.Extensions.Logging;
 using Orleans.Reminders.AzureStorage;
 
+#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     internal sealed class ReminderTableEntry : ITableEntity

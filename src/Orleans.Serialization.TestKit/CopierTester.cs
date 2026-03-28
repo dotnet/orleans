@@ -8,6 +8,7 @@ using Xunit;
 using Xunit.Abstractions;
 using System.Linq;
 
+#nullable disable
 namespace Orleans.Serialization.TestKit
 {
     /// <summary>

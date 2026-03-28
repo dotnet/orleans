@@ -6,6 +6,7 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.EventSourcing.StateStorage;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     public static class StateStorageSiloBuilderExtensions

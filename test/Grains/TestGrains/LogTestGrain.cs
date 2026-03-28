@@ -185,6 +185,11 @@ namespace TestGrains
             return Task.CompletedTask;
         }
 
+        public Task Clear()
+        {
+            return ClearLogAsync();
+        }
+
         public Task<IReadOnlyList<object>> GetEventLog() {
             return this.RetrieveConfirmedEvents(0, Version);
         }

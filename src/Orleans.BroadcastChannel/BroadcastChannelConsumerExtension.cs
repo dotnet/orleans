@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Threading.Tasks;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.BroadcastChannel
 {
     internal interface IBroadcastChannelConsumerExtension : IGrainExtension

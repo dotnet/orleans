@@ -4,6 +4,29 @@ import CounterWidget from '../components/counter-widget';
 import SiloBreakdown from './silo-table';
 import Panel from '../components/panel';
 import Page from '../components/page';
+import { getName } from '../lib/typeName';
+
+// Format a fully-qualified member name so the type is shortened but the
+// member/method part is preserved. Examples:
+//  - "A.B.C<T>.M" -> "C<T>.M"
+//  - "A.B.C<T>.N.M" -> "C<T>.N.M"
+function formatMemberName(value: string): string {
+  if (!value) return value;
+  // find last top-level separator (dot, slash, or '#') not inside generics
+  let depth = 0;
+  for (let i = value.length - 1; i >= 0; i--) {
+    const ch = value[i];
+    if (ch === '>' || ch === ']') depth++;
+    else if (ch === '<' || ch === '[') depth--;
+    else if (depth === 0 && (ch === '.' || ch === '/' || ch === '#')) {
+      const typePart = value.substring(0, i);
+      const memberPart = value.substring(i + 1);
+      return `${getName(typePart)}.${memberPart}`;
+    }
+  }
+
+  return getName(value);
+}
 
 interface GrainMethodValue {
   count: number;
@@ -172,7 +195,7 @@ export default class Grain extends React.Component<GrainProps> {
                 .map(key => (
                   <GrainGraph key={key}
                     stats={this.props.grainStats[key]}
-                    grainMethod={getName(key)}
+                    grainMethod={formatMemberName(key)}
                   />
                 ))}
             </div>
@@ -194,9 +217,4 @@ export default class Grain extends React.Component<GrainProps> {
       return this.renderEmpty();
     return this.renderGraphs();
   }
-}
-
-function getName(value: string): string {
-  const parts = value.split('.');
-  return parts[parts.length - 1];
 }

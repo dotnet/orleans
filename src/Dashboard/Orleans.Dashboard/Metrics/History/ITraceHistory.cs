@@ -1,3 +1,4 @@
+#nullable disable
 using System;
 using System.Collections.Generic;
 using Orleans.Dashboard.Model;
@@ -17,5 +18,5 @@ internal interface ITraceHistory
 
     IEnumerable<TraceAggregate> GroupByGrainAndSilo();
 
-    IEnumerable<GrainMethodAggregate> AggregateByGrainMethod();
+    IEnumerable<GrainMethodAggregate> AggregateByGrainMethod(string[] exclusions = null);
 }

@@ -1,4 +1,3 @@
-#nullable enable
 
 using System;
 using System.Collections.Generic;
@@ -24,7 +23,11 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     }
 
     private readonly ILogger _log;
+#if NET9_0_OR_GREATER
+    private readonly Lock _lockObj = new();
+#else
     private readonly object _lockObj = new();
+#endif
     private readonly Queue<Task> _workItems = new();
     private readonly SchedulingOptions _schedulingOptions;
 

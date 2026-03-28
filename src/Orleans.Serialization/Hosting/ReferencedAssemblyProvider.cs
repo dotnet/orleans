@@ -9,6 +9,7 @@ using System.Reflection;
 using System.Runtime.Loader;
 #endif
 
+#nullable disable
 namespace Orleans.Serialization.Internal
 {
     public static class ReferencedAssemblyProvider

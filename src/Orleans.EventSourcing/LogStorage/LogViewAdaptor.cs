@@ -7,6 +7,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Storage;
 using Orleans.EventSourcing.Common;
 
+#nullable disable
 namespace Orleans.EventSourcing.LogStorage
 {
     /// <summary>
@@ -61,6 +62,13 @@ namespace Orleans.EventSourcing.LogStorage
             GlobalLog = new LogStateWithMetaDataAndETag<TLogEntry>();
             ConfirmedViewInternal = initialstate;
             ConfirmedVersionInternal = 0;
+        }
+
+        protected override Task ClearPrimaryLogAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            return this.globalGrainStorage.ClearStateAsync(grainTypeName, Services.GrainId, GlobalLog);
         }
 
         private void UpdateConfirmedView()

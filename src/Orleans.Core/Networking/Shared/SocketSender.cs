@@ -6,6 +6,7 @@ using System.IO.Pipelines;
 using System.Net.Sockets;
 using System.Runtime.InteropServices;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal sealed class SocketSender : SocketSenderReceiverBase

@@ -4,6 +4,7 @@ using System.Collections.Generic;
 using System.Net;
 using System.Text;
 
+#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal class SiloInstanceRecord

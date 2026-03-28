@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using System.Text.Json;
 using System.Threading.Tasks;
@@ -37,7 +36,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The silo builder for method chaining.</returns>
     public static ISiloBuilder AddDashboard(this ISiloBuilder siloBuilder, Action<DashboardOptions>? configureOptions = null)
     {
-        siloBuilder.Services.AddOrleansDashboardForSiloCore();
+        siloBuilder.Services.AddOrleansDashboardForSiloCore(configureOptions);
         return siloBuilder;
     }
 
@@ -60,16 +59,13 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<IGrainProfiler, GrainProfiler>();
         services.AddSingleton(c => (ILifecycleParticipant<ISiloLifecycle>)c.GetRequiredService<IGrainProfiler>());
         services.AddSingleton<IIncomingGrainCallFilter, GrainProfilerFilter>();
-
         services.AddSingleton<ISiloGrainClient, SiloGrainClient>();
 
-        services.AddSingleton<ISiloDetailsProvider>(c
-            => c.GetService<IMembershipTable>() switch
-            {
-                not null =>
-                c.GetRequiredService<MembershipTableSiloDetailsProvider>(),
-                null => c.GetRequiredService<SiloStatusOracleSiloDetailsProvider>(),
-            });
+        services.AddSingleton<ISiloDetailsProvider>(c => c.GetService<IMembershipTable>() switch
+        {
+            not null => c.GetRequiredService<MembershipTableSiloDetailsProvider>(),
+            null => c.GetRequiredService<SiloStatusOracleSiloDetailsProvider>(),
+        });
 
         services.TryAddSingleton(GrainProfilerFilter.DefaultGrainMethodFormatter);
 
@@ -100,13 +96,24 @@ public static class ServiceCollectionExtensions
         // Create static assets provider
         var assets = endpoints.ServiceProvider.GetService<EmbeddedAssetProvider>()
             ?? throw new InvalidOperationException("Orleans Dashboard services have not been registered. " +
-                "Please call AddServicesForSelfHostedDashboard or AddOrleansDashboard on the IServiceCollection.");
+                "Please call AddDashboard on ISiloBuilder or IClientBuilder.");
 
         // Create a route group for all dashboard endpoints
         var group = endpoints.MapGroup(routePrefix ?? "");
 
         // Static assets - these match the paths referenced in the built CSS/HTML
-        group.MapGet("/", (HttpContext ctx) => assets.ServeAsset("index.html", ctx));
+        // When a routePrefix is specified, redirect requests without trailing slash to include it.
+        // This ensures relative asset paths (like index.min.js) resolve correctly.
+        group.MapGet("/", (HttpContext ctx) =>
+        {
+            if (!string.IsNullOrEmpty(routePrefix) && ctx.Request.Path.Value?.EndsWith('/') == false)
+            {
+                // Redirect to the same path with a trailing slash, preserving the query string
+                var redirectUrl = $"{ctx.Request.PathBase}{ctx.Request.Path}/{ctx.Request.QueryString}";
+                return Results.Redirect(redirectUrl, permanent: true);
+            }
+            return assets.ServeAsset("index.html", ctx);
+        });
         group.MapGet("/index.html", (HttpContext ctx) => assets.ServeAsset("index.html", ctx));
         group.MapGet("/favicon.ico", (HttpContext ctx) => assets.ServeAsset("favicon.ico", ctx));
         group.MapGet("/index.min.js", (HttpContext ctx) => assets.ServeAsset("index.min.js", ctx));
@@ -130,11 +137,11 @@ public static class ServiceCollectionExtensions
             new { version = typeof(EmbeddedAssetProvider).Assembly.GetName().Version?.ToString() },
             jsonOptions));
 
-        group.MapGet("/DashboardCounters", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/DashboardCounters", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
             {
-                var result = await client.DashboardCounters();
+                var result = await client.DashboardCounters(SanitizeExclusionFilters(exclude));
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -185,6 +192,19 @@ public static class ServiceCollectionExtensions
             }
         });
 
+        group.MapGet("/SiloMetadata/{*address}", async (string address, [FromServices] IDashboardClient client) =>
+        {
+            try
+            {
+                var result = await client.SiloMetadata(address);
+                return Results.Json(result.Value, jsonOptions);
+            }
+            catch (SiloUnavailableException)
+            {
+                return CreateUnavailableResult(true);
+            }
+        });
+
         group.MapGet("/SiloStats/{*address}", async (string address, [FromServices] IDashboardClient client) =>
         {
             try
@@ -224,11 +244,11 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/TopGrainMethods", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/TopGrainMethods", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
             {
-                var result = await client.TopGrainMethods(take: 5);
+                var result = await client.TopGrainMethods(take: 5, SanitizeExclusionFilters(exclude));
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -252,11 +272,11 @@ public static class ServiceCollectionExtensions
             }
         });
 
-        group.MapGet("/GrainTypes", async ([FromServices] IDashboardClient client) =>
+        group.MapGet("/GrainTypes", async (string[] exclude, [FromServices] IDashboardClient client) =>
         {
             try
             {
-                var result = await client.GetGrainTypes();
+                var result = await client.GetGrainTypes(SanitizeExclusionFilters(exclude));
                 return Results.Json(result.Value, jsonOptions);
             }
             catch (SiloUnavailableException)
@@ -269,7 +289,8 @@ public static class ServiceCollectionExtensions
         {
             if (opts.Value.HideTrace)
             {
-                return Results.StatusCode(StatusCodes.Status403Forbidden);
+                return Results.Problem("The trace endpoint is disabled in the dashboard options.",
+                    title: "Trace Endpoint Disabled", statusCode: StatusCodes.Status403Forbidden);
             }
 
             await StreamTraceAsync(context, logger);
@@ -332,6 +353,14 @@ public static class ServiceCollectionExtensions
         return Results.Text(message, "text/plain", statusCode: 503);
     }
 
+    private static string[] SanitizeExclusionFilters(string[] filters)
+    {
+        return (filters == null || filters.Length == 0) ? [] : [.. filters
+            .Select(f => f.Trim())
+            .Where(f => !string.IsNullOrWhiteSpace(f))
+            .Select(f => string.Concat(f, '.'))];
+    }
+
     /// <summary>
     /// Adds Orleans Dashboard services to an Orleans client builder.
     /// This allows you to host the Orleans Dashboard application on an Orleans client, so long as the silos also have the dashboard added.
@@ -339,8 +368,9 @@ public static class ServiceCollectionExtensions
     /// <param name="clientBuilder">The client builder.</param>
     /// <param name="configureOptions">Optional configuration action for <see cref="DashboardOptions"/>.</param>
     /// <returns>The service collection for method chaining.</returns>
-    public static IClientBuilder AddOrleansDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)
+    public static IClientBuilder AddDashboard(this IClientBuilder clientBuilder, Action<DashboardOptions>? configureOptions = null)
     {
+        clientBuilder.Services.Configure(configureOptions ?? (x => { }));
         clientBuilder.Services.AddSingleton<DashboardLogger>();
         clientBuilder.Services.AddFromExisting<ILoggerProvider, DashboardLogger>();
         clientBuilder.Services.AddSingleton<IDashboardClient, DashboardClient>();

@@ -1,10 +1,12 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using System.Threading.Channels;
 using System.Threading.Tasks;
 using Orleans.GrainDirectory;
 using Orleans.Runtime.Scheduler;
 
+#nullable disable
 namespace Orleans.Runtime.GrainDirectory
 {
     /// <summary>
@@ -14,7 +16,11 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly ILocalGrainDirectory _localGrainDirectory;
         private readonly IGrainContext _grainContext;
+#if NET9_0_OR_GREATER
+        private readonly Lock _initLock = new();
+#else
         private readonly object _initLock = new();
+#endif
         private BatchedDeregistrationWorker _forceWorker;
         private BatchedDeregistrationWorker _neaWorker;
 

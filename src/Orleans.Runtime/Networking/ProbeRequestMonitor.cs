@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 
 namespace Orleans.Runtime.Messaging
 {
@@ -7,7 +8,11 @@ namespace Orleans.Runtime.Messaging
     /// </summary>
     internal sealed class ProbeRequestMonitor
     {
-        private readonly object _lock = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock _lock = new();
+#else
+        private readonly object _lock = new();
+#endif
         private ValueStopwatch _probeRequestStopwatch;
 
         /// <summary>

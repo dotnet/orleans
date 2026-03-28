@@ -8,6 +8,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Runtime.Membership
 {
     public class ConsulGatewayListProvider : IGatewayListProvider

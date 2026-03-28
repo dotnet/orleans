@@ -2,9 +2,11 @@ using System;
 using System.Collections.Immutable;
 using System.Linq;
 
+#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.DashboardCounters")]
 internal class DashboardCounters
 {
     [Id(0)]

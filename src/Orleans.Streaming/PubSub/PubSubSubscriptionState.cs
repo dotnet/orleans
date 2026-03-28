@@ -2,6 +2,7 @@ using System;
 using Newtonsoft.Json;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Streams
 {
     [Serializable]

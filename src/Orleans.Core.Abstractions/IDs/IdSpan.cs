@@ -94,7 +94,20 @@ namespace Orleans.Runtime
         public override bool Equals(object? obj) => obj is IdSpan kind && Equals(kind);
 
         /// <inheritdoc/>
-        public bool Equals(IdSpan obj) => _value == obj._value || _value.AsSpan().SequenceEqual(obj._value);
+        public bool Equals(IdSpan obj)
+        {
+            if (_value == obj._value)
+            {
+                return true;
+            }
+
+            if (_value is null || obj._value is null)
+            {
+                return false;
+            }
+
+            return _value.AsSpan().SequenceEqual(obj._value);
+        }
 
         /// <inheritdoc/>
         public override int GetHashCode() => _hashCode;
@@ -139,7 +152,20 @@ namespace Orleans.Runtime
         public static byte[]? UnsafeGetArray(IdSpan id) => id._value;
 
         /// <inheritdoc/>
-        public int CompareTo(IdSpan other) => _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
+        public int CompareTo(IdSpan other)
+        {
+            if (_value is null)
+            {
+                return other._value is null ? 0 : -1;
+            }
+
+            if (other._value is null)
+            {
+                return 1;
+            }
+
+            return _value.AsSpan().SequenceCompareTo(other._value.AsSpan());
+        }
 
         /// <summary>
         /// Returns a string representation of this instance, decoding the value as UTF8.

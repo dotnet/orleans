@@ -8,7 +8,6 @@ using Orleans.Placement.Repartitioning;
 
 namespace Orleans.Hosting;
 
-#nullable enable
 public static class ActivationRepartitioningExtensions
 {
     /// <summary>

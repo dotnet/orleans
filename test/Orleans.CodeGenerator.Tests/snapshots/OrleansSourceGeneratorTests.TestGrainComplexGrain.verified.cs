@@ -1,4 +1,4 @@
-﻿#pragma warning disable CS1591, RS0016, RS0041
+#pragma warning disable CS1591, RS0016, RS0041
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -29,7 +29,7 @@ namespace OrleansCodeGen.TestProject
         public override global::System.Reflection.MethodInfo GetMethod() => MethodBackingField;
         public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder)
         {
-            _target = holder.GetTarget<global::TestProject.IComplexGrain>();
+            _target = (global::TestProject.IComplexGrain)holder.GetTarget();
             _cts = new();
             arg3 = _cts.Token;
         }
@@ -89,9 +89,16 @@ namespace OrleansCodeGen.TestProject
         public override global::System.Threading.CancellationToken GetCancellationToken() => arg3;
         public override bool TryCancel()
         {
-            _cts?.Cancel(false);
-            return true;
+            if (_cts is { } cts)
+            {
+                cts.Cancel(false);
+                return true;
+            }
+
+            return false;
         }
+
+        public override bool IsCancellable => true;
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]

@@ -6,6 +6,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
 using Azure.Messaging.EventHubs;
 
+#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>

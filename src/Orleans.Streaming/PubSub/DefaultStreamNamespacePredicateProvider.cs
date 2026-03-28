@@ -1,6 +1,7 @@
 using System;
 using Orleans.Serialization.TypeSystem;
 
+#nullable disable
 namespace Orleans.Streams
 {
     /// <summary>
@@ -77,6 +78,12 @@ namespace Orleans.Streams
             }
 
             var type = Type.GetType(typeName, throwOnError: true);
+
+            if (!typeof(IStreamNamespacePredicate).IsAssignableFrom(type))
+            {
+                throw new InvalidOperationException($"Type \"{type}\" is not a valid stream namespace predicate because it does not implement {nameof(IStreamNamespacePredicate)}.");
+            }
+
             if (string.IsNullOrEmpty(arg))
             {
                 predicate = (IStreamNamespacePredicate)Activator.CreateInstance(type);

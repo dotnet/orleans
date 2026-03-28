@@ -1,0 +1,96 @@
+{
+  "UserConfig": {
+    "NamespaceConfig": [
+      {
+        "Type": "EventHub",
+        "Name": "emulatorNs1",
+        "Entities": [
+          {
+            "Name": "ehorleanstest",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest2",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest3",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest4",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest5",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest6",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest7",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest8",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          },
+          {
+            "Name": "ehorleanstest9",
+            "PartitionCount": "4",
+            "ConsumerGroups": [
+              {
+                "Name": "orleansnightly"
+              }
+            ]
+          }
+        ]
+      }
+    ],
+    "LoggingConfig": {
+      "Type": "File"
+    }
+  }
+}

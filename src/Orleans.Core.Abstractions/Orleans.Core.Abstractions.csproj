@@ -40,4 +40,26 @@
     <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="DynamicProxyGenAssembly2" />
+    <InternalsVisibleTo Include="Orleans.AWS.Tests" />
+    <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Core" />
+    <InternalsVisibleTo Include="Orleans.Core.Tests" />
+    <InternalsVisibleTo Include="Orleans.DefaultCluster.Tests" />
+    <InternalsVisibleTo Include="Orleans.GrainDirectory.Tests" />
+    <InternalsVisibleTo Include="Orleans.Placement.Tests" />
+    <InternalsVisibleTo Include="Orleans.Reminders" />
+    <InternalsVisibleTo Include="Orleans.Runtime" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Internal.Tests" />
+    <InternalsVisibleTo Include="Orleans.Runtime.Tests" />
+    <InternalsVisibleTo Include="Orleans.Streaming" />
+    <InternalsVisibleTo Include="Orleans.Streaming.Abstractions" />
+    <InternalsVisibleTo Include="Orleans.Streaming.EventHubs.Tests" />
+    <InternalsVisibleTo Include="Orleans.TestingHost" />
+    <InternalsVisibleTo Include="TestInternalGrainInterfaces" />
+    <InternalsVisibleTo Include="TestInternalGrains" />
+  </ItemGroup>
 </Project>
+

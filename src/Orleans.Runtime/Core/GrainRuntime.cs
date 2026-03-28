@@ -1,4 +1,3 @@
-#nullable enable
 using System;
 using Orleans.Core;
 using Orleans.Timers;

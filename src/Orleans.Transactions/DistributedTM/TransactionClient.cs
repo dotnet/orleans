@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 
 using Orleans.Serialization;
 
+#nullable disable
 namespace Orleans.Transactions;
 
 internal class TransactionClient : ITransactionClient

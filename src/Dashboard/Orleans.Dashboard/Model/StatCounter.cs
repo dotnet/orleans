@@ -2,6 +2,7 @@ namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
 [Immutable]
+[Alias("Orleans.Dashboard.Model.StatCounter")]
 internal readonly struct StatCounter
 {
     [Id(0)]

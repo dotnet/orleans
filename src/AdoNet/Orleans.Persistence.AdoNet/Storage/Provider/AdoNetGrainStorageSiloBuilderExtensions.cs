@@ -3,6 +3,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers;
 
+#nullable disable
 namespace Orleans.Hosting
 {
     public static class AdoNetGrainStorageSiloBuilderExtensions

@@ -16,6 +16,7 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using System.Net;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>
@@ -33,7 +34,11 @@ namespace Orleans.Runtime
         private readonly Watchdog platformWatchdog;
         private readonly TimeSpan waitForMessageToBeQueuedForOutbound;
         private readonly TimeSpan initTimeout;
-        private readonly object lockable = new object();
+#if NET9_0_OR_GREATER
+        private readonly Lock lockable = new();
+#else
+        private readonly object lockable = new();
+#endif
         private readonly GrainFactory grainFactory;
         private readonly ISiloLifecycleSubject siloLifecycle;
         private readonly List<GrainService> grainServices = new List<GrainService>();

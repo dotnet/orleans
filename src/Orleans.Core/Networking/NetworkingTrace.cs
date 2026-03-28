@@ -3,6 +3,7 @@ using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed class NetworkingTrace : DiagnosticListener, ILogger

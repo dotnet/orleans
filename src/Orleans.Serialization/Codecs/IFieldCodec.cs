@@ -3,6 +3,7 @@ using Orleans.Serialization.WireProtocol;
 using System;
 using System.Buffers;
 
+#nullable disable
 namespace Orleans.Serialization.Codecs
 {
     /// <summary>

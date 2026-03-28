@@ -7,6 +7,7 @@ using Orleans.Clustering.AzureStorage;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
+#nullable disable
 namespace Orleans.AzureUtils
 {
     internal class AzureGatewayListProvider : IGatewayListProvider

@@ -4,6 +4,7 @@ using System.Runtime.InteropServices;
 using Orleans.Serialization.TypeSystem;
 using Orleans.Utilities;
 
+#nullable disable
 namespace Orleans.Runtime
 {
     /// <summary>

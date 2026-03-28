@@ -6,6 +6,7 @@ using System.Text;
 using System.Threading.Tasks;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Clustering.Redis
 {
     /// <summary>

@@ -1,6 +1,8 @@
+#nullable disable
 namespace Orleans.Dashboard.Model;
 
 [GenerateSerializer]
+[Alias("Orleans.Dashboard.Model.SimpleGrainStatisticCounter")]
 internal sealed class SimpleGrainStatisticCounter
 {
     [Id(0)]
