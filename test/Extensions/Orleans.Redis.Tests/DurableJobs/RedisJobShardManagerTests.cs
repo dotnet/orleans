@@ -1,3 +1,6 @@
+using System;
+using System.Threading;
+using System.Threading.Tasks;
 using Tester.DurableJobs;
 using Xunit;
 
@@ -34,78 +37,111 @@ public class RedisJobShardManagerTests : IAsyncLifetime, IAsyncDisposable
     /// Tests basic shard creation and assignment workflow.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_Creation_Assignment()
-        => _runner.ShardCreationAndAssignment();
+    public async Task RedisJobShardManager_Creation_Assignment()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardCreationAndAssignment(cts.Token);
+    }
 
     /// <summary>
     /// Tests reading and consuming jobs from a frozen shard after ownership transfer.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_ReadFrozenShard()
-        => _runner.ReadFrozenShard();
+    public async Task RedisJobShardManager_ReadFrozenShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ReadFrozenShard(cts.Token);
+    }
 
     /// <summary>
     /// Tests consuming jobs from a live shard.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_LiveShard()
-        => _runner.LiveShard();
+    public async Task RedisJobShardManager_LiveShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.LiveShard(cts.Token);
+    }
 
     /// <summary>
     /// Tests job metadata persistence across ownership transfers.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_JobMetadata()
-        => _runner.JobMetadata();
+    public async Task RedisJobShardManager_JobMetadata()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobMetadata(cts.Token);
+    }
 
     /// <summary>
     /// Tests concurrent shard assignment to verify ownership conflict resolution.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_ConcurrentShardAssignment_OwnershipConflicts()
-        => _runner.ConcurrentShardAssignment_OwnershipConflicts();
+    public async Task RedisJobShardManager_ConcurrentShardAssignment_OwnershipConflicts()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ConcurrentShardAssignment_OwnershipConflicts(cts.Token);
+    }
 
     /// <summary>
     /// Tests shard metadata preservation across ownership transfers.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_ShardMetadataMerge()
-        => _runner.ShardMetadataMerge();
+    public async Task RedisJobShardManager_ShardMetadataMerge()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardMetadataMerge(cts.Token);
+    }
 
     /// <summary>
     /// Tests stopping shard processing and verifying jobs remain for reassignment.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_StopProcessingShard()
-        => _runner.StopProcessingShard();
+    public async Task RedisJobShardManager_StopProcessingShard()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.StopProcessingShard(cts.Token);
+    }
 
     /// <summary>
     /// Tests retrying a job with a new due time.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_RetryJobLater()
-        => _runner.RetryJobLater();
+    public async Task RedisJobShardManager_RetryJobLater()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.RetryJobLater(cts.Token);
+    }
 
     /// <summary>
     /// Tests job cancellation before and during processing.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_JobCancellation()
-        => _runner.JobCancellation();
+    public async Task RedisJobShardManager_JobCancellation()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.JobCancellation(cts.Token);
+    }
 
     /// <summary>
     /// Tests that multiple shard registrations with the same time range produce unique IDs.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_ShardRegistrationRetry_IdCollisions()
-        => _runner.ShardRegistrationRetry_IdCollisions();
+    public async Task RedisJobShardManager_ShardRegistrationRetry_IdCollisions()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.ShardRegistrationRetry_IdCollisions(cts.Token);
+    }
 
     /// <summary>
     /// Tests that unregistering a shard with remaining jobs preserves the shard for reassignment.
     /// </summary>
     [SkippableFact]
-    public Task RedisJobShardManager_UnregisterShard_WithJobsRemaining()
-        => _runner.UnregisterShard_WithJobsRemaining();
+    public async Task RedisJobShardManager_UnregisterShard_WithJobsRemaining()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(2));
+        await _runner.UnregisterShard_WithJobsRemaining(cts.Token);
+    }
 
     #endregion
 }

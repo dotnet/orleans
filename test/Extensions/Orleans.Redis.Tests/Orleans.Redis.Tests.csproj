@@ -17,7 +17,7 @@
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.GrainDirectory.Redis\Orleans.GrainDirectory.Redis.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.DurableJobs.Redis\Orleans.DurableJobs.Redis.csproj" />    
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
-
+    <ProjectReference Include="$(SourceRoot)test\Orleans.DurableJobs.Tests\Orleans.DurableJobs.Tests.csproj" />
   </ItemGroup>
 
 </Project>
