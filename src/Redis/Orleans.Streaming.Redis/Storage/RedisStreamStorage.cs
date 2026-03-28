@@ -1,8 +1,7 @@
-using System;
-using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Configuration;
+using Orleans.Streams;
 using StackExchange.Redis;
 
 namespace Orleans.Streaming.Redis.Storage;
@@ -10,29 +9,65 @@ namespace Orleans.Streaming.Redis.Storage;
 /// <summary>
 /// Wrapper/Helper class around StackExchange redis stream
 /// </summary>    
-internal partial class RedisStreamStorage(IConnectionMultiplexer connectionMultiplexer,
-    RedisKey streamKey, string streamName, ILoggerFactory loggerFactory)
+internal partial class RedisStreamStorage
 {
-    private const string GROUP_NAME = "orleans-redis-stream-consumer";
+    public const int MaxNumberOfMsgToGet = 1000;
 
-    private readonly ILogger<RedisStreamStorage> logger = loggerFactory.CreateLogger<RedisStreamStorage>();
+    private readonly string _streamQueueIdName;
+    private readonly RedisStreamOptions _redisStreamOptions;
+    private readonly RedisStreamReceiverOptions _redisStreamReceiverOptions;
+    private readonly ILogger<RedisStreamStorage> _logger;
 
-    private readonly IDatabase database = connectionMultiplexer.GetDatabase();
+    private readonly RedisKey _streamRedisKey;
+    private IDatabase _database;
 
-    public async Task InitAsync()
+    public RedisStreamStorage(
+        QueueId queueId,
+        ClusterOptions clusterOptions,
+        RedisStreamOptions redisStreamOptions,
+        RedisStreamReceiverOptions redisStreamReceiverOptions,
+        ILoggerFactory loggerFactory)
+    {
+        _streamQueueIdName = queueId.ToString();
+        _redisStreamOptions = redisStreamOptions;
+        _redisStreamReceiverOptions = redisStreamReceiverOptions;
+        _logger = loggerFactory.CreateLogger<RedisStreamStorage>();
+
+        _streamRedisKey = _redisStreamOptions.GetRedisKey(clusterOptions, queueId);
+    }
+
+    public async Task InitializeAsync()
+    {
+        await ConnectAsync();
+        await CreateGroupAsync();
+    }
+
+    private async Task ConnectAsync()
     {
         try
         {
-            await database
-                .StreamCreateConsumerGroupAsync(streamKey, GROUP_NAME, "$", true);
-        }
-        catch (Exception exc) when (exc.Message.Contains("name already exists"))
-        {
-            logger.LogInformation("Consumer group {Consumer} already exists for stream {StreamName}", GROUP_NAME, streamName);
+            _database ??= (await _redisStreamOptions.CreateMultiplexer.Invoke(_redisStreamOptions)).GetDatabase();
         }
         catch (Exception exc)
         {
-            ReportErrorAndRethrow(exc, nameof(InitAsync));
+            ReportErrorAndRethrow(exc, nameof(ConnectAsync));
+        }
+    }
+
+    private async Task CreateGroupAsync()
+    {
+        try
+        {
+            await _database
+                .StreamCreateConsumerGroupAsync(_streamRedisKey, _redisStreamReceiverOptions.ConsumerGroupName, position: 0, createStream: true);
+        }
+        catch (Exception exc) when (exc.Message.Contains("name already exists"))
+        {
+            _logger.LogInformation("Consumer group {GroupName} already exists for stream {StreamQueueIdName}", _redisStreamReceiverOptions.ConsumerGroupName, _streamQueueIdName);
+        }
+        catch (Exception exc)
+        {
+            ReportErrorAndRethrow(exc, nameof(CreateGroupAsync));
         }
     }
 
@@ -42,7 +77,7 @@ internal partial class RedisStreamStorage(IConnectionMultiplexer connectionMulti
 
         try
         {
-            id = await database.StreamAddAsync(streamKey, entry.Values);
+            id = await _database.StreamAddAsync(_streamRedisKey, entry.Values);
         }
         catch (Exception exc)
         {
@@ -52,53 +87,68 @@ internal partial class RedisStreamStorage(IConnectionMultiplexer connectionMulti
         return new StreamEntry(id, entry.Values);
     }
 
-    public async Task<IEnumerable<StreamEntry>> GetEntriesAsync(RedisValue? position = null, int? count = null)
+    public async Task<IEnumerable<StreamEntry>> GetEntriesAsync(int count)
     {
-        IEnumerable<StreamEntry> entries = [];
+        IEnumerable<StreamEntry> entriesResult = [];
         try
         {
-            entries = await database.StreamReadGroupAsync(streamKey, GROUP_NAME, streamName, position ?? ">", count);
+            var claimResult = await _database.StreamAutoClaimAsync(_streamRedisKey,
+                _redisStreamReceiverOptions.ConsumerGroupName,
+                _redisStreamReceiverOptions.ConsumerName,
+                (long)_redisStreamReceiverOptions.DeliveredMessageIdleTimeout.TotalMilliseconds,
+                startAtId: 0, count);
+
+            if (claimResult.ClaimedEntries.Length == count)
+            {
+                entriesResult = claimResult.ClaimedEntries;
+            }
+            else
+            {
+                var entriesReadGroup = await _database.StreamReadGroupAsync(_streamRedisKey,
+                    _redisStreamReceiverOptions.ConsumerGroupName,
+                    _redisStreamReceiverOptions.ConsumerName, position: ">",
+                    count - claimResult.ClaimedEntries.Length);
+
+                entriesResult = claimResult.ClaimedEntries.Length != 0 ?
+                    claimResult.ClaimedEntries.Concat(entriesReadGroup) : entriesReadGroup;
+            }
+
         }
         catch (Exception exc)
         {
             ReportErrorAndRethrow(exc, nameof(GetEntriesAsync));
         }
-        return entries;
+        return entriesResult;
     }
 
-    public async Task EntryAcknowledgeAsync(RedisValue messageId)
+    public async Task EntriesAcknowledgeAsync(IEnumerable<StreamEntry> streamEntries)
     {
+        const string DeliveredScript =
+            """
+            local ack = redis.call('XACK', KEYS[1], ARGV[1], unpack(ARGV, 2))
+            local delete = redis.call('XDEL', KEYS[1], unpack(ARGV, 2))
+            return { ack, delete }
+            """;
+
+        var streamEntriesId = streamEntries.Select(x => x.Id).ToArray();
+        var args = new RedisValue[streamEntriesId.Length + 1];
+        args[0] = _redisStreamReceiverOptions.ConsumerGroupName;
+        Array.Copy(streamEntriesId, 0, args, 1, streamEntriesId.Length);
         try
         {
-            await database.StreamAcknowledgeAsync(streamKey, GROUP_NAME, messageId);
+            await _database.ScriptEvaluateAsync(DeliveredScript, keys: [_streamRedisKey], values: args);
         }
         catch (Exception exc)
         {
-            ReportErrorAndRethrow(exc, nameof(EntryAcknowledgeAsync));
-        }
-    }
-
-    public async Task TrimAsync(int maxLength, bool useApproximateMaxLength)
-    {
-        try
-        {
-            var trimMessagesCount = await database.StreamTrimAsync(streamKey, maxLength, useApproximateMaxLength);
-            if (trimMessagesCount > 0)
-            {
-                logger.LogInformation("Trimmed Redis stream {StreamName} to max length {MaxLength}, removed {TrimmedCount} entries", streamName, maxLength, trimMessagesCount);
-            }
-        }
-        catch (Exception exc)
-        {
-            ReportErrorAndRethrow(exc, nameof(TrimAsync));
+            ReportErrorAndRethrow(exc, nameof(EntriesAcknowledgeAsync));
         }
     }
 
     [DoesNotReturn]
     private void ReportErrorAndRethrow(Exception exc, string operation)
     {
-        LogErrorRedisOperation(exc, operation, streamName);
-        throw new AggregateException($"Error doing {operation} for Redis stream {streamName}", exc);
+        LogErrorRedisOperation(exc, operation, _streamQueueIdName);
+        throw new AggregateException($"Error doing {operation} for Redis stream {_streamQueueIdName}", exc);
     }
 
     [LoggerMessage(

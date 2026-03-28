@@ -1,20 +1,14 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
 using Orleans.Providers.Streams.Common;
-using Orleans.Runtime;
 using Orleans.Serialization;
 using Orleans.Streams;
 using StackExchange.Redis;
-
 namespace Orleans.Streaming.Redis.Streams;
 
 [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
-public class RedisStreamDataAdapter(Serializer serializer) : IQueueDataAdapter<StreamEntry, IBatchContainer>, IOnDeserialized
+public class RedisStreamDataAdapterV1(Serializer serializer) : IQueueDataAdapter<StreamEntry, IBatchContainer>, IOnDeserialized
 {
-    private Serializer<RedisStreamBatchContainer> serializer = serializer.GetSerializer<RedisStreamBatchContainer>();
+    private Serializer<RedisStreamBatchContainer> _serializer = serializer.GetSerializer<RedisStreamBatchContainer>();
 
     public IBatchContainer FromQueueMessage(StreamEntry queueMessage, long sequenceId)
     {
@@ -25,9 +19,9 @@ public class RedisStreamDataAdapter(Serializer serializer) : IQueueDataAdapter<S
         }
         var base64String = (string)dataEntry.Value;
         var rawBytes = Convert.FromBase64String(base64String);
-        var redisStreamBatchContainer = serializer.Deserialize(rawBytes);        
+        var redisStreamBatchContainer = _serializer.Deserialize(rawBytes);
         redisStreamBatchContainer.RealSequenceToken = GetSequenceTokenFromStreamEntryId(queueMessage.Id);
-                
+
         return redisStreamBatchContainer;
     }
 
@@ -47,19 +41,19 @@ public class RedisStreamDataAdapter(Serializer serializer) : IQueueDataAdapter<S
 
     public void OnDeserialized(DeserializationContext context)
     {
-        serializer = context.ServiceProvider.GetRequiredService<Serializer<RedisStreamBatchContainer>>();
+        _serializer = context.ServiceProvider.GetRequiredService<Serializer<RedisStreamBatchContainer>>();
     }
 
     public StreamEntry ToQueueMessage<T>(StreamId streamId, IEnumerable<T> events, StreamSequenceToken token, Dictionary<string, object> requestContext)
     {
         var redisStreamBatchContainer = new RedisStreamBatchContainer(streamId, [.. events.Cast<object>()], requestContext);
-        var rawBytes = serializer.SerializeToArray(redisStreamBatchContainer);
+        var rawBytes = _serializer.SerializeToArray(redisStreamBatchContainer);
         var base64String = Convert.ToBase64String(rawBytes);
 
         NameValueEntry namespaceEntry = new("namespace", streamId.Namespace);
         NameValueEntry keyEntry = new("key", streamId.Key);
         NameValueEntry dataEntry = new("data", (RedisValue)base64String);
 
-        return new StreamEntry(RedisValue.Null, [namespaceEntry, keyEntry, dataEntry ]);
+        return new StreamEntry(RedisValue.Null, [namespaceEntry, keyEntry, dataEntry]);
     }
 }

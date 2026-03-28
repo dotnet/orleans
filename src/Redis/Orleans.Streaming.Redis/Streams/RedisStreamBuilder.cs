@@ -106,4 +106,3 @@ public class ClusterClientRedisStreamConfigurator : ClusterClientPersistentStrea
         ConfigureDelegate(services => RedisStreamAdapterFactory.PostConfigureDefaults(services, Name));
     }
 }
-
