@@ -64,9 +64,9 @@ internal partial class RedisStreamStorage
             await Database
                 .StreamCreateConsumerGroupAsync(_streamRedisKey, _redisStreamReceiverOptions.ConsumerGroupName, position: 0, createStream: true);
         }
-        catch (Exception exc) when (exc.Message.Contains("name already exists"))
+        catch (RedisServerException exc) when (exc.Message.Equals("BUSYGROUP Consumer Group name already exists"))
         {
-            _logger.LogInformation("Consumer group {GroupName} already exists for stream {StreamQueueIdName}", _redisStreamReceiverOptions.ConsumerGroupName, _streamQueueIdName);
+            // The group already exists, so we can ignore this exception.
         }
         catch (Exception exc)
         {

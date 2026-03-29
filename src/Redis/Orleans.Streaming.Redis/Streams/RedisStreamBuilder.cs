@@ -11,13 +11,10 @@ public class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurator
     public SiloRedisStreamConfigurator(string name, ISiloBuilder siloBuilder) :
         base(name, configureDelegate => siloBuilder.ConfigureServices(configureDelegate), RedisStreamAdapterFactory.Create)
     {
-        ConfigureDelegate(services =>
-        {
-            services
+        ConfigureDelegate(services => services
                 .ConfigureNamedOptionForLogging<RedisStreamOptions>(name)
                 .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name)
-                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-        });
+                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
     }
 
     public SiloRedisStreamConfigurator ConfigureRedis(Action<OptionsBuilder<RedisStreamOptions>> configureOptions)
@@ -51,10 +48,8 @@ public class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurator
         return this;
     }
 
-    internal void PostConfigureComponents()
-    {
+    internal void PostConfigureComponents() =>
         ConfigureDelegate(services => RedisStreamAdapterFactory.PostConfigureDefaults(services, Name));
-    }
 }
 
 public class ClusterClientRedisStreamConfigurator : ClusterClientPersistentStreamConfigurator
@@ -62,19 +57,15 @@ public class ClusterClientRedisStreamConfigurator : ClusterClientPersistentStrea
     public ClusterClientRedisStreamConfigurator(string name, IClientBuilder clientBuilder)
         : base(name, clientBuilder, RedisStreamAdapterFactory.Create)
     {
-        ConfigureDelegate(services =>
-        {
-            services
+        ConfigureDelegate(services => services
                 .ConfigureNamedOptionForLogging<RedisStreamOptions>(name)
-                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name);
-        });
+                .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
     }
 
     public ClusterClientRedisStreamConfigurator ConfigureRedis(Action<OptionsBuilder<RedisStreamOptions>> configureOptions)
     {
         this.Configure(configureOptions);
         return this;
-
     }
 
     public ClusterClientRedisStreamConfigurator ConfigurePartitioning(int numOfparitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
@@ -96,8 +87,6 @@ public class ClusterClientRedisStreamConfigurator : ClusterClientPersistentStrea
         return this;
     }
 
-    internal void PostConfigureComponents()
-    {
+    internal void PostConfigureComponents() =>
         ConfigureDelegate(services => RedisStreamAdapterFactory.PostConfigureDefaults(services, Name));
-    }
 }
