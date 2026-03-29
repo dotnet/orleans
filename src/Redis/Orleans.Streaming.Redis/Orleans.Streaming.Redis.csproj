@@ -5,7 +5,7 @@
     <PackageId>Microsoft.Orleans.Streaming.Redis</PackageId>
     <Title>Microsoft Orleans Streaming Redis Provider</Title>
     <Description>Microsoft Orleans Streaming implementation that uses Redis</Description>
-    <PackageTags>$(PackageTags) Redis Stream</PackageTags>
+    <PackageTags>$(PackageTags) Redis Streams</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
