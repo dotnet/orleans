@@ -26,6 +26,12 @@ public class RedisStreamOptions
     public Func<ClusterOptions, QueueId, RedisKey> GetRedisKey { get; set; } = DefaultGetRedisKey;
 
     /// <summary>
+    /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
+    /// Setting a value different from null will cause stream entries to be deleted after some period of time.
+    /// </summary>
+    public TimeSpan? EntryExpiry { get; set; }
+
+    /// <summary>
     /// The default multiplexer creation delegate.
     /// </summary>
     public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisStreamOptions options) =>
@@ -36,7 +42,7 @@ public class RedisStreamOptions
     /// </summary>        
     private static RedisKey DefaultGetRedisKey(ClusterOptions clusterOptions, QueueId queueId)
     {
-        RedisKey key = Encoding.UTF8.GetBytes($"{clusterOptions.ServiceId}/streams/{queueId}");
+        RedisKey key = Encoding.UTF8.GetBytes($"{clusterOptions.ServiceId}/streaming/{queueId}");
         return key;
     }
 }

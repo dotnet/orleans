@@ -49,7 +49,14 @@ internal partial class RedisStreamStorage
     {
         try
         {
-            _database ??= (await _redisStreamOptions.CreateMultiplexer.Invoke(_redisStreamOptions)).GetDatabase();
+            if (_database is null)
+            {
+                _database = (await _redisStreamOptions.CreateMultiplexer.Invoke(_redisStreamOptions)).GetDatabase();
+                if (_redisStreamOptions.EntryExpiry is { } expiry)
+                {
+                    await _database.KeyExpireAsync(_streamRedisKey, expiry);
+                }
+            }
         }
         catch (Exception exc)
         {
