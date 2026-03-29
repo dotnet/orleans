@@ -38,7 +38,7 @@ internal class RedisStreamBatchContainer : IBatchContainer
 
     public RedisStreamBatchContainer()
     {
-
+        SequenceToken = new EventSequenceTokenV2();
     }
 
     public RedisStreamBatchContainer(StreamId streamId, StreamSequenceToken token, List<object> events, Dictionary<string, object> requestContext)

@@ -1,83 +1,122 @@
-# Microsoft Orleans Reminders for Redis
+# Microsoft Orleans Streaming for Redis Streams
 
 ## Introduction
-Microsoft Orleans Reminders for Redis provides persistence for Orleans reminders using Redis. This allows your Orleans applications to schedule persistent reminders that will be triggered even after silo restarts or grain deactivation.
+
+Microsoft Orleans Streaming for Redis Streams provides a stream provider implementation for Orleans using Redis Streams as the underlying messaging infrastructure. It enables publishing and subscribing to streams of events leveraging Redis Streams semantics (consumer groups, acks, and message reclaim).
 
 ## Getting Started
+
 To use this package, install it via NuGet:
 
-```shell
-dotnet add package Microsoft.Orleans.Reminders.Redis
+```sh
+dotnet add package Microsoft.Orleans.Streaming.Redis
+
 ```
 
-## Example - Configuring Redis Reminders
+## Example - Configuring Redis Streams
+
 ```csharp
 using Microsoft.Extensions.Hosting;
-using Orleans.Configuration;
 using Orleans.Hosting;
+using StackExchange.Redis;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
             .UseLocalhostClustering()
-            // Configure Redis as reminder storage
-            .UseRedisReminderService(options =>
-            {
-                options.ConnectionString = "localhost:6379";
-                options.Database = 0;
-                options.KeyPrefix = "reminder-"; // Optional prefix for Redis keys
-            });
+            // Configure Redis Streams as a stream provider
+            .AddRedisStreams(
+                name: "RedisStreamProvider",
+                configure: options =>
+                {
+                    options.ConfigureRedis(cfg =>
+                    {
+                        cfg.ConfigurationOptions = ConfigurationOptions.Parse("localhost:6379");
+                    });
+                });
     });
 
 // Run the host
 await builder.RunAsync();
+
 ```
 
-## Example - Using Reminders in a Grain
+## Example - Using Redis Streams in a Grain
+
 ```csharp
-public class ReminderGrain : Grain, IReminderGrain, IRemindable
+using System;
+using System.Threading;
+using System.Threading.Tasks;
+using Orleans;
+using Orleans.Streams;
+
+// Producer grain
+public class ProducerGrain : Grain, IProducerGrain
 {
-    private string _reminderName = "MyReminder";
+    private IAsyncStream<string> _stream;
 
-    public async Task StartReminder(string reminderName)
+    public override Task OnActivateAsync(CancellationToken cancellationToken)
     {
-        _reminderName = reminderName;
-        
-        // Register a persistent reminder
-        await RegisterOrUpdateReminder(
-            reminderName,
-            TimeSpan.FromMinutes(2),  // Time to delay before the first tick (must be > 1 minute)
-            TimeSpan.FromMinutes(5)); // Period of the reminder (must be > 1 minute)
+        var streamProvider = GetStreamProvider("RedisStreamProvider");
+        _stream = streamProvider.GetStream<string>(Guid.NewGuid(), "MyStreamNamespace");
+        return base.OnActivateAsync(cancellationToken);
     }
 
-    public async Task StopReminder()
+    public async Task SendMessage(string message)
     {
-        // Find and unregister the reminder
-        var reminder = await GetReminder(_reminderName);
-        if (reminder != null)
-        {
-            await UnregisterReminder(reminder);
-        }
+        await _stream.OnNextAsync(message);
+    }
+}
+
+// Consumer grain
+public class ConsumerGrain : Grain, IConsumerGrain, IAsyncObserver<string>
+{
+    private StreamSubscriptionHandle<string> _subscription;
+
+    public override async Task OnActivateAsync(CancellationToken cancellationToken)
+    {
+        var streamProvider = GetStreamProvider("RedisStreamProvider");
+        var stream = streamProvider.GetStream<string>(this.GetPrimaryKey(), "MyStreamNamespace");
+        _subscription = await stream.SubscribeAsync(this);
+        await base.OnActivateAsync(cancellationToken);
     }
 
-    public Task ReceiveReminder(string reminderName, TickStatus status)
+    public Task OnNextAsync(string item, StreamSequenceToken token = null)
     {
-        // This method is called when the reminder ticks
-        Console.WriteLine($"Reminder {reminderName} triggered at {DateTime.UtcNow}. Status: {status}");
+        Console.WriteLine($"Received message: {item}");
+        return Task.CompletedTask;
+    }
+
+    public Task OnCompletedAsync() => Task.CompletedTask;
+
+    public Task OnErrorAsync(Exception ex)
+    {
+        Console.WriteLine($"Stream error: {ex.Message}");
         return Task.CompletedTask;
     }
 }
+
 ```
 
+## Relevant Options
+
+- `RedisStreamOptions.ConfigurationOptions`: StackExchange.Redis `ConfigurationOptions` used to connect to Redis.
+- `RedisStreamReceiverOptions.ConsumerGroupName`: consumer group name (default: `orleans`).
+- `RedisStreamReceiverOptions.ConsumerName`: consumer name (default: `pullingagent`).
+- `RedisStreamReceiverOptions.DeliveredMessageIdleTimeout`: idle timeout used for AutoClaim behavior.
+
 ## Documentation
+
 For more comprehensive documentation, please refer to:
 - [Microsoft Orleans Documentation](https://learn.microsoft.com/dotnet/orleans/)
-- [Reminders and Timers](https://learn.microsoft.com/en-us/dotnet/orleans/grains/timers-and-reminders)
-- [Reminder Services](https://learn.microsoft.com/en-us/dotnet/orleans/implementation/reminder-services)
-- [Redis Documentation](https://redis.io/documentation)
+- [Orleans Streams](https://learn.microsoft.com/en-us/dotnet/orleans/streaming/index)
+- [Stream Providers](https://learn.microsoft.com/en-us/dotnet/orleans/streaming/stream-providers)
+- [Redis Streams Introduction](https://redis.io/docs/latest/develop/data-types/streams/)
+- [StackExchange.Redis](https://stackexchange.github.io/StackExchange.Redis/)
 
 ## Feedback & Contributing
+
 - If you have any issues or would like to provide feedback, please [open an issue on GitHub](https://github.com/dotnet/orleans/issues)
 - Join our community on [Discord](https://aka.ms/orleans-discord)
 - Follow the [@msftorleans](https://twitter.com/msftorleans) Twitter account for Orleans announcements

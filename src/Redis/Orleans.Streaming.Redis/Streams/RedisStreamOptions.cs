@@ -26,24 +26,10 @@ public class RedisStreamOptions
     public Func<ClusterOptions, QueueId, RedisKey> GetRedisKey { get; set; } = DefaultGetRedisKey;
 
     /// <summary>
-    /// The maximum length of the stream used to trim old entries.    
-    /// </summary>    
-    /// <remarks><seealso href="https://redis.io/topics/streams-intro"/></remarks>    
-    public int MaxStreamLength { get; set; } = 1000;
-
-    /// <summary>
-    /// The time in minutes after which entries in the stream will be trimmed.
-    /// </summary>
-    public int TrimTimeMinutes { get; set; } = 5;
-
-
-    /// <summary>
     /// The default multiplexer creation delegate.
     /// </summary>
-    public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisStreamOptions options)
-    {
-        return await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
-    }
+    public static async Task<IConnectionMultiplexer> DefaultCreateMultiplexer(RedisStreamOptions options) =>
+        await ConnectionMultiplexer.ConnectAsync(options.ConfigurationOptions);
 
     /// <summary>
     /// The default redis key delegate.
