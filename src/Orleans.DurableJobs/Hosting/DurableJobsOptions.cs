@@ -88,6 +88,51 @@ public sealed class DurableJobsOptions
     /// </remarks>
     public int MaxAdoptedCount { get; set; } = 3;
 
+    /// <summary>
+    /// Gets or sets the maximum number of orphaned shards a silo may claim immediately
+    /// after startup. The cumulative budget grows linearly from this value to
+    /// <see cref="ShardClaimMaxBudget"/> over <see cref="ShardClaimRampUpDuration"/>,
+    /// after which the limit is removed entirely.
+    /// This prevents a freshly started silo from overwhelming itself by claiming all orphaned shards
+    /// at once during disaster-recovery scenarios.
+    /// Default: 2.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// options.ShardClaimInitialBudget = 1;
+    /// </code>
+    /// </example>
+    public int ShardClaimInitialBudget { get; set; } = 2;
+
+    /// <summary>
+    /// Gets or sets the total number of orphaned shards the silo is allowed to have claimed
+    /// by the end of the shard-claim ramp-up period. The cumulative budget is linearly
+    /// interpolated between <see cref="ShardClaimInitialBudget"/> at startup and this value
+    /// at <see cref="ShardClaimRampUpDuration"/>.
+    /// Default: 20.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// options.ShardClaimMaxBudget = 50;
+    /// </code>
+    /// </example>
+    public int ShardClaimMaxBudget { get; set; } = 20;
+
+    /// <summary>
+    /// Gets or sets the duration of the shard-claim ramp-up period after silo activation.
+    /// While the silo has been running for less than this duration, the number of orphaned shards
+    /// it may claim is limited by a linearly increasing budget. Once this period elapses the
+    /// silo claims all available orphaned shards without limit.
+    /// Set to <see cref="TimeSpan.Zero"/> to disable shard-claim ramp-up entirely.
+    /// Default: 5 minutes.
+    /// </summary>
+    /// <example>
+    /// <code>
+    /// options.ShardClaimRampUpDuration = TimeSpan.FromMinutes(10);
+    /// </code>
+    /// </example>
+    public TimeSpan ShardClaimRampUpDuration { get; set; } = TimeSpan.FromMinutes(5);
+
     private static DateTimeOffset? DefaultShouldRetry(IJobRunContext jobContext, Exception ex)
     {
         // Default retry logic: retry up to 5 times with exponential backoff
@@ -140,6 +185,18 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         if (options.MaxAdoptedCount < 0)
         {
             throw new OrleansConfigurationException("DurableJobsOptions.MaxAdoptedCount must be greater than or equal to zero.");
+        }
+        if (options.ShardClaimInitialBudget < 0)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimInitialBudget must be non-negative.");
+        }
+        if (options.ShardClaimMaxBudget < options.ShardClaimInitialBudget)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimMaxBudget must be greater than or equal to ShardClaimInitialBudget.");
+        }
+        if (options.ShardClaimRampUpDuration < TimeSpan.Zero)
+        {
+            throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimRampUpDuration must be non-negative.");
         }
         _logger.LogInformation("DurableJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
     }

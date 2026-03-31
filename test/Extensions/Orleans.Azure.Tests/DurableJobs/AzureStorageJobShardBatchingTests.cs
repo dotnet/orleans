@@ -119,7 +119,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         SetSiloStatus(newSiloAddress, SiloStatus.Active);
 
         var newManager = CreateManager(newSiloAddress);
-        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
 
         var consumedJobs = new List<string>();
@@ -168,7 +168,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         SetSiloStatus(newSiloAddress, SiloStatus.Active);
 
         var newManager = CreateManager(newSiloAddress);
-        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
 
         var consumedJobs = new List<string>();
@@ -222,7 +222,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         SetSiloStatus(newSiloAddress, SiloStatus.Active);
 
         var newManager = CreateManager(newSiloAddress);
-        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
 
         var consumedJobs = new List<string>();
@@ -290,7 +290,7 @@ public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncD
         StorageOptions.Value.BatchFlushInterval = TimeSpan.FromMilliseconds(100);
 
         var newManager = CreateManager(newSiloAddress);
-        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), cancellationToken);
+        var shards = await newManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), maxNewClaims: int.MaxValue, cancellationToken);
         Assert.Single(shards);
 
         var consumedJobs = new List<string>();
