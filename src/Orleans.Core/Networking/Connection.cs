@@ -40,6 +40,7 @@ namespace Orleans.Runtime.Messaging
         private Task _processIncomingTask;
         private Task _processOutgoingTask;
         private Task _closeTask;
+        private CoarseStopwatch _lastMessageReceivedTimestamp;
 
         protected Connection(
             ConnectionContext connection,
@@ -73,6 +74,19 @@ namespace Orleans.Runtime.Messaging
         public bool IsValid => _closeTask is null;
 
         public Task Initialized => _initializationTcs.Task;
+
+        /// <summary>
+        /// Gets the time elapsed since the last message was received on this connection,
+        /// or <see langword="null"/> if no message has been received yet.
+        /// </summary>
+        public TimeSpan? ElapsedSinceLastMessageReceived
+        {
+            get
+            {
+                if (!_lastMessageReceivedTimestamp.IsRunning) return null;
+                return _lastMessageReceivedTimestamp.Elapsed;
+            }
+        }
 
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
@@ -275,6 +289,7 @@ namespace Orleans.Runtime.Messaging
 
             Exception error = default;
             var serializer = this.shared.ServiceProvider.GetRequiredService<MessageSerializer>();
+            var prevBufferLength = 0L;
             try
             {
                 var input = this._transport.Input;
@@ -284,8 +299,15 @@ namespace Orleans.Runtime.Messaging
                     var readResult = await input.ReadAsync();
 
                     var buffer = readResult.Buffer;
+                    if (buffer.Length > prevBufferLength)
+                    {
+                        prevBufferLength = buffer.Length;
+                        _lastMessageReceivedTimestamp.Restart();
+                    }
+
                     if (buffer.Length >= requiredBytes)
                     {
+                        prevBufferLength = 0;
                         do
                         {
                             Message message = default;
@@ -307,7 +329,7 @@ namespace Orleans.Runtime.Messaging
                                 if (!HandleReceiveMessageFailure(message, exception))
                                 {
                                     throw;
-                                }   
+                                }
                             }
                         } while (requiredBytes == 0);
                     }

@@ -76,6 +76,32 @@ namespace Orleans.Runtime.Messaging
             return false;
         }
 
+        /// <summary>
+        /// Gets the minimum elapsed time since any connection to the specified silo last received a message,
+        /// or <see langword="null"/> if no connections exist or no messages have been received.
+        /// </summary>
+        /// <param name="endpoint">The silo address to check.</param>
+        /// <returns>The elapsed time since the most recently received message across all connections, or <see langword="null"/>.</returns>
+        public TimeSpan? GetElapsedSinceLastMessageReceived(SiloAddress endpoint)
+        {
+            if (!this.connections.TryGetValue(endpoint, out var entry))
+            {
+                return null;
+            }
+
+            TimeSpan? minElapsed = null;
+            foreach (var connection in entry.Connections)
+            {
+                if (connection.ElapsedSinceLastMessageReceived is { } elapsed
+                    && (minElapsed is null || elapsed < minElapsed))
+                {
+                    minElapsed = elapsed;
+                }
+            }
+
+            return minElapsed;
+        }
+
         private async Task<Connection> GetConnectionAsync(SiloAddress endpoint)
         {
             await Task.Yield();

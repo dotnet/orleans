@@ -7,6 +7,7 @@ using Orleans;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.MembershipService;
+using Orleans.Runtime.Messaging;
 using TestExtensions;
 using Xunit;
 using Xunit.Abstractions;
@@ -92,7 +93,11 @@ namespace NonSilo.Tests.Membership
                 this.loggerFactory.CreateLogger<ClusterHealthMonitor>(),
                 optionsMonitor,
                 this.fatalErrorHandler,
-                null);
+                null,
+                new ConnectionManager(
+                    Options.Create(new ConnectionOptions()),
+                    null,
+                    new NetworkingTrace(this.loggerFactory)));
             ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
 
             this.remoteSiloProber = Substitute.For<IRemoteSiloProber>();
