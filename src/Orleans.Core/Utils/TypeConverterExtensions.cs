@@ -5,6 +5,7 @@ using System.Text;
 using Orleans.Runtime;
 using Orleans.Serialization.TypeSystem;
 
+#nullable disable
 namespace Orleans.Utilities
 {
     /// <summary>

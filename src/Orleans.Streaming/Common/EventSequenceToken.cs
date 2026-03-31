@@ -3,6 +3,7 @@ using System.Globalization;
 using Orleans.Streams;
 using Newtonsoft.Json;
 
+#nullable disable
 namespace Orleans.Providers.Streams.Common
 {
     /// <summary>

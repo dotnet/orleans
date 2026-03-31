@@ -2,6 +2,7 @@ using System.Collections;
 using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 
+#nullable disable
 namespace Orleans.Serialization.Utilities
 {
     internal sealed class ReferenceEqualsComparer : IEqualityComparer<object>, IEqualityComparer

@@ -1,4 +1,5 @@
-﻿namespace Orleans.Streams
+#nullable disable
+namespace Orleans.Streams
 {
     /// <summary>
     /// Extension methods for grains implicitly subscribed to streams.

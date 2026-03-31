@@ -8,7 +8,6 @@ using Orleans.Hosting;
 using Orleans.Runtime.Services;
 using Orleans.Timers;
 
-#nullable enable
 namespace Orleans.Runtime.ReminderService
 {
     internal sealed class ReminderRegistry : GrainServiceClient<IReminderService>, IReminderRegistry

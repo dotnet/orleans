@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.Extensions.Logging;
 
+#nullable disable
 namespace Orleans.Connections.Security
 {
     internal class TlsServerConnectionMiddleware

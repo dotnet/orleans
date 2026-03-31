@@ -5,6 +5,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Clustering.AdoNet.Storage;
 using Orleans.Configuration;
 
+#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     public partial class AdoNetClusteringTable : IMembershipTable

@@ -10,6 +10,7 @@ using Orleans.Storage;
 using Orleans.Configuration;
 using Orleans.Timers.Internal;
 
+#nullable disable
 namespace Orleans.Transactions.State
 {
     internal partial class TransactionQueue<TState>

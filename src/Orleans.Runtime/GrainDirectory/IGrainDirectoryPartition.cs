@@ -2,7 +2,6 @@ using System.Collections.Generic;
 using System.Threading.Tasks;
 using Orleans.Concurrency;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 [Alias("IGrainDirectoryPartition")]

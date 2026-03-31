@@ -2,6 +2,7 @@ using System;
 using Consul;
 using Orleans.Runtime;
 
+#nullable disable
 namespace Orleans.Configuration
 {
     /// <summary>

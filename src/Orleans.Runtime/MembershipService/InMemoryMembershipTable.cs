@@ -4,6 +4,7 @@ using System.Globalization;
 using System.Linq;
 using Orleans.Serialization;
 
+#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal class InMemoryMembershipTable

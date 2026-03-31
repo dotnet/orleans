@@ -8,7 +8,6 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory
 {
     [Serializable]

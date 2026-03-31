@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.ObjectPool;
 
+#nullable disable
 namespace Orleans.Serialization.Invocation
 {
     internal sealed class ConcurrentObjectPool<T> : ConcurrentObjectPool<T, DefaultConcurrentObjectPoolPolicy<T>> where T : class, new()

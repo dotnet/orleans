@@ -128,6 +128,7 @@
     <Project Path="test/Orleans.Placement.Tests/Orleans.Placement.Tests.csproj" />
     <Project Path="test/Orleans.GrainDirectory.Tests/Orleans.GrainDirectory.Tests.csproj" />
     <Project Path="test/Orleans.Streaming.Tests/Orleans.Streaming.Tests.csproj" />
+    <Project Path="test/Orleans.BroadcastChannel.Tests/Orleans.BroadcastChannel.Tests.csproj" />
     <Project Path="test/Orleans.EventSourcing.Tests/Orleans.EventSourcing.Tests.csproj" />
     <Project Path="test/Orleans.DurableJobs.Tests/Orleans.DurableJobs.Tests.csproj" />
   </Folder>

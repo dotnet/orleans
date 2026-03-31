@@ -1,4 +1,5 @@
-﻿namespace Orleans.Configuration
+#nullable disable
+namespace Orleans.Configuration
 {
     public class AdoNetClusteringClientOptions
     {

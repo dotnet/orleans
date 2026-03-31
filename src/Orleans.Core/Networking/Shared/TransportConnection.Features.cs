@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.AspNetCore.Connections.Features;
 using Microsoft.AspNetCore.Http.Features;
 
+#nullable disable
 namespace Orleans.Networking.Shared
 {
     internal interface IConnectionIdFeature

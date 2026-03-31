@@ -9,6 +9,7 @@ using Orleans.Clustering.AzureStorage;
 using Orleans.Hosting;
 using Orleans.Providers;
 
+#nullable disable
 [assembly: RegisterProvider("AzureTableStorage", "Clustering", "Silo", typeof(AzureTableStorageClusteringProviderBuilder))]
 [assembly: RegisterProvider("AzureTableStorage", "Clustering", "Client", typeof(AzureTableStorageClusteringProviderBuilder))]
 

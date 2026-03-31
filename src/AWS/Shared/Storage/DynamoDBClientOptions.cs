@@ -1,3 +1,4 @@
+#nullable disable
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
 #elif ADVANCED_REMINDERS_DYNAMODB

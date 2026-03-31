@@ -4,6 +4,7 @@ using Orleans;
 using Orleans.Hosting;
 using Orleans.Providers;
 
+#nullable disable
 [assembly: RegisterProvider("DynamoDB", "Clustering", "Silo", typeof(DynamoDBClusteringProviderBuilder))]
 [assembly: RegisterProvider("DynamoDB", "Clustering", "Client", typeof(DynamoDBClusteringProviderBuilder))]
 

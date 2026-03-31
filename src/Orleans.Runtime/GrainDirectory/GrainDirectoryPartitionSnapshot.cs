@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 
-#nullable enable
 namespace Orleans.Runtime.GrainDirectory;
 
 [GenerateSerializer, Alias(nameof(GrainDirectoryPartitionSnapshot)), Immutable]

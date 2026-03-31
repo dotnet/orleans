@@ -8,6 +8,7 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Threading;
 
+#nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>

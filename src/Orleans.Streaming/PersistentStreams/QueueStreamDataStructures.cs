@@ -2,7 +2,6 @@ using System;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 
-#nullable enable
 namespace Orleans.Streams
 {
     [Serializable]

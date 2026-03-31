@@ -1,4 +1,5 @@
 
+#nullable disable
 namespace Orleans.Streaming.EventHubs
 {
     /// <summary>

@@ -8,6 +8,7 @@
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <PackageReadmeFile>README.md</PackageReadmeFile>
   </PropertyGroup>
+
   <ItemGroup>
     <Content Include="buildMultiTargeting\Microsoft.Orleans.Core.targets">
       <PackagePath>%(Identity)</PackagePath>

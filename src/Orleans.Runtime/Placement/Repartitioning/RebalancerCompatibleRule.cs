@@ -10,7 +10,6 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Runtime.Placement.Repartitioning;
 
-#nullable enable
 
 /// <summary>
 /// Tolerance rule which is aware of the cluster size, and if rebalancer is enabled, it scales with the clusters imbalance.
