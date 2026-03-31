@@ -270,47 +270,52 @@ namespace Orleans.Storage
         private async Task<T?> ReadStateWithStreamAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
         {
             var response = await blob.DownloadStreamingAsync();
-            grainState.ETag = response.Value.Details.ETag.ToString();
+            var eTag = response.Value.Details.ETag.ToString();
             var contentLength = response.Value.Details.ContentLength;
 
             if (contentLength <= 0)
             {
-                LogTraceBlobEmptyReading(grainType, grainId, grainState.ETag, blobName, containerName);
+                LogTraceBlobEmptyReading(grainType, grainId, eTag, blobName, containerName);
+                grainState.ETag = eTag;
                 return default;
             }
 
             await using var content = response.Value.Content;
             var loadedState = await streamSerializer!.DeserializeAsync<T>(content).ConfigureAwait(false);
-            LogTraceDataRead(grainType, grainId, grainState.ETag, blobName, containerName);
+            LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
+            grainState.ETag = eTag;
             return loadedState;
         }
 
         private async Task<T?> ReadStateWithBinaryDataAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
         {
             var response = await blob.DownloadContentAsync();
-            grainState.ETag = response.Value.Details.ETag.ToString();
+            var eTag = response.Value.Details.ETag.ToString();
             var contents = response.Value.Content;
 
             if (contents is null || contents.IsEmpty)
             {
-                LogTraceBlobEmptyReading(grainType, grainId, grainState.ETag, blobName, containerName);
+                LogTraceBlobEmptyReading(grainType, grainId, eTag, blobName, containerName);
+                grainState.ETag = eTag;
                 return default;
             }
 
             var loadedState = this.ConvertFromStorageFormat<T>(contents);
-            LogTraceDataRead(grainType, grainId, grainState.ETag, blobName, containerName);
+            LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
+            grainState.ETag = eTag;
             return loadedState;
         }
 
         private async Task<T?> ReadStateWithPooledBufferAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
         {
             var response = await blob.DownloadStreamingAsync();
-            grainState.ETag = response.Value.Details.ETag.ToString();
+            var eTag = response.Value.Details.ETag.ToString();
             var contentLength = response.Value.Details.ContentLength;
 
             if (contentLength <= 0)
             {
-                LogTraceBlobEmptyReading(grainType, grainId, grainState.ETag, blobName, containerName);
+                LogTraceBlobEmptyReading(grainType, grainId, eTag, blobName, containerName);
+                grainState.ETag = eTag;
                 return default;
             }
 
@@ -319,18 +324,25 @@ namespace Orleans.Storage
             if (contentLength <= int.MaxValue)
             {
                 var buffer = ArrayPool<byte>.Shared.Rent((int)contentLength);
-                var memory = buffer.AsMemory(0, (int)contentLength);
-                await content.ReadExactlyAsync(memory);
-                loadedState = this.ConvertFromStorageFormat<T>(new BinaryData(memory));
-                ArrayPool<byte>.Shared.Return(buffer);
+                try
+                {
+                    var memory = buffer.AsMemory(0, (int)contentLength);
+                    await content.ReadExactlyAsync(memory);
+                    loadedState = this.ConvertFromStorageFormat<T>(new BinaryData(memory));
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                }
             }
             else
             {
                 loadedState = this.ConvertFromStorageFormat<T>(new BinaryData(content));
-                LogWarningLargePayloadFallback(contentLength, grainType, grainId, grainState.ETag, blobName, containerName);
+                LogWarningLargePayloadFallback(contentLength, grainType, grainId, eTag, blobName, containerName);
             }
 
-            LogTraceDataRead(grainType, grainId, grainState.ETag, blobName, containerName);
+            LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
+            grainState.ETag = eTag;
             return loadedState;
         }
 
