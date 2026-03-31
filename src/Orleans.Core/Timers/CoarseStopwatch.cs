@@ -45,7 +45,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Returns the elapsed time.
         /// </summary>
-        public TimeSpan Elapsed => TimeSpan.FromMilliseconds(ElapsedMilliseconds);
+        public readonly TimeSpan Elapsed => TimeSpan.FromMilliseconds(ElapsedMilliseconds);
 
         /// <summary>
         /// Returns a value indicating whether this instance has the default value.
