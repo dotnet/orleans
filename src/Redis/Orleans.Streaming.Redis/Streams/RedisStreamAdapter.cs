@@ -15,6 +15,7 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
 {
     private readonly ILoggerFactory _loggerFactory;
     private readonly Serializer<RedisStreamBatchContainer> _serializer;
+    private readonly string _providerName;
     private readonly ClusterOptions _clusterOptions;
     private readonly RedisStreamingOptions _redisOptions;
     private readonly RedisStreamReceiverOptions _receiverOptions;
@@ -33,6 +34,7 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
     {
         _loggerFactory = loggerFactory;
         _serializer = serializer;
+        _providerName = providerName;
         Name = providerName;
         _clusterOptions = clusterOptions;
         _redisOptions = redisOptions;
@@ -42,13 +44,13 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
 
     public string Name { get; }
 
-    public bool IsRewindable => false;
+    public bool IsRewindable => true;
 
     public StreamProviderDirection Direction => StreamProviderDirection.ReadWrite;
 
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
     {
-        var queue = new RedisStreamStorage(_clusterOptions, _redisOptions, _receiverOptions, queueId);
+        var queue = new RedisStreamStorage(_providerName, _clusterOptions, _redisOptions, _receiverOptions, queueId);
         var receiver = new RedisStreamAdapterReceiver(_loggerFactory, _serializer, queue);
         return receiver;
     }
@@ -82,7 +84,7 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
         {
             if (!_queues.TryGetValue(queueId, out var queue))
             {
-                queue = new RedisStreamStorage(_clusterOptions, _redisOptions, _receiverOptions, queueId);
+                queue = new RedisStreamStorage(_providerName, _clusterOptions, _redisOptions, _receiverOptions, queueId);
                 await queue.ConnectAsync();
                 _queues[queueId] = queue;
             }

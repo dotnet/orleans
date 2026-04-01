@@ -10,18 +10,15 @@ namespace Orleans.Streaming.Redis;
 
 internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
 {
-    private readonly ILogger _logger;
     private readonly Serializer<RedisStreamBatchContainer> _serializer;
-    private RedisStreamStorage _queue;
-    private long _seqNumber;
-    private Task _task;
+    private RedisStreamStorage? _queue;
+    private Task? _task;
 
     public RedisStreamAdapterReceiver(
         ILoggerFactory loggerFactory,
         Serializer<RedisStreamBatchContainer> serializer,
         RedisStreamStorage queue)
     {
-        _logger = loggerFactory.CreateLogger<RedisStreamAdapterReceiver>();
         _serializer = serializer;
         _queue = queue;
     }
@@ -31,7 +28,6 @@ internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
         if (_queue != null) // check in case we already shut it down.
         {
             await _queue.ConnectAsync();
-            await _queue.CreateGroupAsync();
         }
     }
 
@@ -53,7 +49,9 @@ internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
             _task = task;
             var messages = await task;
 
-            return messages.Select(message => (IBatchContainer)RedisStreamBatchContainer.FromStreamEntry(_serializer, message, _seqNumber++)).ToList();
+            return messages
+                .Select(message => (IBatchContainer)RedisStreamBatchContainer.FromStreamEntry(_serializer, message, queue.FieldName))
+                .ToList();
         }
         finally
         {
@@ -71,17 +69,14 @@ internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
                 return;
             }
 
-            var task = queue.DeliveredMessagesAsync(messages.Cast<RedisStreamBatchContainer>().Select(x => x.Entry));
-            _task = task;
+            var highestEntry = messages
+                .Cast<RedisStreamBatchContainer>()
+                .Select(x => x.Entry)
+                .MaxBy(entry => RedisStreamBatchContainer.ParseEntryId(entry.Id));
 
-            try
-            {
-                await task;
-            }
-            catch (Exception exception)
-            {
-                _logger.LogError(exception, "Acknowledge messages exception on queue {QueueId}.", queue.QueueId);
-            }
+            var task = queue.DeliveredMessagesAsync(highestEntry);
+            _task = task;
+            await task;
         }
         finally
         {
@@ -100,6 +95,11 @@ internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
         }
         finally
         {
+            if (_queue is not null)
+            {
+                await _queue.ShutdownAsync();
+            }
+
             _queue = null;
         }
     }

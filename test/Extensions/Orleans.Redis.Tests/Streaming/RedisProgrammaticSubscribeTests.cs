@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
-using StackExchange.Redis;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
@@ -18,22 +17,20 @@ public sealed class RedisProgrammaticSubscribeTests : ProgrammaticSubscribeTests
             builder.AddClientBuilderConfigurator<TestClusterConfigurator>();
         }
 
-        private class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
+        private sealed class TestClusterConfigurator : ISiloConfigurator, IClientBuilderConfigurator
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                // Do use "PubSubStore" in this test
-
                 hostBuilder.AddRedisStreams(StreamProviderName, options =>
                 {
-                    options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                    options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                     options.EntryExpiry = TimeSpan.FromHours(1);
                 });
                 hostBuilder.AddMemoryGrainStorage(StreamProviderName);
 
                 hostBuilder.AddRedisStreams(StreamProviderName2, options =>
                 {
-                    options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                    options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                     options.EntryExpiry = TimeSpan.FromHours(1);
                 });
                 hostBuilder.AddMemoryGrainStorage(StreamProviderName2);
@@ -42,22 +39,11 @@ public sealed class RedisProgrammaticSubscribeTests : ProgrammaticSubscribeTests
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder) => clientBuilder.AddStreaming();
         }
 
-        protected override void CheckPreconditionsOrThrow()
-        {
-            try
-            {
-                _ = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
-            }
-            catch (Exception exception)
-            {
-                throw new SkipException("Redis connection string not configured.", exception);
-            }
-
-            base.CheckPreconditionsOrThrow();
-        }
+        protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
     }
 
-    public RedisProgrammaticSubscribeTests(Fixture fixture) : base(fixture)
+    public RedisProgrammaticSubscribeTests(Fixture fixture)
+        : base(fixture)
     {
         fixture.EnsurePreconditionsMet();
     }

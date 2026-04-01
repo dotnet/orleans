@@ -1,6 +1,4 @@
 using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Threading.Tasks;
 using Orleans.Configuration;
 using Orleans.Streams;
@@ -16,9 +14,13 @@ internal sealed class RedisStreamStorage
     private readonly RedisStreamingOptions _redisOptions;
     private readonly RedisStreamReceiverOptions _receiverOptions;
     private readonly RedisKey _key;
-    private IDatabase _db;
+    private readonly RedisKey _checkpointKey;
+    private IDatabase? _db;
+    private RedisStreamCheckpointer? _checkpointer;
+    private string? _readOffset;
 
     public RedisStreamStorage(
+        string providerName,
         ClusterOptions clusterOptions,
         RedisStreamingOptions redisOptions,
         RedisStreamReceiverOptions receiverOptions,
@@ -26,11 +28,14 @@ internal sealed class RedisStreamStorage
     {
         _redisOptions = redisOptions;
         _receiverOptions = receiverOptions;
-        _key = $"{clusterOptions.ServiceId}/streaming/{queueId}";
+        _key = $"{clusterOptions.ServiceId}/streaming/{providerName}/{queueId}";
+        _checkpointKey = $"{_key}/checkpoint";
         QueueId = queueId;
     }
 
     public QueueId QueueId { get; }
+
+    public string FieldName => _receiverOptions.FieldName;
 
     public async Task ConnectAsync()
     {
@@ -39,33 +44,18 @@ internal sealed class RedisStreamStorage
             if (_db is null)
             {
                 _db = (await _redisOptions.CreateMultiplexer.Invoke(_redisOptions)).GetDatabase();
-                if (_redisOptions.EntryExpiry is { } expiry)
-                {
-                    await _db.KeyExpireAsync(_key, expiry);
-                }
+                _checkpointer = new RedisStreamCheckpointer(
+                    _db,
+                    _checkpointKey,
+                    _redisOptions.CheckpointPersistInterval,
+                    _redisOptions.EntryExpiry);
+                await _checkpointer.LoadAsync();
+                _readOffset = _checkpointer.Offset;
             }
         }
         catch (Exception ex)
         {
-            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"));
-        }
-    }
-
-    public async Task CreateGroupAsync()
-    {
-        try
-        {
-            try
-            {
-                await _db.StreamCreateConsumerGroupAsync(_key, _receiverOptions.ConsumerGroupName, position: 0, createStream: true);
-            }
-            catch (RedisServerException exception) when (exception.Message == "BUSYGROUP Consumer Group name already exists")
-            {
-            }
-        }
-        catch (Exception ex)
-        {
-            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"));
+            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"), ex);
         }
     }
 
@@ -73,52 +63,73 @@ internal sealed class RedisStreamStorage
     {
         try
         {
-            await _db.StreamAddAsync(_key, _receiverOptions.FieldName, payload);
-        }
-        catch (Exception ex)
-        {
-            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"));
-        }
-    }
+            var db = _db ?? throw new InvalidOperationException("Redis stream storage is not connected.");
 
-    public async Task<IEnumerable<StreamEntry>> GetMessagesAsync(int count)
-    {
-        try
-        {
-            var claimResult = await _db.StreamAutoClaimAsync(_key, _receiverOptions.ConsumerGroupName, _receiverOptions.ConsumerName, (long)_receiverOptions.DeliveredMessageIdleTimeout.TotalMilliseconds, startAtId: 0, count);
-            if (claimResult.ClaimedEntries.Length == count)
+            await db.StreamAddAsync(
+                _key,
+                _receiverOptions.FieldName,
+                payload,
+                maxLength: _redisOptions.MaxStreamLength,
+                useApproximateMaxLength: _redisOptions.UseApproximateMaxLength);
+
+            if (_redisOptions.EntryExpiry is { } expiry)
             {
-                return claimResult.ClaimedEntries;
+                await db.KeyExpireAsync(_key, expiry);
+                await db.KeyExpireAsync(_checkpointKey, expiry);
             }
-            var messages = await _db.StreamReadGroupAsync(_key, _receiverOptions.ConsumerGroupName, _receiverOptions.ConsumerName, position: ">", count - claimResult.ClaimedEntries.Length);
-            return claimResult.ClaimedEntries.Length != 0 ? claimResult.ClaimedEntries.Concat(messages) : messages;
         }
         catch (Exception ex)
         {
-            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"));
+            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"), ex);
         }
     }
 
-    public async Task DeliveredMessagesAsync(IEnumerable<StreamEntry> messages)
+    public async Task<StreamEntry[]> GetMessagesAsync(int count)
     {
-        const string DeliveredScript =
-            """
-            local ack = redis.call('XACK', KEYS[1], ARGV[1], unpack(ARGV, 2))
-            local delete = redis.call('XDEL', KEYS[1], unpack(ARGV, 2))
-            return { ack, delete }
-            """;
-
-        var messageIds = messages.Select(x => x.Id).ToArray();
-        var args = new RedisValue[messageIds.Length + 1];
-        args[0] = _receiverOptions.ConsumerGroupName;
-        Array.Copy(messageIds, 0, args, 1, messageIds.Length);
         try
         {
-            await _db.ScriptEvaluateAsync(DeliveredScript, keys: [_key], values: args);
+            _ = _checkpointer ?? throw new InvalidOperationException("Redis stream storage is not connected.");
+            var readCount = Math.Min(count, _receiverOptions.ReadCount);
+            if (readCount <= 0)
+            {
+                return [];
+            }
+
+            return await ReadFromOffsetAsync(readCount);
         }
         catch (Exception ex)
         {
-            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"));
+            throw new RedisStreamingException(Invariant($"{ex.GetType()}: {ex.Message}"), ex);
         }
+    }
+
+    public Task DeliveredMessagesAsync(StreamEntry entry)
+    {
+        var checkpointer = _checkpointer ?? throw new InvalidOperationException("Redis stream storage is not connected.");
+        checkpointer.Update(entry.Id.ToString(), DateTime.UtcNow);
+        return Task.CompletedTask;
+    }
+
+    public async Task ShutdownAsync()
+    {
+        if (_checkpointer is { } checkpointer)
+        {
+            await checkpointer.FlushAsync();
+        }
+    }
+
+    private async Task<StreamEntry[]> ReadFromOffsetAsync(int readCount)
+    {
+        var db = _db ?? throw new InvalidOperationException("Redis stream storage is not connected.");
+        var entries = string.IsNullOrEmpty(_readOffset)
+            ? await db.StreamRangeAsync(_key, "-", "+", readCount, Order.Ascending)
+            : await db.StreamRangeAsync(_key, $"({_readOffset})", "+", readCount, Order.Ascending);
+
+        if (entries.Length > 0)
+        {
+            _readOffset = entries[^1].Id.ToString();
+        }
+
+        return entries;
     }
 }

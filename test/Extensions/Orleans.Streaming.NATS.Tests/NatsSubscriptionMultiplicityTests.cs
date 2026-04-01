@@ -144,10 +144,10 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     }
 
     [SkippableFact, TestCategory("NATS")]
-    public async Task NatsTwoIntermitentStreamTest()
+    public async Task NatsTwoIntermittentStreamTest()
     {
-        logger.LogInformation("************************ NatsTwoIntermitentStreamTest *********************************");
-        await runner.TwoIntermitentStreamTest(Guid.NewGuid());
+        logger.LogInformation("************************ NatsTwoIntermittentStreamTest *********************************");
+        await runner.TwoIntermittentStreamTest(Guid.NewGuid());
     }
 
     [SkippableFact, TestCategory("NATS")]

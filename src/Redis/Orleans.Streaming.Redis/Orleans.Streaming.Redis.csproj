@@ -6,7 +6,6 @@
     <Description>Microsoft Orleans streaming implementation that uses Redis</Description>
     <PackageTags>$(PackageTags) Redis Streaming</PackageTags>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
-    <VersionSuffix Condition="$(VersionSuffix) == ''">beta1</VersionSuffix>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
   </PropertyGroup>
 
@@ -16,6 +15,10 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Streaming\Orleans.Streaming.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Redis.Tests" />
   </ItemGroup>
 
 </Project>

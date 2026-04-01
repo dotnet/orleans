@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Globalization;
 using System.Linq;
 using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
@@ -20,7 +21,7 @@ internal sealed class RedisStreamBatchContainer : IBatchContainer
     [Id(2)]
     private readonly Dictionary<string, object> _requestContext;
     [Id(3)]
-    private EventSequenceTokenV2 _sequenceToken;
+    private RedisStreamSequenceToken _sequenceToken = new();
 
     private RedisStreamBatchContainer(
         StreamId streamId,
@@ -65,11 +66,33 @@ internal sealed class RedisStreamBatchContainer : IBatchContainer
     public static RedisStreamBatchContainer FromStreamEntry(
         Serializer<RedisStreamBatchContainer> serializer,
         StreamEntry entry,
-        long seqNumber)
+        string fieldName)
     {
-        var message = serializer.Deserialize((byte[])entry.Values[0].Value);
-        message._sequenceToken = new EventSequenceTokenV2(seqNumber);
+        var payloadEntry = entry.Values.FirstOrDefault(value => string.Equals(value.Name.ToString(), fieldName, StringComparison.Ordinal));
+        if (payloadEntry.Name.IsNull)
+        {
+            throw new RedisStreamingException($"Redis stream entry '{entry.Id}' does not contain the '{fieldName}' payload field.");
+        }
+
+        var payload = (byte[]?)payloadEntry.Value ?? throw new RedisStreamingException($"Redis stream entry '{entry.Id}' contains an empty '{fieldName}' payload field.");
+        var message = serializer.Deserialize(payload);
+        var (sequenceNumber, redisSequenceNumber) = ParseEntryId(entry.Id);
+        message._sequenceToken = new RedisStreamSequenceToken(entry.Id.ToString(), sequenceNumber, redisSequenceNumber, 0);
         message.Entry = entry;
         return message;
+    }
+
+    internal static (long SequenceNumber, long RedisSequenceNumber) ParseEntryId(RedisValue entryId)
+    {
+        var value = entryId.ToString();
+        var separatorIndex = value.IndexOf('-', StringComparison.Ordinal);
+        if (separatorIndex < 0)
+        {
+            throw new FormatException($"Invalid Redis stream entry identifier '{value}'.");
+        }
+
+        return (
+            long.Parse(value[..separatorIndex], CultureInfo.InvariantCulture),
+            long.Parse(value[(separatorIndex + 1)..], CultureInfo.InvariantCulture));
     }
 }

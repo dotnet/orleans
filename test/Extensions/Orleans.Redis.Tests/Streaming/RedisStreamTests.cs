@@ -1,6 +1,5 @@
 using Microsoft.Extensions.Configuration;
 using Orleans.TestingHost;
-using StackExchange.Redis;
 using TestExtensions;
 using UnitTests.Streaming;
 using UnitTests.StreamingTests;
@@ -11,11 +10,9 @@ namespace Tester.Redis.Streaming;
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisStreamTests : TestClusterPerTest
 {
-    public const string STREAM_PROVIDER_NAME = "RedisProvider";
+    public const string StreamProviderName = "RedisProvider";
 
     private SingleStreamTestRunner _runner;
-
-    ////------------------------ One to One ----------------------//
 
     [SkippableFact]
     public async Task Redis_01_OneProducerGrainOneConsumerGrain() => await _runner.StreamTest_01_OneProducerGrainOneConsumerGrain();
@@ -29,8 +26,6 @@ public sealed class RedisStreamTests : TestClusterPerTest
     [SkippableFact]
     public async Task Redis_04_OneProducerClientOneConsumerClient() => await _runner.StreamTest_04_OneProducerClientOneConsumerClient();
 
-    //------------------------ MANY to Many different grains ----------------------//
-
     [SkippableFact]
     public async Task Redis_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains() => await _runner.StreamTest_05_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
 
@@ -43,7 +38,6 @@ public sealed class RedisStreamTests : TestClusterPerTest
     [SkippableFact]
     public async Task Redis_08_ManyDifferent_ManyProducerClientsManyConsumerClients() => await _runner.StreamTest_08_ManyDifferent_ManyProducerClientsManyConsumerClients();
 
-    //------------------------ MANY to Many Same grains ----------------------//
     [SkippableFact]
     public async Task Redis_09_ManySame_ManyProducerGrainsManyConsumerGrains() => await _runner.StreamTest_09_ManySame_ManyProducerGrainsManyConsumerGrains();
 
@@ -56,15 +50,11 @@ public sealed class RedisStreamTests : TestClusterPerTest
     [SkippableFact]
     public async Task Redis_12_ManySame_ManyProducerClientsManyConsumerGrains() => await _runner.StreamTest_12_ManySame_ManyProducerClientsManyConsumerGrains();
 
-    //------------------------ MANY to Many producer consumer same grain ----------------------//
-
     [SkippableFact]
     public async Task Redis_13_SameGrain_ConsumerFirstProducerLater() => await _runner.StreamTest_13_SameGrain_ConsumerFirstProducerLater(false);
 
     [SkippableFact]
     public async Task Redis_14_SameGrain_ProducerFirstConsumerLater() => await _runner.StreamTest_14_SameGrain_ProducerFirstConsumerLater(false);
-
-    //----------------------------------------------//
 
     [SkippableFact]
     public async Task Redis_15_ConsumeAtProducersRequest() => await _runner.StreamTest_15_ConsumeAtProducersRequest();
@@ -72,73 +62,47 @@ public sealed class RedisStreamTests : TestClusterPerTest
     [SkippableFact]
     public async Task Redis_16_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(InternalClient, STREAM_PROVIDER_NAME, 16, false);
+        var multiRunner = new MultipleStreamsTestRunner(InternalClient, StreamProviderName, 16, false);
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains();
     }
 
     [SkippableFact]
     public async Task Redis_17_MultipleStreams_1J_ManyProducerGrainsManyConsumerGrains()
     {
-        var multiRunner = new MultipleStreamsTestRunner(InternalClient, STREAM_PROVIDER_NAME, 17, false);
-        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(
-            () => HostedCluster.StartAdditionalSilo());
+        var multiRunner = new MultipleStreamsTestRunner(InternalClient, StreamProviderName, 17, false);
+        await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(() => HostedCluster.StartAdditionalSilo());
     }
 
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
-        _runner = new SingleStreamTestRunner(InternalClient, STREAM_PROVIDER_NAME);
+        _runner = new SingleStreamTestRunner(InternalClient, StreamProviderName);
     }
 
     public override async Task DisposeAsync()
     {
-        var serviceId = HostedCluster.Options.ServiceId;
+        var serviceId = HostedCluster?.Options.ServiceId;
         await base.DisposeAsync();
-        if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-        {
-            var connection = await ConnectionMultiplexer.ConnectAsync(TestDefaultConfiguration.RedisConnectionString);
-            foreach (var server in connection.GetServers())
-            {
-                await foreach (var key in server.KeysAsync(pattern: $"{serviceId}/*"))
-                {
-                    await connection.GetDatabase().KeyDeleteAsync(key);
-                }
-            }
-        }
+        await RedisStreamTestUtils.DeleteServiceKeysAsync(serviceId);
     }
 
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
-        if (string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-        {
-            throw new SkipException("Empty redis connection string");
-        }
+        TestUtils.CheckForRedis();
         builder.AddSiloBuilderConfigurator<MySiloBuilderConfigurator>();
         builder.AddClientBuilderConfigurator<MyClientBuilderConfigurator>();
     }
 
-    protected override void CheckPreconditionsOrThrow() 
-    {
-        try
-        {
-            _ = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
-        }
-        catch (Exception exception)
-        {
-            throw new SkipException("Redis connection string not configured.", exception);
-        }
-
-        base.CheckPreconditionsOrThrow();  
-    }
+    protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
 
     private sealed class MySiloBuilderConfigurator : ISiloConfigurator
     {
         public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder
-                .AddRedisStreams(STREAM_PROVIDER_NAME, options =>
+                .AddRedisStreams(StreamProviderName, options =>
                 {
-                    options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                    options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                     options.EntryExpiry = TimeSpan.FromHours(1);
                 })
                 .AddMemoryGrainStorage("MemoryStore")
@@ -150,8 +114,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
     {
         public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
         {
-            clientBuilder
-                .AddRedisStreams(STREAM_PROVIDER_NAME, options => options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString));
+            clientBuilder.AddRedisStreams(StreamProviderName, options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions());
         }
     }
 }

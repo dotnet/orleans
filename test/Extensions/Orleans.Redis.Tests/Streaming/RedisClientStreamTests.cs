@@ -1,7 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Orleans.Configuration;
 using Orleans.TestingHost;
-using StackExchange.Redis;
 using Tester.StreamingTests;
 using TestExtensions;
 using Xunit;
@@ -11,13 +10,13 @@ namespace Tester.Redis.Streaming;
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisClientStreamTests : TestClusterPerTest
 {
-    public const string STREAM_PROVIDER_NAME = "RedisProvider";
+    public const string StreamProviderName = "RedisProvider";
     public const string StreamNamespace = "RedisRedisClientStreamTestsNamespace";
 
     private ClientStreamTestRunner _runner;
 
     [SkippableFact]
-    public async Task Redis_StreamProducerOnDroppedClientTest() => await _runner.StreamProducerOnDroppedClientTest(STREAM_PROVIDER_NAME, StreamNamespace);
+    public async Task Redis_StreamProducerOnDroppedClientTest() => await _runner.StreamProducerOnDroppedClientTest(StreamProviderName, StreamNamespace);
 
     public override async Task InitializeAsync()
     {
@@ -27,34 +26,12 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
 
     public override async Task DisposeAsync()
     {
-        var serviceId = HostedCluster.Options.ServiceId;
+        var serviceId = HostedCluster?.Options.ServiceId;
         await base.DisposeAsync();
-        if (!string.IsNullOrWhiteSpace(TestDefaultConfiguration.RedisConnectionString))
-        {
-            var connection = await ConnectionMultiplexer.ConnectAsync(TestDefaultConfiguration.RedisConnectionString);
-            foreach (var server in connection.GetServers())
-            {
-                await foreach (var key in server.KeysAsync(pattern: $"{serviceId}/*"))
-                {
-                    await connection.GetDatabase().KeyDeleteAsync(key);
-                }
-            }
-        }
+        await RedisStreamTestUtils.DeleteServiceKeysAsync(serviceId);
     }
 
-    protected override void CheckPreconditionsOrThrow()
-    {
-        try
-        {
-            _ = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
-        }
-        catch (Exception exception)
-        {
-            throw new SkipException("Redis connection string not configured.", exception);
-        }
-
-        base.CheckPreconditionsOrThrow();
-    }
+    protected override void CheckPreconditionsOrThrow() => TestUtils.CheckForRedis();
 
     protected override void ConfigureTestCluster(TestClusterBuilder builder)
     {
@@ -68,9 +45,9 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
         {
             hostBuilder
                 .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5))
-                .AddRedisStreams(STREAM_PROVIDER_NAME, options =>
+                .AddRedisStreams(StreamProviderName, options =>
                 {
-                    options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString);
+                    options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                     options.EntryExpiry = TimeSpan.FromHours(1);
                 })
                 .AddMemoryGrainStorage("PubSubStore");
@@ -81,8 +58,7 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
     {
         public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
         {
-            clientBuilder
-                .AddRedisStreams(STREAM_PROVIDER_NAME, options => options.ConfigurationOptions = ConfigurationOptions.Parse(TestDefaultConfiguration.RedisConnectionString));
+            clientBuilder.AddRedisStreams(StreamProviderName, options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions());
         }
     }
 }

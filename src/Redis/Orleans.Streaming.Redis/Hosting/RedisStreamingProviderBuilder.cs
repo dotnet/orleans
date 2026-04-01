@@ -16,8 +16,10 @@ namespace Orleans.Hosting;
 
 internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuilder>, IProviderBuilder<IClientBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
+        ArgumentNullException.ThrowIfNull(name);
+
         builder.AddRedisStreams(name, streamsBuilder =>
         {
             streamsBuilder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) =>
@@ -55,8 +57,10 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
         });
     }
 
-    public void Configure(IClientBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(IClientBuilder builder, string? name, IConfigurationSection configurationSection)
     {
+        ArgumentNullException.ThrowIfNull(name);
+
         builder.AddRedisStreams(name, streamsBuilder =>
         {
             streamsBuilder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) =>
