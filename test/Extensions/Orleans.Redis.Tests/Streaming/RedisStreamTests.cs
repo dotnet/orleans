@@ -73,6 +73,15 @@ public sealed class RedisStreamTests : TestClusterPerTest
         await multiRunner.StreamTest_MultipleStreams_ManyDifferent_ManyProducerGrainsManyConsumerGrains(() => HostedCluster.StartAdditionalSilo());
     }
 
+    [SkippableFact]
+    public async Task Redis_18_Deactivation_OneProducerGrainOneConsumerGrain() => await _runner.StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain();
+
+    [SkippableFact]
+    public async Task Redis_19_ConsumerImplicitlySubscribedToProducerClient() => await _runner.StreamTest_19_ConsumerImplicitlySubscribedToProducerClient();
+
+    [SkippableFact]
+    public async Task Redis_20_ConsumerImplicitlySubscribedToProducerGrain() => await _runner.StreamTest_20_ConsumerImplicitlySubscribedToProducerGrain();
+
     public override async Task InitializeAsync()
     {
         await base.InitializeAsync();
