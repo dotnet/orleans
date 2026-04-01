@@ -822,7 +822,7 @@ namespace Orleans.Streams
                         if (_streamInstruments?.PersistentStreamSentMessages.Enabled is true)
                         {
                             tags ??= StreamInstrumentsTagUtils.InitializeTags(
-                                consumerData.StreamId, consumerData.SubscriptionId);
+                                consumerData.StreamId, consumerData.StreamConsumer.GetGrainId());
                             _streamInstruments.PersistentStreamSentMessages.Add(1, tags.Value);
                         }
 
