@@ -760,7 +760,7 @@ namespace Orleans.Streams
                         if (StreamInstruments.PersistentStreamSentMessages.Enabled)
                         {
                             tags ??= StreamInstrumentsTagUtils.InitializeTags(
-                                consumerData.StreamId, consumerData.SubscriptionId);
+                                consumerData.StreamId, consumerData.StreamConsumer.GetGrainId());
                             StreamInstruments.PersistentStreamSentMessages.Add(1, tags.Value);
                         }
 

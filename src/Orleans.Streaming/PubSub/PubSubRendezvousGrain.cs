@@ -272,7 +272,8 @@ namespace Orleans.Streams
                 {
                     await WriteStateAsync();
 
-                    if (StreamInstruments.PubSubConsumersTotal.Enabled) {
+                    if (StreamInstruments.PubSubConsumersTotal.Enabled)
+                    {
                         tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
                         StreamInstruments.PubSubConsumersTotal.Add(
                             -(initialProducerCount - State.Producers.Count), tags.Value);
@@ -307,11 +308,14 @@ namespace Orleans.Streams
 
         public async Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
         {
+            var consumerState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
             TagList? tags = null;
 
             if (StreamInstruments.PubSubConsumersRemoved.Enabled)
             {
-                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, subscriptionId);
+                tags = consumerState is not null
+                    ? StreamInstrumentsTagUtils.InitializeTags(streamId, consumerState.Consumer)
+                    : StreamInstrumentsTagUtils.InitializeTags(streamId);
                 StreamInstruments.PubSubConsumersRemoved.Add(1, tags.Value);
             }
 
@@ -339,7 +343,9 @@ namespace Orleans.Streams
 
                 if (StreamInstruments.PubSubConsumersTotal.Enabled)
                 {
-                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, subscriptionId);
+                    tags ??= consumerState is not null
+                        ? StreamInstrumentsTagUtils.InitializeTags(streamId, consumerState.Consumer)
+                        : StreamInstrumentsTagUtils.InitializeTags(streamId);
                     StreamInstruments.PubSubConsumersTotal.Add(-numRemoved, tags.Value);
                 }
             }
