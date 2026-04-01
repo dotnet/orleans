@@ -82,7 +82,7 @@ namespace Tester.StreamingTests
             // Wait for cache expiration time to pass
             // Then send events to other streams to trigger cache cleaning/eviction
             await Task.Delay(TimeSpan.FromSeconds(6));
-            otherStreams.ForEach(s => s.OnNextAsync(interestingData));
+            await Task.WhenAll(otherStreams.Select(s => s.OnNextAsync(interestingData)));
 
             // Should be delivered
             await stream.OnNextAsync(interestingData);
@@ -130,7 +130,7 @@ namespace Tester.StreamingTests
             // Wait for cache expiration and trigger eviction with more filtered events
             // This tests that filtered events in cache don't affect delivery guarantees
             await Task.Delay(TimeSpan.FromSeconds(6));
-            otherStreams.ForEach(s => s.OnNextAsync(skippedData));
+            await Task.WhenAll(otherStreams.Select(s => s.OnNextAsync(skippedData)));
 
             // Should be delivered
             await stream.OnNextAsync(interestingData);
