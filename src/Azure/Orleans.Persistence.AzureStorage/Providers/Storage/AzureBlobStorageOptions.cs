@@ -84,7 +84,7 @@ namespace Orleans.Configuration
         public bool UsePooledBufferForReads { get; set; } = true;
 
         /// <summary>
-        /// Gets or sets the write path to use when a stream serializer is available.
+        /// Gets or sets the write mode to use when a stream serializer is available.
         /// If the stream serializer is not configured, writes always use <see cref="BinaryData"/>.
         /// </summary>
         public AzureBlobStorageWriteMode WriteMode { get; set; } = AzureBlobStorageWriteMode.BinaryData;
