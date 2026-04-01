@@ -35,7 +35,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Optional stream-based serializer for grain state.
     /// </summary>
-    public interface IGrainStorageStreamingSerializer
+    public interface IGrainStorageStreamingSerializer : IGrainStorageSerializer
     {
         /// <summary>
         /// Serializes the object input to a stream.
@@ -102,14 +102,16 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public void PostConfigure(string name, TOptions options)
+        public void PostConfigure(string? name, TOptions options)
         {
             if (options.GrainStorageSerializer == default)
             {
                 // First, try to get a IGrainStorageSerializer that was registered with
                 // the same name as the storage provider
                 // If none is found, fallback to system wide default
-                options.GrainStorageSerializer = _serviceProvider.GetKeyedService<IGrainStorageSerializer>(name) ?? _serviceProvider.GetRequiredService<IGrainStorageSerializer>();
+                options.GrainStorageSerializer = name is not null
+                    ? _serviceProvider.GetKeyedService<IGrainStorageSerializer>(name) ?? _serviceProvider.GetRequiredService<IGrainStorageSerializer>()
+                    : _serviceProvider.GetRequiredService<IGrainStorageSerializer>();
             }
         }
     }

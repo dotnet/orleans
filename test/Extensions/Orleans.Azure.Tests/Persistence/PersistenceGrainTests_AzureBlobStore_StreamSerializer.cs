@@ -1,3 +1,4 @@
+#nullable enable
 using Azure;
 using Orleans.Configuration;
 using Orleans.Storage;
@@ -70,10 +71,9 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializer : IClassFixtu
         }
     }
 
-    private sealed class CountingGrainStorageSerializer : IGrainStorageSerializer, IGrainStorageStreamingSerializer
+    private sealed class CountingGrainStorageSerializer : IGrainStorageStreamingSerializer
     {
-        private readonly IGrainStorageSerializer _inner;
-        private readonly IGrainStorageStreamingSerializer _innerStream;
+        private readonly IGrainStorageStreamingSerializer _inner;
 
         public static long BinarySerializeCount;
         public static long BinaryDeserializeCount;
@@ -90,8 +90,7 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializer : IClassFixtu
 
         public CountingGrainStorageSerializer(IGrainStorageSerializer inner)
         {
-            _inner = inner;
-            _innerStream = inner as IGrainStorageStreamingSerializer
+            _inner = inner as IGrainStorageStreamingSerializer
                 ?? throw new InvalidOperationException("Inner serializer must support stream operations for this test.");
         }
 
@@ -110,13 +109,13 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializer : IClassFixtu
         public ValueTask SerializeAsync<T>(T input, Stream destination, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref StreamSerializeCount);
-            return _innerStream.SerializeAsync(input, destination, cancellationToken);
+            return _inner.SerializeAsync(input, destination, cancellationToken);
         }
 
-        public ValueTask<T> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
+        public ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref StreamDeserializeCount);
-            return _innerStream.DeserializeAsync<T>(input, cancellationToken);
+            return _inner.DeserializeAsync<T>(input, cancellationToken);
         }
     }
 }
@@ -182,10 +181,9 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializerBufferedWrites
         }
     }
 
-    private sealed class CountingGrainStorageSerializer : IGrainStorageSerializer, IGrainStorageStreamingSerializer
+    private sealed class CountingGrainStorageSerializer : IGrainStorageStreamingSerializer
     {
-        private readonly IGrainStorageSerializer _inner;
-        private readonly IGrainStorageStreamingSerializer _innerStream;
+        private readonly IGrainStorageStreamingSerializer _inner;
 
         public static long BinarySerializeCount;
         public static long BinaryDeserializeCount;
@@ -202,8 +200,7 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializerBufferedWrites
 
         public CountingGrainStorageSerializer(IGrainStorageSerializer inner)
         {
-            _inner = inner;
-            _innerStream = inner as IGrainStorageStreamingSerializer
+            _inner = inner as IGrainStorageStreamingSerializer
                 ?? throw new InvalidOperationException("Inner serializer must support stream operations for this test.");
         }
 
@@ -222,13 +219,13 @@ public class PersistenceGrainTests_AzureBlobStore_StreamSerializerBufferedWrites
         public ValueTask SerializeAsync<T>(T input, Stream destination, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref StreamSerializeCount);
-            return _innerStream.SerializeAsync(input, destination, cancellationToken);
+            return _inner.SerializeAsync(input, destination, cancellationToken);
         }
 
-        public ValueTask<T> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
+        public ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
         {
             Interlocked.Increment(ref StreamDeserializeCount);
-            return _innerStream.DeserializeAsync<T>(input, cancellationToken);
+            return _inner.DeserializeAsync<T>(input, cancellationToken);
         }
     }
 }

@@ -11,7 +11,7 @@ namespace Orleans.Storage
     /// <summary>
     /// Grain storage serializer that uses the Orleans <see cref="Serializer"/>.
     /// </summary>
-    public class OrleansGrainStorageSerializer : IGrainStorageSerializer, IGrainStorageStreamingSerializer
+    public class OrleansGrainStorageSerializer : IGrainStorageStreamingSerializer
     {
         private readonly Serializer serializer;
 
@@ -46,7 +46,7 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public async ValueTask<T> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
+        public async ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
         {
             // Seekable streams (e.g., MemoryStream, FileStream) can be deserialized directly without buffering.
             // Non-seekable streams (e.g., NetworkStream) require buffering to enable efficient multi-pass reading.

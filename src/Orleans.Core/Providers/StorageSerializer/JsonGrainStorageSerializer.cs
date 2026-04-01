@@ -1,12 +1,12 @@
 using Orleans.Serialization;
 
-#nullable disable
+#nullable enable
 namespace Orleans.Storage
 {
     /// <summary>
     /// Grain storage serializer that uses Newtonsoft.Json
     /// </summary>
-    public class JsonGrainStorageSerializer : IGrainStorageSerializer, IGrainStorageStreamingSerializer
+    public class JsonGrainStorageSerializer : IGrainStorageStreamingSerializer
     {
         private readonly OrleansJsonSerializer _orleansJsonSerializer;
 
@@ -40,10 +40,10 @@ namespace Orleans.Storage
         }
 
         /// <inheritdoc/>
-        public ValueTask<T> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
+        public ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            return ValueTask.FromResult((T)_orleansJsonSerializer.Deserialize(typeof(T), input));
+            return ValueTask.FromResult((T?)_orleansJsonSerializer.Deserialize(typeof(T), input));
         }
     }
 }

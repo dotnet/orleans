@@ -8,6 +8,12 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Configuration
 {
+    public enum AzureBlobStorageWriteMode
+    {
+        BinaryData = 0,
+        BufferedStream = 1,
+    }
+
     public partial class AzureBlobStorageOptions : Storage.IStorageProviderSerializerOptions
     {
         public const string DEFAULT_CONTAINER_NAME = "grainstate";
@@ -25,6 +31,10 @@ namespace Orleans.Configuration
         public Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
+
+        public bool UsePooledBufferForReads { get { throw null; } set { } }
+
+        public AzureBlobStorageWriteMode WriteMode { get { throw null; } set { } }
 
         [System.Obsolete("Set the BlobServiceClient property directly.")]
         public void ConfigureBlobServiceClient(System.Func<System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }

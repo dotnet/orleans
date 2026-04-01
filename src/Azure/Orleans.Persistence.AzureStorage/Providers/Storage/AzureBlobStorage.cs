@@ -27,7 +27,6 @@ namespace Orleans.Storage
         private readonly IActivatorProvider _activatorProvider;
         private readonly AzureBlobStorageOptions options;
         private readonly IGrainStorageSerializer grainStorageSerializer;
-        private readonly IGrainStorageStreamingSerializer? streamSerializer;
 
         /// <summary> Default constructor </summary>
         public AzureBlobGrainStorage(
@@ -42,7 +41,6 @@ namespace Orleans.Storage
             this.blobContainerFactory = blobContainerFactory;
             _activatorProvider = activatorProvider;
             this.grainStorageSerializer = options.GrainStorageSerializer;
-            this.streamSerializer = options.GrainStorageSerializer as IGrainStorageStreamingSerializer;
             this.logger = logger;
         }
 
@@ -59,9 +57,9 @@ namespace Orleans.Storage
             {
                 var blob = container.GetBlobClient(blobName);
 
-                T? loadedState = streamSerializer switch
+                T? loadedState = this.grainStorageSerializer switch
                 {
-                    not null => await ReadStateWithStreamAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
+                    IGrainStorageStreamingSerializer serializer => await ReadStateWithStreamAsync(serializer, blob, grainType, grainId, grainState, blobName, container.Name),
                     null when options.UsePooledBufferForReads => await ReadStateWithPooledBufferAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
                     _ => await ReadStateWithBinaryDataAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
                 };
@@ -110,14 +108,15 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlobClient(blobName);
 
-                if (streamSerializer is null || options.WriteMode == AzureBlobStorageWriteMode.BinaryData)
+                if (options.WriteMode is AzureBlobStorageWriteMode.BufferedStream
+                    && this.grainStorageSerializer is IGrainStorageStreamingSerializer serializer)
                 {
-                    var contents = ConvertToStorageFormat(grainState.State);
-                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
+                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, "application/octet-stream", blob);
                 }
                 else
                 {
-                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(grainType, grainId, grainState, "application/octet-stream", blob);
+                    var contents = ConvertToStorageFormat(grainState.State);
+                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
                 }
 
                 LogTraceDataWritten(grainType, grainId, grainState.ETag, blobName, container.Name);
@@ -213,7 +212,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task WriteStateBufferedStreamAndCreateContainerIfNotExists<T>(string grainType, GrainId grainId, IGrainState<T> grainState, string mimeType, BlobClient blob)
+        private async Task WriteStateBufferedStreamAndCreateContainerIfNotExists<T>(IGrainStorageStreamingSerializer serializer, string grainType, GrainId grainId, IGrainState<T> grainState, string mimeType, BlobClient blob)
         {
             var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
 
@@ -230,8 +229,8 @@ namespace Orleans.Storage
                 };
 
                 var result = await DoOptimisticUpdate(
-                    static state => state.self.UploadSerializedStateBufferedAsync(state.blob, state.options, state.value),
-                    (self: this, blob, options, value: grainState.State),
+                    static state => state.self.UploadSerializedStateBufferedAsync(state.serializer, state.blob, state.options, state.value),
+                    (self: this, serializer, blob, options, value: grainState.State),
                     blob,
                     grainState.ETag).ConfigureAwait(false);
 
@@ -243,21 +242,16 @@ namespace Orleans.Storage
                 // if the container does not exist, create it, and make another attempt
                 LogTraceContainerNotFound(grainType, grainId, grainState.ETag, blob.Name, container.Name);
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);
-                await WriteStateBufferedStreamAndCreateContainerIfNotExists(grainType, grainId, grainState, mimeType, blob).ConfigureAwait(false);
+                await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, mimeType, blob).ConfigureAwait(false);
             }
         }
 
-        private async Task<Response<BlobContentInfo>> UploadSerializedStateBufferedAsync<T>(BlobClient blob, BlobUploadOptions options, T value)
+        private async Task<Response<BlobContentInfo>> UploadSerializedStateBufferedAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, BlobUploadOptions options, T value)
         {
-            if (streamSerializer is null)
-            {
-                throw new InvalidOperationException("Stream serializer is not configured.");
-            }
-
             var bufferStream = PooledBufferStream.Rent();
             try
             {
-                await streamSerializer.SerializeAsync(value, bufferStream).ConfigureAwait(false);
+                await serializer.SerializeAsync(value, bufferStream).ConfigureAwait(false);
                 bufferStream.Position = 0;
                 return await blob.UploadAsync(bufferStream, options).ConfigureAwait(false);
             }
@@ -267,7 +261,7 @@ namespace Orleans.Storage
             }
         }
 
-        private async Task<T?> ReadStateWithStreamAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
+        private async Task<T?> ReadStateWithStreamAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
         {
             var response = await blob.DownloadStreamingAsync();
             var eTag = response.Value.Details.ETag.ToString();
@@ -281,7 +275,7 @@ namespace Orleans.Storage
             }
 
             await using var content = response.Value.Content;
-            var loadedState = await streamSerializer!.DeserializeAsync<T>(content).ConfigureAwait(false);
+            var loadedState = await serializer.DeserializeAsync<T>(content).ConfigureAwait(false);
             LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
             grainState.ETag = eTag;
             return loadedState;

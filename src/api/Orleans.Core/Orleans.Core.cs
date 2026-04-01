@@ -1614,7 +1614,11 @@ namespace Orleans.Serialization
         public const string UseFullAssemblyNamesProperty = "UseFullAssemblyNames";
         public OrleansJsonSerializer(Microsoft.Extensions.Options.IOptions<OrleansJsonSerializerOptions> options) { }
 
+        public object Deserialize(System.Type expectedType, System.IO.Stream input) { throw null; }
+
         public object Deserialize(System.Type expectedType, string input) { throw null; }
+
+        public void Serialize(object item, System.Type expectedType, System.IO.Stream destination) { }
 
         public string Serialize(object item, System.Type expectedType) { throw null; }
     }
@@ -1666,7 +1670,7 @@ namespace Orleans.Storage
     {
         public DefaultStorageProviderSerializerOptionsConfigurator(System.IServiceProvider serviceProvider) { }
 
-        public void PostConfigure(string name, TOptions options) { }
+        public void PostConfigure(string? name, TOptions options) { }
     }
 
     public static partial class GrainStorageHelpers
@@ -1699,6 +1703,12 @@ namespace Orleans.Storage
     {
         T Deserialize<T>(System.BinaryData input);
         System.BinaryData Serialize<T>(T input);
+    }
+
+    public partial interface IGrainStorageStreamingSerializer : IGrainStorageSerializer
+    {
+        System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream input, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask SerializeAsync<T>(T input, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IMemoryStorageGrain : IGrainWithIntegerKey, IGrain, Runtime.IAddressable
@@ -1748,20 +1758,28 @@ namespace Orleans.Storage
         IGrainStorageSerializer GrainStorageSerializer { get; set; }
     }
 
-    public partial class JsonGrainStorageSerializer : IGrainStorageSerializer
+    public partial class JsonGrainStorageSerializer : IGrainStorageStreamingSerializer
     {
         public JsonGrainStorageSerializer(Serialization.OrleansJsonSerializer orleansJsonSerializer) { }
 
+        public System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream input, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public T Deserialize<T>(System.BinaryData input) { throw null; }
+
+        public System.Threading.Tasks.ValueTask SerializeAsync<T>(T value, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.BinaryData Serialize<T>(T value) { throw null; }
     }
 
-    public partial class OrleansGrainStorageSerializer : IGrainStorageSerializer
+    public partial class OrleansGrainStorageSerializer : IGrainStorageStreamingSerializer
     {
         public OrleansGrainStorageSerializer(Serialization.Serializer serializer) { }
 
+        public System.Threading.Tasks.ValueTask<T?> DeserializeAsync<T>(System.IO.Stream input, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public T Deserialize<T>(System.BinaryData input) { throw null; }
+
+        public System.Threading.Tasks.ValueTask SerializeAsync<T>(T value, System.IO.Stream destination, System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.BinaryData Serialize<T>(T value) { throw null; }
     }

@@ -127,17 +127,17 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         public T Deserialize<T>(BinaryData input) => throw new InvalidOperationException("Binary deserialization failed.");
     }
 
-    private sealed class ThrowingStreamDeserializeSerializer(IGrainStorageSerializer inner) : IGrainStorageSerializer, IGrainStorageStreamingSerializer
+    private sealed class ThrowingStreamDeserializeSerializer(IGrainStorageSerializer inner) : IGrainStorageStreamingSerializer
     {
-        private readonly IGrainStorageStreamingSerializer _innerStream = inner as IGrainStorageStreamingSerializer
+        private readonly IGrainStorageStreamingSerializer _inner = inner as IGrainStorageStreamingSerializer
             ?? throw new InvalidOperationException("The inner serializer must support streaming.");
 
-        public BinaryData Serialize<T>(T input) => inner.Serialize(input);
+        public BinaryData Serialize<T>(T input) => _inner.Serialize(input);
 
-        public T Deserialize<T>(BinaryData input) => inner.Deserialize<T>(input);
+        public T Deserialize<T>(BinaryData input) => _inner.Deserialize<T>(input);
 
         public ValueTask SerializeAsync<T>(T input, Stream destination, CancellationToken cancellationToken = default)
-            => _innerStream.SerializeAsync(input, destination, cancellationToken);
+            => _inner.SerializeAsync(input, destination, cancellationToken);
 
         public ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
             => throw new InvalidOperationException("Stream deserialization failed.");

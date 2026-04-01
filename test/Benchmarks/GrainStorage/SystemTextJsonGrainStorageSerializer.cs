@@ -1,13 +1,14 @@
+#nullable enable
 using System.Text.Json;
 using Orleans.Storage;
 
 namespace Benchmarks.GrainStorage;
 
-public sealed class SystemTextJsonGrainStorageSerializer : IGrainStorageSerializer, IGrainStorageStreamingSerializer
+public sealed class SystemTextJsonGrainStorageSerializer : IGrainStorageStreamingSerializer
 {
     private readonly JsonSerializerOptions _options;
 
-    public SystemTextJsonGrainStorageSerializer(JsonSerializerOptions options = null)
+    public SystemTextJsonGrainStorageSerializer(JsonSerializerOptions? options = null)
     {
         _options = options ?? new JsonSerializerOptions();
     }
@@ -29,9 +30,9 @@ public sealed class SystemTextJsonGrainStorageSerializer : IGrainStorageSerializ
         return new(JsonSerializer.SerializeAsync(destination, input, _options, cancellationToken));
     }
 
-    public async ValueTask<T> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
+    public async ValueTask<T?> DeserializeAsync<T>(Stream input, CancellationToken cancellationToken = default)
     {
         var result = await JsonSerializer.DeserializeAsync<T>(input, _options, cancellationToken).ConfigureAwait(false);
-        return result!;
+        return result;
     }
 }
