@@ -49,3 +49,4 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:${{ matrix.language }}"
+          upload: ${{ github.event_name == 'merge_group' && 'never' || 'always' }}
