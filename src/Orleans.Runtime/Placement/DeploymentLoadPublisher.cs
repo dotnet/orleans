@@ -1,11 +1,14 @@
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
@@ -18,6 +21,8 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed partial class DeploymentLoadPublisher : SystemTarget, IDeploymentLoadPublisher, ISiloStatusListener, ILifecycleParticipant<ISiloLifecycle>
     {
+        private static readonly DiagnosticListener _diagnosticListener = new(OrleansPlacementDiagnostics.ListenerName);
+
         private readonly ILocalSiloDetails _siloDetails;
         private readonly ISiloStatusOracle _siloStatusOracle;
         private readonly IInternalGrainFactory _grainFactory;
@@ -106,6 +111,16 @@ namespace Orleans.Runtime
                 LocalRuntimeStatistics = myStats;
                 UpdateRuntimeStatisticsInternal(_siloDetails.SiloAddress, myStats);
 
+                if (_diagnosticListener.IsEnabled(OrleansPlacementDiagnostics.EventNames.StatisticsPublished))
+                {
+                    _diagnosticListener.Write(OrleansPlacementDiagnostics.EventNames.StatisticsPublished, new SiloStatisticsPublishedEvent(
+                        _siloDetails.SiloAddress,
+                        myStats.ActivationCount,
+                        myStats.RecentlyUsedActivationCount,
+                        _loadSheddingOptions.Value.LoadSheddingEnabled && myStats.IsOverloaded,
+                        DateTime.UtcNow));
+                }
+
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
                 var tasks = new List<Task>(members.Count);
@@ -129,6 +144,14 @@ namespace Orleans.Runtime
                 }
 
                 await Task.WhenAll(tasks);
+
+                if (_diagnosticListener.IsEnabled(OrleansPlacementDiagnostics.EventNames.ClusterStatisticsRefreshed))
+                {
+                    _diagnosticListener.Write(OrleansPlacementDiagnostics.EventNames.ClusterStatisticsRefreshed, new ClusterStatisticsRefreshedEvent(
+                        _siloDetails.SiloAddress,
+                        _periodicStats.Count,
+                        _periodicStats.Values.Sum(s => s.ActivationCount)));
+                }
             }
             catch (Exception exc)
             {
@@ -158,6 +181,17 @@ namespace Orleans.Runtime
 
             _periodicStats[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
+
+            if (siloAddress != _siloDetails.SiloAddress && _diagnosticListener.IsEnabled(OrleansPlacementDiagnostics.EventNames.StatisticsReceived))
+            {
+                _diagnosticListener.Write(OrleansPlacementDiagnostics.EventNames.StatisticsReceived, new SiloStatisticsReceivedEvent(
+                    siloAddress,
+                    _siloDetails.SiloAddress,
+                    siloStats.ActivationCount,
+                    siloStats.RecentlyUsedActivationCount,
+                    siloStats.IsOverloaded,
+                    DateTime.UtcNow));
+            }
         }
 
         internal async Task RefreshClusterStatistics()
@@ -237,6 +271,14 @@ namespace Orleans.Runtime
         private void OnSiloStatusChange(SiloAddress updatedSilo, SiloStatus status)
         {
             if (!status.IsTerminating()) return;
+
+            if (_diagnosticListener.IsEnabled(OrleansPlacementDiagnostics.EventNames.StatisticsRemoved))
+            {
+                _diagnosticListener.Write(OrleansPlacementDiagnostics.EventNames.StatisticsRemoved, new SiloStatisticsRemovedEvent(
+                    updatedSilo,
+                    _siloDetails.SiloAddress,
+                    "SiloTerminating"));
+            }
 
             _periodicStats.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);

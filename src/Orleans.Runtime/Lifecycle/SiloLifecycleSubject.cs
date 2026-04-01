@@ -2,9 +2,11 @@ using Microsoft.Extensions.Logging;
 using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
+using Orleans.Diagnostics;
 
 namespace Orleans.Runtime
 {
@@ -14,7 +16,9 @@ namespace Orleans.Runtime
     public partial class SiloLifecycleSubject : LifecycleSubject, ISiloLifecycleSubject
     {
         private static readonly ImmutableDictionary<int, string> StageNames = GetStageNames(typeof(ServiceLifecycleStage));
+        private static readonly DiagnosticListener Listener = new(OrleansLifecycleDiagnostics.SiloLifecycleListenerName);
         private readonly List<MonitoredObserver> observers;
+        private readonly SiloAddress? _siloAddress;
         private int highestCompletedStage;
         private int lowestStoppedStage;
 
@@ -28,11 +32,13 @@ namespace Orleans.Runtime
         /// Initializes a new instance of the <see cref="SiloLifecycleSubject"/> class.
         /// </summary>
         /// <param name="logger">The logger.</param>
-        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger) : base(logger)
+        /// <param name="localSiloDetails">Optional local silo details for diagnostic events.</param>
+        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger, ILocalSiloDetails? localSiloDetails = null) : base(logger)
         {
             this.observers = new List<MonitoredObserver>();
             this.highestCompletedStage = int.MinValue;
             this.lowestStoppedStage = int.MaxValue;
+            _siloAddress = localSiloDetails?.SiloAddress;
         }
 
         /// <inheritdoc />
@@ -71,18 +77,28 @@ namespace Orleans.Runtime
         protected override void PerfMeasureOnStop(int stage, TimeSpan elapsed)
         {
             LogDebugStoppingLifecycleStage(this.GetStageName(stage), elapsed);
+            if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.StageStopped))
+            {
+                Listener.Write(OrleansLifecycleDiagnostics.EventNames.StageStopped, new LifecycleStageStoppedEvent(
+                    stage, this.GetStageName(stage), _siloAddress, elapsed));
+            }
         }
 
         /// <inheritdoc />
         protected override void PerfMeasureOnStart(int stage, TimeSpan elapsed)
         {
             LogDebugStartingLifecycleStage(this.GetStageName(stage), elapsed);
+            if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.StageCompleted))
+            {
+                Listener.Write(OrleansLifecycleDiagnostics.EventNames.StageCompleted, new LifecycleStageCompletedEvent(
+                    stage, this.GetStageName(stage), _siloAddress, elapsed));
+            }
         }
 
         /// <inheritdoc />
         public override IDisposable Subscribe(string observerName, int stage, ILifecycleObserver observer)
         {
-            var monitoredObserver = new MonitoredObserver(observerName, stage, this.GetStageName(stage), observer, this.Logger);
+            var monitoredObserver = new MonitoredObserver(observerName, stage, this.GetStageName(stage), observer, this.Logger, _siloAddress);
             this.observers.Add(monitoredObserver);
             return base.Subscribe(observerName, stage, monitoredObserver);
         }
@@ -91,14 +107,16 @@ namespace Orleans.Runtime
         {
             private readonly ILifecycleObserver observer;
             private readonly ILogger logger;
+            private readonly SiloAddress? _siloAddress;
 
-            public MonitoredObserver(string name, int stage, string stageName, ILifecycleObserver observer, ILogger logger)
+            public MonitoredObserver(string name, int stage, string stageName, ILifecycleObserver observer, ILogger logger, SiloAddress? siloAddress)
             {
                 this.Name = name;
                 this.Stage = stage;
                 this.StageName = stageName;
                 this.observer = observer;
                 this.logger = logger;
+                _siloAddress = siloAddress;
             }
 
             public string Name { get; }
@@ -109,14 +127,33 @@ namespace Orleans.Runtime
             {
                 try
                 {
+                    if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverStarting))
+                    {
+                        Listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverStarting, new LifecycleObserverStartingEvent(
+                            this.Name, this.Stage, this.StageName, _siloAddress));
+                    }
+
                     var stopwatch = ValueStopwatch.StartNew();
                     await this.observer.OnStart(ct);
                     stopwatch.Stop();
                     LogDebugObserverStarted(this.Name, this.StageName, stopwatch.Elapsed);
+
+                    if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverCompleted))
+                    {
+                        Listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverCompleted, new LifecycleObserverCompletedEvent(
+                            this.Name, this.Stage, this.StageName, _siloAddress, stopwatch.Elapsed));
+                    }
                 }
                 catch (Exception exception)
                 {
                     LogErrorObserverStartFailure(exception, this.Name, this.StageName);
+
+                    if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverFailed))
+                    {
+                        Listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverFailed, new LifecycleObserverFailedEvent(
+                            this.Name, this.Stage, this.StageName, _siloAddress, exception, TimeSpan.Zero));
+                    }
+
                     throw;
                 }
             }
@@ -126,6 +163,12 @@ namespace Orleans.Runtime
                 var stopwatch = ValueStopwatch.StartNew();
                 try
                 {
+                    if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverStopping))
+                    {
+                        Listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverStopping, new LifecycleObserverStoppingEvent(
+                            this.Name, this.Stage, this.StageName, _siloAddress));
+                    }
+
                     LogDebugObserverStopping(this.Name, this.StageName);
 
                     await this.observer.OnStop(cancellationToken);
@@ -138,10 +181,23 @@ namespace Orleans.Runtime
                     {
                         LogObserverStopped(LogLevel.Debug, this.Name, this.StageName, stopwatch.Elapsed);
                     }
+
+                    if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverStopped))
+                    {
+                        Listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverStopped, new LifecycleObserverStoppedEvent(
+                            this.Name, this.Stage, this.StageName, _siloAddress, stopwatch.Elapsed));
+                    }
                 }
                 catch (Exception exception)
                 {
                     LogErrorObserverStopFailure(exception, this.Name, this.StageName, stopwatch.Elapsed);
+
+                    if (Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverFailed))
+                    {
+                        Listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverFailed, new LifecycleObserverFailedEvent(
+                            this.Name, this.Stage, this.StageName, _siloAddress, exception, stopwatch.Elapsed));
+                    }
+
                     throw;
                 }
             }
