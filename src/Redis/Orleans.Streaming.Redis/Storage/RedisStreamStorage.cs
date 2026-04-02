@@ -121,9 +121,11 @@ internal sealed class RedisStreamStorage
     private async Task<StreamEntry[]> ReadFromOffsetAsync(int readCount)
     {
         var db = _db ?? throw new InvalidOperationException("Redis stream storage is not connected.");
-        var entries = string.IsNullOrEmpty(_readOffset)
-            ? await db.StreamRangeAsync(_key, "-", "+", readCount, Order.Ascending)
-            : await db.StreamRangeAsync(_key, $"({_readOffset})", "+", readCount, Order.Ascending);
+        var startEntryId = string.IsNullOrEmpty(_readOffset)
+            ? "-"
+            : GetNextEntryId(_readOffset);
+
+        var entries = await db.StreamRangeAsync(_key, startEntryId, "+", readCount, Order.Ascending);
 
         if (entries.Length > 0)
         {
@@ -131,5 +133,27 @@ internal sealed class RedisStreamStorage
         }
 
         return entries;
+    }
+
+    internal static string GetNextEntryId(string entryId)
+    {
+        var (sequenceNumber, redisSequenceNumber) = RedisStreamBatchContainer.ParseEntryId(entryId);
+
+        if (redisSequenceNumber == long.MaxValue)
+        {
+            if (sequenceNumber == long.MaxValue)
+            {
+                throw new OverflowException(Invariant($"Redis stream entry identifier '{entryId}' cannot be advanced."));
+            }
+
+            sequenceNumber++;
+            redisSequenceNumber = 0;
+        }
+        else
+        {
+            redisSequenceNumber++;
+        }
+
+        return Invariant($"{sequenceNumber}-{redisSequenceNumber}");
     }
 }
