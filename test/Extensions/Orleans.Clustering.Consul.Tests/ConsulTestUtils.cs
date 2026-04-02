@@ -70,6 +70,10 @@ namespace Consul.Tests
             {
                 return DockerUnavailableSkipReason;
             }
+            catch (DockerApiException)
+            {
+                return DockerUnavailableSkipReason;
+            }
         }
 
         private static string GetDockerSkipReason()
