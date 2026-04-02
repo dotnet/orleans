@@ -156,7 +156,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <returns>True if the grain has been deactivated.</returns>
     public bool HasGrainDeactivated(GrainId grainId)
     {
-        return _deactivatedEvents.Any(e => e.GrainId == grainId);
+        return _deactivatedEvents.Any(e => e.GrainContext.GrainId == grainId);
     }
 
     /// <summary>
@@ -166,7 +166,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <returns>True if the grain has been activated.</returns>
     public bool HasGrainActivated(GrainId grainId)
     {
-        return _activatedEvents.Any(e => e.GrainId == grainId);
+        return _activatedEvents.Any(e => e.GrainContext.GrainId == grainId);
     }
 
     /// <summary>
@@ -176,7 +176,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <returns>The count of deactivation events.</returns>
     public int GetDeactivationCount(string grainTypeName)
     {
-        return _deactivatedEvents.Count(e => e.GrainType.Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
+        return _deactivatedEvents.Count(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -186,7 +186,7 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <returns>The count of activation events.</returns>
     public int GetActivationCount(string grainTypeName)
     {
-        return _activatedEvents.Count(e => e.GrainType.Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
+        return _activatedEvents.Count(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -295,10 +295,10 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         // Check if the event already occurred
         object? existingEvent = eventName switch
         {
-            OrleansGrainDiagnostics.EventNames.Created => _createdEvents.FirstOrDefault(e => e.GrainId == grainId),
-            OrleansGrainDiagnostics.EventNames.Activated => _activatedEvents.FirstOrDefault(e => e.GrainId == grainId),
-            OrleansGrainDiagnostics.EventNames.Deactivating => _deactivatingEvents.FirstOrDefault(e => e.GrainId == grainId),
-            OrleansGrainDiagnostics.EventNames.Deactivated => _deactivatedEvents.FirstOrDefault(e => e.GrainId == grainId),
+            OrleansGrainDiagnostics.EventNames.Created => _createdEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId),
+            OrleansGrainDiagnostics.EventNames.Activated => _activatedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId),
+            OrleansGrainDiagnostics.EventNames.Deactivating => _deactivatingEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId),
+            OrleansGrainDiagnostics.EventNames.Deactivated => _deactivatedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId),
             _ => null
         };
 
@@ -338,22 +338,22 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         {
             case OrleansGrainDiagnostics.EventNames.Created when kvp.Value is GrainCreatedEvent created:
                 _createdEvents.Add(created);
-                SignalWaiters(created.GrainId, kvp.Key, created);
+                SignalWaiters(created.GrainContext.GrainId, kvp.Key, created);
                 break;
 
             case OrleansGrainDiagnostics.EventNames.Activated when kvp.Value is GrainActivatedEvent activated:
                 _activatedEvents.Add(activated);
-                SignalWaiters(activated.GrainId, kvp.Key, activated);
+                SignalWaiters(activated.GrainContext.GrainId, kvp.Key, activated);
                 break;
 
             case OrleansGrainDiagnostics.EventNames.Deactivating when kvp.Value is GrainDeactivatingEvent deactivating:
                 _deactivatingEvents.Add(deactivating);
-                SignalWaiters(deactivating.GrainId, kvp.Key, deactivating);
+                SignalWaiters(deactivating.GrainContext.GrainId, kvp.Key, deactivating);
                 break;
 
             case OrleansGrainDiagnostics.EventNames.Deactivated when kvp.Value is GrainDeactivatedEvent deactivated:
                 _deactivatedEvents.Add(deactivated);
-                SignalWaiters(deactivated.GrainId, kvp.Key, deactivated);
+                SignalWaiters(deactivated.GrainContext.GrainId, kvp.Key, deactivated);
                 break;
         }
     }
@@ -372,6 +372,8 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         }
         _subscriptions.Clear();
     }
+
+    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString()!;
 }
 
 /// <summary>

@@ -126,10 +126,7 @@ internal sealed partial class ActivationData :
                 SetGrainInstance(instance);
                 _activationActivity?.AddEvent(new ActivityEvent("instance-created"));
 
-                if (TryGetGrainTypeName() is { } grainTypeName)
-                {
-                    OrleansGrainDiagnosticListener.EmitCreated(this, grainTypeName, Address.SiloAddress);
-                }
+                OrleansGrainDiagnosticListener.EmitCreated(this);
             }
             catch (Exception exception)
             {
@@ -630,10 +627,7 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
                 {
-                    if (TryGetGrainTypeName() is { } grainTypeName)
-                    {
-                        OrleansGrainDiagnosticListener.EmitDeactivating(this, grainTypeName, Address.SiloAddress, DeactivationReason);
-                    }
+                    OrleansGrainDiagnosticListener.EmitDeactivating(this, DeactivationReason);
 
                     CancelPendingOperations();
 
@@ -1830,10 +1824,7 @@ internal sealed partial class ActivationData :
                 _activationActivity?.Dispose();
                 _activationActivity = null;
 
-                if (TryGetGrainTypeName() is { } grainTypeName)
-                {
-                    OrleansGrainDiagnosticListener.EmitActivated(this, grainTypeName, Address.SiloAddress, activationStopwatch.Elapsed);
-                }
+                OrleansGrainDiagnosticListener.EmitActivated(this, activationStopwatch.Elapsed);
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
             }
@@ -2029,9 +2020,9 @@ internal sealed partial class ActivationData :
             LogExceptionDisposing(_shared.Logger, exception, this);
         }
 
-        if (TryGetGrainTypeName() is { } grainTypeName && DeactivationStartTime is { } deactivationStartTime)
+        if (DeactivationStartTime is { } deactivationStartTime)
         {
-            OrleansGrainDiagnosticListener.EmitDeactivated(this, grainTypeName, Address.SiloAddress, GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime - deactivationStartTime);
+            OrleansGrainDiagnosticListener.EmitDeactivated(this, GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime - deactivationStartTime);
         }
 
         // Signal deactivation

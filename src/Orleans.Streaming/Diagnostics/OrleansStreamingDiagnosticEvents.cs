@@ -77,7 +77,6 @@ public static class OrleansStreamingDiagnostics
 /// <param name="StreamProvider">The name of the stream provider.</param>
 /// <param name="StreamId">The stream ID.</param>
 /// <param name="SubscriptionId">The subscription ID of the consumer.</param>
-/// <param name="ConsumerGrainId">The grain ID of the consumer.</param>
 /// <param name="SequenceToken">The sequence token of the delivered message.</param>
 /// <param name="SiloAddress">The address of the silo handling this delivery.</param>
 /// <param name="Consumer">The consumer endpoint.</param>
@@ -86,7 +85,6 @@ public class StreamMessageDeliveredEvent(
     string StreamProvider,
     StreamId StreamId,
     Guid SubscriptionId,
-    GrainId ConsumerGrainId,
     string? SequenceToken,
     SiloAddress? SiloAddress,
     IAddressable Consumer,
@@ -95,7 +93,6 @@ public class StreamMessageDeliveredEvent(
     public string StreamProvider { get; } = StreamProvider;
     public StreamId StreamId { get; } = StreamId;
     public Guid SubscriptionId { get; } = SubscriptionId;
-    public GrainId ConsumerGrainId { get; } = ConsumerGrainId;
     public string? SequenceToken { get; } = SequenceToken;
     public SiloAddress? SiloAddress { get; } = SiloAddress;
     public IAddressable Consumer { get; } = Consumer;
@@ -256,7 +253,6 @@ internal static class OrleansStreamingDiagnosticListener
                 streamProviderName,
                 consumerData.StreamId.StreamId,
                 consumerData.SubscriptionId.Guid,
-                consumerData.StreamConsumer.GetGrainId(),
                 batch.SequenceToken?.ToString(),
                 siloAddress,
                 consumerData.StreamConsumer,

@@ -600,16 +600,15 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             var disposed = await timerObserver.WaitForTimerDisposedAsync(grain);
 
-            Assert.Equal(created.GrainId, created.GrainContext.GrainId);
-            Assert.Equal(created.ActivationId, created.GrainContext.ActivationId);
-            Assert.Equal(activated.GrainId, activated.GrainContext.GrainId);
-            Assert.Equal(activated.ActivationId, activated.GrainContext.ActivationId);
+            Assert.Equal(created.GrainContext.GrainId, grain.GetGrainId());
+            Assert.Equal(activated.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.Equal(activated.GrainContext.ActivationId, created.GrainContext.ActivationId);
 
-            Assert.Equal(timerCreated.GrainContext.GrainId, created.GrainId);
+            Assert.Equal(timerCreated.GrainContext.GrainId, created.GrainContext.GrainId);
             Assert.NotNull(timerCreated.Timer);
-            Assert.Equal(tickStop.GrainContext.GrainId, created.GrainId);
+            Assert.Equal(tickStop.GrainContext.GrainId, created.GrainContext.GrainId);
             Assert.NotNull(tickStop.Timer);
-            Assert.Equal(disposed.GrainContext.GrainId, created.GrainId);
+            Assert.Equal(disposed.GrainContext.GrainId, created.GrainContext.GrainId);
             Assert.NotNull(disposed.Timer);
         }
 
