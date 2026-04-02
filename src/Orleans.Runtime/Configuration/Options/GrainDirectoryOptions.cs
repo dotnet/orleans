@@ -5,7 +5,7 @@ namespace Orleans.Configuration;
 public class GrainDirectoryOptions
 {
     /// <summary>
-    /// Configuration type that controls the type of the grain directory caching algorithm that silo use.
+    /// Configuration type that controls the type of the grain directory caching algorithm that silos use.
     /// </summary>
     public enum CachingStrategyType
     {
