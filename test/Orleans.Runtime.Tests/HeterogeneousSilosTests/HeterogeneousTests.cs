@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -182,7 +183,22 @@ namespace Tester.HeterogeneousSilosTests
             }
             else
             {
-                await Task.Delay(ClientRefreshDelay.Multiply(3));
+                // Poll until the type map is refreshed to reflect that the secondary silo is gone,
+                // instead of relying on a fixed delay which can be insufficient on slow CI machines.
+                var sw = Stopwatch.StartNew();
+                while (sw.Elapsed < TimeSpan.FromSeconds(30))
+                {
+                    try
+                    {
+                        this.cluster.GrainFactory.GetGrain<T>(0);
+                    }
+                    catch (ArgumentException)
+                    {
+                        break;
+                    }
+
+                    await Task.Delay(TimeSpan.FromMilliseconds(500));
+                }
             }
 
             // Should fail
