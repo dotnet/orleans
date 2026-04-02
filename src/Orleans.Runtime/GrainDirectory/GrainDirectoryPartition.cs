@@ -255,10 +255,12 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         GrainRuntime.CheckRuntimeContext(this);
 
         // We need to detect the shutdown type:
-        // If it was ShuttingDown, it surrendered its ownership gracefully.
+        // If it was ShuttingDown/Stopping, it surrendered its ownership gracefully.
         // If it was Active (or Joining) and suddenly became Dead, it crashed.
 
-        if (previousStatus is not SiloStatus.ShuttingDown && _leaseHoldDuration > TimeSpan.Zero)
+        var isGracefulShutdown = previousStatus is SiloStatus.ShuttingDown or SiloStatus.Stopping;
+
+        if (!isGracefulShutdown && _leaseHoldDuration > TimeSpan.Zero)
         {
             // Instead of just deleting, we mark it as tombstoned.
             // This prevents a new activation on a healthy silo from registering 
