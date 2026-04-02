@@ -16,13 +16,9 @@ namespace TestExtensions;
 /// </remarks>
 public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>
 {
-    private readonly ConcurrentDictionary<(SiloAddress SiloAddress, string EventName), TaskCompletionSource<object?>> _waiters = new();
     private readonly ConcurrentBag<SiloStatusChangedEvent> _statusChangedEvents = new();
     private readonly ConcurrentBag<MembershipViewChangedEvent> _viewChangedEvents = new();
     private readonly ConcurrentBag<SiloSuspectedEvent> _suspectedEvents = new();
-    private readonly ConcurrentBag<SiloDeclaredDeadEvent> _declaredDeadEvents = new();
-    private readonly ConcurrentBag<SiloBecameActiveEvent> _becameActiveEvents = new();
-    private readonly ConcurrentBag<SiloJoiningEvent> _joiningEvents = new();
     private readonly List<IDisposable> _subscriptions = new();
     private IDisposable? _listenerSubscription;
 
@@ -42,19 +38,19 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
     public IReadOnlyCollection<SiloSuspectedEvent> SuspectedEvents => _suspectedEvents.ToArray();
 
     /// <summary>
-    /// Gets all captured silo declared dead events.
+    /// Gets all captured status change events whose new status is <see cref="SiloStatus.Dead"/>.
     /// </summary>
-    public IReadOnlyCollection<SiloDeclaredDeadEvent> DeclaredDeadEvents => _declaredDeadEvents.ToArray();
+    public IReadOnlyCollection<SiloStatusChangedEvent> DeclaredDeadEvents => GetEventsByStatus(SiloStatus.Dead);
 
     /// <summary>
-    /// Gets all captured silo became active events.
+    /// Gets all captured status change events whose new status is <see cref="SiloStatus.Active"/>.
     /// </summary>
-    public IReadOnlyCollection<SiloBecameActiveEvent> BecameActiveEvents => _becameActiveEvents.ToArray();
+    public IReadOnlyCollection<SiloStatusChangedEvent> BecameActiveEvents => GetEventsByStatus(SiloStatus.Active);
 
     /// <summary>
-    /// Gets all captured silo joining events.
+    /// Gets all captured status change events whose new status is <see cref="SiloStatus.Joining"/>.
     /// </summary>
-    public IReadOnlyCollection<SiloJoiningEvent> JoiningEvents => _joiningEvents.ToArray();
+    public IReadOnlyCollection<SiloStatusChangedEvent> JoiningEvents => GetEventsByStatus(SiloStatus.Joining);
 
     /// <summary>
     /// Creates a new instance of the observer and starts listening for membership diagnostic events.
@@ -73,88 +69,40 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
     /// </summary>
     /// <param name="siloAddress">The silo address to wait for.</param>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The declared dead event payload.</returns>
-    public async Task<SiloDeclaredDeadEvent> WaitForSiloDeclaredDeadAsync(SiloAddress siloAddress, TimeSpan? timeout = null)
+    /// <returns>The status changed event payload.</returns>
+    public Task<SiloStatusChangedEvent> WaitForSiloDeclaredDeadAsync(SiloAddress siloAddress, TimeSpan? timeout = null)
     {
-        var result = await WaitForEventAsync(siloAddress, OrleansMembershipDiagnostics.EventNames.SiloDeclaredDead, timeout ?? TimeSpan.FromSeconds(30));
-        return (SiloDeclaredDeadEvent)result!;
+        return WaitForStatusChangeAsync(
+            e => e.NewEntry.SiloAddress.Equals(siloAddress) && e.NewEntry.Status == SiloStatus.Dead,
+            timeout ?? TimeSpan.FromSeconds(30),
+            $"silo {siloAddress} to be declared dead");
     }
 
     /// <summary>
     /// Waits for any silo to be declared dead.
     /// </summary>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The declared dead event payload.</returns>
-    public async Task<SiloDeclaredDeadEvent> WaitForAnySiloDeclaredDeadAsync(TimeSpan? timeout = null)
+    /// <returns>The status changed event payload.</returns>
+    public Task<SiloStatusChangedEvent> WaitForAnySiloDeclaredDeadAsync(TimeSpan? timeout = null)
     {
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        // Check if we already have an event
-        if (_declaredDeadEvents.TryPeek(out var existingEvent))
-        {
-            return existingEvent;
-        }
-
-        // Poll for new events
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            if (_declaredDeadEvents.TryPeek(out var newEvent))
-            {
-                return newEvent;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for any silo declared dead event after {effectiveTimeout}");
+        return WaitForStatusChangeAsync(
+            e => e.NewEntry.Status == SiloStatus.Dead,
+            timeout ?? TimeSpan.FromSeconds(30),
+            "any silo to be declared dead");
     }
 
     /// <summary>
-    /// Waits for any silo matching the predicate to be declared dead.
+    /// Waits for any status change event matching the predicate to be declared dead.
     /// </summary>
-    /// <param name="predicate">A predicate to match the silo.</param>
+    /// <param name="predicate">A predicate to match the event.</param>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The declared dead event payload.</returns>
-    public async Task<SiloDeclaredDeadEvent> WaitForSiloDeclaredDeadAsync(Func<SiloDeclaredDeadEvent, bool> predicate, TimeSpan? timeout = null)
+    /// <returns>The status changed event payload.</returns>
+    public Task<SiloStatusChangedEvent> WaitForSiloDeclaredDeadAsync(Func<SiloStatusChangedEvent, bool> predicate, TimeSpan? timeout = null)
     {
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        // Check if we already have a matching event
-        var existingMatch = _declaredDeadEvents.FirstOrDefault(predicate);
-        if (existingMatch != null)
-        {
-            return existingMatch;
-        }
-
-        // Poll for new events
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            var match = _declaredDeadEvents.FirstOrDefault(predicate);
-            if (match != null)
-            {
-                return match;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for silo declared dead event matching predicate after {effectiveTimeout}");
+        return WaitForStatusChangeAsync(
+            e => e.NewEntry.Status == SiloStatus.Dead && predicate(e),
+            timeout ?? TimeSpan.FromSeconds(30),
+            "a dead-silo status change matching the predicate");
     }
 
     /// <summary>
@@ -169,16 +117,14 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
         var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
-        // Check if we already have a matching event
         var existingMatch = _statusChangedEvents.FirstOrDefault(e =>
-            e.SiloAddress.Equals(siloAddress) &&
-            e.NewStatus.Equals(expectedStatus, StringComparison.OrdinalIgnoreCase));
+            e.NewEntry.SiloAddress.Equals(siloAddress) &&
+            e.NewEntry.Status.ToString().Equals(expectedStatus, StringComparison.OrdinalIgnoreCase));
         if (existingMatch != null)
         {
             return existingMatch;
         }
 
-        // Poll for new events
         while (!cts.Token.IsCancellationRequested)
         {
             try
@@ -191,8 +137,8 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
             }
 
             var match = _statusChangedEvents.FirstOrDefault(e =>
-                e.SiloAddress.Equals(siloAddress) &&
-                e.NewStatus.Equals(expectedStatus, StringComparison.OrdinalIgnoreCase));
+                e.NewEntry.SiloAddress.Equals(siloAddress) &&
+                e.NewEntry.Status.ToString().Equals(expectedStatus, StringComparison.OrdinalIgnoreCase));
             if (match != null)
             {
                 return match;
@@ -207,48 +153,26 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
     /// </summary>
     /// <param name="siloAddress">The silo address to wait for.</param>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The became active event payload.</returns>
-    public async Task<SiloBecameActiveEvent> WaitForSiloBecameActiveAsync(SiloAddress siloAddress, TimeSpan? timeout = null)
+    /// <returns>The status changed event payload.</returns>
+    public Task<SiloStatusChangedEvent> WaitForSiloBecameActiveAsync(SiloAddress siloAddress, TimeSpan? timeout = null)
     {
-        var result = await WaitForEventAsync(siloAddress, OrleansMembershipDiagnostics.EventNames.SiloBecameActive, timeout ?? TimeSpan.FromSeconds(30));
-        return (SiloBecameActiveEvent)result!;
+        return WaitForStatusChangeAsync(
+            e => e.NewEntry.SiloAddress.Equals(siloAddress) && e.NewEntry.Status == SiloStatus.Active,
+            timeout ?? TimeSpan.FromSeconds(30),
+            $"silo {siloAddress} to become active");
     }
 
     /// <summary>
     /// Waits for any silo to become active.
     /// </summary>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The became active event payload.</returns>
-    public async Task<SiloBecameActiveEvent> WaitForAnySiloBecameActiveAsync(TimeSpan? timeout = null)
+    /// <returns>The status changed event payload.</returns>
+    public Task<SiloStatusChangedEvent> WaitForAnySiloBecameActiveAsync(TimeSpan? timeout = null)
     {
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        // Check if we already have an event
-        if (_becameActiveEvents.TryPeek(out var existingEvent))
-        {
-            return existingEvent;
-        }
-
-        // Poll for new events
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            if (_becameActiveEvents.TryPeek(out var newEvent))
-            {
-                return newEvent;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for any silo became active event after {effectiveTimeout}");
+        return WaitForStatusChangeAsync(
+            e => e.NewEntry.Status == SiloStatus.Active,
+            timeout ?? TimeSpan.FromSeconds(30),
+            "any silo to become active");
     }
 
     /// <summary>
@@ -256,11 +180,13 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
     /// </summary>
     /// <param name="siloAddress">The silo address to wait for.</param>
     /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The joining event payload.</returns>
-    public async Task<SiloJoiningEvent> WaitForSiloJoiningAsync(SiloAddress siloAddress, TimeSpan? timeout = null)
+    /// <returns>The status changed event payload.</returns>
+    public Task<SiloStatusChangedEvent> WaitForSiloJoiningAsync(SiloAddress siloAddress, TimeSpan? timeout = null)
     {
-        var result = await WaitForEventAsync(siloAddress, OrleansMembershipDiagnostics.EventNames.SiloJoining, timeout ?? TimeSpan.FromSeconds(30));
-        return (SiloJoiningEvent)result!;
+        return WaitForStatusChangeAsync(
+            e => e.NewEntry.SiloAddress.Equals(siloAddress) && e.NewEntry.Status == SiloStatus.Joining,
+            timeout ?? TimeSpan.FromSeconds(30),
+            $"silo {siloAddress} to start joining");
     }
 
     /// <summary>
@@ -270,7 +196,7 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
     /// <returns>True if the silo has been declared dead.</returns>
     public bool HasSiloDeclaredDead(SiloAddress siloAddress)
     {
-        return _declaredDeadEvents.Any(e => e.DeadSilo.Equals(siloAddress));
+        return _statusChangedEvents.Any(e => e.NewEntry.SiloAddress.Equals(siloAddress) && e.NewEntry.Status == SiloStatus.Dead);
     }
 
     /// <summary>
@@ -280,16 +206,16 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
     /// <returns>True if the silo has become active.</returns>
     public bool HasSiloBecameActive(SiloAddress siloAddress)
     {
-        return _becameActiveEvents.Any(e => e.SiloAddress.Equals(siloAddress));
+        return _statusChangedEvents.Any(e => e.NewEntry.SiloAddress.Equals(siloAddress) && e.NewEntry.Status == SiloStatus.Active);
     }
 
     /// <summary>
     /// Gets the count of silos declared dead.
     /// </summary>
-    /// <returns>The count of declared dead events.</returns>
+    /// <returns>The count of dead-status events.</returns>
     public int GetDeclaredDeadCount()
     {
-        return _declaredDeadEvents.Count;
+        return _statusChangedEvents.Count(e => e.NewEntry.Status == SiloStatus.Dead);
     }
 
     /// <summary>
@@ -339,43 +265,42 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
         _statusChangedEvents.Clear();
         _viewChangedEvents.Clear();
         _suspectedEvents.Clear();
-        _declaredDeadEvents.Clear();
-        _becameActiveEvents.Clear();
-        _joiningEvents.Clear();
     }
 
-    private async Task<object?> WaitForEventAsync(SiloAddress siloAddress, string eventName, TimeSpan timeout)
+    private async Task<SiloStatusChangedEvent> WaitForStatusChangeAsync(Func<SiloStatusChangedEvent, bool> predicate, TimeSpan timeout, string description)
     {
-        var key = (siloAddress, eventName);
-        var tcs = _waiters.GetOrAdd(key, _ => new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously));
-
-        // Check if the event already occurred
-        object? existingEvent = eventName switch
-        {
-            OrleansMembershipDiagnostics.EventNames.SiloDeclaredDead => _declaredDeadEvents.FirstOrDefault(e => e.DeadSilo.Equals(siloAddress)),
-            OrleansMembershipDiagnostics.EventNames.SiloBecameActive => _becameActiveEvents.FirstOrDefault(e => e.SiloAddress.Equals(siloAddress)),
-            OrleansMembershipDiagnostics.EventNames.SiloJoining => _joiningEvents.FirstOrDefault(e => e.SiloAddress.Equals(siloAddress)),
-            _ => null
-        };
-
-        if (existingEvent != null)
-        {
-            return existingEvent;
-        }
-
         using var cts = new CancellationTokenSource(timeout);
-        using var registration = cts.Token.Register(() => tcs.TrySetException(new TimeoutException($"Timed out waiting for {eventName} event for silo {siloAddress} after {timeout}")));
 
-        return await tcs.Task;
+        var existingMatch = _statusChangedEvents.FirstOrDefault(predicate);
+        if (existingMatch != null)
+        {
+            return existingMatch;
+        }
+
+        while (!cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(10, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            var match = _statusChangedEvents.FirstOrDefault(predicate);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        throw new TimeoutException($"Timed out waiting for {description} after {timeout}");
     }
 
-    private void SignalWaiters(SiloAddress siloAddress, string eventName, object payload)
+    private IReadOnlyCollection<SiloStatusChangedEvent> GetEventsByStatus(SiloStatus status)
     {
-        var key = (siloAddress, eventName);
-        if (_waiters.TryRemove(key, out var tcs))
-        {
-            tcs.TrySetResult(payload);
-        }
+        return _statusChangedEvents.Where(e => e.NewEntry.Status == status).ToArray();
     }
 
     void IObserver<DiagnosticListener>.OnNext(DiagnosticListener listener)
@@ -402,21 +327,6 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
             case OrleansMembershipDiagnostics.EventNames.SiloSuspected when kvp.Value is SiloSuspectedEvent suspected:
                 _suspectedEvents.Add(suspected);
                 break;
-
-            case OrleansMembershipDiagnostics.EventNames.SiloDeclaredDead when kvp.Value is SiloDeclaredDeadEvent declaredDead:
-                _declaredDeadEvents.Add(declaredDead);
-                SignalWaiters(declaredDead.DeadSilo, kvp.Key, declaredDead);
-                break;
-
-            case OrleansMembershipDiagnostics.EventNames.SiloBecameActive when kvp.Value is SiloBecameActiveEvent becameActive:
-                _becameActiveEvents.Add(becameActive);
-                SignalWaiters(becameActive.SiloAddress, kvp.Key, becameActive);
-                break;
-
-            case OrleansMembershipDiagnostics.EventNames.SiloJoining when kvp.Value is SiloJoiningEvent joining:
-                _joiningEvents.Add(joining);
-                SignalWaiters(joining.SiloAddress, kvp.Key, joining);
-                break;
         }
     }
 
@@ -432,6 +342,7 @@ public sealed class MembershipDiagnosticObserver : IDisposable, IObserver<Diagno
         {
             subscription.Dispose();
         }
+
         _subscriptions.Clear();
     }
 }

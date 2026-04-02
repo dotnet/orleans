@@ -105,7 +105,7 @@ namespace Orleans.Runtime
                 // Update statistics locally.
                 LocalRuntimeStatistics = myStats;
                 UpdateRuntimeStatisticsInternal(_siloDetails.SiloAddress, myStats);
-                DeploymentLoadPublisherDiagnosticListener.EmitStatisticsPublished(_siloDetails.SiloAddress, myStats, _loadSheddingOptions.Value.LoadSheddingEnabled);
+                DeploymentLoadPublisherDiagnosticListener.EmitStatisticsPublished(_siloDetails.SiloAddress, myStats);
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
@@ -241,7 +241,7 @@ namespace Orleans.Runtime
         {
             if (!status.IsTerminating()) return;
 
-            DeploymentLoadPublisherDiagnosticListener.EmitStatisticsRemoved(updatedSilo, _siloDetails.SiloAddress, "SiloTerminating");
+            DeploymentLoadPublisherDiagnosticListener.EmitStatisticsRemoved(updatedSilo, _siloDetails.SiloAddress);
             _periodicStats.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
         }

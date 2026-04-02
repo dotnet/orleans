@@ -20,7 +20,7 @@ internal class TimerRegistry(ILoggerFactory loggerFactory, TimeProvider timeProv
         ArgumentNullException.ThrowIfNull(callback);
         var timer = new InterleavingGrainTimer(this, grainContext, callback, state);
         grainContext.GetComponent<IGrainTimerRegistry>()?.OnTimerCreated(timer);
-        OrleansTimerDiagnosticListener.EmitCreated(grainContext, timerName: null, dueTime, period, timer);
+        OrleansTimerDiagnosticListener.EmitCreated(grainContext, dueTime, period, timer);
         timer.Change(dueTime, period);
         return timer;
     }
@@ -31,7 +31,7 @@ internal class TimerRegistry(ILoggerFactory loggerFactory, TimeProvider timeProv
         ArgumentNullException.ThrowIfNull(callback);
         var timer = new GrainTimer<T>(this, grainContext, callback, state, options.Interleave, options.KeepAlive);
         grainContext.GetComponent<IGrainTimerRegistry>()?.OnTimerCreated(timer);
-        OrleansTimerDiagnosticListener.EmitCreated(grainContext, timerName: null, options.DueTime, options.Period, timer);
+        OrleansTimerDiagnosticListener.EmitCreated(grainContext, options.DueTime, options.Period, timer);
         timer.Change(options.DueTime, options.Period);
         return timer;
     }

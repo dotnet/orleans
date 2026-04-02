@@ -343,7 +343,7 @@ public sealed class PlacementDiagnosticObserver : IDisposable, IObserver<Diagnos
                 break;
 
             case OrleansPlacementDiagnostics.EventNames.ClusterStatisticsRefreshed when kvp.Value is ClusterStatisticsRefreshedEvent clusterRefreshed:
-                _logger?.LogDebug("PlacementDiagnosticObserver: ClusterStatisticsRefreshed on {SiloAddress}, SiloCount={SiloCount}", clusterRefreshed.SiloAddress, clusterRefreshed.SiloCount);
+                _logger?.LogDebug("PlacementDiagnosticObserver: ClusterStatisticsRefreshed on {SiloAddress}, SiloCount={SiloCount}", clusterRefreshed.SiloAddress, clusterRefreshed.Statistics.Count);
                 _clusterRefreshedEvents.Add(clusterRefreshed);
                 break;
 

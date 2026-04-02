@@ -1733,8 +1733,6 @@ internal sealed partial class ActivationData :
                 SetState(ActivationState.Activating);
             }
             _activationActivity?.AddEvent(new ActivityEvent("state-activating"));
-            var activationStopwatch = ValueStopwatch.StartNew();
-
             LogActivatingGrain(_shared.Logger, this);
 
             try
@@ -1824,7 +1822,7 @@ internal sealed partial class ActivationData :
                 _activationActivity?.Dispose();
                 _activationActivity = null;
 
-                OrleansGrainDiagnosticListener.EmitActivated(this, activationStopwatch.Elapsed);
+                OrleansGrainDiagnosticListener.EmitActivated(this);
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
             }
@@ -2020,9 +2018,9 @@ internal sealed partial class ActivationData :
             LogExceptionDisposing(_shared.Logger, exception, this);
         }
 
-        if (DeactivationStartTime is { } deactivationStartTime)
+        if (DeactivationStartTime is not null)
         {
-            OrleansGrainDiagnosticListener.EmitDeactivated(this, GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime - deactivationStartTime);
+            OrleansGrainDiagnosticListener.EmitDeactivated(this, DeactivationReason);
         }
 
         // Signal deactivation

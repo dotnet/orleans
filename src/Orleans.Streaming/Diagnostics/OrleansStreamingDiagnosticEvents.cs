@@ -74,164 +74,146 @@ public static class OrleansStreamingDiagnostics
 /// <summary>
 /// Event payload for when a stream message is delivered to a consumer.
 /// </summary>
-/// <param name="StreamProvider">The name of the stream provider.</param>
-/// <param name="StreamId">The stream ID.</param>
-/// <param name="SubscriptionId">The subscription ID of the consumer.</param>
-/// <param name="SequenceToken">The sequence token of the delivered message.</param>
-/// <param name="SiloAddress">The address of the silo handling this delivery.</param>
-/// <param name="Consumer">The consumer endpoint.</param>
-/// <param name="Batch">The delivered batch.</param>
+/// <param name="streamProvider">The name of the stream provider.</param>
+/// <param name="streamId">The stream ID.</param>
+/// <param name="subscriptionId">The subscription ID of the consumer.</param>
+/// <param name="siloAddress">The address of the silo handling this delivery.</param>
+/// <param name="consumer">The consumer endpoint.</param>
+/// <param name="batch">The delivered batch.</param>
 public class StreamMessageDeliveredEvent(
-    string StreamProvider,
-    StreamId StreamId,
-    Guid SubscriptionId,
-    string? SequenceToken,
-    SiloAddress? SiloAddress,
-    IAddressable Consumer,
-    IBatchContainer Batch)
+    string streamProvider,
+    StreamId streamId,
+    Guid subscriptionId,
+    SiloAddress? siloAddress,
+    IAddressable consumer,
+    IBatchContainer batch)
 {
-    public string StreamProvider { get; } = StreamProvider;
-    public StreamId StreamId { get; } = StreamId;
-    public Guid SubscriptionId { get; } = SubscriptionId;
-    public string? SequenceToken { get; } = SequenceToken;
-    public SiloAddress? SiloAddress { get; } = SiloAddress;
-    public IAddressable Consumer { get; } = Consumer;
-    public IBatchContainer Batch { get; } = Batch;
+    public string StreamProvider { get; } = streamProvider;
+    public StreamId StreamId { get; } = streamId;
+    public Guid SubscriptionId { get; } = subscriptionId;
+    public SiloAddress? SiloAddress { get; } = siloAddress;
+    public IAddressable Consumer { get; } = consumer;
+    public IBatchContainer Batch { get; } = batch;
 }
 
 /// <summary>
 /// Event payload for when a stream becomes inactive due to no activity.
 /// </summary>
-/// <param name="StreamProvider">The name of the stream provider.</param>
-/// <param name="StreamId">The stream ID.</param>
-/// <param name="InactivityPeriod">The configured inactivity period.</param>
-/// <param name="SiloAddress">The address of the silo where this occurred.</param>
+/// <param name="streamProvider">The name of the stream provider.</param>
+/// <param name="streamId">The stream ID.</param>
+/// <param name="inactivityPeriod">The configured inactivity period.</param>
+/// <param name="siloAddress">The address of the silo where this occurred.</param>
 public class StreamInactiveEvent(
-    string StreamProvider,
-    StreamId StreamId,
-    TimeSpan InactivityPeriod,
-    SiloAddress? SiloAddress)
+    string streamProvider,
+    StreamId streamId,
+    TimeSpan inactivityPeriod,
+    SiloAddress? siloAddress)
 {
-    public string StreamProvider { get; } = StreamProvider;
-    public StreamId StreamId { get; } = StreamId;
-    public TimeSpan InactivityPeriod { get; } = InactivityPeriod;
-    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public string StreamProvider { get; } = streamProvider;
+    public StreamId StreamId { get; } = streamId;
+    public TimeSpan InactivityPeriod { get; } = inactivityPeriod;
+    public SiloAddress? SiloAddress { get; } = siloAddress;
 }
 
 /// <summary>
 /// Event payload for when a stream subscription is added.
 /// </summary>
-/// <param name="StreamProvider">The name of the stream provider.</param>
-/// <param name="StreamId">The stream ID.</param>
-/// <param name="SubscriptionId">The subscription ID.</param>
-/// <param name="ConsumerGrainId">The grain ID of the consumer.</param>
-/// <param name="SiloAddress">The address of the silo handling this subscription.</param>
+/// <param name="streamProvider">The name of the stream provider.</param>
+/// <param name="streamId">The stream ID.</param>
+/// <param name="subscriptionId">The subscription ID.</param>
+/// <param name="consumerGrainId">The grain ID of the consumer.</param>
+/// <param name="siloAddress">The address of the silo handling this subscription.</param>
 public class StreamSubscriptionAddedEvent(
-    string StreamProvider,
-    StreamId StreamId,
-    Guid SubscriptionId,
-    GrainId ConsumerGrainId,
-    SiloAddress? SiloAddress)
+    string streamProvider,
+    StreamId streamId,
+    Guid subscriptionId,
+    GrainId consumerGrainId,
+    SiloAddress? siloAddress)
 {
-    public string StreamProvider { get; } = StreamProvider;
-    public StreamId StreamId { get; } = StreamId;
-    public Guid SubscriptionId { get; } = SubscriptionId;
-    public GrainId ConsumerGrainId { get; } = ConsumerGrainId;
-    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public string StreamProvider { get; } = streamProvider;
+    public StreamId StreamId { get; } = streamId;
+    public Guid SubscriptionId { get; } = subscriptionId;
+    public GrainId ConsumerGrainId { get; } = consumerGrainId;
+    public SiloAddress? SiloAddress { get; } = siloAddress;
 }
 
 /// <summary>
 /// Event payload for when a stream subscription is removed.
 /// </summary>
-/// <param name="StreamProvider">The name of the stream provider.</param>
-/// <param name="StreamId">The stream ID.</param>
-/// <param name="SubscriptionId">The subscription ID.</param>
-/// <param name="SiloAddress">The address of the silo that handled this subscription.</param>
+/// <param name="streamProvider">The name of the stream provider.</param>
+/// <param name="streamId">The stream ID.</param>
+/// <param name="subscriptionId">The subscription ID.</param>
+/// <param name="siloAddress">The address of the silo that handled this subscription.</param>
 public class StreamSubscriptionRemovedEvent(
-    string StreamProvider,
-    StreamId StreamId,
-    Guid SubscriptionId,
-    SiloAddress? SiloAddress)
+    string streamProvider,
+    StreamId streamId,
+    Guid subscriptionId,
+    SiloAddress? siloAddress)
 {
-    public string StreamProvider { get; } = StreamProvider;
-    public StreamId StreamId { get; } = StreamId;
-    public Guid SubscriptionId { get; } = SubscriptionId;
-    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public string StreamProvider { get; } = streamProvider;
+    public StreamId StreamId { get; } = streamId;
+    public Guid SubscriptionId { get; } = subscriptionId;
+    public SiloAddress? SiloAddress { get; } = siloAddress;
 }
 
 /// <summary>
 /// Event payload for when queue leases are acquired by a silo.
 /// </summary>
-/// <param name="StreamProvider">The name of the stream provider.</param>
-/// <param name="SiloAddress">The address of the silo that acquired the leases.</param>
-/// <param name="AcquiredQueueCount">The number of queues newly acquired.</param>
-/// <param name="TotalQueueCount">The total number of queues now owned by this silo.</param>
-/// <param name="TargetQueueCount">The target number of queues for this silo.</param>
-/// <param name="QueueBalancer">The queue balancer instance.</param>
+/// <param name="streamProvider">The name of the stream provider.</param>
+/// <param name="siloAddress">The address of the silo that acquired the leases.</param>
+/// <param name="acquiredQueues">The queues newly acquired.</param>
+/// <param name="queueBalancer">The queue balancer instance.</param>
 public class QueueLeasesAcquiredEvent(
-    string StreamProvider,
-    SiloAddress? SiloAddress,
-    int AcquiredQueueCount,
-    int TotalQueueCount,
-    int TargetQueueCount,
-    IStreamQueueBalancer QueueBalancer)
+    string streamProvider,
+    SiloAddress? siloAddress,
+    QueueId[] acquiredQueues,
+    IStreamQueueBalancer queueBalancer)
 {
-    public string StreamProvider { get; } = StreamProvider;
-    public SiloAddress? SiloAddress { get; } = SiloAddress;
-    public int AcquiredQueueCount { get; } = AcquiredQueueCount;
-    public int TotalQueueCount { get; } = TotalQueueCount;
-    public int TargetQueueCount { get; } = TargetQueueCount;
-    public IStreamQueueBalancer QueueBalancer { get; } = QueueBalancer;
+    public string StreamProvider { get; } = streamProvider;
+    public SiloAddress? SiloAddress { get; } = siloAddress;
+    public QueueId[] AcquiredQueues { get; } = acquiredQueues;
+    public IStreamQueueBalancer QueueBalancer { get; } = queueBalancer;
 }
 
 /// <summary>
 /// Event payload for when queue leases are released by a silo.
 /// </summary>
-/// <param name="StreamProvider">The name of the stream provider.</param>
-/// <param name="SiloAddress">The address of the silo that released the leases.</param>
-/// <param name="ReleasedQueueCount">The number of queues released.</param>
-/// <param name="TotalQueueCount">The total number of queues now owned by this silo.</param>
-/// <param name="TargetQueueCount">The target number of queues for this silo.</param>
-/// <param name="QueueBalancer">The queue balancer instance.</param>
+/// <param name="streamProvider">The name of the stream provider.</param>
+/// <param name="siloAddress">The address of the silo that released the leases.</param>
+/// <param name="releasedQueues">The queues which were released.</param>
+/// <param name="queueBalancer">The queue balancer instance.</param>
 public class QueueLeasesReleasedEvent(
-    string StreamProvider,
-    SiloAddress? SiloAddress,
-    int ReleasedQueueCount,
-    int TotalQueueCount,
-    int TargetQueueCount,
-    IStreamQueueBalancer QueueBalancer)
+    string streamProvider,
+    SiloAddress? siloAddress,
+    QueueId[] releasedQueues,
+    IStreamQueueBalancer queueBalancer)
 {
-    public string StreamProvider { get; } = StreamProvider;
-    public SiloAddress? SiloAddress { get; } = SiloAddress;
-    public int ReleasedQueueCount { get; } = ReleasedQueueCount;
-    public int TotalQueueCount { get; } = TotalQueueCount;
-    public int TargetQueueCount { get; } = TargetQueueCount;
-    public IStreamQueueBalancer QueueBalancer { get; } = QueueBalancer;
+    public string StreamProvider { get; } = streamProvider;
+    public SiloAddress? SiloAddress { get; } = siloAddress;
+    public QueueId[] ReleasedQueues { get; } = releasedQueues;
+    public IStreamQueueBalancer QueueBalancer { get; } = queueBalancer;
 }
 
 /// <summary>
 /// Event payload for when queue ownership changes (after rebalancing completes).
 /// </summary>
-/// <param name="StreamProvider">The name of the stream provider.</param>
-/// <param name="SiloAddress">The address of the silo.</param>
-/// <param name="OwnedQueueCount">The number of queues owned by this silo.</param>
-/// <param name="TargetQueueCount">The target number of queues for this silo.</param>
-/// <param name="ActiveSiloCount">The number of active silos in the cluster.</param>
-/// <param name="QueueBalancer">The queue balancer instance.</param>
+/// <param name="streamProvider">The name of the stream provider.</param>
+/// <param name="siloAddress">The address of the silo.</param>
+/// <param name="previousQueues">The queues owned before the change.</param>
+/// <param name="currentQueues">The queues owned after the change.</param>
+/// <param name="queueBalancer">The queue balancer instance.</param>
 public class QueueBalancerChangedEvent(
-    string StreamProvider,
-    SiloAddress? SiloAddress,
-    int OwnedQueueCount,
-    int TargetQueueCount,
-    int ActiveSiloCount,
-    IStreamQueueBalancer QueueBalancer)
+    string streamProvider,
+    SiloAddress? siloAddress,
+    QueueId[] previousQueues,
+    QueueId[] currentQueues,
+    IStreamQueueBalancer queueBalancer)
 {
-    public string StreamProvider { get; } = StreamProvider;
-    public SiloAddress? SiloAddress { get; } = SiloAddress;
-    public int OwnedQueueCount { get; } = OwnedQueueCount;
-    public int TargetQueueCount { get; } = TargetQueueCount;
-    public int ActiveSiloCount { get; } = ActiveSiloCount;
-    public IStreamQueueBalancer QueueBalancer { get; } = QueueBalancer;
+    public string StreamProvider { get; } = streamProvider;
+    public SiloAddress? SiloAddress { get; } = siloAddress;
+    public QueueId[] PreviousQueues { get; } = previousQueues;
+    public QueueId[] CurrentQueues { get; } = currentQueues;
+    public IStreamQueueBalancer QueueBalancer { get; } = queueBalancer;
 }
 
 internal static class OrleansStreamingDiagnosticListener
@@ -253,7 +235,6 @@ internal static class OrleansStreamingDiagnosticListener
                 streamProviderName,
                 consumerData.StreamId.StreamId,
                 consumerData.SubscriptionId.Guid,
-                batch.SequenceToken?.ToString(),
                 siloAddress,
                 consumerData.StreamConsumer,
                 batch));
@@ -279,54 +260,49 @@ internal static class OrleansStreamingDiagnosticListener
         }
     }
 
-    internal static void EmitQueueChange(string streamProviderName, SiloAddress? siloAddress, int ownedQueueCount, int targetQueueCount, int activeSiloCount, HashSet<QueueId> oldQueues, HashSet<QueueId> newQueues, IStreamQueueBalancer queueBalancer)
+    internal static void EmitQueueChange(string streamProviderName, SiloAddress? siloAddress, HashSet<QueueId> oldQueues, HashSet<QueueId> newQueues, IStreamQueueBalancer queueBalancer)
     {
         if (!Listener.IsEnabled())
         {
             return;
         }
 
-        Emit(Listener, streamProviderName, siloAddress, ownedQueueCount, targetQueueCount, activeSiloCount, oldQueues, newQueues, queueBalancer);
+        Emit(Listener, streamProviderName, siloAddress, oldQueues, newQueues, queueBalancer);
 
-        static void Emit(DiagnosticListener listener, string streamProviderName, SiloAddress? siloAddress, int ownedQueueCount, int targetQueueCount, int activeSiloCount, HashSet<QueueId> oldQueues, HashSet<QueueId> newQueues, IStreamQueueBalancer queueBalancer)
+        static void Emit(DiagnosticListener listener, string streamProviderName, SiloAddress? siloAddress, HashSet<QueueId> oldQueues, HashSet<QueueId> newQueues, IStreamQueueBalancer queueBalancer)
         {
             if (listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged))
             {
                 listener.Write(OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged, new QueueBalancerChangedEvent(
                     streamProviderName,
                     siloAddress,
-                    ownedQueueCount,
-                    targetQueueCount,
-                    activeSiloCount,
+                    oldQueues.ToArray(),
+                    newQueues.ToArray(),
                     queueBalancer));
             }
 
             if (listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired))
             {
-                var acquired = newQueues.Except(oldQueues).Count();
-                if (acquired > 0)
+                var acquired = newQueues.Except(oldQueues).ToArray();
+                if (acquired.Length > 0)
                 {
                     listener.Write(OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired, new QueueLeasesAcquiredEvent(
                         streamProviderName,
                         siloAddress,
                         acquired,
-                        ownedQueueCount,
-                        targetQueueCount,
                         queueBalancer));
                 }
             }
 
             if (listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased))
             {
-                var released = oldQueues.Except(newQueues).Count();
-                if (released > 0)
+                var released = oldQueues.Except(newQueues).ToArray();
+                if (released.Length > 0)
                 {
                     listener.Write(OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased, new QueueLeasesReleasedEvent(
                         streamProviderName,
                         siloAddress,
                         released,
-                        ownedQueueCount,
-                        targetQueueCount,
                         queueBalancer));
                 }
             }

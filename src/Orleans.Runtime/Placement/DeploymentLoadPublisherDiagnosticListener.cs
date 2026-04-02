@@ -1,7 +1,6 @@
 using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
-using System.Linq;
 using Orleans.Diagnostics;
 
 namespace Orleans.Runtime;
@@ -23,29 +22,23 @@ internal static class DeploymentLoadPublisherDiagnosticListener
         {
             listener.Write(OrleansPlacementDiagnostics.EventNames.ClusterStatisticsRefreshed, new ClusterStatisticsRefreshedEvent(
                 siloAddress,
-                periodicStats.Count,
-                periodicStats.Values.Sum(statistics => statistics.ActivationCount),
                 periodicStats));
         }
     }
 
-    internal static void EmitStatisticsPublished(SiloAddress siloAddress, SiloRuntimeStatistics statistics, bool loadSheddingEnabled)
+    internal static void EmitStatisticsPublished(SiloAddress siloAddress, SiloRuntimeStatistics statistics)
     {
         if (!Listener.IsEnabled(OrleansPlacementDiagnostics.EventNames.StatisticsPublished))
         {
             return;
         }
 
-        Emit(Listener, siloAddress, statistics, loadSheddingEnabled);
+        Emit(Listener, siloAddress, statistics);
 
-        static void Emit(DiagnosticListener listener, SiloAddress siloAddress, SiloRuntimeStatistics statistics, bool loadSheddingEnabled)
+        static void Emit(DiagnosticListener listener, SiloAddress siloAddress, SiloRuntimeStatistics statistics)
         {
             listener.Write(OrleansPlacementDiagnostics.EventNames.StatisticsPublished, new SiloStatisticsPublishedEvent(
                 siloAddress,
-                statistics.ActivationCount,
-                statistics.RecentlyUsedActivationCount,
-                loadSheddingEnabled && statistics.IsOverloaded,
-                DateTime.UtcNow,
                 statistics));
         }
     }
@@ -65,29 +58,24 @@ internal static class DeploymentLoadPublisherDiagnosticListener
             listener.Write(OrleansPlacementDiagnostics.EventNames.StatisticsReceived, new SiloStatisticsReceivedEvent(
                 sourceSiloAddress,
                 observerSiloAddress,
-                statistics.ActivationCount,
-                statistics.RecentlyUsedActivationCount,
-                statistics.IsOverloaded,
-                DateTime.UtcNow,
                 statistics));
         }
     }
 
-    internal static void EmitStatisticsRemoved(SiloAddress removedSiloAddress, SiloAddress observerSiloAddress, string reason)
+    internal static void EmitStatisticsRemoved(SiloAddress removedSiloAddress, SiloAddress observerSiloAddress)
     {
         if (!Listener.IsEnabled(OrleansPlacementDiagnostics.EventNames.StatisticsRemoved))
         {
             return;
         }
 
-        Emit(Listener, removedSiloAddress, observerSiloAddress, reason);
+        Emit(Listener, removedSiloAddress, observerSiloAddress);
 
-        static void Emit(DiagnosticListener listener, SiloAddress removedSiloAddress, SiloAddress observerSiloAddress, string reason)
+        static void Emit(DiagnosticListener listener, SiloAddress removedSiloAddress, SiloAddress observerSiloAddress)
         {
             listener.Write(OrleansPlacementDiagnostics.EventNames.StatisticsRemoved, new SiloStatisticsRemovedEvent(
                 removedSiloAddress,
-                observerSiloAddress,
-                reason));
+                observerSiloAddress));
         }
     }
 }

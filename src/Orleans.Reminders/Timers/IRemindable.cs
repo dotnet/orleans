@@ -26,6 +26,11 @@ namespace Orleans
         public interface IGrainReminder
         {
             /// <summary>
+            /// Gets the grain identity which owns this reminder.
+            /// </summary>
+            GrainId GrainId { get; }
+
+            /// <summary>
             /// Gets the name of this reminder.
             /// </summary>
             string ReminderName { get; }

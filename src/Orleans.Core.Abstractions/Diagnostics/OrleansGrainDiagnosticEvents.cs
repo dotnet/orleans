@@ -1,4 +1,3 @@
-using System;
 using System.Diagnostics;
 using Orleans.Runtime;
 
@@ -52,72 +51,63 @@ public static class OrleansGrainDiagnostics
 /// <summary>
 /// Event payload for when a grain activation is created.
 /// </summary>
-/// <param name="GrainContext">The grain context.</param>
-public class GrainCreatedEvent(IGrainContext GrainContext)
+/// <param name="grainContext">The grain context.</param>
+public class GrainCreatedEvent(IGrainContext grainContext)
 {
-    public IGrainContext GrainContext { get; } = GrainContext;
+    public IGrainContext GrainContext { get; } = grainContext;
 }
 
 /// <summary>
 /// Event payload for when a grain activation has completed activation.
 /// </summary>
-/// <param name="GrainContext">The grain context.</param>
-/// <param name="Elapsed">The time taken to activate.</param>
-public class GrainActivatedEvent(
-    IGrainContext GrainContext,
-    TimeSpan Elapsed)
+/// <param name="grainContext">The grain context.</param>
+public class GrainActivatedEvent(IGrainContext grainContext)
 {
-    public IGrainContext GrainContext { get; } = GrainContext;
-    public TimeSpan Elapsed { get; } = Elapsed;
+    public IGrainContext GrainContext { get; } = grainContext;
 }
 
 /// <summary>
 /// Event payload for when a grain activation is about to deactivate.
 /// </summary>
-/// <param name="GrainContext">The grain context.</param>
-/// <param name="ReasonCode">The reason code for deactivation.</param>
-/// <param name="ReasonText">The reason text for deactivation.</param>
+/// <param name="grainContext">The grain context.</param>
+/// <param name="reason">The reason for deactivation.</param>
 public class GrainDeactivatingEvent(
-    IGrainContext GrainContext,
-    DeactivationReasonCode ReasonCode,
-    string? ReasonText)
+    IGrainContext grainContext,
+    DeactivationReason reason)
 {
-    public IGrainContext GrainContext { get; } = GrainContext;
-    public DeactivationReasonCode ReasonCode { get; } = ReasonCode;
-    public string? ReasonText { get; } = ReasonText;
+    public IGrainContext GrainContext { get; } = grainContext;
+    public DeactivationReason Reason { get; } = reason;
 }
 
 /// <summary>
 /// Event payload for when a grain activation has completed deactivation.
 /// </summary>
-/// <param name="GrainContext">The grain context.</param>
-/// <param name="Elapsed">The time taken to deactivate.</param>
+/// <param name="grainContext">The grain context.</param>
+/// <param name="reason">The reason for deactivation.</param>
 public class GrainDeactivatedEvent(
-    IGrainContext GrainContext,
-    TimeSpan Elapsed)
+    IGrainContext grainContext,
+    DeactivationReason reason)
 {
-    public IGrainContext GrainContext { get; } = GrainContext;
-    public TimeSpan Elapsed { get; } = Elapsed;
+    public IGrainContext GrainContext { get; } = grainContext;
+    public DeactivationReason Reason { get; } = reason;
 }
 
 internal static class OrleansGrainDiagnosticListener
 {
     private static readonly DiagnosticListener Listener = new(OrleansGrainDiagnostics.ListenerName);
 
-    internal static void EmitActivated(IGrainContext grainContext, TimeSpan elapsed)
+    internal static void EmitActivated(IGrainContext grainContext)
     {
         if (!Listener.IsEnabled(OrleansGrainDiagnostics.EventNames.Activated))
         {
             return;
         }
 
-        Emit(Listener, grainContext, elapsed);
+        Emit(Listener, grainContext);
 
-        static void Emit(DiagnosticListener listener, IGrainContext grainContext, TimeSpan elapsed)
+        static void Emit(DiagnosticListener listener, IGrainContext grainContext)
         {
-            listener.Write(OrleansGrainDiagnostics.EventNames.Activated, new GrainActivatedEvent(
-                grainContext,
-                elapsed));
+            listener.Write(OrleansGrainDiagnostics.EventNames.Activated, new GrainActivatedEvent(grainContext));
         }
     }
 
@@ -136,20 +126,20 @@ internal static class OrleansGrainDiagnosticListener
         }
     }
 
-    internal static void EmitDeactivated(IGrainContext grainContext, TimeSpan elapsed)
+    internal static void EmitDeactivated(IGrainContext grainContext, DeactivationReason deactivationReason)
     {
         if (!Listener.IsEnabled(OrleansGrainDiagnostics.EventNames.Deactivated))
         {
             return;
         }
 
-        Emit(Listener, grainContext, elapsed);
+        Emit(Listener, grainContext, deactivationReason);
 
-        static void Emit(DiagnosticListener listener, IGrainContext grainContext, TimeSpan elapsed)
+        static void Emit(DiagnosticListener listener, IGrainContext grainContext, DeactivationReason deactivationReason)
         {
             listener.Write(OrleansGrainDiagnostics.EventNames.Deactivated, new GrainDeactivatedEvent(
                 grainContext,
-                elapsed));
+                deactivationReason));
         }
     }
 
@@ -166,8 +156,7 @@ internal static class OrleansGrainDiagnosticListener
         {
             listener.Write(OrleansGrainDiagnostics.EventNames.Deactivating, new GrainDeactivatingEvent(
                 grainContext,
-                deactivationReason.ReasonCode,
-                deactivationReason.Description));
+                deactivationReason));
         }
     }
 }

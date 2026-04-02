@@ -157,7 +157,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Diagnost
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
         // Check if we already have a matching event
-        var existingMatch = _registeredEvents.FirstOrDefault(e => e.GrainId == grainId && e.ReminderName == reminderName);
+        var existingMatch = _registeredEvents.FirstOrDefault(e => e.Entry.GrainId == grainId && e.Entry.ReminderName == reminderName);
         if (existingMatch != null)
         {
             return existingMatch;
@@ -175,7 +175,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Diagnost
                 break;
             }
 
-            var match = _registeredEvents.FirstOrDefault(e => e.GrainId == grainId && e.ReminderName == reminderName);
+            var match = _registeredEvents.FirstOrDefault(e => e.Entry.GrainId == grainId && e.Entry.ReminderName == reminderName);
             if (match != null)
             {
                 return match;
@@ -198,7 +198,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Diagnost
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
         // Check if we already have a matching event
-        var existingMatch = _unregisteredEvents.FirstOrDefault(e => e.GrainId == grainId && e.ReminderName == reminderName);
+        var existingMatch = _unregisteredEvents.FirstOrDefault(e => e.Reminder.GrainId == grainId && e.Reminder.ReminderName == reminderName);
         if (existingMatch != null)
         {
             return existingMatch;
@@ -216,7 +216,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Diagnost
                 break;
             }
 
-            var match = _unregisteredEvents.FirstOrDefault(e => e.GrainId == grainId && e.ReminderName == reminderName);
+            var match = _unregisteredEvents.FirstOrDefault(e => e.Reminder.GrainId == grainId && e.Reminder.ReminderName == reminderName);
             if (match != null)
             {
                 return match;
@@ -236,9 +236,9 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Diagnost
     {
         if (reminderName != null)
         {
-            return _tickCompletedEvents.Count(e => e.GrainId == grainId && e.ReminderName == reminderName);
+            return _tickCompletedEvents.Count(e => e.Reminder.GrainId == grainId && e.Reminder.ReminderName == reminderName);
         }
-        return _tickCompletedEvents.Count(e => e.GrainId == grainId);
+        return _tickCompletedEvents.Count(e => e.Reminder.GrainId == grainId);
     }
 
     /// <summary>
@@ -248,7 +248,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Diagnost
     /// <returns>The count of completed reminder tick events.</returns>
     public int GetTickCountByReminderName(string reminderName)
     {
-        return _tickCompletedEvents.Count(e => e.ReminderName == reminderName);
+        return _tickCompletedEvents.Count(e => e.Reminder.ReminderName == reminderName);
     }
 
     /// <summary>
@@ -278,9 +278,9 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Diagnost
     {
         if (reminderName != null)
         {
-            return _tickCompletedEvents.FirstOrDefault(e => e.GrainId == grainId && e.ReminderName == reminderName);
+            return _tickCompletedEvents.FirstOrDefault(e => e.Reminder.GrainId == grainId && e.Reminder.ReminderName == reminderName);
         }
-        return _tickCompletedEvents.FirstOrDefault(e => e.GrainId == grainId);
+        return _tickCompletedEvents.FirstOrDefault(e => e.Reminder.GrainId == grainId);
     }
 
     void IObserver<DiagnosticListener>.OnNext(DiagnosticListener listener)

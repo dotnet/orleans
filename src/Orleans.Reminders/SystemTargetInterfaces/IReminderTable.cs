@@ -217,6 +217,8 @@ namespace Orleans
             ETag = eTag;
         }
 
+        GrainId IGrainReminder.GrainId => GrainId;
+
         public override string ToString() => $"<IOrleansReminder: GrainId={GrainId} ReminderName={ReminderName} ETag={ETag}>";
     }
 }
