@@ -493,7 +493,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             {
                 if (_leaseHoldDuration > TimeSpan.Zero)
                 {
-                    // We pessimistically asssume if snapshot transfer failed, than safety is needed.
+                    // We pessimistically assume if snapshot transfer failed, then safety is needed.
                     var expiration = _timeProvider.GetUtcNow().UtcDateTime.Add(_leaseHoldDuration);
                     _rangeLeaseHolds.Add((addedRange, expiration));
                     LogWarningLeaseHoldForRange(_logger, addedRange, expiration);
