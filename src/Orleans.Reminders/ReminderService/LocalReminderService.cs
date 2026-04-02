@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
+using Orleans.Diagnostics;
 using Orleans.GrainReferences;
 using Orleans.Hosting;
 using Orleans.Internal;
@@ -170,7 +171,7 @@ namespace Orleans.Runtime.ReminderService
                 entry.ETag = newEtag;
                 StartAndAddTimer(entry);
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
-                EmitReminderRegisteredDiagnostics(grainId, reminderName, dueTime, period);
+                OrleansRemindersDiagnosticListener.EmitRegistered(grainId, reminderName, dueTime, period, Silo);
 
                 return new ReminderData(grainId, reminderName, newEtag);
             }
@@ -213,7 +214,7 @@ namespace Orleans.Runtime.ReminderService
                     // no-op
                     LogRemovedReminderFromTable(reminder);
                 }
-                EmitReminderUnregisteredDiagnostics(grainId, reminderName);
+                OrleansRemindersDiagnosticListener.EmitUnregistered(grainId, reminderName, Silo);
             }
             else
             {
@@ -553,7 +554,7 @@ namespace Orleans.Runtime.ReminderService
 
         private IRemindable GetGrain(GrainId grainId) => (IRemindable)_referenceActivator.CreateReference(grainId, _grainInterfaceType);
 
-        private sealed partial class LocalReminderData
+        private sealed class LocalReminderData
         {
             private readonly IRemindable remindable;
             private readonly DateTime firstTickTime; // time for the first tick of this reminder
@@ -672,7 +673,7 @@ namespace Orleans.Runtime.ReminderService
                 var status = new TickStatus(firstTickTime, period, before);
 
                 LogTraceTriggeringTick(logger, this, status, before);
-                EmitTickFiringDiagnostics(before);
+                OrleansRemindersDiagnosticListener.EmitTickFiring(Identity.GrainId, Identity.ReminderName, before, siloAddress);
 
                 try
                 {
@@ -690,14 +691,14 @@ namespace Orleans.Runtime.ReminderService
                     var after = timeProvider.GetUtcNow().UtcDateTime;
                     var elapsed = after - before;
                     LogTraceTickTriggered(logger, this, elapsed.TotalSeconds, after + period);
-                    EmitTickCompletedDiagnostics(elapsed);
+                    OrleansRemindersDiagnosticListener.EmitTickCompleted(Identity.GrainId, Identity.ReminderName, elapsed, siloAddress);
                 }
                 catch (Exception exc)
                 {
                     var after = timeProvider.GetUtcNow().UtcDateTime;
                     var elapsed = after - before;
                     LogErrorDeliveringReminderTick(logger, this, after + period, exc);
-                    EmitTickFailedDiagnostics(exc, elapsed);
+                    OrleansRemindersDiagnosticListener.EmitTickFailed(Identity.GrainId, Identity.ReminderName, exc, elapsed, siloAddress);
 
                     // What to do with repeated failures to deliver a reminder's ticks?
                 }

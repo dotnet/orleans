@@ -1,5 +1,10 @@
 using System;
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
+using Orleans;
 using Orleans.Runtime;
+using Orleans.Streams;
 
 namespace Orleans.Diagnostics;
 
@@ -168,3 +173,99 @@ public record QueueBalancerChangedEvent(
     int OwnedQueueCount,
     int TargetQueueCount,
     int ActiveSiloCount);
+
+internal static class OrleansStreamingDiagnosticListener
+{
+    private static readonly DiagnosticListener Listener = new(OrleansStreamingDiagnostics.ListenerName);
+
+    internal static void EmitMessageDelivered(string streamProviderName, StreamConsumerData consumerData, IBatchContainer batch, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.MessageDelivered))
+        {
+            return;
+        }
+
+        Emit(Listener, streamProviderName, consumerData, batch, siloAddress);
+
+        static void Emit(DiagnosticListener listener, string streamProviderName, StreamConsumerData consumerData, IBatchContainer batch, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansStreamingDiagnostics.EventNames.MessageDelivered, new StreamMessageDeliveredEvent(
+                streamProviderName,
+                consumerData.StreamId.StreamId,
+                consumerData.SubscriptionId.Guid,
+                consumerData.StreamConsumer.GetGrainId(),
+                batch.SequenceToken?.ToString(),
+                siloAddress));
+        }
+    }
+
+    internal static void EmitStreamInactive(string streamProviderName, StreamId streamId, TimeSpan inactivityPeriod, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.StreamInactive))
+        {
+            return;
+        }
+
+        Emit(Listener, streamProviderName, streamId, inactivityPeriod, siloAddress);
+
+        static void Emit(DiagnosticListener listener, string streamProviderName, StreamId streamId, TimeSpan inactivityPeriod, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansStreamingDiagnostics.EventNames.StreamInactive, new StreamInactiveEvent(
+                streamProviderName,
+                streamId,
+                inactivityPeriod,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitQueueChange(string streamProviderName, SiloAddress? siloAddress, int ownedQueueCount, int targetQueueCount, int activeSiloCount, HashSet<QueueId> oldQueues, HashSet<QueueId> newQueues)
+    {
+        if (!Listener.IsEnabled())
+        {
+            return;
+        }
+
+        Emit(Listener, streamProviderName, siloAddress, ownedQueueCount, targetQueueCount, activeSiloCount, oldQueues, newQueues);
+
+        static void Emit(DiagnosticListener listener, string streamProviderName, SiloAddress? siloAddress, int ownedQueueCount, int targetQueueCount, int activeSiloCount, HashSet<QueueId> oldQueues, HashSet<QueueId> newQueues)
+        {
+            if (listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged))
+            {
+                listener.Write(OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged, new QueueBalancerChangedEvent(
+                    streamProviderName,
+                    siloAddress,
+                    ownedQueueCount,
+                    targetQueueCount,
+                    activeSiloCount));
+            }
+
+            if (listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired))
+            {
+                var acquired = newQueues.Except(oldQueues).Count();
+                if (acquired > 0)
+                {
+                    listener.Write(OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired, new QueueLeasesAcquiredEvent(
+                        streamProviderName,
+                        siloAddress,
+                        acquired,
+                        ownedQueueCount,
+                        targetQueueCount));
+                }
+            }
+
+            if (listener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased))
+            {
+                var released = oldQueues.Except(newQueues).Count();
+                if (released > 0)
+                {
+                    listener.Write(OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased, new QueueLeasesReleasedEvent(
+                        streamProviderName,
+                        siloAddress,
+                        released,
+                        ownedQueueCount,
+                        targetQueueCount));
+                }
+            }
+        }
+    }
+}

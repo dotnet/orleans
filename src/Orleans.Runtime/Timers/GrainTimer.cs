@@ -5,6 +5,7 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
+using Orleans.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Invocation;
 using Orleans.Timers;
@@ -47,7 +48,7 @@ internal abstract partial class GrainTimer : IGrainTimer
             _timer = shared.TimeProvider.CreateTimer(TimerCallback, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
 
-        EmitCreatedDiagnostics();
+        OrleansTimerDiagnosticListener.EmitCreated(GrainContext, timerName: null, _dueTime, _period);
     }
 
     protected IGrainContext GrainContext => _grainContext;
@@ -111,7 +112,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             LogTraceBeforeCallback(Logger, this);
 
-            var diagnostics = EmitTickStartDiagnostics();
+            var diagnostics = OrleansTimerDiagnosticListener.EmitTickStart(GrainContext, timerName: null);
 
             _changed = false;
             var task = InvokeCallbackAsync(_cts.Token);
@@ -127,7 +128,7 @@ internal abstract partial class GrainTimer : IGrainTimer
                 // Complete synchronously.
                 LogTraceAfterCallback(Logger, this);
 
-                EmitTickStopDiagnostics(diagnostics);
+                OrleansTimerDiagnosticListener.EmitTickStop(diagnostics, GrainContext, timerName: null);
 
                 OnTickCompleted();
                 return new(Response.Completed);
@@ -177,7 +178,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         return Response.FromException(exc);
     }
 
-    private async ValueTask<Response> AwaitCallbackTask(Task task, TickDiagnosticsContext diagnostics)
+    private async ValueTask<Response> AwaitCallbackTask(Task task, GrainTimerTickDiagnosticsContext diagnostics)
     {
         try
         {
@@ -185,13 +186,13 @@ internal abstract partial class GrainTimer : IGrainTimer
 
             LogTraceAfterCallback(Logger, this);
 
-            EmitTickStopDiagnostics(diagnostics);
+            OrleansTimerDiagnosticListener.EmitTickStop(diagnostics, GrainContext, timerName: null);
 
             return Response.Completed;
         }
         catch (Exception exc)
         {
-            EmitTickStopDiagnostics(diagnostics, exc);
+            OrleansTimerDiagnosticListener.EmitTickStop(diagnostics, GrainContext, timerName: null, exc);
 
             return OnCallbackException(exc);
         }
@@ -253,7 +254,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
         _timer.Dispose();
 
-        EmitDisposedDiagnostics();
+        OrleansTimerDiagnosticListener.EmitDisposed(GrainContext, timerName: null);
 
         var timerRegistry = _grainContext.GetComponent<IGrainTimerRegistry>();
         timerRegistry?.OnTimerDisposed(this);

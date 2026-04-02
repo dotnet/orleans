@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Diagnostics;
@@ -91,3 +92,84 @@ public record GrainTimerCreatedEvent(
 public record GrainTimerDisposedEvent(
     IGrainContext GrainContext,
     string? TimerName);
+
+internal static class OrleansTimerDiagnosticListener
+{
+    private static readonly DiagnosticListener Listener = new(OrleansTimerDiagnostics.ListenerName);
+
+    internal static void EmitCreated(IGrainContext grainContext, string? timerName, TimeSpan dueTime, TimeSpan period)
+    {
+        if (!Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.Created))
+        {
+            return;
+        }
+
+        Emit(Listener, grainContext, timerName, dueTime, period);
+
+        static void Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName, TimeSpan dueTime, TimeSpan period)
+        {
+            listener.Write(OrleansTimerDiagnostics.EventNames.Created, new GrainTimerCreatedEvent(
+                grainContext,
+                timerName,
+                dueTime,
+                period));
+        }
+    }
+
+    internal static void EmitDisposed(IGrainContext grainContext, string? timerName)
+    {
+        if (!Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.Disposed))
+        {
+            return;
+        }
+
+        Emit(Listener, grainContext, timerName);
+
+        static void Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName)
+        {
+            listener.Write(OrleansTimerDiagnostics.EventNames.Disposed, new GrainTimerDisposedEvent(
+                grainContext,
+                timerName));
+        }
+    }
+
+    internal static GrainTimerTickDiagnosticsContext EmitTickStart(IGrainContext grainContext, string? timerName)
+    {
+        if (!Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.TickStart))
+        {
+            return default;
+        }
+
+        return Emit(Listener, grainContext, timerName);
+
+        static GrainTimerTickDiagnosticsContext Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName)
+        {
+            listener.Write(OrleansTimerDiagnostics.EventNames.TickStart, new GrainTimerTickStartEvent(
+                grainContext,
+                timerName));
+
+            return new(true, Stopwatch.GetTimestamp());
+        }
+    }
+
+    internal static void EmitTickStop(GrainTimerTickDiagnosticsContext diagnostics, IGrainContext grainContext, string? timerName, Exception? exception = null)
+    {
+        if (!diagnostics.EmitStopDiagnostics)
+        {
+            return;
+        }
+
+        Emit(Listener, diagnostics.StartTimestamp, grainContext, timerName, exception);
+
+        static void Emit(DiagnosticListener listener, long startTimestamp, IGrainContext grainContext, string? timerName, Exception? exception)
+        {
+            listener.Write(OrleansTimerDiagnostics.EventNames.TickStop, new GrainTimerTickStopEvent(
+                grainContext,
+                timerName,
+                Stopwatch.GetElapsedTime(startTimestamp),
+                exception));
+        }
+    }
+}
+
+internal readonly record struct GrainTimerTickDiagnosticsContext(bool EmitStopDiagnostics, long StartTimestamp);

@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Diagnostics;
@@ -224,3 +225,145 @@ public record LifecycleObserverStoppedEvent(
     string StageName,
     SiloAddress? SiloAddress,
     TimeSpan Elapsed);
+
+internal static class OrleansLifecycleDiagnosticListener
+{
+    private static readonly DiagnosticListener Listener = new(OrleansLifecycleDiagnostics.SiloLifecycleListenerName);
+
+    internal static void EmitStageCompleted(int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+    {
+        if (!Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.StageCompleted))
+        {
+            return;
+        }
+
+        Emit(Listener, stage, stageName, siloAddress, elapsed);
+
+        static void Emit(DiagnosticListener listener, int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+        {
+            listener.Write(OrleansLifecycleDiagnostics.EventNames.StageCompleted, new LifecycleStageCompletedEvent(
+                stage,
+                stageName,
+                siloAddress,
+                elapsed));
+        }
+    }
+
+    internal static void EmitStageStopped(int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+    {
+        if (!Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.StageStopped))
+        {
+            return;
+        }
+
+        Emit(Listener, stage, stageName, siloAddress, elapsed);
+
+        static void Emit(DiagnosticListener listener, int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+        {
+            listener.Write(OrleansLifecycleDiagnostics.EventNames.StageStopped, new LifecycleStageStoppedEvent(
+                stage,
+                stageName,
+                siloAddress,
+                elapsed));
+        }
+    }
+
+    internal static void EmitObserverCompleted(string observerName, int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+    {
+        if (!Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverCompleted))
+        {
+            return;
+        }
+
+        Emit(Listener, observerName, stage, stageName, siloAddress, elapsed);
+
+        static void Emit(DiagnosticListener listener, string observerName, int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+        {
+            listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverCompleted, new LifecycleObserverCompletedEvent(
+                observerName,
+                stage,
+                stageName,
+                siloAddress,
+                elapsed));
+        }
+    }
+
+    internal static void EmitObserverFailed(string observerName, int stage, string stageName, SiloAddress? siloAddress, Exception exception, TimeSpan elapsed)
+    {
+        if (!Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverFailed))
+        {
+            return;
+        }
+
+        Emit(Listener, observerName, stage, stageName, siloAddress, exception, elapsed);
+
+        static void Emit(DiagnosticListener listener, string observerName, int stage, string stageName, SiloAddress? siloAddress, Exception exception, TimeSpan elapsed)
+        {
+            listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverFailed, new LifecycleObserverFailedEvent(
+                observerName,
+                stage,
+                stageName,
+                siloAddress,
+                exception,
+                elapsed));
+        }
+    }
+
+    internal static void EmitObserverStarting(string observerName, int stage, string stageName, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverStarting))
+        {
+            return;
+        }
+
+        Emit(Listener, observerName, stage, stageName, siloAddress);
+
+        static void Emit(DiagnosticListener listener, string observerName, int stage, string stageName, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverStarting, new LifecycleObserverStartingEvent(
+                observerName,
+                stage,
+                stageName,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitObserverStopped(string observerName, int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+    {
+        if (!Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverStopped))
+        {
+            return;
+        }
+
+        Emit(Listener, observerName, stage, stageName, siloAddress, elapsed);
+
+        static void Emit(DiagnosticListener listener, string observerName, int stage, string stageName, SiloAddress? siloAddress, TimeSpan elapsed)
+        {
+            listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverStopped, new LifecycleObserverStoppedEvent(
+                observerName,
+                stage,
+                stageName,
+                siloAddress,
+                elapsed));
+        }
+    }
+
+    internal static void EmitObserverStopping(string observerName, int stage, string stageName, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansLifecycleDiagnostics.EventNames.ObserverStopping))
+        {
+            return;
+        }
+
+        Emit(Listener, observerName, stage, stageName, siloAddress);
+
+        static void Emit(DiagnosticListener listener, string observerName, int stage, string stageName, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansLifecycleDiagnostics.EventNames.ObserverStopping, new LifecycleObserverStoppingEvent(
+                observerName,
+                stage,
+                stageName,
+                siloAddress));
+        }
+    }
+}

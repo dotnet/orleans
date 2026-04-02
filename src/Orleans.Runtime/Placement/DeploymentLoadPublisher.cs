@@ -105,7 +105,7 @@ namespace Orleans.Runtime
                 // Update statistics locally.
                 LocalRuntimeStatistics = myStats;
                 UpdateRuntimeStatisticsInternal(_siloDetails.SiloAddress, myStats);
-                EmitStatisticsPublishedDiagnostics(myStats);
+                DeploymentLoadPublisherDiagnosticListener.EmitStatisticsPublished(_siloDetails.SiloAddress, myStats, _loadSheddingOptions.Value.LoadSheddingEnabled);
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
@@ -130,7 +130,7 @@ namespace Orleans.Runtime
                 }
 
                 await Task.WhenAll(tasks);
-                EmitClusterStatisticsRefreshedDiagnostics();
+                DeploymentLoadPublisherDiagnosticListener.EmitClusterStatisticsRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
             catch (Exception exc)
             {
@@ -160,7 +160,7 @@ namespace Orleans.Runtime
 
             _periodicStats[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
-            EmitStatisticsReceivedDiagnostics(siloAddress, siloStats);
+            DeploymentLoadPublisherDiagnosticListener.EmitStatisticsReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
         }
 
         internal async Task RefreshClusterStatistics()
@@ -241,7 +241,7 @@ namespace Orleans.Runtime
         {
             if (!status.IsTerminating()) return;
 
-            EmitStatisticsRemovedDiagnostics(updatedSilo);
+            DeploymentLoadPublisherDiagnosticListener.EmitStatisticsRemoved(updatedSilo, _siloDetails.SiloAddress, "SiloTerminating");
             _periodicStats.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
         }

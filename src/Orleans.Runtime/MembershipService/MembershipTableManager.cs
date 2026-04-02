@@ -479,7 +479,7 @@ namespace Orleans.Runtime.MembershipService
                 this.LogMissedIAmAlives(table);
 
                 LogDebugProcessTableUpdateWithTable(this.log, caller, new(table));
-                EmitMembershipDiagnostics(previousSnapshot, this.snapshot);
+                MembershipTableManagerDiagnosticListener.EmitMembershipDiagnostics(previousSnapshot, this.snapshot, this.myAddress);
             }
         }
 

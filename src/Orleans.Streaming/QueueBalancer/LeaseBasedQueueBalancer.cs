@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Diagnostics;
 using Orleans.LeaseProviders;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
@@ -390,7 +391,7 @@ public partial class LeaseBasedQueueBalancer(
         // If queue changed, notify listeners.
         if (!oldQueues.SetEquals(newQueues))
         {
-            EmitQueueChangeDiagnostics(oldQueues, newQueues);
+            OrleansStreamingDiagnosticListener.EmitQueueChange(_name, SiloAddress, _myQueues.Count, _responsibility, _activeSiloCount, oldQueues, newQueues);
             return NotifyListeners();
         }
 

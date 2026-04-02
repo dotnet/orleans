@@ -1,4 +1,5 @@
 using System;
+using System.Diagnostics;
 using Orleans.Runtime;
 
 namespace Orleans.Diagnostics;
@@ -120,3 +121,104 @@ public record ReminderTickFailedEvent(
     Exception Exception,
     TimeSpan Elapsed,
     SiloAddress? SiloAddress);
+
+internal static class OrleansRemindersDiagnosticListener
+{
+    private static readonly DiagnosticListener Listener = new(OrleansRemindersDiagnostics.ListenerName);
+
+    internal static void EmitRegistered(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.Registered))
+        {
+            return;
+        }
+
+        Emit(Listener, grainId, reminderName, dueTime, period, siloAddress);
+
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansRemindersDiagnostics.EventNames.Registered, new ReminderRegisteredEvent(
+                grainId,
+                reminderName,
+                dueTime,
+                period,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitUnregistered(GrainId grainId, string reminderName, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.Unregistered))
+        {
+            return;
+        }
+
+        Emit(Listener, grainId, reminderName, siloAddress);
+
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansRemindersDiagnostics.EventNames.Unregistered, new ReminderUnregisteredEvent(
+                grainId,
+                reminderName,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitTickCompleted(GrainId grainId, string reminderName, TimeSpan elapsed, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.TickCompleted))
+        {
+            return;
+        }
+
+        Emit(Listener, grainId, reminderName, elapsed, siloAddress);
+
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, TimeSpan elapsed, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansRemindersDiagnostics.EventNames.TickCompleted, new ReminderTickCompletedEvent(
+                grainId,
+                reminderName,
+                elapsed,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitTickFailed(GrainId grainId, string reminderName, Exception exception, TimeSpan elapsed, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.TickFailed))
+        {
+            return;
+        }
+
+        Emit(Listener, grainId, reminderName, exception, elapsed, siloAddress);
+
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, Exception exception, TimeSpan elapsed, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansRemindersDiagnostics.EventNames.TickFailed, new ReminderTickFailedEvent(
+                grainId,
+                reminderName,
+                exception,
+                elapsed,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitTickFiring(GrainId grainId, string reminderName, DateTime tickTime, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.TickFiring))
+        {
+            return;
+        }
+
+        Emit(Listener, grainId, reminderName, tickTime, siloAddress);
+
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, DateTime tickTime, SiloAddress? siloAddress)
+        {
+            listener.Write(OrleansRemindersDiagnostics.EventNames.TickFiring, new ReminderTickFiringEvent(
+                grainId,
+                reminderName,
+                tickTime,
+                siloAddress));
+        }
+    }
+}
