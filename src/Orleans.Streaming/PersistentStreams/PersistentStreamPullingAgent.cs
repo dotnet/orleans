@@ -1,6 +1,5 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Diagnostics.Metrics;
 using System.IO;
 using System.Linq;
@@ -8,7 +7,6 @@ using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
@@ -19,7 +17,6 @@ namespace Orleans.Streams
 {
     internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
     {
-        private static readonly DiagnosticListener DiagnosticListener = new(OrleansStreamingDiagnostics.ListenerName);
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
         private readonly IBackoffProvider deliveryBackoffProvider;
@@ -482,18 +479,7 @@ namespace Orleans.Streams
                 {
                     pubSubCache.Remove(tuple.Key);
                     tuple.Value.DisposeAll(logger);
-
-                    // Emit diagnostic event for stream inactivity
-                    if (DiagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.StreamInactive))
-                    {
-                        DiagnosticListener.Write(
-                            OrleansStreamingDiagnostics.EventNames.StreamInactive,
-                            new StreamInactiveEvent(
-                                streamProviderName,
-                                tuple.Key.StreamId,
-                                options.StreamInactivityPeriod,
-                                Silo));
-                    }
+                    EmitStreamInactiveDiagnostics(tuple.Key.StreamId);
                 }
             }
         }
@@ -679,20 +665,7 @@ namespace Orleans.Streams
             {
                 StreamHandshakeToken newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
                 consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
-
-                // Emit diagnostic event for successful message delivery
-                if (DiagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.MessageDelivered))
-                {
-                    DiagnosticListener.Write(
-                        OrleansStreamingDiagnostics.EventNames.MessageDelivered,
-                        new StreamMessageDeliveredEvent(
-                            streamProviderName,
-                            consumerData.StreamId.StreamId,
-                            consumerData.SubscriptionId.Guid,
-                            consumerData.StreamConsumer.GetGrainId(),
-                            batch.SequenceToken?.ToString(),
-                            Silo));
-                }
+                EmitMessageDeliveredDiagnostics(consumerData, batch);
 
                 return newToken;
             }

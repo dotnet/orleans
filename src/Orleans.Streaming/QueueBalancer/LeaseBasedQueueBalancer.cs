@@ -1,13 +1,11 @@
 using System;
 using System.Collections.Generic;
-using System.Diagnostics;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
-using Orleans.Diagnostics;
 using Orleans.LeaseProviders;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
@@ -35,8 +33,6 @@ public partial class LeaseBasedQueueBalancer(
     ILoggerFactory loggerFactory,
     TimeProvider timeProvider) : QueueBalancerBase(services, loggerFactory.CreateLogger($"{typeof(LeaseBasedQueueBalancer).FullName}.{name}")), IStreamQueueBalancer
 {
-    private static readonly DiagnosticListener s_diagnosticListener = new(OrleansStreamingDiagnostics.ListenerName);
-
     private sealed class AcquiredQueue(int order, QueueId queueId, AcquiredLease lease)
     {
         public int LeaseOrder { get; set; } = order;
@@ -391,50 +387,10 @@ public partial class LeaseBasedQueueBalancer(
         if (Cancellation.IsCancellationRequested) return Task.CompletedTask;
         var newQueues = new HashSet<QueueId>(_myQueues.Select(queue => queue.QueueId));
 
-        // If queue changed, notify listeners and emit diagnostic event.
+        // If queue changed, notify listeners.
         if (!oldQueues.SetEquals(newQueues))
         {
-            // Emit diagnostic event for queue ownership change
-            if (s_diagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged))
-            {
-                s_diagnosticListener.Write(
-                    OrleansStreamingDiagnostics.EventNames.QueueBalancerChanged,
-                    new QueueBalancerChangedEvent(
-                        _name,
-                        SiloAddress,
-                        _myQueues.Count,
-                        _responsibility,
-                        _activeSiloCount));
-            }
-
-            // Calculate acquired and released counts for more specific events
-            var acquired = newQueues.Except(oldQueues).Count();
-            var released = oldQueues.Except(newQueues).Count();
-
-            if (acquired > 0 && s_diagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired))
-            {
-                s_diagnosticListener.Write(
-                    OrleansStreamingDiagnostics.EventNames.QueueLeasesAcquired,
-                    new QueueLeasesAcquiredEvent(
-                        _name,
-                        SiloAddress,
-                        acquired,
-                        _myQueues.Count,
-                        _responsibility));
-            }
-
-            if (released > 0 && s_diagnosticListener.IsEnabled(OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased))
-            {
-                s_diagnosticListener.Write(
-                    OrleansStreamingDiagnostics.EventNames.QueueLeasesReleased,
-                    new QueueLeasesReleasedEvent(
-                        _name,
-                        SiloAddress,
-                        released,
-                        _myQueues.Count,
-                        _responsibility));
-            }
-
+            EmitQueueChangeDiagnostics(oldQueues, newQueues);
             return NotifyListeners();
         }
 

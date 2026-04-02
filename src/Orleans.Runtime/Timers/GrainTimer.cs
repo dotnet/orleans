@@ -1,12 +1,10 @@
 using System;
-using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
-using Orleans.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Invocation;
 using Orleans.Timers;
@@ -15,7 +13,6 @@ namespace Orleans.Runtime;
 
 internal abstract partial class GrainTimer : IGrainTimer
 {
-    private static readonly DiagnosticListener Listener = new(OrleansTimerDiagnostics.ListenerName);
     protected static readonly GrainInterfaceType InvokableInterfaceType = GrainInterfaceType.Create("Orleans.Runtime.IGrainTimerInvoker");
     protected static readonly TimerCallback TimerCallback = (state) => ((GrainTimer)state!).ScheduleTickOnActivation();
     protected static readonly MethodInfo InvokableMethodInfo = typeof(IGrainTimerInvoker).GetMethod(nameof(IGrainTimerInvoker.InvokeCallbackAsync), BindingFlags.Instance | BindingFlags.Public)!;
@@ -50,15 +47,7 @@ internal abstract partial class GrainTimer : IGrainTimer
             _timer = shared.TimeProvider.CreateTimer(TimerCallback, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
 
-        if (Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.Created))
-        {
-            Listener.Write(OrleansTimerDiagnostics.EventNames.Created, new GrainTimerCreatedEvent(
-                _grainContext.GrainId,
-                GetGrainTypeName(),
-                null,
-                Timeout.InfiniteTimeSpan,
-                Timeout.InfiniteTimeSpan));
-        }
+        EmitCreatedDiagnostics();
     }
 
     protected IGrainContext GrainContext => _grainContext;
@@ -124,16 +113,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             LogTraceBeforeCallback(Logger, this);
 
-            var emitDiagnostics = Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.TickStart);
-            if (emitDiagnostics)
-            {
-                Listener.Write(OrleansTimerDiagnostics.EventNames.TickStart, new GrainTimerTickStartEvent(
-                    _grainContext.GrainId,
-                    GetGrainTypeName(),
-                    null));
-            }
-
-            var startTimestamp = emitDiagnostics ? Stopwatch.GetTimestamp() : 0;
+            var diagnostics = EmitTickStartDiagnostics();
 
             _changed = false;
             var task = InvokeCallbackAsync(_cts.Token);
@@ -142,22 +122,14 @@ internal abstract partial class GrainTimer : IGrainTimer
             if (task is { IsCompletedSuccessfully: false })
             {
                 // Complete asynchronously.
-                return AwaitCallbackTask(task, emitDiagnostics, startTimestamp);
+                return AwaitCallbackTask(task, diagnostics);
             }
             else
             {
                 // Complete synchronously.
                 LogTraceAfterCallback(Logger, this);
 
-                if (emitDiagnostics)
-                {
-                    Listener.Write(OrleansTimerDiagnostics.EventNames.TickStop, new GrainTimerTickStopEvent(
-                        _grainContext.GrainId,
-                        GetGrainTypeName(),
-                        null,
-                        Stopwatch.GetElapsedTime(startTimestamp),
-                        null));
-                }
+                EmitTickStopDiagnostics(diagnostics);
 
                 OnTickCompleted();
                 return new(Response.Completed);
@@ -207,7 +179,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         return Response.FromException(exc);
     }
 
-    private async ValueTask<Response> AwaitCallbackTask(Task task, bool emitDiagnostics, long startTimestamp)
+    private async ValueTask<Response> AwaitCallbackTask(Task task, TickDiagnosticsContext diagnostics)
     {
         try
         {
@@ -215,29 +187,13 @@ internal abstract partial class GrainTimer : IGrainTimer
 
             LogTraceAfterCallback(Logger, this);
 
-            if (emitDiagnostics)
-            {
-                Listener.Write(OrleansTimerDiagnostics.EventNames.TickStop, new GrainTimerTickStopEvent(
-                    _grainContext.GrainId,
-                    GetGrainTypeName(),
-                    null,
-                    Stopwatch.GetElapsedTime(startTimestamp),
-                    null));
-            }
+            EmitTickStopDiagnostics(diagnostics);
 
             return Response.Completed;
         }
         catch (Exception exc)
         {
-            if (emitDiagnostics)
-            {
-                Listener.Write(OrleansTimerDiagnostics.EventNames.TickStop, new GrainTimerTickStopEvent(
-                    _grainContext.GrainId,
-                    GetGrainTypeName(),
-                    null,
-                    Stopwatch.GetElapsedTime(startTimestamp),
-                    exc));
-            }
+            EmitTickStopDiagnostics(diagnostics, exc);
 
             return OnCallbackException(exc);
         }
@@ -299,13 +255,7 @@ internal abstract partial class GrainTimer : IGrainTimer
 
         _timer.Dispose();
 
-        if (Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.Disposed))
-        {
-            Listener.Write(OrleansTimerDiagnostics.EventNames.Disposed, new GrainTimerDisposedEvent(
-                _grainContext.GrainId,
-                GetGrainTypeName(),
-                null));
-        }
+        EmitDisposedDiagnostics();
 
         var timerRegistry = _grainContext.GetComponent<IGrainTimerRegistry>();
         timerRegistry?.OnTimerDisposed(this);
