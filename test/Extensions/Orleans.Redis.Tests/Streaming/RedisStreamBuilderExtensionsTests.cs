@@ -1,4 +1,3 @@
-using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans;
@@ -11,28 +10,6 @@ namespace Tester.Redis.Streaming;
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisStreamBuilderExtensionsTests
 {
-    [Fact]
-    public void ClientBuilder_AddRedisStreams_WithServiceProviderOptionsDelegate_ConfiguresNamedOptions()
-    {
-        const string providerName = "client-options";
-        var services = new ServiceCollection();
-        var marker = new Marker(128L);
-        services.AddSingleton(marker);
-        var builder = new ClientBuilder(services, new ConfigurationBuilder().Build());
-
-        builder.AddRedisStreams(providerName, (serviceProvider, options) =>
-        {
-            options.MaxStreamLength = serviceProvider.GetRequiredService<Marker>().Value;
-            options.UseApproximateMaxLength = false;
-        });
-
-        using var serviceProvider = services.BuildServiceProvider();
-        var options = serviceProvider.GetOptionsByName<RedisStreamingOptions>(providerName);
-
-        Assert.Equal(marker.Value, options.MaxStreamLength);
-        Assert.False(options.UseApproximateMaxLength);
-    }
-
     [Fact]
     public void ClientBuilder_AddRedisStreams_WithServiceCollectionConfiguratorDelegate_ConfiguresServices()
     {
@@ -55,28 +32,6 @@ public sealed class RedisStreamBuilderExtensionsTests
         Assert.Same(marker, serviceProvider.GetRequiredService<Marker>());
         Assert.Equal(marker.Value, options.MaxStreamLength);
         Assert.Equal(7, partitioning.TotalQueueCount);
-    }
-
-    [Fact]
-    public void SiloBuilder_AddRedisStreams_WithServiceProviderOptionsDelegate_ConfiguresNamedOptions()
-    {
-        const string providerName = "silo-options";
-        var services = new ServiceCollection();
-        var marker = new Marker(512L);
-        services.AddSingleton(marker);
-        var builder = new TestSiloBuilder(services, new ConfigurationBuilder().Build());
-
-        builder.AddRedisStreams(providerName, (serviceProvider, options) =>
-        {
-            options.MaxStreamLength = serviceProvider.GetRequiredService<Marker>().Value;
-            options.CheckpointPersistInterval = TimeSpan.FromSeconds(12);
-        });
-
-        using var serviceProvider = services.BuildServiceProvider();
-        var options = serviceProvider.GetOptionsByName<RedisStreamingOptions>(providerName);
-
-        Assert.Equal(marker.Value, options.MaxStreamLength);
-        Assert.Equal(TimeSpan.FromSeconds(12), options.CheckpointPersistInterval);
     }
 
     [Fact]

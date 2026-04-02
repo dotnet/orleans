@@ -21,17 +21,23 @@ public sealed class RedisProgrammaticSubscribeTests : ProgrammaticSubscribeTests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.AddRedisStreams(StreamProviderName, options =>
+                hostBuilder.AddRedisStreams(StreamProviderName, builder =>
                 {
-                    options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
-                    options.EntryExpiry = TimeSpan.FromHours(1);
+                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    {
+                        options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
+                        options.EntryExpiry = TimeSpan.FromHours(1);
+                    }));
                 });
                 hostBuilder.AddMemoryGrainStorage(StreamProviderName);
 
-                hostBuilder.AddRedisStreams(StreamProviderName2, options =>
+                hostBuilder.AddRedisStreams(StreamProviderName2, builder =>
                 {
-                    options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
-                    options.EntryExpiry = TimeSpan.FromHours(1);
+                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    {
+                        options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
+                        options.EntryExpiry = TimeSpan.FromHours(1);
+                    }));
                 });
                 hostBuilder.AddMemoryGrainStorage(StreamProviderName2);
             }

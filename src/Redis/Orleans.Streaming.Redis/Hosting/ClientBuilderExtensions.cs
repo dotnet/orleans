@@ -1,6 +1,5 @@
 using System;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans.Configuration;
 
 namespace Orleans.Hosting;
 
@@ -9,31 +8,6 @@ namespace Orleans.Hosting;
 /// </summary>
 public static class ClientBuilderExtensions
 {
-    /// <summary>
-    /// Configure cluster client to use Redis streams.
-    /// </summary>
-    public static IClientBuilder AddRedisStreams(this IClientBuilder builder, string name, Action<RedisStreamingOptions> configureOptions)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-
-        builder.AddRedisStreams(name, configurator =>
-            configurator.ConfigureRedis(builder => builder.Configure(configureOptions)));
-        return builder;
-    }
-
-    /// <summary>
-    /// Configure cluster client to use Redis streams.
-    /// </summary>
-    public static IClientBuilder AddRedisStreams(this IClientBuilder builder, string name, Action<IServiceProvider, RedisStreamingOptions> configureOptions)
-    {
-        ArgumentNullException.ThrowIfNull(name);
-        ArgumentNullException.ThrowIfNull(configureOptions);
-
-        builder.AddRedisStreams(name, configurator =>
-            configurator.ConfigureRedis(optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) => configureOptions(services, options))));
-        return builder;
-    }
-
     /// <summary>
     /// Configure cluster client to use Redis streams.
     /// </summary>

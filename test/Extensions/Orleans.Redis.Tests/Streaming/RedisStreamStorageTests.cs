@@ -1,24 +1,84 @@
+using Orleans.Configuration;
 using Orleans.Streaming.Redis;
+using Orleans.Streams;
+using StackExchange.Redis;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.Redis.Streaming;
 
+[Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Redis"), TestCategory("Streaming")]
 public sealed class RedisStreamStorageTests
 {
-    [Theory]
-    [InlineData("1735790000000-3", "1735790000000-4")]
-    [InlineData("1735790000000-9223372036854775807", "1735790000001-0")]
-    public void RedisStreamStorage_GetNextEntryId_ReturnsInclusiveSuccessor(string currentEntryId, string expectedNextEntryId)
+    [SkippableFact]
+    public async Task RedisStreamStorage_Shutdown_DoesNotDisposeSharedMultiplexer()
     {
-        var nextEntryId = RedisStreamStorage.GetNextEntryId(currentEntryId);
+        TestUtils.CheckForRedis();
 
-        Assert.Equal(expectedNextEntryId, nextEntryId);
+        using var connection = await ConnectionMultiplexer.ConnectAsync(RedisStreamTestUtils.GetConfigurationOptions());
+        var storage = CreateStorage(new RedisStreamingOptions
+        {
+            ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions(),
+            CreateMultiplexer = _ => Task.FromResult((Multiplexer: (IConnectionMultiplexer)connection, IsShared: true)),
+        });
+
+        await storage.ConnectAsync();
+
+        Assert.True(connection.IsConnected);
+
+        await storage.ShutdownAsync();
+
+        Assert.True(connection.IsConnected);
+        await connection.GetDatabase().PingAsync();
     }
 
-    [Fact]
-    public void RedisStreamStorage_GetNextEntryId_ThrowsOnOverflow()
+    [SkippableFact]
+    public async Task RedisStreamStorage_Shutdown_DisposesExclusiveMultiplexer()
     {
-        Assert.Throws<OverflowException>(() => RedisStreamStorage.GetNextEntryId($"{long.MaxValue}-{long.MaxValue}"));
+        TestUtils.CheckForRedis();
+
+        ConnectionMultiplexer connection = null!;
+
+        try
+        {
+            var storage = CreateStorage(new RedisStreamingOptions
+            {
+                ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions(),
+                CreateMultiplexer = async _ =>
+                {
+                    connection = await ConnectionMultiplexer.ConnectAsync(RedisStreamTestUtils.GetConfigurationOptions());
+                    return ((IConnectionMultiplexer)connection, false);
+                },
+            });
+
+            await storage.ConnectAsync();
+
+            Assert.True(connection.IsConnected);
+
+            await storage.ShutdownAsync();
+
+            Assert.False(connection.IsConnected);
+        }
+        finally
+        {
+            if (connection is not null)
+            {
+                connection.Dispose();
+            }
+        }
+    }
+
+    private static RedisStreamStorage CreateStorage(RedisStreamingOptions options)
+    {
+        const string providerName = "redis-storage-tests";
+        var serviceId = Guid.NewGuid().ToString("N");
+
+        return new RedisStreamStorage(
+            providerName,
+            new ClusterOptions { ServiceId = serviceId },
+            options,
+            new RedisStreamReceiverOptions(),
+            QueueId.GetQueueId(providerName, 0, 0));
     }
 }

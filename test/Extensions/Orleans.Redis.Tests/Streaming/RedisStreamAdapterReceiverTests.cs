@@ -30,7 +30,7 @@ public sealed class RedisStreamAdapterReceiverTests
         var redisOptions = new RedisStreamingOptions
         {
             ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions(),
-            CreateMultiplexer = _ => Task.FromResult<IConnectionMultiplexer>(connection),
+            CreateMultiplexer = _ => Task.FromResult((Multiplexer: (IConnectionMultiplexer)connection, IsShared: true)),
             EntryExpiry = TimeSpan.FromHours(1),
             CheckpointPersistInterval = TimeSpan.Zero,
             UseApproximateMaxLength = false,

@@ -15,6 +15,8 @@ internal sealed class RedisStreamStorage
     private readonly RedisStreamReceiverOptions _receiverOptions;
     private readonly RedisKey _key;
     private readonly RedisKey _checkpointKey;
+    private IConnectionMultiplexer? _multiplexer;
+    private bool _isSharedMultiplexer;
     private IDatabase? _db;
     private RedisStreamCheckpointer? _checkpointer;
     private string? _readOffset;
@@ -43,14 +45,33 @@ internal sealed class RedisStreamStorage
         {
             if (_db is null)
             {
-                _db = (await _redisOptions.CreateMultiplexer.Invoke(_redisOptions)).GetDatabase();
-                _checkpointer = new RedisStreamCheckpointer(
-                    _db,
-                    _checkpointKey,
-                    _redisOptions.CheckpointPersistInterval,
-                    _redisOptions.EntryExpiry);
-                await _checkpointer.LoadAsync();
-                _readOffset = _checkpointer.Offset;
+                var (multiplexer, isSharedMultiplexer) = await _redisOptions.CreateMultiplexer.Invoke(_redisOptions);
+
+                try
+                {
+                    var database = multiplexer.GetDatabase();
+                    var checkpointer = new RedisStreamCheckpointer(
+                        database,
+                        _checkpointKey,
+                        _redisOptions.CheckpointPersistInterval,
+                        _redisOptions.EntryExpiry);
+                    await checkpointer.LoadAsync();
+
+                    _multiplexer = multiplexer;
+                    _isSharedMultiplexer = isSharedMultiplexer;
+                    _db = database;
+                    _checkpointer = checkpointer;
+                    _readOffset = checkpointer.Offset;
+                }
+                catch
+                {
+                    if (!isSharedMultiplexer)
+                    {
+                        await DisposeMultiplexerAsync(multiplexer);
+                    }
+
+                    throw;
+                }
             }
         }
         catch (Exception ex)
@@ -112,9 +133,24 @@ internal sealed class RedisStreamStorage
 
     public async Task ShutdownAsync()
     {
-        if (_checkpointer is { } checkpointer)
+        var checkpointer = _checkpointer;
+        var multiplexer = _multiplexer;
+        var isSharedMultiplexer = _isSharedMultiplexer;
+
+        _checkpointer = null;
+        _readOffset = null;
+        _db = null;
+        _multiplexer = null;
+        _isSharedMultiplexer = false;
+
+        if (checkpointer is not null)
         {
             await checkpointer.FlushAsync();
+        }
+
+        if (multiplexer is not null && !isSharedMultiplexer)
+        {
+            await DisposeMultiplexerAsync(multiplexer);
         }
     }
 
@@ -155,5 +191,17 @@ internal sealed class RedisStreamStorage
         }
 
         return Invariant($"{sequenceNumber}-{redisSequenceNumber}");
+    }
+
+    private static async Task DisposeMultiplexerAsync(IConnectionMultiplexer multiplexer)
+    {
+        try
+        {
+            await multiplexer.CloseAsync();
+        }
+        finally
+        {
+            multiplexer.Dispose();
+        }
     }
 }

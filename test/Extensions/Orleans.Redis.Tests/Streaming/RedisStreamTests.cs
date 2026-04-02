@@ -109,10 +109,13 @@ public sealed class RedisStreamTests : TestClusterPerTest
         public void Configure(ISiloBuilder hostBuilder)
         {
             hostBuilder
-                .AddRedisStreams(StreamProviderName, options =>
+                .AddRedisStreams(StreamProviderName, builder =>
                 {
-                    options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
-                    options.EntryExpiry = TimeSpan.FromHours(1);
+                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    {
+                        options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
+                        options.EntryExpiry = TimeSpan.FromHours(1);
+                    }));
                 })
                 .AddMemoryGrainStorage("MemoryStore")
                 .AddMemoryGrainStorage("PubSubStore");
@@ -123,7 +126,9 @@ public sealed class RedisStreamTests : TestClusterPerTest
     {
         public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
         {
-            clientBuilder.AddRedisStreams(StreamProviderName, options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions());
+            clientBuilder.AddRedisStreams(
+                StreamProviderName,
+                builder => builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions())));
         }
     }
 }
