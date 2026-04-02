@@ -8,7 +8,7 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Persistence;
 
 /// <summary>
-/// PersistenceGrainTests using AzureStore with pooled read buffers enabled.
+/// PersistenceGrainTests using AzureStore with a non-streaming serializer, which exercises pooled read buffers.
 /// </summary>
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
 public class PersistenceGrainTests_AzureBlobStore_PooledReads : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureBlobStore_PooledReads.Fixture>
@@ -25,7 +25,6 @@ public class PersistenceGrainTests_AzureBlobStore_PooledReads : Base_Persistence
                         optionsBuilder.Configure(options =>
                         {
                             options.ConfigureTestDefaults();
-                            options.UsePooledBufferForReads = true;
                         });
                         optionsBuilder.Configure<IGrainStorageSerializer>((options, serializer) =>
                         {

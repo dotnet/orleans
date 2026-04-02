@@ -51,8 +51,8 @@ public class AzureBlobReadStateStreamingBenchmark
         _binaryGrainId = GrainId.Create("bench-grain", Guid.NewGuid().ToString("N"));
         _streamGrainId = GrainId.Create("bench-grain", Guid.NewGuid().ToString("N"));
 
-        var binaryOptions = CreateOptions(client, new NonStreamingGrainStorageSerializer(serializer), containerName, usePooledReads: false);
-        var streamOptions = CreateOptions(client, serializer, containerName, usePooledReads: true);
+        var binaryOptions = CreateOptions(client, new NonStreamingGrainStorageSerializer(serializer), containerName);
+        var streamOptions = CreateOptions(client, serializer, containerName);
 
         (_binaryStorage, var binaryFactory) = CreateStorage("bench-binary", binaryOptions, activatorProvider);
         (_streamStorage, var streamFactory) = CreateStorage("bench-stream", streamOptions, activatorProvider);
@@ -129,15 +129,13 @@ public class AzureBlobReadStateStreamingBenchmark
     private static AzureBlobStorageOptions CreateOptions(
         BlobServiceClient client,
         IGrainStorageSerializer serializer,
-        string containerName,
-        bool usePooledReads)
+        string containerName)
     {
         return new AzureBlobStorageOptions
         {
             BlobServiceClient = client,
             ContainerName = containerName,
             GrainStorageSerializer = serializer,
-            UsePooledBufferForReads = usePooledReads
         };
     }
 

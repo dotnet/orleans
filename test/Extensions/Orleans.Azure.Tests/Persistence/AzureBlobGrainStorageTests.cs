@@ -49,30 +49,18 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
     [SkippableFact, TestCategory("Functional")]
     public async Task AzureBlobStorage_ReadState_StreamDeserializationFailure_DoesNotMutateGrainState()
     {
-        await AssertFailedReadDoesNotMutateStateAsync(
-            new ThrowingStreamDeserializeSerializer(CreateSetupSerializer()),
-            usePooledBufferForReads: true);
+        await AssertFailedReadDoesNotMutateStateAsync(new ThrowingStreamDeserializeSerializer(CreateSetupSerializer()));
     }
 
     [SkippableFact, TestCategory("Functional")]
     public async Task AzureBlobStorage_ReadState_PooledBinaryDeserializationFailure_DoesNotMutateGrainState()
     {
-        await AssertFailedReadDoesNotMutateStateAsync(
-            new ThrowingBinaryDeserializeSerializer(CreateSetupSerializer()),
-            usePooledBufferForReads: true);
+        await AssertFailedReadDoesNotMutateStateAsync(new ThrowingBinaryDeserializeSerializer(CreateSetupSerializer()));
     }
 
-    [SkippableFact, TestCategory("Functional")]
-    public async Task AzureBlobStorage_ReadState_BinaryDeserializationFailure_DoesNotMutateGrainState()
+    private async Task AssertFailedReadDoesNotMutateStateAsync(IGrainStorageSerializer serializer)
     {
-        await AssertFailedReadDoesNotMutateStateAsync(
-            new ThrowingBinaryDeserializeSerializer(CreateSetupSerializer()),
-            usePooledBufferForReads: false);
-    }
-
-    private async Task AssertFailedReadDoesNotMutateStateAsync(IGrainStorageSerializer serializer, bool usePooledBufferForReads)
-    {
-        var storage = await CreateStorageAsync(serializer, usePooledBufferForReads);
+        var storage = await CreateStorageAsync(serializer);
         var blob = _container.GetBlobClient(GetBlobName());
         await blob.UploadAsync(CreateSetupSerializer().Serialize(new TestState { Value = 7 }), overwrite: true);
 
@@ -94,13 +82,12 @@ public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncD
         Assert.Equal(123, grainState.State.Value);
     }
 
-    private async Task<AzureBlobGrainStorage> CreateStorageAsync(IGrainStorageSerializer serializer, bool usePooledBufferForReads)
+    private async Task<AzureBlobGrainStorage> CreateStorageAsync(IGrainStorageSerializer serializer)
     {
         var options = new AzureBlobStorageOptions
         {
             ContainerName = _containerName,
             GrainStorageSerializer = serializer,
-            UsePooledBufferForReads = usePooledBufferForReads,
         }.ConfigureTestDefaults();
 
         var activatorProvider = _services.GetRequiredService<IActivatorProvider>();

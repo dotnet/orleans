@@ -60,8 +60,7 @@ namespace Orleans.Storage
                 T? loadedState = this.grainStorageSerializer switch
                 {
                     IGrainStorageStreamingSerializer serializer => await ReadStateWithStreamAsync(serializer, blob, grainType, grainId, grainState, blobName, container.Name),
-                    null when options.UsePooledBufferForReads => await ReadStateWithPooledBufferAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
-                    _ => await ReadStateWithBinaryDataAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
+                    _ => await ReadStateWithPooledBufferAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
                 };
 
                 grainState.State = loadedState ?? CreateInstance<T>();
@@ -108,8 +107,7 @@ namespace Orleans.Storage
 
                 var blob = container.GetBlobClient(blobName);
 
-                if (options.WriteMode is AzureBlobStorageWriteMode.BufferedStream
-                    && this.grainStorageSerializer is IGrainStorageStreamingSerializer serializer)
+                if (this.grainStorageSerializer is IGrainStorageStreamingSerializer serializer)
                 {
                     await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, "application/octet-stream", blob);
                 }
@@ -276,25 +274,6 @@ namespace Orleans.Storage
 
             await using var content = response.Value.Content;
             var loadedState = await serializer.DeserializeAsync<T>(content).ConfigureAwait(false);
-            LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
-            grainState.ETag = eTag;
-            return loadedState;
-        }
-
-        private async Task<T?> ReadStateWithBinaryDataAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
-        {
-            var response = await blob.DownloadContentAsync();
-            var eTag = response.Value.Details.ETag.ToString();
-            var contents = response.Value.Content;
-
-            if (contents is null || contents.IsEmpty)
-            {
-                LogTraceBlobEmptyReading(grainType, grainId, eTag, blobName, containerName);
-                grainState.ETag = eTag;
-                return default;
-            }
-
-            var loadedState = this.ConvertFromStorageFormat<T>(contents);
             LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
             grainState.ETag = eTag;
             return loadedState;

@@ -262,7 +262,7 @@ internal class Program
         },
         ["GrainStorage.AzureBlob.ReadState"] = _ =>
         {
-            BenchmarkRunner.Run<AzureBlobReadStateBenchmark>();
+            BenchmarkRunner.Run<AzureBlobReadStateStreamingBenchmark>();
         },
         ["GrainStorage.AzureBlob.ReadState.Streaming"] = _ =>
         {
