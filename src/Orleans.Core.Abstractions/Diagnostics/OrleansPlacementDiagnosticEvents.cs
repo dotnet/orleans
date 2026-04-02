@@ -56,12 +56,22 @@ public static class OrleansPlacementDiagnostics
 /// <param name="RecentlyUsedActivationCount">The number of recently used grain activations.</param>
 /// <param name="IsOverloaded">Whether the silo is currently overloaded.</param>
 /// <param name="Timestamp">The timestamp when these statistics were collected.</param>
-public record SiloStatisticsPublishedEvent(
+/// <param name="Statistics">The statistics instance.</param>
+public class SiloStatisticsPublishedEvent(
     SiloAddress SiloAddress,
     int ActivationCount,
     int RecentlyUsedActivationCount,
     bool IsOverloaded,
-    DateTime Timestamp);
+    DateTime Timestamp,
+    object Statistics)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public int ActivationCount { get; } = ActivationCount;
+    public int RecentlyUsedActivationCount { get; } = RecentlyUsedActivationCount;
+    public bool IsOverloaded { get; } = IsOverloaded;
+    public DateTime Timestamp { get; } = Timestamp;
+    public object Statistics { get; } = Statistics;
+}
 
 /// <summary>
 /// Event payload for when a silo receives runtime statistics from another silo.
@@ -72,13 +82,24 @@ public record SiloStatisticsPublishedEvent(
 /// <param name="RecentlyUsedActivationCount">The number of recently used grain activations.</param>
 /// <param name="IsOverloaded">Whether the sending silo is currently overloaded.</param>
 /// <param name="Timestamp">The timestamp when these statistics were collected.</param>
-public record SiloStatisticsReceivedEvent(
+/// <param name="Statistics">The statistics instance.</param>
+public class SiloStatisticsReceivedEvent(
     SiloAddress FromSilo,
     SiloAddress ReceiverSilo,
     int ActivationCount,
     int RecentlyUsedActivationCount,
     bool IsOverloaded,
-    DateTime Timestamp);
+    DateTime Timestamp,
+    object Statistics)
+{
+    public SiloAddress FromSilo { get; } = FromSilo;
+    public SiloAddress ReceiverSilo { get; } = ReceiverSilo;
+    public int ActivationCount { get; } = ActivationCount;
+    public int RecentlyUsedActivationCount { get; } = RecentlyUsedActivationCount;
+    public bool IsOverloaded { get; } = IsOverloaded;
+    public DateTime Timestamp { get; } = Timestamp;
+    public object Statistics { get; } = Statistics;
+}
 
 /// <summary>
 /// Event payload for when a silo completes refreshing statistics from all cluster members.
@@ -86,10 +107,18 @@ public record SiloStatisticsReceivedEvent(
 /// <param name="SiloAddress">The address of the silo that completed the refresh.</param>
 /// <param name="SiloCount">The number of silos in the cluster.</param>
 /// <param name="TotalActivationCount">The total number of activations across all silos.</param>
-public record ClusterStatisticsRefreshedEvent(
+/// <param name="Statistics">The current cached statistics.</param>
+public class ClusterStatisticsRefreshedEvent(
     SiloAddress SiloAddress,
     int SiloCount,
-    int TotalActivationCount);
+    int TotalActivationCount,
+    object Statistics)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public int SiloCount { get; } = SiloCount;
+    public int TotalActivationCount { get; } = TotalActivationCount;
+    public object Statistics { get; } = Statistics;
+}
 
 /// <summary>
 /// Event payload for when a silo's statistics are removed from the cache.
@@ -97,7 +126,12 @@ public record ClusterStatisticsRefreshedEvent(
 /// <param name="RemovedSilo">The address of the silo whose statistics were removed.</param>
 /// <param name="ObserverSilo">The address of the silo that removed the statistics.</param>
 /// <param name="Reason">The reason for removal.</param>
-public record SiloStatisticsRemovedEvent(
+public class SiloStatisticsRemovedEvent(
     SiloAddress RemovedSilo,
     SiloAddress ObserverSilo,
-    string Reason);
+    string Reason)
+{
+    public SiloAddress RemovedSilo { get; } = RemovedSilo;
+    public SiloAddress ObserverSilo { get; } = ObserverSilo;
+    public string Reason { get; } = Reason;
+}

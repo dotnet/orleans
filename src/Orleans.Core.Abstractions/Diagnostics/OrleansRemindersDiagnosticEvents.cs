@@ -63,12 +63,22 @@ public static class OrleansRemindersDiagnostics
 /// <param name="DueTime">The time until the first tick.</param>
 /// <param name="Period">The period between ticks.</param>
 /// <param name="SiloAddress">The address of the silo handling this reminder.</param>
-public record ReminderRegisteredEvent(
+/// <param name="Reminder">The reminder instance.</param>
+public class ReminderRegisteredEvent(
     GrainId GrainId,
     string ReminderName,
     TimeSpan DueTime,
     TimeSpan Period,
-    SiloAddress? SiloAddress);
+    SiloAddress? SiloAddress,
+    object Reminder)
+{
+    public GrainId GrainId { get; } = GrainId;
+    public string ReminderName { get; } = ReminderName;
+    public TimeSpan DueTime { get; } = DueTime;
+    public TimeSpan Period { get; } = Period;
+    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public object Reminder { get; } = Reminder;
+}
 
 /// <summary>
 /// Event payload for when a reminder is unregistered.
@@ -76,10 +86,18 @@ public record ReminderRegisteredEvent(
 /// <param name="GrainId">The grain ID that the reminder was registered for.</param>
 /// <param name="ReminderName">The name of the reminder.</param>
 /// <param name="SiloAddress">The address of the silo that was handling this reminder.</param>
-public record ReminderUnregisteredEvent(
+/// <param name="Reminder">The reminder instance.</param>
+public class ReminderUnregisteredEvent(
     GrainId GrainId,
     string ReminderName,
-    SiloAddress? SiloAddress);
+    SiloAddress? SiloAddress,
+    object Reminder)
+{
+    public GrainId GrainId { get; } = GrainId;
+    public string ReminderName { get; } = ReminderName;
+    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public object Reminder { get; } = Reminder;
+}
 
 /// <summary>
 /// Event payload for when a reminder tick is about to fire.
@@ -88,11 +106,20 @@ public record ReminderUnregisteredEvent(
 /// <param name="ReminderName">The name of the reminder.</param>
 /// <param name="TickTime">The time at which the tick was triggered.</param>
 /// <param name="SiloAddress">The address of the silo handling this reminder.</param>
-public record ReminderTickFiringEvent(
+/// <param name="Reminder">The reminder target grain reference.</param>
+public class ReminderTickFiringEvent(
     GrainId GrainId,
     string ReminderName,
     DateTime TickTime,
-    SiloAddress? SiloAddress);
+    SiloAddress? SiloAddress,
+    object Reminder)
+{
+    public GrainId GrainId { get; } = GrainId;
+    public string ReminderName { get; } = ReminderName;
+    public DateTime TickTime { get; } = TickTime;
+    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public object Reminder { get; } = Reminder;
+}
 
 /// <summary>
 /// Event payload for when a reminder tick has completed successfully.
@@ -101,11 +128,20 @@ public record ReminderTickFiringEvent(
 /// <param name="ReminderName">The name of the reminder.</param>
 /// <param name="Elapsed">The time taken to complete the tick.</param>
 /// <param name="SiloAddress">The address of the silo handling this reminder.</param>
-public record ReminderTickCompletedEvent(
+/// <param name="Reminder">The reminder target grain reference.</param>
+public class ReminderTickCompletedEvent(
     GrainId GrainId,
     string ReminderName,
     TimeSpan Elapsed,
-    SiloAddress? SiloAddress);
+    SiloAddress? SiloAddress,
+    object Reminder)
+{
+    public GrainId GrainId { get; } = GrainId;
+    public string ReminderName { get; } = ReminderName;
+    public TimeSpan Elapsed { get; } = Elapsed;
+    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public object Reminder { get; } = Reminder;
+}
 
 /// <summary>
 /// Event payload for when a reminder tick has failed.
@@ -115,110 +151,125 @@ public record ReminderTickCompletedEvent(
 /// <param name="Exception">The exception that caused the failure.</param>
 /// <param name="Elapsed">The time elapsed before the failure.</param>
 /// <param name="SiloAddress">The address of the silo handling this reminder.</param>
-public record ReminderTickFailedEvent(
+/// <param name="Reminder">The reminder target grain reference.</param>
+public class ReminderTickFailedEvent(
     GrainId GrainId,
     string ReminderName,
     Exception Exception,
     TimeSpan Elapsed,
-    SiloAddress? SiloAddress);
+    SiloAddress? SiloAddress,
+    object Reminder)
+{
+    public GrainId GrainId { get; } = GrainId;
+    public string ReminderName { get; } = ReminderName;
+    public Exception Exception { get; } = Exception;
+    public TimeSpan Elapsed { get; } = Elapsed;
+    public SiloAddress? SiloAddress { get; } = SiloAddress;
+    public object Reminder { get; } = Reminder;
+}
 
 internal static class OrleansRemindersDiagnosticListener
 {
     private static readonly DiagnosticListener Listener = new(OrleansRemindersDiagnostics.ListenerName);
 
-    internal static void EmitRegistered(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period, SiloAddress? siloAddress)
+    internal static void EmitRegistered(GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period, SiloAddress? siloAddress, object reminder)
     {
         if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.Registered))
         {
             return;
         }
 
-        Emit(Listener, grainId, reminderName, dueTime, period, siloAddress);
+        Emit(Listener, grainId, reminderName, dueTime, period, siloAddress, reminder);
 
-        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period, SiloAddress? siloAddress)
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, TimeSpan dueTime, TimeSpan period, SiloAddress? siloAddress, object reminder)
         {
             listener.Write(OrleansRemindersDiagnostics.EventNames.Registered, new ReminderRegisteredEvent(
                 grainId,
                 reminderName,
                 dueTime,
                 period,
-                siloAddress));
+                siloAddress,
+                reminder));
         }
     }
 
-    internal static void EmitUnregistered(GrainId grainId, string reminderName, SiloAddress? siloAddress)
+    internal static void EmitUnregistered(GrainId grainId, string reminderName, SiloAddress? siloAddress, object reminder)
     {
         if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.Unregistered))
         {
             return;
         }
 
-        Emit(Listener, grainId, reminderName, siloAddress);
+        Emit(Listener, grainId, reminderName, siloAddress, reminder);
 
-        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, SiloAddress? siloAddress)
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, SiloAddress? siloAddress, object reminder)
         {
             listener.Write(OrleansRemindersDiagnostics.EventNames.Unregistered, new ReminderUnregisteredEvent(
                 grainId,
                 reminderName,
-                siloAddress));
+                siloAddress,
+                reminder));
         }
     }
 
-    internal static void EmitTickCompleted(GrainId grainId, string reminderName, TimeSpan elapsed, SiloAddress? siloAddress)
+    internal static void EmitTickCompleted(GrainId grainId, string reminderName, TimeSpan elapsed, SiloAddress? siloAddress, object reminder)
     {
         if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.TickCompleted))
         {
             return;
         }
 
-        Emit(Listener, grainId, reminderName, elapsed, siloAddress);
+        Emit(Listener, grainId, reminderName, elapsed, siloAddress, reminder);
 
-        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, TimeSpan elapsed, SiloAddress? siloAddress)
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, TimeSpan elapsed, SiloAddress? siloAddress, object reminder)
         {
             listener.Write(OrleansRemindersDiagnostics.EventNames.TickCompleted, new ReminderTickCompletedEvent(
                 grainId,
                 reminderName,
                 elapsed,
-                siloAddress));
+                siloAddress,
+                reminder));
         }
     }
 
-    internal static void EmitTickFailed(GrainId grainId, string reminderName, Exception exception, TimeSpan elapsed, SiloAddress? siloAddress)
+    internal static void EmitTickFailed(GrainId grainId, string reminderName, Exception exception, TimeSpan elapsed, SiloAddress? siloAddress, object reminder)
     {
         if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.TickFailed))
         {
             return;
         }
 
-        Emit(Listener, grainId, reminderName, exception, elapsed, siloAddress);
+        Emit(Listener, grainId, reminderName, exception, elapsed, siloAddress, reminder);
 
-        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, Exception exception, TimeSpan elapsed, SiloAddress? siloAddress)
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, Exception exception, TimeSpan elapsed, SiloAddress? siloAddress, object reminder)
         {
             listener.Write(OrleansRemindersDiagnostics.EventNames.TickFailed, new ReminderTickFailedEvent(
                 grainId,
                 reminderName,
                 exception,
                 elapsed,
-                siloAddress));
+                siloAddress,
+                reminder));
         }
     }
 
-    internal static void EmitTickFiring(GrainId grainId, string reminderName, DateTime tickTime, SiloAddress? siloAddress)
+    internal static void EmitTickFiring(GrainId grainId, string reminderName, DateTime tickTime, SiloAddress? siloAddress, object reminder)
     {
         if (!Listener.IsEnabled(OrleansRemindersDiagnostics.EventNames.TickFiring))
         {
             return;
         }
 
-        Emit(Listener, grainId, reminderName, tickTime, siloAddress);
+        Emit(Listener, grainId, reminderName, tickTime, siloAddress, reminder);
 
-        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, DateTime tickTime, SiloAddress? siloAddress)
+        static void Emit(DiagnosticListener listener, GrainId grainId, string reminderName, DateTime tickTime, SiloAddress? siloAddress, object reminder)
         {
             listener.Write(OrleansRemindersDiagnostics.EventNames.TickFiring, new ReminderTickFiringEvent(
                 grainId,
                 reminderName,
                 tickTime,
-                siloAddress));
+                siloAddress,
+                reminder));
         }
     }
 }

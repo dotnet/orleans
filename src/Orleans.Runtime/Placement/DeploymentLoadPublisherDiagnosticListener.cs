@@ -24,7 +24,8 @@ internal static class DeploymentLoadPublisherDiagnosticListener
             listener.Write(OrleansPlacementDiagnostics.EventNames.ClusterStatisticsRefreshed, new ClusterStatisticsRefreshedEvent(
                 siloAddress,
                 periodicStats.Count,
-                periodicStats.Values.Sum(statistics => statistics.ActivationCount)));
+                periodicStats.Values.Sum(statistics => statistics.ActivationCount),
+                periodicStats));
         }
     }
 
@@ -44,7 +45,8 @@ internal static class DeploymentLoadPublisherDiagnosticListener
                 statistics.ActivationCount,
                 statistics.RecentlyUsedActivationCount,
                 loadSheddingEnabled && statistics.IsOverloaded,
-                DateTime.UtcNow));
+                DateTime.UtcNow,
+                statistics));
         }
     }
 
@@ -66,7 +68,8 @@ internal static class DeploymentLoadPublisherDiagnosticListener
                 statistics.ActivationCount,
                 statistics.RecentlyUsedActivationCount,
                 statistics.IsOverloaded,
-                DateTime.UtcNow));
+                DateTime.UtcNow,
+                statistics));
         }
     }
 

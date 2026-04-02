@@ -125,6 +125,11 @@ internal sealed partial class ActivationData :
                 var instance = grainActivator.CreateInstance(this);
                 SetGrainInstance(instance);
                 _activationActivity?.AddEvent(new ActivityEvent("instance-created"));
+
+                if (TryGetGrainTypeName() is { } grainTypeName)
+                {
+                    OrleansGrainDiagnosticListener.EmitCreated(this, grainTypeName, Address.SiloAddress);
+                }
             }
             catch (Exception exception)
             {
@@ -625,6 +630,11 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
                 {
+                    if (TryGetGrainTypeName() is { } grainTypeName)
+                    {
+                        OrleansGrainDiagnosticListener.EmitDeactivating(this, grainTypeName, Address.SiloAddress, DeactivationReason);
+                    }
+
                     CancelPendingOperations();
 
                     _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
@@ -831,12 +841,17 @@ internal sealed partial class ActivationData :
     private string GetActivationInfoString()
     {
         var placement = PlacementStrategy?.GetType().Name;
-        var grainTypeName = _shared.GrainTypeName ?? GrainInstance switch
+        var grainTypeName = TryGetGrainTypeName();
+        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
+    }
+
+    private string? TryGetGrainTypeName()
+    {
+        return _shared.GrainTypeName ?? GrainInstance switch
         {
             { } grainInstance => RuntimeTypeNameFormatter.Format(grainInstance.GetType()),
             _ => null
         };
-        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
     }
 
     public void Dispose() => DisposeAsync().AsTask().Wait();
@@ -1724,6 +1739,7 @@ internal sealed partial class ActivationData :
                 SetState(ActivationState.Activating);
             }
             _activationActivity?.AddEvent(new ActivityEvent("state-activating"));
+            var activationStopwatch = ValueStopwatch.StartNew();
 
             LogActivatingGrain(_shared.Logger, this);
 
@@ -1813,6 +1829,11 @@ internal sealed partial class ActivationData :
                 _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
                 _activationActivity?.Dispose();
                 _activationActivity = null;
+
+                if (TryGetGrainTypeName() is { } grainTypeName)
+                {
+                    OrleansGrainDiagnosticListener.EmitActivated(this, grainTypeName, Address.SiloAddress, activationStopwatch.Elapsed);
+                }
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
             }
@@ -2006,6 +2027,11 @@ internal sealed partial class ActivationData :
         {
             SetActivityError(deactivateCommand.Activity, exception, "Error in FinishDeactivating");
             LogExceptionDisposing(_shared.Logger, exception, this);
+        }
+
+        if (TryGetGrainTypeName() is { } grainTypeName && DeactivationStartTime is { } deactivationStartTime)
+        {
+            OrleansGrainDiagnosticListener.EmitDeactivated(this, grainTypeName, Address.SiloAddress, GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime - deactivationStartTime);
         }
 
         // Signal deactivation

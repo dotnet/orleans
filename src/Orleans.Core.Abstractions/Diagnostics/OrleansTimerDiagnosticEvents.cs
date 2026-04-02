@@ -54,9 +54,16 @@ public static class OrleansTimerDiagnostics
 /// </summary>
 /// <param name="GrainContext">The grain context that owns the timer.</param>
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
-public record GrainTimerTickStartEvent(
+/// <param name="Timer">The timer instance.</param>
+public class GrainTimerTickStartEvent(
     IGrainContext GrainContext,
-    string? TimerName);
+    string? TimerName,
+    IGrainTimer Timer)
+{
+    public IGrainContext GrainContext { get; } = GrainContext;
+    public string? TimerName { get; } = TimerName;
+    public IGrainTimer Timer { get; } = Timer;
+}
 
 /// <summary>
 /// Event payload for when a grain timer tick callback has completed.
@@ -65,11 +72,20 @@ public record GrainTimerTickStartEvent(
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
 /// <param name="Elapsed">The time taken to execute the callback.</param>
 /// <param name="Exception">The exception thrown by the callback, if any.</param>
-public record GrainTimerTickStopEvent(
+/// <param name="Timer">The timer instance.</param>
+public class GrainTimerTickStopEvent(
     IGrainContext GrainContext,
     string? TimerName,
     TimeSpan Elapsed,
-    Exception? Exception);
+    Exception? Exception,
+    IGrainTimer Timer)
+{
+    public IGrainContext GrainContext { get; } = GrainContext;
+    public string? TimerName { get; } = TimerName;
+    public TimeSpan Elapsed { get; } = Elapsed;
+    public Exception? Exception { get; } = Exception;
+    public IGrainTimer Timer { get; } = Timer;
+}
 
 /// <summary>
 /// Event payload for when a grain timer is created.
@@ -78,96 +94,116 @@ public record GrainTimerTickStopEvent(
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
 /// <param name="DueTime">The initial due time of the timer.</param>
 /// <param name="Period">The period of the timer.</param>
-public record GrainTimerCreatedEvent(
+/// <param name="Timer">The timer instance.</param>
+public class GrainTimerCreatedEvent(
     IGrainContext GrainContext,
     string? TimerName,
     TimeSpan DueTime,
-    TimeSpan Period);
+    TimeSpan Period,
+    IGrainTimer Timer)
+{
+    public IGrainContext GrainContext { get; } = GrainContext;
+    public string? TimerName { get; } = TimerName;
+    public TimeSpan DueTime { get; } = DueTime;
+    public TimeSpan Period { get; } = Period;
+    public IGrainTimer Timer { get; } = Timer;
+}
 
 /// <summary>
 /// Event payload for when a grain timer is disposed.
 /// </summary>
 /// <param name="GrainContext">The grain context that owns the timer.</param>
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
-public record GrainTimerDisposedEvent(
+/// <param name="Timer">The timer instance.</param>
+public class GrainTimerDisposedEvent(
     IGrainContext GrainContext,
-    string? TimerName);
+    string? TimerName,
+    IGrainTimer Timer)
+{
+    public IGrainContext GrainContext { get; } = GrainContext;
+    public string? TimerName { get; } = TimerName;
+    public IGrainTimer Timer { get; } = Timer;
+}
 
 internal static class OrleansTimerDiagnosticListener
 {
     private static readonly DiagnosticListener Listener = new(OrleansTimerDiagnostics.ListenerName);
 
-    internal static void EmitCreated(IGrainContext grainContext, string? timerName, TimeSpan dueTime, TimeSpan period)
+    internal static void EmitCreated(IGrainContext grainContext, string? timerName, TimeSpan dueTime, TimeSpan period, IGrainTimer timer)
     {
         if (!Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.Created))
         {
             return;
         }
 
-        Emit(Listener, grainContext, timerName, dueTime, period);
+        Emit(Listener, grainContext, timerName, dueTime, period, timer);
 
-        static void Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName, TimeSpan dueTime, TimeSpan period)
+        static void Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName, TimeSpan dueTime, TimeSpan period, IGrainTimer timer)
         {
             listener.Write(OrleansTimerDiagnostics.EventNames.Created, new GrainTimerCreatedEvent(
                 grainContext,
                 timerName,
                 dueTime,
-                period));
+                period,
+                timer));
         }
     }
 
-    internal static void EmitDisposed(IGrainContext grainContext, string? timerName)
+    internal static void EmitDisposed(IGrainContext grainContext, string? timerName, IGrainTimer timer)
     {
         if (!Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.Disposed))
         {
             return;
         }
 
-        Emit(Listener, grainContext, timerName);
+        Emit(Listener, grainContext, timerName, timer);
 
-        static void Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName)
+        static void Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName, IGrainTimer timer)
         {
             listener.Write(OrleansTimerDiagnostics.EventNames.Disposed, new GrainTimerDisposedEvent(
                 grainContext,
-                timerName));
+                timerName,
+                timer));
         }
     }
 
-    internal static GrainTimerTickDiagnosticsContext EmitTickStart(IGrainContext grainContext, string? timerName)
+    internal static GrainTimerTickDiagnosticsContext EmitTickStart(IGrainContext grainContext, string? timerName, IGrainTimer timer)
     {
         if (!Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.TickStart))
         {
             return default;
         }
 
-        return Emit(Listener, grainContext, timerName);
+        return Emit(Listener, grainContext, timerName, timer);
 
-        static GrainTimerTickDiagnosticsContext Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName)
+        static GrainTimerTickDiagnosticsContext Emit(DiagnosticListener listener, IGrainContext grainContext, string? timerName, IGrainTimer timer)
         {
             listener.Write(OrleansTimerDiagnostics.EventNames.TickStart, new GrainTimerTickStartEvent(
                 grainContext,
-                timerName));
+                timerName,
+                timer));
 
             return new(true, Stopwatch.GetTimestamp());
         }
     }
 
-    internal static void EmitTickStop(GrainTimerTickDiagnosticsContext diagnostics, IGrainContext grainContext, string? timerName, Exception? exception = null)
+    internal static void EmitTickStop(GrainTimerTickDiagnosticsContext diagnostics, IGrainContext grainContext, string? timerName, IGrainTimer timer, Exception? exception = null)
     {
         if (!diagnostics.EmitStopDiagnostics)
         {
             return;
         }
 
-        Emit(Listener, diagnostics.StartTimestamp, grainContext, timerName, exception);
+        Emit(Listener, diagnostics.StartTimestamp, grainContext, timerName, timer, exception);
 
-        static void Emit(DiagnosticListener listener, long startTimestamp, IGrainContext grainContext, string? timerName, Exception? exception)
+        static void Emit(DiagnosticListener listener, long startTimestamp, IGrainContext grainContext, string? timerName, IGrainTimer timer, Exception? exception)
         {
             listener.Write(OrleansTimerDiagnostics.EventNames.TickStop, new GrainTimerTickStopEvent(
                 grainContext,
                 timerName,
                 Stopwatch.GetElapsedTime(startTimestamp),
-                exception));
+                exception,
+                timer));
         }
     }
 }

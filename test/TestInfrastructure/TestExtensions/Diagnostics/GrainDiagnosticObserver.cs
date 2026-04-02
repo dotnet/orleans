@@ -380,6 +380,14 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<DiagnosticL
 public static class GrainDiagnosticExtensions
 {
     /// <summary>
+    /// Waits for a grain to be created.
+    /// </summary>
+    public static Task<GrainCreatedEvent> WaitForCreatedAsync(this GrainDiagnosticObserver observer, IAddressable grain, TimeSpan? timeout = null)
+    {
+        return observer.WaitForGrainCreatedAsync(grain.GetGrainId(), timeout);
+    }
+
+    /// <summary>
     /// Waits for a grain to be deactivated.
     /// </summary>
     public static Task<GrainDeactivatedEvent> WaitForDeactivatedAsync(this GrainDiagnosticObserver observer, IAddressable grain, TimeSpan? timeout = null)

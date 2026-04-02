@@ -67,11 +67,17 @@ public static class OrleansMembershipDiagnostics
 /// <param name="OldStatus">The previous status of the silo.</param>
 /// <param name="NewStatus">The new status of the silo.</param>
 /// <param name="ObserverSiloAddress">The address of the silo that observed this change.</param>
-public record SiloStatusChangedEvent(
+public class SiloStatusChangedEvent(
     SiloAddress SiloAddress,
     string OldStatus,
     string NewStatus,
-    SiloAddress? ObserverSiloAddress);
+    SiloAddress? ObserverSiloAddress)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public string OldStatus { get; } = OldStatus;
+    public string NewStatus { get; } = NewStatus;
+    public SiloAddress? ObserverSiloAddress { get; } = ObserverSiloAddress;
+}
 
 /// <summary>
 /// Event payload for when the membership view changes.
@@ -80,11 +86,17 @@ public record SiloStatusChangedEvent(
 /// <param name="ActiveSiloCount">The number of active silos in the new view.</param>
 /// <param name="TotalSiloCount">The total number of silos in the membership table.</param>
 /// <param name="ObserverSiloAddress">The address of the silo that observed this change.</param>
-public record MembershipViewChangedEvent(
+public class MembershipViewChangedEvent(
     MembershipVersion Version,
     int ActiveSiloCount,
     int TotalSiloCount,
-    SiloAddress? ObserverSiloAddress);
+    SiloAddress? ObserverSiloAddress)
+{
+    public MembershipVersion Version { get; } = Version;
+    public int ActiveSiloCount { get; } = ActiveSiloCount;
+    public int TotalSiloCount { get; } = TotalSiloCount;
+    public SiloAddress? ObserverSiloAddress { get; } = ObserverSiloAddress;
+}
 
 /// <summary>
 /// Event payload for when a silo is suspected of being dead.
@@ -92,10 +104,15 @@ public record MembershipViewChangedEvent(
 /// <param name="SuspectedSilo">The address of the silo that is suspected.</param>
 /// <param name="SuspectingSilo">The address of the silo that raised the suspicion.</param>
 /// <param name="Reason">The reason for the suspicion.</param>
-public record SiloSuspectedEvent(
+public class SiloSuspectedEvent(
     SiloAddress SuspectedSilo,
     SiloAddress SuspectingSilo,
-    string Reason);
+    string Reason)
+{
+    public SiloAddress SuspectedSilo { get; } = SuspectedSilo;
+    public SiloAddress SuspectingSilo { get; } = SuspectingSilo;
+    public string Reason { get; } = Reason;
+}
 
 /// <summary>
 /// Event payload for when a silo is declared dead.
@@ -103,25 +120,38 @@ public record SiloSuspectedEvent(
 /// <param name="DeadSilo">The address of the silo that was declared dead.</param>
 /// <param name="DeclaringSource">A description of what declared the silo dead.</param>
 /// <param name="ObserverSiloAddress">The address of the silo that observed this declaration.</param>
-public record SiloDeclaredDeadEvent(
+public class SiloDeclaredDeadEvent(
     SiloAddress DeadSilo,
     string DeclaringSource,
-    SiloAddress? ObserverSiloAddress);
+    SiloAddress? ObserverSiloAddress)
+{
+    public SiloAddress DeadSilo { get; } = DeadSilo;
+    public string DeclaringSource { get; } = DeclaringSource;
+    public SiloAddress? ObserverSiloAddress { get; } = ObserverSiloAddress;
+}
 
 /// <summary>
 /// Event payload for when a silo becomes active.
 /// </summary>
 /// <param name="SiloAddress">The address of the silo that became active.</param>
 /// <param name="ObserverSiloAddress">The address of the silo that observed this event.</param>
-public record SiloBecameActiveEvent(
+public class SiloBecameActiveEvent(
     SiloAddress SiloAddress,
-    SiloAddress? ObserverSiloAddress);
+    SiloAddress? ObserverSiloAddress)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public SiloAddress? ObserverSiloAddress { get; } = ObserverSiloAddress;
+}
 
 /// <summary>
 /// Event payload for when a silo begins joining the cluster.
 /// </summary>
 /// <param name="SiloAddress">The address of the silo that is joining.</param>
 /// <param name="ObserverSiloAddress">The address of the silo that observed this event.</param>
-public record SiloJoiningEvent(
+public class SiloJoiningEvent(
     SiloAddress SiloAddress,
-    SiloAddress? ObserverSiloAddress);
+    SiloAddress? ObserverSiloAddress)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public SiloAddress? ObserverSiloAddress { get; } = ObserverSiloAddress;
+}

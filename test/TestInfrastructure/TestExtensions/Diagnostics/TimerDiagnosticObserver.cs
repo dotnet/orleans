@@ -17,11 +17,17 @@ namespace TestExtensions;
 /// </remarks>
 public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>
 {
+    private readonly ConcurrentBag<GrainTimerCreatedEvent> _createdEvents = new();
     private readonly ConcurrentBag<GrainTimerTickStartEvent> _tickStartEvents = new();
     private readonly ConcurrentBag<GrainTimerTickStopEvent> _tickStopEvents = new();
     private readonly ConcurrentBag<GrainTimerDisposedEvent> _disposedEvents = new();
     private readonly List<IDisposable> _subscriptions = new();
     private IDisposable? _listenerSubscription;
+
+    /// <summary>
+    /// Gets all captured timer created events.
+    /// </summary>
+    public IReadOnlyCollection<GrainTimerCreatedEvent> CreatedEvents => _createdEvents.ToArray();
 
     /// <summary>
     /// Gets all captured timer tick start events.
@@ -49,6 +55,44 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     }
 
     private TimerDiagnosticObserver() { }
+
+    /// <summary>
+    /// Waits for a timer to be created on a specific grain.
+    /// </summary>
+    /// <param name="grainId">The grain ID to wait for.</param>
+    /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
+    /// <returns>The timer created event payload.</returns>
+    public async Task<GrainTimerCreatedEvent> WaitForTimerCreatedAsync(GrainId grainId, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
+        using var cts = new CancellationTokenSource(effectiveTimeout);
+
+        var existingMatch = _createdEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
+        if (existingMatch != null)
+        {
+            return existingMatch;
+        }
+
+        while (!cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(10, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            var match = _createdEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        throw new TimeoutException($"Timed out waiting for timer creation on grain {grainId} after {effectiveTimeout}");
+    }
 
     /// <summary>
     /// Waits for a timer tick to complete on a specific grain.
@@ -128,6 +172,44 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         }
 
         throw new TimeoutException($"Timed out waiting for timer tick on grain type '{grainTypeName}' after {effectiveTimeout}");
+    }
+
+    /// <summary>
+    /// Waits for a timer to be disposed on a specific grain.
+    /// </summary>
+    /// <param name="grainId">The grain ID to wait for.</param>
+    /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
+    /// <returns>The timer disposed event payload.</returns>
+    public async Task<GrainTimerDisposedEvent> WaitForTimerDisposedAsync(GrainId grainId, TimeSpan? timeout = null)
+    {
+        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
+        using var cts = new CancellationTokenSource(effectiveTimeout);
+
+        var existingMatch = _disposedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
+        if (existingMatch != null)
+        {
+            return existingMatch;
+        }
+
+        while (!cts.Token.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(10, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
+            var match = _disposedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
+            if (match != null)
+            {
+                return match;
+            }
+        }
+
+        throw new TimeoutException($"Timed out waiting for timer disposal on grain {grainId} after {effectiveTimeout}");
     }
 
     /// <summary>
@@ -245,6 +327,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// </summary>
     public void Clear()
     {
+        _createdEvents.Clear();
         _tickStartEvents.Clear();
         _tickStopEvents.Clear();
         _disposedEvents.Clear();
@@ -263,6 +346,10 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     {
         switch (kvp.Key)
         {
+            case OrleansTimerDiagnostics.EventNames.Created when kvp.Value is GrainTimerCreatedEvent created:
+                _createdEvents.Add(created);
+                break;
+
             case OrleansTimerDiagnostics.EventNames.TickStart when kvp.Value is GrainTimerTickStartEvent tickStart:
                 _tickStartEvents.Add(tickStart);
                 break;
@@ -301,6 +388,14 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
 public static class TimerDiagnosticExtensions
 {
     /// <summary>
+    /// Waits for timer creation on a grain.
+    /// </summary>
+    public static Task<GrainTimerCreatedEvent> WaitForTimerCreatedAsync(this TimerDiagnosticObserver observer, IAddressable grain, TimeSpan? timeout = null)
+    {
+        return observer.WaitForTimerCreatedAsync(grain.GetGrainId(), timeout);
+    }
+
+    /// <summary>
     /// Waits for a timer tick on a grain.
     /// </summary>
     public static Task<GrainTimerTickStopEvent> WaitForTimerTickAsync(this TimerDiagnosticObserver observer, IAddressable grain, TimeSpan? timeout = null)
@@ -314,5 +409,13 @@ public static class TimerDiagnosticExtensions
     public static Task WaitForTickCountAsync(this TimerDiagnosticObserver observer, IAddressable grain, int expectedCount, TimeSpan? timeout = null)
     {
         return observer.WaitForTickCountAsync(grain.GetGrainId(), expectedCount, timeout);
+    }
+
+    /// <summary>
+    /// Waits for timer disposal on a grain.
+    /// </summary>
+    public static Task<GrainTimerDisposedEvent> WaitForTimerDisposedAsync(this TimerDiagnosticObserver observer, IAddressable grain, TimeSpan? timeout = null)
+    {
+        return observer.WaitForTimerDisposedAsync(grain.GetGrainId(), timeout);
     }
 }

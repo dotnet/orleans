@@ -53,9 +53,13 @@ public static class OrleansRebalancerDiagnostics
 /// </summary>
 /// <param name="SiloAddress">The address of the silo hosting the rebalancer.</param>
 /// <param name="CycleNumber">The cycle number within the current session.</param>
-public record RebalancerCycleStartEvent(
+public class RebalancerCycleStartEvent(
     SiloAddress SiloAddress,
-    int CycleNumber);
+    int CycleNumber)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public int CycleNumber { get; } = CycleNumber;
+}
 
 /// <summary>
 /// Event payload for when a rebalancing cycle completes.
@@ -66,20 +70,31 @@ public record RebalancerCycleStartEvent(
 /// <param name="EntropyDeviation">The entropy deviation after the cycle.</param>
 /// <param name="Elapsed">The time taken to complete the cycle.</param>
 /// <param name="SessionCompleted">Whether this cycle resulted in session completion.</param>
-public record RebalancerCycleStopEvent(
+public class RebalancerCycleStopEvent(
     SiloAddress SiloAddress,
     int CycleNumber,
     int ActivationsMigrated,
     double EntropyDeviation,
     TimeSpan Elapsed,
-    bool SessionCompleted);
+    bool SessionCompleted)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public int CycleNumber { get; } = CycleNumber;
+    public int ActivationsMigrated { get; } = ActivationsMigrated;
+    public double EntropyDeviation { get; } = EntropyDeviation;
+    public TimeSpan Elapsed { get; } = Elapsed;
+    public bool SessionCompleted { get; } = SessionCompleted;
+}
 
 /// <summary>
 /// Event payload for when a rebalancing session starts.
 /// </summary>
 /// <param name="SiloAddress">The address of the silo hosting the rebalancer.</param>
-public record RebalancerSessionStartEvent(
-    SiloAddress SiloAddress);
+public class RebalancerSessionStartEvent(
+    SiloAddress SiloAddress)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+}
 
 /// <summary>
 /// Event payload for when a rebalancing session stops.
@@ -87,7 +102,12 @@ public record RebalancerSessionStartEvent(
 /// <param name="SiloAddress">The address of the silo hosting the rebalancer.</param>
 /// <param name="Reason">The reason the session stopped.</param>
 /// <param name="TotalCycles">The total number of cycles completed in the session.</param>
-public record RebalancerSessionStopEvent(
+public class RebalancerSessionStopEvent(
     SiloAddress SiloAddress,
     string Reason,
-    int TotalCycles);
+    int TotalCycles)
+{
+    public SiloAddress SiloAddress { get; } = SiloAddress;
+    public string Reason { get; } = Reason;
+    public int TotalCycles { get; } = TotalCycles;
+}
