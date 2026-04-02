@@ -67,7 +67,7 @@ namespace Orleans.Persistence
 
         public System.Func<string, Runtime.GrainId, StackExchange.Redis.RedisKey>? GetStorageKey { get { throw null; } set { } }
 
-        public Storage.IGrainStorageSerializer? GrainStorageSerializer { get { throw null; } set { } }
+        public Storage.IGrainStorageSerializer GrainStorageSerializer { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
 
