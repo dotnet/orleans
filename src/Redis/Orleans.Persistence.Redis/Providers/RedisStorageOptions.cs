@@ -25,7 +25,7 @@ namespace Orleans.Persistence
         public int InitStage { get; set; } = ServiceLifecycleStage.ApplicationServices;
 
         /// <inheritdoc/>
-        public IGrainStorageSerializer? GrainStorageSerializer { get; set; }
+        public IGrainStorageSerializer GrainStorageSerializer { get; set; } = default!;
 
         /// <summary>
         /// Gets or sets the Redis client configuration.
