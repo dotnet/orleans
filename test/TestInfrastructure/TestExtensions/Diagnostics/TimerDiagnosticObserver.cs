@@ -62,7 +62,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
         // Check if we already have a matching event
-        var existingMatch = _tickStopEvents.FirstOrDefault(e => e.GrainId == grainId);
+        var existingMatch = _tickStopEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
         if (existingMatch != null)
         {
             return existingMatch;
@@ -80,7 +80,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
                 break;
             }
 
-            var match = _tickStopEvents.FirstOrDefault(e => e.GrainId == grainId);
+            var match = _tickStopEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId);
             if (match != null)
             {
                 return match;
@@ -102,7 +102,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         using var cts = new CancellationTokenSource(effectiveTimeout);
 
         // Check if we already have a matching event
-        var existingMatch = _tickStopEvents.FirstOrDefault(e => e.GrainType.Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
+        var existingMatch = _tickStopEvents.FirstOrDefault(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
         if (existingMatch != null)
         {
             return existingMatch;
@@ -120,7 +120,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
                 break;
             }
 
-            var match = _tickStopEvents.FirstOrDefault(e => e.GrainType.Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
+            var match = _tickStopEvents.FirstOrDefault(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
             if (match != null)
             {
                 return match;
@@ -217,7 +217,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <returns>The count of timer tick events.</returns>
     public int GetTickCount(GrainId grainId)
     {
-        return _tickStopEvents.Count(e => e.GrainId == grainId);
+        return _tickStopEvents.Count(e => e.GrainContext.GrainId == grainId);
     }
 
     /// <summary>
@@ -227,7 +227,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <returns>The count of timer tick events.</returns>
     public int GetTickCountByGrainType(string grainTypeName)
     {
-        return _tickStopEvents.Count(e => e.GrainType.Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
+        return _tickStopEvents.Count(e => GetGrainTypeName(e.GrainContext).Contains(grainTypeName, StringComparison.OrdinalIgnoreCase));
     }
 
     /// <summary>
@@ -237,7 +237,7 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
     /// <returns>True if at least one timer tick has occurred.</returns>
     public bool HasTimerTicked(GrainId grainId)
     {
-        return _tickStopEvents.Any(e => e.GrainId == grainId);
+        return _tickStopEvents.Any(e => e.GrainContext.GrainId == grainId);
     }
 
     /// <summary>
@@ -291,6 +291,8 @@ public sealed class TimerDiagnosticObserver : IDisposable, IObserver<DiagnosticL
         }
         _subscriptions.Clear();
     }
+
+    private static string GetGrainTypeName(IGrainContext grainContext) => grainContext.GrainId.Type.ToString()!;
 }
 
 /// <summary>

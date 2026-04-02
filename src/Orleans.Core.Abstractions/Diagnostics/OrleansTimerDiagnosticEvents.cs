@@ -51,25 +51,21 @@ public static class OrleansTimerDiagnostics
 /// <summary>
 /// Event payload for when a grain timer tick callback is about to start.
 /// </summary>
-/// <param name="GrainId">The grain ID that owns the timer.</param>
-/// <param name="GrainType">The grain type name.</param>
+/// <param name="GrainContext">The grain context that owns the timer.</param>
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
 public record GrainTimerTickStartEvent(
-    GrainId GrainId,
-    string GrainType,
+    IGrainContext GrainContext,
     string? TimerName);
 
 /// <summary>
 /// Event payload for when a grain timer tick callback has completed.
 /// </summary>
-/// <param name="GrainId">The grain ID that owns the timer.</param>
-/// <param name="GrainType">The grain type name.</param>
+/// <param name="GrainContext">The grain context that owns the timer.</param>
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
 /// <param name="Elapsed">The time taken to execute the callback.</param>
 /// <param name="Exception">The exception thrown by the callback, if any.</param>
 public record GrainTimerTickStopEvent(
-    GrainId GrainId,
-    string GrainType,
+    IGrainContext GrainContext,
     string? TimerName,
     TimeSpan Elapsed,
     Exception? Exception);
@@ -77,14 +73,12 @@ public record GrainTimerTickStopEvent(
 /// <summary>
 /// Event payload for when a grain timer is created.
 /// </summary>
-/// <param name="GrainId">The grain ID that owns the timer.</param>
-/// <param name="GrainType">The grain type name.</param>
+/// <param name="GrainContext">The grain context that owns the timer.</param>
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
 /// <param name="DueTime">The initial due time of the timer.</param>
 /// <param name="Period">The period of the timer.</param>
 public record GrainTimerCreatedEvent(
-    GrainId GrainId,
-    string GrainType,
+    IGrainContext GrainContext,
     string? TimerName,
     TimeSpan DueTime,
     TimeSpan Period);
@@ -92,10 +86,8 @@ public record GrainTimerCreatedEvent(
 /// <summary>
 /// Event payload for when a grain timer is disposed.
 /// </summary>
-/// <param name="GrainId">The grain ID that owns the timer.</param>
-/// <param name="GrainType">The grain type name.</param>
+/// <param name="GrainContext">The grain context that owns the timer.</param>
 /// <param name="TimerName">The name of the timer (may be null if not named).</param>
 public record GrainTimerDisposedEvent(
-    GrainId GrainId,
-    string GrainType,
+    IGrainContext GrainContext,
     string? TimerName);

@@ -17,8 +17,7 @@ internal abstract partial class GrainTimer
         }
 
         Listener.Write(OrleansTimerDiagnostics.EventNames.Created, new GrainTimerCreatedEvent(
-            _grainContext.GrainId,
-            GetGrainTypeName(),
+            GrainContext,
             null,
             Timeout.InfiniteTimeSpan,
             Timeout.InfiniteTimeSpan));
@@ -32,8 +31,7 @@ internal abstract partial class GrainTimer
         }
 
         Listener.Write(OrleansTimerDiagnostics.EventNames.Disposed, new GrainTimerDisposedEvent(
-            _grainContext.GrainId,
-            GetGrainTypeName(),
+            GrainContext,
             null));
     }
 
@@ -43,8 +41,7 @@ internal abstract partial class GrainTimer
         if (Listener.IsEnabled(OrleansTimerDiagnostics.EventNames.TickStart))
         {
             Listener.Write(OrleansTimerDiagnostics.EventNames.TickStart, new GrainTimerTickStartEvent(
-                _grainContext.GrainId,
-                GetGrainTypeName(),
+                GrainContext,
                 null));
 
             startTimestamp = Stopwatch.GetTimestamp();
@@ -62,8 +59,7 @@ internal abstract partial class GrainTimer
         }
 
         Listener.Write(OrleansTimerDiagnostics.EventNames.TickStop, new GrainTimerTickStopEvent(
-            _grainContext.GrainId,
-            GetGrainTypeName(),
+            GrainContext,
             null,
             Stopwatch.GetElapsedTime(diagnostics.StartTimestamp),
             exception));

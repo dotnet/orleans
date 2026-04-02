@@ -54,8 +54,6 @@ internal abstract partial class GrainTimer : IGrainTimer
 
     private ILogger Logger => _shared.TimerLogger;
 
-    private string GetGrainTypeName() => _grainContext.GrainId.Type.ToString()!;
-
     [DoesNotReturn]
     private static void ThrowIncorrectGrainContext() => throw new InvalidOperationException("Current grain context differs from specified grain context.");
 
