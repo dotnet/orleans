@@ -23,13 +23,10 @@ public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurat
                 .ConfigureNamedOptionForLogging<SimpleQueueCacheOptions>(name));
     }
 
-    public SiloRedisStreamConfigurator ConfigureRedis(Action<OptionsBuilder<RedisStreamingOptions>> configureOptions)
-    {
-        ArgumentNullException.ThrowIfNull(configureOptions);
-
-        this.Configure(configureOptions);
-        return this;
-    }
+    /// <summary>
+    /// Gets the options builder for <see cref="RedisStreamingOptions"/>.
+    /// </summary>
+    public OptionsBuilder<RedisStreamingOptions> RedisStreamingOptions => this.GetNamedOptionsBuilder<RedisStreamingOptions>();
 
     public SiloRedisStreamConfigurator ConfigureReceiver(Action<OptionsBuilder<RedisStreamReceiverOptions>> configureOptions)
     {
@@ -68,17 +65,32 @@ public sealed class ClusterClientRedisStreamConfigurator : ClusterClientPersiste
                     .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
     }
 
-    public ClusterClientRedisStreamConfigurator ConfigureRedis(Action<OptionsBuilder<RedisStreamingOptions>> configureOptions)
-    {
-        ArgumentNullException.ThrowIfNull(configureOptions);
-
-        this.Configure(configureOptions);
-        return this;
-    }
+    /// <summary>
+    /// Gets the options builder for <see cref="RedisStreamingOptions"/>.
+    /// </summary>
+    public OptionsBuilder<RedisStreamingOptions> RedisStreamingOptions => this.GetNamedOptionsBuilder<RedisStreamingOptions>();
 
     public ClusterClientRedisStreamConfigurator ConfigurePartitioning(int numOfPartitions = HashRingStreamQueueMapperOptions.DEFAULT_NUM_QUEUES)
     {
         this.Configure<HashRingStreamQueueMapperOptions>(builder => builder.Configure(options => options.TotalQueueCount = numOfPartitions));
         return this;
+    }
+}
+
+file static class RedisStreamConfiguratorExtensions
+{
+    public static OptionsBuilder<TOptions> GetNamedOptionsBuilder<TOptions>(this INamedServiceConfigurator configurator)
+        where TOptions : class, new()
+    {
+        ArgumentNullException.ThrowIfNull(configurator);
+
+        OptionsBuilder<TOptions> optionsBuilder = null!;
+        configurator.ConfigureDelegate(services =>
+        {
+            optionsBuilder = services.AddOptions<TOptions>(configurator.Name);
+            services.ConfigureNamedOptionForLogging<TOptions>(configurator.Name);
+        });
+
+        return optionsBuilder;
     }
 }

@@ -41,21 +41,21 @@ public sealed class RedisSubscriptionObserverWithImplicitSubscribingTests : Subs
             hostBuilder
                 .AddRedisStreams(StreamProviderName, builder =>
                 {
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
-                    }));
+                    });
                     builder.ConfigurePartitioning(1);
                     builder.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 })
                 .AddRedisStreams(StreamProviderName2, builder =>
                 {
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
-                    }));
+                    });
                     builder.ConfigurePartitioning(1);
                     builder.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 })

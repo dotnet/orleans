@@ -47,12 +47,12 @@ public sealed class RedisStreamCacheMissTests : StreamingCacheMissTests
                         options.DataMinTimeInCache = DataMinTimeInCache;
                         options.MetadataMinTimeInCache = TimeSpan.FromMinutes(1);
                     }));
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
                         options.CheckpointPersistInterval = TimeSpan.Zero;
-                    }));
+                    });
                     builder.ConfigurePartitioning(1);
                     builder.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 })
@@ -66,11 +66,11 @@ public sealed class RedisStreamCacheMissTests : StreamingCacheMissTests
         {
             clientBuilder.AddRedisStreams(StreamProviderName, builder =>
             {
-                builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                builder.RedisStreamingOptions.Configure(options =>
                 {
                     options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                     options.EntryExpiry = TimeSpan.FromHours(1);
-                }));
+                });
                 builder.ConfigurePartitioning(1);
             });
         }

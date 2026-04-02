@@ -41,11 +41,11 @@ public sealed class RedisStreamFilteringTests : StreamFilteringTestsBase, IClass
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddRedisStreams(RedisStreamTests.StreamProviderName, builder =>
                     {
-                        builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                        builder.RedisStreamingOptions.Configure(options =>
                         {
                             options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                             options.EntryExpiry = TimeSpan.FromHours(1);
-                        }));
+                        });
                         builder.ConfigurePartitioning(1);
                     })
                     .AddStreamFilter<CustomStreamFilter>(RedisStreamTests.StreamProviderName);
@@ -56,11 +56,11 @@ public sealed class RedisStreamFilteringTests : StreamFilteringTestsBase, IClass
                 clientBuilder
                     .AddRedisStreams(RedisStreamTests.StreamProviderName, builder =>
                     {
-                        builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                        builder.RedisStreamingOptions.Configure(options =>
                         {
                             options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                             options.EntryExpiry = TimeSpan.FromHours(1);
-                        }));
+                        });
                         builder.ConfigurePartitioning(1);
                     })
                     .AddStreamFilter<CustomStreamFilter>(RedisStreamTests.StreamProviderName);

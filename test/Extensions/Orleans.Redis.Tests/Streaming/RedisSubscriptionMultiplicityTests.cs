@@ -66,11 +66,11 @@ public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
             hostBuilder
                 .AddRedisStreams(StreamProviderName, builder =>
                 {
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
-                    }));
+                    });
                 })
                 .AddMemoryGrainStorage("PubSubStore");
         }
@@ -82,7 +82,7 @@ public sealed class RedisSubscriptionMultiplicityTests : TestClusterPerTest
         {
             clientBuilder.AddRedisStreams(
                 StreamProviderName,
-                builder => builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions())));
+                builder => builder.RedisStreamingOptions.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions()));
         }
     }
 }

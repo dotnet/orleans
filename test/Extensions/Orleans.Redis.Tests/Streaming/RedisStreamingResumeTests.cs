@@ -42,12 +42,12 @@ public sealed class RedisStreamingResumeTests : StreamingResumeTests
                         options.DataMaxAgeInCache = DataMaxAgeInCache;
                         options.DataMinTimeInCache = DataMinTimeInCache;
                     }));
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
                         options.CheckpointPersistInterval = TimeSpan.Zero;
-                    }));
+                    });
                     builder.ConfigurePartitioning(1);
                     builder.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 });
@@ -60,7 +60,7 @@ public sealed class RedisStreamingResumeTests : StreamingResumeTests
         {
             clientBuilder.AddRedisStreams(StreamProviderName, builder =>
             {
-                builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions()));
+                builder.RedisStreamingOptions.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions());
                 builder.ConfigurePartitioning(1);
             });
         }

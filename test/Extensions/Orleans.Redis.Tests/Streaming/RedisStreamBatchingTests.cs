@@ -30,11 +30,11 @@ public sealed class RedisStreamBatchingTests : StreamBatchingTestRunner, IClassF
             {
                 clientBuilder.AddRedisStreams(StreamBatchingTestConst.ProviderName, builder =>
                 {
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
-                    }));
+                    });
                     builder.ConfigurePartitioning(PartitionCount);
                     builder.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);
                 });
@@ -49,11 +49,11 @@ public sealed class RedisStreamBatchingTests : StreamBatchingTestRunner, IClassF
                     .AddMemoryGrainStorage("PubSubStore")
                     .AddRedisStreams(StreamBatchingTestConst.ProviderName, builder =>
                     {
-                        builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                        builder.RedisStreamingOptions.Configure(options =>
                         {
                             options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                             options.EntryExpiry = TimeSpan.FromHours(1);
-                        }));
+                        });
                         builder.ConfigurePartitioning(PartitionCount);
                         builder.ConfigurePullingAgent(optionsBuilder => optionsBuilder.Configure(options => options.BatchContainerBatchSize = 10));
                         builder.ConfigureStreamPubSub(StreamPubSubType.ImplicitOnly);

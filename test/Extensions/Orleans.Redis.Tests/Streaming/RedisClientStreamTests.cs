@@ -57,11 +57,11 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
                 .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5))
                 .AddRedisStreams(StreamProviderName, builder =>
                 {
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
-                    }));
+                    });
                 })
                 .AddMemoryGrainStorage("PubSubStore");
         }
@@ -73,7 +73,7 @@ public sealed class RedisClientStreamTests : TestClusterPerTest
         {
             clientBuilder.AddRedisStreams(
                 StreamProviderName,
-                builder => builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions())));
+                builder => builder.RedisStreamingOptions.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions()));
         }
     }
 }

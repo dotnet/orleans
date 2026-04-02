@@ -22,7 +22,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
 
         builder.AddRedisStreams(name, streamsBuilder =>
         {
-            streamsBuilder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) =>
+            streamsBuilder.RedisStreamingOptions.Configure<IServiceProvider>((options, services) =>
                 {
                     var serviceKey = configurationSection["ServiceKey"];
                     if (!string.IsNullOrEmpty(serviceKey))
@@ -48,7 +48,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
                             options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
                         }
                     }
-                }));
+                });
 
             if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
             {
@@ -63,7 +63,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
 
         builder.AddRedisStreams(name, streamsBuilder =>
         {
-            streamsBuilder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure<IServiceProvider>((options, services) =>
+            streamsBuilder.RedisStreamingOptions.Configure<IServiceProvider>((options, services) =>
             {
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))
@@ -89,7 +89,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
                         options.ConfigurationOptions = ConfigurationOptions.Parse(connectionString);
                     }
                 }
-            }));
+            });
 
             if (int.TryParse(configurationSection["PartitionCount"], out var partitionCount))
             {

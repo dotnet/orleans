@@ -111,11 +111,11 @@ public sealed class RedisStreamTests : TestClusterPerTest
             hostBuilder
                 .AddRedisStreams(StreamProviderName, builder =>
                 {
-                    builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options =>
+                    builder.RedisStreamingOptions.Configure(options =>
                     {
                         options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions();
                         options.EntryExpiry = TimeSpan.FromHours(1);
-                    }));
+                    });
                 })
                 .AddMemoryGrainStorage("MemoryStore")
                 .AddMemoryGrainStorage("PubSubStore");
@@ -128,7 +128,7 @@ public sealed class RedisStreamTests : TestClusterPerTest
         {
             clientBuilder.AddRedisStreams(
                 StreamProviderName,
-                builder => builder.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions())));
+                builder => builder.RedisStreamingOptions.Configure(options => options.ConfigurationOptions = RedisStreamTestUtils.GetConfigurationOptions()));
         }
     }
 }

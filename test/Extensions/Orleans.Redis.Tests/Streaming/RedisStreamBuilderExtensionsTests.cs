@@ -11,26 +11,23 @@ namespace Tester.Redis.Streaming;
 public sealed class RedisStreamBuilderExtensionsTests
 {
     [Fact]
-    public void ClientBuilder_AddRedisStreams_WithServiceCollectionConfiguratorDelegate_ConfiguresServices()
+    public void ClientBuilder_AddRedisStreams_WithConfiguratorDelegate_ConfiguresServices()
     {
         const string providerName = "client-configurator";
         var services = new ServiceCollection();
-        var marker = new Marker(256L);
         var builder = new ClientBuilder(services, new ConfigurationBuilder().Build());
 
-        builder.AddRedisStreams(providerName, (serviceCollection, configurator) =>
+        builder.AddRedisStreams(providerName, configurator =>
         {
-            serviceCollection.AddSingleton(marker);
             configurator.ConfigurePartitioning(7);
-            configurator.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options => options.MaxStreamLength = marker.Value));
+            configurator.RedisStreamingOptions.Configure(options => options.MaxStreamLength = 256L);
         });
 
         using var serviceProvider = services.BuildServiceProvider();
         var options = serviceProvider.GetOptionsByName<RedisStreamingOptions>(providerName);
         var partitioning = serviceProvider.GetOptionsByName<HashRingStreamQueueMapperOptions>(providerName);
 
-        Assert.Same(marker, serviceProvider.GetRequiredService<Marker>());
-        Assert.Equal(marker.Value, options.MaxStreamLength);
+        Assert.Equal(256L, options.MaxStreamLength);
         Assert.Equal(7, partitioning.TotalQueueCount);
     }
 
@@ -46,7 +43,7 @@ public sealed class RedisStreamBuilderExtensionsTests
         {
             serviceCollection.AddSingleton(marker);
             configurator.ConfigurePartitioning(9);
-            configurator.ConfigureRedis(optionsBuilder => optionsBuilder.Configure(options => options.MaxStreamLength = marker.Value));
+            configurator.RedisStreamingOptions.Configure(options => options.MaxStreamLength = marker.Value);
         });
 
         using var serviceProvider = services.BuildServiceProvider();
