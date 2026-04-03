@@ -159,6 +159,11 @@ namespace Orleans.Transactions.State
                 completion();
             }
 
+            if (!isRead || exclusiveLock)
+            {
+                record.IsExclusiveLock = true;
+            }
+
             if (isRead)
             {
                 record.AddRead();
@@ -380,7 +385,7 @@ namespace Orleans.Transactions.State
                         return true;
                     }
 
-                    // if we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
+                    // i we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
                     if (group == null
                         && pos.FillCount < this.options.MaxLockGroupSize
                         && !HasConflict(isRead, DateTime.MaxValue, guid, pos, out _))
@@ -412,7 +417,7 @@ namespace Orleans.Transactions.State
             {
                 if (kvp.Key != transactionId)
                 {
-                    if (isRead && kvp.Value.NumberWrites == 0)
+                    if (isRead && kvp.Value.NumberWrites == 0 && !kvp.Value.IsExclusiveLock)
                     {
                         continue;
                     }
