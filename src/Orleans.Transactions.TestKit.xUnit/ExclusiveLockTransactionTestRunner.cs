@@ -6,7 +6,9 @@ namespace Orleans.Transactions.TestKit.xUnit
     public abstract class ExclusiveLockTransactionTestRunnerxUnit : ExclusiveLockTransactionTestRunner
     {
         protected ExclusiveLockTransactionTestRunnerxUnit(IGrainFactory grainFactory, ITestOutputHelper output)
-            : base(grainFactory, output.WriteLine) { }
+            : base(grainFactory, output.WriteLine)
+        {
+        }
 
         [SkippableTheory]
         [InlineData(TransactionTestConstants.SingleStateTransactionalGrain)]
