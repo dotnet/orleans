@@ -5,7 +5,9 @@ namespace Orleans.Transactions.TestKit
     public abstract class ExclusiveLockTransactionTestRunner : TransactionTestRunnerBase
     {
         protected ExclusiveLockTransactionTestRunner(IGrainFactory grainFactory, Action<string> output)
-        : base(grainFactory, output) { }
+            : base(grainFactory, output)
+        {
+        }
 
         /// <summary>
         /// Verifies that concurrent Read-then-Write transactions on the same grain
