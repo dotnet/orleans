@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Placement.Repartitioning;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
@@ -175,7 +176,7 @@ namespace Orleans.Runtime.Messaging
                     return;
                 }
 
-                messagingTrace.OnSendMessage(msg);
+                MessagingEvents.EmitSent(msg);
 
                 if (targetSilo.Matches(_siloAddress))
                 {
@@ -260,7 +261,7 @@ namespace Orleans.Runtime.Messaging
             List<Message> messages,
             GrainAddress? oldAddress,
             SiloAddress? forwardingAddress,
-            string? failedOperation = null,
+            string failedOperation,
             Exception? exc = null,
             bool rejectMessages = false)
         {
@@ -344,7 +345,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        private void TryForwardRequest(Message message, GrainAddress? oldAddress, GrainAddress? destination, string? failedOperation = null, Exception? exc = null)
+        private void TryForwardRequest(Message message, GrainAddress? oldAddress, GrainAddress? destination, string failedOperation, Exception? exc = null)
         {
             Debug.Assert(!message.IsLocalOnly);
 
@@ -574,7 +575,7 @@ namespace Orleans.Runtime.Messaging
                 LogDebugUnableToCreateActivation(log, msg);
 
                 var partialAddress = new GrainAddress { SiloAddress = msg.TargetSilo, GrainId = msg.TargetGrain };
-                ProcessRequestToInvalidActivation(msg, partialAddress, null, "Unable to create local activation");
+                ProcessRequestToInvalidActivation(msg, partialAddress, null, failedOperation: "Unable to create local activation");
             }
         }
 
@@ -650,7 +651,7 @@ namespace Orleans.Runtime.Messaging
             Level = LogLevel.Debug,
             Message = "Forwarding {Message} to '{ForwardingAddress}' after '{FailedOperation}'"
         )]
-        private static partial void LogDebugForwarding(ILogger logger, Exception? exc, Message message, SiloAddress? forwardingAddress, string? failedOperation);
+        private static partial void LogDebugForwarding(ILogger logger, Exception? exc, Message message, SiloAddress? forwardingAddress, string failedOperation);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

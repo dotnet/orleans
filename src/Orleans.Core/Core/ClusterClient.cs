@@ -29,14 +29,15 @@ namespace Orleans
         /// <param name="runtimeClient">The runtime client.</param>
         /// <param name="loggerFactory">Logger factory used to create loggers</param>
         /// <param name="clientMessagingOptions">Messaging parameters</param>
-        public ClusterClient(IServiceProvider serviceProvider, OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions)
+        /// <param name="localClientDetails">The local client details.</param>
+        public ClusterClient(IServiceProvider serviceProvider, OutsideRuntimeClient runtimeClient, ILoggerFactory loggerFactory, IOptions<ClientMessagingOptions> clientMessagingOptions, LocalClientDetails localClientDetails)
         {
             ValidateSystemConfiguration(serviceProvider);
             runtimeClient.ConsumeServices();
 
             _runtimeClient = runtimeClient;
             _logger = loggerFactory.CreateLogger<ClusterClient>();
-            _clusterClientLifecycle = new ClusterClientLifecycle(_logger);
+            _clusterClientLifecycle = new ClusterClientLifecycle(_logger, localClientDetails);
 
             // register all lifecycle participants
             IEnumerable<ILifecycleParticipant<IClusterClientLifecycle>> lifecycleParticipants = ServiceProvider.GetServices<ILifecycleParticipant<IClusterClientLifecycle>>();

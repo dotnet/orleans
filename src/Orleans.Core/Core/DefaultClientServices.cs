@@ -144,7 +144,6 @@ namespace Orleans
             services.TryAddSingleton<ClientMessageCenter>(sp => sp.GetRequiredService<OutsideRuntimeClient>().MessageCenter);
             services.TryAddFromExisting<IMessageCenter, ClientMessageCenter>();
             services.AddSingleton<GatewayManager>();
-            services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<MessagingTrace>();
 
             // Type metadata

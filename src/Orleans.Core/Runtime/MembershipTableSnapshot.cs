@@ -6,11 +6,19 @@ using System.Text;
 
 namespace Orleans.Runtime
 {
+    /// <summary>
+    /// Represents an immutable snapshot of cluster membership state.
+    /// </summary>
     [GenerateSerializer, Immutable]
     internal sealed class MembershipTableSnapshot
     {
         private static readonly MembershipTableSnapshot InitialValue = new(MembershipVersion.MinValue, ImmutableDictionary<SiloAddress, MembershipEntry>.Empty);
 
+        /// <summary>
+        /// Initializes a new instance of the <see cref="MembershipTableSnapshot"/> class.
+        /// </summary>
+        /// <param name="version">The membership version represented by this snapshot.</param>
+        /// <param name="entries">The membership entries contained in this snapshot.</param>
         public MembershipTableSnapshot(
             MembershipVersion version,
             ImmutableDictionary<SiloAddress, MembershipEntry> entries)
@@ -19,8 +27,19 @@ namespace Orleans.Runtime
             this.Entries = entries;
         }
 
+        /// <summary>
+        /// Creates an initial snapshot from membership table data.
+        /// </summary>
+        /// <param name="table">The membership table data.</param>
+        /// <returns>A snapshot containing the provided table data.</returns>
         public static MembershipTableSnapshot Create(MembershipTableData table) => Update(InitialValue, table);
 
+        /// <summary>
+        /// Creates a snapshot by applying membership table data to a previous snapshot.
+        /// </summary>
+        /// <param name="previousSnapshot">The previous snapshot.</param>
+        /// <param name="table">The updated membership table data.</param>
+        /// <returns>The resulting membership snapshot.</returns>
         public static MembershipTableSnapshot Update(MembershipTableSnapshot previousSnapshot, MembershipTableData table)
         {
             ArgumentNullException.ThrowIfNull(previousSnapshot);
@@ -31,6 +50,12 @@ namespace Orleans.Runtime
             return Update(previousSnapshot, version, table.Members.Select(t => t.Item1));
         }
 
+        /// <summary>
+        /// Creates a snapshot by applying the contents of a newer snapshot to a previous snapshot.
+        /// </summary>
+        /// <param name="previousSnapshot">The previous snapshot.</param>
+        /// <param name="updated">The updated snapshot.</param>
+        /// <returns>The resulting membership snapshot.</returns>
         public static MembershipTableSnapshot Update(MembershipTableSnapshot previousSnapshot, MembershipTableSnapshot updated)
         {
             ArgumentNullException.ThrowIfNull(previousSnapshot);
@@ -67,12 +92,21 @@ namespace Orleans.Runtime
             return entry;
         }
 
+        /// <summary>
+        /// Gets the membership version represented by this snapshot.
+        /// </summary>
         [Id(0)]
         public MembershipVersion Version { get; }
         
+        /// <summary>
+        /// Gets the membership entries contained in this snapshot.
+        /// </summary>
         [Id(1)]
         public ImmutableDictionary<SiloAddress, MembershipEntry> Entries { get; }
 
+        /// <summary>
+        /// Gets the number of active silos in this snapshot.
+        /// </summary>
         public int ActiveNodeCount
         {
             get
@@ -90,6 +124,11 @@ namespace Orleans.Runtime
             }
         }
 
+        /// <summary>
+        /// Gets the status of the specified silo in this snapshot.
+        /// </summary>
+        /// <param name="silo">The silo address.</param>
+        /// <returns>The silo status.</returns>
         public SiloStatus GetSiloStatus(SiloAddress silo)
         {
             var status = this.Entries.TryGetValue(silo, out var entry) ? entry.Status : SiloStatus.None;
@@ -108,6 +147,11 @@ namespace Orleans.Runtime
             return status;
         }
 
+        /// <summary>
+        /// Determines whether this snapshot is a successor to another snapshot.
+        /// </summary>
+        /// <param name="other">The snapshot to compare against.</param>
+        /// <returns><see langword="true"/> if this snapshot is a successor to <paramref name="other"/>; otherwise, <see langword="false"/>.</returns>
         public bool IsSuccessorTo(MembershipTableSnapshot other)
         {
             if (Version > other.Version)

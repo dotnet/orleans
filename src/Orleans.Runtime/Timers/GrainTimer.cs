@@ -1,13 +1,11 @@
-using System;
 using System.Diagnostics.CodeAnalysis;
 using System.Reflection;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.CodeGeneration;
 using Orleans.Runtime.Internal;
 using Orleans.Serialization.Invocation;
 using Orleans.Timers;
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime;
 
@@ -46,6 +44,7 @@ internal abstract partial class GrainTimer : IGrainTimer
         {
             _timer = shared.TimeProvider.CreateTimer(TimerCallback, this, Timeout.InfiniteTimeSpan, Timeout.InfiniteTimeSpan);
         }
+
     }
 
     protected IGrainContext GrainContext => _grainContext;
@@ -110,6 +109,7 @@ internal abstract partial class GrainTimer : IGrainTimer
             LogTraceBeforeCallback(Logger, this);
 
             _changed = false;
+            GrainTimerEvents.EmitTickStart(GrainContext, this);
             var task = InvokeCallbackAsync(_cts.Token);
 
             // If the task is not completed, we need to await the tick asynchronously.
@@ -123,12 +123,14 @@ internal abstract partial class GrainTimer : IGrainTimer
                 // Complete synchronously.
                 LogTraceAfterCallback(Logger, this);
 
+                GrainTimerEvents.EmitTickStop(GrainContext, this);
                 OnTickCompleted();
                 return new(Response.Completed);
             }
         }
         catch (Exception exc)
         {
+            GrainTimerEvents.EmitTickStop(GrainContext, this, exc);
             OnTickCompleted();
             return new(OnCallbackException(exc));
         }
@@ -179,10 +181,14 @@ internal abstract partial class GrainTimer : IGrainTimer
 
             LogTraceAfterCallback(Logger, this);
 
+            GrainTimerEvents.EmitTickStop(GrainContext, this);
+
             return Response.Completed;
         }
         catch (Exception exc)
         {
+            GrainTimerEvents.EmitTickStop(GrainContext, this, exc);
+
             return OnCallbackException(exc);
         }
         finally
@@ -242,6 +248,9 @@ internal abstract partial class GrainTimer : IGrainTimer
         }
 
         _timer.Dispose();
+
+        GrainTimerEvents.EmitDisposed(GrainContext, this);
+
         var timerRegistry = _grainContext.GetComponent<IGrainTimerRegistry>();
         timerRegistry?.OnTimerDisposed(this);
     }
