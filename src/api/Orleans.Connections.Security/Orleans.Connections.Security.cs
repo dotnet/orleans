@@ -46,9 +46,13 @@ namespace Orleans.Connections.Security
 
         int HashStrength { get; }
 
+        string HostName { get; }
+
         System.Security.Authentication.ExchangeAlgorithmType KeyExchangeAlgorithm { get; }
 
         int KeyExchangeStrength { get; }
+
+        System.Net.Security.TlsCipherSuite? NegotiatedCipherSuite { get; }
 
         System.Security.Authentication.SslProtocols Protocol { get; }
     }

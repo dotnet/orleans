@@ -98,7 +98,7 @@ namespace Orleans.Persistence.Redis
 
 namespace OrleansCodeGen.Orleans.Persistence.Redis
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_RedisStorageException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Persistence.Redis.RedisStorageException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Persistence.Redis.RedisStorageException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -116,7 +116,7 @@ namespace OrleansCodeGen.Orleans.Persistence.Redis
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_RedisStorageException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Persistence.Redis.RedisStorageException, System.Exception>
