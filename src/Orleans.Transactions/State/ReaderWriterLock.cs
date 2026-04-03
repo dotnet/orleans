@@ -385,7 +385,7 @@ namespace Orleans.Transactions.State
                         return true;
                     }
 
-                    // i we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
+                    // if we have not found a place to insert this op yet, and there is room, and no conflicts, use this one
                     if (group == null
                         && pos.FillCount < this.options.MaxLockGroupSize
                         && !HasConflict(isRead, DateTime.MaxValue, guid, pos, out _))
