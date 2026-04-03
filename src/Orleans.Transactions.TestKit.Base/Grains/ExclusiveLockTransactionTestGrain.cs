@@ -9,7 +9,7 @@ namespace Orleans.Transactions.TestKit
     {
         private readonly ITransactionalState<GrainData> data;
         private readonly ILoggerFactory loggerFactory;
-        private ILogger logger;
+        protected ILogger logger;
 
         public ExclusiveLockTransactionTestGrain(
             [TransactionalState("data", TransactionTestConstants.TransactionStore)]
