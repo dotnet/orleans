@@ -60,7 +60,10 @@ public sealed class InMemoryLogBuffer
             category,
             eventId,
             message,
-            exception);
+            exception)
+        {
+            ThreadId = Environment.CurrentManagedThreadId
+        };
         _entries.Enqueue(entry);
     }
 
@@ -173,7 +176,7 @@ public sealed class InMemoryLogBuffer
         var prefix = entry.LogLevel == LogLevel.Error ? "!!!!!!!!!! " : "";
         var exc = entry.Exception != null ? $"\n{PrintException(entry.Exception)}" : "";
 
-        return string.Create(CultureInfo.InvariantCulture, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss.fff} {Environment.CurrentManagedThreadId}\t{levelStr}\t{entry.EventId}\t{entry.Category}]\t{prefix}{entry.Message}{exc}");
+        return string.Create(CultureInfo.InvariantCulture, $"[{entry.Timestamp:yyyy-MM-dd HH:mm:ss.fff} {entry.ThreadId}\t{levelStr}\t{entry.EventId}\t{entry.Category}]\t{prefix}{entry.Message}{exc}");
     }
 
     private static string PrintException(Exception? exception)
@@ -332,4 +335,7 @@ public readonly record struct LogEntry(
     string Category,
     EventId EventId,
     string Message,
-    Exception? Exception);
+    Exception? Exception)
+{
+    internal int ThreadId { get; init; }
+}

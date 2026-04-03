@@ -30,8 +30,17 @@ namespace Orleans.Runtime
         /// Initializes a new instance of the <see cref="SiloLifecycleSubject"/> class.
         /// </summary>
         /// <param name="logger">The logger.</param>
-        /// <param name="localSiloDetails">Optional local silo details for diagnostic events.</param>
-        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger, ILocalSiloDetails? localSiloDetails = null) : base(logger)
+        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger)
+            : this(logger, null)
+        {
+        }
+
+        /// <summary>
+        /// Initializes a new instance of the <see cref="SiloLifecycleSubject"/> class.
+        /// </summary>
+        /// <param name="logger">The logger.</param>
+        /// <param name="localSiloDetails">Local silo details for diagnostic events.</param>
+        public SiloLifecycleSubject(ILogger<SiloLifecycleSubject> logger, ILocalSiloDetails? localSiloDetails) : base(logger)
         {
             this.observers = new List<MonitoredObserver>();
             this.highestCompletedStage = int.MinValue;

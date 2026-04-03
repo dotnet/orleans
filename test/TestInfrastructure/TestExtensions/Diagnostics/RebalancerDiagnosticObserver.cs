@@ -15,10 +15,10 @@ namespace TestExtensions;
 /// </remarks>
 public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<ActivationRebalancerEvents.RebalancerEvent>
 {
-    private readonly ConcurrentBag<ActivationRebalancerEvents.CycleStart> _cycleStartEvents = new();
-    private readonly ConcurrentBag<ActivationRebalancerEvents.CycleStop> _cycleStopEvents = new();
-    private readonly ConcurrentBag<ActivationRebalancerEvents.SessionStart> _sessionStartEvents = new();
-    private readonly ConcurrentBag<ActivationRebalancerEvents.SessionStop> _sessionStopEvents = new();
+    private readonly ConcurrentQueue<ActivationRebalancerEvents.CycleStart> _cycleStartEvents = new();
+    private readonly ConcurrentQueue<ActivationRebalancerEvents.CycleStop> _cycleStopEvents = new();
+    private readonly ConcurrentQueue<ActivationRebalancerEvents.SessionStart> _sessionStartEvents = new();
+    private readonly ConcurrentQueue<ActivationRebalancerEvents.SessionStop> _sessionStopEvents = new();
     private IDisposable? _subscription;
 
     /// <summary>
@@ -147,9 +147,10 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
         while (!cts.Token.IsCancellationRequested)
         {
-            if (_cycleStopEvents.Count > initialCount)
+            var events = _cycleStopEvents.ToArray();
+            if (events.Length > initialCount)
             {
-                return _cycleStopEvents.First();
+                return events[initialCount];
             }
 
             try
@@ -178,9 +179,10 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
 
         while (!cts.Token.IsCancellationRequested)
         {
-            if (_sessionStopEvents.Count > initialCount)
+            var events = _sessionStopEvents.ToArray();
+            if (events.Length > initialCount)
             {
-                return _sessionStopEvents.First();
+                return events[initialCount];
             }
 
             try
@@ -289,16 +291,16 @@ public sealed class RebalancerDiagnosticObserver : IDisposable, IObserver<Activa
         switch (value)
         {
             case ActivationRebalancerEvents.CycleStart cycleStart:
-                _cycleStartEvents.Add(cycleStart);
+                _cycleStartEvents.Enqueue(cycleStart);
                 break;
             case ActivationRebalancerEvents.CycleStop cycleStop:
-                _cycleStopEvents.Add(cycleStop);
+                _cycleStopEvents.Enqueue(cycleStop);
                 break;
             case ActivationRebalancerEvents.SessionStart sessionStart:
-                _sessionStartEvents.Add(sessionStart);
+                _sessionStartEvents.Enqueue(sessionStart);
                 break;
             case ActivationRebalancerEvents.SessionStop sessionStop:
-                _sessionStopEvents.Add(sessionStop);
+                _sessionStopEvents.Enqueue(sessionStop);
                 break;
         }
     }

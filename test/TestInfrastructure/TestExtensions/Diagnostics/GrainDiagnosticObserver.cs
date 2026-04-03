@@ -1,5 +1,6 @@
 #nullable enable
 using System.Collections.Concurrent;
+using System.Collections.Generic;
 using Orleans.Runtime.Diagnostics;
 
 namespace TestExtensions;
@@ -14,7 +15,7 @@ namespace TestExtensions;
 /// </remarks>
 public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecycleEvents.LifecycleEvent>
 {
-    private readonly ConcurrentDictionary<(GrainId GrainId, string EventName), TaskCompletionSource<object?>> _waiters = new();
+    private readonly ConcurrentDictionary<(GrainId GrainId, string EventName), List<TaskCompletionSource<object?>>> _waiters = new();
     private readonly ConcurrentBag<GrainLifecycleEvents.Created> _createdEvents = new();
     private readonly ConcurrentBag<GrainLifecycleEvents.Activated> _activatedEvents = new();
     private readonly ConcurrentBag<GrainLifecycleEvents.Deactivating> _deactivatingEvents = new();
@@ -129,7 +130,15 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
         // Poll for new events (this is a fallback; the event-driven approach is preferred)
         while (!cts.Token.IsCancellationRequested)
         {
-            await Task.Delay(10, cts.Token);
+            try
+            {
+                await Task.Delay(10, cts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
+
             var match = _deactivatedEvents.FirstOrDefault(predicate);
             if (match != null)
             {
@@ -274,10 +283,32 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
     private async Task<object?> WaitForEventAsync(GrainId grainId, string eventName, TimeSpan timeout)
     {
         var key = (grainId, eventName);
-        var tcs = _waiters.GetOrAdd(key, _ => new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously));
+        var existingEvent = GetExistingEvent(grainId, eventName);
+        if (existingEvent != null)
+        {
+            return existingEvent;
+        }
 
-        // Check if the event already occurred
-        object? existingEvent = eventName switch
+        var waiter = CreateWaiter(key);
+        try
+        {
+            existingEvent = GetExistingEvent(grainId, eventName);
+            if (existingEvent != null)
+            {
+                return existingEvent;
+            }
+
+            return await waiter.Task.WaitAsync(timeout).ConfigureAwait(false);
+        }
+        finally
+        {
+            RemoveWaiter(key, waiter);
+        }
+    }
+
+    private object? GetExistingEvent(GrainId grainId, string eventName)
+    {
+        return eventName switch
         {
             nameof(GrainLifecycleEvents.Created) => _createdEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId),
             nameof(GrainLifecycleEvents.Activated) => _activatedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId),
@@ -285,24 +316,51 @@ public sealed class GrainDiagnosticObserver : IDisposable, IObserver<GrainLifecy
             nameof(GrainLifecycleEvents.Deactivated) => _deactivatedEvents.FirstOrDefault(e => e.GrainContext.GrainId == grainId),
             _ => null
         };
+    }
 
-        if (existingEvent != null)
+    private TaskCompletionSource<object?> CreateWaiter((GrainId GrainId, string EventName) key)
+    {
+        var waiter = new TaskCompletionSource<object?>(TaskCreationOptions.RunContinuationsAsynchronously);
+        var waiters = _waiters.GetOrAdd(key, static _ => []);
+        lock (waiters)
         {
-            return existingEvent;
+            waiters.Add(waiter);
         }
 
-        using var cts = new CancellationTokenSource(timeout);
-        using var registration = cts.Token.Register(() => tcs.TrySetException(new TimeoutException($"Timed out waiting for {eventName} event for grain {grainId} after {timeout}")));
+        return waiter;
+    }
 
-        return await tcs.Task;
+    private void RemoveWaiter((GrainId GrainId, string EventName) key, TaskCompletionSource<object?> waiter)
+    {
+        if (!_waiters.TryGetValue(key, out var waiters))
+        {
+            return;
+        }
+
+        lock (waiters)
+        {
+            waiters.Remove(waiter);
+        }
     }
 
     private void SignalWaiters(GrainId grainId, string eventName, object payload)
     {
         var key = (grainId, eventName);
-        if (_waiters.TryRemove(key, out var tcs))
+        if (_waiters.TryGetValue(key, out var waiters))
         {
-            tcs.TrySetResult(payload);
+            List<TaskCompletionSource<object?>> waitersSnapshot;
+            lock (waiters)
+            {
+                waitersSnapshot = [.. waiters];
+            }
+
+            foreach (var waiter in waitersSnapshot)
+            {
+                if (waiter.TrySetResult(payload))
+                {
+                    RemoveWaiter(key, waiter);
+                }
+            }
         }
     }
 

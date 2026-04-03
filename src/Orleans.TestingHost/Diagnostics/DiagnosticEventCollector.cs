@@ -32,7 +32,7 @@ public readonly record struct DiagnosticEvent(
 public sealed class DiagnosticEventCollector : IDisposable, IObserver<DiagnosticListener>, IObserver<KeyValuePair<string, object?>>
 {
     private readonly ConcurrentQueue<DiagnosticEvent> _events = new();
-    private readonly ConcurrentDictionary<string, List<TaskCompletionSource<DiagnosticEvent>>> _waiters = new();
+    private readonly ConcurrentDictionary<string, List<EventWaiter>> _waiters = new();
     private readonly List<IDisposable> _subscriptions = new();
     private readonly HashSet<string> _listenerPrefixes;
     private IDisposable? _allListenersSubscription;
@@ -104,36 +104,25 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
         TimeSpan timeout,
         CancellationToken cancellationToken = default)
     {
-        // Check if the event already occurred
-        var existing = _events.FirstOrDefault(e => e.Name == eventName);
-        if (existing.Name != null)
+        if (TryGetEvent(eventName, static _ => true, out var existing))
         {
             return existing;
         }
 
-        // Create a waiter
-        var tcs = new TaskCompletionSource<DiagnosticEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var waiters = _waiters.GetOrAdd(eventName, _ => new List<TaskCompletionSource<DiagnosticEvent>>());
-        lock (waiters)
-        {
-            waiters.Add(tcs);
-        }
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(timeout);
-        using var registration = cts.Token.Register(
-            () => tcs.TrySetException(new TimeoutException($"Timed out waiting for event '{eventName}' after {timeout}")));
+        var waiter = CreateWaiter(eventName);
 
         try
         {
-            return await tcs.Task.ConfigureAwait(false);
+            if (TryGetEvent(eventName, static _ => true, out existing))
+            {
+                return existing;
+            }
+
+            return await waiter.Task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            lock (waiters)
-            {
-                waiters.Remove(tcs);
-            }
+            RemoveWaiter(eventName, waiter);
         }
     }
 
@@ -153,56 +142,24 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
     {
         ArgumentNullException.ThrowIfNull(predicate);
 
-        // Check if a matching event already occurred
-        var existing = _events.FirstOrDefault(e => e.Name == eventName && predicate(e));
-        if (existing.Name != null)
+        if (TryGetEvent(eventName, predicate, out var existing))
         {
             return existing;
         }
 
-        // Create a waiter with a predicate filter
-        var tcs = new TaskCompletionSource<DiagnosticEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var waiters = _waiters.GetOrAdd(eventName, _ => new List<TaskCompletionSource<DiagnosticEvent>>());
-
-        // Use a wrapper TCS that applies the predicate
-        var filterTcs = new TaskCompletionSource<DiagnosticEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-        lock (waiters)
-        {
-            waiters.Add(tcs);
-        }
-
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
-        cts.CancelAfter(timeout);
-        using var registration = cts.Token.Register(
-            () => filterTcs.TrySetException(new TimeoutException($"Timed out waiting for event '{eventName}' matching predicate after {timeout}")));
-
-        // Keep waiting for events until we find one matching the predicate
+        var waiter = CreateWaiter(eventName, predicate);
         try
         {
-            while (!cancellationToken.IsCancellationRequested)
+            if (TryGetEvent(eventName, predicate, out existing))
             {
-                var evt = await tcs.Task.ConfigureAwait(false);
-                if (predicate(evt))
-                {
-                    return evt;
-                }
-
-                // Reset the TCS for the next event
-                tcs = new TaskCompletionSource<DiagnosticEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-                lock (waiters)
-                {
-                    waiters.Add(tcs);
-                }
+                return existing;
             }
 
-            throw new OperationCanceledException(cancellationToken);
+            return await waiter.Task.WaitAsync(timeout, cancellationToken).ConfigureAwait(false);
         }
         finally
         {
-            lock (waiters)
-            {
-                waiters.Remove(tcs);
-            }
+            RemoveWaiter(eventName, waiter);
         }
     }
 
@@ -214,13 +171,7 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
     /// <returns>A task completion source that will be completed when the event is captured.</returns>
     public TaskCompletionSource<DiagnosticEvent> CreateEventAwaiter(string eventName)
     {
-        var tcs = new TaskCompletionSource<DiagnosticEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-        var waiters = _waiters.GetOrAdd(eventName, _ => new List<TaskCompletionSource<DiagnosticEvent>>());
-        lock (waiters)
-        {
-            waiters.Add(tcs);
-        }
-        return tcs;
+        return CreateWaiter(eventName).Completion;
     }
 
     /// <summary>
@@ -251,18 +202,17 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
                 return GetEvents(eventName).ToList();
             }
 
-            // Wait for the next event
-            var tcs = new TaskCompletionSource<DiagnosticEvent>(TaskCreationOptions.RunContinuationsAsynchronously);
-            var waiters = _waiters.GetOrAdd(eventName, _ => new List<TaskCompletionSource<DiagnosticEvent>>());
-            lock (waiters)
-            {
-                waiters.Add(tcs);
-            }
+            var waiter = CreateWaiter(eventName);
 
             try
             {
-                using var registration = cts.Token.Register(() => tcs.TrySetCanceled(cts.Token));
-                await tcs.Task.ConfigureAwait(false);
+                currentCount = GetEventCount(eventName);
+                if (currentCount >= expectedCount)
+                {
+                    return GetEvents(eventName).ToList();
+                }
+
+                await waiter.Task.WaitAsync(cts.Token).ConfigureAwait(false);
             }
             catch (OperationCanceledException) when (cts.Token.IsCancellationRequested && !cancellationToken.IsCancellationRequested)
             {
@@ -270,15 +220,43 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
             }
             finally
             {
-                lock (waiters)
-                {
-                    waiters.Remove(tcs);
-                }
+                RemoveWaiter(eventName, waiter);
             }
         }
 
         cancellationToken.ThrowIfCancellationRequested();
         throw new TimeoutException($"Timed out waiting for {expectedCount} '{eventName}' events after {timeout}. Got {GetEventCount(eventName)} events.");
+    }
+
+    private EventWaiter CreateWaiter(string eventName, Func<DiagnosticEvent, bool>? predicate = null)
+    {
+        var waiter = new EventWaiter(predicate);
+        var waiters = _waiters.GetOrAdd(eventName, static _ => []);
+        lock (waiters)
+        {
+            waiters.Add(waiter);
+        }
+
+        return waiter;
+    }
+
+    private void RemoveWaiter(string eventName, EventWaiter waiter)
+    {
+        if (!_waiters.TryGetValue(eventName, out var waiters))
+        {
+            return;
+        }
+
+        lock (waiters)
+        {
+            waiters.Remove(waiter);
+        }
+    }
+
+    private bool TryGetEvent(string eventName, Func<DiagnosticEvent, bool> predicate, out DiagnosticEvent result)
+    {
+        result = _events.FirstOrDefault(e => e.Name == eventName && predicate(e));
+        return result.Name is not null;
     }
 
     void IObserver<DiagnosticListener>.OnNext(DiagnosticListener listener)
@@ -299,15 +277,18 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
         // Signal any waiters
         if (_waiters.TryGetValue(kvp.Key, out var waiters))
         {
-            List<TaskCompletionSource<DiagnosticEvent>> waitersSnapshot;
+            List<EventWaiter> waitersSnapshot;
             lock (waiters)
             {
                 waitersSnapshot = [.. waiters];
             }
 
-            foreach (var tcs in waitersSnapshot)
+            foreach (var waiter in waitersSnapshot)
             {
-                tcs.TrySetResult(evt);
+                if (waiter.TrySetResult(evt))
+                {
+                    RemoveWaiter(kvp.Key, waiter);
+                }
             }
         }
     }
@@ -316,6 +297,19 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
     void IObserver<DiagnosticListener>.OnCompleted() { }
     void IObserver<KeyValuePair<string, object?>>.OnError(Exception error) { }
     void IObserver<KeyValuePair<string, object?>>.OnCompleted() { }
+
+    private sealed class EventWaiter(Func<DiagnosticEvent, bool>? predicate)
+    {
+        private readonly Func<DiagnosticEvent, bool>? _predicate = predicate;
+
+        public TaskCompletionSource<DiagnosticEvent> Completion { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+        public Task<DiagnosticEvent> Task => Completion.Task;
+
+        public bool TrySetResult(DiagnosticEvent evt)
+        {
+            return _predicate is null || _predicate(evt) ? Completion.TrySetResult(evt) : false;
+        }
+    }
 
     /// <inheritdoc />
     public void Dispose()
