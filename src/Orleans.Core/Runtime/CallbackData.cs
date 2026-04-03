@@ -105,7 +105,7 @@ namespace Orleans.Runtime
             shared.Unregister(Message);
             _applicationRequestInstruments.OnAppRequestsEnd((long)stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsTimedOut();
-            OrleansCallBackDataEvent.Log.OnCanceled(Message);
+            OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
             _cancellationTokenRegistration.Dispose();
         }
@@ -128,7 +128,7 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
             _applicationRequestInstruments.OnAppRequestsTimedOut();
 
-            OrleansCallBackDataEvent.Log.OnTimeout(this.Message);
+            OrleansCallBackDataEvent.Instance.OnTimeout(this.Message);
 
             var msg = this.Message; // Local working copy
 
@@ -152,7 +152,7 @@ namespace Orleans.Runtime
             _cancellationTokenRegistration.Dispose();
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
-            OrleansCallBackDataEvent.Log.OnTargetSiloFail(this.Message);
+            OrleansCallBackDataEvent.Instance.OnTargetSiloFail(this.Message);
             var msg = this.Message;
             var statusMessage = lastKnownStatus is StatusResponse status ? $"Last known status is {status}. " : string.Empty;
             LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
@@ -167,7 +167,7 @@ namespace Orleans.Runtime
                 return;
             }
 
-            OrleansCallBackDataEvent.Log.DoCallback(this.Message);
+            OrleansCallBackDataEvent.Instance.DoCallback(this.Message);
 
             this.stopwatch.Stop();
             _cancellationTokenRegistration.Dispose();

@@ -192,7 +192,7 @@ namespace Orleans.Runtime
 
         public void SendResponse(Message request, Response response)
         {
-            OrleansInsideRuntimeClientEvent.Log.SendResponse(request);
+            OrleansInsideRuntimeClientEvent.Instance.SendResponse(request);
 
             // Don't process messages that have already timed out
             if (request.IsExpired)
@@ -383,7 +383,7 @@ namespace Orleans.Runtime
 
         public void ReceiveResponse(Message message)
         {
-            OrleansInsideRuntimeClientEvent.Log.ReceiveResponse(message);
+            OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
             if (message.Result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))

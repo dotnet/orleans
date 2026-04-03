@@ -64,7 +64,7 @@ namespace Orleans.Runtime.Messaging
         public virtual EndPoint RemoteEndPoint { get; }
         public virtual EndPoint LocalEndPoint { get; }
         protected ConnectionContext Context { get; }
-        protected NetworkingTrace Log => this.shared.NetworkingTrace;
+        protected ILogger Log => this.shared.Logger;
         protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
         protected abstract ConnectionDirection ConnectionDirection { get; }
         protected MessageFactory MessageFactory => this.shared.MessageFactory;

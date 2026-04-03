@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
 
 #nullable disable
@@ -476,6 +477,7 @@ namespace Orleans.Streams
                 {
                     pubSubCache.Remove(tuple.Key);
                     tuple.Value.DisposeAll(logger);
+                    StreamingEvents.EmitStreamInactive(streamProviderName, tuple.Key.StreamId, options.StreamInactivityPeriod, Silo);
                 }
             }
         }
@@ -661,6 +663,8 @@ namespace Orleans.Streams
             {
                 StreamHandshakeToken newToken = await ContextualizedDeliverBatchToConsumer(consumerData, batch);
                 consumerData.LastToken = StreamHandshakeToken.CreateDeliveyToken(batch.SequenceToken); // this is the currently delivered token
+                StreamingEvents.EmitMessageDelivered(streamProviderName, consumerData, batch, Silo);
+
                 return newToken;
             }
             catch (Exception ex)

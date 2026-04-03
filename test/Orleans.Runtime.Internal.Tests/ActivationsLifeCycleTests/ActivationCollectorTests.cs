@@ -578,5 +578,39 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, tickCount);
         }
 
+        [Fact, TestCategory("Functional"), TestCategory("Diagnostics"), TestCategory("Timers")]
+        public async Task GrainAndTimerDiagnosticsExposeRuntimeInstances()
+        {
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
+
+            using var grainObserver = GrainDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create();
+
+            const string timerName = nameof(GrainAndTimerDiagnosticsExposeRuntimeInstances);
+            var grain = this.testCluster.GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
+
+            await grain.StartTimer(timerName, TimeSpan.FromMilliseconds(100), keepAlive: true);
+
+            var created = await grainObserver.WaitForCreatedAsync(grain);
+            var activated = await grainObserver.WaitForActivatedAsync(grain);
+            var timerCreated = await timerObserver.WaitForTimerCreatedAsync(grain);
+            var tickStop = await timerObserver.WaitForTimerTickAsync(grain);
+
+            await grain.StopTimer(timerName);
+
+            var disposed = await timerObserver.WaitForTimerDisposedAsync(grain);
+
+            Assert.Equal(created.GrainContext.GrainId, grain.GetGrainId());
+            Assert.Equal(activated.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.Equal(activated.GrainContext.ActivationId, created.GrainContext.ActivationId);
+
+            Assert.Equal(timerCreated.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.NotNull(timerCreated.Timer);
+            Assert.Equal(tickStop.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.NotNull(tickStop.Timer);
+            Assert.Equal(disposed.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.NotNull(disposed.Timer);
+        }
+
     }
 }

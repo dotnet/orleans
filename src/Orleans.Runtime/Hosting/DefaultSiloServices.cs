@@ -413,7 +413,6 @@ namespace Orleans.Hosting
                 sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value));
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
-            services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
             services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
 

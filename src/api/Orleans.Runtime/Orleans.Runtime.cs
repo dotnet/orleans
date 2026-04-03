@@ -857,6 +857,8 @@ namespace Orleans.Runtime
     {
         public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger) : base(default!) { }
 
+        public SiloLifecycleSubject(Microsoft.Extensions.Logging.ILogger<SiloLifecycleSubject> logger, Orleans.Runtime.ILocalSiloDetails localSiloDetails) : base(default!) { }
+
         public int HighestCompletedStage { get { throw null; } }
 
         public int LowestStoppedStage { get { throw null; } }
