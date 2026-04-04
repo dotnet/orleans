@@ -48,6 +48,9 @@ namespace Orleans.Transactions
         public long SequenceNumber;
         public bool HasCopiedState;
 
+        // indicate that this transaction holds an exclusive lock
+        public bool IsExclusiveLock;
+
         public void AddRead()
         {
             NumberReads++;
