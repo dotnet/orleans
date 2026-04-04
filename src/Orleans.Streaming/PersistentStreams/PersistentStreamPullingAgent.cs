@@ -31,6 +31,7 @@ namespace Orleans.Streams
         private readonly IQueueAdapterCache queueAdapterCache;
         private readonly IQueueAdapter queueAdapter;
         private readonly IStreamFailureHandler streamFailureHandler;
+        private readonly TimeProvider _timeProvider;
         internal readonly QueueId QueueId;
 
         private int numMessages;
@@ -55,6 +56,7 @@ namespace Orleans.Streams
             IStreamFailureHandler streamFailureHandler,
             IBackoffProvider deliveryBackoffProvider,
             IBackoffProvider queueReaderBackoffProvider,
+            TimeProvider timeProvider,
             SystemTargetShared shared)
             : base(id, shared)
         {
@@ -71,6 +73,7 @@ namespace Orleans.Streams
             this.queueAdapterCache = queueAdapterCache;
             this.deliveryBackoffProvider = deliveryBackoffProvider;
             this.queueReaderBackoffProvider = queueReaderBackoffProvider;
+            _timeProvider = timeProvider ?? TimeProvider.System;
             numMessages = 0;
 
             logger = shared.LoggerFactory.CreateLogger($"{this.GetType().Namespace}.{streamProviderName}");
@@ -93,7 +96,7 @@ namespace Orleans.Streams
         {
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
-            lastTimeCleanedPubSubCache = DateTime.UtcNow;
+            lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
             try
             {
@@ -240,7 +243,7 @@ namespace Orleans.Streams
                 var consumerReference = this.RuntimeClient.InternalGrainFactory
                     .GetGrain(streamConsumer)
                     .AsReference<IStreamConsumerExtension>();
-                data = streamDataCollection.AddConsumer(subscriptionId, streamId, consumerReference, filterData);
+                data = streamDataCollection.AddConsumer(subscriptionId, streamId, consumerReference, filterData, _timeProvider.GetUtcNow().UtcDateTime);
             }
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
@@ -405,7 +408,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            var now = DateTime.UtcNow;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
             if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {

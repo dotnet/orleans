@@ -73,6 +73,7 @@ namespace Orleans.Runtime.Providers
             var pubsubOptions = this.ServiceProvider.GetOptionsByName<StreamPubSubOptions>(streamProviderName);
             var pullingAgentOptions = this.ServiceProvider.GetOptionsByName<StreamPullingAgentOptions>(streamProviderName);
             var filter = this.ServiceProvider.GetKeyedService<IStreamFilter>(streamProviderName) ?? new NoOpStreamFilter();
+            var timeProvider = this.ServiceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
             var manager = new PersistentStreamPullingManager(
                 managerId,
                 streamProviderName,
@@ -84,6 +85,7 @@ namespace Orleans.Runtime.Providers
                 queueAdapter,
                 deliveryProvider,
                 queueReaderProvider,
+                timeProvider,
                 ServiceProvider.GetRequiredService<SystemTargetShared>());
 
             // Init the manager only after it was registered locally.
