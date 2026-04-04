@@ -250,6 +250,7 @@ namespace Orleans.Streams
             {
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
+                StreamingEvents.EmitSubscriptionAdded(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 if (data.State == StreamConsumerDataState.Inactive)
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
             }
@@ -333,7 +334,10 @@ namespace Orleans.Streams
             // remove consumer
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed)
+            {
+                StreamingEvents.EmitSubscriptionRemoved(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 LogDebugRemovedConsumer(subscriptionId, streamId);
+            }
 
             if (streamData.Count == 0)
                 pubSubCache.Remove(streamId);

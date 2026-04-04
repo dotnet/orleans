@@ -4,6 +4,7 @@ using System.Linq;
 using System.Threading.Tasks;
 using Newtonsoft.Json;
 using Orleans.Runtime;
+using Orleans.Streaming.Diagnostics;
 
 #nullable disable
 namespace Orleans.Streams
@@ -118,10 +119,15 @@ namespace Orleans.Streams
                 }
             }
 
+            var currentStream = this.streamImpl;
+            var streamProviderName = currentStream?.ProviderName;
+            var streamId = currentStream?.StreamId ?? default;
+            var currentSubscriptionId = subscriptionId.Guid;
+
             if (batch is IBatchContainerBatch)
             {
                 var batchContainerBatch = batch as IBatchContainerBatch;
-                await NextBatch(batchContainerBatch);
+                await NextBatch(batchContainerBatch, streamProviderName, streamId, currentSubscriptionId);
             }
             else
             {
@@ -129,11 +135,15 @@ namespace Orleans.Streams
                 {
                     foreach (var itemTuple in batch.GetEvents<T>())
                     {
-                        await NextItem(itemTuple.Item1, itemTuple.Item2);
+                        if (await NextItem(itemTuple.Item1, itemTuple.Item2))
+                        {
+                            EmitItemDelivered(streamProviderName, streamId, currentSubscriptionId, itemTuple.Item2);
+                        }
                     }
-                } else
+                }
+                else
                 {
-                    await NextItems(batch.GetEvents<T>());
+                    await NextItems(batch.GetEvents<T>(), streamProviderName, streamId, currentSubscriptionId);
                 }
             }
 
@@ -171,9 +181,22 @@ namespace Orleans.Streams
                 throw new InvalidCastException("Received an item of type " + item.GetType().Name + ", expected " + typeof(T).FullName);
             }
 
-            await ((this.observer != null)
-                ? NextItem(typedItem, currentToken)
-                : NextItems(new[] { Tuple.Create(typedItem, currentToken) }));
+            var currentStream = this.streamImpl;
+            var streamProviderName = currentStream?.ProviderName;
+            var streamId = currentStream?.StreamId ?? default;
+            var currentSubscriptionId = subscriptionId.Guid;
+
+            if (this.observer != null)
+            {
+                if (await NextItem(typedItem, currentToken))
+                {
+                    EmitItemDelivered(streamProviderName, streamId, currentSubscriptionId, currentToken);
+                }
+            }
+            else
+            {
+                await NextItems(new[] { Tuple.Create(typedItem, currentToken) }, streamProviderName, streamId, currentSubscriptionId);
+            }
 
             // check again, in case the expectedToken was changed indiretly via ResumeAsync()
             if (this.expectedToken != null)
@@ -188,7 +211,7 @@ namespace Orleans.Streams
             return null;
         }
 
-        public async Task NextBatch(IBatchContainerBatch batchContainerBatch)
+        public async Task NextBatch(IBatchContainerBatch batchContainerBatch, string streamProviderName, StreamId streamId, Guid currentSubscriptionId)
         {
             if (this.observer != null)
             {
@@ -199,7 +222,10 @@ namespace Orleans.Streams
                     {
                         foreach (var itemTuple in batchContainer.GetEvents<T>())
                         {
-                            await NextItem(itemTuple.Item1, itemTuple.Item2);
+                            if (await NextItem(itemTuple.Item1, itemTuple.Item2))
+                            {
+                                EmitItemDelivered(streamProviderName, streamId, currentSubscriptionId, itemTuple.Item2);
+                            }
                         }
                     }
                     finally
@@ -213,32 +239,50 @@ namespace Orleans.Streams
             }
             else
             {
-                await NextItems(batchContainerBatch.BatchContainers.SelectMany(batch => batch.GetEvents<T>()));
+                await NextItems(batchContainerBatch.BatchContainers.SelectMany(batch => batch.GetEvents<T>()), streamProviderName, streamId, currentSubscriptionId);
             }
         }
 
-        private Task NextItem(T item, StreamSequenceToken token)
+        private async Task<bool> NextItem(T item, StreamSequenceToken token)
         {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (this.observer == null || !IsValid)
-                return Task.CompletedTask;
+                return false;
 
-            return this.observer.OnNextAsync(item, token);
+            await this.observer.OnNextAsync(item, token);
+            return true;
         }
 
-        private Task NextItems(IEnumerable<Tuple<T, StreamSequenceToken>> items)
+        private async Task NextItems(IEnumerable<Tuple<T, StreamSequenceToken>> items, string streamProviderName, StreamId streamId, Guid currentSubscriptionId)
         {
             // This method could potentially be invoked after Dispose() has been called, 
             // so we have to ignore the request or we risk breaking unit tests AQ_01 - AQ_04.
             if (this.batchObserver == null || !IsValid)
-                return Task.CompletedTask;
+                return;
 
             IList<SequentialItem<T>> batch = items
                 .Select(item => new SequentialItem<T>(item.Item1, item.Item2))
                 .ToList();
 
-            return batch.Count != 0 ? this.batchObserver.OnNextAsync(batch) : Task.CompletedTask;
+            if (batch.Count == 0)
+            {
+                return;
+            }
+
+            await this.batchObserver.OnNextAsync(batch);
+            foreach (var item in batch)
+            {
+                EmitItemDelivered(streamProviderName, streamId, currentSubscriptionId, item.Token);
+            }
+        }
+
+        private static void EmitItemDelivered(string streamProviderName, StreamId streamId, Guid currentSubscriptionId, StreamSequenceToken sequenceToken)
+        {
+            if (streamProviderName is not null)
+            {
+                StreamingEvents.EmitItemDelivered(streamProviderName, streamId, currentSubscriptionId, sequenceToken);
+            }
         }
 
         public Task CompleteStream()

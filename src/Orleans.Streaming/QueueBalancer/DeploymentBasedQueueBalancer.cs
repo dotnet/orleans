@@ -24,6 +24,7 @@ namespace Orleans.Streams
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IDeploymentConfiguration deploymentConfig;
         private readonly DeploymentBasedQueueBalancerOptions options;
+        private readonly TimeProvider _timeProvider;
         private readonly ConcurrentDictionary<SiloAddress, bool> immatureSilos;
         private List<QueueId> allQueues;
         private bool isStarting;
@@ -33,12 +34,14 @@ namespace Orleans.Streams
             IDeploymentConfiguration deploymentConfig,
             DeploymentBasedQueueBalancerOptions options,
             IServiceProvider services,
+            TimeProvider timeProvider,
             ILogger<DeploymentBasedQueueBalancer> logger)
             : base (services, logger)
         {
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
             this.options = options;
+            _timeProvider = timeProvider ?? TimeProvider.System;
 
             isStarting = true;
 
@@ -69,7 +72,7 @@ namespace Orleans.Streams
         
         private async Task NotifyAfterStart()
         {
-            await Task.Delay(this.options.SiloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
             isStarting = false;
             await NotifyListeners();
         }
@@ -77,7 +80,7 @@ namespace Orleans.Streams
         private async Task RecordImmatureSilo(SiloAddress updatedSilo)
         {
             immatureSilos[updatedSilo] = true;      // record as immature
-            await Task.Delay(this.options.SiloMaturityPeriod);
+            await Task.Delay(this.options.SiloMaturityPeriod, _timeProvider);
             immatureSilos[updatedSilo] = false;     // record as mature
         }
 

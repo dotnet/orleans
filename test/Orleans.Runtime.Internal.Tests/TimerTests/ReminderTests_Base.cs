@@ -1,4 +1,4 @@
-//#define USE_SQL_SERVER
+#nullable enable
 
 using System.Text;
 using Microsoft.Extensions.Logging;
@@ -13,420 +13,402 @@ using Xunit;
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
 
-namespace UnitTests.TimerTests
+namespace UnitTests.TimerTests;
+
+/// <summary>
+/// Base class for reminder tests providing common test operations and utilities.
+/// Uses <see cref="ReminderDiagnosticObserver"/> for event-driven waiting instead of Task.Delay.
+/// </summary>
+public class ReminderTests_Base : OrleansTestingBase, IDisposable
 {
-    /// <summary>
-    /// Base class for reminder tests providing common test operations and utilities.
-    /// </summary>
-    public class ReminderTests_Base : OrleansTestingBase, IDisposable
+    protected TestCluster HostedCluster { get; private set; }
+    internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500);
+    internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(2);
+
+    internal const string DR = "DEFAULT_REMINDER";
+    internal const string R1 = "REMINDER_1";
+    internal const string R2 = "REMINDER_2";
+
+    protected const long retries = 3;
+
+    protected const long failAfter = 2; // NOTE: match this sleep with 'failCheckAfter' used in PerGrainFailureTest() so you dont try to get counter immediately after failure as new activation may not have the reminder statistics
+    protected const long failCheckAfter = 6; // safe value: 9
+
+    protected ILogger log;
+    protected ReminderDiagnosticObserver observer;
+
+    public ReminderTests_Base(BaseTestClusterFixture fixture)
     {
-        protected TestCluster HostedCluster { get; private set; }
-        internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500); // the experiment shouldnt be that long that the sums of leeways exceeds a period
-        internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(5);
+        HostedCluster = fixture.HostedCluster;
+        GrainFactory = fixture.GrainFactory;
 
-        internal const string DR = "DEFAULT_REMINDER";
-        internal const string R1 = "REMINDER_1";
-        internal const string R2 = "REMINDER_2";
-
-        protected const long retries = 3;
-
-        protected const long failAfter = 2; // NOTE: match this sleep with 'failCheckAfter' used in PerGrainFailureTest() so you dont try to get counter immediately after failure as new activation may not have the reminder statistics
-        protected const long failCheckAfter = 6; // safe value: 9
-
-        protected ILogger log;
-
-        public ReminderTests_Base(BaseTestClusterFixture fixture)
-        {
-            HostedCluster = fixture.HostedCluster;
-            GrainFactory = fixture.GrainFactory;
-
-            var filters = new LoggerFilterOptions();
+        var filters = new LoggerFilterOptions();
 #if DEBUG
-            filters.AddFilter("Storage", LogLevel.Trace);
-            filters.AddFilter("Reminder", LogLevel.Trace);
+        filters.AddFilter("Storage", LogLevel.Trace);
+        filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
 
-            log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("client", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters).CreateLogger<ReminderTests_Base>();
+        log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("client", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters).CreateLogger<ReminderTests_Base>();
+        observer = ReminderDiagnosticObserver.Create();
+    }
+
+    public IGrainFactory GrainFactory { get; }
+
+    public void Dispose()
+    {
+        observer.Dispose();
+
+        // ReminderTable.Clear() cannot be called from a non-Orleans thread,
+        // so we must proxy the call through a grain.
+        var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
+    }
+
+    public async Task Test_Reminders_Basic_StopByRef()
+    {
+        IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+
+        IGrainReminder r1 = await grain.StartReminder(DR);
+        IGrainReminder r2 = await grain.StartReminder(DR);
+        try
+        {
+            // First handle should now be out of date once the second handle to the same reminder was obtained
+            await grain.StopReminder(r1);
+            Assert.Fail("Removed reminder1, which shouldn't be possible.");
+        }
+        catch (Exception exc)
+        {
+            log.LogInformation(exc, "Couldn't remove {Reminder}, as expected.", r1);
         }
 
-        public IGrainFactory GrainFactory { get; }
+        await grain.StopReminder(r2);
+        log.LogInformation("Removed reminder2 successfully");
 
-        public void Dispose()
+        // trying to see if readreminder works
+        _ = await grain.StartReminder(DR);
+        _ = await grain.StartReminder(DR);
+        _ = await grain.StartReminder(DR);
+        _ = await grain.StartReminder(DR);
+
+        IGrainReminder r = await grain.GetReminderObject(DR);
+        await grain.StopReminder(r);
+        log.LogInformation("Removed got reminder successfully");
+    }
+
+    public async Task Test_Reminders_Basic_ListOps()
+    {
+        Guid id = Guid.NewGuid();
+        log.LogInformation("Start Grain Id = {GrainId}", id);
+        IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(id);
+        const int count = 5;
+        Task<IGrainReminder>[] startReminderTasks = new Task<IGrainReminder>[count];
+        for (int i = 0; i < count; i++)
         {
-            // ReminderTable.Clear() cannot be called from a non-Orleans thread,
-            // so we must proxy the call through a grain.
-            var controlProxy = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            controlProxy.EraseReminderTable().WaitAsync(TestConstants.InitTimeout).Wait();
+            startReminderTasks[i] = grain.StartReminder(DR + "_" + i);
+            log.LogInformation("Started {ReminderName}_{ReminderNumber}", DR, i);
         }
 
-        public async Task Test_Reminders_Basic_StopByRef()
-        {
-            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        await Task.WhenAll(startReminderTasks);
+        // do comparison on strings
+        List<string> registered = (from reminder in startReminderTasks select reminder.Result.ReminderName).ToList();
 
-            IGrainReminder r1 = await grain.StartReminder(DR);
-            IGrainReminder r2 = await grain.StartReminder(DR);
+        log.LogInformation("Waited");
+
+        List<IGrainReminder> remindersList = await grain.GetRemindersList();
+        List<string> fetched = (from reminder in remindersList select reminder.ReminderName).ToList();
+
+        foreach (var remRegistered in registered)
+        {
+            Assert.True(fetched.Remove(remRegistered), $"Couldn't get reminder {remRegistered}. " +
+                                                       $"Registered list: {Utils.EnumerableToString(registered)}, " +
+                                                       $"fetched list: {Utils.EnumerableToString(remindersList, r => r.ReminderName)}");
+        }
+        Assert.True(fetched.Count == 0, $"More than registered reminders. Extra: {Utils.EnumerableToString(fetched)}");
+
+        // Wait for each reminder to tick twice using the observer
+        log.LogInformation("Time tests");
+        for (int i = 0; i < count; i++)
+        {
+            await observer.WaitForTickCountAsync(grain, 2, DR + "_" + i);
+        }
+
+        // Verify via grain counters
+        for (int i = 0; i < count; i++)
+        {
+            long curr = await grain.GetCounter(DR + "_" + i);
+            Assert.True(curr >= 2, $"Reminder {DR}_{i} should have fired at least 2 times, but fired {curr}");
+        }
+    }
+
+    public async Task Test_Reminders_1J_MultiGrainMultiReminders()
+    {
+        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+
+        Task<bool>[] tasks =
+        [
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g1)),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g2)),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g3)),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g4)),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
+        ];
+
+        // Wait for all grains to have at least one reminder tick before adding a silo
+        await observer.WaitForReminderTickAsync(g1);
+        await observer.WaitForReminderTickAsync(g2);
+        await observer.WaitForReminderTickAsync(g3);
+        await observer.WaitForReminderTickAsync(g4);
+        await observer.WaitForReminderTickAsync(g5);
+
+        // start another silo ... although it will take it a while before it stabilizes
+        log.LogInformation("Starting another silo");
+        await this.HostedCluster.StartAdditionalSilosAsync(1, true);
+
+        //Block until all tasks complete.
+        await Task.WhenAll(tasks).WaitAsync(ENDWAIT);
+    }
+
+    public async Task Test_Reminders_ReminderNotFound()
+    {
+        IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+
+        // request a reminder that does not exist
+        IGrainReminder reminder = await g1.GetReminderObject("blarg");
+        Assert.Null(reminder);
+    }
+
+    internal async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g)
+    {
+        // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing
+        // functionality implemented on the LocalReminderService yet
+        this.log.LogInformation("PerGrainMultiReminderTestChurn Grain={Grain}", g);
+
+        // Start Default Reminder and wait for 2 ticks
+        await ExecuteWithRetries(g.StartReminder, DR);
+        await observer.WaitForTickCountAsync(g, 2, DR);
+
+        // Start R1 and wait for 2 ticks
+        await ExecuteWithRetries(g.StartReminder, R1);
+        await observer.WaitForTickCountAsync(g, 2, R1);
+
+        // Start R2 and wait for 2 ticks
+        await ExecuteWithRetries(g.StartReminder, R2);
+        await observer.WaitForTickCountAsync(g, 2, R2);
+
+        // Wait for 1 more DR tick to verify all reminders are still running
+        int drCountBefore = observer.GetTickCount(g.GetGrainId(), DR);
+        await observer.WaitForTickCountAsync(g, drCountBefore + 1, DR);
+
+        // Stop R1
+        await ExecuteWithRetriesStop(g.StopReminder, R1);
+        // Wait for 2 more DR ticks to let things settle after R1 stop
+        drCountBefore = observer.GetTickCount(g.GetGrainId(), DR);
+        await observer.WaitForTickCountAsync(g, drCountBefore + 2, DR);
+
+        // Stop R2
+        await ExecuteWithRetriesStop(g.StopReminder, R2);
+        // Wait for 1 more DR tick
+        drCountBefore = observer.GetTickCount(g.GetGrainId(), DR);
+        await observer.WaitForTickCountAsync(g, drCountBefore + 1, DR);
+
+        // Stop Default reminder
+        await ExecuteWithRetriesStop(g.StopReminder, DR);
+
+        long lastR1 = await g.GetCounter(R1);
+        Assert.True(lastR1 >= 4, $"R1 should have at least 4 ticks, got {lastR1}");
+
+        long lastR2 = await g.GetCounter(R2);
+        Assert.True(lastR2 >= 4, $"R2 should have at least 4 ticks, got {lastR2}");
+
+        long lastDR = await g.GetCounter(DR);
+        Assert.True(lastDR >= 9, $"DR should have at least 9 ticks, got {lastDR}");
+
+        return true;
+    }
+
+    protected async Task<bool> PerGrainFailureTest(IReminderTestGrain2 grain)
+    {
+        this.log.LogInformation("PerGrainFailureTest Grain={Grain}", grain);
+
+        await grain.StartReminder(DR);
+        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR);
+        long last = await grain.GetCounter(DR);
+        Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
+
+        await grain.StopReminder(DR);
+        // Brief pause to confirm no more ticks after stopping
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        long curr = await grain.GetCounter(DR);
+        // After stopping, at most one extra tick could have been in-flight
+        AssertIsInRange(curr, last, last + 1, grain, DR, TimeSpan.FromMilliseconds(200));
+
+        return true;
+    }
+
+    protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g)
+    {
+        this.log.LogInformation("PerGrainMultiReminderTest Grain={Grain}", g);
+
+        // Each reminder is started then verified via observer ticks.
+        // Once all reminders have been started, stop them one at a time
+        // and verify stopped reminders no longer fire.
+
+        // Start Default Reminder and wait for first tick
+        await g.StartReminder(DR);
+        await observer.WaitForTickCountAsync(g, 1, DR);
+        var reminders = await g.GetReminderStates();
+        Assert.True(reminders[DR].Fired.Count >= 1, $"DR should have fired at least 1 time, got {reminders[DR].Fired.Count}");
+
+        // Start R1 and wait for first tick
+        await g.StartReminder(R1);
+        await observer.WaitForTickCountAsync(g, 1, R1);
+        reminders = await g.GetReminderStates();
+        Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should have fired at least 1 time, got {reminders[R1].Fired.Count}");
+
+        // Start R2 and wait for first tick
+        await g.StartReminder(R2);
+        await observer.WaitForTickCountAsync(g, 1, R2);
+        reminders = await g.GetReminderStates();
+        Assert.True(reminders[R2].Fired.Count >= 1, $"R2 should have fired at least 1 time, got {reminders[R2].Fired.Count}");
+        Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should still be running, got {reminders[R1].Fired.Count}");
+        Assert.True(reminders[DR].Fired.Count >= 1, $"DR should still be running, got {reminders[DR].Fired.Count}");
+
+        // Stop R1 — record its count, then wait for another R2 tick to confirm R2/DR continue
+        int r1CountAtStop = reminders[R1].Fired.Count;
+        await g.StopReminder(R1);
+        int r2TicksBefore = observer.GetTickCount(g.GetGrainId(), R2);
+        await observer.WaitForTickCountAsync(g, r2TicksBefore + 1, R2);
+        reminders = await g.GetReminderStates();
+        // R1 should be stable (at most 1 in-flight tick)
+        Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should have stopped, but count went from {r1CountAtStop} to {reminders[R1].Fired.Count}");
+        Assert.True(reminders[R2].Fired.Count >= 2, $"R2 should still be running, got {reminders[R2].Fired.Count}");
+
+        // Stop R2 — record its count, then wait for another DR tick
+        int r2CountAtStop = reminders[R2].Fired.Count;
+        await g.StopReminder(R2);
+        int drTicksBefore = observer.GetTickCount(g.GetGrainId(), DR);
+        await observer.WaitForTickCountAsync(g, drTicksBefore + 1, DR);
+        reminders = await g.GetReminderStates();
+        Assert.True(reminders[R2].Fired.Count <= r2CountAtStop + 1, $"R2 should have stopped, but count went from {r2CountAtStop} to {reminders[R2].Fired.Count}");
+        Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should still be stopped");
+
+        // Stop Default reminder
+        int drCountAtStop = reminders[DR].Fired.Count;
+        await g.StopReminder(DR);
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        reminders = await g.GetReminderStates();
+        Assert.True(reminders[DR].Fired.Count <= drCountAtStop + 1, $"DR should have stopped, but count went from {drCountAtStop} to {reminders[DR].Fired.Count}");
+        Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should still be stopped");
+        Assert.True(reminders[R2].Fired.Count <= r2CountAtStop + 1, $"R2 should still be stopped");
+
+        return true;
+    }
+
+    protected async Task<bool> PerCopyGrainFailureTest(IReminderTestCopyGrain grain)
+    {
+        this.log.LogInformation("PerCopyGrainFailureTest Grain={Grain}", grain);
+
+        await grain.StartReminder(DR);
+        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR);
+        long last = await grain.GetCounter(DR);
+        Assert.Equal(failCheckAfter, last);
+
+        await grain.StopReminder(DR);
+        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        long curr = await grain.GetCounter(DR);
+        Assert.Equal(last, curr);
+
+        return true;
+    }
+
+    protected static string Time()
+    {
+        return DateTime.UtcNow.ToString("hh:mm:ss.fff");
+    }
+
+    protected void AssertIsInRange(long val, long lowerLimit, long upperLimit, IGrain grain, string reminderName, TimeSpan sleepFor)
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.AppendFormat("Grain: {0} Grain PrimaryKey: {1}, Reminder: {2}, SleepFor: {3} Time now: {4}",
+            grain, grain.GetPrimaryKey(), reminderName, sleepFor, Time());
+        sb.AppendFormat(
+            " -- Expecting value in the range between {0} and {1}, and got value {2}.",
+            lowerLimit, upperLimit, val);
+        this.log.LogInformation("{Message}", sb.ToString());
+
+        bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
+
+        if (!tickCountIsInsideRange)
+        {
+            Assert.True(tickCountIsInsideRange, $"AssertIsInRange: {sb}  -- WHICH IS OUTSIDE RANGE.");
+        }
+    }
+
+    protected async Task ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)
+    {
+        for (long i = 1; i <= retries; i++)
+        {
             try
             {
-                // First handle should now be out of date once the seconf handle to the same reminder was obtained
-                await grain.StopReminder(r1);
-                Assert.Fail("Removed reminder1, which shouldn't be possible.");
+                await function(reminderName, period, validate).WaitAsync(TestConstants.InitTimeout);
+                return; // success ... no need to retry
             }
-            catch (Exception exc)
+            catch (AggregateException aggEx)
             {
-                log.LogInformation(exc, "Couldn't remove {Reminder}, as expected.", r1);
-            }
-
-            await grain.StopReminder(r2);
-            log.LogInformation("Removed reminder2 successfully");
-
-            // trying to see if readreminder works
-            _ = await grain.StartReminder(DR);
-            _ = await grain.StartReminder(DR);
-            _ = await grain.StartReminder(DR);
-            _ = await grain.StartReminder(DR);
-
-            IGrainReminder r = await grain.GetReminderObject(DR);
-            await grain.StopReminder(r);
-            log.LogInformation("Removed got reminder successfully");
-        }
-
-        public async Task Test_Reminders_Basic_ListOps()
-        {
-            Guid id = Guid.NewGuid();
-            log.LogInformation("Start Grain Id = {GrainId}", id);
-            IReminderTestGrain2 grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(id);
-            const int count = 5;
-            Task<IGrainReminder>[] startReminderTasks = new Task<IGrainReminder>[count];
-            for (int i = 0; i < count; i++)
-            {
-                startReminderTasks[i] = grain.StartReminder(DR + "_" + i);
-                log.LogInformation("Started {ReminderName}_{ReminderNumber}", DR, i);
-            }
-
-            await Task.WhenAll(startReminderTasks);
-            // do comparison on strings
-            List<string> registered = (from reminder in startReminderTasks select reminder.Result.ReminderName).ToList();
-
-            log.LogInformation("Waited");
-
-            List<IGrainReminder> remindersList = await grain.GetRemindersList();
-            List<string> fetched = (from reminder in remindersList select reminder.ReminderName).ToList();
-
-            foreach (var remRegistered in registered)
-            {
-                Assert.True(fetched.Remove(remRegistered), $"Couldn't get reminder {remRegistered}. " +
-                                                           $"Registered list: {Utils.EnumerableToString(registered)}, " +
-                                                           $"fetched list: {Utils.EnumerableToString(remindersList, r => r.ReminderName)}");
-            }
-            Assert.True(fetched.Count == 0, $"More than registered reminders. Extra: {Utils.EnumerableToString(fetched)}");
-
-            // do some time tests as well
-            log.LogInformation("Time tests");
-            TimeSpan period = await grain.GetReminderPeriod(DR);
-            await Task.Delay((period + LEEWAY).Multiply(2)); // giving some leeway, including leeway in each period to minimize flakiness
-            for (int i = 0; i < count; i++)
-            {
-                long curr = await grain.GetCounter(DR + "_" + i);
-                Assert.Equal(2, curr);
-            }
-        }
-
-        public async Task Test_Reminders_1J_MultiGrainMultiReminders()
-        {
-            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-
-            TimeSpan period = await g1.GetReminderPeriod(DR);
-
-            Task<bool>[] tasks =
-            {
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g1)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g2)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g3)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g4)),
-                Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
-            };
-
-            await Task.Delay(period.Multiply(5));
-
-            // start another silo ... although it will take it a while before it stabilizes
-            log.LogInformation("Starting another silo");
-            await this.HostedCluster.StartAdditionalSilosAsync(1, true);
-
-            //Block until all tasks complete.
-            await Task.WhenAll(tasks).WaitAsync(ENDWAIT);
-        }
-
-        public async Task Test_Reminders_ReminderNotFound()
-        {
-            IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-
-            // request a reminder that does not exist
-            IGrainReminder reminder = await g1.GetReminderObject("blarg");
-            Assert.Null(reminder);
-        }
-
-        internal async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g)
-        {
-            // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing 
-            // functionality implemented on the LocalReminderService yet
-            TimeSpan period = await g.GetReminderPeriod(DR);
-            this.log.LogInformation("PerGrainMultiReminderTestChurn Period={Period} Grain={Grain}", period, g);
-
-            // Start Default Reminder
-            //g.StartReminder(DR, file + "_" + DR).Wait();
-            await ExecuteWithRetries(g.StartReminder, DR);
-            TimeSpan sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
-            // Start R1
-            //g.StartReminder(R1, file + "_" + R1).Wait();
-            await ExecuteWithRetries(g.StartReminder, R1);
-            sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
-            // Start R2
-            //g.StartReminder(R2, file + "_" + R2).Wait();
-            await ExecuteWithRetries(g.StartReminder, R2);
-            sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
-
-            sleepFor = period.Multiply(1);
-            await Task.Delay(sleepFor);
-
-            // Stop R1
-            //g.StopReminder(R1).Wait();
-            await ExecuteWithRetriesStop(g.StopReminder, R1);
-            sleepFor = period.Multiply(2);
-            await Task.Delay(sleepFor);
-            // Stop R2
-            //g.StopReminder(R2).Wait();
-            await ExecuteWithRetriesStop(g.StopReminder, R2);
-            sleepFor = period.Multiply(1);
-            await Task.Delay(sleepFor);
-
-            // Stop Default reminder
-            //g.StopReminder(DR).Wait();
-            await ExecuteWithRetriesStop(g.StopReminder, DR);
-            sleepFor = period.Multiply(1) + LEEWAY; // giving some leeway
-            await Task.Delay(sleepFor);
-
-            long last = await g.GetCounter(R1);
-            AssertIsInRange(last, 4, 6, g, R1, sleepFor);
-
-            last = await g.GetCounter(R2);
-            AssertIsInRange(last, 4, 6, g, R2, sleepFor);
-
-            last = await g.GetCounter(DR);
-            AssertIsInRange(last, 9, 10, g, DR, sleepFor);
-
-            return true;
-        }
-
-        protected async Task<bool> PerGrainFailureTest(IReminderTestGrain2 grain)
-        {
-            TimeSpan period = await grain.GetReminderPeriod(DR);
-
-            this.log.LogInformation("PerGrainFailureTest Period={Period} Grain={Grain}", period, grain);
-
-            await grain.StartReminder(DR);
-            TimeSpan sleepFor = period.Multiply(failCheckAfter) + LEEWAY; // giving some leeway
-            await Task.Delay(sleepFor);
-            long last = await grain.GetCounter(DR);
-            AssertIsInRange(last, failCheckAfter - 1, failCheckAfter + 1, grain, DR, sleepFor);
-
-            await grain.StopReminder(DR);
-            sleepFor = period.Multiply(2) + LEEWAY; // giving some leeway
-            await Task.Delay(sleepFor);
-            long curr = await grain.GetCounter(DR);
-
-            AssertIsInRange(curr, last, last + 1, grain, DR, sleepFor);
-
-            return true;
-        }
-
-        protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g)
-        {
-            var (dueTime, period) = await g.GetReminderDueTimeAndPeriod(DR);
-
-            this.log.LogInformation("PerGrainMultiReminderTest Period={Period} Grain={Grain}", period, g);
-
-            // Each reminder is started 2 periods after the previous reminder
-            // once all reminders have been started, stop them every 2 periods
-            // except the default reminder, which we stop after 3 periods instead
-            // just to test and break the symmetry
-
-            // Start Default Reminder
-            await g.StartReminder(DR);
-            TimeSpan sleepFor = dueTime + period;
-            await Task.Delay(sleepFor);
-            var reminders = await g.GetReminderStates();
-            var (min, max) = GetExpectedRange(1);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
-
-            // Start R1
-            await g.StartReminder(R1);
-            await Task.Delay(sleepFor);
-            reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(1);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-
-            // Start R2
-            await g.StartReminder(R2);
-            await Task.Delay(sleepFor);
-            reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            (min, max) = GetExpectedRange(1);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(3);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
-
-            // Stop R1
-            await g.StopReminder(R1);
-            await Task.Delay(sleepFor);
-            reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(4);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
-
-            // Stop R2
-            await g.StopReminder(R2);
-            await Task.Delay(sleepFor);
-            reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(5);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
-
-            // Stop Default reminder
-            await g.StopReminder(DR);
-            await Task.Delay(sleepFor);
-            reminders = await g.GetReminderStates();
-            (min, max) = GetExpectedRange(2);
-            AssertIsInRange(reminders[R1].Fired.Count, min, max, g, R1, sleepFor);
-            AssertIsInRange(reminders[R2].Fired.Count, min, max, g, R2, sleepFor);
-            (min, max) = GetExpectedRange(5);
-            AssertIsInRange(reminders[DR].Fired.Count, min, max, g, DR, sleepFor);
-
-            return true;
-
-            (int MinFires, int MaxFires) GetExpectedRange(int numPeriods)
-            {
-                var minExpected = ((sleepFor - LEEWAY) * numPeriods - dueTime) / period;
-                var maxExpected = ((sleepFor + LEEWAY) * numPeriods - dueTime) / period;
-                return ((int)Math.Floor(minExpected), (int)Math.Ceiling(maxExpected));
-            }
-        }
-
-        protected async Task<bool> PerCopyGrainFailureTest(IReminderTestCopyGrain grain)
-        {
-            TimeSpan period = await grain.GetReminderPeriod(DR);
-
-            this.log.LogInformation("PerCopyGrainFailureTest Period={Period} Grain={Grain}", period, grain);
-
-            await grain.StartReminder(DR);
-            await Task.Delay(period.Multiply(failCheckAfter) + LEEWAY); // giving some leeway
-            long last = await grain.GetCounter(DR);
-            Assert.Equal(failCheckAfter, last);  // "{0} CopyGrain {1} Reminder {2}" // Time(), grain.GetPrimaryKey(), DR);
-
-            await grain.StopReminder(DR);
-            await Task.Delay(period.Multiply(2) + LEEWAY); // giving some leeway
-            long curr = await grain.GetCounter(DR);
-            Assert.Equal(last, curr); // "{0} CopyGrain {1} Reminder {2}", Time(), grain.GetPrimaryKey(), DR);
-
-            return true;
-        }
-
-        protected static string Time()
-        {
-            return DateTime.UtcNow.ToString("hh:mm:ss.fff");
-        }
-
-        protected void AssertIsInRange(long val, long lowerLimit, long upperLimit, IGrain grain, string reminderName, TimeSpan sleepFor)
-        {
-            StringBuilder sb = new StringBuilder();
-            sb.AppendFormat("Grain: {0} Grain PrimaryKey: {1}, Reminder: {2}, SleepFor: {3} Time now: {4}",
-                grain, grain.GetPrimaryKey(), reminderName, sleepFor, Time());
-            sb.AppendFormat(
-                " -- Expecting value in the range between {0} and {1}, and got value {2}.",
-                lowerLimit, upperLimit, val);
-            this.log.LogInformation("{Message}", sb.ToString());
-
-            bool tickCountIsInsideRange = lowerLimit <= val && val <= upperLimit;
-
-            if (!tickCountIsInsideRange)
-            {
-                Assert.True(tickCountIsInsideRange, $"AssertIsInRange: {sb}  -- WHICH IS OUTSIDE RANGE.");
-            }
-        }
-
-        protected async Task ExecuteWithRetries(Func<string, TimeSpan?, bool, Task> function, string reminderName, TimeSpan? period = null, bool validate = false)
-        {
-            for (long i = 1; i <= retries; i++)
-            {
-                try
-                {
-                    await function(reminderName, period, validate).WaitAsync(TestConstants.InitTimeout);
-                    return; // success ... no need to retry
-                }
-                catch (AggregateException aggEx)
-                {
-                    foreach (var exception in aggEx.InnerExceptions)
-                    {
-                        await HandleError(exception, i);
-                    }
-                }
-                catch (ReminderException exc)
-                {
-                    await HandleError(exc, i);
-                }
-            }
-
-            // execute one last time and bubble up errors if any
-            await function(reminderName, period, validate).WaitAsync(TestConstants.InitTimeout);
-        }
-
-        // Func<> doesnt take optional parameters, thats why we need a separate method
-        protected async Task ExecuteWithRetriesStop(Func<string, Task> function, string reminderName)
-        {
-            for (long i = 1; i <= retries; i++)
-            {
-                try
-                {
-                    await function(reminderName).WaitAsync(TestConstants.InitTimeout);
-                    return; // success ... no need to retry
-                }
-                catch (Exception exception)
+                foreach (var exception in aggEx.InnerExceptions)
                 {
                     await HandleError(exception, i);
                 }
             }
-
-            // execute one last time and bubble up errors if any
-            await function(reminderName).WaitAsync(TestConstants.InitTimeout);
+            catch (ReminderException exc)
+            {
+                await HandleError(exc, i);
+            }
         }
 
-        private async Task<bool> HandleError(Exception ex, long i)
+        // execute one last time and bubble up errors if any
+        await function(reminderName, period, validate).WaitAsync(TestConstants.InitTimeout);
+    }
+
+    // Func<> doesnt take optional parameters, thats why we need a separate method
+    protected async Task ExecuteWithRetriesStop(Func<string, Task> function, string reminderName)
+    {
+        for (long i = 1; i <= retries; i++)
         {
-            if (ex is AggregateException)
+            try
             {
-                ex = ((AggregateException)ex).Flatten().InnerException;
+                await function(reminderName).WaitAsync(TestConstants.InitTimeout);
+                return; // success ... no need to retry
             }
-
-            if (ex is ReminderException)
+            catch (Exception exception)
             {
-                this.log.LogInformation(ex, "Retryable operation failed on attempt {Attempt}", i);
-                await Task.Delay(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
-                return true;
+                await HandleError(exception, i);
             }
-
-            return false;
         }
+
+        // execute one last time and bubble up errors if any
+        await function(reminderName).WaitAsync(TestConstants.InitTimeout);
+    }
+
+    private async Task<bool> HandleError(Exception ex, long i)
+    {
+        if (ex is AggregateException aggregateException)
+        {
+            ex = aggregateException.Flatten().InnerException!;
+        }
+
+        if (ex is ReminderException)
+        {
+            this.log.LogInformation(ex, "Retryable operation failed on attempt {Attempt}", i);
+            await Task.Delay(TimeSpan.FromMilliseconds(10)); // sleep a bit before retrying
+            return true;
+        }
+
+        return false;
     }
 }
 // ReSharper restore InconsistentNaming

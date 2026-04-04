@@ -39,7 +39,8 @@ public class ReminderEventsTests
 
         ReminderEvents.EmitTickCompleted(grainId, reminderName, status, siloAddress, new RemindableStub());
 
-        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, reminderName, TimeSpan.FromSeconds(1));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, reminderName, cts.Token);
 
         Assert.Equal(grainId, tickCompleted.GrainId);
         Assert.Equal(reminderName, tickCompleted.ReminderName);
