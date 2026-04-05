@@ -485,7 +485,7 @@ namespace Orleans.Streams
                 else
                 {
                     var coldStreamData = new StreamConsumerCollection(now);
-                    pubSubCache.Add(streamId, streamData);
+                    pubSubCache.Add(streamId, coldStreamData);
 
                     // Run registration in the background so that cold-stream pubsub
                     // calls do not stall message delivery for other streams on the same queue.
@@ -545,11 +545,7 @@ namespace Orleans.Streams
             }
             catch (Exception exception)
             {
-                logger.LogWarning(
-                    (int)ErrorCode.PersistentStreamPullingAgent_17,
-                    exception,
-                    "Failed to register stream {StreamId}.",
-                    streamId);
+                LogWarningFailedToRegisterStream(streamId, exception);
 
                 // Only reached when producer registration itself fails.
                 if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)
@@ -575,10 +571,7 @@ namespace Orleans.Streams
                 }
                 catch (Exception exception)
                 {
-                    logger.LogWarning((int)ErrorCode.PersistentStreamPullingAgent_26,
-                        exception,
-                        "Failed to add subscription for stream {StreamId}.",
-                        item.Stream);
+                    LogWarningFailedToAddSubscription(item.Stream, exception);
                 }
             }
         }
@@ -1055,11 +1048,25 @@ namespace Orleans.Streams
         private static partial void LogErrorRegisterAsStreamProducer(ILogger logger, Exception exception);
 
         [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.PersistentStreamPullingAgent_17,
+            Message = "Failed to register stream {StreamId}."
+        )]
+        private partial void LogWarningFailedToRegisterStream(QualifiedStreamId streamId, Exception exception);
+
+        [LoggerMessage(
             Level = LogLevel.Debug,
             EventId = (int)ErrorCode.PersistentStreamPullingAgent_16,
             Message = "Got back {Count} subscribers for stream {StreamId}."
         )]
         private partial void LogDebugGotBackSubscribers(int count, QualifiedStreamId streamId);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)ErrorCode.PersistentStreamPullingAgent_26,
+            Message = "Failed to add subscription for stream {StreamId}."
+        )]
+        private partial void LogWarningFailedToAddSubscription(QualifiedStreamId streamId, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

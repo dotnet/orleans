@@ -70,7 +70,7 @@ namespace UnitTests.StreamingTests
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var agent = CreateAgent(pubSub: null, queueId);
 
-            await Assert.ThrowsAsync<NullReferenceException>(() => InvokeRegisterStream(agent, streamId, new EventSequenceTokenV2(1), DateTime.UtcNow));
+            await InvokeRegisterStream(agent, streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
             Assert.Empty(GetPubSubCache(agent));
         }
@@ -150,7 +150,9 @@ namespace UnitTests.StreamingTests
 
         private static Task InvokeRegisterStream(PersistentStreamPullingAgent agent, QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
-            return (Task)RegisterStreamMethod.Invoke(agent, [streamId, firstToken, now])!;
+            var streamData = new StreamConsumerCollection(now);
+            GetPubSubCache(agent).Add(streamId, streamData);
+            return (Task)RegisterStreamMethod.Invoke(agent, [streamData, streamId, firstToken])!;
         }
     }
 }
