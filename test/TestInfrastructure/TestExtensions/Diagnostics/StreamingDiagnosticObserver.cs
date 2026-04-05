@@ -76,6 +76,30 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Waits for a specific number of individual items to be delivered on a stream and then
+    /// for that stream to report a cursor-drained transition afterward.
+    /// </summary>
+    public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .Where(e => e switch
+            {
+                StreamingEvents.ItemDelivered item => MatchesStream(item.StreamId, item.StreamProvider, streamId, streamProvider),
+                StreamingEvents.ConsumerCursorDrained drained => MatchesStream(drained.StreamId, drained.StreamProvider, streamId, streamProvider),
+                _ => false,
+            })
+            .Scan((DeliveredCount: 0, Drained: false), (state, evt) => evt switch
+            {
+                StreamingEvents.ItemDelivered => (state.DeliveredCount + 1, state.Drained),
+                StreamingEvents.ConsumerCursorDrained when state.DeliveredCount >= expectedCount => (state.DeliveredCount, true),
+                _ => state,
+            })
+            .FirstAsync(state => state.Drained)
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Waits for a stream to become inactive.
     /// </summary>
     public async Task<StreamingEvents.StreamInactive> WaitForStreamInactiveAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
@@ -114,13 +138,143 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
-    /// Waits for a subscription to be removed on a specific stream.
+    /// Waits for a subscription to be durably registered on a specific stream.
     /// </summary>
+    public async Task<StreamingEvents.SubscriptionRegistered> WaitForSubscriptionRegisteredAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        return await _events
+            .OfType<StreamingEvents.SubscriptionRegistered>()
+            .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of subscriptions to be durably registered on a stream.
+    /// </summary>
+    public async Task WaitForSubscriptionRegisteredCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .OfType<StreamingEvents.SubscriptionRegistered>()
+            .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a subscription to be attached on a specific stream.
+    /// </summary>
+    public async Task<StreamingEvents.SubscriptionAttached> WaitForSubscriptionAttachedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        return await _events
+            .OfType<StreamingEvents.SubscriptionAttached>()
+            .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of subscriptions to be attached on a stream.
+    /// </summary>
+    public async Task WaitForSubscriptionAttachedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .OfType<StreamingEvents.SubscriptionAttached>()
+            .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+     /// Waits for a subscription to be removed on a specific stream.
+     /// </summary>
     public async Task<StreamingEvents.SubscriptionRemoved> WaitForSubscriptionRemovedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
     {
         return await _events
             .OfType<StreamingEvents.SubscriptionRemoved>()
             .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a subscription to be durably removed from a specific stream.
+    /// </summary>
+    public async Task<StreamingEvents.SubscriptionUnregistered> WaitForSubscriptionUnregisteredAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        return await _events
+            .OfType<StreamingEvents.SubscriptionUnregistered>()
+            .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of subscriptions to be durably removed from a stream.
+    /// </summary>
+    public async Task WaitForSubscriptionUnregisteredCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .OfType<StreamingEvents.SubscriptionUnregistered>()
+            .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a subscription to be detached from a specific stream.
+    /// </summary>
+    public async Task<StreamingEvents.SubscriptionDetached> WaitForSubscriptionDetachedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        return await _events
+            .OfType<StreamingEvents.SubscriptionDetached>()
+            .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of subscriptions to be detached from a stream.
+    /// </summary>
+    public async Task WaitForSubscriptionDetachedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .OfType<StreamingEvents.SubscriptionDetached>()
+            .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a consumer cursor to drain on a specific stream.
+    /// </summary>
+    public async Task<StreamingEvents.ConsumerCursorDrained> WaitForConsumerCursorDrainedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        return await _events
+            .OfType<StreamingEvents.ConsumerCursorDrained>()
+            .FirstAsync(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of consumer cursor drained events on a stream.
+    /// </summary>
+    public async Task WaitForConsumerCursorDrainedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .OfType<StreamingEvents.ConsumerCursorDrained>()
+            .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
             .ToTask(cancellationToken)
             .ConfigureAwait(false);
     }

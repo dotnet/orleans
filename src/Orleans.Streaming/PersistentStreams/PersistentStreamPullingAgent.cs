@@ -250,6 +250,7 @@ namespace Orleans.Streams
             {
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
+                StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 StreamingEvents.EmitSubscriptionAdded(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
                 if (data.State == StreamConsumerDataState.Inactive)
                     RunConsumerCursor(data).Ignore(); // Start delivering events if not actively doing so
@@ -335,6 +336,7 @@ namespace Orleans.Streams
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed)
             {
+                StreamingEvents.EmitSubscriptionDetached(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 StreamingEvents.EmitSubscriptionRemoved(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 LogDebugRemovedConsumer(subscriptionId, streamId);
             }
@@ -454,6 +456,7 @@ namespace Orleans.Streams
 
             LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
 
+            List<Task> registrationTasks = null;
             foreach (var group in
                 multiBatch
                 .Where(m => m != null)
@@ -470,9 +473,16 @@ namespace Orleans.Streams
                 }
                 else
                 {
-                    RegisterStream(streamId, startToken, now).Ignore(); // if this is a new stream register as producer of stream in pub sub system
+                    registrationTasks ??= new List<Task>();
+                    registrationTasks.Add(RegisterStream(streamId, startToken, now));
                 }
             }
+
+            if (registrationTasks is not null)
+            {
+                await Task.WhenAll(registrationTasks);
+            }
+
             return true;
         }
 
@@ -503,6 +513,17 @@ namespace Orleans.Streams
             {
                 await RegisterAsStreamProducer(streamId, firstToken);
                 streamData.StreamRegistered = true;
+            }
+            catch
+            {
+                if (pubSubCache.TryGetValue(streamId, out var cachedStreamData)
+                    && ReferenceEquals(cachedStreamData, streamData))
+                {
+                    pubSubCache.Remove(streamId);
+                }
+
+                streamData.DisposeAll(logger);
+                throw;
             }
             finally
             {
@@ -554,6 +575,7 @@ namespace Orleans.Streams
                         batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
                         if (batch == null)
                         {
+                            StreamingEvents.EmitConsumerCursorDrained(streamProviderName, consumerData.StreamId.StreamId, consumerData.SubscriptionId.Guid, Silo);
                             break;
                         }
                     }

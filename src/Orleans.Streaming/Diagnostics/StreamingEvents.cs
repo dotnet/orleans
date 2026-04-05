@@ -143,11 +143,73 @@ public static class StreamingEvents
     }
 
     /// <summary>
-    /// Event payload for when a stream subscription is removed.
+    /// Event payload for when a stream subscription is durably registered in pubsub state.
     /// </summary>
     /// <param name="streamProvider">The name of the stream provider.</param>
     /// <param name="streamId">The stream ID.</param>
     /// <param name="subscriptionId">The subscription ID.</param>
+    /// <param name="consumerGrainId">The grain ID of the consumer.</param>
+    /// <param name="siloAddress">The address of the silo handling this registration.</param>
+    public sealed class SubscriptionRegistered(
+        string streamProvider,
+        StreamId streamId,
+        Guid subscriptionId,
+        GrainId consumerGrainId,
+        SiloAddress? siloAddress) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The subscription ID.
+        /// </summary>
+        public readonly Guid SubscriptionId = subscriptionId;
+
+        /// <summary>
+        /// The grain ID of the consumer.
+        /// </summary>
+        public readonly GrainId ConsumerGrainId = consumerGrainId;
+    }
+
+    /// <summary>
+    /// Event payload for when a stream subscription is attached to a pulling agent and ready to receive data.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="subscriptionId">The subscription ID.</param>
+    /// <param name="consumerGrainId">The grain ID of the consumer.</param>
+    /// <param name="siloAddress">The address of the silo handling this attachment.</param>
+    public sealed class SubscriptionAttached(
+        string streamProvider,
+        StreamId streamId,
+        Guid subscriptionId,
+        GrainId consumerGrainId,
+        SiloAddress? siloAddress) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The subscription ID.
+        /// </summary>
+        public readonly Guid SubscriptionId = subscriptionId;
+
+        /// <summary>
+        /// The grain ID of the consumer.
+        /// </summary>
+        public readonly GrainId ConsumerGrainId = consumerGrainId;
+    }
+
+    /// <summary>
+     /// Event payload for when a stream subscription is removed.
+     /// </summary>
+     /// <param name="streamProvider">The name of the stream provider.</param>
+     /// <param name="streamId">The stream ID.</param>
+     /// <param name="subscriptionId">The subscription ID.</param>
     /// <param name="siloAddress">The address of the silo that handled this subscription.</param>
     public sealed class SubscriptionRemoved(
         string streamProvider,
@@ -167,8 +229,128 @@ public static class StreamingEvents
     }
 
     /// <summary>
-    /// Event payload for when an individual item from a stream batch is delivered to a consumer.
+    /// Event payload for when a stream subscription is durably removed from pubsub state.
     /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="subscriptionId">The subscription ID.</param>
+    /// <param name="siloAddress">The address of the silo handling this removal.</param>
+    public sealed class SubscriptionUnregistered(
+        string streamProvider,
+        StreamId streamId,
+        Guid subscriptionId,
+        SiloAddress? siloAddress) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The subscription ID.
+        /// </summary>
+        public readonly Guid SubscriptionId = subscriptionId;
+    }
+
+    /// <summary>
+    /// Event payload for when a stream subscription is detached from a pulling agent.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="subscriptionId">The subscription ID.</param>
+    /// <param name="siloAddress">The address of the silo handling this detachment.</param>
+    public sealed class SubscriptionDetached(
+        string streamProvider,
+        StreamId streamId,
+        Guid subscriptionId,
+        SiloAddress? siloAddress) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The subscription ID.
+        /// </summary>
+        public readonly Guid SubscriptionId = subscriptionId;
+    }
+
+    /// <summary>
+    /// Event payload for when a producer is durably registered in pubsub state for a stream.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="producerGrainId">The producer grain ID.</param>
+    /// <param name="siloAddress">The address of the silo handling this registration.</param>
+    public sealed class ProducerRegistered(
+        string streamProvider,
+        StreamId streamId,
+        GrainId producerGrainId,
+        SiloAddress? siloAddress) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The producer grain ID.
+        /// </summary>
+        public readonly GrainId ProducerGrainId = producerGrainId;
+    }
+
+    /// <summary>
+    /// Event payload for when a producer is durably removed from pubsub state for a stream.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="producerGrainId">The producer grain ID.</param>
+    /// <param name="siloAddress">The address of the silo handling this removal.</param>
+    public sealed class ProducerUnregistered(
+        string streamProvider,
+        StreamId streamId,
+        GrainId producerGrainId,
+        SiloAddress? siloAddress) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The producer grain ID.
+        /// </summary>
+        public readonly GrainId ProducerGrainId = producerGrainId;
+    }
+
+    /// <summary>
+    /// Event payload for when a consumer cursor is drained and no more currently available work remains.
+    /// </summary>
+    /// <param name="streamProvider">The name of the stream provider.</param>
+    /// <param name="streamId">The stream ID.</param>
+    /// <param name="subscriptionId">The subscription ID.</param>
+    /// <param name="siloAddress">The address of the silo handling this cursor.</param>
+    public sealed class ConsumerCursorDrained(
+        string streamProvider,
+        StreamId streamId,
+        Guid subscriptionId,
+        SiloAddress? siloAddress) : StreamingEvent(streamProvider, siloAddress)
+    {
+        /// <summary>
+        /// The stream ID.
+        /// </summary>
+        public readonly StreamId StreamId = streamId;
+
+        /// <summary>
+        /// The subscription ID.
+        /// </summary>
+        public readonly Guid SubscriptionId = subscriptionId;
+    }
+
+    /// <summary>
+     /// Event payload for when an individual item from a stream batch is delivered to a consumer.
+     /// </summary>
     /// <param name="streamProvider">The name of the stream provider.</param>
     /// <param name="streamId">The stream ID.</param>
     /// <param name="subscriptionId">The subscription ID of the consumer.</param>
@@ -291,6 +473,48 @@ public static class StreamingEvents
         }
     }
 
+    internal static void EmitSubscriptionRegistered(string streamProviderName, StreamId streamId, Guid subscriptionId, GrainId consumerGrainId, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(SubscriptionRegistered)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, streamId, subscriptionId, consumerGrainId, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, GrainId consumerGrainId, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(SubscriptionRegistered), new SubscriptionRegistered(
+                streamProviderName,
+                streamId,
+                subscriptionId,
+                consumerGrainId,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitSubscriptionAttached(string streamProviderName, StreamId streamId, Guid subscriptionId, GrainId consumerGrainId, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(SubscriptionAttached)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, streamId, subscriptionId, consumerGrainId, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, GrainId consumerGrainId, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(SubscriptionAttached), new SubscriptionAttached(
+                streamProviderName,
+                streamId,
+                subscriptionId,
+                consumerGrainId,
+                siloAddress));
+        }
+    }
+
     internal static void EmitSubscriptionRemoved(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
     {
         if (!Listener.IsEnabled(nameof(SubscriptionRemoved)))
@@ -304,6 +528,106 @@ public static class StreamingEvents
         static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
         {
             Listener.Write(nameof(SubscriptionRemoved), new SubscriptionRemoved(
+                streamProviderName,
+                streamId,
+                subscriptionId,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitSubscriptionUnregistered(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(SubscriptionUnregistered)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, streamId, subscriptionId, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(SubscriptionUnregistered), new SubscriptionUnregistered(
+                streamProviderName,
+                streamId,
+                subscriptionId,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitSubscriptionDetached(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(SubscriptionDetached)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, streamId, subscriptionId, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(SubscriptionDetached), new SubscriptionDetached(
+                streamProviderName,
+                streamId,
+                subscriptionId,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitProducerRegistered(string streamProviderName, StreamId streamId, GrainId producerGrainId, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(ProducerRegistered)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, streamId, producerGrainId, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, StreamId streamId, GrainId producerGrainId, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(ProducerRegistered), new ProducerRegistered(
+                streamProviderName,
+                streamId,
+                producerGrainId,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitProducerUnregistered(string streamProviderName, StreamId streamId, GrainId producerGrainId, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(ProducerUnregistered)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, streamId, producerGrainId, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, StreamId streamId, GrainId producerGrainId, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(ProducerUnregistered), new ProducerUnregistered(
+                streamProviderName,
+                streamId,
+                producerGrainId,
+                siloAddress));
+        }
+    }
+
+    internal static void EmitConsumerCursorDrained(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
+    {
+        if (!Listener.IsEnabled(nameof(ConsumerCursorDrained)))
+        {
+            return;
+        }
+
+        Emit(streamProviderName, streamId, subscriptionId, siloAddress);
+
+        [MethodImpl(MethodImplOptions.NoInlining)]
+        static void Emit(string streamProviderName, StreamId streamId, Guid subscriptionId, SiloAddress? siloAddress)
+        {
+            Listener.Write(nameof(ConsumerCursorDrained), new ConsumerCursorDrained(
                 streamProviderName,
                 streamId,
                 subscriptionId,

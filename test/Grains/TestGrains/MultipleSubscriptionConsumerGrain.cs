@@ -8,6 +8,7 @@ namespace UnitTests.Grains
     public class MultipleSubscriptionConsumerGrain : Grain, IMultipleSubscriptionConsumerGrain
     {
         private readonly Dictionary<StreamSubscriptionHandle<int>, Tuple<Counter,Counter>> consumedMessageCounts;
+        private readonly List<CountObserverRegistration> countObservers = [];
         private readonly ILogger logger;
         private int consumerCount = 0;
 
@@ -29,6 +30,20 @@ namespace UnitTests.Grains
             public void Clear()
             {
                 Value = 0;
+            }
+        }
+
+        private sealed class CountObserverRegistration
+        {
+            public Guid HandleId { get; }
+            public int ExpectedCount { get; }
+            public IMultipleSubscriptionConsumerObserver Observer { get; }
+
+            public CountObserverRegistration(Guid handleId, int expectedCount, IMultipleSubscriptionConsumerObserver observer)
+            {
+                HandleId = handleId;
+                ExpectedCount = expectedCount;
+                Observer = observer;
             }
         }
 
@@ -59,6 +74,7 @@ namespace UnitTests.Grains
 
             // track counter
             consumedMessageCounts.Add(handle, Tuple.Create(count,error));
+            NotifyObservers();
 
             // return handle
             return handle;
@@ -86,6 +102,7 @@ namespace UnitTests.Grains
 
             // track counter
             consumedMessageCounts[newhandle] = counters;
+            NotifyObservers();
 
             // return handle
             return newhandle;
@@ -100,6 +117,7 @@ namespace UnitTests.Grains
 
             // stop tracking event count for stream
             consumedMessageCounts.Remove(handle);
+            countObservers.RemoveAll(observer => observer.HandleId == handle.HandleId);
         }
 
         public Task<IList<StreamSubscriptionHandle<int>>> GetAllSubscriptions(Guid streamId, string streamNamespace, string providerToUse)
@@ -133,6 +151,8 @@ namespace UnitTests.Grains
                 counters.Item1.Clear();
                 counters.Item2.Clear();
             }
+
+            NotifyObservers();
             return Task.CompletedTask;
         }
 
@@ -148,6 +168,13 @@ namespace UnitTests.Grains
             return Task.CompletedTask;
         }
 
+        public Task RegisterCountObserver(Guid handleId, int expectedCount, IMultipleSubscriptionConsumerObserver observer)
+        {
+            countObservers.Add(new CountObserverRegistration(handleId, expectedCount, observer));
+            NotifyObservers();
+            return Task.CompletedTask;
+        }
+
         private Task OnNext(IList<SequentialItem<int>> items, int countCapture, Counter count)
         {
             foreach(SequentialItem<int> item in items)
@@ -160,6 +187,8 @@ namespace UnitTests.Grains
                 }
                 count.Increment();
             }
+
+            NotifyObservers();
             return Task.CompletedTask;
         }
 
@@ -167,7 +196,48 @@ namespace UnitTests.Grains
         {
             logger.LogInformation(e, "Got exception on handle {Handle}", countCapture);
             error.Increment();
+            NotifyObservers();
             return Task.CompletedTask;
+        }
+
+        private (int ConsumedCount, int ErrorCount)? GetCounts(Guid handleId)
+        {
+            foreach (var entry in consumedMessageCounts)
+            {
+                if (entry.Key.HandleId == handleId)
+                {
+                    return (entry.Value.Item1.Value, entry.Value.Item2.Value);
+                }
+            }
+
+            return null;
+        }
+
+        private void NotifyObservers()
+        {
+            for (var i = countObservers.Count - 1; i >= 0; i--)
+            {
+                var observer = countObservers[i];
+                var counts = GetCounts(observer.HandleId);
+                if (counts is null)
+                {
+                    countObservers.RemoveAt(i);
+                    continue;
+                }
+
+                if (counts.Value.ErrorCount > 0)
+                {
+                    observer.Observer.ConsumptionFailed(observer.HandleId, counts.Value.ErrorCount);
+                    countObservers.RemoveAt(i);
+                    continue;
+                }
+
+                if (counts.Value.ConsumedCount >= observer.ExpectedCount)
+                {
+                    observer.Observer.ConsumedCountReached(observer.HandleId, counts.Value.ConsumedCount);
+                    countObservers.RemoveAt(i);
+                }
+            }
         }
     }
 }
