@@ -23,7 +23,7 @@ namespace UnitTests.StreamingTests
         private static readonly FieldInfo PubSubCacheField = typeof(PersistentStreamPullingAgent).GetField("pubSubCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
-        public async Task ReadFromQueue_WaitsForColdStreamRegistration()
+        public async Task ReadFromQueue_DoesNotWaitForColdStreamRegistration()
         {
             var registration = new TaskCompletionSource<ISet<PubSubSubscriptionState>>(TaskCreationOptions.RunContinuationsAsynchronously);
             var pubSub = Substitute.For<IStreamPubSub>();
@@ -33,7 +33,8 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = StreamId.Create("namespace", Guid.NewGuid());
             var receiver = Substitute.For<IQueueAdapterReceiver>();
-            receiver.GetQueueMessagesAsync(1)
+            // Use Arg.Any<int>() to match regardless of the maxCacheAddCount value.
+            receiver.GetQueueMessagesAsync(Arg.Any<int>())
                 .Returns(Task.FromResult<IList<IBatchContainer>>(
                 [
                     new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
@@ -43,11 +44,23 @@ namespace UnitTests.StreamingTests
 
             var readTask = InvokeReadFromQueue(agent, queueId, receiver, 1);
 
-            Assert.False(readTask.IsCompleted);
+            // ReadFromQueue should complete immediately without waiting for cold-stream registration.
+            Assert.True(readTask.IsCompletedSuccessfully, $"ReadFromQueue should have completed synchronously (IsFaulted={readTask.IsFaulted})");
+            Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
 
+            // The stream entry is added synchronously by RegisterStream before its first await,
+            // so the pubSubCache already contains the stream even though registration is still pending.
+            var cache = GetPubSubCache(agent);
+            Assert.Single(cache);
+
+            var (_, streamData) = cache.Single();
+            Assert.NotNull(streamData.RegistrationTask);
+            Assert.False(streamData.RegistrationTask.IsCompleted, "Registration should still be in progress");
+
+            // Completing registration should resolve the tracked task and clear it.
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
-
-            Assert.True(await readTask);
+            await streamData.RegistrationTask;
+            Assert.Null(streamData.RegistrationTask);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
@@ -77,6 +90,9 @@ namespace UnitTests.StreamingTests
                 timerRegistry: null!,
                 activations: new ActivationDirectory());
 
+            var queueAdapter = Substitute.For<IQueueAdapter>();
+            queueAdapter.Name.Returns("provider");
+
             return new PersistentStreamPullingAgent(
                 SystemTargetGrainId.Create(SystemTargetGrainId.CreateGrainType("persistent-stream-pulling-agent-test"), siloAddress),
                 "provider",
@@ -84,13 +100,42 @@ namespace UnitTests.StreamingTests
                 new NoOpStreamFilter(),
                 queueId,
                 new StreamPullingAgentOptions(),
-                Substitute.For<IQueueAdapter>(),
+                queueAdapter,
                 queueAdapterCache: null,
                 new NoOpStreamDeliveryFailureHandler(),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 new FixedBackoff(TimeSpan.FromMilliseconds(1)),
                 TimeProvider.System,
                 shared);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task RegisterStream_KeepsCacheEntryWhenSubscriberHandshakeFails()
+        {
+            // A subscriber whose grain reference cannot be resolved (RuntimeClient is null in test setup)
+            // simulates a handshake failure.  The stream entry must survive.
+            var subscriptionId = GuidId.GetGuidId(Guid.NewGuid());
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var consumerGrainId = GrainId.Create("test", Guid.NewGuid().ToString());
+
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(
+                    new HashSet<PubSubSubscriptionState>
+                    {
+                        new PubSubSubscriptionState(subscriptionId, streamId, consumerGrainId),
+                    }));
+
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var agent = CreateAgent(pubSub, queueId);
+
+            // RegisterStream should complete without throwing even though the subscriber
+            // handshake will fault (NullReferenceException from the null RuntimeClient).
+            await InvokeRegisterStream(agent, streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
+
+            var cache = GetPubSubCache(agent);
+            Assert.True(cache.ContainsKey(streamId), "Stream entry must remain in pubsub cache after a subscriber-handshake failure.");
+            Assert.True(cache[streamId].StreamRegistered, "StreamRegistered must be true once producer registration succeeds.");
         }
 
         private static Dictionary<QualifiedStreamId, StreamConsumerCollection> GetPubSubCache(PersistentStreamPullingAgent agent)

@@ -100,6 +100,30 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Waits for a specific number of individual items to be delivered to a particular subscription and then
+    /// for that subscription's cursor-drained transition to be reported.
+    /// </summary>
+    public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, Guid subscriptionId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .Where(e => e switch
+            {
+                StreamingEvents.ItemDelivered item => MatchesSubscription(item.StreamId, item.SubscriptionId, item.StreamProvider, streamId, subscriptionId, streamProvider),
+                StreamingEvents.ConsumerCursorDrained drained => MatchesSubscription(drained.StreamId, drained.SubscriptionId, drained.StreamProvider, streamId, subscriptionId, streamProvider),
+                _ => false,
+            })
+            .Scan((DeliveredCount: 0, Drained: false), (state, evt) => evt switch
+            {
+                StreamingEvents.ItemDelivered => (state.DeliveredCount + 1, state.Drained),
+                StreamingEvents.ConsumerCursorDrained when state.DeliveredCount >= expectedCount => (state.DeliveredCount, true),
+                _ => state,
+            })
+            .FirstAsync(state => state.Drained)
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Waits for a stream to become inactive.
     /// </summary>
     public async Task<StreamingEvents.StreamInactive> WaitForStreamInactiveAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
@@ -266,6 +290,18 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Waits for a consumer cursor to drain for a specific subscription.
+    /// </summary>
+    public async Task<StreamingEvents.ConsumerCursorDrained> WaitForConsumerCursorDrainedAsync(StreamId streamId, Guid subscriptionId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        return await _events
+            .OfType<StreamingEvents.ConsumerCursorDrained>()
+            .FirstAsync(e => MatchesSubscription(e.StreamId, e.SubscriptionId, e.StreamProvider, streamId, subscriptionId, streamProvider))
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Waits for a specific number of consumer cursor drained events on a stream.
     /// </summary>
     public async Task WaitForConsumerCursorDrainedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
@@ -273,6 +309,20 @@ public sealed class StreamingDiagnosticObserver : IDisposable
         await _events
             .OfType<StreamingEvents.ConsumerCursorDrained>()
             .Where(e => MatchesStream(e.StreamId, e.StreamProvider, streamId, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
+    /// Waits for a specific number of consumer cursor drained events for a specific subscription.
+    /// </summary>
+    public async Task WaitForConsumerCursorDrainedCountAsync(StreamId streamId, Guid subscriptionId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    {
+        await _events
+            .OfType<StreamingEvents.ConsumerCursorDrained>()
+            .Where(e => MatchesSubscription(e.StreamId, e.SubscriptionId, e.StreamProvider, streamId, subscriptionId, streamProvider))
             .Take(expectedCount)
             .LastOrDefaultAsync()
             .ToTask(cancellationToken)
@@ -296,6 +346,13 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     private static bool MatchesStream(StreamId eventStreamId, string eventStreamProvider, StreamId streamId, string? streamProvider)
     {
         return eventStreamId == streamId
+            && (streamProvider is null || eventStreamProvider == streamProvider);
+    }
+
+    private static bool MatchesSubscription(StreamId eventStreamId, Guid eventSubscriptionId, string eventStreamProvider, StreamId streamId, Guid subscriptionId, string? streamProvider)
+    {
+        return eventStreamId == streamId
+            && eventSubscriptionId == subscriptionId
             && (streamProvider is null || eventStreamProvider == streamProvider);
     }
 
