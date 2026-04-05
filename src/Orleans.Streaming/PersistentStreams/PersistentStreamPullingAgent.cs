@@ -519,6 +519,12 @@ namespace Orleans.Streams
             try
             {
                 pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
+
+                // The pin cursor must be established inline with queue reading, but the
+                // registration work itself must always continue asynchronously so the
+                // hot read path does not depend on synchronous pubsub implementations.
+                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
                 var subscribers = await RegisterAsStreamProducer(streamId);
 
                 // Producer registration succeeded; the stream entry is now established.

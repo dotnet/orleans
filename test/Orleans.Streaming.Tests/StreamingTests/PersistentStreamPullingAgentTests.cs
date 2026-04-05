@@ -46,20 +46,59 @@ namespace UnitTests.StreamingTests
 
             // ReadFromQueue should complete immediately without waiting for cold-stream registration.
             Assert.True(readTask.IsCompletedSuccessfully, $"ReadFromQueue should have completed synchronously (IsFaulted={readTask.IsFaulted})");
-            Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
 
-            // The stream entry is added synchronously by RegisterStream before its first await,
-            // so the pubSubCache already contains the stream even though registration is still pending.
+            // ReadFromQueue adds the stream entry synchronously and tracks the in-flight
+            // background registration task for the cold stream.
             var cache = GetPubSubCache(agent);
             Assert.Single(cache);
 
             var (_, streamData) = cache.Single();
-            Assert.NotNull(streamData.RegistrationTask);
-            Assert.False(streamData.RegistrationTask.IsCompleted, "Registration should still be in progress");
+            var registrationTask = streamData.RegistrationTask;
+            Assert.NotNull(registrationTask);
+            Assert.False(registrationTask.IsCompleted, "Registration should still be in progress");
+
+            Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
 
             // Completing registration should resolve the tracked task and clear it.
             registration.SetResult(new HashSet<PubSubSubscriptionState>());
-            await streamData.RegistrationTask;
+            await registrationTask;
+            Assert.Null(streamData.RegistrationTask);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_ClearsRegistrationTaskWhenColdStreamRegistrationCompletesSynchronously()
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            pubSub.RegisterProducer(default, default)
+                .ReturnsForAnyArgs(Task.FromResult<ISet<PubSubSubscriptionState>>(new HashSet<PubSubSubscriptionState>()));
+
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = StreamId.Create("namespace", Guid.NewGuid());
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>(
+                [
+                    new GeneratedBatchContainer(streamId, 1, new EventSequenceTokenV2(1)),
+                ]));
+
+            var agent = CreateAgent(pubSub, queueId);
+
+            var readTask = InvokeReadFromQueue(agent, queueId, receiver, 1);
+
+            Assert.True(readTask.IsCompletedSuccessfully, $"ReadFromQueue should have completed synchronously (IsFaulted={readTask.IsFaulted})");
+            Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
+
+            var cache = GetPubSubCache(agent);
+            Assert.Single(cache);
+
+            var (_, streamData) = cache.Single();
+            var registrationTask = streamData.RegistrationTask;
+            if (registrationTask is not null)
+            {
+                await registrationTask;
+            }
+
+            Assert.True(streamData.StreamRegistered);
             Assert.Null(streamData.RegistrationTask);
         }
 
