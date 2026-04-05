@@ -484,12 +484,9 @@ namespace Orleans.Streams
                 }
                 else
                 {
-                    var coldStreamData = new StreamConsumerCollection(now);
-                    pubSubCache.Add(streamId, coldStreamData);
-
                     // Run registration in the background so that cold-stream pubsub
                     // calls do not stall message delivery for other streams on the same queue.
-                    coldStreamData.RegistrationTask = RegisterStream(coldStreamData, streamId, startToken);
+                    RegisterStream(streamId, startToken, now);
                 }
             }
 
@@ -509,8 +506,11 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RegisterStream(StreamConsumerCollection streamData, QualifiedStreamId streamId, StreamSequenceToken firstToken)
+        private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
+            var streamData = new StreamConsumerCollection(now);
+            pubSubCache.Add(streamId, streamData);
+
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
@@ -519,37 +519,57 @@ namespace Orleans.Streams
             try
             {
                 pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
-
-                // The pin cursor must be established inline with queue reading, but the
-                // registration work itself must always continue asynchronously so the
-                // hot read path does not depend on synchronous pubsub implementations.
-                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
-
-                var subscribers = await RegisterAsStreamProducer(streamId);
-
-                // Producer registration succeeded; the stream entry is now established.
-                // Subscriber-handshake failures must not tear down the entry from here on.
-                streamData.StreamRegistered = true;
-
-                LogDebugGotBackSubscribers(subscribers.Count, streamId);
-
-                // Await all initial subscriber handshakes before releasing the pin cursor so
-                // that the first batch cannot be purged from the cache before each subscriber
-                // has established its own cursor.
-                if (subscribers.Count > 0)
-                {
-                    var addSubscriptionTasks = new List<Task>(subscribers.Count);
-                    foreach (PubSubSubscriptionState item in subscribers)
-                    {
-                        addSubscriptionTasks.Add(SubscribeWithIsolation(item));
-                    }
-
-                    await Task.WhenAll(addSubscriptionTasks);
-                }
-
-                streamData.RegistrationTask = null;
+                streamData.RegistrationTask = RegisterStreamAsync();
             }
             catch (Exception exception)
+            {
+                pinCursor?.Dispose();
+                FailRegistration(exception);
+            }
+
+            async Task RegisterStreamAsync()
+            {
+                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
+                try
+                {
+                    var subscribers = await RegisterAsStreamProducer(streamId);
+
+                    // Producer registration succeeded; the stream entry is now established.
+                    // Subscriber-handshake failures must not tear down the entry from here on.
+                    streamData.StreamRegistered = true;
+
+                    LogDebugGotBackSubscribers(subscribers.Count, streamId);
+
+                    // Await all initial subscriber handshakes before releasing the pin cursor so
+                    // that the first batch cannot be purged from the cache before each subscriber
+                    // has established its own cursor.
+                    if (subscribers.Count > 0)
+                    {
+                        var addSubscriptionTasks = new List<Task>(subscribers.Count);
+                        foreach (PubSubSubscriptionState item in subscribers)
+                        {
+                            addSubscriptionTasks.Add(SubscribeWithIsolation(item));
+                        }
+
+                        await Task.WhenAll(addSubscriptionTasks);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    FailRegistration(exception);
+                }
+                finally
+                {
+                    streamData.RegistrationTask = null;
+
+                    // Disposed after all initial subscriber handshakes complete so the first
+                    // batch stays pinned until each subscriber has its own cache cursor.
+                    pinCursor?.Dispose();
+                }
+            }
+
+            void FailRegistration(Exception exception)
             {
                 LogWarningFailedToRegisterStream(streamId, exception);
 
@@ -561,12 +581,6 @@ namespace Orleans.Streams
                 }
 
                 streamData.DisposeAll(logger);
-            }
-            finally
-            {
-                // Disposed after all initial subscriber handshakes complete so the first
-                // batch stays pinned until each subscriber has its own cache cursor.
-                pinCursor?.Dispose();
             }
 
             async Task SubscribeWithIsolation(PubSubSubscriptionState item)

@@ -189,9 +189,14 @@ namespace UnitTests.StreamingTests
 
         private static Task InvokeRegisterStream(PersistentStreamPullingAgent agent, QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
-            var streamData = new StreamConsumerCollection(now);
-            GetPubSubCache(agent).Add(streamId, streamData);
-            return (Task)RegisterStreamMethod.Invoke(agent, [streamData, streamId, firstToken])!;
+            RegisterStreamMethod.Invoke(agent, [streamId, firstToken, now]);
+
+            if (GetPubSubCache(agent).TryGetValue(streamId, out var streamData) && streamData.RegistrationTask is { } registrationTask)
+            {
+                return registrationTask;
+            }
+
+            return Task.CompletedTask;
         }
     }
 }
