@@ -484,18 +484,12 @@ namespace Orleans.Streams
                 }
                 else
                 {
-                    // RegisterStream synchronously adds the entry to pubSubCache before its
-                    // first await, so subsequent batches for this stream will take the if-branch
-                    // above. Run registration in the background so that cold-stream pubsub
-                    // calls do not stall message delivery for other streams on the same queue.
-                    var task = RegisterStream(streamId, startToken, now);
+                    var coldStreamData = new StreamConsumerCollection(now);
+                    pubSubCache.Add(streamId, streamData);
 
-                    // Capture the in-flight task for single-flight tracking; pubSubCache
-                    // already holds the entry at this point.
-                    if (pubSubCache.TryGetValue(streamId, out var coldStreamData))
-                    {
-                        coldStreamData.RegistrationTask = task;
-                    }
+                    // Run registration in the background so that cold-stream pubsub
+                    // calls do not stall message delivery for other streams on the same queue.
+                    coldStreamData.RegistrationTask = RegisterStream(coldStreamData, streamId, startToken);
                 }
             }
 
@@ -515,10 +509,8 @@ namespace Orleans.Streams
             }
         }
 
-        private async Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
+        private async Task RegisterStream(StreamConsumerCollection streamData, QualifiedStreamId streamId, StreamSequenceToken firstToken)
         {
-            var streamData = new StreamConsumerCollection(now);
-            pubSubCache.Add(streamId, streamData);
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
@@ -527,7 +519,7 @@ namespace Orleans.Streams
             try
             {
                 pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
-                ISet<PubSubSubscriptionState> subscribers = await RegisterAsStreamProducer(streamId);
+                var subscribers = await RegisterAsStreamProducer(streamId);
 
                 // Producer registration succeeded; the stream entry is now established.
                 // Subscriber-handshake failures must not tear down the entry from here on.
@@ -537,9 +529,7 @@ namespace Orleans.Streams
 
                 // Await all initial subscriber handshakes before releasing the pin cursor so
                 // that the first batch cannot be purged from the cache before each subscriber
-                // has established its own cursor.  Each handshake is wrapped with
-                // SuppressThrowing for per-subscriber failure isolation: a fault on one
-                // subscriber is logged individually and does not abort the others.
+                // has established its own cursor.
                 if (subscribers.Count > 0)
                 {
                     var addSubscriptionTasks = new List<Task>(subscribers.Count);
