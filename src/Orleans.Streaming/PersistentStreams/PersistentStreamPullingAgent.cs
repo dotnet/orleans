@@ -509,23 +509,14 @@ namespace Orleans.Streams
         private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
             var streamData = new StreamConsumerCollection(now);
-            pubSubCache.Add(streamId, streamData);
 
             // Create a fake cursor to point into a cache.
             // That way we will not purge the event from the cache, until we talk to pub sub.
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
-            IQueueCacheCursor pinCursor = null;
-            try
-            {
-                pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
-                streamData.RegistrationTask = RegisterStreamAsync();
-            }
-            catch (Exception exception)
-            {
-                pinCursor?.Dispose();
-                FailRegistration(exception);
-            }
+            var pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
+            streamData.RegistrationTask = RegisterStreamAsync();
+            pubSubCache.Add(streamId, streamData);
 
             async Task RegisterStreamAsync()
             {
