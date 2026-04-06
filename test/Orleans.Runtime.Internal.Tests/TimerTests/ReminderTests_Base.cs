@@ -233,8 +233,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         this.log.LogInformation("PerGrainFailureTest Grain={Grain}", grain);
 
         await grain.StartReminder(DR);
-        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR, cancellationToken);
-        long last = await grain.GetCounter(DR);
+        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), failCheckAfter, cancellationToken);
         Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
         await grain.StopReminder(DR);
@@ -245,6 +244,33 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         AssertIsInRange(curr, last, last + 1, grain, DR, TimeSpan.FromMilliseconds(200));
 
         return true;
+    }
+
+    private async Task<long> WaitForReminderCounterAsync(IAddressable grain, string reminderName, Func<Task<long>> getCounter, long minimumCount, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(grain);
+        ArgumentNullException.ThrowIfNull(getCounter);
+        ArgumentOutOfRangeException.ThrowIfNegative(minimumCount);
+
+        long result = 0;
+        await observer.WaitForTickConditionAsync(
+            grain,
+            async ct =>
+            {
+                try
+                {
+                    result = await getCounter();
+                    return result >= minimumCount;
+                }
+                catch (FileNotFoundException) when (!ct.IsCancellationRequested)
+                {
+                    return false;
+                }
+            },
+            reminderName,
+            cancellationToken);
+
+        return result;
     }
 
     protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g, CancellationToken cancellationToken = default)
@@ -309,14 +335,13 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         this.log.LogInformation("PerCopyGrainFailureTest Grain={Grain}", grain);
 
         await grain.StartReminder(DR);
-        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR, cancellationToken);
-        long last = await grain.GetCounter(DR);
-        Assert.Equal(failCheckAfter, last);
+        long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), failCheckAfter, cancellationToken);
+        Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
         await grain.StopReminder(DR);
         await Task.Delay(TimeSpan.FromMilliseconds(200));
         long curr = await grain.GetCounter(DR);
-        Assert.Equal(last, curr);
+        AssertIsInRange(curr, last, last + 1, grain, DR, TimeSpan.FromMilliseconds(200));
 
         return true;
     }

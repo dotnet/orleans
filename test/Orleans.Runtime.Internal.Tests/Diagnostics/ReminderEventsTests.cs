@@ -77,6 +77,44 @@ public class ReminderEventsTests
         await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
     }
 
+    [Fact, TestCategory("BVT")]
+    public async Task ReminderDiagnosticObserver_WaitsForTickCondition_UntilConditionIsSatisfied()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        var grainId = GrainId.Create("test", "grain");
+        const string reminderName = "reminder";
+        var now = DateTime.UtcNow;
+        var period = TimeSpan.FromSeconds(5);
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14003), 4);
+        var acceptedTickCount = 0;
+
+        var waitTask = observer.WaitForTickConditionAsync(
+            grainId,
+            _ => Task.FromResult(acceptedTickCount >= 1),
+            reminderName);
+
+        Assert.False(waitTask.IsCompleted);
+
+        ReminderEvents.EmitTickCompleted(
+            grainId,
+            reminderName,
+            new TickStatus(now, period, now),
+            siloAddress,
+            new RemindableStub());
+
+        Assert.False(waitTask.IsCompleted);
+
+        acceptedTickCount = 1;
+        ReminderEvents.EmitTickCompleted(
+            grainId,
+            reminderName,
+            new TickStatus(now, period, now.Add(period)),
+            siloAddress,
+            new RemindableStub());
+
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+    }
+
     private sealed class Observer : IObserver<ReminderEvents.ReminderEvent>, IDisposable
     {
         private readonly IDisposable _subscription;

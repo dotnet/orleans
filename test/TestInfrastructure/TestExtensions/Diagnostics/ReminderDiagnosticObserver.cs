@@ -110,6 +110,27 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Waits until a condition associated with reminder ticks becomes true, re-evaluating after each matching tick.
+    /// </summary>
+    public async Task WaitForTickConditionAsync(GrainId grainId, Func<CancellationToken, Task<bool>> condition, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var nextTickTarget = GetTickCount(grainId, reminderName) + 1;
+            if (await condition(cancellationToken).ConfigureAwait(false))
+            {
+                return;
+            }
+
+            await WaitForTickCountCoreAsync(grainId, nextTickTarget, reminderName, cancellationToken).ConfigureAwait(false);
+        }
+    }
+
+    /// <summary>
     /// Waits for a reminder to be registered.
     /// </summary>
     public Task<ReminderEvents.Registered> WaitForReminderRegisteredAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken = default)
@@ -246,6 +267,14 @@ public static class ReminderDiagnosticExtensions
     public static Task WaitForAdditionalTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int additionalCount, string? reminderName = null, CancellationToken cancellationToken = default)
     {
         return observer.WaitForAdditionalTickCountAsync(grain.GetGrainId(), additionalCount, reminderName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits until a condition associated with reminder ticks on a grain becomes true.
+    /// </summary>
+    public static Task WaitForTickConditionAsync(this ReminderDiagnosticObserver observer, IAddressable grain, Func<CancellationToken, Task<bool>> condition, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        return observer.WaitForTickConditionAsync(grain.GetGrainId(), condition, reminderName, cancellationToken);
     }
 
     /// <summary>
