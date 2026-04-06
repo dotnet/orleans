@@ -1,6 +1,5 @@
 using System.Collections.Generic;
 using System.Net;
-using System.Reflection;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using NSubstitute;
@@ -18,10 +17,6 @@ namespace UnitTests.StreamingTests
 {
     public class PersistentStreamPullingAgentTests
     {
-        private static readonly MethodInfo ReadFromQueueMethod = typeof(PersistentStreamPullingAgent).GetMethod("ReadFromQueue", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        private static readonly MethodInfo RegisterStreamMethod = typeof(PersistentStreamPullingAgent).GetMethod("RegisterStream", BindingFlags.Instance | BindingFlags.NonPublic)!;
-        private static readonly FieldInfo PubSubCacheField = typeof(PersistentStreamPullingAgent).GetField("pubSubCache", BindingFlags.Instance | BindingFlags.NonPublic)!;
-
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task ReadFromQueue_DoesNotWaitForColdStreamRegistration()
         {
@@ -41,15 +36,13 @@ namespace UnitTests.StreamingTests
                 ]));
 
             var agent = CreateAgent(pubSub, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
 
-            var readTask = InvokeReadFromQueue(agent, queueId, receiver, 1);
-
-            // ReadFromQueue should complete immediately without waiting for cold-stream registration.
-            Assert.True(readTask.IsCompletedSuccessfully, $"ReadFromQueue should have completed synchronously (IsFaulted={readTask.IsFaulted})");
+            var readTask = testAccessor.ReadFromQueue(queueId, receiver, 1);
 
             // ReadFromQueue adds the stream entry synchronously and tracks the in-flight
             // background registration task for the cold stream.
-            var cache = GetPubSubCache(agent);
+            var cache = await testAccessor.GetPubSubCache();
             Assert.Single(cache);
 
             var (_, streamData) = cache.Single();
@@ -82,13 +75,12 @@ namespace UnitTests.StreamingTests
                 ]));
 
             var agent = CreateAgent(pubSub, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
 
-            var readTask = InvokeReadFromQueue(agent, queueId, receiver, 1);
+            var readResult = await testAccessor.ReadFromQueue(queueId, receiver, 1);
+            Assert.True(readResult, "ReadFromQueue should return true indicating data was read");
 
-            Assert.True(readTask.IsCompletedSuccessfully, $"ReadFromQueue should have completed synchronously (IsFaulted={readTask.IsFaulted})");
-            Assert.True(await readTask, "ReadFromQueue should return true indicating data was read");
-
-            var cache = GetPubSubCache(agent);
+            var cache = await testAccessor.GetPubSubCache();
             Assert.Single(cache);
 
             var (_, streamData) = cache.Single();
@@ -108,10 +100,11 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var agent = CreateAgent(pubSub: null, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
 
-            await InvokeRegisterStream(agent, streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
+            await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
-            Assert.Empty(GetPubSubCache(agent));
+            Assert.Empty(await testAccessor.GetPubSubCache());
         }
 
         private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub pubSub, QueueId queueId)
@@ -167,36 +160,15 @@ namespace UnitTests.StreamingTests
 
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var agent = CreateAgent(pubSub, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
 
             // RegisterStream should complete without throwing even though the subscriber
             // handshake will fault (NullReferenceException from the null RuntimeClient).
-            await InvokeRegisterStream(agent, streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
+            await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
-            var cache = GetPubSubCache(agent);
+            var cache = await testAccessor.GetPubSubCache();
             Assert.True(cache.ContainsKey(streamId), "Stream entry must remain in pubsub cache after a subscriber-handshake failure.");
             Assert.True(cache[streamId].StreamRegistered, "StreamRegistered must be true once producer registration succeeds.");
-        }
-
-        private static Dictionary<QualifiedStreamId, StreamConsumerCollection> GetPubSubCache(PersistentStreamPullingAgent agent)
-        {
-            return (Dictionary<QualifiedStreamId, StreamConsumerCollection>)PubSubCacheField.GetValue(agent)!;
-        }
-
-        private static Task<bool> InvokeReadFromQueue(PersistentStreamPullingAgent agent, QueueId queueId, IQueueAdapterReceiver receiver, int maxCacheAddCount)
-        {
-            return (Task<bool>)ReadFromQueueMethod.Invoke(agent, [queueId, receiver, maxCacheAddCount])!;
-        }
-
-        private static Task InvokeRegisterStream(PersistentStreamPullingAgent agent, QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
-        {
-            RegisterStreamMethod.Invoke(agent, [streamId, firstToken, now]);
-
-            if (GetPubSubCache(agent).TryGetValue(streamId, out var streamData) && streamData.RegistrationTask is { } registrationTask)
-            {
-                return registrationTask;
-            }
-
-            return Task.CompletedTask;
         }
     }
 }

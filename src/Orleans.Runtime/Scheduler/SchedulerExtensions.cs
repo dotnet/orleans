@@ -46,6 +46,13 @@ namespace Orleans.Runtime.Scheduler
             return workItem.Task;
         }
 
+        internal static Task<TResult> RunOrQueueTaskResult<TResult>(this IGrainContext targetContext, Func<TResult> taskFunc)
+        {
+            var task = new Task<TResult>(taskFunc);
+            targetContext.Scheduler.QueueTask(task);
+            return task;
+        }
+
         internal static ValueTask RunOrQueueTask<TState>(this IGrainContext targetContext, Func<TState, ValueTask> taskFunc, TState state)
         {
             var currentContext = RuntimeContext.Current;

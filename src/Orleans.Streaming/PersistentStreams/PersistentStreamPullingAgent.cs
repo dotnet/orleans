@@ -10,13 +10,14 @@ using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
+using Orleans.Runtime.Scheduler;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
 
 #nullable disable
 namespace Orleans.Streams
 {
-    internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent
+    internal sealed partial class PersistentStreamPullingAgent : SystemTarget, IPersistentStreamPullingAgent, PersistentStreamPullingAgent.ITestAccessor
     {
         private const int ReadLoopRetryMax = 6;
         private const int StreamInactivityCheckFrequency = 10;
@@ -43,6 +44,13 @@ namespace Orleans.Streams
         private Task receiverInitTask;
         private bool IsShutdown => timer == null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
+
+        internal interface ITestAccessor
+        {
+            Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount);
+            Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
+            Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
+        }
 
         internal PersistentStreamPullingAgent(
             SystemTargetGrainId id,
@@ -80,6 +88,25 @@ namespace Orleans.Streams
             LogInfoCreated(GetType().Name, GrainId, strProviderName, Silo, new(QueueId));
             shared.ActivationDirectory.RecordNewTarget(this);
         }
+
+        Task<bool> ITestAccessor.ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount)
+            => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount)).Unwrap();
+
+        Task ITestAccessor.RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
+            => this.RunOrQueueTaskResult(() =>
+            {
+                RegisterStream(streamId, firstToken, now);
+
+                if (pubSubCache.TryGetValue(streamId, out var streamData) && streamData.RegistrationTask is { } registrationTask)
+                {
+                    return registrationTask;
+                }
+
+                return Task.CompletedTask;
+            }).Unwrap();
+
+        Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
+            => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
 
         /// <summary>
         /// Take responsibility for a new queues that was assigned to me via a new range.
