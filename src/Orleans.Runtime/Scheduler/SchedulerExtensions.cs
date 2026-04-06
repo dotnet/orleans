@@ -29,7 +29,7 @@ namespace Orleans.Runtime.Scheduler
         internal static Task RunOrQueueTask(this IGrainContext targetContext, Func<Task> taskFunc)
         {
             var currentContext = RuntimeContext.Current;
-            if (currentContext != null && currentContext.Equals(targetContext))
+            if (currentContext is not null && currentContext.Equals(targetContext))
             {
                 try
                 {
@@ -37,7 +37,7 @@ namespace Orleans.Runtime.Scheduler
                 }
                 catch (Exception exc)
                 {
-                    return Task.FromResult(exc);
+                    return Task.FromException(exc);
                 }
             }
 
@@ -48,6 +48,19 @@ namespace Orleans.Runtime.Scheduler
 
         internal static Task<TResult> RunOrQueueTaskResult<TResult>(this IGrainContext targetContext, Func<TResult> taskFunc)
         {
+            var currentContext = RuntimeContext.Current;
+            if (currentContext is not null && currentContext.Equals(targetContext))
+            {
+                try
+                {
+                    return Task.FromResult(taskFunc());
+                }
+                catch (Exception exc)
+                {
+                    return Task.FromException<TResult>(exc);
+                }
+            }
+
             var task = new Task<TResult>(taskFunc);
             targetContext.Scheduler.QueueTask(task);
             return task;
@@ -56,7 +69,7 @@ namespace Orleans.Runtime.Scheduler
         internal static ValueTask RunOrQueueTask<TState>(this IGrainContext targetContext, Func<TState, ValueTask> taskFunc, TState state)
         {
             var currentContext = RuntimeContext.Current;
-            if (currentContext != null && currentContext.Equals(targetContext))
+            if (currentContext is not null && currentContext.Equals(targetContext))
             {
                 try
                 {

@@ -34,14 +34,13 @@ namespace Orleans.Streams
             IDeploymentConfiguration deploymentConfig,
             DeploymentBasedQueueBalancerOptions options,
             IServiceProvider services,
-            TimeProvider timeProvider,
             ILogger<DeploymentBasedQueueBalancer> logger)
             : base (services, logger)
         {
             this.siloStatusOracle = siloStatusOracle ?? throw new ArgumentNullException(nameof(siloStatusOracle));
             this.deploymentConfig = deploymentConfig ?? throw new ArgumentNullException(nameof(deploymentConfig));
             this.options = options;
-            _timeProvider = timeProvider ?? TimeProvider.System;
+            _timeProvider = services.GetService<TimeProvider>() ?? TimeProvider.System;
 
             isStarting = true;
 

@@ -225,16 +225,34 @@ namespace UnitTests.Grains
                     continue;
                 }
 
-                if (counts.Value.ErrorCount > 0)
+                var errorCount = counts.Value.ErrorCount;
+                if (errorCount > 0)
                 {
-                    observer.Observer.ConsumptionFailed(observer.HandleId, counts.Value.ErrorCount);
+                    try
+                    {
+                        observer.Observer.ConsumptionFailed(observer.HandleId, errorCount);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogWarning(exception, "Failed to notify observer of consumption failure for handle {HandleId}", observer.HandleId);
+                    }
+
                     countObservers.RemoveAt(i);
                     continue;
                 }
 
-                if (counts.Value.ConsumedCount >= observer.ExpectedCount)
+                var consumedCount = counts.Value.ConsumedCount;
+                if (consumedCount >= observer.ExpectedCount)
                 {
-                    observer.Observer.ConsumedCountReached(observer.HandleId, counts.Value.ConsumedCount);
+                    try
+                    {
+                        observer.Observer.ConsumedCountReached(observer.HandleId, consumedCount);
+                    }
+                    catch (Exception exception)
+                    {
+                        logger.LogWarning(exception, "Failed to notify observer of consumed count reached for handle {HandleId}", observer.HandleId);
+                    }
+
                     countObservers.RemoveAt(i);
                 }
             }

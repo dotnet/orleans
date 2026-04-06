@@ -204,7 +204,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
             tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
                 consumer, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100)));
         }
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks2);
 
         //clean up test
         tasks2.Clear();
@@ -248,7 +248,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
             tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
                 consumer, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100)));
         }
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(tasks2);
 
         //clean up test
         tasks2.Clear();

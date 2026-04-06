@@ -147,29 +147,30 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        using var cts = new CancellationTokenSource(ENDWAIT);
 
         Task<bool>[] tasks =
         [
-            Task.Run(() => this.PerGrainMultiReminderTestChurn(g1)),
-            Task.Run(() => this.PerGrainMultiReminderTestChurn(g2)),
-            Task.Run(() => this.PerGrainMultiReminderTestChurn(g3)),
-            Task.Run(() => this.PerGrainMultiReminderTestChurn(g4)),
-            Task.Run(() => this.PerGrainMultiReminderTestChurn(g5)),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g1, cts.Token), cts.Token),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g2, cts.Token), cts.Token),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g3, cts.Token), cts.Token),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g4, cts.Token), cts.Token),
+            Task.Run(() => this.PerGrainMultiReminderTestChurn(g5, cts.Token), cts.Token),
         ];
 
         // Wait for all grains to have at least one reminder tick before adding a silo
-        await observer.WaitForReminderTickAsync(g1);
-        await observer.WaitForReminderTickAsync(g2);
-        await observer.WaitForReminderTickAsync(g3);
-        await observer.WaitForReminderTickAsync(g4);
-        await observer.WaitForReminderTickAsync(g5);
+        await observer.WaitForReminderTickAsync(g1, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g2, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g3, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g4, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g5, cancellationToken: cts.Token);
 
         // start another silo ... although it will take it a while before it stabilizes
         log.LogInformation("Starting another silo");
-        await this.HostedCluster.StartAdditionalSilosAsync(1, true);
+        await this.HostedCluster.StartAdditionalSilosAsync(1, true).WaitAsync(cts.Token);
 
         //Block until all tasks complete.
-        await Task.WhenAll(tasks).WaitAsync(ENDWAIT);
+        await Task.WhenAll(tasks).WaitAsync(cts.Token);
     }
 
     public async Task Test_Reminders_ReminderNotFound()
@@ -181,7 +182,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         Assert.Null(reminder);
     }
 
-    internal async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g)
+    internal async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g, CancellationToken cancellationToken = default)
     {
         // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing
         // functionality implemented on the LocalReminderService yet
@@ -189,28 +190,28 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
 
         // Start Default Reminder and wait for 2 ticks
         await ExecuteWithRetries(g.StartReminder, DR);
-        await observer.WaitForTickCountAsync(g, 2, DR);
+        await observer.WaitForTickCountAsync(g, 2, DR, cancellationToken);
 
         // Start R1 and wait for 2 ticks
         await ExecuteWithRetries(g.StartReminder, R1);
-        await observer.WaitForTickCountAsync(g, 2, R1);
+        await observer.WaitForTickCountAsync(g, 2, R1, cancellationToken);
 
         // Start R2 and wait for 2 ticks
         await ExecuteWithRetries(g.StartReminder, R2);
-        await observer.WaitForTickCountAsync(g, 2, R2);
+        await observer.WaitForTickCountAsync(g, 2, R2, cancellationToken);
 
         // Wait for 1 more DR tick to verify all reminders are still running
-        await observer.WaitForAdditionalTickCountAsync(g, 1, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, DR, cancellationToken);
 
         // Stop R1
         await ExecuteWithRetriesStop(g.StopReminder, R1);
         // Wait for 2 more DR ticks to let things settle after R1 stop
-        await observer.WaitForAdditionalTickCountAsync(g, 2, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 2, DR, cancellationToken);
 
         // Stop R2
         await ExecuteWithRetriesStop(g.StopReminder, R2);
         // Wait for 1 more DR tick
-        await observer.WaitForAdditionalTickCountAsync(g, 1, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, DR, cancellationToken);
 
         // Stop Default reminder
         await ExecuteWithRetriesStop(g.StopReminder, DR);
@@ -227,12 +228,12 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         return true;
     }
 
-    protected async Task<bool> PerGrainFailureTest(IReminderTestGrain2 grain)
+    protected async Task<bool> PerGrainFailureTest(IReminderTestGrain2 grain, CancellationToken cancellationToken = default)
     {
         this.log.LogInformation("PerGrainFailureTest Grain={Grain}", grain);
 
         await grain.StartReminder(DR);
-        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR);
+        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR, cancellationToken);
         long last = await grain.GetCounter(DR);
         Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
@@ -246,7 +247,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         return true;
     }
 
-    protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g)
+    protected async Task<bool> PerGrainMultiReminderTest(IReminderTestGrain2 g, CancellationToken cancellationToken = default)
     {
         this.log.LogInformation("PerGrainMultiReminderTest Grain={Grain}", g);
 
@@ -256,19 +257,19 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
 
         // Start Default Reminder and wait for first tick
         await g.StartReminder(DR);
-        await observer.WaitForTickCountAsync(g, 1, DR);
+        await observer.WaitForTickCountAsync(g, 1, DR, cancellationToken);
         var reminders = await g.GetReminderStates();
         Assert.True(reminders[DR].Fired.Count >= 1, $"DR should have fired at least 1 time, got {reminders[DR].Fired.Count}");
 
         // Start R1 and wait for first tick
         await g.StartReminder(R1);
-        await observer.WaitForTickCountAsync(g, 1, R1);
+        await observer.WaitForTickCountAsync(g, 1, R1, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should have fired at least 1 time, got {reminders[R1].Fired.Count}");
 
         // Start R2 and wait for first tick
         await g.StartReminder(R2);
-        await observer.WaitForTickCountAsync(g, 1, R2);
+        await observer.WaitForTickCountAsync(g, 1, R2, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R2].Fired.Count >= 1, $"R2 should have fired at least 1 time, got {reminders[R2].Fired.Count}");
         Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should still be running, got {reminders[R1].Fired.Count}");
@@ -277,7 +278,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // Stop R1 — record its count, then wait for another R2 tick to confirm R2/DR continue
         int r1CountAtStop = reminders[R1].Fired.Count;
         await g.StopReminder(R1);
-        await observer.WaitForAdditionalTickCountAsync(g, 1, R2);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, R2, cancellationToken);
         reminders = await g.GetReminderStates();
         // R1 should be stable (at most 1 in-flight tick)
         Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should have stopped, but count went from {r1CountAtStop} to {reminders[R1].Fired.Count}");
@@ -286,7 +287,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // Stop R2 — record its count, then wait for another DR tick
         int r2CountAtStop = reminders[R2].Fired.Count;
         await g.StopReminder(R2);
-        await observer.WaitForAdditionalTickCountAsync(g, 1, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, DR, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R2].Fired.Count <= r2CountAtStop + 1, $"R2 should have stopped, but count went from {r2CountAtStop} to {reminders[R2].Fired.Count}");
         Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should still be stopped");
@@ -303,12 +304,12 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         return true;
     }
 
-    protected async Task<bool> PerCopyGrainFailureTest(IReminderTestCopyGrain grain)
+    protected async Task<bool> PerCopyGrainFailureTest(IReminderTestCopyGrain grain, CancellationToken cancellationToken = default)
     {
         this.log.LogInformation("PerCopyGrainFailureTest Grain={Grain}", grain);
 
         await grain.StartReminder(DR);
-        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR);
+        await observer.WaitForTickCountAsync(grain, (int)failCheckAfter, DR, cancellationToken);
         long last = await grain.GetCounter(DR);
         Assert.Equal(failCheckAfter, last);
 
