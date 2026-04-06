@@ -96,10 +96,10 @@ namespace UnitTests.StreamingTests
             if (registrationTask is not null)
             {
                 await registrationTask;
+                Assert.Null(streamData.RegistrationTask);
             }
 
             Assert.True(streamData.StreamRegistered);
-            Assert.Null(streamData.RegistrationTask);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
