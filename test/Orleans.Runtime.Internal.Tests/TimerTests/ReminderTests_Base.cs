@@ -200,20 +200,17 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         await observer.WaitForTickCountAsync(g, 2, R2);
 
         // Wait for 1 more DR tick to verify all reminders are still running
-        int drCountBefore = observer.GetTickCount(g.GetGrainId(), DR);
-        await observer.WaitForTickCountAsync(g, drCountBefore + 1, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, DR);
 
         // Stop R1
         await ExecuteWithRetriesStop(g.StopReminder, R1);
         // Wait for 2 more DR ticks to let things settle after R1 stop
-        drCountBefore = observer.GetTickCount(g.GetGrainId(), DR);
-        await observer.WaitForTickCountAsync(g, drCountBefore + 2, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 2, DR);
 
         // Stop R2
         await ExecuteWithRetriesStop(g.StopReminder, R2);
         // Wait for 1 more DR tick
-        drCountBefore = observer.GetTickCount(g.GetGrainId(), DR);
-        await observer.WaitForTickCountAsync(g, drCountBefore + 1, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, DR);
 
         // Stop Default reminder
         await ExecuteWithRetriesStop(g.StopReminder, DR);
@@ -280,8 +277,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // Stop R1 — record its count, then wait for another R2 tick to confirm R2/DR continue
         int r1CountAtStop = reminders[R1].Fired.Count;
         await g.StopReminder(R1);
-        int r2TicksBefore = observer.GetTickCount(g.GetGrainId(), R2);
-        await observer.WaitForTickCountAsync(g, r2TicksBefore + 1, R2);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, R2);
         reminders = await g.GetReminderStates();
         // R1 should be stable (at most 1 in-flight tick)
         Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should have stopped, but count went from {r1CountAtStop} to {reminders[R1].Fired.Count}");
@@ -290,8 +286,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // Stop R2 — record its count, then wait for another DR tick
         int r2CountAtStop = reminders[R2].Fired.Count;
         await g.StopReminder(R2);
-        int drTicksBefore = observer.GetTickCount(g.GetGrainId(), DR);
-        await observer.WaitForTickCountAsync(g, drTicksBefore + 1, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, DR);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R2].Fired.Count <= r2CountAtStop + 1, $"R2 should have stopped, but count went from {r2CountAtStop} to {reminders[R2].Fired.Count}");
         Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should still be stopped");

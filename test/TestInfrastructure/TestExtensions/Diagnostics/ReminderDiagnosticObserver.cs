@@ -1,5 +1,4 @@
 #nullable enable
-using System.Collections.Concurrent;
 using System.Reactive.Linq;
 using System.Reactive.Subjects;
 using System.Reactive.Threading.Tasks;
@@ -18,10 +17,13 @@ namespace TestExtensions;
 /// </remarks>
 public sealed class ReminderDiagnosticObserver : IDisposable
 {
+    private readonly object _lock = new();
     private readonly IConnectableObservable<ReminderEvents.ReminderEvent> _events;
     private readonly IDisposable _connection;
     private readonly IDisposable _storageSubscription;
-    private readonly ConcurrentBag<ReminderEvents.TickCompleted> _tickCompletedEvents = new();
+    private readonly Dictionary<GrainId, int> _tickCountsByGrain = [];
+    private readonly Dictionary<ReminderTickKey, int> _tickCountsByReminder = [];
+    private readonly List<TickCountWaiter> _tickCountWaiters = [];
 
     /// <summary>
     /// Creates a new instance of the observer and starts listening for reminder diagnostic events.
@@ -40,9 +42,34 @@ public sealed class ReminderDiagnosticObserver : IDisposable
 
     private void StoreEvent(ReminderEvents.ReminderEvent value)
     {
-        if (value is ReminderEvents.TickCompleted e)
+        if (value is not ReminderEvents.TickCompleted tickCompleted)
         {
-            _tickCompletedEvents.Add(e);
+            return;
+        }
+
+        List<TaskCompletionSource<bool>> ready = [];
+        lock (_lock)
+        {
+            _tickCountsByGrain[tickCompleted.GrainId] = _tickCountsByGrain.GetValueOrDefault(tickCompleted.GrainId) + 1;
+            var reminderKey = new ReminderTickKey(tickCompleted.GrainId, tickCompleted.ReminderName);
+            _tickCountsByReminder[reminderKey] = _tickCountsByReminder.GetValueOrDefault(reminderKey) + 1;
+
+            for (var i = _tickCountWaiters.Count - 1; i >= 0; i--)
+            {
+                var waiter = _tickCountWaiters[i];
+                if (GetTickCountCore(waiter.GrainId, waiter.ReminderName) < waiter.TargetCount)
+                {
+                    continue;
+                }
+
+                _tickCountWaiters.RemoveAt(i);
+                ready.Add(waiter.TaskSource);
+            }
+        }
+
+        foreach (var taskSource in ready)
+        {
+            taskSource.TrySetResult(true);
         }
     }
 
@@ -60,15 +87,26 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of reminder ticks to complete on a grain.
     /// </summary>
-    public async Task WaitForTickCountAsync(GrainId grainId, int expectedCount, string? reminderName = null, CancellationToken cancellationToken = default)
+    public Task WaitForTickCountAsync(GrainId grainId, int expectedCount, string? reminderName = null, CancellationToken cancellationToken = default)
     {
-        await _events
-            .OfType<ReminderEvents.TickCompleted>()
-            .Where(e => MatchesReminder(e, grainId, reminderName))
-            .Take(expectedCount)
-            .LastOrDefaultAsync()
-            .ToTask(cancellationToken);
-        cancellationToken.ThrowIfCancellationRequested();
+        ArgumentOutOfRangeException.ThrowIfNegative(expectedCount);
+        return WaitForTickCountCoreAsync(grainId, expectedCount, reminderName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for additional reminder ticks after the current observed count.
+    /// </summary>
+    public Task WaitForAdditionalTickCountAsync(GrainId grainId, int additionalCount, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(additionalCount);
+
+        int targetCount;
+        lock (_lock)
+        {
+            targetCount = GetTickCountCore(grainId, reminderName) + additionalCount;
+        }
+
+        return WaitForTickCountCoreAsync(grainId, targetCount, reminderName, cancellationToken);
     }
 
     /// <summary>
@@ -98,18 +136,79 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// </summary>
     public int GetTickCount(GrainId grainId, string? reminderName = null)
     {
-        if (reminderName is not null)
+        lock (_lock)
         {
-            return _tickCompletedEvents.Count(e => MatchesReminder(e, grainId, reminderName));
+            return GetTickCountCore(grainId, reminderName);
         }
-
-        return _tickCompletedEvents.Count(e => e.GrainId == grainId);
     }
 
     private static bool MatchesReminder(ReminderEvents.ReminderEvent evt, GrainId grainId, string? reminderName)
     {
         return evt.GrainId == grainId
             && (reminderName is null || evt.ReminderName == reminderName);
+    }
+
+    private Task WaitForTickCountCoreAsync(GrainId grainId, int targetCount, string? reminderName, CancellationToken cancellationToken)
+    {
+        if (cancellationToken.IsCancellationRequested)
+        {
+            return Task.FromCanceled(cancellationToken);
+        }
+
+        TickCountWaiter? waiter;
+        lock (_lock)
+        {
+            if (GetTickCountCore(grainId, reminderName) >= targetCount)
+            {
+                return Task.CompletedTask;
+            }
+
+            waiter = new TickCountWaiter(grainId, reminderName, targetCount);
+            _tickCountWaiters.Add(waiter);
+        }
+
+        return WaitAsync(waiter, cancellationToken);
+    }
+
+    private async Task WaitAsync(TickCountWaiter waiter, CancellationToken cancellationToken)
+    {
+        using var registration = cancellationToken.Register(static state =>
+        {
+            var (observer, pendingWaiter, token) = ((ReminderDiagnosticObserver Observer, TickCountWaiter Waiter, CancellationToken Token))state!;
+            observer.CancelWaiter(pendingWaiter, token);
+        }, (this, waiter, cancellationToken));
+
+        await waiter.TaskSource.Task.ConfigureAwait(false);
+    }
+
+    private void CancelWaiter(TickCountWaiter waiter, CancellationToken cancellationToken)
+    {
+        lock (_lock)
+        {
+            _tickCountWaiters.Remove(waiter);
+        }
+
+        waiter.TaskSource.TrySetCanceled(cancellationToken);
+    }
+
+    private int GetTickCountCore(GrainId grainId, string? reminderName)
+    {
+        if (reminderName is null)
+        {
+            return _tickCountsByGrain.GetValueOrDefault(grainId);
+        }
+
+        return _tickCountsByReminder.GetValueOrDefault(new ReminderTickKey(grainId, reminderName));
+    }
+
+    private readonly record struct ReminderTickKey(GrainId GrainId, string ReminderName);
+
+    private sealed class TickCountWaiter(GrainId grainId, string? reminderName, int targetCount)
+    {
+        public GrainId GrainId { get; } = grainId;
+        public string? ReminderName { get; } = reminderName;
+        public int TargetCount { get; } = targetCount;
+        public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
     }
 
     /// <inheritdoc/>
@@ -139,6 +238,14 @@ public static class ReminderDiagnosticExtensions
     public static Task WaitForTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int expectedCount, string? reminderName = null, CancellationToken cancellationToken = default)
     {
         return observer.WaitForTickCountAsync(grain.GetGrainId(), expectedCount, reminderName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for additional reminder ticks on a grain after the current observed count.
+    /// </summary>
+    public static Task WaitForAdditionalTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int additionalCount, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        return observer.WaitForAdditionalTickCountAsync(grain.GetGrainId(), additionalCount, reminderName, cancellationToken);
     }
 
     /// <summary>
