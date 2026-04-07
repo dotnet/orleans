@@ -93,7 +93,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             await stream.Publish(3);
 
             using var cts = new CancellationTokenSource(CallTimeoutMs);
-            await observer.WaitForDeliveryCountAsync(channelId, 3, cancellationToken: cts.Token);
+            await observer.WaitForDeliveryCountAsync(channelId, 3, providerName: null, cancellationToken: cts.Token);
 
             var grain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
             var values = await grain.GetValues(channelId);
@@ -135,7 +135,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             foreach (var channel in channels)
             {
                 using var cts = new CancellationTokenSource(CallTimeoutMs);
-                await observer.WaitForDeliveryCountAsync(channel.ChannelId, 1, cancellationToken: cts.Token);
+                await observer.WaitForDeliveryCountAsync(channel.ChannelId, 1, providerName: null, cancellationToken: cts.Token);
 
                 var values = await grain.GetValues(channel.ChannelId);
 
@@ -158,7 +158,7 @@ namespace Tester.StreamingTests.BroadcastChannel
 
             // 3 items × 2 subscribers = 6 deliveries
             using var cts = new CancellationTokenSource(CallTimeoutMs);
-            await observer.WaitForDeliveryCountAsync(channelId, 6, cancellationToken: cts.Token);
+            await observer.WaitForDeliveryCountAsync(channelId, 6, providerName: null, cancellationToken: cts.Token);
 
             var grains = new ISubscriberGrain[]
             {
@@ -202,7 +202,7 @@ namespace Tester.StreamingTests.BroadcastChannel
             {
                 // 1 item × 2 subscribers = 2 deliveries
                 using var cts1 = new CancellationTokenSource(CallTimeoutMs);
-                await observer.WaitForDeliveryCountAsync(channelId, 2, cancellationToken: cts1.Token);
+                await observer.WaitForDeliveryCountAsync(channelId, 2, providerName: null, cancellationToken: cts1.Token);
 
                 var values = await badGrain.GetValues(channelId);
                 Assert.Single(values);
@@ -213,7 +213,7 @@ namespace Tester.StreamingTests.BroadcastChannel
                 await stream.Publish(2);
                 // Wait for good grain delivery (total: 3 successful deliveries)
                 using var cts2 = new CancellationTokenSource(CallTimeoutMs);
-                await observer.WaitForDeliveryCountAsync(channelId, 3, cancellationToken: cts2.Token);
+                await observer.WaitForDeliveryCountAsync(channelId, 3, providerName: null, cancellationToken: cts2.Token);
 
                 // Bad grain callback is still invoked (but throws), so emit doesn't fire.
                 // Poll for the counter as the diagnostic event can't observe failed deliveries.
@@ -237,7 +237,7 @@ namespace Tester.StreamingTests.BroadcastChannel
 
             // Wait for all remaining deliveries: 5 total (good: 3, bad: 2)
             using var ctsFinal = new CancellationTokenSource(CallTimeoutMs);
-            await observer.WaitForDeliveryCountAsync(channelId, 5, cancellationToken: ctsFinal.Token);
+            await observer.WaitForDeliveryCountAsync(channelId, 5, providerName: null, cancellationToken: ctsFinal.Token);
 
             var goodValues = await goodGrain.GetValues(channelId);
 

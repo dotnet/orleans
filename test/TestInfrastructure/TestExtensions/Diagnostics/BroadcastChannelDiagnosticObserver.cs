@@ -35,7 +35,7 @@ public sealed class BroadcastChannelDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for an item to be published to a specific channel.
     /// </summary>
-    public async Task<BroadcastChannelEvents.ItemPublished> WaitForItemPublishedAsync(ChannelId channelId, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task<BroadcastChannelEvents.ItemPublished> WaitForItemPublishedAsync(ChannelId channelId, string? providerName, CancellationToken cancellationToken)
     {
         return await _events
             .OfType<BroadcastChannelEvents.ItemPublished>()
@@ -47,7 +47,7 @@ public sealed class BroadcastChannelDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for an item to be delivered to a specific channel subscriber.
     /// </summary>
-    public async Task<BroadcastChannelEvents.ItemDelivered> WaitForItemDeliveredAsync(ChannelId channelId, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task<BroadcastChannelEvents.ItemDelivered> WaitForItemDeliveredAsync(ChannelId channelId, string? providerName, CancellationToken cancellationToken)
     {
         return await _events
             .OfType<BroadcastChannelEvents.ItemDelivered>()
@@ -59,7 +59,7 @@ public sealed class BroadcastChannelDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of items to be delivered on a channel.
     /// </summary>
-    public async Task WaitForDeliveryCountAsync(ChannelId channelId, int expectedCount, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task WaitForDeliveryCountAsync(ChannelId channelId, int expectedCount, string? providerName, CancellationToken cancellationToken)
     {
         await _events
             .OfType<BroadcastChannelEvents.ItemDelivered>()
@@ -73,7 +73,7 @@ public sealed class BroadcastChannelDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of items to be published to a channel.
     /// </summary>
-    public async Task WaitForPublishCountAsync(ChannelId channelId, int expectedCount, string? providerName = null, CancellationToken cancellationToken = default)
+    public async Task WaitForPublishCountAsync(ChannelId channelId, int expectedCount, string? providerName, CancellationToken cancellationToken)
     {
         await _events
             .OfType<BroadcastChannelEvents.ItemPublished>()
