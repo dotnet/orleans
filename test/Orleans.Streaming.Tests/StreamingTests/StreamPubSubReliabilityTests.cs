@@ -135,7 +135,7 @@ namespace UnitTests.StreamingTests
             // Wait for subscription removal to propagate
             var rxStreamId = Orleans.Runtime.StreamId.Create(this.StreamNamespace, streamId);
             using var subCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
-            await observer.WaitForSubscriptionRemovedAsync(rxStreamId, subCts.Token, streamProviderName);
+            await observer.WaitForSubscriptionRemovedAsync(rxStreamId, streamProviderName, subCts.Token);
 
             // Send one more message
             await producer.SendItem(2);

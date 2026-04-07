@@ -713,14 +713,14 @@ public class SubscriptionMultiplicityTestRunner
     {
         using var observer = StreamingDiagnosticObserver.Create();
         await action();
-        await observer.WaitForSubscriptionRegisteredAsync(streamId, cancellationToken, streamProviderName);
+        await observer.WaitForSubscriptionRegisteredAsync(streamId, streamProviderName, cancellationToken);
     }
 
     private async Task WaitForSubscriptionDetachedAsync(StreamId streamId, Func<Task> action, CancellationToken cancellationToken)
     {
         using var observer = StreamingDiagnosticObserver.Create();
         await action();
-        await observer.WaitForSubscriptionDetachedAsync(streamId, cancellationToken, streamProviderName);
+        await observer.WaitForSubscriptionDetachedAsync(streamId, streamProviderName, cancellationToken);
     }
 
     private async Task AssertCountersAsync(ISampleStreaming_ProducerGrain producer, IMultipleSubscriptionConsumerGrain consumer, int expectedProduced, int expectedConsumerCount)

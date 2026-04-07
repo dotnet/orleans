@@ -43,9 +43,9 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var interestingData = new byte[1] { 1 };
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 1, cts.Token, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 1, StreamProviderName, cts.Token);
         await WaitForEventCounterAsync(grain, 1);
-        await observer.WaitForStreamInactiveAsync(streamId, cts.Token, StreamProviderName);
+        await observer.WaitForStreamInactiveAsync(streamId, StreamProviderName, cts.Token);
 
         if (waitForCacheToFlush)
         {
@@ -59,7 +59,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
 
             // Wait for the last other stream to go inactive, ensuring cache flush
             var lastOtherStreamId = StreamId.Create(nameof(IImplicitSubscriptionCounterGrain), lastOtherKey);
-            await observer.WaitForStreamInactiveAsync(lastOtherStreamId, cts.Token, StreamProviderName);
+            await observer.WaitForStreamInactiveAsync(lastOtherStreamId, StreamProviderName, cts.Token);
 
             for (var i = 0; i < 5; i++)
             {
@@ -69,7 +69,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         }
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 2, cts.Token, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 2, StreamProviderName, cts.Token);
         await WaitForEventCounterAsync(grain, 2);
 
         Assert.Equal(0, await grain.GetErrorCounter());
@@ -88,13 +88,13 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var interestingData = new byte[1] { 1 };
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 1, cts.Token, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 1, StreamProviderName, cts.Token);
         await WaitForEventCounterAsync(grain, 1);
-        await observer.WaitForStreamInactiveAsync(streamId, cts.Token, StreamProviderName);
+        await observer.WaitForStreamInactiveAsync(streamId, StreamProviderName, cts.Token);
         await grain.Deactivate();
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 2, cts.Token, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 2, StreamProviderName, cts.Token);
         await WaitForEventCounterAsync(grain, 2);
 
         Assert.Equal(0, await grain.GetErrorCounter());
@@ -119,13 +119,13 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         await otherStream.OnNextAsync(interestingData);
         await otherStream.OnNextAsync(interestingData);
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 2, cts.Token, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 2, StreamProviderName, cts.Token);
         await WaitForEventCounterAsync(grain, 2);
-        await observer.WaitForStreamInactiveAsync(streamId, cts.Token, StreamProviderName);
+        await observer.WaitForStreamInactiveAsync(streamId, StreamProviderName, cts.Token);
         await grain.Deactivate();
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 3, cts.Token, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 3, StreamProviderName, cts.Token);
         await WaitForEventCounterAsync(grain, 3);
 
         Assert.Equal(0, await grain.GetErrorCounter());
