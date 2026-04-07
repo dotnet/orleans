@@ -19,6 +19,10 @@ namespace Orleans.Streams
         [Id(2)]
         public bool StreamRegistered { get; set; }
 
+        // Not serialized - runtime-only in-flight registration tracking.
+        [NonSerialized]
+        public Task RegistrationTask;
+
         public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();

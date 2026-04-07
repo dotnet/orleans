@@ -24,7 +24,7 @@ namespace UnitTests.HaloTests.Streaming
         public class Fixture : BaseAzureTestClusterFixture
         {
             public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-            public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+            public const string MemoryStreamProviderName = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
 
             protected override void ConfigureTestCluster(TestClusterBuilder builder)
             {
@@ -84,7 +84,7 @@ namespace UnitTests.HaloTests.Streaming
 
         protected TestCluster HostedCluster { get; }
 
-        private const string SmsStreamProviderName = Fixture.SmsStreamProviderName;
+        private const string MemoryStreamProviderName = Fixture.MemoryStreamProviderName;
         private const string AzureQueueStreamProviderName = Fixture.AzureQueueStreamProviderName;
         private static readonly TimeSpan Timeout = TimeSpan.FromSeconds(10);
 
@@ -132,9 +132,13 @@ namespace UnitTests.HaloTests.Streaming
             IProducerEventCountingGrain producer = this.fixture.GrainFactory.GetGrain<IProducerEventCountingGrain>(producerGuid);
             await producer.BecomeProducer(_streamId, _streamProvider);
 
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(Timeout);
+
             await producer.SendEvent();
 
-            await Task.Delay(1000);
+            var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
+            await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer), Timeout);
 
@@ -150,9 +154,13 @@ namespace UnitTests.HaloTests.Streaming
             IConsumerEventCountingGrain consumer = this.fixture.GrainFactory.GetGrain<IConsumerEventCountingGrain>(consumerGuid);
             await consumer.BecomeConsumer(_streamId, _streamProvider);
 
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(Timeout);
+
             await producer.SendEvent();
 
-            await Task.Delay(1000);
+            var streamId = Orleans.Runtime.StreamId.Create("HaloStreamingNamespace", _streamId);
+            await observer.WaitForMessageDeliveredAsync(streamId, _streamProvider, cts.Token);
 
             await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer), Timeout);
 

@@ -30,7 +30,7 @@ namespace UnitTests.Streaming.Reliability
     public class StreamReliabilityTests : TestClusterPerTest
     {
         private readonly ITestOutputHelper _output;
-        public const string SMS_STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+        public const string MEMORY_STREAM_PROVIDER_NAME = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
         public const string AZURE_QUEUE_STREAM_PROVIDER_NAME = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
         private const int QueueCount = 8;
         private Guid _streamId;
@@ -67,7 +67,7 @@ namespace UnitTests.Streaming.Reliability
                         options.ConfigureTestDefaults();
                         options.QueueNames = AzureQueueUtilities.GenerateQueueNames(dep.Value.ClusterId, QueueCount);
                     }))
-                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(SMS_STREAM_PROVIDER_NAME)
+                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(MEMORY_STREAM_PROVIDER_NAME)
                 .Configure<GatewayOptions>(options => options.GatewayListRefreshPeriod = TimeSpan.FromSeconds(5));
             }
         }
@@ -86,7 +86,7 @@ namespace UnitTests.Streaming.Reliability
                         options.DeleteStateOnClear = true;
                     }))
                 .AddMemoryGrainStorage("MemoryStore", options => options.NumStorageGrains = 1)
-                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(SMS_STREAM_PROVIDER_NAME)
+                .AddMemoryStreams<DefaultMemoryMessageBodySerializer>(MEMORY_STREAM_PROVIDER_NAME)
                 .AddAzureTableGrainStorage("PubSubStore", builder => builder.Configure<IOptions<ClusterOptions>>((options, silo) =>
                 {
                     options.DeleteStateOnClear = true;
@@ -180,7 +180,7 @@ namespace UnitTests.Streaming.Reliability
             // This test case is just a sanity-check that the SMS test config is OK.
             const string testName = "SMS_Baseline_StreamRel";
             _streamId = Guid.NewGuid();
-            _streamProviderName = SMS_STREAM_PROVIDER_NAME;
+            _streamProviderName = MEMORY_STREAM_PROVIDER_NAME;
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
@@ -216,7 +216,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_AddMany_Consumers()
         {
             const string testName = "SMS_AddMany_Consumers";
-            await Test_AddMany_Consumers(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_AddMany_Consumers(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
 
         [SkippableFact(Skip = "Ignore"), TestCategory("Failures"), TestCategory("Streaming"), TestCategory("Reliability"), TestCategory("AzureStorage")]
@@ -230,7 +230,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_PubSub_MultiConsumerSameGrain()
         {
             const string testName = "SMS_PubSub_MultiConsumerSameGrain";
-            await Test_PubSub_MultiConsumerSameGrain(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_PubSub_MultiConsumerSameGrain(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         // AQ_PubSub_MultiConsumerSameGrain not required - does not use PubSub
 
@@ -238,7 +238,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_PubSub_MultiProducerSameGrain()
         {
             const string testName = "SMS_PubSub_MultiProducerSameGrain";
-            await Test_PubSub_MultiProducerSameGrain(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_PubSub_MultiProducerSameGrain(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         // AQ_PubSub_MultiProducerSameGrain not required - does not use PubSub
 
@@ -246,7 +246,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_PubSub_Unsubscribe()
         {
             const string testName = "SMS_PubSub_Unsubscribe";
-            await Test_PubSub_Unsubscribe(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_PubSub_Unsubscribe(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         // AQ_PubSub_Unsubscribe not required - does not use PubSub
 
@@ -255,7 +255,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_StreamRel_AllSilosRestart_PubSubCounts()
         {
             const string testName = "SMS_StreamRel_AllSilosRestart_PubSubCounts";
-            await Test_AllSilosRestart_PubSubCounts(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_AllSilosRestart_PubSubCounts(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         // AQ_StreamRel_AllSilosRestart_PubSubCounts not required - does not use PubSub
 
@@ -264,7 +264,7 @@ namespace UnitTests.Streaming.Reliability
         {
             const string testName = "SMS_StreamRel_AllSilosRestart";
 
-            await Test_AllSilosRestart(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_AllSilosRestart(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_AllSilosRestart()
@@ -286,7 +286,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_StreamRel_SiloDies_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Consumer";
-            await Test_SiloDies_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_SiloDies_Consumer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Consumer()
@@ -299,7 +299,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_StreamRel_SiloDies_Producer()
         {
             const string testName = "SMS_StreamRel_SiloDies_Producer";
-            await Test_SiloDies_Producer(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_SiloDies_Producer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloDies_Producer()
@@ -312,7 +312,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_StreamRel_SiloRestarts_Consumer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Consumer";
-            await Test_SiloRestarts_Consumer(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_SiloRestarts_Consumer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Consumer()
@@ -325,7 +325,7 @@ namespace UnitTests.Streaming.Reliability
         public async Task SMS_StreamRel_SiloRestarts_Producer()
         {
             const string testName = "SMS_StreamRel_SiloRestarts_Producer";
-            await Test_SiloRestarts_Producer(testName, SMS_STREAM_PROVIDER_NAME);
+            await Test_SiloRestarts_Producer(testName, MEMORY_STREAM_PROVIDER_NAME);
         }
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("AzureQueue")]
         public async Task AQ_StreamRel_SiloRestarts_Producer()
@@ -611,7 +611,7 @@ namespace UnitTests.Streaming.Reliability
         {
             const string testName = "SMS_AllSilosRestart_UnsubscribeConsumer";
             _streamId = Guid.NewGuid();
-            _streamProviderName = SMS_STREAM_PROVIDER_NAME;
+            _streamProviderName = MEMORY_STREAM_PROVIDER_NAME;
 
             StreamTestUtils.LogStartTest(testName, _streamId, _streamProviderName, logger, HostedCluster);
 
