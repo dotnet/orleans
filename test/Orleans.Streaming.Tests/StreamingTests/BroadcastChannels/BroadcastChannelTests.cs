@@ -84,14 +84,19 @@ namespace Tester.StreamingTests.BroadcastChannel
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("some-namespace", grainKey);
+
+            using var observer = BroadcastChannelDiagnosticObserver.Create();
             var stream = provider.GetChannelWriter<int>(channelId);
 
             await stream.Publish(1);
             await stream.Publish(2);
             await stream.Publish(3);
 
+            using var cts = new CancellationTokenSource(CallTimeoutMs);
+            await observer.WaitForDeliveryCountAsync(channelId, 3, providerName: null, cancellationToken: cts.Token);
+
             var grain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
-            var values = await Get(() => grain.GetValues(channelId), 3);
+            var values = await grain.GetValues(channelId);
 
             Assert.Equal(3, values.Count);
             if (fireAndForget)
@@ -111,6 +116,8 @@ namespace Tester.StreamingTests.BroadcastChannel
         private async Task ClientPublishMultipleChannelTestImpl(IBroadcastChannelProvider provider)
         {
             var grainKey = Guid.NewGuid().ToString("N");
+
+            using var observer = BroadcastChannelDiagnosticObserver.Create();
             var channels = new List<(ChannelId ChannelId, int ExpectedValue)>();
 
             for (var i = 0; i < 10; i++)
@@ -127,7 +134,10 @@ namespace Tester.StreamingTests.BroadcastChannel
 
             foreach (var channel in channels)
             {
-                var values = await Get(() => grain.GetValues(channel.ChannelId), 1);
+                using var cts = new CancellationTokenSource(CallTimeoutMs);
+                await observer.WaitForDeliveryCountAsync(channel.ChannelId, 1, providerName: null, cancellationToken: cts.Token);
+
+                var values = await grain.GetValues(channel.ChannelId);
 
                 Assert.Single(values);
                 Assert.Equal(channel.ExpectedValue, values[0]);
@@ -138,11 +148,17 @@ namespace Tester.StreamingTests.BroadcastChannel
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
+
+            using var observer = BroadcastChannelDiagnosticObserver.Create();
             var stream = provider.GetChannelWriter<int>(channelId);
 
             await stream.Publish(1);
             await stream.Publish(2);
             await stream.Publish(3);
+
+            // 3 items × 2 subscribers = 6 deliveries
+            using var cts = new CancellationTokenSource(CallTimeoutMs);
+            await observer.WaitForDeliveryCountAsync(channelId, 6, providerName: null, cancellationToken: cts.Token);
 
             var grains = new ISubscriberGrain[]
             {
@@ -152,7 +168,7 @@ namespace Tester.StreamingTests.BroadcastChannel
 
             foreach (var grain in grains)
             {
-                var values = await Get(() => grain.GetValues(channelId), 3);
+                var values = await grain.GetValues(channelId);
 
                 Assert.Equal(3, values.Count);
                 if (fireAndForget)
@@ -174,6 +190,8 @@ namespace Tester.StreamingTests.BroadcastChannel
         {
             var grainKey = Guid.NewGuid().ToString("N");
             var channelId = ChannelId.Create("multiple-namespaces-0", grainKey);
+
+            using var observer = BroadcastChannelDiagnosticObserver.Create();
             var stream = provider.GetChannelWriter<int>(channelId);
 
             var badGrain = _fixture.Client.GetGrain<ISimpleSubscriberGrain>(grainKey);
@@ -182,14 +200,23 @@ namespace Tester.StreamingTests.BroadcastChannel
             await stream.Publish(1);
             if (fireAndForget)
             {
-                var values = await Get(() => badGrain.GetValues(channelId), 1);
+                // 1 item × 2 subscribers = 2 deliveries
+                using var cts1 = new CancellationTokenSource(CallTimeoutMs);
+                await observer.WaitForDeliveryCountAsync(channelId, 2, providerName: null, cancellationToken: cts1.Token);
+
+                var values = await badGrain.GetValues(channelId);
                 Assert.Single(values);
             }
             await badGrain.ThrowsOnReceive(true);
             if (fireAndForget)
             {
                 await stream.Publish(2);
-                // Wait to be sure that published event reached the grain
+                // Wait for good grain delivery (total: 3 successful deliveries)
+                using var cts2 = new CancellationTokenSource(CallTimeoutMs);
+                await observer.WaitForDeliveryCountAsync(channelId, 3, providerName: null, cancellationToken: cts2.Token);
+
+                // Bad grain callback is still invoked (but throws), so emit doesn't fire.
+                // Poll for the counter as the diagnostic event can't observe failed deliveries.
                 var counter = 0;
                 using var cts = new CancellationTokenSource(CallTimeoutMs);
                 while (!cts.IsCancellationRequested)
@@ -208,7 +235,11 @@ namespace Tester.StreamingTests.BroadcastChannel
             await badGrain.ThrowsOnReceive(false);
             await stream.Publish(3);
 
-            var goodValues = await Get(() => goodGrain.GetValues(channelId), 3);
+            // Wait for all remaining deliveries: 5 total (good: 3, bad: 2)
+            using var ctsFinal = new CancellationTokenSource(CallTimeoutMs);
+            await observer.WaitForDeliveryCountAsync(channelId, 5, providerName: null, cancellationToken: ctsFinal.Token);
+
+            var goodValues = await goodGrain.GetValues(channelId);
 
             Assert.Equal(3, goodValues.Count);
             if (fireAndForget)
@@ -224,7 +255,7 @@ namespace Tester.StreamingTests.BroadcastChannel
                 Assert.Equal(3, goodValues[2]);
             }
 
-            var badValues = await Get(() => badGrain.GetValues(channelId), 2);
+            var badValues = await badGrain.GetValues(channelId);
 
             Assert.Equal(2, badValues.Count);
             if (fireAndForget)
@@ -237,28 +268,6 @@ namespace Tester.StreamingTests.BroadcastChannel
                 Assert.Equal(1, badValues[0]);
                 Assert.Equal(3, badValues[1]);
             }
-        }
-
-        private static async Task<List<T>> Get<T>(Func<Task<List<T>>> func, int expectedCount, int timeoutMs = CallTimeoutMs)
-        {
-            using var cts = new CancellationTokenSource(timeoutMs);
-            while (!cts.IsCancellationRequested)
-            {
-                try
-                {
-                    var values = await func();
-                    if (values.Count == expectedCount)
-                    {
-                        return values;
-                    }
-                    await Task.Delay(10);
-                }
-                catch (Exception)
-                {
-                    // Ignore
-                }
-            }
-            return await func();
         }
     }
 }
