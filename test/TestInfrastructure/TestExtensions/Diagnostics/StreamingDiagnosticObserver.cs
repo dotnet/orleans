@@ -34,7 +34,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a message to be delivered on a specific stream.
     /// </summary>
-    public async Task<StreamingEvents.MessageDelivered> WaitForMessageDeliveredAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.MessageDelivered> WaitForMessageDeliveredAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.MessageDelivered>()
@@ -46,7 +46,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of messages to be delivered on a stream.
     /// </summary>
-    public async Task WaitForDeliveryCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForDeliveryCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.MessageDelivered>()
@@ -64,7 +64,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// Unlike <see cref="WaitForDeliveryCountAsync"/> which counts batch deliveries,
     /// this method counts individual items within batches.
     /// </remarks>
-    public async Task WaitForItemDeliveryCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForItemDeliveryCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.ItemDelivered>()
@@ -79,7 +79,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// Waits for a specific number of individual items to be delivered on a stream and then
     /// for that stream to report a cursor-drained transition afterward.
     /// </summary>
-    public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .Where(e => e switch
@@ -103,7 +103,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// Waits for a specific number of individual items to be delivered to a particular subscription and then
     /// for that subscription's cursor-drained transition to be reported.
     /// </summary>
-    public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, Guid subscriptionId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForItemDeliveryAndCursorDrainAsync(StreamId streamId, Guid subscriptionId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .Where(e => e switch
@@ -126,7 +126,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a stream to become inactive.
     /// </summary>
-    public async Task<StreamingEvents.StreamInactive> WaitForStreamInactiveAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.StreamInactive> WaitForStreamInactiveAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.StreamInactive>()
@@ -138,7 +138,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a subscription to be added on a specific stream.
     /// </summary>
-    public async Task<StreamingEvents.SubscriptionAdded> WaitForSubscriptionAddedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.SubscriptionAdded> WaitForSubscriptionAddedAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.SubscriptionAdded>()
@@ -150,7 +150,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of subscriptions to be added on a stream.
     /// </summary>
-    public async Task WaitForSubscriptionAddedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForSubscriptionAddedCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.SubscriptionAdded>()
@@ -164,7 +164,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a subscription to be durably registered on a specific stream.
     /// </summary>
-    public async Task<StreamingEvents.SubscriptionRegistered> WaitForSubscriptionRegisteredAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.SubscriptionRegistered> WaitForSubscriptionRegisteredAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.SubscriptionRegistered>()
@@ -176,7 +176,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of subscriptions to be durably registered on a stream.
     /// </summary>
-    public async Task WaitForSubscriptionRegisteredCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForSubscriptionRegisteredCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.SubscriptionRegistered>()
@@ -190,7 +190,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a subscription to be attached on a specific stream.
     /// </summary>
-    public async Task<StreamingEvents.SubscriptionAttached> WaitForSubscriptionAttachedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.SubscriptionAttached> WaitForSubscriptionAttachedAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.SubscriptionAttached>()
@@ -202,7 +202,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of subscriptions to be attached on a stream.
     /// </summary>
-    public async Task WaitForSubscriptionAttachedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForSubscriptionAttachedCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.SubscriptionAttached>()
@@ -213,10 +213,10 @@ public sealed class StreamingDiagnosticObserver : IDisposable
             .ConfigureAwait(false);
     }
 
-    /// <summary>
+     /// <summary>
      /// Waits for a subscription to be removed on a specific stream.
      /// </summary>
-    public async Task<StreamingEvents.SubscriptionRemoved> WaitForSubscriptionRemovedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.SubscriptionRemoved> WaitForSubscriptionRemovedAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.SubscriptionRemoved>()
@@ -228,7 +228,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a subscription to be durably removed from a specific stream.
     /// </summary>
-    public async Task<StreamingEvents.SubscriptionUnregistered> WaitForSubscriptionUnregisteredAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.SubscriptionUnregistered> WaitForSubscriptionUnregisteredAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.SubscriptionUnregistered>()
@@ -240,7 +240,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of subscriptions to be durably removed from a stream.
     /// </summary>
-    public async Task WaitForSubscriptionUnregisteredCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForSubscriptionUnregisteredCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.SubscriptionUnregistered>()
@@ -254,7 +254,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a subscription to be detached from a specific stream.
     /// </summary>
-    public async Task<StreamingEvents.SubscriptionDetached> WaitForSubscriptionDetachedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.SubscriptionDetached> WaitForSubscriptionDetachedAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.SubscriptionDetached>()
@@ -266,7 +266,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of subscriptions to be detached from a stream.
     /// </summary>
-    public async Task WaitForSubscriptionDetachedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForSubscriptionDetachedCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.SubscriptionDetached>()
@@ -280,7 +280,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a consumer cursor to drain on a specific stream.
     /// </summary>
-    public async Task<StreamingEvents.ConsumerCursorDrained> WaitForConsumerCursorDrainedAsync(StreamId streamId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.ConsumerCursorDrained> WaitForConsumerCursorDrainedAsync(StreamId streamId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.ConsumerCursorDrained>()
@@ -292,7 +292,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a consumer cursor to drain for a specific subscription.
     /// </summary>
-    public async Task<StreamingEvents.ConsumerCursorDrained> WaitForConsumerCursorDrainedAsync(StreamId streamId, Guid subscriptionId, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task<StreamingEvents.ConsumerCursorDrained> WaitForConsumerCursorDrainedAsync(StreamId streamId, Guid subscriptionId, CancellationToken cancellationToken, string? streamProvider = null)
     {
         return await _events
             .OfType<StreamingEvents.ConsumerCursorDrained>()
@@ -304,7 +304,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of consumer cursor drained events on a stream.
     /// </summary>
-    public async Task WaitForConsumerCursorDrainedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForConsumerCursorDrainedCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.ConsumerCursorDrained>()
@@ -318,7 +318,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of consumer cursor drained events for a specific subscription.
     /// </summary>
-    public async Task WaitForConsumerCursorDrainedCountAsync(StreamId streamId, Guid subscriptionId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForConsumerCursorDrainedCountAsync(StreamId streamId, Guid subscriptionId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.ConsumerCursorDrained>()
@@ -332,7 +332,7 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of subscriptions to be removed on a stream.
     /// </summary>
-    public async Task WaitForSubscriptionRemovedCountAsync(StreamId streamId, int expectedCount, string? streamProvider = null, CancellationToken cancellationToken = default)
+    public async Task WaitForSubscriptionRemovedCountAsync(StreamId streamId, int expectedCount, CancellationToken cancellationToken, string? streamProvider = null)
     {
         await _events
             .OfType<StreamingEvents.SubscriptionRemoved>()

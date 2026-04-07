@@ -160,7 +160,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
 
         //wait for consumers to unsubscribe via diagnostic events
         var rxStreamId = StreamId.Create("EmptySpace", streamId.Guid);
-        await observer.WaitForSubscriptionRemovedCountAsync(rxStreamId, 10, StreamProviderName, cts.Token);
+        await observer.WaitForSubscriptionRemovedCountAsync(rxStreamId, 10, cts.Token, StreamProviderName);
 
         var subs = await subscriptionManager.GetSubscriptions(streamId);
         Assert.Empty(subs);

@@ -34,6 +34,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
     protected virtual async Task ResumeAfterInactivityImpl(bool waitForCacheToFlush)
     {
         using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
         var key = Guid.NewGuid();
         var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
@@ -42,9 +43,9 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var interestingData = new byte[1] { 1 };
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 1, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 1, cts.Token, StreamProviderName);
         await WaitForEventCounterAsync(grain, 1);
-        await observer.WaitForStreamInactiveAsync(streamId, StreamProviderName);
+        await observer.WaitForStreamInactiveAsync(streamId, cts.Token, StreamProviderName);
 
         if (waitForCacheToFlush)
         {
@@ -58,7 +59,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
 
             // Wait for the last other stream to go inactive, ensuring cache flush
             var lastOtherStreamId = StreamId.Create(nameof(IImplicitSubscriptionCounterGrain), lastOtherKey);
-            await observer.WaitForStreamInactiveAsync(lastOtherStreamId, StreamProviderName);
+            await observer.WaitForStreamInactiveAsync(lastOtherStreamId, cts.Token, StreamProviderName);
 
             for (var i = 0; i < 5; i++)
             {
@@ -68,7 +69,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         }
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 2, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 2, cts.Token, StreamProviderName);
         await WaitForEventCounterAsync(grain, 2);
 
         Assert.Equal(0, await grain.GetErrorCounter());
@@ -78,6 +79,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
     public virtual async Task ResumeAfterDeactivation()
     {
         using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
         var key = Guid.NewGuid();
         var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
@@ -86,13 +88,13 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         var interestingData = new byte[1] { 1 };
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 1, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 1, cts.Token, StreamProviderName);
         await WaitForEventCounterAsync(grain, 1);
-        await observer.WaitForStreamInactiveAsync(streamId, StreamProviderName);
+        await observer.WaitForStreamInactiveAsync(streamId, cts.Token, StreamProviderName);
         await grain.Deactivate();
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 2, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 2, cts.Token, StreamProviderName);
         await WaitForEventCounterAsync(grain, 2);
 
         Assert.Equal(0, await grain.GetErrorCounter());
@@ -102,6 +104,7 @@ public abstract class StreamingResumeTests : TestClusterPerTest
     public virtual async Task ResumeAfterDeactivationActiveStream()
     {
         using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
         var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
         var key = Guid.NewGuid();
         var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
@@ -116,13 +119,13 @@ public abstract class StreamingResumeTests : TestClusterPerTest
         await otherStream.OnNextAsync(interestingData);
         await otherStream.OnNextAsync(interestingData);
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 2, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 2, cts.Token, StreamProviderName);
         await WaitForEventCounterAsync(grain, 2);
-        await observer.WaitForStreamInactiveAsync(streamId, StreamProviderName);
+        await observer.WaitForStreamInactiveAsync(streamId, cts.Token, StreamProviderName);
         await grain.Deactivate();
 
         await stream.OnNextAsync(interestingData);
-        await observer.WaitForItemDeliveryCountAsync(streamId, 3, StreamProviderName);
+        await observer.WaitForItemDeliveryCountAsync(streamId, 3, cts.Token, StreamProviderName);
         await WaitForEventCounterAsync(grain, 3);
 
         Assert.Equal(0, await grain.GetErrorCounter());
