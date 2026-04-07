@@ -9,6 +9,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Reactive" />
     <PackageReference Include="xunit.assert" />
     <PackageReference Include="xunit.extensibility.core" />
     <PackageReference Include="xunit.extensibility.execution" />
