@@ -39,12 +39,80 @@ public class ReminderEventsTests
 
         ReminderEvents.EmitTickCompleted(grainId, reminderName, status, siloAddress, new RemindableStub());
 
-        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, reminderName, TimeSpan.FromSeconds(1));
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
+        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, reminderName, cts.Token);
 
         Assert.Equal(grainId, tickCompleted.GrainId);
         Assert.Equal(reminderName, tickCompleted.ReminderName);
         Assert.Equal(status, tickCompleted.Status);
         Assert.Same(siloAddress, tickCompleted.SiloAddress);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task ReminderDiagnosticObserver_WaitsForAdditionalTickCount_FromCurrentState()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        var grainId = GrainId.Create("test", "grain");
+        const string reminderName = "reminder";
+        var now = DateTime.UtcNow;
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14002), 3);
+
+        ReminderEvents.EmitTickCompleted(
+            grainId,
+            reminderName,
+            new TickStatus(now, TimeSpan.FromSeconds(5), now),
+            siloAddress,
+            new RemindableStub());
+
+        var waitTask = observer.WaitForAdditionalTickCountAsync(grainId, 1, reminderName);
+        Assert.False(waitTask.IsCompleted);
+
+        ReminderEvents.EmitTickCompleted(
+            grainId,
+            reminderName,
+            new TickStatus(now, TimeSpan.FromSeconds(5), now.AddSeconds(5)),
+            siloAddress,
+            new RemindableStub());
+
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task ReminderDiagnosticObserver_WaitsForTickCondition_UntilConditionIsSatisfied()
+    {
+        using var observer = ReminderDiagnosticObserver.Create();
+        var grainId = GrainId.Create("test", "grain");
+        const string reminderName = "reminder";
+        var now = DateTime.UtcNow;
+        var period = TimeSpan.FromSeconds(5);
+        var siloAddress = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 14003), 4);
+        var acceptedTickCount = 0;
+
+        var waitTask = observer.WaitForTickConditionAsync(
+            grainId,
+            _ => Task.FromResult(acceptedTickCount >= 1),
+            reminderName);
+
+        Assert.False(waitTask.IsCompleted);
+
+        ReminderEvents.EmitTickCompleted(
+            grainId,
+            reminderName,
+            new TickStatus(now, period, now),
+            siloAddress,
+            new RemindableStub());
+
+        Assert.False(waitTask.IsCompleted);
+
+        acceptedTickCount = 1;
+        ReminderEvents.EmitTickCompleted(
+            grainId,
+            reminderName,
+            new TickStatus(now, period, now.Add(period)),
+            siloAddress,
+            new RemindableStub());
+
+        await waitTask.WaitAsync(TimeSpan.FromSeconds(1));
     }
 
     private sealed class Observer : IObserver<ReminderEvents.ReminderEvent>, IDisposable

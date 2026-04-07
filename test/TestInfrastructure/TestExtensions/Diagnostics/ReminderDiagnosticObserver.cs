@@ -1,5 +1,7 @@
 #nullable enable
-using System.Collections.Concurrent;
+using System.Reactive.Linq;
+using System.Reactive.Subjects;
+using System.Reactive.Threading.Tasks;
 using Orleans;
 using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
 
@@ -10,272 +12,155 @@ namespace TestExtensions;
 /// methods to wait for reminder ticks deterministically.
 /// </summary>
 /// <remarks>
-/// This replaces Task.Delay/Thread.Sleep patterns in tests with event-driven waiting,
-/// making tests faster and more reliable when waiting for grain reminder callbacks.
+/// Uses <c>System.Reactive</c> operators with <c>Replay()</c> so that <c>WaitFor*</c> methods
+/// match against both past and future events with zero-latency, event-driven waiting.
 /// </remarks>
-public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<ReminderEvents.ReminderEvent>
+public sealed class ReminderDiagnosticObserver : IDisposable
 {
-    private readonly ConcurrentBag<ReminderEvents.Registered> _registeredEvents = new();
-    private readonly ConcurrentBag<ReminderEvents.Unregistered> _unregisteredEvents = new();
-    private readonly ConcurrentBag<ReminderEvents.TickFiring> _tickFiringEvents = new();
-    private readonly ConcurrentBag<ReminderEvents.TickCompleted> _tickCompletedEvents = new();
-    private readonly ConcurrentBag<ReminderEvents.TickFailed> _tickFailedEvents = new();
-    private IDisposable? _subscription;
-
-    /// <summary>
-    /// Gets all captured reminder registered events.
-    /// </summary>
-    public IReadOnlyCollection<ReminderEvents.Registered> RegisteredEvents => _registeredEvents.ToArray();
-
-    /// <summary>
-    /// Gets all captured reminder unregistered events.
-    /// </summary>
-    public IReadOnlyCollection<ReminderEvents.Unregistered> UnregisteredEvents => _unregisteredEvents.ToArray();
-
-    /// <summary>
-    /// Gets all captured reminder tick firing events.
-    /// </summary>
-    public IReadOnlyCollection<ReminderEvents.TickFiring> TickFiringEvents => _tickFiringEvents.ToArray();
-
-    /// <summary>
-    /// Gets all captured reminder tick completed events.
-    /// </summary>
-    public IReadOnlyCollection<ReminderEvents.TickCompleted> TickCompletedEvents => _tickCompletedEvents.ToArray();
-
-    /// <summary>
-    /// Gets all captured reminder tick failed events.
-    /// </summary>
-    public IReadOnlyCollection<ReminderEvents.TickFailed> TickFailedEvents => _tickFailedEvents.ToArray();
+    private readonly object _lock = new();
+    private readonly IConnectableObservable<ReminderEvents.ReminderEvent> _events;
+    private readonly IDisposable _connection;
+    private readonly IDisposable _storageSubscription;
+    private readonly Dictionary<GrainId, int> _tickCountsByGrain = [];
+    private readonly Dictionary<ReminderTickKey, int> _tickCountsByReminder = [];
+    private readonly List<TickCountWaiter> _tickCountWaiters = [];
 
     /// <summary>
     /// Creates a new instance of the observer and starts listening for reminder diagnostic events.
     /// </summary>
     public static ReminderDiagnosticObserver Create()
     {
-        var observer = new ReminderDiagnosticObserver();
-        observer._subscription = ReminderEvents.AllEvents.Subscribe(observer);
-        return observer;
+        return new ReminderDiagnosticObserver();
     }
 
     private ReminderDiagnosticObserver()
     {
+        _events = ReminderEvents.AllEvents.Replay();
+        _storageSubscription = _events.Subscribe(StoreEvent);
+        _connection = _events.Connect();
+    }
+
+    private void StoreEvent(ReminderEvents.ReminderEvent value)
+    {
+        if (value is not ReminderEvents.TickCompleted tickCompleted)
+        {
+            return;
+        }
+
+        List<TaskCompletionSource<bool>> ready = [];
+        lock (_lock)
+        {
+            _tickCountsByGrain[tickCompleted.GrainId] = _tickCountsByGrain.GetValueOrDefault(tickCompleted.GrainId) + 1;
+            var reminderKey = new ReminderTickKey(tickCompleted.GrainId, tickCompleted.ReminderName);
+            _tickCountsByReminder[reminderKey] = _tickCountsByReminder.GetValueOrDefault(reminderKey) + 1;
+
+            for (var i = _tickCountWaiters.Count - 1; i >= 0; i--)
+            {
+                var waiter = _tickCountWaiters[i];
+                if (GetTickCountCore(waiter.GrainId, waiter.ReminderName) < waiter.TargetCount)
+                {
+                    continue;
+                }
+
+                _tickCountWaiters.RemoveAt(i);
+                ready.Add(waiter.TaskSource);
+            }
+        }
+
+        foreach (var taskSource in ready)
+        {
+            taskSource.TrySetResult(true);
+        }
     }
 
     /// <summary>
     /// Waits for a reminder tick to complete on a specific grain.
     /// </summary>
-    /// <param name="grainId">The grain ID to wait for.</param>
-    /// <param name="reminderName">Optional reminder name to filter by. If null, waits for any reminder tick on the grain.</param>
-    /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The tick completed event payload.</returns>
-    public async Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(GrainId grainId, string? reminderName = null, TimeSpan? timeout = null)
+    public Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(GrainId grainId, string? reminderName = null, CancellationToken cancellationToken = default)
     {
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        var existingMatch = FindTickCompletedEvent(grainId, reminderName);
-        if (existingMatch is not null)
-        {
-            return existingMatch;
-        }
-
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            var match = FindTickCompletedEvent(grainId, reminderName);
-            if (match is not null)
-            {
-                return match;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for reminder tick on grain {grainId}{(reminderName is not null ? $" reminder {reminderName}" : "")} after {effectiveTimeout}");
+        return _events
+            .OfType<ReminderEvents.TickCompleted>()
+            .FirstAsync(e => MatchesReminder(e, grainId, reminderName))
+            .ToTask(cancellationToken);
     }
 
     /// <summary>
     /// Waits for a specific number of reminder ticks to complete on a grain.
     /// </summary>
-    /// <param name="grainId">The grain ID to wait for.</param>
-    /// <param name="expectedCount">The minimum number of ticks to wait for.</param>
-    /// <param name="reminderName">Optional reminder name to filter by. If null, counts ticks from any reminder on the grain.</param>
-    /// <param name="timeout">Maximum time to wait. Defaults to 60 seconds.</param>
-    /// <returns>A task that completes when the expected count is reached.</returns>
-    /// <exception cref="TimeoutException">Thrown if the expected count is not reached within the timeout.</exception>
-    public async Task WaitForTickCountAsync(GrainId grainId, int expectedCount, string? reminderName = null, TimeSpan? timeout = null)
+    public Task WaitForTickCountAsync(GrainId grainId, int expectedCount, string? reminderName = null, CancellationToken cancellationToken = default)
     {
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(60);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
+        ArgumentOutOfRangeException.ThrowIfNegative(expectedCount);
+        return WaitForTickCountCoreAsync(grainId, expectedCount, reminderName, cancellationToken);
+    }
 
-        while (!cts.Token.IsCancellationRequested)
+    /// <summary>
+    /// Waits for additional reminder ticks after the current observed count.
+    /// </summary>
+    public Task WaitForAdditionalTickCountAsync(GrainId grainId, int additionalCount, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentOutOfRangeException.ThrowIfNegative(additionalCount);
+
+        int targetCount;
+        lock (_lock)
         {
-            var currentCount = GetTickCount(grainId, reminderName);
-            if (currentCount >= expectedCount)
+            targetCount = GetTickCountCore(grainId, reminderName) + additionalCount;
+        }
+
+        return WaitForTickCountCoreAsync(grainId, targetCount, reminderName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits until a condition associated with reminder ticks becomes true, re-evaluating after each matching tick.
+    /// </summary>
+    public async Task WaitForTickConditionAsync(GrainId grainId, Func<CancellationToken, Task<bool>> condition, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(condition);
+
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+
+            var nextTickTarget = GetTickCount(grainId, reminderName) + 1;
+            if (await condition(cancellationToken).ConfigureAwait(false))
             {
                 return;
             }
 
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
+            await WaitForTickCountCoreAsync(grainId, nextTickTarget, reminderName, cancellationToken).ConfigureAwait(false);
         }
-
-        var finalCount = GetTickCount(grainId, reminderName);
-        if (finalCount >= expectedCount)
-        {
-            return;
-        }
-
-        throw new TimeoutException($"Timed out waiting for {expectedCount} reminder ticks on grain {grainId}{(reminderName is not null ? $" reminder {reminderName}" : "")}. Current count: {finalCount} after {effectiveTimeout}");
     }
 
     /// <summary>
     /// Waits for a reminder to be registered.
     /// </summary>
-    /// <param name="grainId">The grain ID to wait for.</param>
-    /// <param name="reminderName">The reminder name to wait for.</param>
-    /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The registered event payload.</returns>
-    public async Task<ReminderEvents.Registered> WaitForReminderRegisteredAsync(GrainId grainId, string reminderName, TimeSpan? timeout = null)
+    public Task<ReminderEvents.Registered> WaitForReminderRegisteredAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken = default)
     {
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        var existingMatch = _registeredEvents.FirstOrDefault(e => MatchesReminder(e, grainId, reminderName));
-        if (existingMatch is not null)
-        {
-            return existingMatch;
-        }
-
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            var match = _registeredEvents.FirstOrDefault(e => MatchesReminder(e, grainId, reminderName));
-            if (match is not null)
-            {
-                return match;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for reminder '{reminderName}' to be registered on grain {grainId} after {effectiveTimeout}");
+        return _events
+            .OfType<ReminderEvents.Registered>()
+            .FirstAsync(e => MatchesReminder(e, grainId, reminderName))
+            .ToTask(cancellationToken);
     }
 
     /// <summary>
     /// Waits for a reminder to be unregistered.
     /// </summary>
-    /// <param name="grainId">The grain ID to wait for.</param>
-    /// <param name="reminderName">The reminder name to wait for.</param>
-    /// <param name="timeout">Maximum time to wait. Defaults to 30 seconds.</param>
-    /// <returns>The unregistered event payload.</returns>
-    public async Task<ReminderEvents.Unregistered> WaitForReminderUnregisteredAsync(GrainId grainId, string reminderName, TimeSpan? timeout = null)
+    public Task<ReminderEvents.Unregistered> WaitForReminderUnregisteredAsync(GrainId grainId, string reminderName, CancellationToken cancellationToken = default)
     {
-        var effectiveTimeout = timeout ?? TimeSpan.FromSeconds(30);
-        using var cts = new CancellationTokenSource(effectiveTimeout);
-
-        var existingMatch = _unregisteredEvents.FirstOrDefault(e => MatchesReminder(e, grainId, reminderName));
-        if (existingMatch is not null)
-        {
-            return existingMatch;
-        }
-
-        while (!cts.Token.IsCancellationRequested)
-        {
-            try
-            {
-                await Task.Delay(10, cts.Token);
-            }
-            catch (OperationCanceledException)
-            {
-                break;
-            }
-
-            var match = _unregisteredEvents.FirstOrDefault(e => MatchesReminder(e, grainId, reminderName));
-            if (match is not null)
-            {
-                return match;
-            }
-        }
-
-        throw new TimeoutException($"Timed out waiting for reminder '{reminderName}' to be unregistered on grain {grainId} after {effectiveTimeout}");
+        return _events
+            .OfType<ReminderEvents.Unregistered>()
+            .FirstAsync(e => MatchesReminder(e, grainId, reminderName))
+            .ToTask(cancellationToken);
     }
 
     /// <summary>
     /// Gets the count of completed reminder ticks for a specific grain.
     /// </summary>
-    /// <param name="grainId">The grain ID to filter by.</param>
-    /// <param name="reminderName">Optional reminder name to filter by.</param>
-    /// <returns>The count of completed reminder tick events.</returns>
     public int GetTickCount(GrainId grainId, string? reminderName = null)
     {
-        if (reminderName is not null)
+        lock (_lock)
         {
-            return _tickCompletedEvents.Count(e => MatchesReminder(e, grainId, reminderName));
+            return GetTickCountCore(grainId, reminderName);
         }
-
-        return _tickCompletedEvents.Count(e => e.GrainId == grainId);
-    }
-
-    /// <summary>
-    /// Gets the count of completed reminder ticks for a specific reminder name across all grains.
-    /// </summary>
-    /// <param name="reminderName">The reminder name to filter by.</param>
-    /// <returns>The count of completed reminder tick events.</returns>
-    public int GetTickCountByReminderName(string reminderName)
-    {
-        return _tickCompletedEvents.Count(e => e.ReminderName == reminderName);
-    }
-
-    /// <summary>
-    /// Checks if a reminder has ticked on a specific grain.
-    /// </summary>
-    /// <param name="grainId">The grain ID to check.</param>
-    /// <param name="reminderName">Optional reminder name to filter by.</param>
-    /// <returns>True if at least one reminder tick has occurred.</returns>
-    public bool HasReminderTicked(GrainId grainId, string? reminderName = null)
-    {
-        return FindTickCompletedEvent(grainId, reminderName) is not null;
-    }
-
-    /// <summary>
-    /// Clears all captured events.
-    /// </summary>
-    public void Clear()
-    {
-        _registeredEvents.Clear();
-        _unregisteredEvents.Clear();
-        _tickFiringEvents.Clear();
-        _tickCompletedEvents.Clear();
-        _tickFailedEvents.Clear();
-    }
-
-    private ReminderEvents.TickCompleted? FindTickCompletedEvent(GrainId grainId, string? reminderName)
-    {
-        if (reminderName is not null)
-        {
-            return _tickCompletedEvents.FirstOrDefault(e => MatchesReminder(e, grainId, reminderName));
-        }
-
-        return _tickCompletedEvents.FirstOrDefault(e => e.GrainId == grainId);
     }
 
     private static bool MatchesReminder(ReminderEvents.ReminderEvent evt, GrainId grainId, string? reminderName)
@@ -284,39 +169,74 @@ public sealed class ReminderDiagnosticObserver : IDisposable, IObserver<Reminder
             && (reminderName is null || evt.ReminderName == reminderName);
     }
 
-    void IObserver<ReminderEvents.ReminderEvent>.OnNext(ReminderEvents.ReminderEvent value)
+    private Task WaitForTickCountCoreAsync(GrainId grainId, int targetCount, string? reminderName, CancellationToken cancellationToken)
     {
-        switch (value)
+        if (cancellationToken.IsCancellationRequested)
         {
-            case ReminderEvents.Registered registered:
-                _registeredEvents.Add(registered);
-                break;
-            case ReminderEvents.Unregistered unregistered:
-                _unregisteredEvents.Add(unregistered);
-                break;
-            case ReminderEvents.TickFiring tickFiring:
-                _tickFiringEvents.Add(tickFiring);
-                break;
-            case ReminderEvents.TickCompleted tickCompleted:
-                _tickCompletedEvents.Add(tickCompleted);
-                break;
-            case ReminderEvents.TickFailed tickFailed:
-                _tickFailedEvents.Add(tickFailed);
-                break;
+            return Task.FromCanceled(cancellationToken);
         }
+
+        TickCountWaiter? waiter;
+        lock (_lock)
+        {
+            if (GetTickCountCore(grainId, reminderName) >= targetCount)
+            {
+                return Task.CompletedTask;
+            }
+
+            waiter = new TickCountWaiter(grainId, reminderName, targetCount);
+            _tickCountWaiters.Add(waiter);
+        }
+
+        return WaitAsync(waiter, cancellationToken);
     }
 
-    void IObserver<ReminderEvents.ReminderEvent>.OnError(Exception error)
+    private async Task WaitAsync(TickCountWaiter waiter, CancellationToken cancellationToken)
     {
+        using var registration = cancellationToken.Register(static state =>
+        {
+            var (observer, pendingWaiter, token) = ((ReminderDiagnosticObserver Observer, TickCountWaiter Waiter, CancellationToken Token))state!;
+            observer.CancelWaiter(pendingWaiter, token);
+        }, (this, waiter, cancellationToken));
+
+        await waiter.TaskSource.Task.ConfigureAwait(false);
     }
 
-    void IObserver<ReminderEvents.ReminderEvent>.OnCompleted()
+    private void CancelWaiter(TickCountWaiter waiter, CancellationToken cancellationToken)
     {
+        lock (_lock)
+        {
+            _tickCountWaiters.Remove(waiter);
+        }
+
+        waiter.TaskSource.TrySetCanceled(cancellationToken);
     }
 
+    private int GetTickCountCore(GrainId grainId, string? reminderName)
+    {
+        if (reminderName is null)
+        {
+            return _tickCountsByGrain.GetValueOrDefault(grainId);
+        }
+
+        return _tickCountsByReminder.GetValueOrDefault(new ReminderTickKey(grainId, reminderName));
+    }
+
+    private readonly record struct ReminderTickKey(GrainId GrainId, string ReminderName);
+
+    private sealed class TickCountWaiter(GrainId grainId, string? reminderName, int targetCount)
+    {
+        public GrainId GrainId { get; } = grainId;
+        public string? ReminderName { get; } = reminderName;
+        public int TargetCount { get; } = targetCount;
+        public TaskCompletionSource<bool> TaskSource { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    }
+
+    /// <inheritdoc/>
     public void Dispose()
     {
-        _subscription?.Dispose();
+        _storageSubscription.Dispose();
+        _connection.Dispose();
     }
 }
 
@@ -328,32 +248,48 @@ public static class ReminderDiagnosticExtensions
     /// <summary>
     /// Waits for a reminder tick on a grain.
     /// </summary>
-    public static Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string? reminderName = null, TimeSpan? timeout = null)
+    public static Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string? reminderName = null, CancellationToken cancellationToken = default)
     {
-        return observer.WaitForReminderTickAsync(grain.GetGrainId(), reminderName, timeout);
+        return observer.WaitForReminderTickAsync(grain.GetGrainId(), reminderName, cancellationToken);
     }
 
     /// <summary>
     /// Waits for a specific number of reminder ticks on a grain.
     /// </summary>
-    public static Task WaitForTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int expectedCount, string? reminderName = null, TimeSpan? timeout = null)
+    public static Task WaitForTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int expectedCount, string? reminderName = null, CancellationToken cancellationToken = default)
     {
-        return observer.WaitForTickCountAsync(grain.GetGrainId(), expectedCount, reminderName, timeout);
+        return observer.WaitForTickCountAsync(grain.GetGrainId(), expectedCount, reminderName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits for additional reminder ticks on a grain after the current observed count.
+    /// </summary>
+    public static Task WaitForAdditionalTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int additionalCount, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        return observer.WaitForAdditionalTickCountAsync(grain.GetGrainId(), additionalCount, reminderName, cancellationToken);
+    }
+
+    /// <summary>
+    /// Waits until a condition associated with reminder ticks on a grain becomes true.
+    /// </summary>
+    public static Task WaitForTickConditionAsync(this ReminderDiagnosticObserver observer, IAddressable grain, Func<CancellationToken, Task<bool>> condition, string? reminderName = null, CancellationToken cancellationToken = default)
+    {
+        return observer.WaitForTickConditionAsync(grain.GetGrainId(), condition, reminderName, cancellationToken);
     }
 
     /// <summary>
     /// Waits for a reminder to be registered on a grain.
     /// </summary>
-    public static Task<ReminderEvents.Registered> WaitForReminderRegisteredAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string reminderName, TimeSpan? timeout = null)
+    public static Task<ReminderEvents.Registered> WaitForReminderRegisteredAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string reminderName, CancellationToken cancellationToken = default)
     {
-        return observer.WaitForReminderRegisteredAsync(grain.GetGrainId(), reminderName, timeout);
+        return observer.WaitForReminderRegisteredAsync(grain.GetGrainId(), reminderName, cancellationToken);
     }
 
     /// <summary>
     /// Waits for a reminder to be unregistered on a grain.
     /// </summary>
-    public static Task<ReminderEvents.Unregistered> WaitForReminderUnregisteredAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string reminderName, TimeSpan? timeout = null)
+    public static Task<ReminderEvents.Unregistered> WaitForReminderUnregisteredAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string reminderName, CancellationToken cancellationToken = default)
     {
-        return observer.WaitForReminderUnregisteredAsync(grain.GetGrainId(), reminderName, timeout);
+        return observer.WaitForReminderUnregisteredAsync(grain.GetGrainId(), reminderName, cancellationToken);
     }
 }
