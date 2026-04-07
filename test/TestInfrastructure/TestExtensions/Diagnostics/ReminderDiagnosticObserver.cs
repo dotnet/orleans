@@ -76,7 +76,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a reminder tick to complete on a specific grain.
     /// </summary>
-    public Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(GrainId grainId, CancellationToken cancellationToken, string? reminderName = null)
+    public Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(GrainId grainId, string? reminderName, CancellationToken cancellationToken)
     {
         return _events
             .OfType<ReminderEvents.TickCompleted>()
@@ -87,7 +87,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for a specific number of reminder ticks to complete on a grain.
     /// </summary>
-    public Task WaitForTickCountAsync(GrainId grainId, int expectedCount, CancellationToken cancellationToken, string? reminderName = null)
+    public Task WaitForTickCountAsync(GrainId grainId, int expectedCount, string? reminderName, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(expectedCount);
         return WaitForTickCountCoreAsync(grainId, expectedCount, reminderName, cancellationToken);
@@ -96,7 +96,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits for additional reminder ticks after the current observed count.
     /// </summary>
-    public Task WaitForAdditionalTickCountAsync(GrainId grainId, int additionalCount, CancellationToken cancellationToken, string? reminderName = null)
+    public Task WaitForAdditionalTickCountAsync(GrainId grainId, int additionalCount, string? reminderName, CancellationToken cancellationToken)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(additionalCount);
 
@@ -112,7 +112,7 @@ public sealed class ReminderDiagnosticObserver : IDisposable
     /// <summary>
     /// Waits until a condition associated with reminder ticks becomes true, re-evaluating after each matching tick.
     /// </summary>
-    public async Task WaitForTickConditionAsync(GrainId grainId, Func<CancellationToken, Task<bool>> condition, CancellationToken cancellationToken, string? reminderName = null)
+    public async Task WaitForTickConditionAsync(GrainId grainId, Func<CancellationToken, Task<bool>> condition, string? reminderName, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(condition);
 
@@ -248,33 +248,33 @@ public static class ReminderDiagnosticExtensions
     /// <summary>
     /// Waits for a reminder tick on a grain.
     /// </summary>
-    public static Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(this ReminderDiagnosticObserver observer, IAddressable grain, CancellationToken cancellationToken, string? reminderName = null)
+    public static Task<ReminderEvents.TickCompleted> WaitForReminderTickAsync(this ReminderDiagnosticObserver observer, IAddressable grain, string? reminderName, CancellationToken cancellationToken)
     {
-        return observer.WaitForReminderTickAsync(grain.GetGrainId(), cancellationToken, reminderName);
+        return observer.WaitForReminderTickAsync(grain.GetGrainId(), reminderName, cancellationToken);
     }
 
     /// <summary>
     /// Waits for a specific number of reminder ticks on a grain.
     /// </summary>
-    public static Task WaitForTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int expectedCount, CancellationToken cancellationToken, string? reminderName = null)
+    public static Task WaitForTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int expectedCount, string? reminderName, CancellationToken cancellationToken)
     {
-        return observer.WaitForTickCountAsync(grain.GetGrainId(), expectedCount, cancellationToken, reminderName);
+        return observer.WaitForTickCountAsync(grain.GetGrainId(), expectedCount, reminderName, cancellationToken);
     }
 
     /// <summary>
     /// Waits for additional reminder ticks on a grain after the current observed count.
     /// </summary>
-    public static Task WaitForAdditionalTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int additionalCount, CancellationToken cancellationToken, string? reminderName = null)
+    public static Task WaitForAdditionalTickCountAsync(this ReminderDiagnosticObserver observer, IAddressable grain, int additionalCount, string? reminderName, CancellationToken cancellationToken)
     {
-        return observer.WaitForAdditionalTickCountAsync(grain.GetGrainId(), additionalCount, cancellationToken, reminderName);
+        return observer.WaitForAdditionalTickCountAsync(grain.GetGrainId(), additionalCount, reminderName, cancellationToken);
     }
 
     /// <summary>
     /// Waits until a condition associated with reminder ticks on a grain becomes true.
     /// </summary>
-    public static Task WaitForTickConditionAsync(this ReminderDiagnosticObserver observer, IAddressable grain, Func<CancellationToken, Task<bool>> condition, CancellationToken cancellationToken, string? reminderName = null)
+    public static Task WaitForTickConditionAsync(this ReminderDiagnosticObserver observer, IAddressable grain, Func<CancellationToken, Task<bool>> condition, string? reminderName, CancellationToken cancellationToken)
     {
-        return observer.WaitForTickConditionAsync(grain.GetGrainId(), condition, cancellationToken, reminderName);
+        return observer.WaitForTickConditionAsync(grain.GetGrainId(), condition, reminderName, cancellationToken);
     }
 
     /// <summary>

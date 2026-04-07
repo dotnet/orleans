@@ -130,7 +130,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         using var cts = new CancellationTokenSource(ENDWAIT);
         for (int i = 0; i < count; i++)
         {
-            await observer.WaitForTickCountAsync(grain, 2, cts.Token, DR + "_" + i);
+            await observer.WaitForTickCountAsync(grain, 2, DR + "_" + i, cts.Token);
         }
 
         // Verify via grain counters
@@ -160,11 +160,11 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         ];
 
         // Wait for all grains to have at least one reminder tick before adding a silo
-        await observer.WaitForReminderTickAsync(g1, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g2, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g3, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g4, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g5, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g1, reminderName: null, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g2, reminderName: null, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g3, reminderName: null, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g4, reminderName: null, cancellationToken: cts.Token);
+        await observer.WaitForReminderTickAsync(g5, reminderName: null, cancellationToken: cts.Token);
 
         // start another silo ... although it will take it a while before it stabilizes
         log.LogInformation("Starting another silo");
@@ -268,8 +268,8 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
                     return false;
                 }
             },
-            cancellationToken,
-            reminderName);
+            reminderName,
+            cancellationToken);
 
         return result;
     }
@@ -302,19 +302,19 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
 
         // Start Default Reminder and wait for first tick
         await g.StartReminder(DR);
-        await observer.WaitForTickCountAsync(g, 1, cancellationToken, DR);
+        await observer.WaitForTickCountAsync(g, 1, DR, cancellationToken);
         var reminders = await g.GetReminderStates();
         Assert.True(reminders[DR].Fired.Count >= 1, $"DR should have fired at least 1 time, got {reminders[DR].Fired.Count}");
 
         // Start R1 and wait for first tick
         await g.StartReminder(R1);
-        await observer.WaitForTickCountAsync(g, 1, cancellationToken, R1);
+        await observer.WaitForTickCountAsync(g, 1, R1, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should have fired at least 1 time, got {reminders[R1].Fired.Count}");
 
         // Start R2 and wait for first tick
         await g.StartReminder(R2);
-        await observer.WaitForTickCountAsync(g, 1, cancellationToken, R2);
+        await observer.WaitForTickCountAsync(g, 1, R2, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R2].Fired.Count >= 1, $"R2 should have fired at least 1 time, got {reminders[R2].Fired.Count}");
         Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should still be running, got {reminders[R1].Fired.Count}");
@@ -323,7 +323,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // Stop R1 — record its count, then wait for another R2 tick to confirm R2/DR continue
         int r1CountAtStop = reminders[R1].Fired.Count;
         await g.StopReminder(R1);
-        await observer.WaitForAdditionalTickCountAsync(g, 1, cancellationToken, R2);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, R2, cancellationToken);
         reminders = await g.GetReminderStates();
         // R1 should be stable (at most 1 in-flight tick)
         Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should have stopped, but count went from {r1CountAtStop} to {reminders[R1].Fired.Count}");
@@ -332,7 +332,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // Stop R2 — record its count, then wait for another DR tick
         int r2CountAtStop = reminders[R2].Fired.Count;
         await g.StopReminder(R2);
-        await observer.WaitForAdditionalTickCountAsync(g, 1, cancellationToken, DR);
+        await observer.WaitForAdditionalTickCountAsync(g, 1, DR, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R2].Fired.Count <= r2CountAtStop + 1, $"R2 should have stopped, but count went from {r2CountAtStop} to {reminders[R2].Fired.Count}");
         Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should still be stopped");

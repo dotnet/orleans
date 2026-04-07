@@ -40,7 +40,7 @@ public class ReminderEventsTests
         ReminderEvents.EmitTickCompleted(grainId, reminderName, status, siloAddress, new RemindableStub());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
+        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, reminderName, cts.Token);
 
         Assert.Equal(grainId, tickCompleted.GrainId);
         Assert.Equal(reminderName, tickCompleted.ReminderName);
@@ -65,7 +65,7 @@ public class ReminderEventsTests
             siloAddress,
             new RemindableStub());
 
-        var waitTask = observer.WaitForAdditionalTickCountAsync(grainId, 1, cts.Token, reminderName);
+        var waitTask = observer.WaitForAdditionalTickCountAsync(grainId, 1, reminderName, cts.Token);
         Assert.False(waitTask.IsCompleted);
 
         ReminderEvents.EmitTickCompleted(
@@ -93,8 +93,8 @@ public class ReminderEventsTests
         var waitTask = observer.WaitForTickConditionAsync(
             grainId,
             _ => Task.FromResult(acceptedTickCount >= 1),
-            cts.Token,
-            reminderName);
+            reminderName,
+            cts.Token);
 
         Assert.False(waitTask.IsCompleted);
 
