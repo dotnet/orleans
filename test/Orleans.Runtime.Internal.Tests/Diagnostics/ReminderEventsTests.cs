@@ -40,7 +40,7 @@ public class ReminderEventsTests
         ReminderEvents.EmitTickCompleted(grainId, reminderName, status, siloAddress, new RemindableStub());
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
-        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, reminderName, cts.Token);
+        var tickCompleted = await observer.WaitForReminderTickAsync(grainId, cts.Token, reminderName);
 
         Assert.Equal(grainId, tickCompleted.GrainId);
         Assert.Equal(reminderName, tickCompleted.ReminderName);
@@ -52,6 +52,7 @@ public class ReminderEventsTests
     public async Task ReminderDiagnosticObserver_WaitsForAdditionalTickCount_FromCurrentState()
     {
         using var observer = ReminderDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var now = DateTime.UtcNow;
@@ -64,7 +65,7 @@ public class ReminderEventsTests
             siloAddress,
             new RemindableStub());
 
-        var waitTask = observer.WaitForAdditionalTickCountAsync(grainId, 1, reminderName);
+        var waitTask = observer.WaitForAdditionalTickCountAsync(grainId, 1, cts.Token, reminderName);
         Assert.False(waitTask.IsCompleted);
 
         ReminderEvents.EmitTickCompleted(
@@ -81,6 +82,7 @@ public class ReminderEventsTests
     public async Task ReminderDiagnosticObserver_WaitsForTickCondition_UntilConditionIsSatisfied()
     {
         using var observer = ReminderDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(1));
         var grainId = GrainId.Create("test", "grain");
         const string reminderName = "reminder";
         var now = DateTime.UtcNow;
@@ -91,6 +93,7 @@ public class ReminderEventsTests
         var waitTask = observer.WaitForTickConditionAsync(
             grainId,
             _ => Task.FromResult(acceptedTickCount >= 1),
+            cts.Token,
             reminderName);
 
         Assert.False(waitTask.IsCompleted);
