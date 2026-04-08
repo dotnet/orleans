@@ -97,7 +97,15 @@ namespace Orleans.Runtime.Placement
                 worker.Stop();
             }
 
-            await Task.WhenAll(_workers.Select(static worker => worker.CompletionTask)).WaitAsync(cancellationToken).SuppressThrowing();
+            var completionTask = Task.WhenAll(_workers.Select(static worker => worker.CompletionTask));
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await completionTask.SuppressThrowing();
+            }
+            else
+            {
+                await completionTask.WaitAsync(cancellationToken).SuppressThrowing();
+            }
         }
 
         /// <summary>
@@ -132,6 +140,8 @@ namespace Orleans.Runtime.Placement
 
         public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
         {
+            ThrowIfStopping();
+
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (_assumeHomogeneousSilosForTesting)
@@ -146,6 +156,7 @@ namespace Orleans.Runtime.Placement
 
             var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
 
+            ThrowIfStopping();
             var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
             if (filters.Length > 0)
             {
@@ -157,6 +168,7 @@ namespace Orleans.Runtime.Placement
                 IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
                 foreach (var placementFilter in filters)
                 {
+                    ThrowIfStopping();
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
                     filteredSilos = InstrumentFilteredSilos(
                         director.Filter(placementFilter, target, filteredSilos),
@@ -165,6 +177,7 @@ namespace Orleans.Runtime.Placement
                         parentActivityContext);
                 }
 
+                ThrowIfStopping();
                 compatibleSilos = filteredSilos.ToArray();
             }
 
@@ -202,6 +215,7 @@ namespace Orleans.Runtime.Placement
                 throw new ArgumentException("Interface version not provided", nameof(target));
             }
 
+            ThrowIfStopping();
             var grainType = target.GrainIdentity.Type;
             var silos = _versionSelectorManager
                 .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
@@ -520,12 +534,13 @@ namespace Orleans.Runtime.Placement
         /// sequence is actually enumerated, not when the filter is composed. This avoids
         /// per-filter array materialization while still giving accurate span timings.
         /// </summary>
-        private static IEnumerable<SiloAddress> InstrumentFilteredSilos(
+        private IEnumerable<SiloAddress> InstrumentFilteredSilos(
             IEnumerable<SiloAddress> silos,
             PlacementFilterStrategy filter,
             GrainType grainType,
             ActivityContext? parentActivityContext)
         {
+            ThrowIfStopping();
             using var filterSpan = parentActivityContext is { } parentContext
                 ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates, ActivityKind.Internal, parentContext)
                 : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
@@ -534,6 +549,7 @@ namespace Orleans.Runtime.Placement
 
             foreach (var silo in silos)
             {
+                ThrowIfStopping();
                 yield return silo;
             }
         }

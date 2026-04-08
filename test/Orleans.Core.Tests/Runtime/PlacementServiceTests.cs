@@ -1,5 +1,7 @@
+using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
@@ -21,6 +23,18 @@ namespace UnitTests.Runtime
             var target = CreateTarget();
 
             await StopAsync(target);
+
+            Assert.All(GetWorkerTasks(target), task => Assert.True(task.IsCompleted));
+        }
+
+        [Fact]
+        public async Task LifecycleStop_WithCanceledToken_CompletesWorkerTasks()
+        {
+            var target = CreateTarget();
+            using var cts = new CancellationTokenSource();
+            cts.Cancel();
+
+            await StopAsync(target, cts.Token);
 
             Assert.All(GetWorkerTasks(target), task => Assert.True(task.IsCompleted));
         }
@@ -55,6 +69,32 @@ namespace UnitTests.Runtime
             await Assert.ThrowsAsync<SiloUnavailableException>(() => InvokeGetOrPlaceActivationAsync(target, message));
         }
 
+        [Fact]
+        public async Task GetCompatibleSilos_AfterLifecycleStop_ThrowsSiloUnavailableException()
+        {
+            var target = CreateTarget();
+            var placementTarget = new PlacementTarget(GrainId.Create("test", "grain-1"), new Dictionary<string, object>(), default, 0);
+
+            await StopAsync(target);
+
+            Assert.Throws<SiloUnavailableException>(() => target.GetCompatibleSilos(placementTarget));
+        }
+
+        [Fact]
+        public async Task GetCompatibleSilosWithVersions_AfterLifecycleStop_ThrowsSiloUnavailableException()
+        {
+            var target = CreateTarget();
+            var placementTarget = new PlacementTarget(
+                GrainId.Create("test", "grain-1"),
+                new Dictionary<string, object>(),
+                GrainInterfaceType.Create("test.interface"),
+                1);
+
+            await StopAsync(target);
+
+            Assert.Throws<SiloUnavailableException>(() => target.GetCompatibleSilosWithVersions(placementTarget));
+        }
+
         private static PlacementService CreateTarget()
         {
             var optionsMonitor = Substitute.For<IOptionsMonitor<SiloMessagingOptions>>();
@@ -80,12 +120,12 @@ namespace UnitTests.Runtime
                 placementFilterDirectoryResolver: null!);
         }
 
-        private static async Task StopAsync(PlacementService target)
+        private static async Task StopAsync(PlacementService target, CancellationToken cancellationToken = default)
         {
             var lifecycle = new SiloLifecycleSubject(NullLoggerFactory.Instance.CreateLogger<SiloLifecycleSubject>());
             ((ILifecycleParticipant<ISiloLifecycle>)target).Participate(lifecycle);
             await lifecycle.OnStart();
-            await lifecycle.OnStop();
+            await lifecycle.OnStop(cancellationToken);
         }
 
         private static Task<SiloAddress> InvokeGetOrPlaceActivationAsync(PlacementService target, Message message)
