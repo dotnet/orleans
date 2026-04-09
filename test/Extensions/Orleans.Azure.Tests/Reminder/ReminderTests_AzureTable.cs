@@ -131,9 +131,7 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-            using var cts = new CancellationTokenSource(ENDWAIT);
-
-            TimeSpan period = await g1.GetReminderPeriod(DR);
+            using var cts = new CancellationTokenSource(CHURN_ENDWAIT);
 
             Task<bool>[] tasks =
             {
@@ -144,7 +142,7 @@ namespace Tester.AzureUtils.TimerTests
                 Task.Run(() => PerGrainMultiReminderTestChurn(g5, cts.Token), cts.Token),
             };
 
-            await Task.Delay(period.Multiply(5), cts.Token);
+            await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
 
             // start two extra silos ... although it will take it a while before they stabilize
             log.LogInformation("Starting 2 extra silos");

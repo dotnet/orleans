@@ -24,6 +24,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
     protected TestCluster HostedCluster { get; private set; }
     internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500);
     internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(2);
+    internal static readonly TimeSpan CHURN_ENDWAIT = TimeSpan.FromMinutes(5);
 
     internal const string DR = "DEFAULT_REMINDER";
     internal const string R1 = "REMINDER_1";
@@ -148,7 +149,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-        using var cts = new CancellationTokenSource(ENDWAIT);
+        using var cts = new CancellationTokenSource(CHURN_ENDWAIT);
 
         Task<bool>[] tasks =
         [
@@ -160,11 +161,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         ];
 
         // Wait for all grains to have at least one reminder tick before adding a silo
-        await observer.WaitForReminderTickAsync(g1, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g2, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g3, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g4, cancellationToken: cts.Token);
-        await observer.WaitForReminderTickAsync(g5, cancellationToken: cts.Token);
+        await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
 
         // start another silo ... although it will take it a while before it stabilizes
         log.LogInformation("Starting another silo");
@@ -181,6 +178,17 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // request a reminder that does not exist
         IGrainReminder reminder = await g1.GetReminderObject("blarg");
         Assert.Null(reminder);
+    }
+
+    protected async Task WaitForInitialReminderTicksAsync(CancellationToken cancellationToken, params IReminderTestGrain2[] grains)
+    {
+        ArgumentNullException.ThrowIfNull(grains);
+
+        foreach (var grain in grains)
+        {
+            ArgumentNullException.ThrowIfNull(grain);
+            await observer.WaitForReminderTickAsync(grain, cancellationToken: cancellationToken);
+        }
     }
 
     internal async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g, CancellationToken cancellationToken = default)
@@ -224,7 +232,10 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         Assert.True(lastR2 >= 4, $"R2 should have at least 4 ticks, got {lastR2}");
 
         long lastDR = await g.GetCounter(DR);
-        Assert.True(lastDR >= 9, $"DR should have at least 9 ticks, got {lastDR}");
+        // The observer-driven waits no longer spend two full periods between each step, so
+        // DEFAULT_REMINDER is guaranteed to reach 8 ticks here instead of the old 9-tick floor.
+        const long minimumDefaultReminderTicks = 8;
+        Assert.True(lastDR >= minimumDefaultReminderTicks, $"DR should have at least {minimumDefaultReminderTicks} ticks, got {lastDR}");
 
         return true;
     }
