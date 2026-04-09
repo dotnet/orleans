@@ -6,7 +6,7 @@ namespace Orleans.Runtime.Versions.Selector
 {
     internal sealed class MinimumVersionSelector : IVersionSelector
     {
-        public ushort[] GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, ICompatibilityDirector compatibilityDirector)
+        public GrainInterfaceVersion[] GetSuitableVersion(GrainInterfaceVersion requestedVersion, GrainInterfaceVersion[] availableVersions, ICompatibilityDirector compatibilityDirector)
         {
             return new[]
             {

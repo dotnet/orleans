@@ -6,7 +6,7 @@ namespace Orleans.Runtime.Versions.Selector
 {
     internal class AllCompatibleVersionsSelector : IVersionSelector
     {
-        public ushort[] GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, ICompatibilityDirector compatibilityDirector)
+        public GrainInterfaceVersion[] GetSuitableVersion(GrainInterfaceVersion requestedVersion, GrainInterfaceVersion[] availableVersions, ICompatibilityDirector compatibilityDirector)
         {
             return availableVersions.Where(v => compatibilityDirector.IsCompatible(requestedVersion, v)).ToArray();
         }

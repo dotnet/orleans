@@ -1,5 +1,6 @@
 using Orleans.Runtime;
 using Orleans.Runtime.Placement;
+using Orleans.Runtime.Versions;
 
 namespace UnitTests.Grains
 {
@@ -18,7 +19,7 @@ namespace UnitTests.Grains
             {
                 var silosByVersion = context.GetCompatibleSilosWithVersions(target);
                 var maxSiloCount = 0;
-                ushort version = 0;
+                GrainInterfaceVersion version = 0;
                 foreach (var kvp in silosByVersion)
                 {
                     if (kvp.Value.Length > maxSiloCount)

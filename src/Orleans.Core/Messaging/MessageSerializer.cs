@@ -9,6 +9,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 using Orleans.Configuration;
 using Orleans.Networking.Shared;
+using Orleans.Runtime.Versions;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.GeneratedCodeHelpers;
@@ -241,7 +242,17 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasInterfaceVersion))
             {
-                writer.WriteVarUInt32(value.InterfaceVersion);
+                var ver = value.InterfaceVersion;
+                if (ver.IsNumeric)
+                {
+                    writer.WriteByte(0);
+                    writer.WriteVarUInt32(ver.NumericValue);
+                }
+                else
+                {
+                    writer.WriteByte(1);
+                    _idSpanCodec.WriteRaw(ref writer, IdSpan.Create(ver.SemanticValue.ToString()));
+                }
             }
 
             if (headers.HasFlag(MessageFlags.HasCacheInvalidationHeader))
@@ -284,7 +295,16 @@ namespace Orleans.Runtime.Messaging
 
             if (headers.HasFlag(MessageFlags.HasInterfaceVersion))
             {
-                result.InterfaceVersion = (ushort)reader.ReadVarUInt32();
+                var kind = reader.ReadByte();
+                if (kind == 0)
+                {
+                    result.InterfaceVersion = (ushort)reader.ReadVarUInt32();
+                }
+                else
+                {
+                    var idSpan = _idSpanCodec.ReadRaw(ref reader);
+                    result.InterfaceVersion = GrainInterfaceVersion.Parse(idSpan.ToString());
+                }
             }
 
             if (headers.HasFlag(MessageFlags.HasCacheInvalidationHeader))

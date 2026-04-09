@@ -6,20 +6,20 @@ namespace Orleans.Runtime.Versions.Selector
 {
     internal sealed class LatestVersionSelector : IVersionSelector
     {
-        public ushort[] GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, ICompatibilityDirector compatibilityDirector)
+        public GrainInterfaceVersion[] GetSuitableVersion(GrainInterfaceVersion requestedVersion, GrainInterfaceVersion[] availableVersions, ICompatibilityDirector compatibilityDirector)
         {
-            var max = int.MinValue;
+            GrainInterfaceVersion? max = null;
             foreach (var version in availableVersions)
             {
-                if (compatibilityDirector.IsCompatible(requestedVersion, version) && version > max)
+                if (compatibilityDirector.IsCompatible(requestedVersion, version) && (max is null || version > max))
                 {
                     max = version;
                 }
             }
 
-            if (max < 0) return Array.Empty<ushort>();
+            if (max is null) return Array.Empty<GrainInterfaceVersion>();
 
-            return new[] { (ushort)max };
+            return new[] { max.Value };
         }
     }
 }

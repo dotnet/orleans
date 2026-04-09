@@ -1,4 +1,5 @@
 using System;
+using Orleans.Runtime.Versions;
 using Orleans.Versions.Compatibility;
 
 namespace Orleans.Versions.Selector
@@ -15,7 +16,7 @@ namespace Orleans.Versions.Selector
         /// <param name="availableVersions">The collection of available interface versions.</param>
         /// <param name="compatibilityDirector">The compatibility director.</param>
         /// <returns>A collection of suitable interface versions for a given request.</returns>
-        ushort[] GetSuitableVersion(ushort requestedVersion, ushort[] availableVersions, ICompatibilityDirector compatibilityDirector);
+        GrainInterfaceVersion[] GetSuitableVersion(GrainInterfaceVersion requestedVersion, GrainInterfaceVersion[] availableVersions, ICompatibilityDirector compatibilityDirector);
     }
 
     /// <summary>

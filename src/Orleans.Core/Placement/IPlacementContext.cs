@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime.Placement
 {
@@ -23,7 +24,7 @@ namespace Orleans.Runtime.Placement
         /// A description of the grain being placed as well as contextual information about the request which is triggering placement.
         /// </param>
         /// <returns>The collection of silos which are compatible with the provided placement target, along with the versions of the grain interface which each server supports.</returns>
-        IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target);
+        IReadOnlyDictionary<GrainInterfaceVersion, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target);
 
         /// <summary>
         /// Gets the local silo's identity.
