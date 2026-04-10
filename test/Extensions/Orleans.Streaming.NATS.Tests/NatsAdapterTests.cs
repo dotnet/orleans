@@ -107,6 +107,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
 
         int receivedBatches = 0;
         var streamsPerQueue = new ConcurrentDictionary<QueueId, HashSet<StreamId>>();
+        var firstTokensPerQueue = new ConcurrentDictionary<(QueueId QueueId, StreamId StreamId), StreamSequenceToken>();
 
         // reader threads (at most 2 active queues because only two streams)
         var work = new List<Task>();
@@ -134,6 +135,10 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
                                 set.Add(message.StreamId);
                                 return set;
                             });
+                        firstTokensPerQueue.AddOrUpdate(
+                            (queueId, message.StreamId),
+                            message.SequenceToken,
+                            (_, existing) => message.SequenceToken.CompareTo(existing) < 0 ? message.SequenceToken : existing);
                         output.WriteLine("Queue {0} received message on stream {1}", queueId,
                             message.StreamId);
                         Assert.Equal(NumMessagesPerBatch / 2,
@@ -163,8 +168,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
         // Make sure we got back everything we sent
         Assert.Equal(NumBatches, receivedBatches);
 
-        // check to see if all the events are in the cache and we can enumerate through them
-        StreamSequenceToken firstInCache = new EventSequenceTokenV2(0);
+        // NATS sequence numbers are stream-global and start above zero, so use the first token observed for each stream.
         foreach (KeyValuePair<QueueId, HashSet<StreamId>> kvp in streamsPerQueue)
         {
             var receiver = receivers[kvp.Key];
@@ -172,6 +176,8 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
 
             foreach (StreamId streamGuid in kvp.Value)
             {
+                Assert.True(firstTokensPerQueue.TryGetValue((kvp.Key, streamGuid), out var firstInCache));
+
                 // read all messages in cache for stream
                 IQueueCacheCursor cursor = qCache.GetCacheCursor(streamGuid, firstInCache);
                 int messageCount = 0;

@@ -587,7 +587,10 @@ jobs:
     - name: Wait for NATS
       run: |
         echo "Waiting for NATS to be ready..."
-        timeout 60 bash -c 'until nc -z 127.0.0.1 4222 && nc -z 127.0.0.1 8222; do sleep 1; done'
+        if ! timeout 60 bash -c 'until docker logs nats 2>&1 | grep -q "Server is ready"; do sleep 1; done'; then
+          docker logs nats
+          exit 1
+        fi
         echo "NATS is ready"
     - uses: actions/checkout@v4
     - name: Setup .NET
