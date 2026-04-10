@@ -388,7 +388,6 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-azure-cosmosdb:
-    if: ${{ false }}
     name: Azure Cosmos DB provider tests
     runs-on: windows-latest
     continue-on-error: true
@@ -417,11 +416,32 @@ jobs:
         Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
         Start-CosmosDbEmulator -NoUI -Consistency Strong -PartitionCount 2 -DefaultPartitionCount 2
         $IPAddress = "127.0.0.1" #(Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress ?? "127.0.0.1"
-        Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://$($IPAddress):8081/"
+        $Endpoint = "https://$($IPAddress):8081/"
+        Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=$Endpoint"
+        Write-Host "Waiting for Azure Cosmos DB emulator to be ready..."
+        for ($i = 0; $i -lt 60; $i++)
+        {
+          try
+          {
+            Invoke-WebRequest -Uri "$($Endpoint)_explorer/index.html" -SkipCertificateCheck | Out-Null
+            Write-Host "Azure Cosmos DB emulator is ready"
+            break
+          }
+          catch
+          {
+            if ($i -eq 59)
+            {
+              throw "Azure Cosmos DB emulator did not become ready in time."
+            }
+
+            Start-Sleep -Seconds 2
+          }
+        }
     - name: Test
       run: dotnet test
+        test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
