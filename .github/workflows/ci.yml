@@ -601,6 +601,68 @@ jobs:
         path: |
           **/TestResults/*
           **/logs/*
+  test-sqs:
+    name: AWS SQS provider tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        provider: ["SQS"]
+        framework: ["net8.0", "net10.0"]
+    services:
+      dynamodb:
+        image: amazon/dynamodb-local:latest
+        ports:
+        - 8000:8000
+        env:
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+          AWS_ACCESS_KEY_ID: root
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+          AWS_SECRET_ACCESS_KEY: pass
+          AWS_REGION: us-east-1
+    steps:
+    - name: Start ElasticMQ
+      run: docker run -d --name elasticmq -p 9324:9324 softwaremill/elasticmq-native:latest
+    - name: Wait for ElasticMQ and DynamoDB
+      run: |
+        echo "Waiting for ElasticMQ and DynamoDB Local to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 9324 && nc -z localhost 8000; do sleep 1; done'
+        echo "ElasticMQ and DynamoDB Local are ready"
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+    - name: Test
+      run: dotnet test
+        test/Extensions/Orleans.AWS.Tests/Orleans.AWS.Tests.csproj
+        --framework ${{ matrix.framework }}
+        --filter "Category=${{ matrix.provider }}"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+      env:
+        ORLEANSSQSCONNECTIONSTRING: "Service=http://127.0.0.1:9324"
+        ORLEANSDYNAMODBSERVICE: "http://127.0.0.1:8000"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDYNAMODBACCESSKEY: "root"
+# [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
+        ORLEANSDYNAMODBSECRETKEY: "pass"
+    - name: Clean up ElasticMQ
+      if: always()
+      run: docker rm -f elasticmq
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
   test-nats:
     name: NATS stream provider tests
     runs-on: ubuntu-latest

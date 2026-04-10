@@ -13,6 +13,7 @@ namespace AWSUtils.Tests.Streaming
     /// <summary>
     /// Tests multiple subscription scenarios for SQS streams including parallel, linear, and resubscription patterns.
     /// </summary>
+    [TestCategory("AWS"), TestCategory("SQS")]
     public class SQSSubscriptionMultiplicityTests : TestClusterPerTest
     {
         private const string SQSStreamProviderName = "SQSProvider";
