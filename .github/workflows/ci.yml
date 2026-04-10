@@ -405,14 +405,17 @@ jobs:
       run: |
         docker run -d --name cosmosdb-emulator \
           -p 8081:8081 \
-          -p 10250-10255:10250-10255 \
-          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:latest
+          -e PROTOCOL=https \
+          -e ENABLE_EXPLORER=false \
+          -e ENABLE_TELEMETRY=false \
+          -e LOG_LEVEL=warn \
+          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
     - name: Wait for Azure Cosmos DB emulator
       run: |
         endpoint="https://localhost:8081/"
         echo "Waiting for Azure Cosmos DB emulator to be ready..."
         for i in {1..60}; do
-          if curl --silent --show-error --fail --insecure "${endpoint}_explorer/index.html" > /dev/null; then
+          if curl --silent --show-error --insecure "${endpoint}" > /dev/null; then
             echo "Azure Cosmos DB emulator is ready"
             echo "ORLEANSCOSMOSDBACCOUNTENDPOINT=${endpoint}" >> "$GITHUB_ENV"
             exit 0
