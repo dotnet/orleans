@@ -37,7 +37,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
         this.output = output;
         this.fixture = fixture;
 
-        this.natsConnection = new NatsConnection();
+        this.natsConnection = NatsTestConstants.CreateConnection();
         this.natsContext = new NatsJSContext(this.natsConnection);
 
         this.testStreamName = $"test-stream-{Guid.NewGuid()}";
@@ -74,7 +74,7 @@ public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFix
     [SkippableFact]
     public async Task SendAndReceiveFromNats()
     {
-        var options = new NatsOptions { StreamName = testStreamName };
+        var options = new NatsOptions { StreamName = testStreamName, NatsClientOptions = NatsTestConstants.NatsClientOptions };
         var adapterFactory = new NatsAdapterFactory(
             NATS_STREAM_PROVIDER_NAME,
             options,
