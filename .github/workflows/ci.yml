@@ -437,20 +437,30 @@ jobs:
         cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRow'
         cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRowInParallel'
         cosmos_filter+='&FullyQualifiedName!~Tester.Cosmos.Persistence.PersistenceProviderTests_Cosmos.PersistenceProvider_Azure_ChangeWriteFormat'
-        if [ "${{ matrix.framework }}" = 'net8.0' ]; then
-          # The Linux emulator remains unstable for net8.0 Cosmos reminder coverage under CI load.
-          cosmos_filter+='&Category!=Reminders'
-        fi
-        dotnet test \
-          test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj \
-          --framework ${{ matrix.framework }} \
-          --filter "${cosmos_filter}" \
-          --blame-hang-timeout 10m \
-          --blame-crash-dump-type full \
-          --blame-hang-dump-type full \
-          --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx" \
-          -- \
-          -parallel none -noshadow
+        for attempt in 1 2; do
+          logger_name="test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
+          extra_args=()
+          if [ "$attempt" -gt 1 ]; then
+            echo "Cosmos tests failed on attempt $((attempt - 1)); retrying once with the same filter."
+            extra_args+=(--no-build)
+          fi
+
+          if dotnet test \
+            test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj \
+            --framework ${{ matrix.framework }} \
+            --filter "${cosmos_filter}" \
+            --blame-hang-timeout 10m \
+            --blame-crash-dump-type full \
+            --blame-hang-dump-type full \
+            --logger "trx;LogFileName=${logger_name}" \
+            "${extra_args[@]}" \
+            -- \
+            -parallel none -noshadow; then
+            exit 0
+          fi
+        done
+
+        exit 1
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://localhost:8081/"
