@@ -226,10 +226,14 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         await ExecuteWithRetriesStop(g.StopReminder, DR);
 
         long lastR1 = await g.GetCounter(R1);
-        Assert.True(lastR1 >= 4, $"R1 should have at least 4 ticks, got {lastR1}");
+        const long minimumReminder1Ticks = 4;
+        Assert.True(lastR1 >= minimumReminder1Ticks, $"R1 should have at least {minimumReminder1Ticks} ticks, got {lastR1}");
 
         long lastR2 = await g.GetCounter(R2);
-        Assert.True(lastR2 >= 4, $"R2 should have at least 4 ticks, got {lastR2}");
+        // R2 only gets its initial two observed ticks plus the DR-based settle window after R1 stops,
+        // so the observer-driven sequence guarantees 3 ticks here instead of the old 4-tick floor.
+        const long minimumReminder2Ticks = 3;
+        Assert.True(lastR2 >= minimumReminder2Ticks, $"R2 should have at least {minimumReminder2Ticks} ticks, got {lastR2}");
 
         long lastDR = await g.GetCounter(DR);
         // The observer-driven waits no longer spend two full periods between each step, so
