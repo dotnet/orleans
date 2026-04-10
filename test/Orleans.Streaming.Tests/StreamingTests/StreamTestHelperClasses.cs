@@ -376,14 +376,14 @@ namespace UnitTests.StreamingTests
 
         public StreamId StreamId { get; }
 
-        private ProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string providerName, ILogger logger)
+        private ProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string providerName, string streamNamespace, ILogger logger)
         {
             _targets = targets;
             _logger = logger;
             _streamId = streamId;
             _providerName = providerName;
             _cleanedUpFlag = new InterlockedFlag();
-            StreamId = StreamId.Create(null, streamId);
+            StreamId = StreamId.Create(streamNamespace, streamId);
         }
 
         private static async Task<ProducerProxy> NewProducerProxy(IStreaming_ProducerGrain[] targets, Guid streamId, string streamProvider, string streamNamespace, ILogger logger)
@@ -395,7 +395,7 @@ namespace UnitTests.StreamingTests
             if (logger == null)
                 throw new ArgumentNullException(nameof(logger));
 
-            ProducerProxy newObj = new ProducerProxy(targets, streamId, streamProvider, logger);
+            ProducerProxy newObj = new ProducerProxy(targets, streamId, streamProvider, streamNamespace, logger);
             await newObj.BecomeProducer(streamId, streamProvider, streamNamespace);
             return newObj;
         }
