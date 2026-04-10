@@ -583,7 +583,7 @@ jobs:
 #          HTTP_PORT: 8222
     steps:
     - name: Start NATS
-      run: docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:latest --js --http-port=8222
+      run: docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:latest --js --http_port=8222
     - name: Wait for NATS
       run: |
         echo "Waiting for NATS to be ready..."
