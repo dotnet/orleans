@@ -430,16 +430,23 @@ jobs:
           sleep 2
         done
     - name: Test
-      run: dotnet test
-        test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj
-        --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+      run: |
+        cosmos_filter='Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress'
+        # The Linux vNext emulator still misses a narrow set of ETag/version concurrency semantics.
+        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_ReadRow_Insert_Read'
+        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRow'
+        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRowInParallel'
+        cosmos_filter+='&FullyQualifiedName!~Tester.Cosmos.Persistence.PersistenceProviderTests_Cosmos.PersistenceProvider_Azure_ChangeWriteFormat'
+        dotnet test \
+          test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj \
+          --framework ${{ matrix.framework }} \
+          --filter "${cosmos_filter}" \
+          --blame-hang-timeout 10m \
+          --blame-crash-dump-type full \
+          --blame-hang-dump-type full \
+          --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx" \
+          -- \
+          -parallel none -noshadow
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://localhost:8081/"
