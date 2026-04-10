@@ -15,6 +15,9 @@ namespace UnitTests.Directory
     /// Tests for distributed hash table grain locator functionality including grain unregistration and batch operations.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("GrainDirectory")]
     public class DhtGrainLocatorTests
     {
         private readonly DhtGrainLocator target;

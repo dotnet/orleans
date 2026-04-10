@@ -9,6 +9,8 @@ using Xunit.Abstractions;
 
 namespace TestExtensions.Runners;
 
+[TestSuite("Functional")]
+[TestArea("Persistence")]
 public abstract class GrainPersistenceTestsRunner : OrleansTestingBase
 {
     private readonly ITestOutputHelper output;

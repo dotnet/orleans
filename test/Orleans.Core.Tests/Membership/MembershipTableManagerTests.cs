@@ -17,6 +17,9 @@ namespace NonSilo.Tests.Membership
     /// Tests for <see cref="MembershipTableManager"/>
     /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MembershipTableManagerTests
     {
         private readonly ITestOutputHelper output;

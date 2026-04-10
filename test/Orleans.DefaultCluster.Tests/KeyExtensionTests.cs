@@ -11,6 +11,9 @@ namespace DefaultCluster.Tests.General
     /// (GUID, long, or string) with a string extension. This enables scenarios like
     /// multi-tenancy where the same grain type can have different instances per tenant.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class KeyExtensionTests : HostedTestClusterEnsureDefaultStarted
     {
         public KeyExtensionTests(DefaultClusterFixture fixture) : base(fixture)

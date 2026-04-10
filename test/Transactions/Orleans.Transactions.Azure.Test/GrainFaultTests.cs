@@ -8,6 +8,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     /// Tests for transaction behavior under grain fault conditions with Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class GrainFaultTests : GrainFaultTransactionTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public GrainFaultTests(TestFixture fixture, ITestOutputHelper output)

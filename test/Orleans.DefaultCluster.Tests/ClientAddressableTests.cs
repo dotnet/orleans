@@ -15,6 +15,9 @@ namespace DefaultCluster.Tests
     /// - Polling patterns where grains pull data from clients
     /// Client-addressable objects must be registered with the runtime and have a limited lifetime.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ClientAddressableTests : HostedTestClusterEnsureDefaultStarted
     {
         private object anchor;

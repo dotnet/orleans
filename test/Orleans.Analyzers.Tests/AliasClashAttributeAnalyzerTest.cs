@@ -10,6 +10,9 @@ namespace Analyzers.Tests;
 /// runtime conflicts. This analyzer catches these issues at compile time.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class AliasClashAttributeAnalyzerTest : DiagnosticAnalyzerTestBase<AliasClashAttributeAnalyzer>
 {
     private async Task VerifyHasDiagnostic(string code)

@@ -13,6 +13,9 @@ namespace DefaultCluster.Tests.General
     /// - Preserved across grain deactivations
     /// This enables grains to maintain durable state without explicit database code.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class StateClassTests : HostedTestClusterEnsureDefaultStarted
     {
         private readonly Random rand = new Random();

@@ -14,6 +14,9 @@ namespace UnitTests.TimerTests
     /// <summary>
     /// Tests for grain-based reminder functionality using in-memory reminder service as table storage.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Functional"), TestCategory("Reminders")]
     public class ReminderTests_TableGrain : ReminderTests_Base, IClassFixture<ReminderTests_TableGrain.Fixture>
     {

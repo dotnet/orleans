@@ -11,6 +11,9 @@ namespace NonSilo.Tests
     /// system and type resolution when communicating between silos and clients.
     /// </summary>
     [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class RuntimeTypeNameFormatterTests
     {
         public interface IMyBaseType<T> { }

@@ -13,6 +13,9 @@ namespace DependencyInjection.Tests.Autofac
     /// Tests dependency injection functionality using Autofac as the DI container for Orleans grains.
     /// </summary>
     [TestCategory("DI"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("DependencyInjection")]
     public class DependencyInjectionGrainTestsUsingAutofac : DependencyInjectionGrainTestRunner, IClassFixture<DependencyInjectionGrainTestsUsingAutofac.Fixture>
     {
         public class Fixture : BaseTestClusterFixture
@@ -43,6 +46,9 @@ namespace DependencyInjection.Tests.Autofac
     /// Tests that Orleans silos can start successfully when configured to use Autofac as the DI container.
     /// </summary>
     [TestCategory("DI"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("DependencyInjection")]
     public class DependencyInjectionSiloStartsUsingAutofac : IClassFixture<DependencyInjectionSiloStartsUsingAutofac.Fixture>
     {
         private readonly BaseTestClusterFixture fixture;

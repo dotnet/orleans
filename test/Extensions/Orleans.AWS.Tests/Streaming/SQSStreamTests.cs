@@ -14,6 +14,9 @@ namespace AWSUtils.Tests.Streaming
     /// Tests SQS streaming provider with various producer/consumer configurations between grains and clients.
     /// </summary>
     [TestCategory("AWS"), TestCategory("SQS")]
+    [TestSuite("Functional")]
+    [TestProvider("SQS")]
+    [TestArea("Streaming")]
     public class SQSStreamTests : TestClusterPerTest
     {
         public static readonly string SQS_STREAM_PROVIDER_NAME = "SQSProvider";

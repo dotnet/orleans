@@ -11,6 +11,9 @@ namespace Tester.AzureUtils.General
     /// Tests for generic grain types using Azure Table Storage as the persistence provider.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Generics")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Persistence")]
     public class GenericGrainsInAzureTableStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureTableStorageTests.Fixture>
     {
         private readonly Fixture fixture;
@@ -70,6 +73,9 @@ namespace Tester.AzureUtils.General
     /// Tests for generic grain types using Azure Blob Storage as the persistence provider.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Generics")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Persistence")]
     public class GenericGrainsInAzureBlobStorageTests : OrleansTestingBase, IClassFixture<GenericGrainsInAzureBlobStorageTests.Fixture>
     {
         private readonly Fixture fixture;

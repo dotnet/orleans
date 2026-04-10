@@ -8,6 +8,9 @@ namespace UnitTests.ActivationRebalancingTests;
 /// <summary>
 /// Tests for controlling the activation rebalancer, including suspend/resume operations and report subscription.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class ControlRebalancerTests(RebalancerFixture fixture, ITestOutputHelper output)
     : RebalancingTestBase<RebalancerFixture>(fixture, output), IClassFixture<RebalancerFixture>

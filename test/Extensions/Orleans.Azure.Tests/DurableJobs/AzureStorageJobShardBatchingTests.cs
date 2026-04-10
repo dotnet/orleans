@@ -21,6 +21,9 @@ namespace Tester.AzureUtils.DurableJobs;
 /// These tests verify Azure-specific batching behaviors that don't apply to all providers.
 /// </summary>
 [TestCategory("DurableJobs")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class AzureStorageJobShardBatchingTests : AzureStorageBasicTests, IAsyncDisposable
 {
     private readonly IDictionary<string, string> _metadata = new Dictionary<string, string>

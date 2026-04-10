@@ -8,6 +8,8 @@ namespace Tester.EventSourcingTests
     /// <summary>
     /// Tests for event-sourced counters grain functionality including concurrent increments and state management.
     /// </summary>
+    [TestProvider("None")]
+    [TestArea("EventSourcing")]
     public partial class CountersGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;
@@ -17,7 +19,7 @@ namespace Tester.EventSourcingTests
             this.fixture = fixture;
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact, TestSuite("Functional"), TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task Record()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));
@@ -39,7 +41,7 @@ namespace Tester.EventSourcingTests
             Assert.Empty((await grain.GetTentativeState()));
         }
 
-        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        [Fact, TestSuite("Functional"), TestCategory("EventSourcing"), TestCategory("Functional")]
         public async Task ConcurrentIncrements()
         {
             var grain = this.fixture.GrainFactory.GetGrain<ICountersGrain>(GrainId.Create("simple-counters-grain", "0"));

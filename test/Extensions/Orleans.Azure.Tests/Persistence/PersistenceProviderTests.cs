@@ -45,6 +45,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [Fact, TestCategory("Functional")]
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Persistence")]
         public async Task PersistenceProvider_Mock_WriteRead()
         {
             const string testName = nameof(PersistenceProvider_Mock_WriteRead);
@@ -55,6 +58,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [Fact, TestCategory("Functional")]
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Persistence")]
         public async Task PersistenceProvider_FileStore_WriteRead()
         {
             const string testName = nameof(PersistenceProvider_FileStore_WriteRead);
@@ -64,6 +70,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         public async Task PersistenceProvider_Azure_Read()
         {
             TestUtils.CheckForAzureStorage();
@@ -74,6 +83,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(15 * 64 * 1024 - 256, false)]
@@ -94,6 +106,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         [InlineData(null, false, false)]
         [InlineData(null, true, false)]
         [InlineData(15 * 64 * 1024 - 256, false, false)]
@@ -115,6 +130,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
         [InlineData(15 * 32 * 1024 - 256, true, false)]
@@ -142,6 +160,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
         [InlineData(15 * 32 * 1024 - 256, true, false)]
@@ -172,6 +193,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         [InlineData(null, true, false)]
         [InlineData(null, false, true)]
         [InlineData(15 * 32 * 1024 - 256, true, false)]
@@ -206,6 +230,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableTheory, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         [InlineData(null, false)]
         [InlineData(null, true)]
         [InlineData(15 * 64 * 1024 - 256, false)]
@@ -235,6 +262,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("AzureStorage")]
+        [TestSuite("Functional")]
+        [TestProvider("AzureStorage")]
+        [TestArea("Persistence")]
         public async Task AzureTableStorage_ConvertJsonToFromStorageFormatWithCustomJsonProperties()
         {
             TestUtils.CheckForAzureStorage();
@@ -253,6 +283,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [Fact, TestCategory("Functional"), TestCategory("MemoryStore")]
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Persistence")]
         public async Task PersistenceProvider_Memory_FixedLatency_WriteRead()
         {
             const string testName = nameof(PersistenceProvider_Memory_FixedLatency_WriteRead);
@@ -287,6 +320,9 @@ namespace Tester.AzureUtils.Persistence
         }
 
         [Fact, TestCategory("Functional")]
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Persistence")]
         public void LoadClassByName()
         {
             string className = typeof(MockStorageProvider).FullName;

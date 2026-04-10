@@ -19,6 +19,9 @@ namespace Tester.Cosmos.Persistence;
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Persistence"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Persistence")]
 public class PersistenceProviderTests_Cosmos
 {
     private readonly IProviderRuntime providerRuntime;

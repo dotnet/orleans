@@ -8,6 +8,9 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     /// <summary>
     /// Tests grain placement behavior during version upgrades when using AllCompatibleVersions selector and AllVersionsCompatible compatibility strategy.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class VersionPlacementTests : UpgradeTestsBase
     {

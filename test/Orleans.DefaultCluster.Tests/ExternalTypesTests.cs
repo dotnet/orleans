@@ -8,6 +8,9 @@ namespace DefaultCluster.Tests.General
     /// Tests for Orleans' ability to handle types defined outside of the grain interface and implementation assemblies.
     /// Verifies that the serialization system correctly handles external types (like enums) passed as parameters to grain methods.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ExternalTypesTests : HostedTestClusterEnsureDefaultStarted
     {
         public ExternalTypesTests(DefaultClusterFixture fixture) : base(fixture)

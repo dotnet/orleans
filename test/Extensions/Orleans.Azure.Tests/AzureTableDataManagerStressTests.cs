@@ -12,6 +12,9 @@ namespace Tester.AzureUtils
     /// Stress tests for Azure Table Storage data manager testing high-volume read/write operations and performance.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Stress")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Persistence")]
     public class AzureTableDataManagerStressTests : AzureStorageBasicTests
     {
         private readonly ITestOutputHelper output;

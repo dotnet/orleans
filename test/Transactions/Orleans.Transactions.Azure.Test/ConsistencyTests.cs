@@ -8,6 +8,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     /// Tests for transaction consistency behavior with Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions-dev")]
+    [TestSuite("Nightly")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class ConsistencyTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public ConsistencyTests(TestFixture fixture, ITestOutputHelper output)

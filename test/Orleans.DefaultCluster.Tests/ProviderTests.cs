@@ -14,6 +14,9 @@ namespace DefaultCluster.Tests
     /// that can be dynamically installed. This enables modular grain design
     /// where optional functionality can be added as needed.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ProviderTests : OrleansTestingBase, IClassFixture<ProviderTests.Fixture>
     {
         private readonly Fixture fixture;

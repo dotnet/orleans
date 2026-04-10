@@ -11,6 +11,9 @@ namespace UnitTests.General
     /// Tests for request context functionality including multi-threading, activity ID propagation, and import/export operations.
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class RequestContextTests_Local : IDisposable
     {
         private readonly Dictionary<string, object> headers = new Dictionary<string, object>();

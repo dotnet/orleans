@@ -35,6 +35,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Needing highly optimized wire format
 /// </summary>
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IFieldCodec<MyProtobufClass?>>
 {
     public ProtobufSerializerTests(ITestOutputHelper output) : base(output)
@@ -101,6 +104,9 @@ public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IField
 }
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ProtobufCodecCopierTests : CopierTester<MyProtobufClass?, IDeepCopier<MyProtobufClass?>>
 {
     public ProtobufCodecCopierTests(ITestOutputHelper output) : base(output)
@@ -125,6 +131,9 @@ public class ProtobufCodecCopierTests : CopierTester<MyProtobufClass?, IDeepCopi
 }
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ProtobufRepeatedFieldCodecTests : FieldCodecTester<RepeatedField<int>, RepeatedFieldCodec<int>>
 {
     public ProtobufRepeatedFieldCodecTests(ITestOutputHelper output) : base(output)
@@ -147,6 +156,9 @@ public class ProtobufRepeatedFieldCodecTests : FieldCodecTester<RepeatedField<in
 }
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ProtobufRepeatedFieldCopierTests : CopierTester<RepeatedField<int>, IDeepCopier<RepeatedField<int>>>
 {
     public ProtobufRepeatedFieldCopierTests(ITestOutputHelper output) : base(output)
@@ -171,6 +183,9 @@ public class ProtobufRepeatedFieldCopierTests : CopierTester<RepeatedField<int>,
 }
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFieldCodec<string, int>>
 {
     public MapFieldCodecTests(ITestOutputHelper output) : base(output)
@@ -193,6 +208,9 @@ public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFie
 }
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldCopier<string, int>>
 {
     public MapFieldCopierTests(ITestOutputHelper output) : base(output)
@@ -215,6 +233,9 @@ public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldC
 }
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ByteStringCodecTests : FieldCodecTester<ByteString, ByteStringCodec>
 {
     public ByteStringCodecTests(ITestOutputHelper output) : base(output)
@@ -234,6 +255,9 @@ public class ByteStringCodecTests : FieldCodecTester<ByteString, ByteStringCodec
 }
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ByteStringCopierTests : CopierTester<ByteString, ByteStringCopier>
 {
     public ByteStringCopierTests(ITestOutputHelper output) : base(output)

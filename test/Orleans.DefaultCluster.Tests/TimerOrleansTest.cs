@@ -15,6 +15,7 @@ namespace DefaultCluster.Tests.TimerTests
     /// timeouts, and other scenarios where persistence isn't required.
     /// Timers are more efficient than reminders for high-frequency operations.
     /// </summary>
+    [TestArea("Runtime")]
     public class TimerOrleansTest : HostedTestClusterEnsureDefaultStarted
     {
         private readonly ITestOutputHelper output;
@@ -56,6 +57,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// and that stopping a timer prevents further ticks. This demonstrates
         /// the fundamental timer lifecycle within a grain activation.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Basic()
         {
@@ -82,6 +85,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// and that timers across different grain activations don't interfere
         /// with each other, demonstrating timer isolation per grain.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Parallel()
         {
@@ -130,6 +135,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// is deactivated and reactivated, timers start fresh. This demonstrates
         /// the non-durable nature of timers compared to reminders.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Migration()
         {
@@ -182,6 +189,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// and that exceptions in timer callbacks are captured and don't crash
         /// the grain. Important for timer-based orchestration patterns.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall()
         {
@@ -234,6 +243,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// different period specifications) work correctly and that all timer
         /// variants execute their callbacks as expected.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task GrainTimer_TestAllOverloads()
         {
@@ -261,6 +272,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// which is important for one-shot timer patterns or timers that
         /// need to cancel themselves based on conditions.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task GrainTimer_DisposeFromCallback()
         {
@@ -279,6 +292,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// and are serialized with other grain methods, maintaining the
         /// single-threaded execution model.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_Test()
         {
@@ -321,6 +336,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// timers can be safely modified from within their own callbacks.
         /// Essential for adaptive timing scenarios.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task GrainTimer_Change()
         {
@@ -395,6 +412,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// traditional Grain-derived classes, demonstrating that the timer
         /// infrastructure is independent of the grain implementation style.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Basic_Poco()
         {
@@ -421,6 +440,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// traditional grains, with each instance having independent timers
         /// that don't interfere with each other.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Parallel_Poco()
         {
@@ -469,6 +490,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// behavior as traditional grains - timers are lost on deactivation
         /// and start fresh on reactivation.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task TimerOrleansTest_Migration_Poco()
         {
@@ -521,6 +544,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// including grain-to-grain calls, with proper exception handling
         /// in the timer callback context.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task AsyncTimerTest_GrainCall_Poco()
         {
@@ -573,6 +598,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// registration methods, maintaining API compatibility with
         /// traditional grain implementations.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Timers")]
         public async Task GrainTimer_TestAllOverloads_Poco()
         {
@@ -600,6 +627,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// timer callbacks are properly serialized in non-reentrant grains
         /// regardless of the grain implementation style.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_Test_Poco()
         {
@@ -641,6 +670,8 @@ namespace DefaultCluster.Tests.TimerTests
         /// of timing parameters through the Change method, including
         /// edge cases and callback-initiated changes.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task GrainTimer_Change_Poco()
         {

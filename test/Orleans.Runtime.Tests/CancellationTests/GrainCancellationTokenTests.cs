@@ -10,6 +10,9 @@ namespace UnitTests.CancellationTests
     /// <summary>
     /// Tests for GrainCancellationToken functionality including task cancellation and token callbacks.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainCancellationTokenTests : OrleansTestingBase, IClassFixture<GrainCancellationTokenTests.Fixture>
     {
         private readonly Fixture fixture;

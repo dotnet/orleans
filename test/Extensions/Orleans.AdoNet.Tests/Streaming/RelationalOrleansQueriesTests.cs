@@ -12,6 +12,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
+[TestProvider("SqlServer")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -19,6 +20,7 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
+[TestProvider("MySql")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 100)
@@ -30,6 +32,7 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 /// <summary>
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
+[TestProvider("PostgreSql")]
 public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 99)
@@ -42,6 +45,8 @@ public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesT
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class RelationalOrleansQueriesTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";

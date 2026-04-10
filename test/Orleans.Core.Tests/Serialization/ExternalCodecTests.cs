@@ -18,6 +18,9 @@ using Orleans.Metadata;
 namespace UnitTests.Serialization
 {
     [TestCategory("Serialization"), TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class ExternalCodecTests
     {
         private readonly SerializationTestEnvironment environment;

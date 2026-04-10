@@ -12,6 +12,9 @@ namespace Tester.Cosmos.Persistence;
 /// PersistenceGrainTests using Cosmos DB - Requires access to Cosmos DB
 /// </summary>
 [TestCategory("Persistence"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Persistence")]
 public class PersistenceGrainTests_CosmosGrainStorage : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_CosmosGrainStorage.Fixture>
 {
     public class Fixture : BaseTestClusterFixture
@@ -50,6 +53,9 @@ public class PersistenceGrainTests_CosmosGrainStorage : GrainPersistenceTestsRun
 }
 
 [TestCategory("Persistence"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Persistence")]
 public class PersistenceGrainTests_CosmosGrainStorage_DeleteStateOnClear : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_CosmosGrainStorage_DeleteStateOnClear.Fixture>
 {
     public class Fixture : BaseTestClusterFixture

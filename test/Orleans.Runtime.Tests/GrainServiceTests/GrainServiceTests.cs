@@ -8,6 +8,9 @@ namespace Tester
     /// <summary>
     /// Tests for grain service functionality including service invocation, lifecycle, and extensions.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainServiceTests : OrleansTestingBase, IClassFixture<GrainServiceTests.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

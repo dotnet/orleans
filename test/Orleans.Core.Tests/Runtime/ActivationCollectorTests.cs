@@ -15,6 +15,9 @@ namespace UnitTests.Runtime
     /// Tests for activation collector functionality including ticket generation from timestamps.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Runtime")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ActivationCollectorTests
     {
         private readonly FakeTimeProvider timeProvider;

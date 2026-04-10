@@ -16,6 +16,9 @@ namespace Tester.AzureUtils.Streaming
     /// <summary>
     /// Tests for Azure Queue streaming client functionality, including producer and consumer behavior with dropped clients.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AQClientStreamTests : TestClusterPerTest
     {
         private const string AQStreamProviderName = "AzureQueueProvider";

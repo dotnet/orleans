@@ -24,6 +24,9 @@ namespace UnitTests.General
     /// 
     /// Proper exception handling is crucial for debugging and maintaining distributed applications.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ExceptionPropagationTests : OrleansTestingBase, IClassFixture<ExceptionPropagationTests.Fixture>
     {
         private const int TestIterations = 3;

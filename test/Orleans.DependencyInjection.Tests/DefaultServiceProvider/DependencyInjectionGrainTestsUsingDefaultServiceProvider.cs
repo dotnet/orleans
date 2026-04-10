@@ -10,6 +10,9 @@ namespace DependencyInjection.Tests.DefaultServiceProvider
     /// that the default ServiceProvider implementation works correctly with Orleans.
     /// </summary>
     [TestCategory("DI"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("DependencyInjection")]
     public class DependencyInjectionGrainTestsUsingDefaultServiceProvider : DependencyInjectionGrainTestRunner, IClassFixture<DependencyInjectionGrainTestsUsingDefaultServiceProvider.Fixture>
     {
         /// <summary>

@@ -10,6 +10,9 @@ namespace UnitTests.StorageTests.AdoNet
     /// Tests for MySQL relational storage functionality.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("MySql")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Persistence")]
     public class MySqlRelationalStoreTests : RelationalStoreTestsBase, IClassFixture<MySqlRelationalStoreTests.Fixture>
     {
         private const string TestDatabaseName = "OrleansStreamTest";

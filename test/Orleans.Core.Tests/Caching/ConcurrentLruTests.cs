@@ -13,6 +13,9 @@ namespace NonSilo.Tests.Caching;
 /// It's used throughout Orleans for caching grain directory entries, grain references, and other frequently accessed data.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
 {
     private readonly ITestOutputHelper _testOutputHelper = testOutputHelper;

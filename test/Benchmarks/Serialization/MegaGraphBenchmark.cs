@@ -16,6 +16,9 @@ namespace Benchmarks.Serialization;
 /// Benchmarks Orleans serialization performance for very large object graphs with hundreds of thousands of items.
 /// </summary>
 [Trait("Category", "Benchmark")]
+[TestSuite("Benchmark")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 [Config(typeof(BenchmarkConfig))]
 public class MegaGraphBenchmark
 {

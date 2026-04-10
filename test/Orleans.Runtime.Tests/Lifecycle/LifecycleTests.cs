@@ -3,6 +3,9 @@ using Xunit;
 
 namespace Tester
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class LifecycleTests
     {
         [Fact, TestCategory("BVT"), TestCategory("Lifecycle")]

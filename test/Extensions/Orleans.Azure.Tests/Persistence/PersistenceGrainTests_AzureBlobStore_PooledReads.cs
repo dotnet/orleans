@@ -11,6 +11,9 @@ namespace Tester.AzureUtils.Persistence;
 /// PersistenceGrainTests using AzureStore with a non-streaming serializer, which exercises pooled read buffers.
 /// </summary>
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class PersistenceGrainTests_AzureBlobStore_PooledReads : Base_PersistenceGrainTests_AzureStore, IClassFixture<PersistenceGrainTests_AzureBlobStore_PooledReads.Fixture>
 {
     public class Fixture : BaseAzureTestClusterFixture

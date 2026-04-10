@@ -20,6 +20,9 @@ namespace AWSUtils.Tests.StorageTests
     /// </summary>
     [TestCategory("Persistence"), TestCategory("AWS"), TestCategory("DynamoDb")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Persistence")]
     public class DynamoDBStorageProviderTests
     {
         private readonly IProviderRuntime providerRuntime;

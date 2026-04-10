@@ -27,6 +27,9 @@ namespace Orleans.Serialization.UnitTests
     /// especially when handling large object graphs or streaming scenarios.
     /// </summary>
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public class PooledBufferTests
     {
         [Fact]

@@ -14,6 +14,9 @@ namespace Tester.AzureUtils.Lease
     /// Tests for lease-based queue balancer functionality in Azure Storage, including auto-scaling and node failure scenarios.
     /// </summary>
     [TestCategory("Functional"), TestCategory("AzureStorage"), TestCategory("Lease")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Lease")]
     public class LeaseBasedQueueBalancerTests : TestClusterPerTest
     {
         private const string StreamProviderName = "MemoryStreamProvider";

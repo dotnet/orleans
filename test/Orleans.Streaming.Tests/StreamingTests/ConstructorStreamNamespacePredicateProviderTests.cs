@@ -10,6 +10,9 @@ namespace UnitTests;
 /// <summary>
 /// Tests for <see cref="ConstructorStreamNamespacePredicateProvider"/> predicate type registration and resolution.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 [TestCategory("BVT"), TestCategory("Predicates")]
 public class ConstructorStreamNamespacePredicateProviderTests
 {

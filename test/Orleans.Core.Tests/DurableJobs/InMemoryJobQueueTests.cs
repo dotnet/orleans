@@ -11,6 +11,9 @@ using Xunit;
 namespace NonSilo.Tests.DurableJobs;
 
 [TestCategory("DurableJobs")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableJobs")]
 public class InMemoryJobQueueTests
 {
     [Fact]

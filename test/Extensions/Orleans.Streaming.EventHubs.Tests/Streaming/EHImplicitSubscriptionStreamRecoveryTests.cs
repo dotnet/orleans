@@ -17,6 +17,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// Tests for EventHub stream recovery with implicit subscriptions handling transient and non-transient errors.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<EHImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
         private readonly Fixture fixture;

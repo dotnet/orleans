@@ -13,6 +13,9 @@ namespace DefaultCluster.Tests.StorageTests
     /// state persistence across restarts is not required.
     /// </summary>
     [TestCategory("Storage"), TestCategory("MemoryStore")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MemoryStorageProviderTests : HostedTestClusterEnsureDefaultStarted
     {
         public MemoryStorageProviderTests(DefaultClusterFixture fixture) : base(fixture)

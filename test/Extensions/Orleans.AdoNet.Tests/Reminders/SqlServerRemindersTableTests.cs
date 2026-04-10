@@ -13,6 +13,9 @@ namespace UnitTests.RemindersTest
     /// Tests for operation of Orleans Reminders Table using SQL Server
     /// </summary>
     [TestCategory("Functional"), TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Reminders")]
     public class SqlServerRemindersTableTests : ReminderTableTestsBase
     {
         public SqlServerRemindersTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

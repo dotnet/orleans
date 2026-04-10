@@ -10,6 +10,9 @@ namespace DefaultCluster.Tests
     /// support multiple inheritance paths, and correctly expose methods from all levels
     /// of the interface hierarchy.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainInterfaceHierarchyTests : HostedTestClusterEnsureDefaultStarted
     {
         public GrainInterfaceHierarchyTests(DefaultClusterFixture fixture) : base(fixture)

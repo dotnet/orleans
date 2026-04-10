@@ -14,6 +14,9 @@ namespace Tester.Forwarding
     /// <summary>
     /// Tests for silo shutdown scenarios including request forwarding, timer handling, and stuck activations.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ShutdownSiloTests : TestClusterPerTest
     {
         public const int NumberOfSilos = 2;

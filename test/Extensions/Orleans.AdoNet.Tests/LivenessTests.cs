@@ -10,6 +10,9 @@ namespace UnitTests.MembershipTests
     /// Tests for Orleans silo membership liveness functionality using SQL Server as the membership provider.
     /// </summary>
     [TestCategory("SqlServer"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("AdoNet")]
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Membership")]
     public class LivenessTests_SqlServer : LivenessTestsBase
     {
         public const string TestDatabaseName = "OrleansTest_SqlServer_Liveness";
@@ -80,6 +83,9 @@ namespace UnitTests.MembershipTests
     /// Tests for Orleans silo membership liveness functionality using PostgreSQL as the membership provider.
     /// </summary>
     [TestCategory("PostgreSql"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("AdoNet")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Membership")]
     public class LivenessTests_PostgreSql : LivenessTestsBase
     {
         public const string TestDatabaseName = "OrleansTest_Postgres_Liveness";
@@ -150,6 +156,9 @@ namespace UnitTests.MembershipTests
     /// Tests for Orleans silo membership liveness functionality using MySQL as the membership provider.
     /// </summary>
     [TestCategory("MySql"), TestCategory("Functional"), TestCategory("Membership"), TestCategory("AdoNet")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Membership")]
     public class LivenessTests_MySql : LivenessTestsBase
     {
         public const string TestDatabaseName = "OrleansTest_MySql_Liveness";

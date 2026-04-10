@@ -7,6 +7,9 @@ namespace Tester.EventSourcingTests
     /// <summary>
     /// Tests for event-sourced account grain functionality including balance operations and transaction logging.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("EventSourcing")]
     public class AccountGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;

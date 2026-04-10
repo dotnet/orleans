@@ -17,6 +17,9 @@ namespace Orleans.Serialization.Buffers.Adaptors.UnitTests;
 /// Unit tests for the PooledBufferStream constructor.
 /// </summary>
 [Category("BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class PooledBufferStreamTests
 {
     /// <summary>

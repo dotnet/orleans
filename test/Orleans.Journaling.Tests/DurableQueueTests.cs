@@ -12,6 +12,9 @@ namespace Orleans.Journaling.Tests;
 /// reliable message processing patterns in Orleans grains.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Journaling")]
 public class DurableQueueTests : StateMachineTestBase
 {
     /// <summary>

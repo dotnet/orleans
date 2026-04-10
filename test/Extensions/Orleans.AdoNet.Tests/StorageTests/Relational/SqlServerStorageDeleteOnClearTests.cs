@@ -8,6 +8,9 @@ namespace UnitTests.StorageTests.Relational
     /// Persistence tests for SQL Server with the delete-state-on-clear option enabled.
     /// </summary>
     [TestCategory("AdoNet"), TestCategory("SqlServer"), TestCategory("Persistence")]
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Persistence")]
     public class SqlServerStorageDeleteOnClearTests : RelationalStorageTests, IClassFixture<CommonFixture>
     {
         private const string AdoNetInvariant = AdoNetInvariants.InvariantNameSqlServer;

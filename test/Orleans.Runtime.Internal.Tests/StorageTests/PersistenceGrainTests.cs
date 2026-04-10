@@ -83,6 +83,9 @@ namespace UnitTests.StorageTests
         {
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Silo_StorageProvider_Name_Missing()
         {
@@ -93,6 +96,9 @@ namespace UnitTests.StorageTests
                     $"Provider {providerName} on silo {silo.Name} should not be registered");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_CheckStateInit()
         {
@@ -102,6 +108,9 @@ namespace UnitTests.StorageTests
             Assert.True(ok, "CheckStateInit OK");
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_CheckStorageProvider()
         {
@@ -111,6 +120,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(typeof(MockStorageProvider).FullName, providerType); // StorageProvider provider type
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Init()
         {
@@ -126,6 +138,9 @@ namespace UnitTests.StorageTests
             Assert.Contains(1, replies); // StorageProvider #Init
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Activate_StoredValue()
         {
@@ -143,6 +158,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(initialValue, readValue); // Read previously stored value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Generics")]
         public async Task Persistence_Grain_Activate_StoredValue_Generic()
         {
@@ -160,6 +178,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(initialValue, readValue); // Read previously stored value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Activate_Error()
         {
@@ -180,6 +201,9 @@ namespace UnitTests.StorageTests
                 grain.GetValue());
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Read()
         {
@@ -194,6 +218,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Write()
         {
@@ -218,6 +245,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_ReRead()
         {
@@ -243,6 +273,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(42, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Read_Write()
         {
@@ -267,6 +300,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, val); // Value after Re-Read
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_Delete()
         {
@@ -313,6 +349,9 @@ namespace UnitTests.StorageTests
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Write()
         {
@@ -337,6 +376,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Delete()
         {
@@ -370,6 +412,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Read_Error()
         {
@@ -433,6 +478,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(0, providerState.ProviderStateForTest.WriteCount); // StorageProvider #Writes-2
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_Write_Error()
         {
@@ -507,6 +555,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(4, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_ReRead_Error()
         {
@@ -589,6 +640,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(43, providerState.LastStoredGrainState.Field1); // Store-Field1
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeRead()
         {
@@ -615,6 +669,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterRead()
         {
@@ -653,6 +710,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeWrite()
         {
@@ -687,6 +747,9 @@ namespace UnitTests.StorageTests
 #endif
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_InconsistentStateException_DeactivatesGrain()
         {
@@ -730,6 +793,9 @@ namespace UnitTests.StorageTests
         /// the exception originated from.
         /// </summary>
         /// <returns></returns>
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_InconsistentStateException_DeactivatesOnlyCurrentGrain()
         {
@@ -755,6 +821,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(proxyActivationId, await proxy.GetActivationId());
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterWrite()
         {
@@ -782,6 +851,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_BeforeReRead()
         {
@@ -809,6 +881,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Provider_Error_AfterReRead()
         {
@@ -839,6 +914,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_Handled_Read()
         {
@@ -870,6 +948,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_Handled_Write()
         {
@@ -901,6 +982,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(expectedVal, val); // Returned value
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Error_NotHandled_Write()
         {
@@ -964,6 +1048,9 @@ namespace UnitTests.StorageTests
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_BadProvider()
         {
@@ -971,6 +1058,9 @@ namespace UnitTests.StorageTests
             var oex = await Assert.ThrowsAsync<BadProviderConfigException>(() => grain.DoSomething());
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public void OrleansException_BadProvider()
         {
@@ -997,6 +1087,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(msg1,  exc.InnerException.Message);  //  "InnerException.Message should be '{0}'", msg1
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("MemoryStore")]
         public async Task MemoryStore_UserGrain_Read_Write()
         {
@@ -1035,6 +1128,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(name2, await friends[1].GetName()); // GetFriends - Friend #2 Name
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_Grain_NoState()
         {
@@ -1047,6 +1143,9 @@ namespace UnitTests.StorageTests
             Assert.True(HasStorageProvider(providerName));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Serialization")]
         public void Serialize_GrainState_DeepCopy()
         {
@@ -1110,6 +1209,9 @@ namespace UnitTests.StorageTests
             //await Task.WhenAll(copyTask, serializeTask);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task ReentrentGrainWithState()
         {
@@ -1126,6 +1228,9 @@ namespace UnitTests.StorageTests
             await Task.WhenAll(t11, t12, t21, t22);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task NonReentrentStressGrainWithoutState()
         {
@@ -1136,6 +1241,9 @@ namespace UnitTests.StorageTests
 
         private const bool DoStart = true; // Task.Delay tests fail (Timeout) unless True
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task ReentrentGrain_Task_Delay()
         {
@@ -1145,6 +1253,9 @@ namespace UnitTests.StorageTests
             await grain1.Task_Delay(DoStart);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task NonReentrentGrain_Task_Delay()
         {
@@ -1154,6 +1265,9 @@ namespace UnitTests.StorageTests
             await grain1.Task_Delay(DoStart);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence"), TestCategory("Scheduler"), TestCategory("Reentrancy")]
         public async Task StateInheritanceTest()
         {
@@ -1165,6 +1279,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(1, val);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task SurrogatePersistence_TypeWithoutPublicConstructor_Read()
         {
@@ -1179,6 +1296,9 @@ namespace UnitTests.StorageTests
             Assert.Equal(2, val.Field2);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional"), TestCategory("Persistence")]
         public async Task Persistence_RecordTypeWithoutPublicParameterlessConstructor_Read()
         {

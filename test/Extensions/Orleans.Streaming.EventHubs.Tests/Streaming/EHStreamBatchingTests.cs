@@ -13,6 +13,9 @@ namespace ServiceBus.Tests.Streaming
     /// Tests for EventHub stream batching functionality with implicit subscriptions.
     /// </summary>
     [TestCategory("EventHub")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHStreamBatchingTests : StreamBatchingTestRunner, IClassFixture<EHStreamBatchingTests.Fixture>
     {
         public class Fixture : BaseEventHubTestClusterFixture

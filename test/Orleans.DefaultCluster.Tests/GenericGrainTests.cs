@@ -16,6 +16,9 @@ namespace DefaultCluster.Tests.General
     /// and proper grain activation/routing based on generic type arguments.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Generics")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GenericGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         private static int grainId = 0;
@@ -914,6 +917,9 @@ namespace DefaultCluster.Tests.General
         /// and advanced type inference scenarios that push the boundaries of the generic type resolver.
         /// </summary>
         [TestCategory("BVT"), TestCategory("Generics")]
+        [TestSuite("BVT")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         public class GenericEdgeCaseTests : HostedTestClusterEnsureDefaultStarted
         {
             public GenericEdgeCaseTests(DefaultClusterFixture fixture) : base(fixture)

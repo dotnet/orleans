@@ -17,6 +17,9 @@ namespace Tester.HeterogeneousSilosTests
     /// <summary>
     /// Tests for heterogeneous silo configurations including grain type exclusion and type resolution merging.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Functional")]
     public class HeterogeneousTests : OrleansTestingBase, IDisposable, IAsyncLifetime
     {

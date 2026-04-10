@@ -13,6 +13,9 @@ namespace UnitTests.CancellationTests;
 /// <summary>
 /// Tests for Observer CancellationToken functionality with acknowledgement waiting enabled.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public sealed class ObserverCancellationTokenTests_WaitForAcknowledgement(ObserverCancellationTokenTests_WaitForAcknowledgement.Fixture fixture)
     : ObserverCancellationTokenTests(fixture), IClassFixture<ObserverCancellationTokenTests_WaitForAcknowledgement.Fixture>
 {
@@ -25,6 +28,9 @@ public sealed class ObserverCancellationTokenTests_WaitForAcknowledgement(Observ
 /// <summary>
 /// Tests for Observer CancellationToken functionality with acknowledgement waiting disabled.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public sealed class ObserverCancellationTokenTests_NoWaitForAcknowledgement(ObserverCancellationTokenTests_NoWaitForAcknowledgement.Fixture fixture)
     : ObserverCancellationTokenTests(fixture), IClassFixture<ObserverCancellationTokenTests_NoWaitForAcknowledgement.Fixture>
 {

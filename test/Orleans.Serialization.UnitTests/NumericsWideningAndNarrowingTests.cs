@@ -27,6 +27,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Safe conversions that preserve values within target type ranges
 /// - Appropriate handling of overflow/underflow scenarios
 /// </summary>
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class NumericsWideningAndNarrowingTests
 {
     private readonly IServiceProvider _serviceProvider;

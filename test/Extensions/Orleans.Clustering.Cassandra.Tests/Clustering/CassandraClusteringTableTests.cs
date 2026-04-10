@@ -16,6 +16,9 @@ namespace Tester.Cassandra.Clustering;
 /// </summary>
 [TestCategory("Cassandra"), TestCategory("Clustering")]
 [Collection("Cassandra")]
+[TestSuite("Functional")]
+[TestProvider("Cassandra")]
+[TestArea("Membership")]
 public sealed class CassandraClusteringTableTests : IClassFixture<CassandraContainer>
 {
     private readonly CassandraContainer _cassandraContainer;

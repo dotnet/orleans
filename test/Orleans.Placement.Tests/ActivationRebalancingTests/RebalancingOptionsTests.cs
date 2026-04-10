@@ -7,6 +7,9 @@ namespace UnitTests.ActivationRebalancingTests;
 /// <summary>
 /// Tests for activation rebalancer configuration options validation.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRebalancing")]
 public class RebalancingOptionsTests
 {

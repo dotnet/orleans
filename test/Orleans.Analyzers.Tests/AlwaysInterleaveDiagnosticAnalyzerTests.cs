@@ -10,6 +10,9 @@ namespace Analyzers.Tests
     /// declared on the interface to properly configure interleaving behavior for all implementations.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Analyzer")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Analyzer")]
     public class AlwaysInterleaveDiagnosticAnalyzerTest : DiagnosticAnalyzerTestBase<AlwaysInterleaveDiagnosticAnalyzer>
     {
         protected override Task<(Diagnostic[], string)> GetDiagnosticsAsync(string source, params string[] extraUsings)

@@ -8,6 +8,9 @@ namespace UnitTests.Serialization
     /// Tests for serialization of immutable collections.
     /// </summary>
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Serialization")]
     public class SerializationTestsImmutableCollections
     {
         private readonly TestEnvironmentFixture fixture;

@@ -21,6 +21,9 @@ namespace Tester.Cosmos.Clustering;
 /// - Partition key strategies for cluster isolation
 /// </summary>
 [TestCategory("Membership"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Membership")]
 public class CosmosMembershipTableTests : MembershipTableTestsBase
 {
     public CosmosMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

@@ -10,6 +10,9 @@ namespace Tester.DurableJobs;
 /// These tests verify shard lifecycle management, ownership, and failover semantics for the InMemory provider.
 /// </summary>
 [TestCategory("BVT"), TestCategory("DurableJobs")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableJobs")]
 public class InMemoryJobShardManagerTests : IAsyncLifetime
 {
     private readonly InMemoryJobShardManagerTestFixture _fixture;

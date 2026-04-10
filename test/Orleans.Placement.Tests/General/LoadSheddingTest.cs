@@ -16,6 +16,9 @@ namespace UnitTests.General
     /// Tests for load shedding functionality when the gateway is overloaded.
     /// </summary>
     // if we parallelize tests, each test should run in isolation 
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Placement")]
     public class LoadSheddingTest : OrleansTestingBase, IClassFixture<LoadSheddingTest.Fixture>
     {
         private readonly Fixture fixture;

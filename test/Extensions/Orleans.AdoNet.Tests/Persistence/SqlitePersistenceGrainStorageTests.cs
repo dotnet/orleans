@@ -10,6 +10,9 @@ using Xunit;
 namespace Tester.AdoNet.Persistence
 {
     [TestCategory("AdoNet"), TestCategory("Persistence"), TestCategory("Sqlite"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("Sqlite")]
+    [TestArea("Persistence")]
     public class SqlitePersistenceGrainStorageTests : IClassFixture<SqlitePersistenceGrainStorageFixture>
     {
         private readonly SqlitePersistenceGrainStorageFixture fixture;

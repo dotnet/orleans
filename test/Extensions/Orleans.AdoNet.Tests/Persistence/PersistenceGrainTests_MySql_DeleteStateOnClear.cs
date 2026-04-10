@@ -15,6 +15,9 @@ namespace Tester.AdoNet.Persistence
     /// with the delete-state-on-clear option enabled.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("MySql")]
+    [TestSuite("Functional")]
+    [TestProvider("MySql")]
+    [TestArea("Persistence")]
     public class PersistenceGrainTests_MySql_DeleteStateOnClear : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_MySql_DeleteStateOnClear.Fixture>
     {
         public const string TestDatabaseName = "OrleansTest_MySql_Storage";

@@ -1,4 +1,4 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Runtime;
 using Orleans.TestingHost;
 
@@ -10,6 +10,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("BVT"), TestCategory("Lifecycle")]
     public class StartupTaskTests : IClassFixture<StartupTaskTests.Fixture>
     {

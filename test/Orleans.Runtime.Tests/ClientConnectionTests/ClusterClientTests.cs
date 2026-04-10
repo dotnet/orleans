@@ -11,6 +11,9 @@ using Xunit;
 
 namespace Tester.ClientConnectionTests
 {
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Functional")]
     public class ClusterClientTests : TestClusterPerTest
     {

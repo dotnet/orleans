@@ -15,6 +15,9 @@ namespace Tester.Redis.Clustering
     /// </summary>
     [TestCategory("Redis"), TestCategory("Clustering"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("Redis")]
+    [TestArea("Membership")]
     public class RedisMembershipTableTests : MembershipTableTestsBase
     {
         public RedisMembershipTableTests(ConnectionStringFixture fixture, CommonFixture environment) : base(fixture, environment, CreateFilters())

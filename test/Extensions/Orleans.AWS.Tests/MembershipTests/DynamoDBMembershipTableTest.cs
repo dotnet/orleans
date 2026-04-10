@@ -15,6 +15,9 @@ namespace AWSUtils.Tests.MembershipTests
     /// Tests for operation of Orleans Membership Table using AWS DynamoDB - Requires access to external DynamoDB storage
     /// </summary>
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Membership")]
     public class DynamoDBMembershipTableTest : MembershipTableTestsBase, IClassFixture<DynamoDBStorageTestsFixture>
     {
         public DynamoDBMembershipTableTest(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

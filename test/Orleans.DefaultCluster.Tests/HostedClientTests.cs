@@ -24,6 +24,9 @@ namespace DefaultCluster.Tests.General
     /// This pattern is common in ASP.NET Core applications hosting Orleans.
     /// </summary>
     [TestCategory("BVT"), TestCategory("HostedClient")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class HostedClientTests : IClassFixture<HostedClientTests.Fixture>
     {
         private readonly TimeSpan _timeout = Debugger.IsAttached ? TimeSpan.FromMinutes(5) : TimeSpan.FromSeconds(10);

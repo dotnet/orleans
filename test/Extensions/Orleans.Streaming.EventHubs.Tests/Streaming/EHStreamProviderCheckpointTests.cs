@@ -21,6 +21,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// Tests for EventHub stream provider checkpoint and recovery functionality after agent restarts or silo failures.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHStreamProviderCheckpointTests : TestClusterPerTest
     {
         private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;

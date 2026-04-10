@@ -17,6 +17,7 @@ namespace Tester.AdoNet.GrainDirectory;
 /// Tests for <see cref="AdoNetGrainDirectory"/> against SQL Server.
 /// </summary>
 [TestCategory("SqlServer")]
+[TestProvider("SqlServer")]
 public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -25,6 +26,7 @@ public class SqlServerAdoNetGrainDirectoryTests() : AdoNetGrainDirectoryTests(Ad
 /// Tests for <see cref="AdoNetGrainDirectory"/> against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql")]
+[TestProvider("PostgreSql")]
 public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
     public PostgreSqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
@@ -37,6 +39,7 @@ public class PostgreSqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 /// Tests for <see cref="AdoNetGrainDirectory"/> against MySQL.
 /// </summary>
 [TestCategory("MySql")]
+[TestProvider("MySql")]
 public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 {
     public MySqlAdoNetGrainDirectoryTests() : base(AdoNetInvariants.InvariantNameMySql, 90)
@@ -50,6 +53,8 @@ public class MySqlAdoNetGrainDirectoryTests : AdoNetGrainDirectoryTests
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestSuite("Functional")]
+[TestArea("GrainDirectory")]
 public abstract class AdoNetGrainDirectoryTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private RelationalStorageForTesting _testing;

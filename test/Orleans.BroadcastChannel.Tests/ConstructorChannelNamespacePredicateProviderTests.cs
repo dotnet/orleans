@@ -12,6 +12,9 @@ namespace UnitTests;
 /// <summary>
 /// Tests for <see cref="ConstructorChannelNamespacePredicateProvider"/> predicate type registration and resolution.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 [TestCategory("BVT"), TestCategory("Predicates")]
 public class ConstructorChannelNamespacePredicateProviderTests
 {

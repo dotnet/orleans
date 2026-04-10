@@ -23,6 +23,9 @@ namespace Orleans.TestingHost.Tests
     /// Each T0-T9 class tests cluster initialization in isolation to ensure
     /// no static state interference between tests.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T0
     {
         [Fact, TestCategory("Functional")]
@@ -37,6 +40,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T1
     {
         [Fact, TestCategory("Functional")]
@@ -51,6 +63,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T2
     {
         [Fact, TestCategory("Functional")]
@@ -65,6 +86,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T3
     {
         [Fact, TestCategory("Functional")]
@@ -80,6 +110,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T4
     {
         [Fact, TestCategory("Functional")]
@@ -95,6 +134,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T5
     {
         [Fact, TestCategory("Functional")]
@@ -110,6 +158,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T6
     {
         [Fact, TestCategory("Functional")]
@@ -125,6 +182,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T7
     {
         [Fact, TestCategory("Functional")]
@@ -140,6 +206,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T8
     {
         [Fact, TestCategory("Functional")]
@@ -155,6 +230,15 @@ namespace Orleans.TestingHost.Tests
         }
     }
 
+    [TestSuite("Functional")]
+
+    [TestProvider("None")]
+
+    [TestArea("TestingHost")]
+
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T9
     {
         [Fact, TestCategory("Functional")]
@@ -175,6 +259,9 @@ namespace Orleans.TestingHost.Tests
     /// Verifies that different types of configurators (Host, Client, ClientHost)
     /// are properly invoked during cluster initialization.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class T10
     {
         private static bool _hostWasInvoked;
@@ -243,6 +330,9 @@ namespace Orleans.TestingHost.Tests
     /// Implements IAsyncLifetime to properly manage cluster lifecycle
     /// and ensure cleanup after tests complete.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("TestingHost")]
     public class TestClusterTests : IAsyncLifetime
     {
         private TestCluster _testCluster;

@@ -16,6 +16,9 @@ namespace NATS.Tests;
 
 [TestCategory("NATS")]
 [Collection(TestEnvironmentFixture.DefaultCollection)]
+[TestSuite("Functional")]
+[TestProvider("NATS")]
+[TestArea("Streaming")]
 public class NatsAdapterTests : IAsyncLifetime, IClassFixture<TestEnvironmentFixture>
 {
     private const int NumBatches = 20;

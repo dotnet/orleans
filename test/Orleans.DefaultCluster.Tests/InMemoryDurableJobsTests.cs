@@ -7,6 +7,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class InMemoryDurableJobsTests : HostedTestClusterEnsureDefaultStarted
 {
     private readonly DurableJobTestsRunner _runner;

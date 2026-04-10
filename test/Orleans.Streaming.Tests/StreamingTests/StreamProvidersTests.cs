@@ -17,6 +17,9 @@ namespace UnitTests.Streaming
     /// <summary>
     /// Tests for stream provider configuration and error injection scenarios.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class StreamProvidersTests_ProviderConfigNotLoaded : IClassFixture<StreamProvidersTests_ProviderConfigNotLoaded.Fixture>
     {
         public class Fixture : BaseTestClusterFixture

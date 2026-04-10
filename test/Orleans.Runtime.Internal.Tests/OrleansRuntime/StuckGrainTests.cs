@@ -13,6 +13,9 @@ namespace UnitTests.StuckGrainTests
     /// <summary>
     /// Summary description for PersistenceTest
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class StuckGrainTests : OrleansTestingBase, IClassFixture<StuckGrainTests.Fixture>
     {
         private readonly Fixture fixture;

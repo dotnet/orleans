@@ -15,6 +15,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests for SQL Server ADO.NET subscription observer with implicit subscribing.
 /// </summary>
+[TestProvider("SqlServer")]
 public class SqlServerAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
 {
 }
@@ -22,6 +23,7 @@ public class SqlServerAdoNetSubscriptionObserverWithImplicitSubscribingTests() :
 /// <summary>
 /// Tests for MySQL ADO.NET subscription observer with implicit subscribing.
 /// </summary>
+[TestProvider("MySql")]
 public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests : AdoNetSubscriptionObserverWithImplicitSubscribingTests
 {
     public MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : base(new Fixture(AdoNetInvariants.InvariantNameMySql))
@@ -33,6 +35,7 @@ public class MySqlAdoNetSubscriptionObserverWithImplicitSubscribingTests : AdoNe
 /// <summary>
 /// Tests for PostgreSQL ADO.NET subscription observer with implicit subscribing.
 /// </summary>
+[TestProvider("PostgreSql")]
 public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() : AdoNetSubscriptionObserverWithImplicitSubscribingTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
 {
 }
@@ -41,6 +44,8 @@ public class PostgreSqlAdoNetSubscriptionObserverWithImplicitSubscribingTests() 
 /// Base class for ADO.NET subscription observer with implicit subscribing tests.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming"), TestCategory("Functional")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetSubscriptionObserverWithImplicitSubscribingTests(AdoNetSubscriptionObserverWithImplicitSubscribingTests.Fixture fixture) : SubscriptionObserverWithImplicitSubscribingTestRunner(fixture), IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";

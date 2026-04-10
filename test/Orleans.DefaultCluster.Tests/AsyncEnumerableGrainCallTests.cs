@@ -15,6 +15,9 @@ namespace DefaultCluster.Tests;
 /// Orleans uses a grain extension mechanism to manage the lifecycle of async enumerators
 /// across the distributed system.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStarted
 {
     public AsyncEnumerableGrainCallTests(DefaultClusterFixture fixture) : base(fixture)

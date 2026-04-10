@@ -16,6 +16,9 @@ using Xunit.Abstractions;
 namespace UnitTests.ActivationRepartitioningTests;
 
 // Scenarios can be seen visually here: https://github.com/dotnet/orleans/pull/8877
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning"), Category("BVT")]
 public class CustomToleranceTests(CustomToleranceTests.Fixture fixture, ITestOutputHelper output) : RepartitioningTestBase<CustomToleranceTests.Fixture>(fixture), IClassFixture<CustomToleranceTests.Fixture>
 {

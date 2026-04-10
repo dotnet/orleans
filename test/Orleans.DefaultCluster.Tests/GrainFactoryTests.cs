@@ -11,6 +11,9 @@ namespace DefaultCluster.Tests
     /// handles ambiguous type mappings, supports grain class prefixes and full names,
     /// and manages inheritance hierarchies in grain type resolution.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainFactoryTests : HostedTestClusterEnsureDefaultStarted
     {
         public GrainFactoryTests(DefaultClusterFixture fixture) : base(fixture)

@@ -13,6 +13,9 @@ namespace DefaultCluster.Tests.General
     /// the caller doesn't need confirmation of completion or results.
     /// </summary>
     [TestCategory("BVT"), TestCategory("OneWay")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class OneWayCallTests : HostedTestClusterEnsureDefaultStarted
     {
         public OneWayCallTests(DefaultClusterFixture fixture) : base(fixture) { }

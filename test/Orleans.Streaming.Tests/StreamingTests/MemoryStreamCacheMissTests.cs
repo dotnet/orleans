@@ -8,6 +8,9 @@ namespace Tester.StreamingTests
     /// <summary>
     /// Tests memory stream cache miss scenarios with custom cache eviction settings and stream filters.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("Functional"), TestCategory("Streaming"), TestCategory("StreamingCacheMiss")]
     public class MemoryStreamCacheMissTests : StreamingCacheMissTests
     {

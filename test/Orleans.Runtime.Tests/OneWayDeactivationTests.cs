@@ -11,6 +11,9 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("BVT"), TestCategory("OneWay")]
     public class OneWayDeactivationTests : OrleansTestingBase, IClassFixture<OneWayDeactivationTests.Fixture>
     {

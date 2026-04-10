@@ -20,6 +20,7 @@ namespace DefaultCluster.Tests
     /// - Various grain communication patterns under error conditions
     /// Orleans ensures that errors in grains don't crash the system and are properly communicated to callers.
     /// </summary>
+    [TestArea("Runtime")]
     public class ErrorGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         private static readonly TimeSpan timeout = TimeSpan.FromSeconds(10);
@@ -35,6 +36,8 @@ namespace DefaultCluster.Tests
         /// Verifies that error grain references can be obtained and basic methods can be called.
         /// This establishes the baseline for error handling tests.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorGrain_GetGrain()
         {
@@ -48,6 +51,8 @@ namespace DefaultCluster.Tests
         /// Verifies that standard .NET exception handling works as expected for comparison
         /// with distributed error handling in Orleans.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingLocalError()
         {
@@ -75,6 +80,8 @@ namespace DefaultCluster.Tests
         /// - Multiple awaits on the same failed Task consistently throw the same exception
         /// This ensures reliable error propagation in distributed calls.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingGrainError1()
         {
@@ -114,6 +121,8 @@ namespace DefaultCluster.Tests
         /// - Timing assertions ensure proper async behavior
         /// This establishes baseline behavior for comparison with timeout scenarios.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact(Skip = "https://github.com/dotnet/orleans/issues/9558"), TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingTimedMethod()
         {
@@ -145,6 +154,8 @@ namespace DefaultCluster.Tests
         /// - Timing ensures the error happens after the expected delay
         /// This tests Orleans' handling of delayed failures.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling")]
         public async Task ErrorHandlingTimedMethodWithError()
         {
@@ -165,6 +176,8 @@ namespace DefaultCluster.Tests
         /// - Orleans properly manages resources under load
         /// This tests the scalability of Orleans' message handling and scheduling.
         /// </summary>
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("ErrorHandling"), TestCategory("Stress")]
         public async Task StressHandlingMultipleDelayedRequests()
         {
@@ -191,6 +204,8 @@ namespace DefaultCluster.Tests
         /// containing grain references. This is important for scenarios where grains
         /// need to coordinate with multiple other grains.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ErrorHandling"), TestCategory("GrainReference")]
         public async Task ArgumentTypes_ListOfGrainReferences()
         {
@@ -208,6 +223,8 @@ namespace DefaultCluster.Tests
         /// operations execute correctly after the specified delay.
         /// This tests Orleans' internal timer and scheduling mechanisms.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("AsynchronyPrimitives"), TestCategory("ErrorHandling")]
         public async Task AC_DelayedExecutor_2()
         {
@@ -223,6 +240,8 @@ namespace DefaultCluster.Tests
         /// Verifies that grains correctly handle async methods for setting and getting state.
         /// This demonstrates Orleans' support for modern async/await patterns in grain implementations.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("SimpleGrain")]
         public async Task SimpleGrain_AsyncMethods()
         {
@@ -243,6 +262,8 @@ namespace DefaultCluster.Tests
         /// of one grain call is directly returned by another grain.
         /// This pattern is common in grain orchestration scenarios.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("SimpleGrain")]
         public async Task SimpleGrain_PromiseForward()
         {
@@ -257,6 +278,8 @@ namespace DefaultCluster.Tests
         /// Verifies that different GUID patterns produce well-distributed hash codes
         /// for grain placement. This is important for load balancing across silos.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("SimpleGrain")]
         public void SimpleGrain_GuidDistribution()
         {
@@ -303,6 +326,8 @@ namespace DefaultCluster.Tests
         /// Verifies behavior when client observers are disconnected from grains.
         /// This tests Orleans' observer pattern implementation for event notifications.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("Revisit"), TestCategory("Observers")]
         public void ObserverTest_Disconnect()
         {
@@ -314,6 +339,8 @@ namespace DefaultCluster.Tests
         /// Verifies behavior when the same observer is subscribed multiple times
         /// and then disconnected. This tests edge cases in observer management.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("Revisit"), TestCategory("Observers")]
         public void ObserverTest_Disconnect2()
         {

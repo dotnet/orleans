@@ -8,6 +8,9 @@ namespace UnitTests.StorageTests.AdoNet
     /// Tests for SQL Server relational storage functionality.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("SqlServer")]
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Persistence")]
     public class SqlServerRelationalStoreTests : RelationalStoreTestsBase, IClassFixture<SqlServerRelationalStoreTests.Fixture>
     {
         private const string TestDatabaseName = "OrleansStreamTest";

@@ -8,6 +8,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     /// Tests for transaction golden path scenarios with Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class GoldenPathTests : GoldenPathTransactionTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public GoldenPathTests(TestFixture fixture, ITestOutputHelper output)

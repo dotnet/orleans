@@ -10,6 +10,9 @@ namespace UnitTests.StreamingTests
     /// <summary>
     /// Tests programmatic stream subscriptions using memory streams with multiple stream providers.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("BVT"), TestCategory("Streaming")]
     public class MemoryProgrammaticSubcribeTests : ProgrammaticSubscribeTestsRunner, IClassFixture<MemoryProgrammaticSubcribeTests.Fixture>
     {

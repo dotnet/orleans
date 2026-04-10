@@ -14,6 +14,9 @@ using Xunit;
 namespace Tester.AzureUtils.DurableJobs;
 
 [TestCategory("DurableJobs"), TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class NetstringJsonSerializerTests
 {
     private static byte[] EncodeToBytes(JobOperation operation)

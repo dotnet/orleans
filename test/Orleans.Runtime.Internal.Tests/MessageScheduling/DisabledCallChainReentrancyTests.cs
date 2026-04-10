@@ -7,6 +7,9 @@ namespace UnitTests.General
     /// <summary>
     /// Tests for disabled call chain reentrancy behavior on non-reentrant grains.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class DisabledCallChainReentrancyTests : OrleansTestingBase, IClassFixture<DisabledCallChainReentrancyTests.Fixture>
     {
         private readonly DisabledCallChainReentrancyTestRunner runner;

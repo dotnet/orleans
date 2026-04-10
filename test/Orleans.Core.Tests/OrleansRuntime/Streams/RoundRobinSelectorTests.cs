@@ -9,6 +9,9 @@ namespace UnitTests.OrleansRuntime.Streams
     /// Tests for round-robin resource selector including selection distribution and duplicate handling.
     /// </summary>
     [TestCategory("BVT")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     public class RoundRobinSelectorTests : ResourceSelectorTestRunner
     {
         private const int ResourceCount = 10;

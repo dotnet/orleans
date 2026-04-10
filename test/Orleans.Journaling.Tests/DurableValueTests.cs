@@ -12,6 +12,9 @@ namespace Orleans.Journaling.Tests;
 /// durability without the complexity of collections.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Journaling")]
 public class DurableValueTests : StateMachineTestBase
 {
     /// <summary>

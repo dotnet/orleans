@@ -8,6 +8,9 @@ namespace AWSUtils.Tests.StorageTests.AWSUtils
     /// Verifies CRUD operations, conditional updates, and etag-based concurrency control.
     /// </summary>
     [TestCategory("Storage"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Persistence")]
     public class DynamoDBStorageTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
         private readonly string PartitionKey;

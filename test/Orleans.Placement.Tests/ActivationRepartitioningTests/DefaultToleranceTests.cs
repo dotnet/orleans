@@ -15,6 +15,9 @@ namespace UnitTests.ActivationRepartitioningTests;
 /// Tests for default tolerance scenarios in activation repartitioning, including grain movement and placement decisions.
 /// </summary>
 // Scenarious can be seen visually here: https://github.com/dotnet/orleans/pull/8877
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Functional"), TestCategory("ActivationRepartitioning")]
 public class DefaultToleranceTests(DefaultToleranceTests.Fixture fixture) : RepartitioningTestBase<DefaultToleranceTests.Fixture>(fixture), IClassFixture<DefaultToleranceTests.Fixture>
 {
