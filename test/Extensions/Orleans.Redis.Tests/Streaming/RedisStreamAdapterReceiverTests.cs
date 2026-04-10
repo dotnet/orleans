@@ -1,5 +1,4 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging.Abstractions;
 using Orleans.Configuration;
 using Orleans.Serialization;
 using Orleans.Streaming.Redis;
@@ -50,7 +49,6 @@ public sealed class RedisStreamAdapterReceiverTests
             await writer.AddMessageAsync(CreatePayload(serializer, 2));
 
             var firstReceiver = new RedisStreamAdapterReceiver(
-                NullLoggerFactory.Instance,
                 serializer,
                 new RedisStreamStorage(providerName, clusterOptions, redisOptions, receiverOptions, queueId));
             await firstReceiver.Initialize(TimeSpan.FromSeconds(10));
@@ -72,7 +70,6 @@ public sealed class RedisStreamAdapterReceiverTests
             Assert.Equal(secondToken.EntryId, await connection.GetDatabase().StringGetAsync(checkpointKey));
 
             var resumedReceiver = new RedisStreamAdapterReceiver(
-                NullLoggerFactory.Instance,
                 serializer,
                 new RedisStreamStorage(providerName, clusterOptions, redisOptions, receiverOptions, queueId));
             await resumedReceiver.Initialize(TimeSpan.FromSeconds(10));

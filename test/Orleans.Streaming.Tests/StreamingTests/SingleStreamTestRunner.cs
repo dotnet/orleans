@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using Tester;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -259,6 +260,33 @@ public class SingleStreamTestRunner
         this.producer = await ProducerProxy.NewProducerGrainsAsync(streamId, this.streamProviderName, null, this.logger, this.client);
     }
 
+    private async Task ProducePhaseAndWaitForDeliveriesAsync(Func<Task> produce)
+    {
+        var consumerCount = await consumer.ConsumerCount;
+        Assert.NotEqual(0, consumerCount);
+
+        var producedBefore = await producer.ExpectedItemsProduced;
+        using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(_timeout);
+
+        await produce();
+
+        var producedAfter = await producer.ExpectedItemsProduced;
+        var producedThisPhase = producedAfter - producedBefore;
+        Assert.True(producedThisPhase > 0, "No items were produced during the current phase.");
+
+        await observer.WaitForItemDeliveryCountAsync(producer.StreamId, producedThisPhase * consumerCount, producer.ProviderName, cts.Token);
+    }
+
+    private async Task ProduceAndWaitForImplicitDeliveriesAsync(int count)
+    {
+        using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(_timeout);
+
+        await producer.ProduceSequentialSeries(count);
+        await observer.WaitForItemDeliveryCountAsync(producer.StreamId, count, producer.ProviderName, cts.Token);
+    }
+
     public async Task StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain()
     {
         Heading("StreamTest_16_Deactivation_OneProducerGrainOneConsumerGrain");
@@ -320,10 +348,8 @@ public class SingleStreamTestRunner
         var producerCount = await producer.ProducerCount;
         logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
-        async Task<bool> waitUntilFunc(bool lastTry) =>
-                0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
-        await producer.ProduceSequentialSeries(ItemCount);
-        await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        _ = consumerTypeName;
+        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount);
         await CheckCounters(producer, consumer);
         await StopProxies();
     }
@@ -340,10 +366,8 @@ public class SingleStreamTestRunner
         var producerCount = await producer.ProducerCount;
         logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
-        async Task<bool> waitUntilFunc(bool lastTry) =>
-                0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
-        await producer.ProduceSequentialSeries(ItemCount);
-        await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        _ = consumerTypeName;
+        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount);
         await CheckCounters(producer, consumer);
         await StopProxies();
     }
@@ -361,10 +385,8 @@ public class SingleStreamTestRunner
         var producerCount = await producer.ProducerCount;
         logger.LogInformation("\n** Test {TestNumber} BasicTestAsync: producerCount={ProducerCount}.\n", testNumber, producerCount);
 
-        async Task<bool> waitUntilFunc(bool lastTry) =>
-                0 < await TestUtils.GetActivationCount(this.client, consumerTypeName) && await this.CheckCounters(this.producer, this.consumer, false);
-        await producer.ProduceSequentialSeries(ItemCount);
-        await TestingUtils.WaitUntilAsync(waitUntilFunc, _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        _ = consumerTypeName;
+        await ProduceAndWaitForImplicitDeliveriesAsync(ItemCount);
         await CheckCounters(producer, consumer);
         await StopProxies();
     }
@@ -423,9 +445,6 @@ public class SingleStreamTestRunner
 
     public async Task BasicTestAsync(bool fullTest = true)
     {
-        using var observer = StreamingDiagnosticObserver.Create();
-        using var cts = new CancellationTokenSource(_timeout);
-
         logger.LogInformation("\n** Starting Test {TestNumber} BasicTestAsync.\n", testNumber);
         var producerCount = await producer.ProducerCount;
         var consumerCount = await consumer.ConsumerCount;
@@ -435,27 +454,17 @@ public class SingleStreamTestRunner
             producerCount,
             consumerCount);
 
-        await producer.ProduceSequentialSeries(ItemCount);
-        await WaitForItemDeliveryCountAndAssertCountersAsync(observer, cts.Token);
+        await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProduceSequentialSeries(ItemCount));
+        await CheckCounters(producer, consumer);
         if (runFullTest)
         {
-            await producer.ProduceParallelSeries(ItemCount);
-            await WaitForItemDeliveryCountAndAssertCountersAsync(observer, cts.Token);
-       
-            await producer.ProducePeriodicSeries(ItemCount);
-            await WaitForItemDeliveryCountAndAssertCountersAsync(observer, cts.Token);
+            await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProduceParallelSeries(ItemCount));
+            await CheckCounters(producer, consumer);
+
+            await ProducePhaseAndWaitForDeliveriesAsync(() => producer.ProducePeriodicSeries(ItemCount));
+            await CheckCounters(producer, consumer);
         }
         await ValidatePubSub(producer.StreamId, producer.ProviderName);
-    }
-
-    private async Task WaitForItemDeliveryCountAndAssertCountersAsync(StreamingDiagnosticObserver observer, CancellationToken cancellationToken)
-    {
-        var consumerCount = await consumer.ConsumerCount;
-        Assert.NotEqual(0, consumerCount);
-
-        var expectedConsumed = await producer.ExpectedItemsProduced * consumerCount;
-        await observer.WaitForItemDeliveryCountAsync(producer.StreamId, expectedConsumed, producer.ProviderName, cancellationToken);
-        await CheckCounters(producer, consumer);
     }
 
     public async Task StopProxies()

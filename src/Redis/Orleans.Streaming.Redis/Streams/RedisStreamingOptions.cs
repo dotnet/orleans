@@ -22,7 +22,7 @@ public sealed class RedisStreamingOptions
 
     /// <summary>
     /// Entry expiry, null by default. A value should be set ONLY for ephemeral environments (like in tests).
-    /// Setting a value different from null will cause reminder entries to be deleted after some period of time.
+    /// Setting a value different from null will cause stream entries and related checkpoint keys to be deleted after the configured period of time.
     /// </summary>
     public TimeSpan? EntryExpiry { get; set; } = null;
 

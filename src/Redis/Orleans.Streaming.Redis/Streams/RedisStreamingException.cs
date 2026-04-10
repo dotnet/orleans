@@ -3,7 +3,7 @@ using System;
 namespace Orleans.Streaming.Redis;
 
 /// <summary>
-/// Exception thrown from <see cref="RedisStreamingException"/>.
+/// Exception thrown when Redis streaming provider operations fail.
 /// </summary>
 [GenerateSerializer]
 public class RedisStreamingException : Exception

@@ -43,7 +43,7 @@ internal sealed class RedisStreamAdapterFactory : IQueueAdapterFactory
 
     public Task<IQueueAdapter> CreateAdapter()
     {
-        var adapter = new RedisStreamAdapter(_loggerFactory, _serializer, _providerName, _clusterOptions, _redisOptions, _receiverOptions, _streamQueueMapper);
+        var adapter = new RedisStreamAdapter(_serializer, _providerName, _clusterOptions, _redisOptions, _receiverOptions, _streamQueueMapper);
         return Task.FromResult<IQueueAdapter>(adapter);
     }
 

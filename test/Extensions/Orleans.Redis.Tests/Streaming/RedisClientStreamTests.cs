@@ -12,7 +12,7 @@ namespace Tester.Redis.Streaming;
 public sealed class RedisClientStreamTests : TestClusterPerTest
 {
     public const string StreamProviderName = "RedisProvider";
-    public const string StreamNamespace = "RedisRedisClientStreamTestsNamespace";
+    public const string StreamNamespace = "RedisClientStreamTestsNamespace";
 
     private readonly ITestOutputHelper _output;
     private ClientStreamTestRunner _runner;

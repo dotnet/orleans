@@ -47,26 +47,12 @@ namespace Tester.StreamingTests
             Guid streamGuid = Guid.NewGuid();
             int[] eventCount = {0};
 
-            // become stream consumers
-            await SubscribeToStream(streamProviderName, streamGuid, streamNamespace,
-                (e, t) => { eventCount[0]++; return Task.CompletedTask; });
-
-            // setup producer
-            var producer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
-            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
-
-            // produce some events
-            await producer.StartPeriodicProducing();
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
-            await producer.StopPeriodicProducing();
-
-            // check counts
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(() => Task.FromResult(eventCount[0]), producer.GetNumberProduced, lastTry), _timeout);
+            await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount);
 
             // Hard kill client
             await testHost.KillClientAsync();
 
-            // make sure dead client has had time to drop
+            // Not all providers emit subscription-removal diagnostics for client disconnect cleanup.
             await Task.Delay(Constants.DEFAULT_CLIENT_DROP_TIMEOUT + TimeSpan.FromSeconds(5));
 
             // initialize new client
@@ -74,18 +60,7 @@ namespace Tester.StreamingTests
 
             eventCount[0] = 0;
 
-            // become stream consumers
-            await SubscribeToStream(streamProviderName, streamGuid, streamNamespace,
-                (e, t) => { eventCount[0]++; return Task.CompletedTask; });
-
-            // setup producer
-            producer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
-            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
-
-            // produce more events
-            await producer.StartPeriodicProducing();
-            await Task.Delay(TimeSpan.FromMilliseconds(1000));
-            await producer.StopPeriodicProducing();
+            await ProduceEventsToClient(streamProviderName, streamGuid, streamNamespace, 10, eventCount);
 
             // give strem retry policy time to fail
             if (waitForRetryTimeouts)
@@ -93,8 +68,6 @@ namespace Tester.StreamingTests
                 await Task.Delay(TimeSpan.FromSeconds(90));
             }
 
-            // check counts
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(() => Task.FromResult(eventCount[0]), producer.GetNumberProduced, lastTry), _timeout);
             int deliveryFailureCount = await getDeliveryFailureCount();
             Assert.Equal(0, deliveryFailureCount);
         }
@@ -116,15 +89,15 @@ namespace Tester.StreamingTests
             // get reference to a consumer
             var consumer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
 
+            // subscribe
+            await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+            var subscription = await observer.WaitForSubscriptionRegisteredAsync(streamId, streamProviderName, cts.Token);
             try
             {
-                // subscribe
-                await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
-
                 // generate events
                 await GenerateEvents(streamProviderName, streamGuid, streamNamespace, eventsProduced);
 
-                await observer.WaitForItemDeliveryCountAsync(streamId, eventsProduced, streamProviderName, cts.Token);
+                await observer.WaitForItemDeliveryCountAsync(streamId, subscription.SubscriptionId, eventsProduced, streamProviderName, cts.Token);
                 Assert.Equal(eventsProduced, await consumer.GetNumberConsumed());
             }
             finally
@@ -143,13 +116,35 @@ namespace Tester.StreamingTests
             }
         }
 
-        private async Task<bool> CheckCounters(Func<Task<int>> getConsumed, Func<Task<int>> getProduced, bool assertIsTrue)
+        private async Task ProduceEventsToClient(string streamProviderName, Guid streamGuid, string streamNamespace, int eventsProduced, int[] eventCount)
         {
-            int eventsProduced = await getProduced();
-            int numConsumed = await getConsumed();
-            if (!assertIsTrue) return eventsProduced == numConsumed;
-            Assert.Equal(eventsProduced, numConsumed);
-            return true;
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(_timeout);
+            var streamId = StreamId.Create(streamNamespace, streamGuid);
+
+            await SubscribeToStream(streamProviderName, streamGuid, streamNamespace,
+                (e, t) =>
+                {
+                    eventCount[0]++;
+                    return Task.CompletedTask;
+                });
+
+            var producer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ProducerGrain>(Guid.NewGuid());
+            await producer.BecomeProducer(streamGuid, streamNamespace, streamProviderName);
+
+            await ProduceExactCountAsync(producer, eventsProduced);
+            await observer.WaitForItemDeliveryCountAsync(streamId, eventsProduced, streamProviderName, cts.Token);
+
+            Assert.Equal(eventsProduced, eventCount[0]);
+            Assert.Equal(eventsProduced, await producer.GetNumberProduced());
+        }
+
+        private static async Task ProduceExactCountAsync(ISampleStreaming_ProducerGrain producer, int count)
+        {
+            for (var i = 0; i < count; i++)
+            {
+                await producer.Produce();
+            }
         }
     }
 }

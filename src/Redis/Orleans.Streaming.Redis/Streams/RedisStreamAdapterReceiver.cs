@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans.Serialization;
 using Orleans.Streams;
 
@@ -15,7 +14,6 @@ internal sealed class RedisStreamAdapterReceiver : IQueueAdapterReceiver
     private Task? _task;
 
     public RedisStreamAdapterReceiver(
-        ILoggerFactory loggerFactory,
         Serializer<RedisStreamBatchContainer> serializer,
         RedisStreamStorage queue)
     {

@@ -3,7 +3,6 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Serialization;
@@ -13,7 +12,6 @@ namespace Orleans.Streaming.Redis;
 
 internal sealed class RedisStreamAdapter : IQueueAdapter
 {
-    private readonly ILoggerFactory _loggerFactory;
     private readonly Serializer<RedisStreamBatchContainer> _serializer;
     private readonly string _providerName;
     private readonly ClusterOptions _clusterOptions;
@@ -24,7 +22,6 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
     private readonly ConcurrentDictionary<QueueId, RedisStreamStorage> _queues = new();
 
     public RedisStreamAdapter(
-        ILoggerFactory loggerFactory,
         Serializer<RedisStreamBatchContainer> serializer,
         string providerName,
         ClusterOptions clusterOptions,
@@ -32,7 +29,6 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
         RedisStreamReceiverOptions receiverOptions,
         HashRingBasedStreamQueueMapper streamQueueMapper)
     {
-        _loggerFactory = loggerFactory;
         _serializer = serializer;
         _providerName = providerName;
         Name = providerName;
@@ -51,7 +47,7 @@ internal sealed class RedisStreamAdapter : IQueueAdapter
     public IQueueAdapterReceiver CreateReceiver(QueueId queueId)
     {
         var queue = new RedisStreamStorage(_providerName, _clusterOptions, _redisOptions, _receiverOptions, queueId);
-        var receiver = new RedisStreamAdapterReceiver(_loggerFactory, _serializer, queue);
+        var receiver = new RedisStreamAdapterReceiver(_serializer, queue);
         return receiver;
     }
 
