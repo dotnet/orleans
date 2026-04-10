@@ -388,9 +388,8 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-azure-cosmosdb:
-    if: ${{ false }}
     name: Azure Cosmos DB provider tests
-    runs-on: windows-latest
+    runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
       matrix:
@@ -402,37 +401,74 @@ jobs:
       uses: actions/setup-dotnet@v4
       with:
         global-json-file: global.json
-    # - name: Install emulator certificate
-    #   run: |
-    #     sleep 90s
-    #     mkdir /tmp/emulatorcerts
-    #     sudo sh -c "curl -k https://127.0.0.1:${{ job.services.cosmosdb-emulator.ports[8081] }}/_explorer/emulator.pem > /tmp/emulatorcert.crt"
-    #     cat /tmp/emulatorcert.crt
-    #     awk 'BEGIN {c=0;} /BEGIN CERT/{c++} { print > "emulatorcert." c ".crt"}' < /tmp/emulatorcert.crt
-    #     sudo cp emulatorcert.*.crt /usr/local/share/ca-certificates/
-    #     sudo update-ca-certificates
     - name: Start Azure Cosmos DB emulator
       run: |
-        Write-Host "Launching Azure Cosmos DB Emulator"
-        Import-Module "$env:ProgramFiles\Azure Cosmos DB Emulator\PSModules\Microsoft.Azure.CosmosDB.Emulator"
-        Start-CosmosDbEmulator -NoUI -Consistency Strong -PartitionCount 2 -DefaultPartitionCount 2
-        $IPAddress = "127.0.0.1" #(Get-NetIPAddress -AddressFamily IPV4 -AddressState Preferred -PrefixOrigin Manual | Select-Object IPAddress -First 1).IPAddress ?? "127.0.0.1"
-        Add-Content -Path $env:GITHUB_ENV -Value "ORLEANSCOSMOSDBACCOUNTENDPOINT=https://$($IPAddress):8081/"
+        docker run -d --name cosmosdb-emulator \
+          -p 8081:8081 \
+          -e PROTOCOL=https \
+          -e ENABLE_EXPLORER=false \
+          -e ENABLE_TELEMETRY=false \
+          -e LOG_LEVEL=warn \
+          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+    - name: Wait for Azure Cosmos DB emulator
+      run: |
+        endpoint="https://localhost:8081/"
+        echo "Waiting for Azure Cosmos DB emulator to be ready..."
+        for i in {1..60}; do
+          if curl --silent --show-error --insecure "${endpoint}" > /dev/null; then
+            echo "Azure Cosmos DB emulator is ready"
+            echo "ORLEANSCOSMOSDBACCOUNTENDPOINT=${endpoint}" >> "$GITHUB_ENV"
+            exit 0
+          fi
+
+          if [ "$i" -eq 60 ]; then
+            docker logs --tail 200 cosmosdb-emulator
+            echo "Azure Cosmos DB emulator did not become ready in time."
+            exit 1
+          fi
+
+          sleep 2
+        done
     - name: Test
-      run: dotnet test
-        --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
-        --blame-hang-timeout 10m
-        --blame-crash-dump-type full
-        --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
-        --
-        -parallel none -noshadow
+      run: |
+        cosmos_filter='Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress'
+        # The Linux vNext emulator still misses a narrow set of ETag/version concurrency semantics.
+        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_ReadRow_Insert_Read'
+        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRow'
+        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRowInParallel'
+        cosmos_filter+='&FullyQualifiedName!~Tester.Cosmos.Persistence.PersistenceProviderTests_Cosmos.PersistenceProvider_Azure_ChangeWriteFormat'
+        for attempt in 1 2; do
+          logger_name="test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
+          extra_args=()
+          if [ "$attempt" -gt 1 ]; then
+            echo "Cosmos tests failed on attempt $((attempt - 1)); retrying once with the same filter."
+            extra_args+=(--no-build)
+          fi
+
+          if dotnet test \
+            test/Extensions/Orleans.Cosmos.Tests/Orleans.Cosmos.Tests.csproj \
+            --framework ${{ matrix.framework }} \
+            --filter "${cosmos_filter}" \
+            --blame-hang-timeout 10m \
+            --blame-crash-dump-type full \
+            --blame-hang-dump-type full \
+            --logger "trx;LogFileName=${logger_name}" \
+            "${extra_args[@]}" \
+            -- \
+            -parallel none -noshadow; then
+            exit 0
+          fi
+        done
+
+        exit 1
       env:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
-        #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://127.0.0.1:8081/"
+        #ORLEANSCOSMOSDBACCOUNTENDPOINT: "https://localhost:8081/"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSCOSMOSDBACCOUNTKEY: "C2y6yDjf5/R+ob0N8A7Cgv30VRDJIWEHLM+4QDU5DE2nQ9nDuVTqobD4b8mGGyPMbIZnqyMsEcaGQy67XIw/Jw=="
+    - name: Clean up Azure Cosmos DB emulator
+      if: always()
+      run: docker rm -f cosmosdb-emulator || true
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
