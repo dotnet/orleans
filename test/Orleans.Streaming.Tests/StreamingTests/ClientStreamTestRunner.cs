@@ -2,6 +2,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Xunit.Abstractions;
@@ -108,17 +109,28 @@ namespace Tester.StreamingTests
 
         private async Task ProduceEventsFromClient(string streamProviderName, Guid streamGuid, string streamNamespace, int eventsProduced)
         {
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(_timeout);
+            var streamId = StreamId.Create(streamNamespace, streamGuid);
+
             // get reference to a consumer
             var consumer = this.testHost.GrainFactory.GetGrain<ISampleStreaming_ConsumerGrain>(Guid.NewGuid());
 
-            // subscribe
-            await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
+            try
+            {
+                // subscribe
+                await consumer.BecomeConsumer(streamGuid, streamNamespace, streamProviderName);
 
-            // generate events
-            await GenerateEvents(streamProviderName, streamGuid, streamNamespace, eventsProduced);
+                // generate events
+                await GenerateEvents(streamProviderName, streamGuid, streamNamespace, eventsProduced);
 
-            // make sure all went well
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(() => consumer.GetNumberConsumed(), () => Task.FromResult(eventsProduced), lastTry), _timeout);
+                await observer.WaitForItemDeliveryCountAsync(streamId, eventsProduced, streamProviderName, cts.Token);
+                Assert.Equal(eventsProduced, await consumer.GetNumberConsumed());
+            }
+            finally
+            {
+                await consumer.StopConsuming();
+            }
         }
 
         private async Task GenerateEvents(string streamProviderName, Guid streamGuid, string streamNamespace, int produceCount)

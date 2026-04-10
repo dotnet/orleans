@@ -619,9 +619,15 @@ jobs:
 #          HTTP_PORT: 8222
     steps:
     - name: Start NATS
-      run: docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:latest --js --http-port=8222
+      run: docker run -d --name nats -p 4222:4222 -p 8222:8222 nats:latest --js --http_port=8222
     - name: Wait for NATS
-      run: sleep 5
+      run: |
+        echo "Waiting for NATS to be ready..."
+        if ! timeout 60 bash -c 'until docker logs nats 2>&1 | grep -q "Server is ready"; do sleep 1; done'; then
+          docker logs nats
+          exit 1
+        fi
+        echo "NATS is ready"
     - uses: actions/checkout@v4
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
@@ -629,8 +635,9 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
+        test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Category=${{ matrix.provider }}"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full

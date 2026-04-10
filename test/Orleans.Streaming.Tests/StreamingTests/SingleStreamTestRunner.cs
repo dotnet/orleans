@@ -4,6 +4,7 @@ using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.TestingHost.Utils;
 using Tester;
+using TestExtensions;
 using UnitTests.GrainInterfaces;
 using UnitTests.Grains;
 using Xunit;
@@ -422,6 +423,9 @@ public class SingleStreamTestRunner
 
     public async Task BasicTestAsync(bool fullTest = true)
     {
+        using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(_timeout);
+
         logger.LogInformation("\n** Starting Test {TestNumber} BasicTestAsync.\n", testNumber);
         var producerCount = await producer.ProducerCount;
         var consumerCount = await consumer.ConsumerCount;
@@ -432,19 +436,26 @@ public class SingleStreamTestRunner
             consumerCount);
 
         await producer.ProduceSequentialSeries(ItemCount);
-        await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await CheckCounters(producer, consumer);
+        await WaitForItemDeliveryCountAndAssertCountersAsync(observer, cts.Token);
         if (runFullTest)
         {
             await producer.ProduceParallelSeries(ItemCount);
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-            await CheckCounters(producer, consumer);
+            await WaitForItemDeliveryCountAndAssertCountersAsync(observer, cts.Token);
        
             await producer.ProducePeriodicSeries(ItemCount);
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(producer, consumer, false), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-            await CheckCounters(producer, consumer);
+            await WaitForItemDeliveryCountAndAssertCountersAsync(observer, cts.Token);
         }
         await ValidatePubSub(producer.StreamId, producer.ProviderName);
+    }
+
+    private async Task WaitForItemDeliveryCountAndAssertCountersAsync(StreamingDiagnosticObserver observer, CancellationToken cancellationToken)
+    {
+        var consumerCount = await consumer.ConsumerCount;
+        Assert.NotEqual(0, consumerCount);
+
+        var expectedConsumed = await producer.ExpectedItemsProduced * consumerCount;
+        await observer.WaitForItemDeliveryCountAsync(producer.StreamId, expectedConsumed, producer.ProviderName, cancellationToken);
+        await CheckCounters(producer, consumer);
     }
 
     public async Task StopProxies()
