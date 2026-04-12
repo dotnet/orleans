@@ -22,7 +22,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
 
         builder.AddRedisStreams(name, streamsBuilder =>
         {
-            streamsBuilder.RedisStreamingOptions.Configure<IServiceProvider>((options, services) =>
+            streamsBuilder.ConfigureOptions((options, services) =>
                 {
                     var serviceKey = configurationSection["ServiceKey"];
                     if (!string.IsNullOrEmpty(serviceKey))
@@ -63,7 +63,7 @@ internal sealed class RedisStreamingProviderBuilder : IProviderBuilder<ISiloBuil
 
         builder.AddRedisStreams(name, streamsBuilder =>
         {
-            streamsBuilder.RedisStreamingOptions.Configure<IServiceProvider>((options, services) =>
+            streamsBuilder.ConfigureOptions((options, services) =>
             {
                 var serviceKey = configurationSection["ServiceKey"];
                 if (!string.IsNullOrEmpty(serviceKey))

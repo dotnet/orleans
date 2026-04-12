@@ -24,6 +24,12 @@ public sealed class SiloRedisStreamConfigurator : SiloPersistentStreamConfigurat
     }
 
     /// <summary>
+    /// Configures the Redis streaming options.
+    /// </summary>
+    /// <param name="configureOptions">The delegate used to configure the options.</param>
+    public void ConfigureOptions(Action<RedisStreamingOptions, IServiceProvider> configureOptions) => RedisStreamingOptions.Configure(configureOptions);
+
+    /// <summary>
     /// Gets the options builder for <see cref="RedisStreamingOptions"/>.
     /// </summary>
     public OptionsBuilder<RedisStreamingOptions> RedisStreamingOptions => this.GetNamedOptionsBuilder<RedisStreamingOptions>();
@@ -64,6 +70,12 @@ public sealed class ClusterClientRedisStreamConfigurator : ClusterClientPersiste
             .ConfigureServices(services => services.ConfigureNamedOptionForLogging<RedisStreamingOptions>(name)
                     .ConfigureNamedOptionForLogging<HashRingStreamQueueMapperOptions>(name));
     }
+
+    /// <summary>
+    /// Configures the Redis streaming options.
+    /// </summary>
+    /// <param name="configureOptions">The delegate used to configure the options.</param>
+    public void ConfigureOptions(Action<RedisStreamingOptions, IServiceProvider> configureOptions) => RedisStreamingOptions.Configure(configureOptions);
 
     /// <summary>
     /// Gets the options builder for <see cref="RedisStreamingOptions"/>.
