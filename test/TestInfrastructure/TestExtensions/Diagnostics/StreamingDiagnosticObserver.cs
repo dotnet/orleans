@@ -76,6 +76,20 @@ public sealed class StreamingDiagnosticObserver : IDisposable
     }
 
     /// <summary>
+    /// Waits for a specific number of individual items to be delivered to a particular subscription.
+    /// </summary>
+    public async Task WaitForItemDeliveryCountAsync(StreamId streamId, Guid subscriptionId, int expectedCount, string? streamProvider, CancellationToken cancellationToken)
+    {
+        await _events
+            .OfType<StreamingEvents.ItemDelivered>()
+            .Where(e => MatchesSubscription(e.StreamId, e.SubscriptionId, e.StreamProvider, streamId, subscriptionId, streamProvider))
+            .Take(expectedCount)
+            .LastOrDefaultAsync()
+            .ToTask(cancellationToken)
+            .ConfigureAwait(false);
+    }
+
+    /// <summary>
     /// Waits for a specific number of individual items to be delivered on a stream and then
     /// for that stream to report a cursor-drained transition afterward.
     /// </summary>

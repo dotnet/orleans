@@ -14,6 +14,7 @@ namespace Tester.StreamingTests;
 
 public abstract class ProgrammaticSubscribeTestsRunner
 {
+    private const int EventCountPerPhase = 10;
     private readonly BaseTestClusterFixture fixture;
     public const string StreamProviderName = "StreamProvider1";
     public const string StreamProviderName2 = "StreamProvider2";
@@ -43,8 +44,11 @@ public abstract class ProgrammaticSubscribeTestsRunner
     [SkippableFact]
     public async Task StreamingTests_Consumer_Producer_Subscribe()
     {
+        using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+        var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
         //set up subscription for 10 consumer grains
         var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
         var consumers = subscriptions.Select(sub => this.fixture.HostedCluster.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
@@ -52,61 +56,59 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var producer = this.fixture.HostedCluster.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        await producer.StartPeriodicProducing();
-
-        int numProduced = 0;
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await producer.StopPeriodicProducing();
-        
-        var tasks = new List<Task>();
-        foreach (var consumer in consumers)
-        {
-            tasks.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer }, 
-                consumer, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100)));
-        }
-        await Task.WhenAll(tasks);
+        await ProduceExactCountAsync(producer, EventCountPerPhase);
+        await observer.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase * consumers.Count, StreamProviderName, cts.Token);
+        await AssertCountersAsync(new[] { producer }, consumers, this.fixture.Logger);
 
         //clean up test
-        tasks.Clear();
-        tasks = consumers.Select(consumer => consumer.StopConsuming()).ToList();
-        await Task.WhenAll(tasks);
+        await Task.WhenAll(consumers.Select(consumer => consumer.StopConsuming()));
     }
 
     [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5635")]
     public async Task StreamingTests_Consumer_Producer_UnSubscribe()
     {
+        using var cts = new CancellationTokenSource(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+        var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
         //set up subscription for consumer grains
         var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 2);
 
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        await producer.StartPeriodicProducing();
+        using (var phaseOneObserver = StreamingDiagnosticObserver.Create())
+        {
+            await ProduceExactCountAsync(producer, EventCountPerPhase);
+            await phaseOneObserver.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase * subscriptions.Count, StreamProviderName, cts.Token);
+        }
 
-        int numProduced = 0;
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
         //the subscription to remove
         var subscription = subscriptions[0];
         // remove subscription
-        await subscriptionManager.RemoveSubscription(streamId, subscription.SubscriptionId);
-        var numProducedWhenUnSub = await producer.GetNumberProduced();
+        using (var removalObserver = StreamingDiagnosticObserver.Create())
+        {
+            await subscriptionManager.RemoveSubscription(streamId, subscription.SubscriptionId);
+            await removalObserver.WaitForSubscriptionRemovedAsync(rxStreamId, StreamProviderName, cts.Token);
+        }
+
         var consumerUnSub = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscription.GrainId);
         var consumerNormal = this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(subscriptions[1].GrainId);
         //assert consumer grain's onAdd func got called.
         Assert.True((await consumerUnSub.GetCountOfOnAddFuncCalled()) > 0);
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProducedWhenUnSub, producer, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await producer.StopPeriodicProducing();
 
-        //assert normal consumer consumed equal to produced
-        await TestingUtils.WaitUntilAsync(
-        lastTry =>CheckCounters(new List<ITypedProducerGrain> { producer }, consumerNormal, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
+        using (var phaseTwoObserver = StreamingDiagnosticObserver.Create())
+        {
+            await ProduceExactCountAsync(producer, EventCountPerPhase);
+            await phaseTwoObserver.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase, StreamProviderName, cts.Token);
+        }
+
+        await AssertCountersAsync(new[] { producer }, consumerNormal, this.fixture.Logger);
 
         //asert unsubscribed consumer consumed less than produced
-        numProduced = await producer.GetNumberProduced();
+        var numProduced = await producer.GetNumberProduced();
         var numConsumed = await consumerUnSub.GetNumberConsumed();
-        Assert.True(numConsumed <= numProducedWhenUnSub);
+        Assert.Equal(EventCountPerPhase, numConsumed);
         Assert.True(numConsumed < numProduced);
 
         // clean up test
@@ -152,11 +154,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingInt>(Guid.NewGuid());
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        await producer.StartPeriodicProducing();
-
-        int numProduced = 0;
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await producer.StopPeriodicProducing();
+        await ProduceExactCountAsync(producer, 1);
 
         //wait for consumers to unsubscribe via diagnostic events
         var rxStreamId = StreamId.Create("EmptySpace", streamId.Guid);
@@ -171,8 +169,11 @@ public abstract class ProgrammaticSubscribeTestsRunner
     [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5650")]
     public async Task StreamingTests_Consumer_Producer_SubscribeToTwoStream_MessageWithPolymorphism()
     {
+        using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+        var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
         //set up subscription for 10 consumer grains
         var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
         var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
@@ -180,12 +181,9 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        await producer.StartPeriodicProducing();
-
-        int numProduced = 0;
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
         // set up the new stream to subscribe, which produce strings
         var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName);
+        var rxStreamId2 = StreamId.Create(streamId2.Namespace, streamId2.Guid);
         var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
         await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
@@ -193,30 +191,31 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var tasks = consumers.Select(consumer => subscriptionManager.AddSubscription<IPassive_ConsumerGrain>(streamId2, consumer.GetPrimaryKey())).ToList();
         await Task.WhenAll(tasks);
 
-        await producer2.StartPeriodicProducing();
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await producer.StopPeriodicProducing();
-        await producer2.StopPeriodicProducing();
-
-        var tasks2 = new List<Task>();
-        foreach (var consumer in consumers)
+        for (var i = 0; i < EventCountPerPhase; i++)
         {
-            tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
-                consumer, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100)));
+            await producer.Produce();
+            if (i < EventCountPerPhase - 2)
+            {
+                await producer2.Produce();
+            }
         }
-        await Task.WhenAll(tasks2);
+        await Task.WhenAll(
+            observer.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase * consumers.Count, StreamProviderName, cts.Token),
+            observer.WaitForItemDeliveryCountAsync(rxStreamId2, (EventCountPerPhase - 2) * consumers.Count, StreamProviderName, cts.Token));
+        await AssertCountersAsync(new ITypedProducerGrain[] { producer, producer2 }, consumers, this.fixture.Logger);
 
         //clean up test
-        tasks2.Clear();
-        tasks2 = consumers.Select(consumer => consumer.StopConsuming()).ToList();
-        await Task.WhenAll(tasks2);
+        await Task.WhenAll(consumers.Select(consumer => consumer.StopConsuming()));
     }
 
     [SkippableFact]
     public async Task StreamingTests_Consumer_Producer_SubscribeToStreamsHandledByDifferentStreamProvider()
     {
+        using var observer = StreamingDiagnosticObserver.Create();
+        using var cts = new CancellationTokenSource(_timeout);
         var subscriptionManager = new SubscriptionManager(this.fixture.HostedCluster);
         var streamId = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace", StreamProviderName);
+        var rxStreamId = StreamId.Create(streamId.Namespace, streamId.Guid);
         //set up subscription for 10 consumer grains
         var subscriptions = await subscriptionManager.SetupStreamingSubscriptionForStream<IPassive_ConsumerGrain>(streamId, 10);
         var consumers = subscriptions.Select(sub => this.fixture.GrainFactory.GetGrain<IPassive_ConsumerGrain>(sub.GrainId)).ToList();
@@ -224,12 +223,9 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var producer = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
         await producer.BecomeProducer(streamId.Guid, streamId.Namespace, streamId.ProviderName);
 
-        await producer.StartPeriodicProducing();
-
-        int numProduced = 0;
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
         // set up the new stream to subscribe, which produce strings
         var streamId2 = new FullStreamIdentity(Guid.NewGuid(), "EmptySpace2", StreamProviderName2);
+        var rxStreamId2 = StreamId.Create(streamId2.Namespace, streamId2.Guid);
         var producer2 = this.fixture.GrainFactory.GetGrain<ITypedProducerGrainProducingApple>(Guid.NewGuid());
         await producer2.BecomeProducer(streamId2.Guid, streamId2.Namespace, streamId2.ProviderName);
 
@@ -237,42 +233,43 @@ public abstract class ProgrammaticSubscribeTestsRunner
         var tasks = consumers.Select(consumer => subscriptionManager.AddSubscription<IPassive_ConsumerGrain>(streamId2, consumer.GetPrimaryKey())).ToList();
         await Task.WhenAll(tasks);
 
-        await producer2.StartPeriodicProducing();
-        await TestingUtils.WaitUntilAsync(lastTry => ProducerHasProducedSinceLastCheck(numProduced, producer2, lastTry), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100));
-        await producer.StopPeriodicProducing();
-        await producer2.StopPeriodicProducing();
-
-        var tasks2 = new List<Task>();
-        foreach (var consumer in consumers)
+        for (var i = 0; i < EventCountPerPhase; i++)
         {
-            tasks2.Add(TestingUtils.WaitUntilAsync(lastTry => CheckCounters(new List<ITypedProducerGrain> { producer, producer2 },
-                consumer, lastTry, this.fixture.Logger), _timeout, delayOnFail: TimeSpan.FromMilliseconds(100)));
+            await producer.Produce();
+            if (i < EventCountPerPhase - 2)
+            {
+                await producer2.Produce();
+            }
         }
-        await Task.WhenAll(tasks2);
+        await Task.WhenAll(
+            observer.WaitForItemDeliveryCountAsync(rxStreamId, EventCountPerPhase * consumers.Count, StreamProviderName, cts.Token),
+            observer.WaitForItemDeliveryCountAsync(rxStreamId2, (EventCountPerPhase - 2) * consumers.Count, StreamProviderName2, cts.Token));
+        await AssertCountersAsync(new ITypedProducerGrain[] { producer, producer2 }, consumers, this.fixture.Logger);
 
         //clean up test
-        tasks2.Clear();
-        tasks2 = consumers.Select(consumer => consumer.StopConsuming()).ToList();
-        await Task.WhenAll(tasks2);
+        await Task.WhenAll(consumers.Select(consumer => consumer.StopConsuming()));
     }
 
     //test utilities and statics
     private static readonly TimeSpan _timeout = TimeSpan.FromSeconds(30);
-   
-    public static async Task<bool> ProducerHasProducedSinceLastCheck(int numProducedLastTime, ITypedProducerGrain producer, bool assertIsTrue)
+
+    private static async Task ProduceExactCountAsync(ITypedProducerGrain producer, int count)
     {
-        var numProduced = await producer.GetNumberProduced();
-        if (assertIsTrue)
+        for (var i = 0; i < count; i++)
         {
-            throw new OrleansException($"Producer has not produced since last check");
-        }
-        else
-        {
-            return numProduced > numProducedLastTime;
+            await producer.Produce();
         }
     }
 
-    public static async Task<bool> CheckCounters(List<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, bool assertIsTrue, ILogger logger)
+    private static async Task AssertCountersAsync(IEnumerable<ITypedProducerGrain> producers, IEnumerable<IPassive_ConsumerGrain> consumers, ILogger logger)
+    {
+        foreach (var consumer in consumers)
+        {
+            await AssertCountersAsync(producers, consumer, logger);
+        }
+    }
+
+    private static async Task AssertCountersAsync(IEnumerable<ITypedProducerGrain> producers, IPassive_ConsumerGrain consumer, ILogger logger)
     {
         int numProduced = 0;
         foreach (var p in producers)
@@ -281,15 +278,7 @@ public abstract class ProgrammaticSubscribeTestsRunner
         }
         var numConsumed = await consumer.GetNumberConsumed();
         logger.LogInformation("CheckCounters: numProduced = {ProducedCount}, numConsumed = {ConsumedCount}", numProduced, numConsumed);
-        if (assertIsTrue)
-        {
-            Assert.Equal(numProduced, numConsumed);
-            return true;
-        }
-        else
-        {
-            return numProduced == numConsumed;
-        }
+        Assert.Equal(numProduced, numConsumed);
     }
 }
 

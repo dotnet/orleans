@@ -23,6 +23,7 @@
     <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Redis.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
   </ItemGroup>
 </Project>

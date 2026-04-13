@@ -410,7 +410,7 @@ public class SubscriptionMultiplicityTestRunner
         Assert.Empty(actualSubscriptions);
     }
 
-    public async Task TwoIntermitentStreamTest(Guid streamGuid)
+    public async Task TwoIntermittentStreamTest(Guid streamGuid)
     {
         const string streamNamespace1 = "streamNamespace1";
         const string streamNamespace2 = "streamNamespace2";
