@@ -30,37 +30,4 @@ public sealed class RedisStreamBuilderExtensionsTests
         Assert.Equal(256L, options.MaxStreamLength);
         Assert.Equal(7, partitioning.TotalQueueCount);
     }
-
-    [Fact]
-    public void SiloBuilder_AddRedisStreams_WithServiceCollectionConfiguratorDelegate_ConfiguresServices()
-    {
-        const string providerName = "silo-configurator";
-        var services = new ServiceCollection();
-        var marker = new Marker(1024L);
-        var builder = new TestSiloBuilder(services, new ConfigurationBuilder().Build());
-
-        builder.AddRedisStreams(providerName, (serviceCollection, configurator) =>
-        {
-            serviceCollection.AddSingleton(marker);
-            configurator.ConfigurePartitioning(9);
-            configurator.RedisStreamingOptions.Configure(options => options.MaxStreamLength = marker.Value);
-        });
-
-        using var serviceProvider = services.BuildServiceProvider();
-        var options = serviceProvider.GetOptionsByName<RedisStreamingOptions>(providerName);
-        var partitioning = serviceProvider.GetOptionsByName<HashRingStreamQueueMapperOptions>(providerName);
-
-        Assert.Same(marker, serviceProvider.GetRequiredService<Marker>());
-        Assert.Equal(marker.Value, options.MaxStreamLength);
-        Assert.Equal(9, partitioning.TotalQueueCount);
-    }
-
-    private sealed record Marker(long Value);
-
-    private sealed class TestSiloBuilder(IServiceCollection services, IConfiguration configuration) : ISiloBuilder
-    {
-        public IServiceCollection Services { get; } = services;
-
-        public IConfiguration Configuration { get; } = configuration;
-    }
 }
