@@ -159,6 +159,55 @@ namespace Orleans.Reminders
     }
 }
 
+namespace Orleans.Reminders.Diagnostics
+{
+    public static partial class ReminderEvents
+    {
+        public const string ListenerName = "Orleans.Reminders";
+        public static System.IObservable<ReminderEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class Registered : ReminderEvent
+        {
+            public Registered(Runtime.GrainId grainId, string reminderName, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
+        }
+
+        public abstract partial class ReminderEvent
+        {
+            public readonly Runtime.GrainId GrainId;
+            public readonly string ReminderName;
+            public readonly Runtime.SiloAddress? SiloAddress;
+            protected ReminderEvent(Runtime.GrainId grainId, string reminderName, Runtime.SiloAddress? siloAddress) { }
+        }
+
+        public sealed partial class TickCompleted : ReminderEvent
+        {
+            public readonly IRemindable Remindable;
+            public readonly Runtime.TickStatus Status;
+            public TickCompleted(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, Runtime.SiloAddress? siloAddress, IRemindable remindable) : base(default, default!, default) { }
+        }
+
+        public sealed partial class TickFailed : ReminderEvent
+        {
+            public readonly System.Exception Exception;
+            public readonly IRemindable Remindable;
+            public readonly Runtime.TickStatus Status;
+            public TickFailed(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, System.Exception exception, Runtime.SiloAddress? siloAddress, IRemindable remindable) : base(default, default!, default) { }
+        }
+
+        public sealed partial class TickFiring : ReminderEvent
+        {
+            public readonly IRemindable Remindable;
+            public readonly Runtime.TickStatus Status;
+            public TickFiring(Runtime.GrainId grainId, string reminderName, Runtime.TickStatus status, Runtime.SiloAddress? siloAddress, IRemindable remindable) : base(default, default!, default) { }
+        }
+
+        public sealed partial class Unregistered : ReminderEvent
+        {
+            public Unregistered(Runtime.GrainId grainId, string reminderName, Runtime.SiloAddress? siloAddress) : base(default, default!, default) { }
+        }
+    }
+}
+
 namespace Orleans.Runtime
 {
     public partial interface IGrainReminder

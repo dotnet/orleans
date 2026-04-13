@@ -600,6 +600,96 @@ namespace Orleans.Configuration.Overrides
     }
 }
 
+namespace Orleans.Core.Diagnostics
+{
+    public static partial class ClientLifecycleEvents
+    {
+        public const string ListenerName = "Orleans.ClientLifecycle";
+        public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
+
+        public abstract partial class LifecycleEvent
+        {
+            public readonly Runtime.SiloAddress ClientAddress;
+            public readonly int Stage;
+            public readonly string StageName;
+            protected LifecycleEvent(int stage, string stageName, Runtime.SiloAddress clientAddress) { }
+        }
+
+        public sealed partial class ObserverCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverCompleted(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverFailed(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStarting(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopped(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopping(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageCompleted(int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageFailed(int stage, string stageName, Runtime.SiloAddress clientAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStarting(int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopped(int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopping(int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+    }
+}
+
 namespace Orleans.GrainDirectory
 {
     public partial interface IGrainLocator
