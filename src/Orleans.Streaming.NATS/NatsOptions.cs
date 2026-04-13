@@ -55,8 +55,8 @@ public class NatsOptions
     /// <summary>
     /// The number of stream replicas in the NATS JetStream cluster.
     /// Higher values improve availability during node restarts (R3 survives
-    /// single-node failures in a 3-node cluster). Must be an odd number
-    /// and cannot exceed the number of NATS nodes.
+    /// single-node failures in a 3-node cluster). The NATS server enforces
+    /// that the value is odd and does not exceed the cluster size.
     /// Defaults to 1. Set to 3 for production clusters with ≥ 3 nodes.
     /// </summary>
     public int NumReplicas { get; set; } = 1;

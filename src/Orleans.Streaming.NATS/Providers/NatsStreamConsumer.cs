@@ -32,6 +32,10 @@ internal sealed class NatsStreamConsumer(
     };
 
     private INatsJSConsumer? _consumer;
+    private int _consecutiveInitFailures;
+
+    // Log on the 1st attempt, then every 100th to avoid flooding at ~100ms poll cadence.
+    private const int InitLogInterval = 100;
 
     public async Task<(NatsStreamMessage[] Messages, int Count)> GetMessages(int messageCount = 0,
         CancellationToken cancellationToken = default)
@@ -41,19 +45,39 @@ internal sealed class NatsStreamConsumer(
             // Lazy retry: attempt re-initialization on each poll cycle.
             // This handles transient failures during initial Initialize()
             // (leader election, timeout, network blip).
+            var shouldLog = this._consecutiveInitFailures % InitLogInterval == 0;
             try
             {
-                this._logger.LogWarning(
-                    "NATS Consumer not initialized — attempting re-initialization. Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
-                    provider, stream, partition);
+                if (shouldLog)
+                {
+                    this._logger.LogWarning(
+                        "NATS Consumer not initialized — attempting re-initialization (attempt {Attempt}). "
+                        + "Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
+                        this._consecutiveInitFailures + 1, provider, stream, partition);
+                }
 
                 await Initialize(cancellationToken);
+                if (this._consecutiveInitFailures > 0)
+                {
+                    this._logger.LogInformation(
+                        "NATS Consumer re-initialized successfully after {Attempts} failed attempt(s). "
+                        + "Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
+                        this._consecutiveInitFailures, provider, stream, partition);
+                }
+
+                this._consecutiveInitFailures = 0;
             }
             catch (Exception ex)
             {
-                this._logger.LogWarning(ex,
-                    "NATS Consumer re-initialization failed. Provider: {Provider} | Stream: {Stream} | Partition: {Partition}. Will retry on next poll.",
-                    provider, stream, partition);
+                this._consecutiveInitFailures++;
+                if (shouldLog)
+                {
+                    this._logger.LogWarning(ex,
+                        "NATS Consumer re-initialization failed (attempt {Attempt}). "
+                        + "Provider: {Provider} | Stream: {Stream} | Partition: {Partition}. Will retry on next poll.",
+                        this._consecutiveInitFailures, provider, stream, partition);
+                }
+
                 return ([], 0);
             }
 

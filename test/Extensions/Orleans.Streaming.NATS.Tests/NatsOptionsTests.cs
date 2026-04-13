@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging.Abstractions;
 using NATS.Client.Core;
 using NATS.Client.JetStream;
 using NATS.Client.JetStream.Models;
@@ -89,24 +90,30 @@ public sealed class NatsOptionsTests
             throw new SkipException("Nats Server is not available");
         }
 
-        var streamName = $"test-replicas-{Guid.NewGuid()}";
+        var providerName = $"test-replicas-{Guid.NewGuid():N}";
+        var streamName = $"test-replicas-stream-{Guid.NewGuid():N}";
+        var options = new NatsOptions
+        {
+            StreamName = streamName,
+            NumReplicas = 1,
+            PartitionCount = 2,
+            ProducerCount = 1
+        };
+
+        var connectionManager = new NatsConnectionManager(providerName, NullLoggerFactory.Instance, options);
+        await connectionManager.Initialize();
+
         await using var natsConnection = new NatsConnection();
         var natsContext = new NatsJSContext(natsConnection);
-
         await natsConnection.ConnectAsync();
 
         try
         {
-            var streamConfig = new StreamConfig(streamName, [$"test-replicas-provider.>"])
-            {
-                Retention = StreamConfigRetention.Workqueue,
-                NumReplicas = 1
-            };
-
-            var stream = await natsContext.CreateStreamAsync(streamConfig);
+            var stream = await natsContext.GetStreamAsync(streamName);
             var info = stream.Info;
 
             Assert.Equal(1, info.Config.NumReplicas);
+            Assert.Equal(StreamConfigRetention.Workqueue, info.Config.Retention);
         }
         finally
         {
