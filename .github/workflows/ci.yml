@@ -22,18 +22,18 @@ jobs:
       matrix:
         os: [ubuntu-latest, windows-latest, macos-latest]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '20.x'
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Build
       run: dotnet build -bl
-    - uses: actions/upload-artifact@v4
+    - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: build_log_${{ matrix.os }}
         retention-days: 1
@@ -58,9 +58,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -77,7 +77,7 @@ jobs:
         ORLEANSREDISCONNECTIONSTRING: "localhost:6379,ssl=False,abortConnect=False"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -94,9 +94,9 @@ jobs:
         dbversion: ["4.0", "4.1", "5.0"]
         framework: ["net8.0", "net10.0"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -113,7 +113,7 @@ jobs:
         CASSANDRAVERSION: ${{ matrix.dbversion }}
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.dbversion }}_${{ matrix.framework }}
         retention-days: 1
@@ -142,9 +142,9 @@ jobs:
           --health-timeout 5s
           --health-retries 5
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -162,7 +162,7 @@ jobs:
         ORLEANSPOSTGRESCONNECTIONSTRING: "Server=127.0.0.1;Port=5432;Pooling=false;User Id=postgres;Password=postgres;SSL Mode=Disable"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -186,9 +186,9 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
           MARIADB_ROOT_PASSWORD: "mariadb"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -206,7 +206,7 @@ jobs:
         ORLEANSMYSQLCONNECTIONSTRING: "Server=127.0.0.1;Port=3306;UId=root;Pwd=mariadb;"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -232,9 +232,9 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="False positive")]
           SA_PASSWORD: "yourWeak(!)Password"
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -252,7 +252,7 @@ jobs:
         ORLEANSMSSQLCONNECTIONSTRING: "Server=127.0.0.1,1433;User Id=SA;Password=yourWeak(!)Password;TrustServerCertificate=True;"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -268,7 +268,7 @@ jobs:
         framework: ["net8.0", "net10.0"]
         provider: ["AzureStorage"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
       run: |
         docker run -d --name azurite \
@@ -283,7 +283,7 @@ jobs:
         timeout 60 bash -c 'until nc -z localhost 10000 && nc -z localhost 10001 && nc -z localhost 10002; do sleep 1; done'
         echo "Azurite is ready"
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -306,7 +306,7 @@ jobs:
       run: docker rm -f azurite
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -322,7 +322,7 @@ jobs:
         framework: ["net8.0", "net10.0"]
         provider: ["EventHub"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Start Azurite
       run: |
         docker run -d --name azurite \
@@ -352,7 +352,7 @@ jobs:
         timeout 60 bash -c 'until nc -z localhost 5672; do sleep 1; done'
         echo "Event Hubs emulator is ready"
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -380,7 +380,7 @@ jobs:
       run: docker rm -f azurite
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -396,9 +396,9 @@ jobs:
         framework: ["net8.0", "net10.0"]
         provider: ["Cosmos"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Start Azure Cosmos DB emulator
@@ -471,7 +471,7 @@ jobs:
       run: docker rm -f cosmosdb-emulator || true
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -487,9 +487,9 @@ jobs:
         provider: ["Consul"]
         framework: ["net8.0", "net10.0"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -504,7 +504,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -525,9 +525,9 @@ jobs:
         ports:
           - 2181:2181
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -544,7 +544,7 @@ jobs:
         ORLEANSZOOKEEPERCONNECTIONSTRING: "localhost:2181"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -571,9 +571,9 @@ jobs:
           AWS_SECRET_ACCESS_KEY: pass
           AWS_REGION: us-east-1
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -594,7 +594,7 @@ jobs:
         ORLEANSDYNAMODBSECRETKEY: "pass"
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -628,9 +628,9 @@ jobs:
           exit 1
         fi
         echo "NATS is ready"
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test
@@ -649,7 +649,7 @@ jobs:
       run: docker rm -f nats
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
         retention-days: 1
@@ -666,13 +666,13 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         framework: ["net8.0", "net10.0"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup Node.js
-      uses: actions/setup-node@v4
+      uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5
       with:
         node-version: '20.x'
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Build
@@ -689,7 +689,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.suite }}_${{ matrix.os }}_${{ matrix.framework }}
         retention-days: 1
@@ -705,9 +705,9 @@ jobs:
         os: [ubuntu-latest, windows-latest, macos-latest]
         framework: ["net8.0", "net10.0"]
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
     - name: Setup .NET
-      uses: actions/setup-dotnet@v4
+      uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
       with:
         global-json-file: global.json
     - name: Test Code Generator
@@ -722,7 +722,7 @@ jobs:
         -parallel none -noshadow
     - name: Archive Test Results
       if: always()
-      uses: actions/upload-artifact@v4
+      uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
       with:
         name: test_output_${{ github.job }}_${{ matrix.os }}_${{ matrix.framework }}
         retention-days: 1
