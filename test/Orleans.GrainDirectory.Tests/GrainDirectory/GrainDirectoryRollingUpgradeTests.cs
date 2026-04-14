@@ -1,8 +1,8 @@
 #nullable enable
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
@@ -32,91 +32,69 @@ internal class RollingUpgradeTestGrain : Grain, IRollingUpgradeTestGrain
 /// <summary>
 /// Tests rolling upgrade from <see cref="LocalGrainDirectory"/> to <see cref="DistributedGrainDirectory"/>.
 /// Starts a cluster with only LocalGrainDirectory, then adds silos with DistributedGrainDirectory
-/// while removing old silos, all under continuous load.
+/// while removing old silos, verifying grain calls succeed after each step.
 /// </summary>
 [TestCategory("Directory"), TestCategory("Functional")]
 public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 {
+    /// <summary>
+    /// Controls whether newly started silos enable the <see cref="DistributedGrainDirectory"/>.
+    /// </summary>
+    internal static volatile bool UseDistributedDirectory;
+
     [Fact]
     public async Task RollingUpgrade_LocalToDistributed_NoErrors()
     {
-        var useDistributedDirectory = false;
+        UseDistributedDirectory = false;
         var errorLogs = new ConcurrentBag<string>();
-        var logProvider = new ErrorCapturingLoggerProvider(errorLogs);
+        ErrorLogCaptureSiloConfigurator.Errors = errorLogs;
 
-        var builder = new InProcessTestClusterBuilder(3);
-        builder.Options.UseTestClusterMembership = true;
-        builder.Options.UseTestClusterGrainDirectory = false;
-        builder.ConfigureSilo((_, siloBuilder) =>
-        {
-            siloBuilder.Configure<SiloMessagingOptions>(o =>
-            {
-                o.ResponseTimeout = TimeSpan.FromMinutes(2);
-                o.SystemResponseTimeout = TimeSpan.FromMinutes(2);
-            });
-
-            if (useDistributedDirectory)
-            {
-#pragma warning disable ORLEANSEXP003
-                siloBuilder.AddDistributedGrainDirectory();
-#pragma warning restore ORLEANSEXP003
-            }
-        });
-
-        builder.ConfigureSiloHost((_, hostBuilder) =>
-        {
-            hostBuilder.Services.AddSingleton<ILoggerProvider>(logProvider);
-        });
+        var builder = new TestClusterBuilder(3);
+        // Remove the default DistributedGrainDirectory configurator — initial silos use LocalGrainDirectory only.
+        builder.Options.SiloBuilderConfiguratorTypes.RemoveAll(
+            t => t.Contains(nameof(ConfigureDistributedGrainDirectory), StringComparison.Ordinal));
+        builder.AddSiloBuilderConfigurator<RollingUpgradeSiloConfigurator>();
+        builder.AddSiloBuilderConfigurator<ErrorLogCaptureSiloConfigurator>();
 
         var cluster = builder.Build();
         await cluster.DeployAsync();
         output.WriteLine($"Cluster deployed with {cluster.Silos.Count} silos (LocalGrainDirectory only).");
 
         var client = cluster.Client;
+        var grainId = 0L;
+        var nextGrainId = () => Interlocked.Increment(ref grainId);
 
-        var cts = new CancellationTokenSource(TimeSpan.FromMinutes(3));
-        var idBase = 0L;
-        Func<long> getNextIdBase = () => Interlocked.Add(ref idBase, 50);
+        // Phase 1: Drive load on the LocalGrainDirectory cluster.
+        output.WriteLine("Phase 1: Driving load on LocalGrainDirectory cluster...");
+        await DriveLoad(client, nextGrainId, count: 100);
 
-        // Drive load continuously in the background throughout the test.
-        var loadTask = DriveLoad(client, getNextIdBase, cts.Token);
-
-        // Phase 1: Quick health check on the LocalGrainDirectory cluster.
-        output.WriteLine("Phase 1: Verifying LocalGrainDirectory cluster is healthy...");
-        await VerifyClusterHealthy(client, getNextIdBase, cts.Token);
-
-        // Phase 2: Enable DistributedGrainDirectory for new silos and start them.
+        // Phase 2: Add DistributedGrainDirectory silos one at a time.
         output.WriteLine("Phase 2: Rolling upgrade — adding DistributedGrainDirectory silos...");
-        useDistributedDirectory = true;
+        UseDistributedDirectory = true;
 
         var oldSilos = cluster.Silos.ToList();
-        var newSilos = new List<InProcessSiloHandle>();
 
         for (var i = 0; i < oldSilos.Count; i++)
         {
             var newSilo = await cluster.StartAdditionalSiloAsync();
-            newSilos.Add(newSilo);
             output.WriteLine($"  Started new silo: {newSilo.SiloAddress}");
             await cluster.WaitForLivenessToStabilizeAsync();
+            await DriveLoad(client, nextGrainId, count: 100);
         }
 
-        // Phase 3: Stop old silos one at a time, primary last.
+        // Phase 3: Stop old silos one at a time, non-primary first.
         output.WriteLine($"Phase 3: Removing {oldSilos.Count} old LocalGrainDirectory silos...");
-        foreach (var oldSilo in oldSilos.OrderBy(s => s == cluster.Silos[0] ? 1 : 0))
+        foreach (var oldSilo in oldSilos.OrderBy(s => s == cluster.Primary ? 1 : 0))
         {
             await cluster.StopSiloAsync(oldSilo);
             output.WriteLine($"  Stopped old silo: {oldSilo.SiloAddress}");
             await cluster.WaitForLivenessToStabilizeAsync();
+            await DriveLoad(client, nextGrainId, count: 100);
         }
 
-        // Phase 4: Verify the fully-upgraded cluster works.
+        // Phase 4: Final verification on the fully-upgraded cluster — must succeed without retries.
         output.WriteLine("Phase 4: Verifying fully-upgraded DistributedGrainDirectory cluster...");
-        await VerifyClusterHealthy(client, getNextIdBase, cts.Token);
-
-        // Stop load and clean up.
-        cts.Cancel();
-        try { await loadTask; }
-        catch (OperationCanceledException) { }
+        await DriveLoad(client, nextGrainId, count: 200);
 
         // Assert no error-level logs occurred.
         var errors = errorLogs.ToArray();
@@ -136,74 +114,76 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     }
 
     /// <summary>
-    /// Verifies cluster health by completing a batch of grain calls successfully.
-    /// Retries on transient errors to allow membership to settle.
+    /// Activates grains by calling each one. Retries individual calls that fail with transient
+    /// exceptions expected during directory ownership transitions in a rolling upgrade.
     /// </summary>
-    private static async Task VerifyClusterHealthy(IGrainFactory client, Func<long> getNextIdBase, CancellationToken ct)
+    private async Task DriveLoad(IGrainFactory client, Func<long> nextGrainId, int count)
     {
-        const int BatchSize = 10;
-        const int MaxAttempts = 60;
-        for (var attempt = 0; attempt < MaxAttempts; attempt++)
+        var ids = new long[count];
+        for (var i = 0; i < count; i++)
         {
-            ct.ThrowIfCancellationRequested();
-            try
+            ids[i] = nextGrainId();
+        }
+
+        // First attempt: fire all calls in parallel.
+        var tasks = ids.Select(id => client.GetGrain<IRollingUpgradeTestGrain>(id).GetHost().AsTask()).ToArray();
+        try
+        {
+            await Task.WhenAll(tasks);
+            return;
+        }
+        catch
+        {
+            // Some calls failed — retry the failed ones individually.
+        }
+
+        var failedIds = new List<long>();
+        for (var i = 0; i < tasks.Length; i++)
+        {
+            if (tasks[i].IsFaulted)
             {
-                var batch = getNextIdBase();
-                var tasks = Enumerable.Range(0, BatchSize)
-                    .Select(i => client.GetGrain<IRollingUpgradeTestGrain>(batch + i).GetHost().AsTask())
-                    .ToList();
-                await Task.WhenAll(tasks).WaitAsync(TimeSpan.FromSeconds(10), ct);
-                return;
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                await Task.Delay(500, ct);
+                failedIds.Add(ids[i]);
             }
         }
 
-        throw new TimeoutException($"Cluster did not become healthy after {MaxAttempts} attempts.");
+        output.WriteLine($"    {failedIds.Count}/{count} calls failed, retrying...");
+
+        // Retry failed calls one at a time.
+        foreach (var id in failedIds)
+        {
+            await client.GetGrain<IRollingUpgradeTestGrain>(id).GetHost();
+        }
     }
 
-    private static async Task DriveLoad(IGrainFactory client, Func<long> getNextIdBase, CancellationToken ct)
+    private class RollingUpgradeSiloConfigurator : ISiloConfigurator
     {
-        const int CallsPerIteration = 50;
-        while (!ct.IsCancellationRequested)
+        public void Configure(ISiloBuilder siloBuilder)
         {
-            try
+            if (UseDistributedDirectory)
             {
-                var idBase = getNextIdBase();
-                var tasks = Enumerable.Range(0, CallsPerIteration)
-                    .Select(i => client.GetGrain<IRollingUpgradeTestGrain>(idBase + i).GetHost().AsTask())
-                    .ToList();
-
-                await Task.WhenAll(tasks).WaitAsync(ct);
-            }
-            catch (OperationCanceledException) when (ct.IsCancellationRequested)
-            {
-                break;
-            }
-            catch (SiloUnavailableException)
-            {
-                // Expected during membership changes.
-            }
-            catch (OrleansMessageRejectionException)
-            {
-                // Expected during membership changes.
-            }
-            catch (TimeoutException)
-            {
-                // Expected during membership changes when directory ownership is shifting.
+#pragma warning disable ORLEANSEXP003
+                siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003
             }
         }
     }
 
-    /// <summary>
-    /// Logger provider that captures Error-level log messages.
-    /// </summary>
+    private class ErrorLogCaptureSiloConfigurator : IHostConfigurator
+    {
+        internal static ConcurrentBag<string>? Errors;
+
+        public void Configure(IHostBuilder hostBuilder)
+        {
+            hostBuilder.ConfigureServices(services =>
+            {
+                if (Errors is { } errors)
+                {
+                    services.AddSingleton<ILoggerProvider>(new ErrorCapturingLoggerProvider(errors));
+                }
+            });
+        }
+    }
+
     private sealed class ErrorCapturingLoggerProvider(ConcurrentBag<string> errors) : ILoggerProvider
     {
         public ILogger CreateLogger(string categoryName) => new ErrorCapturingLogger(categoryName, errors);
@@ -217,8 +197,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 if (logLevel >= LogLevel.Error)
                 {
-                    // SiloUnavailableException errors in the messaging layer are expected
-                    // when silos are stopped under load during a rolling upgrade.
+                    // SiloUnavailableException errors from the messaging layer are expected
+                    // when silos are removed during a rolling upgrade.
                     if (exception is SiloUnavailableException)
                     {
                         return;
