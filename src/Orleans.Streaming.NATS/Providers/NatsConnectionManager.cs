@@ -151,7 +151,7 @@ internal sealed partial class NatsConnectionManager
         if (this._natsContext is null)
         {
             this.LogNatsContextNotInitialized();
-            throw new InvalidOperationException("Unable to enqueue message: NATS context is not initialized");
+            throw new InvalidOperationException("Unable to enqueue message because the NATS context is not initialized.");
         }
 
         var ns = message.StreamId.Namespace.IsEmpty ? "null" : Encoding.UTF8.GetString(message.StreamId.Namespace.Span);
@@ -203,31 +203,31 @@ internal sealed partial class NatsConnectionManager
 
     #region Logging
 
-    [LoggerMessage(1, LogLevel.Error, "Unable to connect to NATS server {NatsServer}")]
+    [LoggerMessage(1, LogLevel.Error, "Unable to connect to NATS server '{NatsServer}'.")]
     private partial void LogUnableToConnectToNatsServer(string natsServer);
 
-    [LoggerMessage(2, LogLevel.Error, "Unable to use {NatsServer} for Orleans Stream Provider {ProviderName}: NATS JetStream is not available")]
+    [LoggerMessage(2, LogLevel.Error, "Unable to use NATS server '{NatsServer}' for Orleans stream provider '{ProviderName}': JetStream is not available.")]
     private partial void LogJetStreamUnavailable(string natsServer, string providerName);
 
-    [LoggerMessage(3, LogLevel.Trace, "Connected to NATS server {NatsServer}")]
+    [LoggerMessage(3, LogLevel.Trace, "Connected to NATS server '{NatsServer}'.")]
     private partial void LogConnectedToNatsServer(string natsServer);
 
-    [LoggerMessage(4, LogLevel.Information, "Stream {Stream} exists with different config — updating.")]
+    [LoggerMessage(4, LogLevel.Information, "Stream '{Stream}' exists with a different configuration. Updating it.")]
     private partial void LogUpdatingExistingStream(string stream);
 
-    [LoggerMessage(5, LogLevel.Trace, "Initialized to NATS JetStream stream {Stream} on server {NatsServer}")]
+    [LoggerMessage(5, LogLevel.Trace, "Initialized JetStream stream '{Stream}' on NATS server '{NatsServer}'.")]
     private partial void LogInitializedJetStreamStream(string stream, string natsServer);
 
-    [LoggerMessage(6, LogLevel.Error, "Error initializing NATS JetStream Connection Manager")]
+    [LoggerMessage(6, LogLevel.Error, "Error initializing the NATS JetStream connection manager.")]
     private partial void LogErrorInitializingConnectionManager(Exception exception);
 
-    [LoggerMessage(7, LogLevel.Error, "Unable to enqueue message: NATS context is not initialized")]
+    [LoggerMessage(7, LogLevel.Error, "Unable to enqueue message because the NATS context is not initialized.")]
     private partial void LogNatsContextNotInitialized();
 
-    [LoggerMessage(8, LogLevel.Trace, "Enqueued NATS message to subject {Subject}")]
+    [LoggerMessage(8, LogLevel.Trace, "Enqueued NATS message to subject '{Subject}'.")]
     private partial void LogEnqueuedNatsMessage(string subject);
 
-    [LoggerMessage(9, LogLevel.Error, "Failed to enqueue NATS message to {Subject}")]
+    [LoggerMessage(9, LogLevel.Error, "Failed to enqueue NATS message to subject '{Subject}'.")]
     private partial void LogFailedToEnqueueNatsMessage(Exception exception, string subject);
 
     #endregion Logging

@@ -140,13 +140,13 @@ internal sealed partial class NatsQueueAdapterReceiver : IQueueAdapterReceiver
 
     #region Logging
 
-    [LoggerMessage(1, LogLevel.Error, "Unable to create consumer for partition {Partition}")]
+    [LoggerMessage(1, LogLevel.Error, "Unable to create a consumer for partition '{Partition}'.")]
     private partial void LogUnableToCreateConsumer(uint partition);
 
-    [LoggerMessage(2, LogLevel.Warning, "NATS provider is not initialized. Unable to get messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.")]
+    [LoggerMessage(2, LogLevel.Warning, "NATS provider '{Provider}' is not initialized for partition '{Partition}', so messages cannot be received. This is expected during shutdown; otherwise, provider initialization failed.")]
     private partial void LogProviderNotInitializedForReceiving(string provider, uint partition);
 
-    [LoggerMessage(3, LogLevel.Warning, "NATS provider is not initialized. Unable to deliver messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.")]
+    [LoggerMessage(3, LogLevel.Warning, "NATS provider '{Provider}' is not initialized for partition '{Partition}', so delivered messages cannot be acknowledged. This is expected during shutdown; otherwise, provider initialization failed.")]
     private partial void LogProviderNotInitializedForDelivery(string provider, uint partition);
 
     #endregion Logging
