@@ -13,7 +13,7 @@ namespace Orleans.Streaming.NATS;
 /// <summary>
 /// Wrapper around NATS and JetStream APIs
 /// </summary>
-internal sealed class NatsConnectionManager
+internal sealed partial class NatsConnectionManager
 {
     private static readonly byte[] AckPayload = "+ACK"u8.ToArray();
     private readonly string _providerName;
@@ -80,15 +80,13 @@ internal sealed class NatsConnectionManager
 
             if (this._natsConnection.ConnectionState != NatsConnectionState.Open)
             {
-                this._logger.LogError("Unable to connect to NATS server {NatsServer}", this._natsClientOptions.Url);
+                this.LogUnableToConnectToNatsServer(this._natsClientOptions.Url);
                 return;
             }
 
             if (!this._natsConnection.ServerInfo!.JetStreamAvailable)
             {
-                this._logger.LogError(
-                    "Unable to use {NatsServer} for Orleans Stream Provider {ProviderName}: NATS JetStream is not available",
-                    this._natsClientOptions.Url, this._providerName);
+                this.LogJetStreamUnavailable(this._natsClientOptions.Url, this._providerName);
                 return;
             }
 
@@ -98,13 +96,12 @@ internal sealed class NatsConnectionManager
 
                 if (producerContext.Connection.ConnectionState != NatsConnectionState.Open)
                 {
-                    this._logger.LogError("Unable to connect to NATS server {NatsServer}",
-                        producerContext.Connection.Opts.Url);
+                    this.LogUnableToConnectToNatsServer(producerContext.Connection.Opts.Url);
                     return;
                 }
             }
 
-            this._logger.LogTrace("Connected to NATS server {NatsServer}", this._natsClientOptions.Url);
+            this.LogConnectedToNatsServer(this._natsClientOptions.Url);
 
             try
             {
@@ -118,21 +115,16 @@ internal sealed class NatsConnectionManager
             {
                 // Stream exists with different config — attempt in-place update
                 // (safe for NumReplicas changes; NATS allows replica count upgrades)
-                this._logger.LogInformation(
-                    "Stream {Stream} exists with different config — updating.",
-                    this._options.StreamName);
+                this.LogUpdatingExistingStream(this._options.StreamName);
 
                 await this._natsContext.UpdateStreamAsync(BuildStreamConfig(), cancellationToken);
             }
 
-            this._logger.LogTrace(
-                "Initialized to NATS JetStream stream {Stream} on server {NatsServer}",
-                this._options.StreamName,
-                this._natsClientOptions.Url);
+            this.LogInitializedJetStreamStream(this._options.StreamName, this._natsClientOptions.Url);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Error initializing NATS JetStream Connection Manager");
+            this.LogErrorInitializingConnectionManager(ex);
             throw;
         }
     }
@@ -158,7 +150,7 @@ internal sealed class NatsConnectionManager
     {
         if (this._natsContext is null)
         {
-            this._logger.LogError("Unable to enqueue message: NATS context is not initialized");
+            this.LogNatsContextNotInitialized();
             throw new InvalidOperationException("Unable to enqueue message: NATS context is not initialized");
         }
 
@@ -177,11 +169,11 @@ internal sealed class NatsConnectionManager
 
         if (ack.Success)
         {
-            _logger.LogTrace("Enqueued NATS message to subject {Subject}", subject);
+            this.LogEnqueuedNatsMessage(subject);
         }
         else
         {
-            this._logger.LogError(ack.Error, "Failed to enqueue NATS message to {Subject}", subject);
+            this.LogFailedToEnqueueNatsMessage(ack.Error, subject);
         }
     }
 
@@ -208,4 +200,35 @@ internal sealed class NatsConnectionManager
         await this._natsConnection
             .PublishAsync(subject, AckPayload, serializer: NatsRawSerializer<byte[]>.Default);
     }
+
+    #region Logging
+
+    [LoggerMessage(1, LogLevel.Error, "Unable to connect to NATS server {NatsServer}")]
+    private partial void LogUnableToConnectToNatsServer(string natsServer);
+
+    [LoggerMessage(2, LogLevel.Error, "Unable to use {NatsServer} for Orleans Stream Provider {ProviderName}: NATS JetStream is not available")]
+    private partial void LogJetStreamUnavailable(string natsServer, string providerName);
+
+    [LoggerMessage(3, LogLevel.Trace, "Connected to NATS server {NatsServer}")]
+    private partial void LogConnectedToNatsServer(string natsServer);
+
+    [LoggerMessage(4, LogLevel.Information, "Stream {Stream} exists with different config — updating.")]
+    private partial void LogUpdatingExistingStream(string stream);
+
+    [LoggerMessage(5, LogLevel.Trace, "Initialized to NATS JetStream stream {Stream} on server {NatsServer}")]
+    private partial void LogInitializedJetStreamStream(string stream, string natsServer);
+
+    [LoggerMessage(6, LogLevel.Error, "Error initializing NATS JetStream Connection Manager")]
+    private partial void LogErrorInitializingConnectionManager(Exception exception);
+
+    [LoggerMessage(7, LogLevel.Error, "Unable to enqueue message: NATS context is not initialized")]
+    private partial void LogNatsContextNotInitialized();
+
+    [LoggerMessage(8, LogLevel.Trace, "Enqueued NATS message to subject {Subject}")]
+    private partial void LogEnqueuedNatsMessage(string subject);
+
+    [LoggerMessage(9, LogLevel.Error, "Failed to enqueue NATS message to {Subject}")]
+    private partial void LogFailedToEnqueueNatsMessage(Exception exception, string subject);
+
+    #endregion Logging
 }

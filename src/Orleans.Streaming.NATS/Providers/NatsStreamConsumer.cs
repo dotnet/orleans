@@ -12,7 +12,7 @@ namespace Orleans.Streaming.NATS;
 /// <summary>
 /// Wrapper around a NATS JetStream consumer
 /// </summary>
-internal sealed class NatsStreamConsumer(
+internal sealed partial class NatsStreamConsumer(
     ILoggerFactory loggerFactory,
     NatsJSContext context,
     string provider,
@@ -50,19 +50,13 @@ internal sealed class NatsStreamConsumer(
             {
                 if (shouldLog)
                 {
-                    this._logger.LogWarning(
-                        "NATS Consumer not initialized — attempting re-initialization (attempt {Attempt}). "
-                        + "Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
-                        this._consecutiveInitFailures + 1, provider, stream, partition);
+                    this.LogConsumerReinitializationAttempt(this._consecutiveInitFailures + 1, provider, stream, partition);
                 }
 
                 await Initialize(cancellationToken);
                 if (this._consecutiveInitFailures > 0)
                 {
-                    this._logger.LogInformation(
-                        "NATS Consumer re-initialized successfully after {Attempts} failed attempt(s). "
-                        + "Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
-                        this._consecutiveInitFailures, provider, stream, partition);
+                    this.LogConsumerReinitialized(this._consecutiveInitFailures, provider, stream, partition);
                 }
 
                 this._consecutiveInitFailures = 0;
@@ -72,10 +66,7 @@ internal sealed class NatsStreamConsumer(
                 this._consecutiveInitFailures++;
                 if (shouldLog)
                 {
-                    this._logger.LogWarning(ex,
-                        "NATS Consumer re-initialization failed (attempt {Attempt}). "
-                        + "Provider: {Provider} | Stream: {Stream} | Partition: {Partition}. Will retry on next poll.",
-                        this._consecutiveInitFailures, provider, stream, partition);
+                    this.LogConsumerReinitializationFailed(ex, this._consecutiveInitFailures, provider, stream, partition);
                 }
 
                 return ([], 0);
@@ -101,8 +92,7 @@ internal sealed class NatsStreamConsumer(
             var streamMessage = msg.Data;
             if (streamMessage is null)
             {
-                this._logger.LogWarning("Unable to deserialize NATS message for subject {Subject}. Ignoring...",
-                    msg.Subject);
+                this.LogUnableToDeserializeMessage(msg.Subject);
                 continue;
             }
 
@@ -126,4 +116,20 @@ internal sealed class NatsStreamConsumer(
 
         this._consumer = consumer;
     }
+
+    #region Logging
+
+    [LoggerMessage(1, LogLevel.Warning, "NATS Consumer not initialized — attempting re-initialization (attempt {Attempt}). Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.")]
+    private partial void LogConsumerReinitializationAttempt(int attempt, string provider, string stream, uint partition);
+
+    [LoggerMessage(2, LogLevel.Information, "NATS Consumer re-initialized successfully after {Attempts} failed attempt(s). Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.")]
+    private partial void LogConsumerReinitialized(int attempts, string provider, string stream, uint partition);
+
+    [LoggerMessage(3, LogLevel.Warning, "NATS Consumer re-initialization failed (attempt {Attempt}). Provider: {Provider} | Stream: {Stream} | Partition: {Partition}. Will retry on next poll.")]
+    private partial void LogConsumerReinitializationFailed(Exception exception, int attempt, string provider, string stream, uint partition);
+
+    [LoggerMessage(4, LogLevel.Warning, "Unable to deserialize NATS message for subject {Subject}. Ignoring...")]
+    private partial void LogUnableToDeserializeMessage(string subject);
+
+    #endregion Logging
 }

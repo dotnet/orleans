@@ -11,7 +11,7 @@ using Orleans.Serialization;
 
 namespace Orleans.Streaming.NATS;
 
-internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
+internal sealed partial class NatsQueueAdapterReceiver : IQueueAdapterReceiver
 {
     private readonly ILogger _logger;
     private readonly uint _partition;
@@ -56,7 +56,7 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
         this._consumer = this._nats.CreateConsumer(this._partition);
         if (this._consumer is null)
         {
-            this._logger.LogError("Unable to create consumer for partition {Partition}", this._partition);
+            this.LogUnableToCreateConsumer(this._partition);
             return;
         }
 
@@ -85,9 +85,7 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
         {
             if (this._nats is null || this._consumer is null)
             {
-                this._logger.LogWarning(
-                    "NATS provider is not initialized. Unable to get messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.",
-                    this._providerName, this._partition);
+                this.LogProviderNotInitializedForReceiving(this._providerName, this._partition);
                 return [];
             }
 
@@ -121,9 +119,7 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
     {
         if (this._nats is null || this._consumer is null)
         {
-            this._logger.LogWarning(
-                "NATS provider is not initialized. Unable to deliver messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.",
-                this._providerName, this._partition);
+            this.LogProviderNotInitializedForDelivery(this._providerName, this._partition);
             return;
         }
 
@@ -141,4 +137,17 @@ internal sealed class NatsQueueAdapterReceiver : IQueueAdapterReceiver
 
         await Task.WhenAll(tasks);
     }
+
+    #region Logging
+
+    [LoggerMessage(1, LogLevel.Error, "Unable to create consumer for partition {Partition}")]
+    private partial void LogUnableToCreateConsumer(uint partition);
+
+    [LoggerMessage(2, LogLevel.Warning, "NATS provider is not initialized. Unable to get messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.")]
+    private partial void LogProviderNotInitializedForReceiving(string provider, uint partition);
+
+    [LoggerMessage(3, LogLevel.Warning, "NATS provider is not initialized. Unable to deliver messages. If we are shutting down it is fine. Otherwise, we have a problem with initialization of the NATS stream provider {Provider} for partition {Partition}.")]
+    private partial void LogProviderNotInitializedForDelivery(string provider, uint partition);
+
+    #endregion Logging
 }
