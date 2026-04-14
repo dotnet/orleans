@@ -16,6 +16,9 @@ namespace UnitTests.StreamingTests
     /// <summary>
     /// Tests implicit subscription stream recovery scenarios with generated events, including transient and non-transient error handling.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GeneratedImplicitSubscriptionStreamRecoveryTests : OrleansTestingBase, IClassFixture<GeneratedImplicitSubscriptionStreamRecoveryTests.Fixture>
     {
         private static readonly string StreamProviderTypeName = typeof(PersistentStreamProvider).FullName;

@@ -12,6 +12,9 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("Streaming")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class SampleAzureQueueStreamingTests : TestClusterPerTest
     {
         private const string StreamProvider = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;

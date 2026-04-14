@@ -13,6 +13,9 @@ namespace UnitTests.General
     /// <summary>
     /// Tests for request context propagation across grain calls and activities.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class RequestContextTests_Silo : OrleansTestingBase, IClassFixture<RequestContextTests_Silo.Fixture>, IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -329,6 +332,9 @@ namespace UnitTests.General
         }
     }
 
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class Halo_RequestContextTests : OrleansTestingBase
     {
         private readonly ITestOutputHelper output;
@@ -374,6 +380,9 @@ namespace UnitTests.General
         }
     }
 
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class Halo_CallContextTests : OrleansTestingBase
     {
         private readonly ITestOutputHelper output;

@@ -19,6 +19,9 @@ namespace Orleans.Serialization.UnitTests;
 /// This approach enables Orleans to maintain its high-performance serialization while
 /// integrating with third-party libraries and legacy code.
 /// </summary>
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ConverterCodecTests : FieldCodecTester<MyForeignLibraryType, IFieldCodec<MyForeignLibraryType>>
 {
     public ConverterCodecTests(ITestOutputHelper output) : base(output)
@@ -30,6 +33,9 @@ public class ConverterCodecTests : FieldCodecTester<MyForeignLibraryType, IField
     protected override MyForeignLibraryType[] TestValues => new MyForeignLibraryType[] { null, CreateValue() };
 }
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class ConverterCopierTests : CopierTester<MyForeignLibraryType, IDeepCopier<MyForeignLibraryType>>
 {
     public ConverterCopierTests(ITestOutputHelper output) : base(output)
@@ -41,6 +47,9 @@ public class ConverterCopierTests : CopierTester<MyForeignLibraryType, IDeepCopi
     protected override MyForeignLibraryType[] TestValues => new MyForeignLibraryType[] { null, CreateValue() };
 }
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class WrappedConverterCodecTests : FieldCodecTester<WrapsMyForeignLibraryType, IFieldCodec<WrapsMyForeignLibraryType>>
 {
     public WrappedConverterCodecTests(ITestOutputHelper output) : base(output)
@@ -52,6 +61,9 @@ public class WrappedConverterCodecTests : FieldCodecTester<WrapsMyForeignLibrary
     protected override WrapsMyForeignLibraryType[] TestValues => new WrapsMyForeignLibraryType[] { default, CreateValue() };
 }
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class WrappedConverterCopierTests : CopierTester<WrapsMyForeignLibraryType, IDeepCopier<WrapsMyForeignLibraryType>>
 {
     public WrappedConverterCopierTests(ITestOutputHelper output) : base(output)
@@ -74,6 +86,9 @@ public class StructConverterCodecTests : ValueTypeFieldCodecTester<MyForeignLibr
     protected override MyForeignLibraryValueType[] TestValues => new MyForeignLibraryValueType[] { default, CreateValue() };
 }
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class StructConverterCopierTests : CopierTester<MyForeignLibraryValueType, IDeepCopier<MyForeignLibraryValueType>>
 {
     public StructConverterCopierTests(ITestOutputHelper output) : base(output)
@@ -96,6 +111,9 @@ public class WrappedStructConverterCodecTests : ValueTypeFieldCodecTester<WrapsM
     protected override WrapsMyForeignLibraryValueType[] TestValues => new WrapsMyForeignLibraryValueType[] { default, CreateValue() };
 }
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class WrappedStructConverterCopierTests : CopierTester<WrapsMyForeignLibraryValueType, IDeepCopier<WrapsMyForeignLibraryValueType>>
 {
     public WrappedStructConverterCopierTests(ITestOutputHelper output) : base(output)
@@ -107,6 +125,9 @@ public class WrappedStructConverterCopierTests : CopierTester<WrapsMyForeignLibr
     protected override WrapsMyForeignLibraryValueType[] TestValues => new WrapsMyForeignLibraryValueType[] { default, CreateValue() };
 }
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class DerivedConverterCodecTests : FieldCodecTester<DerivedFromMyForeignLibraryType, IFieldCodec<DerivedFromMyForeignLibraryType>>
 {
     public DerivedConverterCodecTests(ITestOutputHelper output) : base(output)
@@ -118,6 +139,9 @@ public class DerivedConverterCodecTests : FieldCodecTester<DerivedFromMyForeignL
     protected override DerivedFromMyForeignLibraryType[] TestValues => new DerivedFromMyForeignLibraryType[] { null, CreateValue() };
 }
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class DerivedConverterCopierTests : CopierTester<DerivedFromMyForeignLibraryType, IDeepCopier<DerivedFromMyForeignLibraryType>>
 {
     public DerivedConverterCopierTests(ITestOutputHelper output) : base(output)
@@ -130,6 +154,9 @@ public class DerivedConverterCopierTests : CopierTester<DerivedFromMyForeignLibr
 }
 
 
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class CombinedConverterCopierTests : CopierTester<MyFirstForeignLibraryType, IDeepCopier<MyFirstForeignLibraryType>>
 {
     public CombinedConverterCopierTests(ITestOutputHelper output) : base(output)

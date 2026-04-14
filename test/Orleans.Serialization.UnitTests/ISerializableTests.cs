@@ -35,6 +35,9 @@ namespace Orleans.Serialization.UnitTests
     /// for better performance and version tolerance.
     /// </summary>
     [Trait("Category", "BVT"), Trait("Category", "ISerializable")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public class ISerializableTests
     {
         private readonly IServiceProvider _serviceProvider;

@@ -20,6 +20,9 @@ namespace NonSilo.Tests.Directory
     /// Tests for grain directory resolver functionality including custom directory resolution and directory listing.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Directory")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("GrainDirectory")]
     public class GrainDirectoryResolverTests
     {
         private readonly IGrainDirectory azureDirectory = Substitute.For<IGrainDirectory>();

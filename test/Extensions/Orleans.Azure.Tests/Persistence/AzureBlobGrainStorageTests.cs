@@ -20,6 +20,9 @@ using Xunit;
 namespace Tester.AzureUtils.Persistence;
 
 [TestCategory("Persistence"), TestCategory("AzureStorage")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public sealed class AzureBlobGrainStorageTests : AzureStorageBasicTests, IAsyncDisposable
 {
     private const string GrainType = "test-grain";

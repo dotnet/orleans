@@ -12,6 +12,7 @@ namespace DefaultCluster.Tests.General
     /// while maintaining a single grain instance.
     /// </summary>
     //using ValueUpdateEventArgs = MultifacetGrainClient.ValueUpdateEventArgs;
+    [TestArea("Runtime")]
     public class MultifacetGrainTest : HostedTestClusterEnsureDefaultStarted
     {
         private IMultifacetWriter writer;
@@ -31,6 +32,8 @@ namespace DefaultCluster.Tests.General
         /// can be accessed through either interface using AsReference<T>(),
         /// and that both references operate on the same underlying grain state.
         /// </summary>
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Cast")]
         public async Task RWReferences()
         {
@@ -49,6 +52,8 @@ namespace DefaultCluster.Tests.General
         /// it doesn't implement results in an InvalidCastException,
         /// ensuring type safety in the multifacet pattern.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public void RWReferencesInvalidCastException()
         {
@@ -65,6 +70,8 @@ namespace DefaultCluster.Tests.General
         /// to different interfaces of the same grain, enabling patterns
         /// where grain creation logic returns appropriate interfaces to callers.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task MultifacetFactory()
         {
@@ -84,6 +91,8 @@ namespace DefaultCluster.Tests.General
         /// to and stored by other grains, and that these references remain
         /// valid and operate on the same underlying grain instance.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Cast")]
         public async Task Multifacet_InterfacesAsArguments()
         {

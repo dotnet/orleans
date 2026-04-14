@@ -9,6 +9,9 @@ namespace UnitTests.SiloMetadataTests;
 /// <summary>
 /// Tests for silo metadata configuration, retrieval, and synchronization across cluster.
 /// </summary>
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 [TestCategory("SiloMetadata")]
 public class SiloMetadataTests(SiloMetadataTests.Fixture fixture) : IClassFixture<SiloMetadataTests.Fixture>
 {

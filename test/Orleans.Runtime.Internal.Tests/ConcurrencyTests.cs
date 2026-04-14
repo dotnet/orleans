@@ -19,6 +19,9 @@ namespace UnitTests.ConcurrencyTests
     /// - Reducing latency when multiple clients read the same data
     /// - Maintaining grain state consistency
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ConcurrencyTests : OrleansTestingBase, IClassFixture<ConcurrencyTests.Fixture>
     {
         private readonly Fixture fixture;

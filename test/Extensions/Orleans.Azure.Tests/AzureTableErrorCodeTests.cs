@@ -8,6 +8,9 @@ namespace Tester.AzureUtils
     /// Tests for Azure Storage error code handling and validation of table/container names.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Storage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Persistence")]
     public class AzureTableErrorCodeTests
     {
 

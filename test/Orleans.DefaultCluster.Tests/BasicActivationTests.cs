@@ -17,6 +17,7 @@ namespace DefaultCluster.Tests.General
     /// - Request context propagation
     /// Orleans uses an activation model where grains are activated on-demand and can be deactivated when idle.
     /// </summary>
+    [TestArea("Runtime")]
     public class BasicActivationTests : HostedTestClusterEnsureDefaultStarted
     {
         public BasicActivationTests(DefaultClusterFixture fixture) : base(fixture)
@@ -34,6 +35,8 @@ namespace DefaultCluster.Tests.General
         /// - Multiple grain references to the same identity share the same activation
         /// This demonstrates Orleans' virtual actor model where grains exist logically even when not activated.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_ActivateAndUpdate()
         {
@@ -60,6 +63,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that the grain system properly handles Guid-based grain identities.
         /// GUIDs are commonly used for grain keys when natural numeric identifiers don't exist.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_Guid_ActivateAndUpdate()
         {
@@ -87,6 +92,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that grains can enforce constraints during activation (e.g., rejecting certain key values).
         /// This demonstrates Orleans' ability to fail fast when grain invariants are violated.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
         public async Task BasicActivation_Fail()
         {
@@ -112,6 +119,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that Orleans properly handles burst failures without resource leaks or deadlocks.
         /// All concurrent requests should receive the same activation failure.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("ErrorHandling"), TestCategory("GetGrain")]
         public async Task BasicActivation_BurstFail()
         {
@@ -146,6 +155,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies proper handling of edge cases in numeric grain keys.
         /// This ensures the grain system correctly handles the full range of long values.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_ULong_MaxValue()
         {
@@ -172,6 +183,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies proper handling of zero as a grain key.
         /// Zero is a valid grain key and should work like any other numeric identifier.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_ULong_MinValue()
         {
@@ -199,6 +212,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies proper handling of large positive grain keys.
         /// This ensures no overflow or precision issues with large numeric identifiers.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_Long_MaxValue()
         {
@@ -225,6 +240,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies proper handling of the most negative possible grain key.
         /// This ensures the grain system handles the full range of signed long values.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate"), TestCategory("GetGrain")]
         public async Task BasicActivation_Long_MinValue()
         {
@@ -251,6 +268,8 @@ namespace DefaultCluster.Tests.General
         /// Verifies that grains can return references to other grains through various collection types.
         /// This demonstrates Orleans' support for complex grain interface hierarchies.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("ActivateDeactivate")]
         public async Task BasicActivation_MultipleGrainInterfaces()
         {
@@ -272,6 +291,8 @@ namespace DefaultCluster.Tests.General
         /// - The system properly cleans up expired messages
         /// This tests Orleans' resilience to transient failures and timeout conditions.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("ActivateDeactivate"),
          TestCategory("Reentrancy")]
         public async Task BasicActivation_Reentrant_RecoveryAfterExpiredMessage()
@@ -325,6 +346,8 @@ namespace DefaultCluster.Tests.General
         /// from the client through to grain method executions.
         /// Request context is essential for distributed tracing and multi-tenancy scenarios.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("RequestContext"), TestCategory("GetGrain")]
         public async Task BasicActivation_TestRequestContext()
         {

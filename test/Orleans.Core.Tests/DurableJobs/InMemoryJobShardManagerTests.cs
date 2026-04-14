@@ -12,6 +12,9 @@ using Xunit;
 namespace NonSilo.Tests.DurableJobs;
 
 [TestCategory("DurableJobs")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableJobs")]
 public class InMemoryJobShardManagerTests : IAsyncLifetime
 {
     private static readonly SiloAddress Silo1 = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 5001), 1);

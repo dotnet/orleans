@@ -9,6 +9,9 @@ namespace NonSilo.Tests.Membership
     /// Tests for membership table snapshot functionality including silo status retrieval and IAmAliveTime preservation.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MembershipTableSnapshotTests
     {
         [Fact]

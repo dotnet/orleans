@@ -11,6 +11,9 @@ using UnitTests.Streaming;
 namespace NATS.Tests;
 
 [TestCategory("NATS")]
+[TestSuite("Functional")]
+[TestProvider("NATS")]
+[TestArea("Streaming")]
 public class NatsStreamTests : TestClusterPerTest
 {
     private const string NatsStreamProviderName = "NatsProvider-Test";

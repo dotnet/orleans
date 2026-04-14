@@ -13,6 +13,9 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AQSubscriptionObserverWithImplicitSubscribingTests : SubscriptionObserverWithImplicitSubscribingTestRunner, IClassFixture<AQSubscriptionObserverWithImplicitSubscribingTests.Fixture>
     {
         private const int queueCount = 8;

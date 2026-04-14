@@ -7,6 +7,9 @@ using Orleans.Transactions.Abstractions;
 namespace Orleans.Transactions.Tests
 {
     [TestCategory("BVT"), TestCategory("Transactions")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Transactions")]
     public class TransactionOverloadDetectorTests
     {
         private readonly ITestOutputHelper output;

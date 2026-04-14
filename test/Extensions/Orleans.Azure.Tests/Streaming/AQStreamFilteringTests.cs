@@ -15,6 +15,9 @@ namespace Tester.AzureUtils.Streaming
     /// Tests for stream filtering functionality with Azure Queue streaming providers.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("AzureQueue")]
+    [TestSuite("BVT")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AQStreamFilteringTests : StreamFilteringTestsBase, IClassFixture<AQStreamFilteringTests.Fixture>, IAsyncLifetime
     {
         private const int queueCount = 1;

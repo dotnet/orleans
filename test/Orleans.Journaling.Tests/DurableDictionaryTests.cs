@@ -12,6 +12,9 @@ namespace Orleans.Journaling.Tests;
 /// durable log. This ensures that the dictionary state can be recovered after failures.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Journaling")]
 public class DurableDictionaryTests : StateMachineTestBase
 {
     /// <summary>

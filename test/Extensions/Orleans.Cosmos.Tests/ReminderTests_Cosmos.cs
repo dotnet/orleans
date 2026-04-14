@@ -12,6 +12,9 @@ namespace Tester.Cosmos.Reminders;
 /// Tests for Orleans reminders functionality using Azure Cosmos DB as the reminder service backing store.
 /// </summary>
 [TestCategory("Reminders"), TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Reminders")]
 public class ReminderTests_Cosmos : ReminderTests_Base, IClassFixture<ReminderTests_Cosmos.Fixture>
 {
     public class Fixture : BaseTestClusterFixture

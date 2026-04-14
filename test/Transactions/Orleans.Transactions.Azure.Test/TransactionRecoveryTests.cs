@@ -14,6 +14,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     /// Tests for transaction recovery after silo failures with Azure Storage clustering.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class TransactionRecoveryTests : TestClusterPerTest
     {
         private TransactionRecoveryTestsRunnerxUnit testRunner;

@@ -20,6 +20,9 @@ namespace AWSUtils.Tests.Liveness
     /// maintains consistency and recovers properly.
     /// </summary>
     [TestCategory("Membership"), TestCategory("AWS"), TestCategory("DynamoDb")]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Membership")]
     public class LivenessTests_DynamoDB : LivenessTestsBase
     {
         public LivenessTests_DynamoDB(ITestOutputHelper output) : base(output)

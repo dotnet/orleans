@@ -7,6 +7,9 @@ using Xunit;
 namespace NonSilo.Tests.ScheduledJobs;
 
 [TestCategory("DurableJobs")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("DurableJobs")]
 public class DurableJobReceiverExtensionTests
 {
     [Fact]

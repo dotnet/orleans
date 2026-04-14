@@ -18,6 +18,9 @@ namespace Tester.Redis.Persistence
     /// </summary>
     [TestCategory("Redis"), TestCategory("Persistence")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("Redis")]
+    [TestArea("Persistence")]
     public class RedisPersistenceGrainTests : GrainPersistenceTestsRunner, IClassFixture<RedisPersistenceGrainTests.Fixture>
     {
         public static readonly string ServiceId = Guid.NewGuid().ToString("N");

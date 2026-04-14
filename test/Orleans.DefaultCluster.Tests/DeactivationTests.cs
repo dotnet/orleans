@@ -15,6 +15,9 @@ namespace DefaultCluster.Tests.General
     /// - State is preserved across deactivation/reactivation cycles
     /// These tests verify the performance and correctness of this mechanism.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class DeactivationTests : HostedTestClusterEnsureDefaultStarted
     {
         public DeactivationTests(DefaultClusterFixture fixture) : base(fixture)

@@ -13,6 +13,9 @@ using Orleans.Dashboard.Core;
 
 namespace UnitTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Dashboard")]
     public class GrainStateTests : IDisposable
     {
         private readonly TestCluster _cluster;

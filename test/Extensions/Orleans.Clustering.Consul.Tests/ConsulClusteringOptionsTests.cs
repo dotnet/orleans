@@ -3,6 +3,9 @@ using Xunit;
 
 namespace Consul.Tests
 {
+    [TestSuite("BVT")]
+    [TestProvider("Consul")]
+    [TestArea("Clustering")]
     public class ConsulClusteringOptionsTests
     {
         [Fact, TestCategory("BVT"), TestCategory("Consul")]

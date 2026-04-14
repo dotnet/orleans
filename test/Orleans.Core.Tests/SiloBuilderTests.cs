@@ -67,6 +67,9 @@ namespace NonSilo.Tests
     /// </summary>
     [TestCategory("BVT")]
     [TestCategory("Hosting")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class SiloBuilderTests
     {
         /// <summary>

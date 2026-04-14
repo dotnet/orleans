@@ -29,6 +29,9 @@ namespace Orleans.Serialization.UnitTests
     /// - Graceful handling of unknown fields during deserialization
     /// - Support for schema evolution patterns
     /// </summary>
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public class ManualVersionToleranceTests
     {
         private const string TestString = "hello, Orleans.Serialization";

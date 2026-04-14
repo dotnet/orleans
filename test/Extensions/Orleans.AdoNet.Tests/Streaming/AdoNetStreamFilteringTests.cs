@@ -12,6 +12,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Tests for SQL Server ADO.NET stream filtering functionality.
 /// </summary>
+[TestProvider("SqlServer")]
 public class SqlServerAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNameSqlServer))
 {
 }
@@ -19,6 +20,7 @@ public class SqlServerAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(
 /// <summary>
 /// Tests for MySQL ADO.NET stream filtering functionality.
 /// </summary>
+[TestProvider("MySql")]
 public class MySqlAdoNetStreamFilteringTests : AdoNetStreamFilteringTests
 {
     public MySqlAdoNetStreamFilteringTests() : base(new Fixture(AdoNetInvariants.InvariantNameMySql))
@@ -30,6 +32,7 @@ public class MySqlAdoNetStreamFilteringTests : AdoNetStreamFilteringTests
 /// <summary>
 /// Tests for PostgreSQL ADO.NET stream filtering functionality.
 /// </summary>
+[TestProvider("PostgreSql")]
 public class PostgreSqlAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests(new Fixture(AdoNetInvariants.InvariantNamePostgreSql))
 {
 }
@@ -38,6 +41,8 @@ public class PostgreSqlAdoNetStreamFilteringTests() : AdoNetStreamFilteringTests
 /// Base class for ADO.NET stream filtering tests.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("BVT")]
+[TestArea("Streaming")]
 public abstract class AdoNetStreamFilteringTests : StreamFilteringTestsBase, IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansStreamTest";

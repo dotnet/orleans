@@ -42,6 +42,9 @@ namespace Tester
     /// <summary>
     /// Tests for gateway connection handling including reconnection behavior and cluster mismatch scenarios.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GatewayConnectionTests : TestClusterPerTest
     {
         private OutsideRuntimeClient runtimeClient;

@@ -9,6 +9,9 @@ namespace Orleans.Transactions.Tests
     /// Tests for behavior when transactions are disabled.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Transactions")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Transactions")]
     public class DisabledTransactionsTests : DisabledTransactionsTestRunnerxUnit, IClassFixture<DefaultClusterFixture>
     {
         public DisabledTransactionsTests(DefaultClusterFixture fixture, ITestOutputHelper output)

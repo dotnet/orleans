@@ -15,6 +15,9 @@ namespace UnitTests.MembershipTests
     /// Tests for Orleans membership table operations using PostgreSQL as the storage backend.
     /// </summary>
     [TestCategory("Membership"), TestCategory("PostgreSql"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Membership")]
     public class PostgreSqlMembershipTableTests : MembershipTableTestsBase
     {
         public PostgreSqlMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

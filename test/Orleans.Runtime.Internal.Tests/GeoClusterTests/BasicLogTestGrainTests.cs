@@ -15,6 +15,9 @@ namespace Tests.GeoClusterTests
     /// Tests for log-based consistency providers with different storage configurations.
     /// </summary>
     [TestCategory("GeoCluster"), TestCategory("Functional")]
+    [TestSuite("Nightly")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Runtime")]
     public class BasicLogTestGrainTests : IClassFixture<BasicLogTestGrainTests.Fixture>
     {
         private readonly Fixture fixture;

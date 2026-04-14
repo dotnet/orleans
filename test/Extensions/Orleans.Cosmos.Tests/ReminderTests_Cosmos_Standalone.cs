@@ -15,6 +15,9 @@ namespace Tester.Cosmos.Reminders;
 /// </summary>
 [Collection(TestEnvironmentFixture.DefaultCollection)]
 [TestCategory("Cosmos")]
+[TestSuite("Functional")]
+[TestProvider("Cosmos")]
+[TestArea("Reminders")]
 public class ReminderTests_Cosmos_Standalone
 {
     private readonly ITestOutputHelper _output;

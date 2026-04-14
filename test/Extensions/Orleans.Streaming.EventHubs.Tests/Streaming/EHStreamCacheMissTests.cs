@@ -13,6 +13,9 @@ namespace ServiceBus.Tests.StreamingTests
     /// Tests for EventHub streaming cache miss scenarios with custom stream filters and cache eviction.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming"), TestCategory("Functional"), TestCategory("StreamingCacheMiss")]
+    [TestSuite("Functional")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class EHStreamCacheMissTests : StreamingCacheMissTests
     {
         private const string EHPath = "ehorleanstest";

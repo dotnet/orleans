@@ -10,6 +10,9 @@ using Xunit.Abstractions;
 
 namespace UnitTests.GrainDirectory;
 
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 [TestCategory("BVT"), TestCategory("Directory")]
 public sealed class DefaultGrainDirectoryTests(DefaultClusterFixture fixture, ITestOutputHelper output)
     : GrainDirectoryTests<IGrainDirectory>(output), IClassFixture<DefaultClusterFixture>

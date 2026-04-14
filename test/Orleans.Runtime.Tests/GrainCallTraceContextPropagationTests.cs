@@ -18,6 +18,9 @@ namespace UnitTests.General
     /// Tests specifically for verifying trace context propagation between client and grain server.
     /// These tests expose issues where the server-side span starts a new trace instead of continuing the client's trace.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [Collection("ActivationTracing")]
     public class GrainCallTraceContextPropagationTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {

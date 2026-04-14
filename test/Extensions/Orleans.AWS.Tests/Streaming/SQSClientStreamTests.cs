@@ -15,6 +15,9 @@ namespace AWSUtils.Tests.Streaming
     /// <summary>
     /// Tests SQS streaming functionality from Orleans client perspective including producer dropout scenarios.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("SQS")]
+    [TestArea("Streaming")]
     public class SQSClientStreamTests : TestClusterPerTest
     {
         private const string SQSStreamProviderName = "SQSProvider";

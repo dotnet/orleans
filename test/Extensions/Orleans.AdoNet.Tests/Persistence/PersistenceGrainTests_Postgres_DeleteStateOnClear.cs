@@ -15,6 +15,9 @@ namespace Tester.AdoNet.Persistence
     /// with the delete-state-on-clear option enabled.
     /// </summary>
     [TestCategory("Persistence"), TestCategory("PostgreSql")]
+    [TestSuite("Functional")]
+    [TestProvider("PostgreSql")]
+    [TestArea("Persistence")]
     public class PersistenceGrainTests_Postgres_DeleteStateOnClear : GrainPersistenceTestsRunner, IClassFixture<PersistenceGrainTests_Postgres_DeleteStateOnClear.Fixture>
     {
         public const string TestDatabaseName = "OrleansTest_Postgres_Storage";

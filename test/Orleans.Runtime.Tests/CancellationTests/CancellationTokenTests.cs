@@ -10,6 +10,9 @@ namespace UnitTests.CancellationTests;
 /// <summary>
 /// Tests for CancellationToken functionality with acknowledgement waiting enabled.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public sealed class CancellationTokenTests_WaitForAcknowledgement(CancellationTokenTests_WaitForAcknowledgement.Fixture fixture) : CancellationTokenTests(fixture), IClassFixture<CancellationTokenTests_WaitForAcknowledgement.Fixture>
 {
     public sealed class Fixture : FixtureBase
@@ -22,6 +25,9 @@ public sealed class CancellationTokenTests_WaitForAcknowledgement(CancellationTo
 /// <summary>
 /// Tests for CancellationToken functionality with acknowledgement waiting disabled.
 /// </summary>
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public sealed class CancellationTokenTests_NoWaitForAcknowledgement(CancellationTokenTests_NoWaitForAcknowledgement.Fixture fixture) : CancellationTokenTests(fixture), IClassFixture<CancellationTokenTests_NoWaitForAcknowledgement.Fixture>
 {
     public sealed class Fixture : FixtureBase

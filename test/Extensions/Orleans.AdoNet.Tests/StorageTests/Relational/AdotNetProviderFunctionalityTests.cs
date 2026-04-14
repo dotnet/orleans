@@ -9,6 +9,9 @@ namespace UnitTests.StorageTests.Relational
     /// <summary>
     /// Tests for various helper classes.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Persistence")]
     public class AdotNetProviderFunctionalityTests
     {
         [TestCategory("Functional"), TestCategory("Persistence")]

@@ -10,6 +10,9 @@ using Xunit;
 namespace UnitTests.Runtime
 {
     [TestCategory("BVT"), TestCategory("Placement")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Placement")]
     public class ActivationCountPlacementDirectorTests
     {
         [Fact]

@@ -13,6 +13,9 @@ namespace UnitTests.MembershipTests
     /// <summary>
     /// Tests handling of ungraceful silo shutdowns and their impact on outstanding grain requests.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class SilosStopTests : TestClusterPerTest
     {
         private class BuilderConfigurator : ISiloConfigurator, IClientBuilderConfigurator

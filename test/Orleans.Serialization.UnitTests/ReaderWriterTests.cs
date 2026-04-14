@@ -35,6 +35,9 @@ namespace Orleans.Serialization.UnitTests
     /// and directly impact the performance of grain communication.
     /// </summary>
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public sealed class ReaderWriterPoolingStreamTest : ReaderWriterTestBase<Stream, PoolingStreamBufferWriter, ReaderInput>
     {
         public ReaderWriterPoolingStreamTest(ITestOutputHelper output) : base(output)
@@ -79,6 +82,9 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public sealed class ReaderWriterStreamTest : ReaderWriterTestBase<Stream, ArrayStreamBufferWriter, ReaderInput>
     {
         public ReaderWriterStreamTest(ITestOutputHelper output) : base(output)
@@ -119,6 +125,9 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public sealed class ReaderWriterMemoryStreamTest : ReaderWriterTestBase<MemoryStream, MemoryStreamBufferWriter, ReaderInput>
     {
         public ReaderWriterMemoryStreamTest(ITestOutputHelper output) : base(output)
@@ -159,6 +168,9 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public sealed class ReaderWriterSpanTest : ReaderWriterTestBase<byte[], SpanBufferWriter, SpanReaderInput>
     {
         public ReaderWriterSpanTest(ITestOutputHelper output) : base(output)
@@ -196,6 +208,9 @@ namespace Orleans.Serialization.UnitTests
     }
 
     [Trait("Category", "BVT")]
+    [Trait("Suite", "BVT")]
+    [Trait("Provider", "None")]
+    [Trait("Area", "Serialization")]
     public sealed class ReaderWriterSegmentWriterTest : ReaderWriterTestBase<TestMultiSegmentBufferWriter, TestMultiSegmentBufferWriter, ReadOnlySequenceInput>
     {
         public ReaderWriterSegmentWriterTest(ITestOutputHelper output) : base(output)

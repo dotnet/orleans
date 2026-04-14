@@ -30,6 +30,9 @@ namespace UnitTests
     /// These tests verify Orleans can recover from poison directory entries
     /// and maintain the single activation constraint.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainLocatorActivationResiliencyTests : HostedTestClusterEnsureDefaultStarted
     {
         public GrainLocatorActivationResiliencyTests(DefaultClusterFixture fixture) : base(fixture)

@@ -15,6 +15,9 @@ namespace Tester.AzureUtils.TimerTests
     /// Tests for Azure Table Storage-based reminder service, including basic operations, failover, and multi-grain scenarios.
     /// </summary>
     [TestCategory("Reminders"), TestCategory("AzureStorage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Reminders")]
     public class ReminderTests_AzureTable : ReminderTests_Base, IClassFixture<ReminderTests_AzureTable.Fixture>
     {
         public class Fixture : BaseAzureTestClusterFixture

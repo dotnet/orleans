@@ -21,6 +21,9 @@ namespace UnitTests.General
     /// The ActivityPropagationGrainCallFilter is responsible for creating child activities for grain calls
     /// and ensuring proper context propagation throughout the distributed system.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ActivityPropagationTests : OrleansTestingBase, IClassFixture<ActivityPropagationTests.Fixture>
     {
         private static readonly ActivityListener Listener;

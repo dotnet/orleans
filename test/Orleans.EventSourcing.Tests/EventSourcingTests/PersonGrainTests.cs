@@ -1,4 +1,4 @@
-﻿using TestGrainInterfaces;
+using TestGrainInterfaces;
 using Xunit;
 using Assert = Xunit.Assert;
 
@@ -7,6 +7,9 @@ namespace Tester.EventSourcingTests
     /// <summary>
     /// Tests for journaled person grain functionality including birth registration, marriage events, and state transitions.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("EventSourcing")]
     public class PersonGrainTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;

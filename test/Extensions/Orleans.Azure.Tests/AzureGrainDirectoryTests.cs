@@ -13,6 +13,9 @@ namespace Tester.AzureUtils
     /// Tests for Azure Table-based grain directory functionality, including registration, lookup, and unregistration operations.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Directory")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Membership")]
     public class AzureTableGrainDirectoryTests(ITestOutputHelper testOutput) : GrainDirectoryTests<AzureTableGrainDirectory>(testOutput)
     {
         protected override AzureTableGrainDirectory CreateGrainDirectory()

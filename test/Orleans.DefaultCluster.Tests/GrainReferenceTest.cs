@@ -22,6 +22,9 @@ namespace DefaultCluster.Tests.General
     /// and proper hash code generation for distributed systems.
     /// </summary>
     [TestCategory("BVT"), TestCategory("GrainReference")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GrainReferenceTest : HostedTestClusterEnsureDefaultStarted
     {
         public GrainReferenceTest(DefaultClusterFixture fixture) : base(fixture)

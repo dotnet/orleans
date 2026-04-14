@@ -8,6 +8,9 @@ using Xunit;
 
 namespace UnitTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Dashboard")]
     public class EmbeddedAssetTests
     {
         private static readonly Assembly DashboardAssembly = typeof(DashboardOptions).Assembly;

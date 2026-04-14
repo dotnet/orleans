@@ -30,6 +30,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Needing better performance than JSON but more portability than Orleans' native format
 /// </summary>
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class MemoryPackCodecTests : FieldCodecTester<MyMemoryPackClass?, IFieldCodec<MyMemoryPackClass?>>
 {
     public MemoryPackCodecTests(ITestOutputHelper output) : base(output)
@@ -101,6 +104,9 @@ public class MemoryPackCodecTests : FieldCodecTester<MyMemoryPackClass?, IFieldC
 
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class MemoryPackUnionCodecTests : FieldCodecTester<IMyMemoryPackUnion?, IFieldCodec<IMyMemoryPackUnion?>>
 {
     public MemoryPackUnionCodecTests(ITestOutputHelper output) : base(output)
@@ -124,6 +130,9 @@ public class MemoryPackUnionCodecTests : FieldCodecTester<IMyMemoryPackUnion?, I
 
 
 [Trait("Category", "BVT")]
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class MemoryPackCodecCopierTests : CopierTester<MyMemoryPackClass?, IDeepCopier<MyMemoryPackClass?>>
 {
     public MemoryPackCodecCopierTests(ITestOutputHelper output) : base(output)

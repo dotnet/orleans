@@ -17,6 +17,7 @@ namespace UnitTests.ActivationsLifeCycleTests
     /// Tests for grain deactivation on idle behavior and related stress scenarios.
     /// </summary>
     [TestCategory("ActivationCollector")]
+    [TestArea("Runtime")]
     public class DeactivateOnIdleTests : OrleansTestingBase, IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -51,6 +52,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTestInside_Basic()
         {
@@ -66,6 +70,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.True(age.TotalMilliseconds < 2000, "Should be newly activated grain");
         }
 
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("SlowBVT")]
         public async Task DeactivateOnIdleTest_Stress_1()
         {
@@ -80,6 +87,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_2_NonReentrant()
         {
@@ -102,6 +112,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(t1, t2);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_3_Reentrant()
         {
@@ -124,6 +137,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(t1, t2);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_4_Timer()
         {
@@ -137,6 +153,9 @@ namespace UnitTests.ActivationsLifeCycleTests
             await a.IncrCounter();
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdleTest_Stress_5()
         {
@@ -166,6 +185,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(t1, t2);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Stress")]
         public async Task DeactivateOnIdleTest_Stress_11()
         {
@@ -179,12 +200,18 @@ namespace UnitTests.ActivationsLifeCycleTests
             await Task.WhenAll(tasks);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdle_NonExistentActivation_1()
         {
             await DeactivateOnIdle_NonExistentActivation_Runner(0);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
+        [TestArea("Runtime")]
         [Fact, TestCategory("Functional")]
         public async Task DeactivateOnIdle_NonExistentActivation_2()
         {

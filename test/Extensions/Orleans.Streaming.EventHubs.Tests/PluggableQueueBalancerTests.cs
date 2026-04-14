@@ -12,6 +12,9 @@ namespace ServiceBus.Tests
     /// Tests for pluggable queue balancer functionality with EventHub streaming provider.
     /// </summary>
     [TestCategory("EventHub"), TestCategory("Streaming")]
+    [TestSuite("BVT")]
+    [TestProvider("EventHub")]
+    [TestArea("Streaming")]
     public class PluggableQueueBalancerTestsWithEHStreamProvider : PluggableQueueBalancerTestBase, IClassFixture<PluggableQueueBalancerTestsWithEHStreamProvider.Fixture>
     {
         private const string StreamProviderName = "EventHubStreamProvider";

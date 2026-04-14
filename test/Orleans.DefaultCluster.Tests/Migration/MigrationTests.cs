@@ -10,6 +10,9 @@ using Xunit;
 
 namespace DefaultCluster.Tests.General
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MigrationTests : HostedTestClusterEnsureDefaultStarted
     {
         public MigrationTests(DefaultClusterFixture fixture) : base(fixture)

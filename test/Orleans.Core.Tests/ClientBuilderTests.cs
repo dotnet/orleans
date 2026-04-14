@@ -37,6 +37,9 @@ namespace NonSilo.Tests
     /// </summary>
     [TestCategory("BVT")]
     [TestCategory("ClientBuilder")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ClientBuilderTests
     {
         /// <summary>

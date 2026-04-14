@@ -14,6 +14,9 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("Streaming")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class DelayedQueueRebalancingTests : TestClusterPerTest
     {
         private const string adapterName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;

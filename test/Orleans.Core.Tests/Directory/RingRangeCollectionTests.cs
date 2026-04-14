@@ -9,6 +9,9 @@ namespace NonSilo.Tests.Directory;
 /// Tests for ring range collection operations including containment, intersection, and difference calculations.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 public sealed class RingRangeCollectionTests
 {
     private static readonly Gen<RingRangeCollection> GenRingRangeCollection = Gen.Int[0, 100].SelectMany(count => Gen.Select(Gen.UInt, Gen.Bool, static (boundary, included) => (boundary, included)).Array[count].Select(elements =>

@@ -12,6 +12,7 @@ namespace UnitTDefaultCluster.Tests.General
     /// parameters. This is Orleans' equivalent of thread-local storage or async-local
     /// storage, but designed for distributed calls across grains and silos.
     /// </summary>
+    [TestArea("Runtime")]
     public class RequestContextTests : HostedTestClusterEnsureDefaultStarted
     {
         public RequestContextTests(DefaultClusterFixture fixture) : base(fixture)
@@ -25,6 +26,8 @@ namespace UnitTDefaultCluster.Tests.General
         /// the automatic propagation of ambient context across grain boundaries.
         /// This is useful for correlation IDs, authentication tokens, etc.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("RequestContext")]
         public async Task RequestContextCallerToCalleeFlow()
         {
@@ -46,6 +49,8 @@ namespace UnitTDefaultCluster.Tests.General
         /// NOTE: This test is currently skipped as the feature may not be fully supported.
         /// Request context typically flows one-way (caller to callee) for isolation.
         /// </summary>
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact(Skip = "Was failing before (just masked as a Pass), needs fixing or removing"), TestCategory("RequestContext"), TestCategory("Functional")]
         public async Task RequestContextCalleeToCallerFlow()
         {

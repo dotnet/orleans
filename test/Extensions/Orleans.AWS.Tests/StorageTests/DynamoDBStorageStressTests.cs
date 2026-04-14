@@ -12,6 +12,9 @@ namespace AWSUtils.Tests.StorageTests
     /// Stress tests for DynamoDB storage to verify performance under high-volume read/write operations.
     /// </summary>
     [TestCategory("Storage"), TestCategory("AWS"), TestCategory("DynamoDb"), TestCategory("Stress")]
+    [TestSuite("Functional")]
+    [TestProvider("DynamoDB")]
+    [TestArea("Persistence")]
     public class DynamoDBStorageStressTests : IClassFixture<DynamoDBStorageTestsFixture>
     {
         private readonly ITestOutputHelper output;

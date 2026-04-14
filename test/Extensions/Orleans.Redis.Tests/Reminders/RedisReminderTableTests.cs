@@ -15,6 +15,9 @@ namespace Tester.Redis.Reminders
     /// </summary>
     [TestCategory("Redis"), TestCategory("Reminders"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("Redis")]
+    [TestArea("Reminders")]
     public class RedisRemindersTableTests : ReminderTableTestsBase
     {
         public RedisRemindersTableTests(ConnectionStringFixture fixture, CommonFixture clusterFixture) : base (fixture, clusterFixture, CreateFilters())

@@ -17,6 +17,9 @@ namespace UnitTests.StreamingTests
     /// <summary>
     /// Tests for the controllable stream generator provider functionality, validating stream generation behavior and control commands.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ControllableStreamGeneratorProviderTests : OrleansTestingBase, IClassFixture<ControllableStreamGeneratorProviderTests.Fixture>
     {
         private const int TotalQueueCount = 4;

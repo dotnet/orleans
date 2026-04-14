@@ -5,6 +5,9 @@ using Xunit;
 namespace Orleans.Transactions.Tests
 {
     [TestCategory("BVT"), TestCategory("Transactions")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Transactions")]
     public class TocGoldenPathTransactionMemoryTests : TocGoldenPathTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
     {
         public TocGoldenPathTransactionMemoryTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)

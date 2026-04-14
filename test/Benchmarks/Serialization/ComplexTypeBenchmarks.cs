@@ -19,6 +19,9 @@ namespace Benchmarks.Serialization;
 /// Benchmarks Orleans serialization performance for complex object graphs with circular references.
 /// </summary>
 [Trait("Category", "Benchmark")]
+[TestSuite("Benchmark")]
+[TestProvider("None")]
+[TestArea("Serialization")]
 [Config(typeof(BenchmarkConfig))]
 [MemoryDiagnoser]
 public class ComplexTypeBenchmarks

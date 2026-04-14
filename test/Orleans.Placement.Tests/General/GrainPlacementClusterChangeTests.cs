@@ -1,4 +1,4 @@
-﻿using System.Net;
+using System.Net;
 using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
@@ -10,6 +10,9 @@ namespace UnitTests.General
     /// <summary>
     /// Tests for grain placement behavior when cluster topology changes.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Placement")]
     public sealed class GrainPlacementClusterChangeTests(ITestOutputHelper output) : TestClusterPerTest
     {
         [Theory]

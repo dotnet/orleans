@@ -9,6 +9,9 @@ namespace UnitTests.OrleansRuntime
     /// <summary>
     /// Tests for async serial executor functionality including sequential task execution and concurrency validation.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class AsyncSerialExecutorTests
     {
         public ITestOutputHelper output;

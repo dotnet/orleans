@@ -13,7 +13,8 @@ namespace UnitTests.General
     /// <summary>
     /// Tests for various Orleans identifier types including GrainId, UniqueKey, SiloAddress, and related functionality.
     /// </summary>
-    [Collection(TestEnvironmentFixture.DefaultCollection)]
+        [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestArea("Runtime")]
     public class IdentifierTests
     {
         private readonly ITestOutputHelper output;
@@ -23,7 +24,7 @@ namespace UnitTests.General
         private class A { }
 
         private class B : A { }
-        
+
         public IdentifierTests(ITestOutputHelper output, TestEnvironmentFixture fixture)
         {
             this.output = output;
@@ -41,6 +42,8 @@ namespace UnitTests.General
             Assert.Equal(831806783u, hashCode);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsNullKeyExtension()
         {
@@ -48,6 +51,8 @@ namespace UnitTests.General
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: null));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsEmptyKeyExtension()
         {
@@ -55,6 +60,8 @@ namespace UnitTests.General
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: ""));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeyKeyExtGrainCategoryDisallowsWhiteSpaceKeyExtension()
         {
@@ -62,6 +69,8 @@ namespace UnitTests.General
             UniqueKey.NewKey(Guid.NewGuid(), category: UniqueKey.Category.KeyExtGrain, keyExt: " \t\n\r"));
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ParsingUniqueKeyStringificationShouldReproduceAnIdenticalObject()
         {
@@ -91,6 +100,8 @@ namespace UnitTests.General
         }
 
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void GrainIdShouldEncodeAndDecodePrimaryKeyGuidCorrectly()
         {
@@ -107,6 +118,8 @@ namespace UnitTests.General
         /// <summary>
         /// Tests GrainId serialization and deserialization through printable string representation.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
         [MemberData(nameof(TestGrainIds))]
         public void GrainId_ToFromPrintableString(GrainId grainId)
@@ -117,6 +130,8 @@ namespace UnitTests.General
             Assert.Equal(grainId, roundTripped);
         }
 
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
         [MemberData(nameof(TestGrainIds))]
         public void GrainId_TryParseFromPrintableString(GrainId grainId)
@@ -131,6 +146,8 @@ namespace UnitTests.General
         /// <summary>
         /// Tests GrainId JSON serialization and deserialization round-trip.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Theory, TestCategory("SlowBVT"), TestCategory("Identifiers")]
         [MemberData(nameof(TestGrainIds))]
         public void GrainId_RoundTripJsonConverter(GrainId grainId)
@@ -162,6 +179,8 @@ namespace UnitTests.General
             }
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueTypeCodeDataShouldStore32BitsOfInformation()
         {
@@ -172,6 +191,8 @@ namespace UnitTests.General
             Assert.Equal(expected, actual);
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeysShouldPreserveTheirPrimaryKeyValueIfItIsGuid()
         {
@@ -193,6 +214,8 @@ namespace UnitTests.General
             Assert.Equal(expectedKeyExt2, actualKeyExt2); // "UniqueKey objects should preserve the value of their key extension (Guid case #2).");
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void UniqueKeysShouldPreserveTheirPrimaryKeyValueIfItIsLong()
         {
@@ -214,6 +237,8 @@ namespace UnitTests.General
         /// <summary>
         /// Tests GrainId interning functionality to ensure identical IDs reference the same object.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ID_Interning_GrainID()
         {
@@ -228,6 +253,8 @@ namespace UnitTests.General
             Assert.Equal(gid2, gid3); // Should be equal GrainId's
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ID_Interning_string_equals()
         {
@@ -246,6 +273,8 @@ namespace UnitTests.General
             Assert.Equal(r2, r3); // 4: Should be equal
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void ID_Intern_FindOrCreate_derived_class()
         {
@@ -281,6 +310,8 @@ namespace UnitTests.General
         /// <summary>
         /// Tests SiloAddress interning to ensure identical addresses reference the same object.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void Interning_SiloAddress()
         {
@@ -298,6 +329,8 @@ namespace UnitTests.General
             Assert.Same(a2, a3); // Should be same / intern'ed SiloAddress object
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void Interning_SiloAddress2()
         {
@@ -307,6 +340,8 @@ namespace UnitTests.General
             Assert.NotSame(a1, a2); // Should not be same / intern'ed SiloAddress object
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void Interning_SiloAddress_Serialization()
         {
@@ -318,6 +353,8 @@ namespace UnitTests.General
             Assert.Same(a1, a3); // Should be same / intern'ed SiloAddress object
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers")]
         public void SiloAddress_ToFrom_ParsableString()
         {
@@ -344,6 +381,8 @@ namespace UnitTests.General
         /// <summary>
         /// Tests GrainReference creation, serialization, and round-trip operations.
         /// </summary>
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("BVT"), TestCategory("Identifiers"), TestCategory("GrainReference")]
         public void GrainReference_Test1()
         {

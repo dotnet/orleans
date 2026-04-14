@@ -8,10 +8,13 @@ namespace UnitTests.General
     /// <summary>
     /// Tests for various grain placement strategies including random, prefer local, and stateless worker placement.
     /// </summary>
+        [TestArea("Placement")]
     public class GrainPlacementTests(DefaultClusterFixture fixture) : IClassFixture<DefaultClusterFixture>
     {
         private readonly DefaultClusterFixture _fixture = fixture;
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task VerifyDefaultPlacement()
         {
@@ -19,6 +22,8 @@ namespace UnitTests.General
             Assert.IsType<ResourceOptimizedPlacement>(actual);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task RandomlyPlacedGrainShouldPlaceActivationsRandomly()
         {
@@ -62,6 +67,8 @@ namespace UnitTests.General
         //    }
         //}
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task PreferLocalPlacedGrainShouldPlaceActivationsLocally_TwoHops()
         {
@@ -116,6 +123,8 @@ namespace UnitTests.General
             return activations.Distinct().Count();
         }
 
+        [TestSuite("BVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("Placement"), TestCategory("BVT")]
         public async Task StatelessWorkerShouldCreateSpecifiedActivationCount()
         {
@@ -137,6 +146,8 @@ namespace UnitTests.General
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Placement"), TestCategory("Functional")]
         public async Task StatelessWorkerGrainShouldCreateActivationsOnLocalSilo()
         {

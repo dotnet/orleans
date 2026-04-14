@@ -11,6 +11,9 @@ namespace Tester.EventSourcingTests
     /// <summary>
     /// Integration tests for clear-log behavior on non-Azure log test grain configurations.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("EventSourcing")]
     public class LogTestGrainClearTests : IClassFixture<EventSourcingClusterFixture>
     {
         private readonly EventSourcingClusterFixture fixture;

@@ -28,6 +28,9 @@ namespace UnitTests.MessageCenterTests
     /// 
     /// These tests verify that gateway selection distributes load evenly.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class GatewaySelectionTest
     {
         protected readonly ITestOutputHelper output;

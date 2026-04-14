@@ -9,6 +9,9 @@ using Xunit.Abstractions;
 namespace NonSilo.Tests;
 
 [TestCategory("BVT"), TestCategory("Lifecycle")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class ServiceLifecycleTests
 {
     private readonly ServiceLifecycle<ISiloLifecycle> _lifecycle;

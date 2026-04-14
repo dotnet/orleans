@@ -11,6 +11,9 @@ namespace UnitTests.OrleansRuntime
     /// such as querying grain activation information, collecting statistics, and
     /// performing administrative tasks across the Orleans cluster.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ManagementGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         public ManagementGrainTests(DefaultClusterFixture fixture) : base(fixture)

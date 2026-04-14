@@ -26,6 +26,9 @@ namespace Tester.AzureUtils.DurableJobs;
 /// Provider-specific tests (e.g., batching) remain here.
 /// </summary>
 [TestCategory("DurableJobs")]
+[TestSuite("Functional")]
+[TestProvider("AzureStorage")]
+[TestArea("Persistence")]
 public class AzureStorageJobShardManagerTests : AzureStorageBasicTests, IAsyncDisposable
 {
     private readonly AzureStorageJobShardManagerTestFixture _fixture;

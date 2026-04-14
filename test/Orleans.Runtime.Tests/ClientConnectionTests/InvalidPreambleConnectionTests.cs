@@ -11,6 +11,9 @@ namespace Tester.ClientConnectionTests
     /// <summary>
     /// Tests for handling invalid connection preambles sent to gateway endpoints.
     /// </summary>
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class InvalidPreambleConnectionTests : TestClusterPerTest
     {
         protected override void ConfigureTestCluster(TestClusterBuilder builder)

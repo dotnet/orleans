@@ -11,6 +11,8 @@ using Xunit;
 
 namespace UnitTests.StreamingTests;
 
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public class SingleStreamTestRunner
 {
     public const string MEMORY_STREAM_PROVIDER_NAME = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;

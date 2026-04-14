@@ -11,6 +11,9 @@ namespace Analyzers.Tests;
 /// This analyzer helps developers avoid confusion between grain implementations and serializable data types.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class IncorrectAttributeUseAnalyzerTest : DiagnosticAnalyzerTestBase<IncorrectAttributeUseAnalyzer>
 {
     private async Task VerifyHasDiagnostic(string code)

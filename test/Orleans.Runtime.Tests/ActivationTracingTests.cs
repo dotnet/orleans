@@ -19,6 +19,9 @@ namespace UnitTests.General
     /// Failing test demonstrating missing activation tracing spans.
     /// Expects an activation Activity to be created on first grain activation.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [Collection("ActivationTracing")]
     public class ActivationTracingTests : OrleansTestingBase, IClassFixture<ActivationTracingTests.Fixture>
     {

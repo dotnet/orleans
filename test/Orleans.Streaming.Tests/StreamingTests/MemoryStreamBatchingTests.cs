@@ -12,6 +12,9 @@ namespace UnitTests.StreamingTests
     /// <summary>
     /// Tests memory stream batching functionality with configured batch container size of 10 items.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("BVT")]
     public class MemoryStreamBatchingTests : StreamBatchingTestRunner, IClassFixture<MemoryStreamBatchingTests.Fixture>
     {

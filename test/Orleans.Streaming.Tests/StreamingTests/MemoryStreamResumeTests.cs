@@ -7,6 +7,9 @@ namespace Tester.StreamingTests
     /// <summary>
     /// Tests memory stream resume functionality with configurable stream inactivity periods and cache eviction settings.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("SlowBVT"), TestCategory("Streaming"), TestCategory("StreamingResume")]
     public class MemoryStreamResumeTests : StreamingResumeTests
     {

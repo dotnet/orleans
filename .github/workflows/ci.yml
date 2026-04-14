@@ -66,7 +66,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -102,7 +102,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Clustering)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -150,7 +150,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -194,7 +194,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -240,7 +240,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -255,6 +255,39 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: test_output_${{ github.job }}_${{ matrix.framework }}
+        retention-days: 1
+        path: |
+          **/TestResults/*
+          **/logs/*
+  test-sqlite:
+    name: SQLite provider tests
+    runs-on: ubuntu-latest
+    continue-on-error: true
+    strategy:
+      matrix:
+        provider: ["Sqlite"]
+        framework: ["net8.0", "net10.0"]
+    steps:
+    - uses: actions/checkout@v4
+    - name: Setup .NET
+      uses: actions/setup-dotnet@v4
+      with:
+        global-json-file: global.json
+    - name: Test
+      run: dotnet test
+        --framework ${{ matrix.framework }}
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_${{ matrix.provider }}_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+    - name: Archive Test Results
+      if: always()
+      uses: actions/upload-artifact@v4
+      with:
+        name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -288,7 +321,7 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
@@ -308,7 +341,7 @@ jobs:
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -357,7 +390,7 @@ jobs:
         global-json-file: global.json
     - name: Test
       run: dotnet test
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional|Category=Streaming)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --framework ${{ matrix.framework }}
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
@@ -431,7 +464,7 @@ jobs:
         done
     - name: Test
       run: |
-        cosmos_filter='Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress'
+        cosmos_filter='Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)&Category!=Performance&Category!=Stress'
         # The Linux vNext emulator still misses a narrow set of ETag/version concurrency semantics.
         cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_ReadRow_Insert_Read'
         cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRow'
@@ -495,7 +528,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -533,7 +566,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -552,12 +585,12 @@ jobs:
           **/TestResults/*
           **/logs/*
   test-dynamodb:
-    name: AWS DynamoDB provider tests
+    name: AWS provider tests (${{ matrix.provider }})
     runs-on: ubuntu-latest
     continue-on-error: true
     strategy:
       matrix:
-        provider: ["DynamoDB"]
+        provider: ["DynamoDB", "SQS"]
         framework: ["net8.0", "net10.0"]
     services:
       dynamodb:
@@ -570,8 +603,17 @@ jobs:
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
           AWS_SECRET_ACCESS_KEY: pass
           AWS_REGION: us-east-1
+      elasticmq:
+        image: softwaremill/elasticmq-native:latest
+        ports:
+        - 9324:9324
     steps:
     - uses: actions/checkout@v4
+    - name: Wait for ElasticMQ
+      run: |
+        echo "Waiting for ElasticMQ to be ready..."
+        timeout 60 bash -c 'until nc -z localhost 9324; do sleep 1; done'
+        echo "ElasticMQ is ready"
     - name: Setup .NET
       uses: actions/setup-dotnet@v4
       with:
@@ -579,7 +621,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}&(Category=BVT|Category=SlowBVT|Category=Functional)"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -592,11 +634,12 @@ jobs:
         ORLEANSDYNAMODBACCESSKEY: "root"
 # [SuppressMessage("Microsoft.Security", "CS002:SecretInNextLine", Justification="Not a secret")]
         ORLEANSDYNAMODBSECRETKEY: "pass"
+        ORLEANSSQSCONNECTIONSTRING: "Service=http://127.0.0.1:9324"
     - name: Archive Test Results
       if: always()
       uses: actions/upload-artifact@v4
       with:
-        name: test_output_${{ github.job }}_${{ matrix.framework }}
+        name: test_output_${{ github.job }}_${{ matrix.provider }}_${{ matrix.framework }}
         retention-days: 1
         path: |
           **/TestResults/*
@@ -637,7 +680,7 @@ jobs:
       run: dotnet test
         test/Extensions/Orleans.Streaming.NATS.Tests/Orleans.Streaming.NATS.Tests.csproj
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.provider }}"
+        --filter "Provider=${{ matrix.provider }}&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -680,7 +723,7 @@ jobs:
     - name: Test
       run: dotnet test
         --framework ${{ matrix.framework }}
-        --filter "Category=${{ matrix.suite }}&Category!=Consul"
+        --filter "Provider=None&Suite=${{ matrix.suite }}&Area!=CodeGen"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
@@ -711,13 +754,23 @@ jobs:
       with:
         global-json-file: global.json
     - name: Test Code Generator
-      run: dotnet test
-        test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
+      run: dotnet test test/Orleans.CodeGenerator.Tests/Orleans.CodeGenerator.Tests.csproj
         --framework ${{ matrix.framework }}
+        --filter "Provider=None&Area=CodeGen&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
         --blame-hang-timeout 10m
         --blame-crash-dump-type full
         --blame-hang-dump-type full
-        --logger "trx;LogFileName=test_results_${{ matrix.framework }}.trx"
+        --logger "trx;LogFileName=test_results_codegen_${{ matrix.framework }}.trx"
+        --
+        -parallel none -noshadow
+        &&
+        dotnet test test/Orleans.DefaultCluster.Tests/Orleans.DefaultCluster.Tests.csproj
+        --framework ${{ matrix.framework }}
+        --filter "Provider=None&Area=CodeGen&(Suite=BVT|Suite=SlowBVT|Suite=Functional)"
+        --blame-hang-timeout 10m
+        --blame-crash-dump-type full
+        --blame-hang-dump-type full
+        --logger "trx;LogFileName=test_results_defaultcluster_codegen_${{ matrix.framework }}.trx"
         --
         -parallel none -noshadow
     - name: Archive Test Results

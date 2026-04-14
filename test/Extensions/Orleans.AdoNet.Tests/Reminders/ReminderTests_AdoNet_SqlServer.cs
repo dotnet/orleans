@@ -20,6 +20,9 @@ namespace Tester.AdoNet.Reminders
     /// Integration tests for Orleans reminders functionality using SQL Server as the reminder service backend.
     /// </summary>
     [TestCategory("Reminders"), TestCategory("AdoNet"), TestCategory("SqlServer")]
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Reminders")]
     public class ReminderTests_AdoNet_SqlServer : ReminderTests_Base, IClassFixture<ReminderTests_AdoNet_SqlServer.Fixture>
     {
         private const string TestDatabaseName = "OrleansTest_SqlServer_Reminders";

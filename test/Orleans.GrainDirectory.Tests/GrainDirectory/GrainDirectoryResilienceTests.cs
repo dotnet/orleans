@@ -25,6 +25,9 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 }
 
 [TestCategory("Stress"), TestCategory("Directory")]
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("GrainDirectory")]
 public sealed class GrainDirectoryResilienceTests
 {
     /// <summary>

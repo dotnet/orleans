@@ -11,6 +11,9 @@ using Xunit;
 namespace NonSilo.Tests;
 
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public sealed class ObserverManagerTests
 {
     [Fact]

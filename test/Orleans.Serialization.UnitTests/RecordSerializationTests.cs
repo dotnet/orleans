@@ -28,6 +28,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Functional programming patterns
 /// - Clean API contracts
 /// </summary>
+[Trait("Suite", "BVT")]
+[Trait("Provider", "None")]
+[Trait("Area", "Serialization")]
 public class RecordSerializationTests
 {
     private readonly ServiceProvider _services;

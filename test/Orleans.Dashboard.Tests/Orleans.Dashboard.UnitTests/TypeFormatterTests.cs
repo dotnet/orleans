@@ -3,6 +3,9 @@ using Xunit;
 
 namespace UnitTests
 {
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Dashboard")]
     public class TypeFormatterTests
     {
         [Fact]

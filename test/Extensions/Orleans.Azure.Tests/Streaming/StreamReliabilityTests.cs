@@ -27,6 +27,9 @@ using Orleans.Providers;
 namespace UnitTests.Streaming.Reliability
 {
     [TestCategory("Streaming"), TestCategory("Reliability")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class StreamReliabilityTests : TestClusterPerTest
     {
         private readonly ITestOutputHelper _output;

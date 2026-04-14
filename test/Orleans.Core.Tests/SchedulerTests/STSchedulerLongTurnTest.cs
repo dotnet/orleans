@@ -9,13 +9,16 @@ namespace DefaultCluster.Tests.SchedulerTests
     /// <summary>
     /// Tests Orleans scheduler behavior with long-running grain operations to ensure they don't cause timeouts or queue blocking.
     /// </summary>
-    [TestCategory("BVT")]
+        [TestCategory("BVT")]
+    [TestArea("Runtime")]
     public class STSchedulerLongTurnTest : HostedTestClusterEnsureDefaultStarted
     {
         public STSchedulerLongTurnTest(DefaultClusterFixture fixture) : base(fixture)
         {
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Scheduler")]
         public async Task Sched_LongTurnTest()
         {

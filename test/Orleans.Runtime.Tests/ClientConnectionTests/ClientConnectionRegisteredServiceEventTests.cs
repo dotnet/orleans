@@ -12,6 +12,9 @@ namespace Tester
     /// <summary>
     /// Tests for client connection events using registered service event notification patterns.
     /// </summary>
+    [TestSuite("SlowBVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ClientConnectionRegisteredServiceEventTests : TestClusterPerTest
     {
         private EventNotifier<EventArgs> clusterConnectionLostNotifier;

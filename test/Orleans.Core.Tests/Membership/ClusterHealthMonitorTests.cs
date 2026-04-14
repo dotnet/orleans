@@ -17,6 +17,9 @@ namespace NonSilo.Tests.Membership
     /// and uses voting mechanisms to declare silos as dead, preventing split-brain scenarios in the distributed system.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ClusterHealthMonitorTests
     {
         private readonly ITestOutputHelper output;

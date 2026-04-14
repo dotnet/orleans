@@ -26,6 +26,7 @@ namespace UnitTests
     /// 
     /// Note: These tests modify global timeout settings, so they should run in isolation.
     /// </summary>
+        [TestArea("Runtime")]
     public class TimeoutTests : HostedTestClusterEnsureDefaultStarted, IDisposable
     {
         private readonly ITestOutputHelper output;
@@ -56,6 +57,8 @@ namespace UnitTests
         /// - Request tracking is cleaned up (no lingering requests)
         /// - Re-awaiting the same task fails immediately
         /// </summary>
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("Functional"), TestCategory("Timeout")]
         public async Task Timeout_LongMethod()
         {
@@ -132,6 +135,8 @@ namespace UnitTests
         /// 
         /// Currently skipped due to issue #3995.
         /// </summary>
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/3995"), TestCategory("SlowBVT")]
         public async Task CallThatShouldHaveBeenDroppedNotExecutedTest()
         {

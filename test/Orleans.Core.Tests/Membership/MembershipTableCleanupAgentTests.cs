@@ -16,6 +16,9 @@ namespace NonSilo.Tests.Membership
     /// Tests for membership table cleanup agent functionality including enabled/disabled scenarios and defunct silo cleanup.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class MembershipTableCleanupAgentTests
     {
         private readonly ITestOutputHelper output;

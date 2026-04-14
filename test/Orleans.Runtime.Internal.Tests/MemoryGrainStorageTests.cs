@@ -29,6 +29,9 @@ namespace UnitTests;
 /// a comprehensive suite of persistence behavior tests.
 /// </summary>
 [TestCategory("Persistence"), TestCategory("Memory")]
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Runtime")]
 public class MemoryGrainStorageTests : GrainPersistenceTestsRunner, IClassFixture<MemoryGrainStorageTests.Fixture>
 {
     public class Fixture : BaseTestClusterFixture

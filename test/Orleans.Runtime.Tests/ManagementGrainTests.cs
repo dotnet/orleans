@@ -26,6 +26,9 @@ namespace UnitTests.Management
     /// - Building management dashboards
     /// - Implementing custom placement strategies based on current load
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class ManagementGrainTests :  OrleansTestingBase, IClassFixture<ManagementGrainTests.Fixture>
     {
         private readonly Fixture fixture;

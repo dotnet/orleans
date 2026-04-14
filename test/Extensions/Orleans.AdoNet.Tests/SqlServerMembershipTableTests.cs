@@ -14,6 +14,9 @@ namespace UnitTests.MembershipTests
     /// Tests for operation of Orleans Membership Table using SQL Server
     /// </summary>
     [TestCategory("Membership"), TestCategory("SQLServer"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("SqlServer")]
+    [TestArea("Membership")]
     public class SqlServerMembershipTableTests : MembershipTableTestsBase
     {
         public SqlServerMembershipTableTests(ConnectionStringFixture fixture, TestEnvironmentFixture environment) : base(fixture, environment, CreateFilters())

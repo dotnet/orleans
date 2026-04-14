@@ -19,6 +19,9 @@ using Xunit;
 namespace NonSilo.Tests.Directory
 {
     [TestCategory("BVT"), TestCategory("Directory")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("GrainDirectory")]
     public class ClientDirectoryTests
     {
         private readonly ILocalSiloDetails _localSiloDetails;

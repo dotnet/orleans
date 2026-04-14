@@ -8,6 +8,9 @@ namespace UnitTests.OrleansRuntime.Streams
     /// <summary>
     /// Tests for cached message block functionality in streaming infrastructure.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     public class CachedMessageBlockTests
     {
         private const int TestBlockSize = 100;

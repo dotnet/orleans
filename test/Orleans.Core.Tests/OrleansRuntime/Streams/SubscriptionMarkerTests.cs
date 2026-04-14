@@ -6,6 +6,9 @@ namespace UnitTests.OrleansRuntime.Streams
     /// <summary>
     /// Tests for subscription marker functionality including implicit and explicit subscription marking.
     /// </summary>
+    [TestSuite("Nightly")]
+    [TestProvider("None")]
+    [TestArea("Streaming")]
     public class SubscriptionMarkerTests
     {
         [Fact, TestCategory("BVT"), TestCategory("Nightly"), TestCategory("Streaming")]

@@ -17,6 +17,9 @@ using Xunit;
 namespace UnitTests.HaloTests.Streaming
 {
     [TestCategory("Streaming"), TestCategory("Halo")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class HaloStreamSubscribeTests : OrleansTestingBase, IClassFixture<HaloStreamSubscribeTests.Fixture>
     {
         private readonly Fixture fixture;

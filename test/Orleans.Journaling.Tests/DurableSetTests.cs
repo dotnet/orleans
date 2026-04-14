@@ -12,6 +12,9 @@ namespace Orleans.Journaling.Tests;
 /// collections of unique identifiers, tags, or other distinct values in Orleans grains.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Journaling")]
 public class DurableSetTests : StateMachineTestBase
 {
     /// <summary>

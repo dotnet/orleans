@@ -11,6 +11,7 @@ namespace Tester.AdoNet.GrainDirectory;
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against Sql Server.
 /// </summary>
 [TestCategory("SqlServer")]
+[TestProvider("SqlServer")]
 public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueriesTests(AdoNetInvariants.InvariantNameSqlServer, 90)
 {
 }
@@ -19,6 +20,7 @@ public class SqlServerRelationalOrleansQueriesTests() : RelationalOrleansQueries
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against PostgreSQL.
 /// </summary>
 [TestCategory("PostgreSql")]
+[TestProvider("PostgreSql")]
 public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public PostgreSqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNamePostgreSql, 90)
@@ -31,6 +33,7 @@ public class PostgreSqlRelationalOrleansQueriesTests : RelationalOrleansQueriesT
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/> against MySQL.
 /// </summary>
 [TestCategory("MySql")]
+[TestProvider("MySql")]
 public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 {
     public MySqlRelationalOrleansQueriesTests() : base(AdoNetInvariants.InvariantNameMySql, 90)
@@ -43,6 +46,8 @@ public class MySqlRelationalOrleansQueriesTests : RelationalOrleansQueriesTests
 /// Tests the relational storage layer via <see cref="RelationalOrleansQueries"/>.
 /// </summary>
 [TestCategory("Functional"), TestCategory("AdoNet"), TestCategory("GrainDirectory")]
+[TestSuite("Functional")]
+[TestArea("GrainDirectory")]
 public abstract class RelationalOrleansQueriesTests(string invariant, int concurrency = 100) : IAsyncLifetime
 {
     private const string TestDatabaseName = "OrleansGrainDirectoryTest";

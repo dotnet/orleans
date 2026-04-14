@@ -11,6 +11,9 @@ namespace DefaultCluster.Tests.General
     /// Validates that Orleans can correctly serialize/deserialize F# constructs like records, options, and discriminated unions,
     /// ensuring proper cross-language support within the .NET ecosystem.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class FSharpGrainTests : HostedTestClusterEnsureDefaultStarted
     {
         public FSharpGrainTests(DefaultClusterFixture fixture) : base(fixture)

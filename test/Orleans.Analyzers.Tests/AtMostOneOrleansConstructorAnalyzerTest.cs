@@ -8,6 +8,9 @@ using Xunit;
 namespace Analyzers.Tests;
 
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class AtMostOneOrleansConstructorAnalyzerTest : DiagnosticAnalyzerTestBase<AtMostOneOrleansConstructorAnalyzer>
 {
     [Fact]

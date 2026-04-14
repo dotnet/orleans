@@ -14,6 +14,9 @@ namespace Analyzers.Tests;
 /// This analyzer helps developers remember to add aliases to grain interfaces, serializable types, and RPC methods.
 /// </summary>
 [TestCategory("BVT"), TestCategory("Analyzer")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Analyzer")]
 public class GenerateAliasAttributesAnalyzerTest : DiagnosticAnalyzerTestBase<GenerateAliasAttributesAnalyzer>
 {
     private async Task VerifyHasDiagnostic(string code, int diagnosticsCount = 1)

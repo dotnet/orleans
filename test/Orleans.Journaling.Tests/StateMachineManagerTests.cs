@@ -13,6 +13,9 @@ namespace Orleans.Journaling.Tests;
 /// WriteStateAsync calls, and ensures consistent recovery after failures.
 /// </summary>
 [TestCategory("BVT")]
+[TestSuite("BVT")]
+[TestProvider("None")]
+[TestArea("Journaling")]
 public class StateMachineManagerTests : StateMachineTestBase
 {
     /// <summary>

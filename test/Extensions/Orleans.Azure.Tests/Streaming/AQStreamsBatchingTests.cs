@@ -14,6 +14,9 @@ using Xunit.Abstractions;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("AQStreaming"), TestCategory("AzureStorage")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AQStreamsBatchingTests : StreamBatchingTestRunner, IClassFixture<AQStreamsBatchingTests.Fixture>
     {
         private const int queueCount = 8;

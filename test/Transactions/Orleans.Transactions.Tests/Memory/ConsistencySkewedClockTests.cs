@@ -8,6 +8,9 @@ namespace Orleans.Transactions.Tests
     /// Tests for transaction consistency with skewed clock scenarios using in-memory storage.
     /// </summary>
     [TestCategory("Transactions-dev")]
+    [TestSuite("Nightly")]
+    [TestProvider("None")]
+    [TestArea("Transactions")]
     public class ConsistencySkewedClockTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<SkewedClockMemoryTransactionsFixture>
     {
         public ConsistencySkewedClockTests(SkewedClockMemoryTransactionsFixture fixture, ITestOutputHelper output)

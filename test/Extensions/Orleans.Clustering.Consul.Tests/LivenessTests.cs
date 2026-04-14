@@ -10,6 +10,9 @@ namespace Consul.Tests
     /// Tests Orleans cluster liveness functionality using Consul as the membership provider.
     /// </summary>
     [TestCategory("Membership"), TestCategory("Consul")]
+    [TestSuite("Functional")]
+    [TestProvider("Consul")]
+    [TestArea("Membership")]
     public class LivenessTests_Consul : LivenessTestsBase
     {
         public LivenessTests_Consul(ITestOutputHelper output) : base(output)

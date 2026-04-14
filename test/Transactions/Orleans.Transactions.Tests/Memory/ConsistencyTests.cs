@@ -8,6 +8,9 @@ namespace Orleans.Transactions.Tests
     /// Tests for transaction consistency behavior with in-memory storage.
     /// </summary>
     [TestCategory("Transactions-dev")]
+    [TestSuite("Nightly")]
+    [TestProvider("None")]
+    [TestArea("Transactions")]
     public class ConsistencyTests : ConsistencyTransactionTestRunnerxUnit, IClassFixture<MemoryTransactionsFixture>
     {
         public ConsistencyTests(MemoryTransactionsFixture fixture, ITestOutputHelper output)

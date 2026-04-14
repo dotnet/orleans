@@ -8,6 +8,9 @@ using Xunit;
 
 namespace UnitTests.General
 {
+    [TestSuite("Functional")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class RingTests_Standalone
     {
         private const int count = 5;

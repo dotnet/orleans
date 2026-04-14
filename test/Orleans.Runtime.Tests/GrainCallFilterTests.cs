@@ -66,6 +66,9 @@ namespace UnitTests.General
     /// These tests verify filter execution order, context propagation, exception handling,
     /// and integration with various Orleans features like streaming and observers.
     /// </summary>
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     [TestCategory("BVT"), TestCategory("GrainCallFilter")]
     public class GrainCallFilterTests : OrleansTestingBase, IClassFixture<GrainCallFilterTests.Fixture>
     {

@@ -13,6 +13,7 @@ namespace Tester.AdoNet.Streaming;
 /// <summary>
 /// Cluster streaming tests for ADO.NET Streaming against SQL Server.
 /// </summary>
+[TestProvider("SqlServer")]
 public class SqlServerAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNameSqlServer)
 {
 }
@@ -20,6 +21,7 @@ public class SqlServerAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvari
 /// <summary>
 /// Cluster streaming tests for ADO.NET Streaming against MySQL.
 /// </summary>
+[TestProvider("MySql")]
 public class MySqlAdoNetStreamingTests : AdoNetStreamingTests
 {
     public MySqlAdoNetStreamingTests() : base(AdoNetInvariants.InvariantNameMySql)
@@ -31,6 +33,7 @@ public class MySqlAdoNetStreamingTests : AdoNetStreamingTests
 /// <summary>
 /// Cluster streaming tests for ADO.NET Streaming against PostgreSQL.
 /// </summary>
+[TestProvider("PostgreSql")]
 public class PostgreSqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvariants.InvariantNamePostgreSql)
 {
 }
@@ -39,6 +42,8 @@ public class PostgreSqlAdoNetStreamingTests() : AdoNetStreamingTests(AdoNetInvar
 /// Cluster streaming tests for ADO.NET Streaming.
 /// </summary>
 [TestCategory("AdoNet"), TestCategory("Streaming")]
+[TestSuite("Functional")]
+[TestArea("Streaming")]
 public abstract class AdoNetStreamingTests : TestClusterPerTest
 {
     private const string TestDatabaseName = "OrleansStreamTest";

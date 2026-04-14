@@ -17,6 +17,9 @@ namespace NonSilo.Tests.Membership
     /// Tests for silo health monitoring including direct/indirect probing, failure detection, and stale silo handling.
     /// </summary>
     [TestCategory("BVT"), TestCategory("Membership")]
+    [TestSuite("BVT")]
+    [TestProvider("None")]
+    [TestArea("Runtime")]
     public class SiloHealthMonitorTests
     {
         private readonly ITestOutputHelper _output;

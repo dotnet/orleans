@@ -17,6 +17,7 @@ namespace UnitTests.ActivationsLifeCycleTests
     /// <summary>
     /// Tests for the activation collector that manages grain activation lifecycle and garbage collection.
     /// </summary>
+        [TestArea("Runtime")]
     public class ActivationCollectorTests : OrleansTestingBase, IAsyncLifetime
     {
         private static readonly TimeSpan DEFAULT_COLLECTION_QUANTUM = TimeSpan.FromSeconds(10);
@@ -87,6 +88,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorForceCollection()
         {
@@ -116,6 +119,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             await grain.ForceActivationCollection(TimeSpan.FromSeconds(4));
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivations()
         {
@@ -146,6 +151,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }   
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivations()
         {
@@ -207,6 +214,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             quit[0] = true;
         }          
         
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ManualCollectionShouldNotCollectBusyActivations()
         {
@@ -281,6 +290,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             quit[0] = true;
         }    
         
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectIdleActivationsSpecifiedInPerTypeConfiguration()
         {
@@ -313,6 +324,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }   
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyActivationsSpecifiedInPerTypeConfiguration()
         {
@@ -376,6 +389,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             quit[0] = true;
         } 
   
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact(Skip = "Flaky test. Needs to be investigated."), TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldNotCollectBusyStatelessWorkers()
         {
@@ -492,6 +507,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             }
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectByCollectionSpecificAgeLimitForTwelveSeconds()
         {
@@ -529,6 +546,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }
 
+        [TestSuite("Functional")]
+        [TestProvider("None")]
         [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
         public async Task ActivationCollectorShouldCollectAfterCancellingKeepAlive()
         {
@@ -559,6 +578,8 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }
 
+        [TestSuite("SlowBVT")]
+        [TestProvider("None")]
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_NoKeepAlive_Test()
         {

@@ -13,6 +13,9 @@ using Xunit;
 namespace Tester.AzureUtils.Streaming
 {
     [TestCategory("AzureStorage"), TestCategory("Storage"), TestCategory("Streaming")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Streaming")]
     public class AQSubscriptionMultiplicityTests : TestClusterPerTest
     {
         private const string AQStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;

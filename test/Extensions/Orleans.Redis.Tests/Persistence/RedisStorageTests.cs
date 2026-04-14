@@ -11,6 +11,9 @@ namespace Tester.Redis.Persistence
     /// </summary>
     [TestCategory("Redis"), TestCategory("Persistence"), TestCategory("Functional")]
     [Collection(TestEnvironmentFixture.DefaultCollection)]
+    [TestSuite("Functional")]
+    [TestProvider("Redis")]
+    [TestArea("Persistence")]
     public class RedisStorageTests
     {
         private readonly CommonFixture fixture;

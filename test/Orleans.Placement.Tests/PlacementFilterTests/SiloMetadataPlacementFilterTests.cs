@@ -7,6 +7,9 @@ using Xunit;
 
 namespace UnitTests.PlacementFilterTests;
 
+[TestSuite("Functional")]
+[TestProvider("None")]
+[TestArea("Placement")]
 [TestCategory("Placement"), TestCategory("Filters"), TestCategory("SiloMetadata")]
 public class SiloMetadataPlacementFilterTests(SiloMetadataPlacementFilterTests.Fixture fixture) : IClassFixture<SiloMetadataPlacementFilterTests.Fixture>
 {

@@ -11,6 +11,9 @@ namespace Orleans.Transactions.AzureStorage.Tests
     /// Tests for scoped transaction functionality with Azure Storage.
     /// </summary>
     [TestCategory("AzureStorage"), TestCategory("Transactions"), TestCategory("Functional")]
+    [TestSuite("Functional")]
+    [TestProvider("AzureStorage")]
+    [TestArea("Transactions")]
     public class TransactionScopeTests : ScopedTransactionsTestRunnerxUnit, IClassFixture<TestFixture>
     {
         public TransactionScopeTests(TestFixture fixture, ITestOutputHelper output)
