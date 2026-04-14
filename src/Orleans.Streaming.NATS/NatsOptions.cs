@@ -1,4 +1,4 @@
-﻿using System.Text.Json;
+using System.Text.Json;
 using Orleans.Runtime;
 using NATS.Client.Core;
 
@@ -51,6 +51,15 @@ public class NatsOptions
     /// System.Text.Json serializer options to be used by the NATS provider.
     /// </summary>
     public JsonSerializerOptions? JsonSerializerOptions { get; set; }
+
+    /// <summary>
+    /// The number of stream replicas in the NATS JetStream cluster.
+    /// Higher values improve availability during node restarts (R3 survives
+    /// single-node failures in a 3-node cluster). The NATS server enforces
+    /// that the value is odd and does not exceed the cluster size.
+    /// Defaults to 1. Set to 3 for production clusters with ≥ 3 nodes.
+    /// </summary>
+    public int NumReplicas { get; set; } = 1;
 }
 
 public class NatsStreamOptionsValidator(NatsOptions options, string? name = null) : IConfigurationValidator
@@ -61,6 +70,12 @@ public class NatsStreamOptionsValidator(NatsOptions options, string? name = null
         {
             throw new OrleansConfigurationException(
                 $"The {nameof(NatsOptions.StreamName)} is required for the NATS stream provider '{name}'.");
+        }
+
+        if (options.NumReplicas < 1)
+        {
+            throw new OrleansConfigurationException(
+                $"The {nameof(NatsOptions.NumReplicas)} must be at least 1 for the NATS stream provider '{name}'.");
         }
     }
 }

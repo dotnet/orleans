@@ -108,22 +108,21 @@ internal sealed class NatsConnectionManager
 
             try
             {
-                var streamConfig = new StreamConfig(this._options.StreamName, [$"{this._providerName}.>"])
-                {
-                    Retention = StreamConfigRetention.Workqueue,
-                    SubjectTransform = new SubjectTransform
-                    {
-                        Src = $"{this._providerName}.*.*",
-                        Dest =
-                            @$"{this._providerName}.{{{{partition({this._options.PartitionCount},1,2)}}}}.{{{{wildcard(1)}}}}.{{{{wildcard(2)}}}}"
-                    }
-                };
-
-                await this._natsContext.CreateStreamAsync(streamConfig, cancellationToken);
+                await this._natsContext.CreateStreamAsync(BuildStreamConfig(), cancellationToken);
             }
             catch (NatsJSApiException e) when (e.Error.ErrCode == 10065)
             {
                 // ignore, stream already exists
+            }
+            catch (NatsJSApiException e) when (e.Error.ErrCode == 10058)
+            {
+                // Stream exists with different config — attempt in-place update
+                // (safe for NumReplicas changes; NATS allows replica count upgrades)
+                this._logger.LogInformation(
+                    "Stream {Stream} exists with different config — updating.",
+                    this._options.StreamName);
+
+                await this._natsContext.UpdateStreamAsync(BuildStreamConfig(), cancellationToken);
             }
 
             this._logger.LogTrace(
@@ -137,6 +136,18 @@ internal sealed class NatsConnectionManager
             throw;
         }
     }
+
+    private StreamConfig BuildStreamConfig() => new(this._options.StreamName, [$"{this._providerName}.>"])
+    {
+        Retention = StreamConfigRetention.Workqueue,
+        NumReplicas = this._options.NumReplicas,
+        SubjectTransform = new SubjectTransform
+        {
+            Src = $"{this._providerName}.*.*",
+            Dest =
+                @$"{this._providerName}.{{{{partition({this._options.PartitionCount},1,2)}}}}.{{{{wildcard(1)}}}}.{{{{wildcard(2)}}}}"
+        }
+    };
 
     /// <summary>
     /// Enqueue a message to NATS JetStream stream
