@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <RootNamespace>UnitTests</RootNamespace>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+    <TargetFrameworks>$(TestTargetFrameworks)</TargetFrameworks>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="Xunit.SkippableFact" />
+    <PackageReference Include="xunit" />
+    <PackageReference Include="xunit.runner.visualstudio">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Testing.Reminders\Orleans.Testing.Reminders.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestGrainInterfaces\TestGrainInterfaces.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Grains\TestInternalGrains\TestInternalGrains.csproj" />
+  </ItemGroup>
+</Project>
