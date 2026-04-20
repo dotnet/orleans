@@ -412,6 +412,11 @@ namespace Orleans.Runtime
         private void ThrowIfTicketIsInvalid(DateTime ticket)
         {
             if (ticket.Ticks == 0) throw new ArgumentException("Empty ticket is not allowed in this context.");
+            // DateTime.MaxValue is a sentinel produced by MakeTicketFromDateTime when the
+            // rounded-up tick overflows (e.g., ScanStale rescheduling an activation whose
+            // KeepAliveUntil is DateTime.MaxValue). Its ticks aren't quantum-aligned, but
+            // it is a valid ticket and must not be rejected here.
+            if (ticket == DateTime.MaxValue) return;
             if (0 != ticket.Ticks % _grainCollectionOptions.CollectionQuantum.Ticks)
             {
                 throw new ArgumentException(string.Format("invalid ticket ({0})", ticket));
