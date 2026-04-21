@@ -13,11 +13,12 @@ namespace Orleans.Transactions.TestKit
 
         // committer service
         public const string RemoteCommitService = "RemoteCommitService";
-        
+
         // grain implementations
         public const string NoStateTransactionalGrain = "NoStateTransactionalGrain";
         public const string SingleStateTransactionalGrain = "SingleStateTransactionalGrain";
         public const string DoubleStateTransactionalGrain = "DoubleStateTransactionalGrain";
         public const string MaxStateTransactionalGrain = "MaxStateTransactionalGrain";
+        public const string ExclusiveLockTransactionTestGrain = "ExclusiveLockTransactionTestGrain";
     }
 }

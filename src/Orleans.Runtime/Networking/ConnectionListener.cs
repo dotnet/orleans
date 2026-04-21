@@ -8,6 +8,7 @@ using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Core.Diagnostics;
 using Orleans.Internal;
 
 #nullable disable
@@ -39,7 +40,7 @@ namespace Orleans.Runtime.Messaging
 
         protected IServiceProvider ServiceProvider => this.connectionShared.ServiceProvider;
 
-        protected NetworkingTrace NetworkingTrace => this.connectionShared.NetworkingTrace;
+        protected ILogger Logger => this.connectionShared.Logger;
 
         protected ConnectionOptions ConnectionOptions { get; }
 
@@ -101,7 +102,8 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                LogCriticalExceptionInAcceptAsync(this.NetworkingTrace, exception);
+                ConnectionEvents.EmitAcceptFailed(this.Endpoint, exception);
+                LogCriticalExceptionInAcceptAsync(this.Logger, exception);
             }
         }
 
@@ -132,7 +134,7 @@ namespace Orleans.Runtime.Messaging
             }
             catch (Exception exception)
             {
-                LogWarningExceptionDuringShutdown(this.NetworkingTrace, exception);
+                LogWarningExceptionDuringShutdown(this.Logger, exception);
             }
         }
 
@@ -154,11 +156,11 @@ namespace Orleans.Runtime.Messaging
                 try
                 {
                     await connection.Run();
-                    LogInformationConnectionTerminated(this.NetworkingTrace, connection);
+                    LogInformationConnectionTerminated(this.Logger, connection);
                 }
                 catch (Exception exception)
                 {
-                    LogInformationConnectionTerminatedWithException(this.NetworkingTrace, exception, connection);
+                    LogInformationConnectionTerminatedWithException(this.Logger, exception, connection);
                 }
                 finally
                 {
@@ -169,9 +171,9 @@ namespace Orleans.Runtime.Messaging
 
         private IDisposable BeginConnectionScope(Connection connection)
         {
-            if (this.NetworkingTrace.IsEnabled(LogLevel.Critical))
+            if (this.Logger.IsEnabled(LogLevel.Critical))
             {
-                return this.NetworkingTrace.BeginScope(new ConnectionLogScope(connection));
+                return this.Logger.BeginScope(new ConnectionLogScope(connection));
             }
 
             return null;

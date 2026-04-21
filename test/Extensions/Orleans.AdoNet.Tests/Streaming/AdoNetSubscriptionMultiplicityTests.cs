@@ -121,7 +121,7 @@ public abstract class AdoNetSubscriptionMultiplicityTests : TestClusterPerTest
     public Task AdoNetActiveSubscriptionTest() => _runner.ActiveSubscriptionTest(Guid.NewGuid(), StreamNamespace);
 
     [SkippableFact, TestCategory("Functional")]
-    public Task AdoNetTwoIntermittentStreamTest() => _runner.TwoIntermitentStreamTest(Guid.NewGuid());
+    public Task AdoNetTwoIntermittentStreamTest() => _runner.TwoIntermittentStreamTest(Guid.NewGuid());
 
     [SkippableFact, TestCategory("Functional")]
     public Task AdoNetSubscribeFromClientTest() => _runner.SubscribeFromClientTest(Guid.NewGuid(), StreamNamespace);

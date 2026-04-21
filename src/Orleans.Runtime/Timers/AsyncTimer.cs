@@ -18,7 +18,7 @@ namespace Orleans.Runtime
         private readonly TimeSpan period;
         private readonly string name;
         private readonly ILogger log;
-        private readonly TimeProvider timeProvider;
+        private readonly TimeProvider _timeProvider;
         private DateTime lastFired = DateTime.MinValue;
         private DateTime expected;
 
@@ -27,7 +27,7 @@ namespace Orleans.Runtime
             this.log = log;
             this.period = period;
             this.name = name;
-            this.timeProvider = timeProvider;
+            _timeProvider = timeProvider;
         }
 
         /// <summary>
@@ -39,7 +39,7 @@ namespace Orleans.Runtime
         {
             if (cancellation.IsCancellationRequested) return false;
 
-            var start = this.timeProvider.GetUtcNow().UtcDateTime;
+            var start = _timeProvider.GetUtcNow().UtcDateTime;
             var delay = overrideDelay switch
             {
                 { } value => value,
@@ -58,7 +58,7 @@ namespace Orleans.Runtime
                 while (delay > maxDelay)
                 {
                     delay -= maxDelay;
-                    var task2 = await Task.WhenAny(Task.Delay(maxDelay, this.timeProvider, cancellation.Token)).ConfigureAwait(false);
+                    var task2 = await Task.WhenAny(Task.Delay(maxDelay, _timeProvider, cancellation.Token)).ConfigureAwait(false);
                     if (task2.IsCanceled)
                     {
                         await Task.Yield();
@@ -67,7 +67,7 @@ namespace Orleans.Runtime
                     }
                 }
 
-                var task = await Task.WhenAny(Task.Delay(delay, this.timeProvider, cancellation.Token)).ConfigureAwait(false);
+                var task = await Task.WhenAny(Task.Delay(delay, _timeProvider, cancellation.Token)).ConfigureAwait(false);
                 if (task.IsCanceled)
                 {
                     await Task.Yield();
@@ -76,7 +76,7 @@ namespace Orleans.Runtime
                 }
             }
 
-            var now = this.lastFired = this.timeProvider.GetUtcNow().UtcDateTime;
+            var now = this.lastFired = _timeProvider.GetUtcNow().UtcDateTime;
             var overshoot = GetOvershootDelay(now, dueTime);
             if (overshoot > TimeSpan.Zero)
             {
@@ -103,7 +103,7 @@ namespace Orleans.Runtime
 
         public bool CheckHealth(DateTime lastCheckTime, out string reason)
         {
-            var now = this.timeProvider.GetUtcNow().UtcDateTime;
+            var now = _timeProvider.GetUtcNow().UtcDateTime;
             var due = this.expected;
             var overshoot = GetOvershootDelay(now, due);
             if (overshoot > TimeSpan.Zero && !Debugger.IsAttached)

@@ -249,7 +249,7 @@ namespace Orleans
         {
             ThrowIfDisposed();
             var message = this.messageFactory.CreateResponseMessage(request);
-            OrleansOutsideRuntimeClientEvent.Log.SendResponse(message);
+            OrleansOutsideRuntimeClientEvent.Instance.SendResponse(message);
             message.BodyObject = response;
 
             MessageCenter.SendMessage(message);
@@ -261,7 +261,7 @@ namespace Orleans
             var cancellationToken = request.GetCancellationToken();
             cancellationToken.ThrowIfCancellationRequested();
             var message = this.messageFactory.CreateMessage(request, options);
-            OrleansOutsideRuntimeClientEvent.Log.SendRequest(message);
+            OrleansOutsideRuntimeClientEvent.Instance.SendRequest(message);
 
             message.InterfaceType = target.InterfaceType;
             message.InterfaceVersion = target.InterfaceVersion;
@@ -300,7 +300,7 @@ namespace Orleans
 
         public void ReceiveResponse(Message response)
         {
-            OrleansOutsideRuntimeClientEvent.Log.ReceiveResponse(response);
+            OrleansOutsideRuntimeClientEvent.Instance.ReceiveResponse(response);
 
             LogReceivedMessage(logger, response);
 

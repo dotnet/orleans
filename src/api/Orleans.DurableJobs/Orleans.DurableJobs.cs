@@ -132,13 +132,9 @@ namespace Orleans.DurableJobs
         protected abstract System.Threading.Tasks.Task PersistAddJobAsync(string jobId, string jobName, System.DateTimeOffset dueTime, Runtime.GrainId target, System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata, System.Threading.CancellationToken cancellationToken);
         protected abstract System.Threading.Tasks.Task PersistRemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
         protected abstract System.Threading.Tasks.Task PersistRetryJobAsync(string jobId, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        [System.Diagnostics.DebuggerStepThrough]
         public System.Threading.Tasks.Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
@@ -148,7 +144,7 @@ namespace Orleans.DurableJobs
 
         protected Runtime.SiloAddress SiloAddress { get { throw null; } }
 
-        public abstract System.Threading.Tasks.Task<System.Collections.Generic.List<IJobShard>> AssignJobShardsAsync(System.DateTimeOffset maxDueTime, System.Threading.CancellationToken cancellationToken);
+        public abstract System.Threading.Tasks.Task<System.Collections.Generic.List<IJobShard>> AssignJobShardsAsync(System.DateTimeOffset maxDueTime, int maxNewClaims, System.Threading.CancellationToken cancellationToken);
         public abstract System.Threading.Tasks.Task<IJobShard> CreateShardAsync(System.DateTimeOffset minDueTime, System.DateTimeOffset maxDueTime, System.Collections.Generic.IDictionary<string, string> metadata, System.Threading.CancellationToken cancellationToken);
         public abstract System.Threading.Tasks.Task UnregisterShardAsync(IJobShard shard, System.Threading.CancellationToken cancellationToken);
     }
@@ -175,9 +171,9 @@ namespace Orleans.Hosting
 
         public static ISiloBuilder AddDurableJobs(this ISiloBuilder builder) { throw null; }
 
-        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseInMemoryDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { throw null; }
-
         public static ISiloBuilder UseInMemoryDurableJobs(this ISiloBuilder builder) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseInMemoryDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { throw null; }
     }
 
     public sealed partial class DurableJobsOptions
@@ -191,6 +187,12 @@ namespace Orleans.Hosting
         public System.TimeSpan OverloadBackoffDelay { get { throw null; } set { } }
 
         public System.TimeSpan ShardActivationBufferPeriod { get { throw null; } set { } }
+
+        public int ShardClaimInitialBudget { get { throw null; } set { } }
+
+        public int ShardClaimMaxBudget { get { throw null; } set { } }
+
+        public System.TimeSpan ShardClaimRampUpDuration { get { throw null; } set { } }
 
         public System.TimeSpan ShardDuration { get { throw null; } set { } }
 

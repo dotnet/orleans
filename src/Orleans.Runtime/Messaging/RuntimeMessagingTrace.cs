@@ -1,166 +1,167 @@
-using System;
-using System.Collections.Generic;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Diagnostics;
 
-#nullable disable
-namespace Orleans.Runtime
+namespace Orleans.Runtime;
+
+internal sealed partial class RuntimeMessagingTrace(ILoggerFactory loggerFactory) : MessagingTrace(loggerFactory)
 {
-    internal sealed class RuntimeMessagingTrace : MessagingTrace
+    internal void OnDispatcherReceiveInvalidActivation(Message message, ActivationState activationState)
     {
-        public const string DispatcherReceiveInvalidActivationEventName = Category + ".Dispatcher.InvalidActivation";
-        public const string DispatcherDetectedDeadlockEventName = Category + ".Dispatcher.DetectedDeadlock";
-        public const string DispatcherDiscardedRejectionEventName = Category + ".Dispatcher.DiscardedRejection";
-        public const string DispatcherRejectedMessageEventName = Category + ".Dispatcher.Rejected";
-        public const string DispatcherForwardingEventName = Category + ".Dispatcher.Forwarding";
-        public const string DispatcherForwardingMultipleEventName = Category + ".Dispatcher.ForwardingMultiple";
-        public const string DispatcherForwardingFailedEventName = Category + ".Dispatcher.ForwardingFailed";
-        public const string DispatcherSelectTargetFailedEventName = Category + ".Dispatcher.SelectTargetFailed";
+        DispatcherEvents.EmitReceivedInvalidActivation(message, activationState);
+        MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+        LogDispatcherReceiveInvalidActivation(Logger, activationState, message);
+    }
 
-        private static readonly Action<ILogger, ActivationState, Message, Exception> LogDispatcherReceiveInvalidActivation =
-            LoggerMessage.Define<ActivationState, Message>(
-                LogLevel.Warning,
-                new EventId((int)ErrorCode.Dispatcher_Receive_InvalidActivation, DispatcherReceiveInvalidActivationEventName),
-                "Invalid activation in state {State} for message {Message}");
+    internal void OnDispatcherDetectedDeadlock(Message message, ActivationData activation)
+    {
+        DispatcherEvents.EmitDetectedDeadlock(message, activation);
+        LogDispatcherDetectedDeadlock(Logger, message, activation);
+    }
 
-        private static readonly Action<ILogger, Message, ActivationData, Exception> LogDispatcherDetectedDeadlock =
-            LoggerMessage.Define<Message, ActivationData>(
-                LogLevel.Warning,
-                new EventId((int)ErrorCode.Dispatcher_DetectedDeadlock, DispatcherDetectedDeadlockEventName),
-                "Detected application deadlock on message {Message} and activation {Activation}");
+    internal void OnDispatcherDiscardedRejection(Message message, Message.RejectionTypes rejectionType, string? reason, Exception? exception)
+    {
+        DispatcherEvents.EmitDiscardedRejection(message, rejectionType, reason, exception);
+        LogDispatcherDiscardedRejection(Logger, message, new RejectionReasonLogRecord(reason), rejectionType, exception);
+    }
 
-        private static readonly Action<ILogger, Message, string, Message.RejectionTypes, Exception> LogDispatcherDiscardedRejection =
-            LoggerMessage.Define<Message, string, Message.RejectionTypes>(
-                LogLevel.Warning,
-                new EventId((int)ErrorCode.Messaging_Dispatcher_DiscardRejection, DispatcherDiscardedRejectionEventName),
-                "Discarding rejection of message {Message} with reason '{Reason}' ({RejectionType})");
+    internal void OnDispatcherRejectMessage(Message message, Message.RejectionTypes rejectionType, string? reason, Exception? exception)
+    {
+        DispatcherEvents.EmitRejected(message, rejectionType, reason, exception);
+        MessagingInstruments.OnRejectedMessage(message);
+        LogDispatcherRejectedMessage(Logger, message, new RejectionReasonLogRecord(reason), rejectionType, exception);
+    }
 
-        private static readonly Action<ILogger, Message, string, Message.RejectionTypes, Exception> LogDispatcherRejectedMessage =
-            LoggerMessage.Define<Message, string, Message.RejectionTypes>(
-                LogLevel.Debug,
-                new EventId((int)ErrorCode.Messaging_Dispatcher_Rejected, DispatcherRejectedMessageEventName),
-                "Rejected message {Message} with reason '{Reason}' ({RejectionType})");
+    internal void OnDispatcherForwarding(Message message, GrainAddress? oldAddress, SiloAddress? forwardingAddress, string failedOperation, Exception? exception)
+    {
+        DispatcherEvents.EmitForwarding(message, oldAddress, forwardingAddress, failedOperation, exception);
+        LogDispatcherForwarding(
+            Logger,
+            message,
+            new OldAddressLogRecord(oldAddress),
+            new ForwardingAddressLogRecord(forwardingAddress),
+            failedOperation,
+            message.ForwardCount,
+            exception);
+        MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
+    }
 
-        private static readonly Action<ILogger, Message, GrainAddress, SiloAddress, string, int, Exception> LogDispatcherForwarding =
-            LoggerMessage.Define<Message, GrainAddress, SiloAddress, string, int>(
-                LogLevel.Debug,
-                new EventId((int)ErrorCode.Messaging_Dispatcher_TryForward, DispatcherForwardingEventName),
-                "Trying to forward {Message} from {OldAddress} to {ForwardingAddress} after {FailedOperation}. Attempt {ForwardCount}");
+    internal void OnDispatcherForwardingFailed(Message message, GrainAddress? oldAddress, SiloAddress? forwardingAddress, string failedOperation, Exception? exception)
+    {
+        DispatcherEvents.EmitForwardingFailed(message, oldAddress, forwardingAddress, failedOperation, exception);
+        LogDispatcherForwardingFailed(
+            Logger,
+            message,
+            new OldAddressLogRecord(oldAddress),
+            new ForwardingAddressLogRecord(forwardingAddress),
+            failedOperation,
+            message.ForwardCount,
+            exception);
+    }
 
-        private static readonly Action<ILogger, Message, GrainAddress, SiloAddress, string, int, Exception> LogDispatcherForwardingFailed =
-            LoggerMessage.Define<Message, GrainAddress, SiloAddress, string, int>(
-                LogLevel.Warning,
-                new EventId((int)ErrorCode.Messaging_Dispatcher_TryForwardFailed, DispatcherForwardingFailedEventName),
-                "Failed to forward message {Message} from {OldAddress} to {ForwardingAddress} after {FailedOperation}. Attempt {ForwardCount}");
+    internal void OnDispatcherForwardingMultiple(int messageCount, GrainAddress? oldAddress, SiloAddress? forwardingAddress, string failedOperation, Exception? exception)
+    {
+        DispatcherEvents.EmitForwardingMultiple(messageCount, oldAddress, forwardingAddress, failedOperation, exception);
+        LogDispatcherForwardingMultiple(
+            Logger,
+            messageCount,
+            new OldAddressLogRecord(oldAddress),
+            new ForwardingAddressLogRecord(forwardingAddress),
+            failedOperation,
+            exception);
+    }
 
-        private static readonly Action<ILogger, int, GrainAddress, SiloAddress, string, Exception> LogDispatcherForwardingMultiple =
-            LoggerMessage.Define<int, GrainAddress, SiloAddress, string>(
-                LogLevel.Debug,
-                new EventId((int)ErrorCode.Messaging_Dispatcher_ForwardingRequests, DispatcherForwardingMultipleEventName),
-                "Forwarding {MessageCount} requests destined for address {OldAddress} to address {ForwardingAddress} after {FailedOperation}");
-
-        private static readonly Action<ILogger, Message, Exception> LogDispatcherSelectTargetFailed =
-            LoggerMessage.Define<Message>(
-                LogLevel.Error,
-                new EventId((int)ErrorCode.Dispatcher_SelectTarget_Failed, DispatcherSelectTargetFailedEventName),
-                "Failed to address message {Message}");
-
-        public RuntimeMessagingTrace(ILoggerFactory loggerFactory) : base(loggerFactory)
+    internal void OnDispatcherSelectTargetFailed(Message message, Exception exception)
+    {
+        DispatcherEvents.EmitSelectTargetFailed(message, exception);
+        MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
+        if (ShouldLogError(exception))
         {
+            LogDispatcherSelectTargetFailed(Logger, message, exception);
         }
 
-        internal void OnDispatcherReceiveInvalidActivation(Message message, ActivationState activationState)
+        static bool ShouldLogError(Exception ex)
         {
-            if (this.IsEnabled(DispatcherReceiveInvalidActivationEventName))
-            {
-                this.Write(DispatcherReceiveInvalidActivationEventName, new { Message = message, ActivationState = activationState });
-            }
-
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
-            LogDispatcherReceiveInvalidActivation(this, activationState, message, null);
+            return ex.GetBaseException() is not KeyNotFoundException &&
+                   ex.GetBaseException() is not ClientNotAvailableException;
         }
+    }
 
-        internal void OnDispatcherDiscardedRejection(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
-        {
-            if (this.IsEnabled(DispatcherDiscardedRejectionEventName))
-            {
-                this.Write(DispatcherDiscardedRejectionEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
-            }
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Dispatcher_Receive_InvalidActivation,
+        EventName = nameof(DispatcherEvents.ReceivedInvalidActivation),
+        Level = LogLevel.Warning,
+        Message = "Invalid activation in state {State} for message {Message}"
+    )]
+    private static partial void LogDispatcherReceiveInvalidActivation(ILogger logger, ActivationState state, Message message);
 
-            LogDispatcherDiscardedRejection(this, message, reason, rejectionType, exception);
-        }
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Dispatcher_DetectedDeadlock,
+        EventName = nameof(DispatcherEvents.DetectedDeadlock),
+        Level = LogLevel.Warning,
+        Message = "Detected application deadlock on message {Message} and activation {Activation}"
+    )]
+    private static partial void LogDispatcherDetectedDeadlock(ILogger logger, Message message, ActivationData activation);
 
-        internal void OnDispatcherRejectMessage(Message message, Message.RejectionTypes rejectionType, string reason, Exception exception)
-        {
-            if (this.IsEnabled(DispatcherRejectedMessageEventName))
-            {
-                this.Write(DispatcherRejectedMessageEventName, new { Message = message, RejectionType = rejectionType, Reason = reason, Exception = exception });
-            }
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Messaging_Dispatcher_DiscardRejection,
+        EventName = nameof(DispatcherEvents.DiscardedRejection),
+        Level = LogLevel.Warning,
+        Message = "Discarding rejection of message {Message} with reason '{Reason}' ({RejectionType})"
+    )]
+    private static partial void LogDispatcherDiscardedRejection(ILogger logger, Message message, RejectionReasonLogRecord reason, Message.RejectionTypes rejectionType, Exception? exception);
 
-            MessagingInstruments.OnRejectedMessage(message);
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Messaging_Dispatcher_Rejected,
+        EventName = nameof(DispatcherEvents.Rejected),
+        Level = LogLevel.Debug,
+        Message = "Rejected message {Message} with reason '{Reason}' ({RejectionType})"
+    )]
+    private static partial void LogDispatcherRejectedMessage(ILogger logger, Message message, RejectionReasonLogRecord reason, Message.RejectionTypes rejectionType, Exception? exception);
 
-            if (this.IsEnabled(LogLevel.Debug))
-            {
-                LogDispatcherRejectedMessage(this, message, reason, rejectionType, exception);
-            }
-        }
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Messaging_Dispatcher_TryForward,
+        EventName = nameof(DispatcherEvents.Forwarding),
+        Level = LogLevel.Debug,
+        Message = "Trying to forward {Message} from {OldAddress} to {ForwardingAddress} after {FailedOperation}. Attempt {ForwardCount}"
+    )]
+    private static partial void LogDispatcherForwarding(ILogger logger, Message message, OldAddressLogRecord oldAddress, ForwardingAddressLogRecord forwardingAddress, string failedOperation, int forwardCount, Exception? exception);
 
-        internal void OnDispatcherForwarding(Message message, GrainAddress oldAddress, SiloAddress forwardingAddress, string failedOperation, Exception exception)
-        {
-            if (this.IsEnabled(DispatcherForwardingEventName))
-            {
-                this.Write(DispatcherForwardingEventName, new { Message = message, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
-            }
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Messaging_Dispatcher_TryForwardFailed,
+        EventName = nameof(DispatcherEvents.ForwardingFailed),
+        Level = LogLevel.Warning,
+        Message = "Failed to forward message {Message} from {OldAddress} to {ForwardingAddress} after {FailedOperation}. Attempt {ForwardCount}"
+    )]
+    private static partial void LogDispatcherForwardingFailed(ILogger logger, Message message, OldAddressLogRecord oldAddress, ForwardingAddressLogRecord forwardingAddress, string failedOperation, int forwardCount, Exception? exception);
 
-            if (this.IsEnabled(LogLevel.Debug))
-            {
-                LogDispatcherForwarding(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
-            }
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Messaging_Dispatcher_ForwardingRequests,
+        EventName = nameof(DispatcherEvents.ForwardingMultiple),
+        Level = LogLevel.Debug,
+        Message = "Forwarding {MessageCount} requests destined for address {OldAddress} to address {ForwardingAddress} after {FailedOperation}"
+    )]
+    private static partial void LogDispatcherForwardingMultiple(ILogger logger, int messageCount, OldAddressLogRecord oldAddress, ForwardingAddressLogRecord forwardingAddress, string failedOperation, Exception? exception);
 
-            MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
-        }
+    [LoggerMessage(
+        EventId = (int)ErrorCode.Dispatcher_SelectTarget_Failed,
+        EventName = nameof(DispatcherEvents.SelectTargetFailed),
+        Level = LogLevel.Error,
+        Message = "Failed to address message {Message}"
+    )]
+    private static partial void LogDispatcherSelectTargetFailed(ILogger logger, Message message, Exception exception);
 
-        internal void OnDispatcherForwardingFailed(Message message, GrainAddress oldAddress, SiloAddress forwardingAddress, string failedOperation, Exception exception)
-        {
-            if (this.IsEnabled(DispatcherForwardingFailedEventName))
-            {
-                this.Write(DispatcherForwardingFailedEventName, new { Message = message, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
-            }
+    private readonly struct RejectionReasonLogRecord(string? reason)
+    {
+        public override string ToString() => string.IsNullOrWhiteSpace(reason) ? "(unspecified)" : $"\"{reason}\"";
+    }
 
-            LogDispatcherForwardingFailed(this, message, oldAddress, forwardingAddress, failedOperation, message.ForwardCount, exception);
-        }
+    private readonly struct OldAddressLogRecord(GrainAddress? oldAddress)
+    {
+        public override string ToString() => oldAddress?.ToString() ?? "(unknown)";
+    }
 
-        internal void OnDispatcherForwardingMultiple(int messageCount, GrainAddress oldAddress, SiloAddress forwardingAddress, string failedOperation, Exception exception)
-        {
-            if (this.IsEnabled(DispatcherForwardingMultipleEventName))
-            {
-                this.Write(DispatcherForwardingMultipleEventName, new { MessageCount = messageCount, OldAddress = oldAddress, ForwardingAddress = forwardingAddress, FailedOperation = failedOperation, Exception = exception });
-            }
-
-            if (this.IsEnabled(LogLevel.Debug))
-            {
-                LogDispatcherForwardingMultiple(this, messageCount, oldAddress, forwardingAddress, failedOperation, exception);
-            }
-        }
-
-        internal void OnDispatcherSelectTargetFailed(Message message, Exception exception)
-        {
-            if (this.IsEnabled(DispatcherSelectTargetFailedEventName))
-            {
-                this.Write(DispatcherSelectTargetFailedEventName, new { Message = message, Exception = exception });
-            }
-
-            if (ShouldLogError(exception))
-            {
-                LogDispatcherSelectTargetFailed(this, message, exception);
-            }
-
-            MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
-
-            static bool ShouldLogError(Exception ex)
-            {
-                return !(ex.GetBaseException() is KeyNotFoundException) &&
-                       !(ex.GetBaseException() is ClientNotAvailableException);
-            }
-        }
+    private readonly struct ForwardingAddressLogRecord(SiloAddress? forwardingAddress)
+    {
+        public override string ToString() => forwardingAddress?.ToString() ?? "(unknown)";
     }
 }

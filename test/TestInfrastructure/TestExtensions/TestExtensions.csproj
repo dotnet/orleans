@@ -5,10 +5,12 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.BroadcastChannel\Orleans.BroadcastChannel.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="System.Reactive" />
     <PackageReference Include="xunit.assert" />
     <PackageReference Include="xunit.extensibility.core" />
     <PackageReference Include="xunit.extensibility.execution" />

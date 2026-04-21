@@ -12,7 +12,7 @@ namespace Orleans.Streaming.NATS;
 /// <summary>
 /// Wrapper around a NATS JetStream consumer
 /// </summary>
-internal sealed class NatsStreamConsumer(
+internal sealed partial class NatsStreamConsumer(
     ILoggerFactory loggerFactory,
     NatsJSContext context,
     string provider,
@@ -32,16 +32,51 @@ internal sealed class NatsStreamConsumer(
     };
 
     private INatsJSConsumer? _consumer;
+    private int _consecutiveInitFailures;
+
+    // Log on the 1st attempt, then every 100th to avoid flooding at ~100ms poll cadence.
+    private const int InitLogInterval = 100;
 
     public async Task<(NatsStreamMessage[] Messages, int Count)> GetMessages(int messageCount = 0,
         CancellationToken cancellationToken = default)
     {
         if (this._consumer is null)
         {
-            this._logger.LogError(
-                "Internal NATS Consumer is not initialized. Provider: {Provider} | Stream: {Stream} | Partition: {Partition}.",
-                provider, stream, partition);
-            return ([], 0);
+            // Lazy retry: attempt re-initialization on each poll cycle.
+            // This handles transient failures during initial Initialize()
+            // (leader election, timeout, network blip).
+            var shouldLog = this._consecutiveInitFailures % InitLogInterval == 0;
+            try
+            {
+                if (shouldLog)
+                {
+                    this.LogConsumerReinitializationAttempt(this._consecutiveInitFailures + 1, provider, stream, partition);
+                }
+
+                await Initialize(cancellationToken);
+                if (this._consecutiveInitFailures > 0)
+                {
+                    this.LogConsumerReinitialized(this._consecutiveInitFailures, provider, stream, partition);
+                }
+
+                this._consecutiveInitFailures = 0;
+            }
+            catch (Exception ex)
+            {
+                this._consecutiveInitFailures++;
+                if (shouldLog)
+                {
+                    this.LogConsumerReinitializationFailed(ex, this._consecutiveInitFailures, provider, stream, partition);
+                }
+
+                return ([], 0);
+            }
+
+            // If still null after retry, bail (next poll will retry again)
+            if (this._consumer is null)
+            {
+                return ([], 0);
+            }
         }
 
         var batchCount = messageCount > 0 && messageCount < batchSize ? messageCount : batchSize;
@@ -57,8 +92,7 @@ internal sealed class NatsStreamConsumer(
             var streamMessage = msg.Data;
             if (streamMessage is null)
             {
-                this._logger.LogWarning("Unable to deserialize NATS message for subject {Subject}. Ignoring...",
-                    msg.Subject);
+                this.LogUnableToDeserializeMessage(msg.Subject);
                 continue;
             }
 
@@ -82,4 +116,20 @@ internal sealed class NatsStreamConsumer(
 
         this._consumer = consumer;
     }
+
+    #region Logging
+
+    [LoggerMessage(1, LogLevel.Warning, "NATS consumer is not initialized. Attempting re-initialization on attempt {Attempt} for provider '{Provider}', stream '{Stream}', and partition '{Partition}'.")]
+    private partial void LogConsumerReinitializationAttempt(int attempt, string provider, string stream, uint partition);
+
+    [LoggerMessage(2, LogLevel.Information, "NATS consumer re-initialized successfully after {Attempts} failed attempt(s) for provider '{Provider}', stream '{Stream}', and partition '{Partition}'.")]
+    private partial void LogConsumerReinitialized(int attempts, string provider, string stream, uint partition);
+
+    [LoggerMessage(3, LogLevel.Warning, "NATS consumer re-initialization failed on attempt {Attempt} for provider '{Provider}', stream '{Stream}', and partition '{Partition}'. Will retry on the next poll.")]
+    private partial void LogConsumerReinitializationFailed(Exception exception, int attempt, string provider, string stream, uint partition);
+
+    [LoggerMessage(4, LogLevel.Warning, "Unable to deserialize the NATS message for subject '{Subject}'. Ignoring it.")]
+    private partial void LogUnableToDeserializeMessage(string subject);
+
+    #endregion Logging
 }

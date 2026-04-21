@@ -131,28 +131,27 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
-
-            TimeSpan period = await g1.GetReminderPeriod(DR);
+            using var cts = new CancellationTokenSource(CHURN_ENDWAIT);
 
             Task<bool>[] tasks =
             {
-                Task.Run(() => PerGrainMultiReminderTestChurn(g1)),
-                Task.Run(() => PerGrainMultiReminderTestChurn(g2)),
-                Task.Run(() => PerGrainMultiReminderTestChurn(g3)),
-                Task.Run(() => PerGrainMultiReminderTestChurn(g4)),
-                Task.Run(() => PerGrainMultiReminderTestChurn(g5)),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g1, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g2, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g3, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g4, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTestChurn(g5, cts.Token), cts.Token),
             };
 
-            await Task.Delay(period.Multiply(5));
+            await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
 
             // start two extra silos ... although it will take it a while before they stabilize
             log.LogInformation("Starting 2 extra silos");
 
-            await this.HostedCluster.StartAdditionalSilosAsync(2, true);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            await this.HostedCluster.StartAdditionalSilosAsync(2, true).WaitAsync(cts.Token);
+            await this.HostedCluster.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
 
             //Block until all tasks complete.
-            await Task.WhenAll(tasks).WaitAsync(ENDWAIT);
+            await Task.WhenAll(tasks).WaitAsync(cts.Token);
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -163,35 +162,37 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            using var cts = new CancellationTokenSource(ENDWAIT);
 
             Task<bool>[] tasks =
             {
-                Task.Run(() => PerGrainMultiReminderTest(g1)),
-                Task.Run(() => PerGrainMultiReminderTest(g2)),
-                Task.Run(() => PerGrainMultiReminderTest(g3)),
-                Task.Run(() => PerGrainMultiReminderTest(g4)),
-                Task.Run(() => PerGrainMultiReminderTest(g5)),
+                Task.Run(() => PerGrainMultiReminderTest(g1, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTest(g2, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTest(g3, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTest(g4, cts.Token), cts.Token),
+                Task.Run(() => PerGrainMultiReminderTest(g5, cts.Token), cts.Token),
             };
 
             //Block until all tasks complete.
-            await Task.WhenAll(tasks).WaitAsync(ENDWAIT);
+            await Task.WhenAll(tasks).WaitAsync(cts.Token);
         }
 
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F_Basic()
         {
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            using var cts = new CancellationTokenSource(ENDWAIT);
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
-            Task<bool> test = Task.Run(async () => { await PerGrainFailureTest(g1); return true; });
+            Task<bool> test = Task.Run(() => PerGrainFailureTest(g1, cts.Token), cts.Token);
 
             Thread.Sleep(period.Multiply(failAfter));
             // stop the secondary silo
             log.LogInformation("Stopping secondary silo");
             await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos.First());
 
-            await test; // Block until test completes.
+            await test.WaitAsync(cts.Token); // Block until test completes.
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -204,16 +205,17 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            using var cts = new CancellationTokenSource(ENDWAIT);
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
             {
-                Task.Run(() => PerGrainFailureTest(g1)),
-                Task.Run(() => PerGrainFailureTest(g2)),
-                Task.Run(() => PerGrainFailureTest(g3)),
-                Task.Run(() => PerGrainFailureTest(g4)),
-                Task.Run(() => PerGrainFailureTest(g5)),
+                Task.Run(() => PerGrainFailureTest(g1, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g2, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g3, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g4, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g5, cts.Token), cts.Token),
             };
 
             Thread.Sleep(period.Multiply(failAfter));
@@ -225,7 +227,7 @@ namespace Tester.AzureUtils.TimerTests
             silos.RemoveAt(i);
             await this.HostedCluster.StopSiloAsync(silos[Random.Shared.Next(silos.Count)]);
 
-            await Task.WhenAll(tasks).WaitAsync(ENDWAIT); // Block until all tasks complete.
+            await Task.WhenAll(tasks).WaitAsync(cts.Token); // Block until all tasks complete.
         }
 
         [SkippableFact, TestCategory("Functional")]
@@ -239,16 +241,17 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g3 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+            using var cts = new CancellationTokenSource(ENDWAIT);
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
             {
-                Task.Run(() => PerGrainFailureTest(g1)),
-                Task.Run(() => PerGrainFailureTest(g2)),
-                Task.Run(() => PerGrainFailureTest(g3)),
-                Task.Run(() => PerGrainFailureTest(g4)),
-                Task.Run(() => PerGrainFailureTest(g5)),
+                Task.Run(() => PerGrainFailureTest(g1, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g2, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g3, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g4, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g5, cts.Token), cts.Token),
             };
 
             Thread.Sleep(period.Multiply(failAfter));
@@ -261,9 +264,9 @@ namespace Tester.AzureUtils.TimerTests
             {
                 t.GetAwaiter().GetResult();
             });
-            await Task.WhenAll(new[] { t1, t2 }).WaitAsync(ENDWAIT);
+            await Task.WhenAll(new[] { t1, t2 }).WaitAsync(cts.Token);
 
-            await Task.WhenAll(tasks).WaitAsync(ENDWAIT); // Block until all tasks complete.
+            await Task.WhenAll(tasks).WaitAsync(cts.Token); // Block until all tasks complete.
             log.LogInformation("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
         }
 
@@ -314,15 +317,16 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestCopyGrain g3 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
             IReminderTestCopyGrain g4 = this.GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
+            using var cts = new CancellationTokenSource(ENDWAIT);
 
             TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
             {
-                Task.Run(() => PerGrainFailureTest(g1)),
-                Task.Run(() => PerGrainFailureTest(g2)),
-                Task.Run(() => PerCopyGrainFailureTest(g3)),
-                Task.Run(() => PerCopyGrainFailureTest(g4)),
+                Task.Run(() => PerGrainFailureTest(g1, cts.Token), cts.Token),
+                Task.Run(() => PerGrainFailureTest(g2, cts.Token), cts.Token),
+                Task.Run(() => PerCopyGrainFailureTest(g3, cts.Token), cts.Token),
+                Task.Run(() => PerCopyGrainFailureTest(g4, cts.Token), cts.Token),
             };
 
             Thread.Sleep(period.Multiply(failAfter));
@@ -332,9 +336,9 @@ namespace Tester.AzureUtils.TimerTests
             log.LogInformation("Stopping a silo and joining a silo");
             Task t1 = Task.Run(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
             Task t2 = Task.Run(async () => await this.HostedCluster.StartAdditionalSilosAsync(1));
-            await Task.WhenAll(new[] { t1, t2 }).WaitAsync(ENDWAIT);
+            await Task.WhenAll(new[] { t1, t2 }).WaitAsync(cts.Token);
 
-            await Task.WhenAll(tasks).WaitAsync(ENDWAIT); // Block until all tasks complete.
+            await Task.WhenAll(tasks).WaitAsync(cts.Token); // Block until all tasks complete.
         }
 
         [SkippableFact, TestCategory("Functional")]

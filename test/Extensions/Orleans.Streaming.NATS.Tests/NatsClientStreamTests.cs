@@ -27,7 +27,7 @@ public class NatsClientStreamTests : TestClusterPerTest
             throw new SkipException("Nats Server is not available");
         }
 
-        this.natsConnection = new NatsConnection();
+        this.natsConnection = NatsTestConstants.CreateConnection();
         this.natsContext = new NatsJSContext(this.natsConnection);
     }
 
@@ -84,6 +84,7 @@ public class NatsClientStreamTests : TestClusterPerTest
                 .AddNatsStreams(NatsStreamProviderName, options =>
                 {
                     options.StreamName = TestStreamName;
+                    options.NatsClientOptions = NatsTestConstants.NatsClientOptions;
                 })
                 .AddMemoryGrainStorage("PubSubStore")
                 .Configure<SiloMessagingOptions>(options => options.ClientDropTimeout = TimeSpan.FromSeconds(5));
@@ -98,6 +99,7 @@ public class NatsClientStreamTests : TestClusterPerTest
                 .AddNatsStreams(NatsStreamProviderName, options =>
                 {
                     options.StreamName = TestStreamName;
+                    options.NatsClientOptions = NatsTestConstants.NatsClientOptions;
                 });
             ;
         }

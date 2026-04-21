@@ -16,7 +16,9 @@
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Reminders.Redis\Orleans.Reminders.Redis.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Persistence.Redis\Orleans.Persistence.Redis.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.GrainDirectory.Redis\Orleans.GrainDirectory.Redis.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Redis\Orleans.Streaming.Redis\Orleans.Streaming.Redis.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
 
   </ItemGroup>
 

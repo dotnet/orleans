@@ -35,6 +35,7 @@ namespace Orleans.Transactions
             this.TransactionId = other.TransactionId;
             this.TryToCommit = other.TryToCommit;
             this.IsReadOnly = other.IsReadOnly;
+            this.UseExclusiveLock = other.UseExclusiveLock;
             this.TimeStamp = other.TimeStamp;
             this.Priority = other.Priority;
         }
@@ -63,6 +64,9 @@ namespace Orleans.Transactions
 
         [Id(6)]
         public bool TryToCommit { get; internal set; } = true;
+
+        [Id(7)]
+        public bool UseExclusiveLock { get; set; } = false;
 
         [NonSerialized]
         public int PendingCalls;

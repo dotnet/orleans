@@ -103,10 +103,10 @@ namespace ServiceBus.Tests.StreamingTests
         }
 
         [SkippableFact, TestCategory("EventHub"), TestCategory("Streaming")]
-        public async Task EHTwoIntermitentStreamTest()
+        public async Task EHTwoIntermittentStreamTest()
         {
-            this.fixture.Logger.LogInformation("************************ EHTwoIntermitentStreamTest *********************************");
-            await runner.TwoIntermitentStreamTest(Guid.NewGuid());
+            this.fixture.Logger.LogInformation("************************ EHTwoIntermittentStreamTest *********************************");
+            await runner.TwoIntermittentStreamTest(Guid.NewGuid());
         }
     }
 }
