@@ -84,5 +84,29 @@ namespace Orleans.TestingHost
             }
             return Task.CompletedTask;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Activate."
+        )]
+        private static partial void LogInformationActivated(ILogger logger);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Added ReadState fault for {GrainId}."
+        )]
+        private static partial void LogInformationAddedReadStateFault(ILogger logger, GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Added WriteState fault for {GrainId}."
+        )]
+        private static partial void LogInformationAddedWriteStateFault(ILogger logger, GrainId grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Added ClearState fault for {GrainId}."
+        )]
+        private static partial void LogInformationAddedClearStateFault(ILogger logger, GrainId grainId);
     }
 }

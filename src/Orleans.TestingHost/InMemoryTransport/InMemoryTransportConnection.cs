@@ -88,4 +88,10 @@ internal partial class InMemoryTransportConnection : TransportConnection
     }
 
     public override string ToString() => $"InMem({LocalEndPoint}<->{RemoteEndPoint})";
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Connection id \"{ConnectionId}\" closing because: \"{Message}\""
+    )]
+    private static partial void LogDebugConnectionClosing(ILogger logger, string connectionId, string? message);
 }

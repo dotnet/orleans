@@ -120,6 +120,42 @@ namespace Orleans.TestingHost
         {
             (realStorageProvider as ILifecycleParticipant<ISiloLifecycle>)?.Participate(lifecycle);
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Fault injected for ReadState for grain {GrainId} of type {GrainType}"
+        )]
+        private static partial void LogInformationFaultInjectedForReadState(ILogger logger, GrainId grainId, string grainType);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "ReadState for grain {GrainId} of type {GrainType}"
+        )]
+        private static partial void LogInformationReadState(ILogger logger, GrainId grainId, string grainType);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Fault injected for WriteState for grain {GrainId} of type {GrainType}"
+        )]
+        private static partial void LogInformationFaultInjectedForWriteState(ILogger logger, GrainId grainId, string grainType);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "WriteState for grain {GrainId} of type {GrainType}"
+        )]
+        private static partial void LogInformationWriteState(ILogger logger, GrainId grainId, string grainType);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Fault injected for ClearState for grain {GrainId} of type {GrainType}"
+        )]
+        private static partial void LogInformationFaultInjectedForClearState(ILogger logger, GrainId grainId, string grainType);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "ClearState for grain {GrainId} of type {GrainType}"
+        )]
+        private static partial void LogInformationClearState(ILogger logger, GrainId grainId, string grainType);
     }
 
     /// <summary>
