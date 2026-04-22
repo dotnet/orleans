@@ -13,7 +13,7 @@ namespace Orleans.TestingHost
     /// <summary>
     /// Grain that tracks storage exceptions to be injected.
     /// </summary>
-    public class StorageFaultGrain : Grain, IStorageFaultGrain
+    public partial class StorageFaultGrain : Grain, IStorageFaultGrain
     {
         private ILogger logger;
         private Dictionary<GrainId, Exception> readFaults;
@@ -28,14 +28,14 @@ namespace Orleans.TestingHost
             readFaults = new();
             writeFaults = new();
             clearfaults = new();
-            logger.LogInformation("Activate.");
+            LogInformationActivated(logger);
         }
 
         /// <inheritdoc />
         public Task AddFaultOnRead(GrainId grainId, Exception exception)
         {
             readFaults.Add(grainId, exception);
-            logger.LogInformation("Added ReadState fault for {GrainId}.", GrainId);
+            LogInformationAddedReadStateFault(logger, GrainId);
             return Task.CompletedTask;
         }
 
@@ -43,7 +43,7 @@ namespace Orleans.TestingHost
         public Task AddFaultOnWrite(GrainId grainId, Exception exception)
         {
             writeFaults.Add(grainId, exception);
-            logger.LogInformation("Added WriteState fault for {GrainId}.", GrainId);
+            LogInformationAddedWriteStateFault(logger, GrainId);
             return Task.CompletedTask;
         }
 
@@ -51,7 +51,7 @@ namespace Orleans.TestingHost
         public Task AddFaultOnClear(GrainId grainId, Exception exception)
         {
             clearfaults.Add(grainId, exception);
-            logger.LogInformation("Added ClearState fault for {GrainId}.", GrainId);
+            LogInformationAddedClearStateFault(logger, GrainId);
             return Task.CompletedTask;
         }
 
