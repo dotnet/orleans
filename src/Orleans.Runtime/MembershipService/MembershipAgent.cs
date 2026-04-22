@@ -515,5 +515,11 @@ namespace Orleans.Runtime.MembershipService
             Message = "Failure updating status to Dead"
         )]
         private partial void LogErrorFailureUpdatingStatusToDead(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Graceful shutdown aborted: starting ungraceful shutdown"
+        )]
+        private static partial void LogWarningGracefulShutdownAborted(ILogger logger);
     }
 }

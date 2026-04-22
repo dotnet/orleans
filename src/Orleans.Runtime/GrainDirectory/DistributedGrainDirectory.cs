@@ -464,4 +464,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         Message = "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms"
     )]
     private static partial void LogDebugSubmittingRegisteredActivations(ILogger logger, int count, RingRange range, MembershipVersion membershipVersion, int deactivationCount, long elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'."
+    )]
+    private static partial void LogTraceInvokingOperation(ILogger logger, string operation, SiloAddress owner, GrainId grainId);
 }
