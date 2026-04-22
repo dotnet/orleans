@@ -6,7 +6,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Transactions.TestKit
 {
-    public class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector
+    public partial class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector
     {
         public bool InjectBeforeStore { get; set; }
         public bool InjectAfterStore { get; set; }
@@ -25,7 +25,7 @@ namespace Orleans.Transactions.TestKit
                 InjectAfterStore = false;
                 this.injectionAfterStoreCounter++;
                 var message = $"Storage exception thrown after store, thrown total {injectionAfterStoreCounter}";
-                this.logger.LogInformation(message);
+                LogInformationMessage(this.logger, message);
                 throw new SimpleAzureStorageException(message);
             }
         }
@@ -37,7 +37,7 @@ namespace Orleans.Transactions.TestKit
                 InjectBeforeStore = false;
                 this.injectionBeforeStoreCounter++;
                 var message = $"Storage exception thrown before store. Thrown total {injectionBeforeStoreCounter}";
-                this.logger.LogInformation(message);
+                LogInformationMessage(this.logger, message);
                 throw new SimpleAzureStorageException(message);
             }
         }

@@ -15,7 +15,7 @@ namespace Orleans.Transactions.TestKit
     // TODO : Replace with more complete service implementation which:
     // - can be called to verify that commit service receive Callme with proper args.
     // - can produce errors for fault senarios.
-    public class RemoteCommitService : IRemoteCommitService
+    public partial class RemoteCommitService : IRemoteCommitService
     {
         private readonly ILogger logger;
 
@@ -26,21 +26,21 @@ namespace Orleans.Transactions.TestKit
 
         public async Task<bool> Pass(Guid transactionId, string data)
         {
-            this.logger.LogInformation("Transaction {TransactionId} Passed with data: {Data}", transactionId, data);
+            LogInformationTransactionPassed(this.logger, transactionId, data);
             await Task.Delay(30);
             return true;
         }
 
         public async Task<bool> Fail(Guid transactionId, string data)
         {
-            this.logger.LogInformation("Transaction {TransactionId} Failed with data: {Data}", transactionId, data);
+            LogInformationTransactionFailed(this.logger, transactionId, data);
             await Task.Delay(30);
             return false;
         }
 
         public async Task<bool> Throw(Guid transactionId, string data)
         {
-            this.logger.LogInformation("Transaction {TransactionId} Threw with data: {Data}", transactionId, data);
+            LogInformationTransactionThrew(this.logger, transactionId, data);
             await Task.Delay(30);
             throw new ApplicationException("Transaction {transactionId} Threw with data: {data}");
         }

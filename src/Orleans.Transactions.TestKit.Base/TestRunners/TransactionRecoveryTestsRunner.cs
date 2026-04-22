@@ -12,7 +12,7 @@ using Orleans.Transactions.TestKit.Correctnesss;
 #nullable disable
 namespace Orleans.Transactions.TestKit
 {
-    public class TransactionRecoveryTestsRunner : TransactionTestRunnerBase
+    public partial class TransactionRecoveryTestsRunner : TransactionTestRunnerBase
     {
         private static readonly TimeSpan RecoveryTimeout = TimeSpan.FromSeconds(60);
         // reduce to or remove once we fix timeouts abort
@@ -24,7 +24,7 @@ namespace Orleans.Transactions.TestKit
         protected void Log(string message)
         {
             this.testOutput($"[{DateTime.Now}] {message}");
-            this.logger.LogInformation(message);
+            LogInformationMessage(this.logger, message);
         }
 
         private class ExpectedGrainActivity
