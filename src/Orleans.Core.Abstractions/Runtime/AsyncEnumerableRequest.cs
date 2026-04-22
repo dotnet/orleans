@@ -392,6 +392,12 @@ internal sealed partial class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             Activity.Current = previousActivity;
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to dispose async enumerator."
+    )]
+    private static partial void LogWarningFailedToDisposeAsyncEnumerator(ILogger logger, Exception exception);
 }
 
 public static class AsyncEnumerableExtensions
