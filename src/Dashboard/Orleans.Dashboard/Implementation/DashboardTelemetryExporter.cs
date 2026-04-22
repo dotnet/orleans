@@ -121,4 +121,10 @@ internal sealed partial class DashboardTelemetryExporter(
 
         return delta.ToString(CultureInfo.InvariantCulture);
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Ignoring unknown metric type {MetricType}"
+    )]
+    private static partial void LogWarningIgnoringUnknownMetricType(ILogger logger, MetricType metricType);
 }

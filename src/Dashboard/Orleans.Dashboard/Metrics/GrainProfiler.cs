@@ -121,4 +121,11 @@ internal sealed partial class GrainProfiler(
     }
 
     public void Enable(bool enabled) => _isEnabled = enabled;
+
+    [LoggerMessage(
+        EventId = 100001,
+        Level = LogLevel.Warning,
+        Message = "Exception thrown sending tracing to dashboard grain"
+    )]
+    private static partial void LogWarningSubmitTracingFailed(ILogger logger, Exception exception);
 }

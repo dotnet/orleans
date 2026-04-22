@@ -119,4 +119,18 @@ internal sealed partial class GrainProfilerFilter(
 
         return shouldSkip;
     }
+
+    [LoggerMessage(
+        EventId = 100002,
+        Level = LogLevel.Error,
+        Message = "error recording results for grain"
+    )]
+    private static partial void LogErrorRecordingResultsForGrain(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        EventId = 100003,
+        Level = LogLevel.Error,
+        Message = "error reading NoProfilingAttribute attribute for grain"
+    )]
+    private static partial void LogErrorReadingNoProfilingAttribute(ILogger logger, Exception exception);
 }

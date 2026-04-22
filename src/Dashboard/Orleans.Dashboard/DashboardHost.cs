@@ -128,4 +128,16 @@ internal sealed partial class DashboardHost(
 
         return "1.0.0.0";
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Unable to activate silo grain service during startup. The service will be activated on first use."
+    )]
+    private static partial void LogWarningActivateSiloGrainServiceStartupFailed(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Unable to activate dashboard grain during startup. The grain will be activated on first use."
+    )]
+    private static partial void LogWarningActivateDashboardGrainStartupFailed(ILogger logger, Exception exception);
 }

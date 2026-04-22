@@ -140,4 +140,10 @@ internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
 
         return Task.CompletedTask;
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Not running in Orleans runtime"
+    )]
+    private static partial void LogWarningNotRunningInOrleansRuntime(ILogger logger);
 }
