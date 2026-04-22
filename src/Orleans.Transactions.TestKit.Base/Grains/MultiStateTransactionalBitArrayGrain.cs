@@ -201,7 +201,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
     }
 
     [GrainType("txn-correctness-MultiStateTransactionalBitArrayGrain")]
-    public class MultiStateTransactionalBitArrayGrain : Grain, ITransactionalBitArrayGrain
+    public partial class MultiStateTransactionalBitArrayGrain : Grain, ITransactionalBitArrayGrain
     {
         protected ITransactionalState<BitArrayState>[] dataArray;
         private readonly ILoggerFactory loggerFactory;
@@ -218,7 +218,7 @@ namespace Orleans.Transactions.TestKit.Correctnesss
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
-            this.logger.LogTrace("GrainId: {GrainId}.", this.GetPrimaryKey());
+            LogTraceGrainId(this.logger, this.GetPrimaryKey());
 
             return base.OnActivateAsync(cancellationToken);
         }
@@ -233,9 +233,9 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return Task.WhenAll(this.dataArray
                 .Select(data => data.PerformUpdate(state =>
                 {
-                    this.logger.LogTrace("Setting bit {Index} in state {State}. Transaction {CurrentTransactionId}", index, state, TransactionContext.CurrentTransactionId);
+                    LogTraceSettingBit(this.logger, index, state, TransactionContext.CurrentTransactionId);
                     state.Set(index, true);
-                    this.logger.LogTrace("Set bit {Index} in state {State}.", index, state);
+                    LogTraceSetBit(this.logger, index, state);
                 })));
         }
 
@@ -244,9 +244,33 @@ namespace Orleans.Transactions.TestKit.Correctnesss
             return (await Task.WhenAll(this.dataArray
                 .Select(state => state.PerformRead(s =>
                 {
-                    this.logger.LogTrace("Get state {State}.", s);
+                    LogTraceGetState(this.logger, s);
                     return s;
                 })))).ToList();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "GrainId: {GrainId}."
+        )]
+        private static partial void LogTraceGrainId(ILogger logger, Guid grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Setting bit {Index} in state {State}. Transaction {CurrentTransactionId}"
+        )]
+        private static partial void LogTraceSettingBit(ILogger logger, int index, BitArrayState state, object currentTransactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Set bit {Index} in state {State}."
+        )]
+        private static partial void LogTraceSetBit(ILogger logger, int index, BitArrayState state);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Get state {State}."
+        )]
+        private static partial void LogTraceGetState(ILogger logger, BitArrayState state);
     }
 }
