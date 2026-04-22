@@ -57,5 +57,35 @@ namespace Orleans.Transactions.TestKit
             });
             return new int[] { result };
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Setting from {Value} to {NewValue}."
+        )]
+        private static partial void LogInformationSettingValue(ILogger logger, int value, int newValue);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Set to {Value}."
+        )]
+        private static partial void LogInformationSetValue(ILogger logger, int value);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Adding {NumberToAdd} to value {Value}."
+        )]
+        private static partial void LogInformationAddingValue(ILogger logger, int numberToAdd, int value);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Value after Adding {NumberToAdd} is {Value}."
+        )]
+        private static partial void LogInformationValueAfterAdd(ILogger logger, int numberToAdd, int value);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Get {Value}."
+        )]
+        private static partial void LogInformationGetValue(ILogger logger, int value);
     }
 }

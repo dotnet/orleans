@@ -82,5 +82,23 @@ namespace Orleans.Transactions.TestKit
             this.DeactivateOnIdle();
             return Task.CompletedTask;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "GrainId {GrainId}"
+        )]
+        private static partial void LogInformationGrainId(ILogger logger, Guid grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Setting value {NewValue}."
+        )]
+        private static partial void LogInformationSettingValue(ILogger logger, int newValue);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Adding {NumberToAdd} to value {Value}."
+        )]
+        private static partial void LogInformationAddingValue(ILogger logger, int numberToAdd, int value);
     }
 }

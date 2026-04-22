@@ -294,5 +294,11 @@ namespace Orleans.Transactions.TestKit
             this.Log($"Report complete : {pass}");
             pass.Should().BeTrue();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "{Message}"
+        )]
+        private static partial void LogInformationMessage(ILogger logger, string message);
     }
 }

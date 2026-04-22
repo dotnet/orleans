@@ -44,6 +44,24 @@ namespace Orleans.Transactions.TestKit
             await Task.Delay(30);
             throw new ApplicationException("Transaction {transactionId} Threw with data: {data}");
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Transaction {TransactionId} Passed with data: {Data}"
+        )]
+        private static partial void LogInformationTransactionPassed(ILogger logger, Guid transactionId, string data);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Transaction {TransactionId} Failed with data: {Data}"
+        )]
+        private static partial void LogInformationTransactionFailed(ILogger logger, Guid transactionId, string data);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Transaction {TransactionId} Threw with data: {Data}"
+        )]
+        private static partial void LogInformationTransactionThrew(ILogger logger, Guid transactionId, string data);
     }
 
     [Serializable]

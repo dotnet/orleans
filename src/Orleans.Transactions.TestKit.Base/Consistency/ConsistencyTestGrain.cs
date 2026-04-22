@@ -172,5 +172,29 @@ namespace Orleans.Transactions.TestKit.Consistency
                 throw;
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "g{MyNumber} {CurrentTransactionId} {Stack} Write"
+        )]
+        private static partial void LogTraceWrite(ILogger logger, int myNumber, object currentTransactionId, string stack);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "g{MyNumber} {CurrentTransactionId} {Stack} Read"
+        )]
+        private static partial void LogTraceRead(ILogger logger, int myNumber, object currentTransactionId, string stack);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "g{MyNumber} {CurrentTransactionId} {Stack} --> {ExceptionType}"
+        )]
+        private static partial void LogTraceException(ILogger logger, int myNumber, object currentTransactionId, string stack, string exceptionType);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "g{MyNumber} {CurrentTransactionId} {Stack} Recurse {Count} {ParallelOrSequential}"
+        )]
+        private static partial void LogTraceRecurse(ILogger logger, int myNumber, object currentTransactionId, string stack, int count, string parallelOrSequential);
     } 
 }

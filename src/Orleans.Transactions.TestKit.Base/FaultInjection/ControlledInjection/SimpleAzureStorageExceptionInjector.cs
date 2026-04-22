@@ -41,6 +41,12 @@ namespace Orleans.Transactions.TestKit
                 throw new SimpleAzureStorageException(message);
             }
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "{Message}"
+        )]
+        private static partial void LogInformationMessage(ILogger logger, string message);
     }
 
     [GenerateSerializer]

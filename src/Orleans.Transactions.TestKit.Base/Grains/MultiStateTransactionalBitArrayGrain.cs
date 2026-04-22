@@ -248,5 +248,29 @@ namespace Orleans.Transactions.TestKit.Correctnesss
                     return s;
                 })))).ToList();
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "GrainId: {GrainId}."
+        )]
+        private static partial void LogTraceGrainId(ILogger logger, Guid grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Setting bit {Index} in state {State}. Transaction {CurrentTransactionId}"
+        )]
+        private static partial void LogTraceSettingBit(ILogger logger, int index, BitArrayState state, object currentTransactionId);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Set bit {Index} in state {State}."
+        )]
+        private static partial void LogTraceSetBit(ILogger logger, int index, BitArrayState state);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "Get state {State}."
+        )]
+        private static partial void LogTraceGetState(ILogger logger, BitArrayState state);
     }
 }
