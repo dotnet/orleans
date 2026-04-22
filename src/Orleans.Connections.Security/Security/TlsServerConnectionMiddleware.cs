@@ -252,5 +252,19 @@ namespace Orleans.Connections.Security
 
             return certificate as X509Certificate2 ?? new X509Certificate2(certificate);
         }
+
+        [LoggerMessage(
+            EventId = 2,
+            Level = LogLevel.Warning,
+            Message = "Authentication timed out"
+        )]
+        private static partial void LogWarningAuthenticationTimedOut(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            EventId = 1,
+            Level = LogLevel.Warning,
+            Message = "Authentication failed"
+        )]
+        private static partial void LogWarningAuthenticationFailed(ILogger logger, Exception exception);
     }
 }
