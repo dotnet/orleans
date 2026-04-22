@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 #nullable disable
 namespace Orleans.Connections.Security
 {
-    internal class TlsClientConnectionMiddleware
+    internal partial class TlsClientConnectionMiddleware
     {
         private readonly ConnectionDelegate _next;
         private readonly TlsOptions _options;
@@ -143,13 +143,19 @@ namespace Orleans.Connections.Security
                 }
                 catch (OperationCanceledException ex)
                 {
-                    _logger?.LogWarning(2, ex, "Authentication timed out");
+                    if (_logger is { } logger)
+                    {
+                        LogWarningAuthenticationTimedOut(logger, ex);
+                    }
                     await sslStream.DisposeAsync();
                     return;
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(1, ex, "Authentication failed");
+                    if (_logger is { } logger)
+                    {
+                        LogWarningAuthenticationFailed(logger, ex);
+                    }
                     await sslStream.DisposeAsync();
                     return;
                 }
