@@ -173,7 +173,7 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
             catch (Exception ex)
             {
                 // Log but continue - we'll let another silo claim it
-                _logger.LogWarning(ex, "Failed to release ownership of shard '{ShardId}' that was not in cache", blobName);
+                LogWarningReleaseOwnershipNotInCache(_logger, ex, blobName);
             }
         }
 
@@ -448,6 +448,12 @@ public sealed partial class AzureStorageJobShardManager : JobShardManager
         Message = "Failed to take ownership of shard '{ShardId}' for silo {SiloAddress}"
     )]
     private static partial void LogOwnershipFailed(ILogger logger, Exception exception, string shardId, SiloAddress siloAddress);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to release ownership of shard '{ShardId}' that was not in cache"
+    )]
+    private static partial void LogWarningReleaseOwnershipNotInCache(ILogger logger, Exception exception, string shardId);
 
     [LoggerMessage(
         Level = LogLevel.Information,

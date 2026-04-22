@@ -145,7 +145,7 @@ public sealed class DurableJobsOptions
     }
 }
 
-public sealed class DurableJobsOptionsValidator : IConfigurationValidator
+public sealed partial class DurableJobsOptionsValidator : IConfigurationValidator
 {
     private readonly ILogger<DurableJobsOptionsValidator> _logger;
     private readonly IOptions<DurableJobsOptions> _options;
@@ -177,10 +177,7 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         }
         if (options.ConcurrencySlowStartEnabled && options.SlowStartInitialConcurrency > options.MaxConcurrentJobsPerSilo)
         {
-            _logger.LogWarning(
-                "DurableJobsOptions.SlowStartInitialConcurrency ({SlowStartInitialConcurrency}) exceeds MaxConcurrentJobsPerSilo ({MaxConcurrentJobsPerSilo}); slow start will not be applied.",
-                options.SlowStartInitialConcurrency,
-                options.MaxConcurrentJobsPerSilo);
+            LogWarningSlowStartInitialConcurrencyExceedsMax(_logger, options.SlowStartInitialConcurrency, options.MaxConcurrentJobsPerSilo);
         }
         if (options.MaxAdoptedCount < 0)
         {
@@ -198,6 +195,6 @@ public sealed class DurableJobsOptionsValidator : IConfigurationValidator
         {
             throw new OrleansConfigurationException("DurableJobsOptions.ShardClaimRampUpDuration must be non-negative.");
         }
-        _logger.LogInformation("DurableJobsOptions validated: ShardDuration={ShardDuration}", options.ShardDuration);
+        LogInformationOptionsValidated(_logger, options.ShardDuration);
     }
 }
