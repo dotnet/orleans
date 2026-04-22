@@ -220,8 +220,22 @@ namespace Orleans.Core
             var errorString = errorCode is { Length: > 0 } ? $" Error: {errorCode}" : null;
 
             var grainId = _grainContext.GrainId;
-            // TODO: pending on https://github.com/dotnet/runtime/issues/110570
-            _shared.Logger.LogError((int)id, exception, "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}", _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+            switch (id)
+            {
+                case ErrorCode.StorageProvider_ReadFailed:
+                    LogErrorStorageReadFailed(_shared.Logger, exception, _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+                    break;
+                case ErrorCode.StorageProvider_WriteFailed:
+                    LogErrorStorageWriteFailed(_shared.Logger, exception, _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+                    break;
+                case ErrorCode.StorageProvider_DeleteFailed:
+                    LogErrorStorageDeleteFailed(_shared.Logger, exception, _shared.ProviderTypeName, _shared.Name, operation, grainId, errorString);
+                    break;
+                default:
+                    var message = $"Error from storage provider {_shared.ProviderTypeName}.{_shared.Name} during {operation} for grain {grainId}{errorString}";
+                    _shared.Logger.Log(LogLevel.Error, new EventId((int)id), message, exception, static (state, _) => state);
+                    break;
+            }
 
             // If error is not specialization of OrleansException, wrap it
             if (exception is not OrleansException)
@@ -244,6 +258,27 @@ namespace Orleans.Core
             Message = "Failed to rehydrate state named {StateName} for grain {GrainId}"
         )]
         private static partial void LogErrorOnRehydrate(ILogger logger, Exception exception, string stateName, GrainId grainId);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.StorageProvider_ReadFailed,
+            Level = LogLevel.Error,
+            Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
+        )]
+        private static partial void LogErrorStorageReadFailed(ILogger logger, Exception exception, string providerName, string stateName, string operation, GrainId grainId, string? errorCode);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.StorageProvider_WriteFailed,
+            Level = LogLevel.Error,
+            Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
+        )]
+        private static partial void LogErrorStorageWriteFailed(ILogger logger, Exception exception, string providerName, string stateName, string operation, GrainId grainId, string? errorCode);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.StorageProvider_DeleteFailed,
+            Level = LogLevel.Error,
+            Message = "Error from storage provider {ProviderName}.{StateName} during {Operation} for grain {GrainId}{ErrorCode}"
+        )]
+        private static partial void LogErrorStorageDeleteFailed(ILogger logger, Exception exception, string providerName, string stateName, string operation, GrainId grainId, string? errorCode);
     }
 
     internal sealed class StateStorageBridgeSharedMap(ILoggerFactory loggerFactory, IActivatorProvider activatorProvider)

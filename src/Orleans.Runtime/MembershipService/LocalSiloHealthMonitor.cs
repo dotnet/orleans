@@ -352,7 +352,7 @@ namespace Orleans.Runtime.MembershipService
                 }
                 catch (Exception exception)
                 {
-                    _log.LogError(exception, "Exception monitoring .NET thread pool delay");
+                    LocalSiloHealthMonitor.LogThreadPoolDelayMonitorError(_log, exception);
                 }
             }
         }
@@ -397,6 +397,12 @@ namespace Orleans.Runtime.MembershipService
             Message = "Self-monitoring determined that local health is degraded. Degradation score is {Score}/{MaxScore} (lower is better). Complaints: {Complaints}"
         )]
         private partial void LogSelfMonitoringDegraded(int score, int maxScore, string complaints);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Exception monitoring .NET thread pool delay"
+        )]
+        private static partial void LogThreadPoolDelayMonitorError(ILogger logger, Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Error,
