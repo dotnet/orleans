@@ -1003,7 +1003,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                _shared.Logger.LogError(exception, "Error in grain message loop");
+                LogErrorInGrainMessageLoop(_shared.Logger, exception);
             }
         }
 

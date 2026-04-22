@@ -13,7 +13,7 @@ using Orleans.Configuration;
 namespace Orleans.Runtime.Scheduler;
 
 [DebuggerDisplay("WorkItemGroup Context={GrainContext} State={_state}")]
-internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
+internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 {
     private enum WorkGroupStatus : byte
     {
@@ -72,11 +72,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 #if DEBUG
         if (_log.IsEnabled(LogLevel.Trace))
         {
-            _log.LogTrace(
-                "EnqueueWorkItem {Task} into {GrainContext} when TaskScheduler.Current={TaskScheduler}",
-                task,
-                GrainContext,
-                System.Threading.Tasks.TaskScheduler.Current);
+            LogTraceEnqueueWorkItem(_log, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
         }
 #endif
 
@@ -107,11 +103,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
 #if DEBUG
             if (_log.IsEnabled(LogLevel.Trace))
             {
-                _log.LogTrace(
-                    "Add to RunQueue {Task}, #{SequenceNumber}, onto {GrainContext}",
-                    task,
-                    thisSequenceNumber,
-                    GrainContext);
+                LogTraceAddToRunQueue(_log, task, thisSequenceNumber, GrainContext);
             }
 #endif
             ScheduleExecution(this);
@@ -121,12 +113,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTooManyTasksInQueue(int count, int maxPendingItemsLimit)
     {
-        _log.LogWarning(
-            (int)ErrorCode.SchedulerTooManyPendingItems,
-            "{PendingWorkItemCount} pending work items for group {WorkGroupName}, exceeding the warning threshold of {WarningThreshold}",
-            count,
-            GrainContext?.ToString() ?? "Unknown",
-            maxPendingItemsLimit);
+        LogWarningTooManyPendingItems(_log, count, GrainContext?.ToString() ?? "Unknown", maxPendingItemsLimit);
     }
 
     /// <summary>
@@ -230,10 +217,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     {
         if (_log.IsEnabled(LogLevel.Trace))
         {
-            _log.LogTrace(
-            "About to execute task '{Task}' in GrainContext={GrainContext}",
-            task,
-            GrainContext);
+            LogTraceAboutToExecuteTask(_log, task, GrainContext);
         }
     }
 #endif
@@ -241,11 +225,7 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskLoopError(Exception ex)
     {
-        _log.LogError(
-            (int)ErrorCode.Runtime_Error_100032,
-            ex,
-            "Worker thread {Thread} caught an exception thrown from IWorkItem.Execute",
-            Environment.CurrentManagedThreadId);
+        LogErrorTaskLoop(_log, ex, Environment.CurrentManagedThreadId);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -257,11 +237,10 @@ internal sealed class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
         }
 
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
-        _log.LogWarning(
-            (int)ErrorCode.SchedulerTurnTooLong3,
-            "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}",
+        LogWarningLongRunningTurn(
+            _log,
             task.AsyncState ?? task,
-            GrainContext.ToString(),
+            GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),
             _schedulingOptions.TurnWarningLengthThreshold,
             Environment.CurrentManagedThreadId.ToString());

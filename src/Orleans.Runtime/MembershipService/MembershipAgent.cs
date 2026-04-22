@@ -349,7 +349,7 @@ namespace Orleans.Runtime.MembershipService
                         var task = await Task.WhenAny(gracePeriod, this.BecomeShuttingDown());
                         if (ReferenceEquals(task, gracePeriod))
                         {
-                            this.log.LogWarning("Graceful shutdown aborted: starting ungraceful shutdown");
+                            LogWarningGracefulShutdownAborted(this.log);
                             await Task.Run(() => this.BecomeStopping());
                         }
                         else
