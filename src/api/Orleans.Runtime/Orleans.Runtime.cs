@@ -624,7 +624,7 @@ namespace Orleans.Runtime
 
     public sealed partial class GrainTypeSharedContext
     {
-        public GrainTypeSharedContext(GrainType grainType, IClusterManifestProvider clusterManifestProvider, Orleans.Metadata.GrainClassMap grainClassMap, Placement.PlacementStrategyResolver placementStrategyResolver, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SiloMessagingOptions> messagingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GrainCollectionOptions> collectionOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SchedulingOptions> schedulingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.StatelessWorkerOptions> statelessWorkerOptions, IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, GrainReferences.GrainReferenceActivator grainReferenceActivator, System.IServiceProvider serviceProvider, Orleans.Serialization.Session.SerializerSessionPool serializerSessionPool) { }
+        public GrainTypeSharedContext(GrainType grainType, IClusterManifestProvider clusterManifestProvider, Orleans.Metadata.GrainClassMap grainClassMap, Placement.PlacementStrategyResolver placementStrategyResolver, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SiloMessagingOptions> messagingOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.GrainCollectionOptions> collectionOptions, Microsoft.Extensions.Options.IOptions<Orleans.Configuration.SchedulingOptions> schedulingOptions, IGrainRuntime grainRuntime, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory, GrainReferences.GrainReferenceActivator grainReferenceActivator, System.IServiceProvider serviceProvider, Orleans.Serialization.Session.SerializerSessionPool serializerSessionPool) { }
 
         public System.TimeSpan CollectionAgeLimit { get { throw null; } }
 
@@ -649,8 +649,6 @@ namespace Orleans.Runtime
         public Orleans.Configuration.SchedulingOptions SchedulingOptions { get { throw null; } }
 
         public Orleans.Serialization.Session.SerializerSessionPool SerializerSessionPool { get { throw null; } }
-
-        public Orleans.Configuration.StatelessWorkerOptions StatelessWorkerOptions { get { throw null; } }
 
         public object? GetComponent(System.Type componentType) { throw null; }
 

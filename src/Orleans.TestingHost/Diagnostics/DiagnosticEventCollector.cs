@@ -1,11 +1,5 @@
-#nullable enable
-using System;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
 
 namespace Orleans.TestingHost.Diagnostics;
 
@@ -33,9 +27,9 @@ public sealed class DiagnosticEventCollector : IDisposable, IObserver<Diagnostic
 {
     private readonly ConcurrentQueue<DiagnosticEvent> _events = new();
     private readonly ConcurrentDictionary<string, List<EventWaiter>> _waiters = new();
-    private readonly List<IDisposable> _subscriptions = new();
+    private readonly List<IDisposable> _subscriptions = [];
     private readonly HashSet<string> _listenerPrefixes;
-    private IDisposable? _allListenersSubscription;
+    private readonly IDisposable? _allListenersSubscription;
     private bool _disposed;
 
     /// <summary>
