@@ -16,7 +16,7 @@ using Orleans.Dashboard.Core;
 #nullable disable
 namespace Orleans.Dashboard.Metrics;
 
-internal sealed class GrainProfiler(
+internal sealed partial class GrainProfiler(
     IGrainFactory grainFactory,
     ILogger<GrainProfiler> logger,
     ILocalSiloDetails localSiloDetails,
@@ -115,7 +115,7 @@ internal sealed class GrainProfiler(
             }
             catch (Exception ex)
             {
-                logger.LogWarning(100001, ex, "Exception thrown sending tracing to dashboard grain");
+                LogWarningSubmitTracingFailed(logger, ex);
             }
         }
     }

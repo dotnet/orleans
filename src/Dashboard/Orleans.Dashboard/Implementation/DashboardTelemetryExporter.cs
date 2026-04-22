@@ -11,7 +11,7 @@ using Orleans.Dashboard.Core;
 
 namespace Orleans.Dashboard.Implementation;
 
-internal sealed class DashboardTelemetryExporter(
+internal sealed partial class DashboardTelemetryExporter(
     ILocalSiloDetails localSiloDetails,
     ISiloGrainClient siloGrainClient,
     ILogger<DashboardTelemetryExporter> logger) : BaseExporter<Metric>
@@ -98,7 +98,7 @@ internal sealed class DashboardTelemetryExporter(
                     CollectMetric(metric, p => p.GetHistogramSum());
                     break;
                 default:
-                    _logger.LogWarning("Ignoring unknown metric type {MetricType}", metric.MetricType);
+                    LogWarningIgnoringUnknownMetricType(_logger, metric.MetricType);
                     break;
             }
         }

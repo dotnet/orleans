@@ -13,7 +13,7 @@ using Orleans.Dashboard.Core;
 #nullable disable
 namespace Orleans.Dashboard.Implementation;
 
-internal sealed class SiloGrainService : GrainService, ISiloGrainService
+internal sealed partial class SiloGrainService : GrainService, ISiloGrainService
 {
     private const int DefaultTimerIntervalMs = 1000; // 1 second
     private readonly Queue<SiloRuntimeStatistics> _statistics;
@@ -59,7 +59,7 @@ internal sealed class SiloGrainService : GrainService, ISiloGrainService
         }
         catch (InvalidOperationException)
         {
-            _logger.LogWarning("Not running in Orleans runtime");
+            LogWarningNotRunningInOrleansRuntime(_logger);
         }
 
         await base.Start();

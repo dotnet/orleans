@@ -8,7 +8,7 @@ using Orleans.Dashboard.Metrics;
 
 namespace Orleans.Dashboard.Implementation;
 
-internal sealed class GrainProfilerFilter(
+internal sealed partial class GrainProfilerFilter(
     IGrainProfiler profiler,
     ILogger<GrainProfilerFilter> logger,
     GrainProfilerFilter.GrainMethodFormatterDelegate formatMethodName) : IIncomingGrainCallFilter
@@ -65,7 +65,7 @@ internal sealed class GrainProfilerFilter(
         }
         catch (Exception ex)
         {
-            _logger.LogError(100002, ex, "error recording results for grain");
+            LogErrorRecordingResultsForGrain(_logger, ex);
         }
     }
 
@@ -109,7 +109,7 @@ internal sealed class GrainProfilerFilter(
             }
             catch (Exception ex)
             {
-                _logger.LogError(100003, ex, "error reading NoProfilingAttribute attribute for grain");
+                LogErrorReadingNoProfilingAttribute(_logger, ex);
 
                 shouldSkip = false;
             }
