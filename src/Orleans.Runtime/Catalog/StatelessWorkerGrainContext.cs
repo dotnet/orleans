@@ -13,7 +13,7 @@ namespace Orleans.Runtime;
 internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
 {
     private static readonly object CollectIdleWorkersSentinel = new();
-    private readonly GrainTypeSharedContext _shared;
+    private readonly StatelessWorkerGrainTypeSharedContext _shared;
     private readonly IGrainContextActivator _innerActivator;
     private readonly int _maxWorkers;
     private readonly List<ActivationData> _workers = [];
@@ -42,32 +42,29 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public StatelessWorkerGrainContext(
         GrainAddress address,
-        GrainTypeSharedContext sharedContext,
+        StatelessWorkerGrainTypeSharedContext sharedContext,
         IGrainContextActivator innerActivator)
     {
         Address = address;
         _shared = sharedContext;
         _innerActivator = innerActivator;
 
-        var strategy = (StatelessWorkerPlacement)_shared.PlacementStrategy;
-        var options = _shared.StatelessWorkerOptions;
-
-        _isIdleWorkerRemovalStrategy = strategy.RemoveIdleWorkers && options.RemoveIdleWorkers;
+        _isIdleWorkerRemovalStrategy = _shared.RemoveIdleWorkers;
         if (_isIdleWorkerRemovalStrategy)
         {
-            _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
             _inspectionTimer = new Timer(
                 static state => ((StatelessWorkerGrainContext)state!).EnqueueWorkItem(WorkItemType.CollectIdleWorkers, CollectIdleWorkersSentinel),
                 this,
-                options.IdleWorkersInspectionPeriod,
-                options.IdleWorkersInspectionPeriod);
+                _shared.IdleWorkersInspectionPeriod,
+                _shared.IdleWorkersInspectionPeriod);
+            _minIdleCyclesBeforeRemoval = _shared.MinIdleCyclesBeforeRemoval;
         }
 
-        _maxWorkers = strategy.MaxLocal;
+        _maxWorkers = _shared.MaxLocalWorkers;
         _messageLoopTask = Task.Run(RunMessageLoop);
     }
 
-    public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
+    public GrainReference GrainReference => _grainReference ??= _shared.Shared.GrainReferenceActivator.CreateReference(GrainId, default);
 
     public GrainId GrainId => Address.GrainId;
 
@@ -83,7 +80,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
-    public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
+    public PlacementStrategy PlacementStrategy => _shared.Shared.PlacementStrategy;
 
     public Task Deactivated
     {
@@ -120,7 +117,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     public object? GetComponent(Type componentType)
     {
         if (componentType.IsAssignableFrom(GetType())) return this;
-        return _shared.GetComponent(componentType);
+        return _shared.Shared.GetComponent(componentType);
     }
 
     public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
@@ -130,7 +127,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             throw new ArgumentException($"Cannot set a component of type '{typeof(TComponent)}' on a {nameof(StatelessWorkerGrainContext)}");
         }
 
-        _shared.SetComponent(instance);
+        _shared.Shared.SetComponent(instance);
     }
 
     public object? GetTarget() => throw new NotImplementedException();
@@ -173,8 +170,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
                                 if (_workers.Count == 0)
                                 {
-                                    // When the last worker is destroyed, we can consider the stateless worker grain activation to be destroyed as well
-                                    _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+                                    _shared.Shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
 
                                     if (_isIdleWorkerRemovalStrategy)
                                     {
@@ -186,7 +182,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                                         {
                                             if (t.Exception is { } ex)
                                             {
-                                                LogErrorInMessageLoop(_shared.Logger, ex);
+                                                LogErrorInMessageLoop(_shared.Shared.Logger, ex);
                                             }
                                         }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Current);
                                     }
@@ -205,7 +201,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             }
             catch (Exception exception)
             {
-                LogErrorInMessageLoop(_shared.Logger, exception);
+                LogErrorInMessageLoop(_shared.Shared.Logger, exception);
             }
         }
     }
@@ -233,7 +229,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
         _detectedIdleCyclesCount = controlSignal < 0 ? ++_detectedIdleCyclesCount : 0;
 
-        if (_detectedIdleCyclesCount >= _minIdleCyclesBeforeRemoval)
+        if (_detectedIdleCyclesCount >= _shared.MinIdleCyclesBeforeRemoval)
         {
             var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
             if (inactiveWorkers.Length > 0)
@@ -303,7 +299,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         }
         catch (Exception exception) when (message is Message msg)
         {
-            _shared.InternalRuntime.MessageCenter.RejectMessage(
+            _shared.Shared.InternalRuntime.MessageCenter.RejectMessage(
                 msg,
                 Message.RejectionTypes.Transient,
                 exception,
@@ -321,7 +317,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
         // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
         var requestContext = (message as Message)?.RequestContextData ?? [];
-        var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+        var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
         newWorker.Activate(requestContext, cancellation.Token);
         _workers.Add(newWorker);
