@@ -133,6 +133,7 @@ internal sealed partial class NatsConnectionManager
     {
         Retention = StreamConfigRetention.Workqueue,
         NumReplicas = this._options.NumReplicas,
+        Storage = this._options.StorageType,
         SubjectTransform = new SubjectTransform
         {
             Src = $"{this._providerName}.*.*",
