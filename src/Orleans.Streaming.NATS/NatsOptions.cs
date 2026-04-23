@@ -1,6 +1,7 @@
 using System.Text.Json;
 using Orleans.Runtime;
 using NATS.Client.Core;
+using NATS.Client.JetStream.Models;
 
 namespace Orleans.Streaming.NATS;
 
@@ -60,6 +61,19 @@ public class NatsOptions
     /// Defaults to 1. Set to 3 for production clusters with ≥ 3 nodes.
     /// </summary>
     public int NumReplicas { get; set; } = 1;
+
+    /// <summary>
+    /// The storage backend used by the NATS JetStream stream.
+    /// Use <see cref="StreamConfigStorage.File"/> for durability across NATS
+    /// server restarts, or <see cref="StreamConfigStorage.Memory"/> for lower
+    /// latency when durability is not required and the NATS server is
+    /// configured with a memory store. The NATS server must have the
+    /// corresponding storage type enabled; requesting a storage type the
+    /// server has not provisioned results in an "insufficient storage
+    /// resources available" error at stream creation.
+    /// Defaults to <see cref="StreamConfigStorage.File"/>.
+    /// </summary>
+    public StreamConfigStorage StorageType { get; set; } = StreamConfigStorage.File;
 }
 
 public class NatsStreamOptionsValidator(NatsOptions options, string? name = null) : IConfigurationValidator
