@@ -1,10 +1,7 @@
-using System;
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Linq;
 using System.Text;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Activators;
@@ -13,7 +10,6 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 
-#nullable disable
 namespace Orleans.Serialization.TypeSystem
 {
     /// <summary>
@@ -34,8 +30,8 @@ namespace Orleans.Serialization.TypeSystem
         private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
         private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
         private readonly HashSet<string> _allowedTypesConfiguration;
-        private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases = new()
-        {
+        private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases =
+        [
             ("object", "System.Object"),
             ("string", "System.String"),
             ("char", "System.Char"),
@@ -56,7 +52,7 @@ namespace Orleans.Serialization.TypeSystem
             ("DateTime", "System.DateTime"),
             ("DateTimeOffset", "System.DateTimeOffset"),
             ("Type", "System.Type"),
-        };
+        ];
 
         /// <summary>
         /// Initializes a new instance of the <see cref="TypeConverter"/> class.
@@ -83,8 +79,8 @@ namespace Orleans.Serialization.TypeSystem
             _convertFromDisplayName = ConvertFromDisplayName;
             _compoundAliasResolver = ResolveCompoundAliasType;
 
-            _wellKnownAliasToType = new Dictionary<QualifiedType, QualifiedType>();
-            _wellKnownTypeToAlias = new Dictionary<QualifiedType, QualifiedType>();
+            _wellKnownAliasToType = [];
+            _wellKnownTypeToAlias = [];
 
             _allowedTypes = new ConcurrentDictionary<QualifiedType, bool>(QualifiedType.EqualityComparer);
             _allowedTypesConfiguration = new(StringComparer.Ordinal);
@@ -104,7 +100,7 @@ namespace Orleans.Serialization.TypeSystem
             {
                 var alias = new QualifiedType(null, item.Key);
                 var spec = RuntimeTypeNameParser.Parse(RuntimeTypeNameFormatter.Format(item.Value));
-                string asmName = null;
+                string? asmName = null;
                 if (spec is AssemblyQualifiedTypeSpec asm)
                 {
                     asmName = asm.Assembly;
@@ -119,6 +115,14 @@ namespace Orleans.Serialization.TypeSystem
                 }
 
                 _wellKnownAliasToType[alias] = originalQualifiedType;
+                if (!_allowAllTypes)
+                {
+                    _allowedTypes[originalQualifiedType] = true;
+                    if (asmName is { Length: > 0 })
+                    {
+                        _allowedTypes[new QualifiedType(null, spec.Format())] = true;
+                    }
+                }
             }
         }
 
@@ -262,9 +266,9 @@ namespace Orleans.Serialization.TypeSystem
             return ParseInternal(formatted, out result);
         }
 
-        private string FormatInternal(Type type, Func<TypeSpec, TypeSpec> rewriter = null)
+        private string FormatInternal(Type type, Func<TypeSpec, TypeSpec>? rewriter = null)
         {
-            string runtimeType = null;
+            string? runtimeType = null;
             foreach (var converter in _converters)
             {
                 if (converter.TryFormat(type, out var value))
@@ -274,10 +278,7 @@ namespace Orleans.Serialization.TypeSystem
                 }
             }
 
-            if (string.IsNullOrWhiteSpace(runtimeType))
-            {
-                runtimeType = RuntimeTypeNameFormatter.Format(type);
-            }
+            runtimeType = string.IsNullOrWhiteSpace(runtimeType) ? RuntimeTypeNameFormatter.Format(type) : runtimeType;
 
             var runtimeTypeSpec = RuntimeTypeNameParser.Parse(runtimeType);
             ValidationResult validationState = default;
@@ -296,7 +297,7 @@ namespace Orleans.Serialization.TypeSystem
 
             if (!_allowAllTypes && validationState.IsTypeNameAllowed != true)
             {
-                if (InspectType(_typeFilters, type) == false)
+                if (InspectType(_typeFilters, type) != true)
                 {
                     ThrowTypeNotAllowed(type);
                 }
@@ -334,7 +335,7 @@ namespace Orleans.Serialization.TypeSystem
             {
                 if (!_allowAllTypes && validationState.IsTypeNameAllowed != true)
                 {
-                    if (InspectType(_typeFilters, type) == false)
+                    if (InspectType(_typeFilters, type) != true)
                     {
                         ThrowTypeNotAllowed(type);
                     }
@@ -373,12 +374,17 @@ namespace Orleans.Serialization.TypeSystem
 
             foreach (var filter in _typeNameFilters)
             {
-                var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly);
+                var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly ?? string.Empty);
                 if (isAllowed.HasValue)
                 {
                     allowed = _allowedTypes[type] = isAllowed.Value;
                     return allowed;
                 }
+            }
+
+            if (_wellKnownAliasToType.TryGetValue(type, out var runtimeType))
+            {
+                return IsNameTypeAllowed(runtimeType);
             }
 
             return null;
@@ -426,20 +432,17 @@ namespace Orleans.Serialization.TypeSystem
 
         private ValidationResult UpdateValidationResult(QualifiedType input, ValidationResult state)
         {
-            // If there has not been an error yet, inspect this type to ensure it is allowed.
-            if (IsNameTypeAllowed(input) is bool allowed)
+            switch (IsNameTypeAllowed(input))
             {
-                var newAllowed = allowed && (state.IsTypeNameAllowed ?? true);
-                var newErrorList = state.ErrorTypes ?? new List<QualifiedType>();
-                if (!allowed)
-                {
+                case true:
+                    return new(true, state.HasUnknownTypeNames, state.ErrorTypes);
+                case false:
+                    var newErrorList = state.ErrorTypes;
                     newErrorList.Add(input);
-                }
-
-                return new(newAllowed, newErrorList);
+                    return new(state.HasAllowedTypeNames, state.HasUnknownTypeNames, newErrorList);
+                default:
+                    return new(state.HasAllowedTypeNames, true, state.ErrorTypes);
             }
-
-            return state;
         }
 
         [DoesNotReturn]
@@ -482,16 +485,20 @@ namespace Orleans.Serialization.TypeSystem
             throw new InvalidOperationException(message);
         }
 
-        private readonly struct ValidationResult
+        private readonly struct ValidationResult(bool hasAllowedTypeNames, bool hasUnknownTypeNames, List<QualifiedType>? errorTypes)
         {
-            public ValidationResult(bool? isTypeNameAllowed, List<QualifiedType> errorTypes)
-            {
-                IsTypeNameAllowed = isTypeNameAllowed;
-                ErrorTypes = errorTypes;
-            }
+            private readonly List<QualifiedType>? _errorTypes = errorTypes;
 
-            public bool? IsTypeNameAllowed { get; }
-            public List<QualifiedType> ErrorTypes { get; }
+            public bool HasAllowedTypeNames { get; } = hasAllowedTypeNames;
+            public bool HasUnknownTypeNames { get; } = hasUnknownTypeNames;
+            public List<QualifiedType> ErrorTypes => _errorTypes ?? [];
+
+            public bool? IsTypeNameAllowed =>
+                ErrorTypes is { Count: > 0 }
+                    ? false
+                    : HasAllowedTypeNames && !HasUnknownTypeNames
+                        ? true
+                        : null;
         }
 
         private static bool? InspectType(ITypeFilter[] filters, Type type)
@@ -499,7 +506,7 @@ namespace Orleans.Serialization.TypeSystem
             bool? result = null;
             if (type.HasElementType)
             {
-                result = Combine(result, InspectType(filters, type.GetElementType()));
+                result = Combine(result, InspectType(filters, type.GetElementType()!));
                 return result;
             }
 
