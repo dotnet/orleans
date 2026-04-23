@@ -10,6 +10,8 @@ on:
   merge_group:
     types:
       - checks_requested
+permissions:
+  contents: read
 env:
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 1
   DOTNET_NOLOGO: true
