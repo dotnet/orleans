@@ -42,6 +42,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
         public RemoteGrainDirectory CacheValidator { get; }
+        internal LocalGrainDirectoryClientCompatibility? DistributedGrainDirectoryClientCompatibility { get; }
+        internal LocalGrainDirectoryPartitionCompatibility? DistributedGrainDirectoryPartitionCompatibility { get; }
 
         internal GrainDirectoryHandoffManager HandoffManager { get; }
 
@@ -80,6 +82,8 @@ namespace Orleans.Runtime.GrainDirectory
             var distributedDirectoryActive = serviceProvider.GetService<DistributedGrainDirectory>() is not null;
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
+            DistributedGrainDirectoryClientCompatibility = distributedDirectoryActive ? null : new LocalGrainDirectoryClientCompatibility(this, systemTargetShared);
+            DistributedGrainDirectoryPartitionCompatibility = distributedDirectoryActive ? null : new LocalGrainDirectoryPartitionCompatibility(this, systemTargetShared);
 
             // add myself to the list of members
             AddServer(MyAddress);

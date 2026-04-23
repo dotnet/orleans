@@ -77,9 +77,22 @@ namespace Orleans.Runtime.GrainDirectory
                 if (splitPartListSingle.Count > 0)
                 {
                     LogDebugSendingEntries(logger, splitPartListSingle.Count, addedSilo);
+                    LogInformationSendingSplitPartition(logger, splitPartListSingle.Count, addedSilo);
                 }
 
-                await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
+                try
+                {
+                    await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
+                    if (splitPartListSingle.Count > 0)
+                    {
+                        LogInformationCompletedSplitPartition(logger, splitPartListSingle.Count, addedSilo);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSplitPartitionFailed(logger, exception, splitPartListSingle.Count, addedSilo);
+                    throw;
+                }
             }
             else
             {
@@ -95,6 +108,8 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.GrainId);
                 }
+
+                LogInformationRemovedTransferredEntries(logger, splitPartListSingle.Count, addedSilo);
             }
         }
 
@@ -256,6 +271,24 @@ namespace Orleans.Runtime.GrainDirectory
         private static partial void LogDebugSendingEntries(ILogger logger, int count, SiloAddress addedSilo);
 
         [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Rolling upgrade diagnostic: sending {Count} split-partition registrations to {AddedSilo}."
+        )]
+        private static partial void LogInformationSendingSplitPartition(ILogger logger, int count, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Rolling upgrade diagnostic: completed split-partition transfer of {Count} registrations to {AddedSilo}."
+        )]
+        private static partial void LogInformationCompletedSplitPartition(ILogger logger, int count, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Rolling upgrade diagnostic: split-partition transfer of {Count} registrations to {AddedSilo} failed."
+        )]
+        private static partial void LogWarningSplitPartitionFailed(ILogger logger, Exception exception, int count, SiloAddress addedSilo);
+
+        [LoggerMessage(
             Level = LogLevel.Warning,
             Message = "Silo {AddedSilo} is no longer active and therefore cannot receive this partition split"
         )]
@@ -266,6 +299,12 @@ namespace Orleans.Runtime.GrainDirectory
             Message = "Removing {Count} single activation after partition split"
         )]
         private static partial void LogDebugRemovingEntries(ILogger logger, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Rolling upgrade diagnostic: removed {Count} transferred registrations after handoff to {AddedSilo}."
+        )]
+        private static partial void LogInformationRemovedTransferredEntries(ILogger logger, int count, SiloAddress addedSilo);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
