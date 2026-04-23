@@ -18,10 +18,10 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     private readonly EventCounterListener _eventCounterListener = new();
 
     [SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "Used for memory-dump debugging.")]
-    private readonly ObservableCounter<long> _availableMemoryCounter;
+    private readonly ObservableGauge<long> _availableMemoryGauge;
 
     [SuppressMessage("CodeQuality", "IDE0052:Remove unread private members", Justification = "Used for memory-dump debugging.")]
-    private readonly ObservableCounter<long> _maximumAvailableMemoryCounter;
+    private readonly ObservableGauge<long> _maximumAvailableMemoryGauge;
 
     private readonly DualModeKalmanFilter _cpuUsageFilter = new();
     private readonly DualModeKalmanFilter _memoryUsageFilter = new();
@@ -30,8 +30,8 @@ internal sealed class EnvironmentStatisticsProvider : IEnvironmentStatisticsProv
     {
         GC.Collect(0, GCCollectionMode.Forced, true); // we make sure the GC structure wont be empty, also performing a blocking GC guarantees immediate collection.
 
-        _availableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(_availableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
-        _maximumAvailableMemoryCounter = Instruments.Meter.CreateObservableCounter(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(_maximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+        _availableMemoryGauge = Instruments.Meter.CreateObservableGauge(InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB, () => (long)(_availableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
+        _maximumAvailableMemoryGauge = Instruments.Meter.CreateObservableGauge(InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB, () => (long)(_maximumAvailableMemoryBytes / OneKiloByte / OneKiloByte), unit: "MB");
     }
 
     /// <inheritdoc />
