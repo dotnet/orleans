@@ -3,11 +3,9 @@ using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Linq;
 using System.Text;
-using System.Threading;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Hashing;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
@@ -27,13 +25,12 @@ namespace Orleans.CodeGenerator
         public bool GenerateCompatibilityInvokers { get; set; }
     }
 
-    public class CodeGenerator
+    public class CodeGenerator : IGeneratorServices
     {
         internal const string CodeGeneratorName = "OrleansCodeGen";
         private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
         private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
         private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
-        private readonly List<string> DisabledWarnings = new() { "CS1591", "RS0016", "RS0041" };
 
         public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
         {
@@ -41,387 +38,17 @@ namespace Orleans.CodeGenerator
             Options = options;
             LibraryTypes = LibraryTypes.FromCompilation(compilation, options);
             MetadataModel = new MetadataModel();
-            CopierGenerator = new CopierGenerator(this);
-            SerializerGenerator = new SerializerGenerator(this);
-            ProxyGenerator = new ProxyGenerator(this);
+            ProxyGenerator = new ProxyGenerator(this, new CopierGenerator(this));
             InvokableGenerator = new InvokableGenerator(this);
-            MetadataGenerator = new MetadataGenerator(this);
-            ActivatorGenerator = new ActivatorGenerator(this);
         }
 
         public Compilation Compilation { get; }
         public CodeGeneratorOptions Options { get; }
         internal LibraryTypes LibraryTypes { get; }
+        LibraryTypes IGeneratorServices.LibraryTypes => LibraryTypes;
         internal MetadataModel MetadataModel { get; }
-        internal CopierGenerator CopierGenerator { get; }
-        internal SerializerGenerator SerializerGenerator { get; }
         internal ProxyGenerator ProxyGenerator { get; }
         internal InvokableGenerator InvokableGenerator { get; }
-        internal MetadataGenerator MetadataGenerator { get; }
-        internal ActivatorGenerator ActivatorGenerator { get; }
-
-        public CompilationUnitSyntax GenerateCode(CancellationToken cancellationToken)
-        {
-            var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
-            var compilationAsm = LibraryTypes.Compilation.Assembly;
-            ComputeAssembliesToExamine(compilationAsm, assembliesToExamine);
-
-            // Expand the set of referenced assemblies
-            MetadataModel.ApplicationParts.Add(compilationAsm.MetadataName);
-            foreach (var reference in LibraryTypes.Compilation.References)
-            {
-                if (LibraryTypes.Compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol asm)
-                {
-                    continue;
-                }
-
-                if (asm.GetAttributes(LibraryTypes.ApplicationPartAttribute, out var attrs))
-                {
-                    MetadataModel.ApplicationParts.Add(asm.MetadataName);
-                    foreach (var attr in attrs)
-                    {
-                        MetadataModel.ApplicationParts.Add((string)attr.ConstructorArguments.First().Value);
-                    }
-                }
-            }
-
-            // The mapping of proxy base types to a mapping of return types to invokable base types. Used to set default invokable base types for each proxy base type.
-            var proxyBaseTypeInvokableBaseTypes = new Dictionary<INamedTypeSymbol, Dictionary<INamedTypeSymbol, INamedTypeSymbol>>(SymbolEqualityComparer.Default);
-
-            foreach (var asm in assembliesToExamine)
-            {
-                var containingAssemblyAttributes = asm.GetAttributes();
-
-                foreach (var symbol in asm.GetDeclaredTypes())
-                {
-                    if (GetWellKnownTypeId(symbol) is uint wellKnownTypeId)
-                    {
-                        MetadataModel.WellKnownTypeIds.Add((symbol.ToOpenTypeSyntax(), wellKnownTypeId));
-                    }
-
-                    if (GetAlias(symbol) is string typeAlias)
-                    {
-                        MetadataModel.TypeAliases.Add((symbol.ToOpenTypeSyntax(), typeAlias));
-                    }
-
-                    if (GetCompoundTypeAlias(symbol) is CompoundTypeAliasComponent[] compoundTypeAlias)
-                    {
-                        MetadataModel.CompoundTypeAliases.Add(compoundTypeAlias, symbol.ToOpenTypeSyntax());
-                    }
-
-                    if (FSharpUtilities.IsUnionCase(LibraryTypes, symbol, out var sumType) && ShouldGenerateSerializer(sumType))
-                    {
-                        if (!Compilation.IsSymbolAccessibleWithin(sumType, Compilation.Assembly))
-                        {
-                            throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(sumType));
-                        }
-
-                        var typeDescription = new FSharpUtilities.FSharpUnionCaseTypeDescription(Compilation, symbol, LibraryTypes);
-                        MetadataModel.SerializableTypes.Add(typeDescription);
-                    }
-                    else if (ShouldGenerateSerializer(symbol))
-                    {
-                        // https://learn.microsoft.com/dotnet/api/system.runtime.compilerservices.referenceassemblyattribute
-                        if (containingAssemblyAttributes.Any(attributeData => attributeData.AttributeClass is
-                            {
-                                Name: "ReferenceAssemblyAttribute",
-                                ContainingNamespace:
-                                {
-                                    Name: "CompilerServices",
-                                    ContainingNamespace:
-                                    {
-                                        Name: "Runtime",
-                                        ContainingNamespace:
-                                        {
-                                            Name: "System",
-                                            ContainingNamespace.IsGlobalNamespace: true
-                                        }
-                                    }
-                                }
-                            }))
-                        {
-                            // not ALWAYS will be properly processed, therefore emit a warning
-                            throw new OrleansGeneratorDiagnosticAnalysisException(ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(symbol));
-                        }
-
-                        if (!Compilation.IsSymbolAccessibleWithin(symbol, Compilation.Assembly))
-                        {
-                            throw new OrleansGeneratorDiagnosticAnalysisException(InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(symbol));
-                        }
-
-                        if (FSharpUtilities.IsRecord(LibraryTypes, symbol))
-                        {
-                            var typeDescription = new FSharpUtilities.FSharpRecordTypeDescription(Compilation, symbol, LibraryTypes);
-                            MetadataModel.SerializableTypes.Add(typeDescription);
-                        }
-                        else
-                        {
-                            // Regular type
-                            var includePrimaryConstructorParameters = ShouldIncludePrimaryConstructorParameters(symbol);
-                            var constructorParameters = ImmutableArray<IParameterSymbol>.Empty;
-                            if (includePrimaryConstructorParameters)
-                            {
-                                if (symbol.IsRecord)
-                                {
-                                    // If there is a primary constructor then that will be declared before the copy constructor
-                                    // A record always generates a copy constructor and marks it as compiler generated
-                                    // todo: find an alternative to this magic
-                                    var potentialPrimaryConstructor = symbol.Constructors[0];
-                                    if (!potentialPrimaryConstructor.IsImplicitlyDeclared && !potentialPrimaryConstructor.IsCompilerGenerated())
-                                    {
-                                        constructorParameters = potentialPrimaryConstructor.Parameters;
-                                    }
-                                }
-                                else
-                                {
-                                    var annotatedConstructors = symbol.Constructors.Where(ctor => ctor.HasAnyAttribute(LibraryTypes.ConstructorAttributeTypes)).ToList();
-                                    if (annotatedConstructors.Count == 1)
-                                    {
-                                        constructorParameters = annotatedConstructors[0].Parameters;
-                                    }
-                                    else
-                                    {
-                                        // record structs from referenced assemblies do not return IsRecord=true
-                                        // above. See https://github.com/dotnet/roslyn/issues/69326
-                                        // So we implement the same heuristics from ShouldIncludePrimaryConstructorParameters
-                                        // to detect a primary constructor.
-                                        var properties = symbol.GetMembers().OfType<IPropertySymbol>().ToImmutableArray();
-                                        var primaryConstructor = symbol.GetMembers()
-                                            .OfType<IMethodSymbol>()
-                                            .Where(m => m.MethodKind == MethodKind.Constructor && m.Parameters.Length > 0)
-                                            // Check for a ctor where all parameters have a corresponding compiler-generated prop.
-                                            .FirstOrDefault(ctor => ctor.Parameters.All(prm =>
-                                                properties.Any(prop => prop.Name.Equals(prm.Name, StringComparison.Ordinal) && prop.IsCompilerGenerated())));
-
-                                        if (primaryConstructor != null)
-                                            constructorParameters = primaryConstructor.Parameters;
-                                    }
-                                }
-                            }
-
-                            var implicitMemberSelectionStrategy = (Options.GenerateFieldIds, GetGenerateFieldIdsOptionFromType(symbol)) switch
-                            {
-                                (_, GenerateFieldIds.PublicProperties) => GenerateFieldIds.PublicProperties,
-                                (GenerateFieldIds.PublicProperties, _) => GenerateFieldIds.PublicProperties,
-                                _ => GenerateFieldIds.None
-                            };
-                            var fieldIdAssignmentHelper = new FieldIdAssignmentHelper(symbol, constructorParameters, implicitMemberSelectionStrategy, LibraryTypes);
-                            if (!fieldIdAssignmentHelper.IsValidForSerialization)
-                            {
-                                throw new OrleansGeneratorDiagnosticAnalysisException(CanNotGenerateImplicitFieldIdsDiagnostic.CreateDiagnostic(symbol, fieldIdAssignmentHelper.FailureReason));
-                            }
-
-                            var typeDescription = new SerializableTypeDescription(Compilation, symbol, includePrimaryConstructorParameters, GetDataMembers(fieldIdAssignmentHelper), LibraryTypes);
-                            MetadataModel.SerializableTypes.Add(typeDescription);
-                        }
-                    }
-
-                    if (symbol.TypeKind == TypeKind.Interface)
-                    {
-                        VisitInterface(symbol.OriginalDefinition);
-                    }
-
-                    if ((symbol.TypeKind == TypeKind.Class || symbol.TypeKind == TypeKind.Struct)
-                        && !symbol.IsAbstract
-                        && (symbol.DeclaredAccessibility == Accessibility.Public || symbol.DeclaredAccessibility == Accessibility.Internal))
-                    {
-                        if (symbol.HasAttribute(LibraryTypes.RegisterSerializerAttribute))
-                        {
-                            MetadataModel.DetectedSerializers.Add(symbol);
-                        }
-
-                        if (symbol.HasAttribute(LibraryTypes.RegisterActivatorAttribute))
-                        {
-                            MetadataModel.DetectedActivators.Add(symbol);
-                        }
-
-                        if (symbol.HasAttribute(LibraryTypes.RegisterCopierAttribute))
-                        {
-                            MetadataModel.DetectedCopiers.Add(symbol);
-                        }
-
-                        if (symbol.HasAttribute(LibraryTypes.RegisterConverterAttribute))
-                        {
-                            MetadataModel.DetectedConverters.Add(symbol);
-                        }
-
-                        // Find all implementations of invokable interfaces
-                        foreach (var iface in symbol.AllInterfaces)
-                        {
-                            var attribute = iface.GetAttribute(
-                                LibraryTypes.GenerateMethodSerializersAttribute,
-                                inherited: true);
-                            if (attribute != null)
-                            {
-                                MetadataModel.InvokableInterfaceImplementations.Add(symbol);
-                                break;
-                            }
-                        }
-                    }
-
-                    GenerateFieldIds GetGenerateFieldIdsOptionFromType(INamedTypeSymbol t)
-                    {
-                        var attribute = t.GetAttribute(LibraryTypes.GenerateSerializerAttribute);
-                        if (attribute is null)
-                            return GenerateFieldIds.None;
-
-                        foreach (var namedArgument in attribute.NamedArguments)
-                        {
-                            if (namedArgument.Key == "GenerateFieldIds")
-                            {
-                                var value = namedArgument.Value.Value;
-                                return value == null ? GenerateFieldIds.None : (GenerateFieldIds)(int)value;
-                            }
-                        }
-                        return GenerateFieldIds.None;
-                    }
-
-                    bool ShouldGenerateSerializer(INamedTypeSymbol t) => t.HasAttribute(LibraryTypes.GenerateSerializerAttribute);
-
-                    bool ShouldIncludePrimaryConstructorParameters(INamedTypeSymbol t)
-                    {
-                        static bool? TestGenerateSerializerAttribute(INamedTypeSymbol t, INamedTypeSymbol at)
-                        {
-                            var attribute = t.GetAttribute(at);
-                            if (attribute != null)
-                            {
-                                foreach (var namedArgument in attribute.NamedArguments)
-                                {
-                                    if (namedArgument.Key == "IncludePrimaryConstructorParameters")
-                                    {
-                                        if (namedArgument.Value.Kind == TypedConstantKind.Primitive && namedArgument.Value.Value is bool b)
-                                        {
-                                            return b;
-                                        }
-                                    }
-                                }
-                            }
-
-                            // If there is no such named argument, return null so that other attributes have a chance to apply and defaults can be applied.
-                            return null;
-                        }
-
-                        if (TestGenerateSerializerAttribute(t, LibraryTypes.GenerateSerializerAttribute) is bool res)
-                        {
-                            return res;
-                        }
-
-                        // Default to true for records.
-                        if (t.IsRecord)
-                            return true;
-
-                        var properties = t.GetMembers().OfType<IPropertySymbol>().ToImmutableArray();
-
-                        return t.GetMembers()
-                            .OfType<IMethodSymbol>()
-                            .Where(m => m.MethodKind == MethodKind.Constructor && m.Parameters.Length > 0)
-                            // Check for a ctor where all parameters have a corresponding compiler-generated prop.
-                            .Any(ctor => ctor.Parameters.All(prm =>
-                                properties.Any(prop => prop.Name.Equals(prm.Name, StringComparison.Ordinal) && prop.IsCompilerGenerated())));
-                    }
-                }
-            }
-
-            // Generate serializers.
-            foreach (var type in MetadataModel.SerializableTypes)
-            {
-                string ns = type.GeneratedNamespace;
-
-                // Generate a partial serializer class for each serializable type.
-                var serializer = SerializerGenerator.Generate(type);
-                AddMember(ns, serializer);
-
-                // Generate a copier for each serializable type.
-                if (CopierGenerator.GenerateCopier(type, MetadataModel.DefaultCopiers) is { } copier)
-                    AddMember(ns, copier);
-
-                if (!type.IsAbstractType && !type.IsEnumType && (!type.IsValueType && type.IsEmptyConstructable && !type.UseActivator && type is not GeneratedInvokableDescription || type.HasActivatorConstructor))
-                {
-                    MetadataModel.ActivatableTypes.Add(type);
-
-                    // Generate an activator class for types with default constructor or activator constructor.
-                    var activator = ActivatorGenerator.GenerateActivator(type);
-                    AddMember(ns, activator);
-                }
-            }
-
-            // Generate metadata.
-            var metadataClassNamespace = CodeGeneratorName + "." + SyntaxGeneration.Identifier.SanitizeIdentifierName(Compilation.AssemblyName);
-            var metadataClass = MetadataGenerator.GenerateMetadata();
-            AddMember(ns: metadataClassNamespace, member: metadataClass);
-            var metadataAttribute = AttributeList()
-                .WithTarget(AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)))
-                .WithAttributes(
-                    SingletonSeparatedList(
-                        Attribute(LibraryTypes.TypeManifestProviderAttribute.ToNameSyntax())
-                            .AddArgumentListArguments(AttributeArgument(TypeOfExpression(QualifiedName(IdentifierName(metadataClassNamespace), IdentifierName(metadataClass.Identifier.Text)))))));
-
-            var assemblyAttributes = ApplicationPartAttributeGenerator.GenerateSyntax(LibraryTypes, MetadataModel);
-            assemblyAttributes.Add(metadataAttribute);
-
-            if (assemblyAttributes.Count > 0)
-            {
-                assemblyAttributes[0] = assemblyAttributes[0]
-                    .WithLeadingTrivia(
-                        SyntaxFactory.TriviaList(
-                            new List<SyntaxTrivia>
-                            {
-                                Trivia(
-                                   PragmaWarningDirectiveTrivia(
-                                       Token(SyntaxKind.DisableKeyword),
-                                       SeparatedList(DisabledWarnings.Select(str =>
-                                       {
-                                           var syntaxToken = SyntaxFactory.Literal(
-                                                SyntaxFactory.TriviaList(),
-                                                str,
-                                                str,
-                                                SyntaxFactory.TriviaList());
-
-                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
-                                       })),
-                                       isActive: true)),
-                            }));
-            }
-
-            var usings = List(new[] { UsingDirective(ParseName("global::Orleans.Serialization.Codecs")), UsingDirective(ParseName("global::Orleans.Serialization.GeneratedCodeHelpers")) });
-            var namespaces = new List<MemberDeclarationSyntax>(_namespacedMembers.Count);
-            foreach (var pair in _namespacedMembers)
-            {
-                var ns = pair.Key;
-                var member = pair.Value;
-
-                namespaces.Add(NamespaceDeclaration(ParseName(ns)).WithMembers(List(member)).WithUsings(usings));
-            }
-
-            if (namespaces.Count > 0)
-            {
-                namespaces[namespaces.Count - 1] = namespaces[namespaces.Count - 1]
-                    .WithTrailingTrivia(
-                       SyntaxFactory.TriviaList(
-                           new List<SyntaxTrivia>
-                           {
-                                Trivia(
-                                   PragmaWarningDirectiveTrivia(
-                                       Token(SyntaxKind.RestoreKeyword),
-                                       SeparatedList(DisabledWarnings.Select(str =>
-                                       {
-                                           var syntaxToken = SyntaxFactory.Literal(
-                                                SyntaxFactory.TriviaList(),
-                                                str,
-                                                str,
-                                                SyntaxFactory.TriviaList());
-
-                                            return (ExpressionSyntax)SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
-                                       })),
-                                       isActive: true)),
-                           }));
-            }
-
-            return CompilationUnit()
-                .WithAttributeLists(List(assemblyAttributes))
-                .WithMembers(List(namespaces));
-        }
-
         public static string GetGeneratedNamespaceName(ITypeSymbol type) => type.GetNamespaceAndNesting() switch
         {
             { Length: > 0 } ns => $"{CodeGeneratorName}.{ns}",
@@ -438,66 +65,15 @@ namespace Orleans.CodeGenerator
             existing.Add(member);
         }
 
-        private void ComputeAssembliesToExamine(IAssemblySymbol asm, HashSet<IAssemblySymbol> expandedAssemblies)
+        internal IEnumerable<(string Namespace, MemberDeclarationSyntax Member)> GetEmittedMembers()
         {
-            if (!expandedAssemblies.Add(asm))
+            foreach (var entry in _namespacedMembers)
             {
-                return;
-            }
-
-            if (!asm.GetAttributes(LibraryTypes.GenerateCodeForDeclaringAssemblyAttribute, out var attrs)) return;
-
-            foreach (var attr in attrs)
-            {
-                var param = attr.ConstructorArguments.First();
-                if (param.Kind != TypedConstantKind.Type)
+                foreach (var member in entry.Value)
                 {
-                    throw new ArgumentException($"Unrecognized argument type in attribute [{attr.AttributeClass.Name}({param.ToCSharpString()})]");
-                }
-
-                var type = (ITypeSymbol)param.Value;
-
-                // Recurse on the assemblies which the type was declared in.
-                var declaringAsm = type.OriginalDefinition.ContainingAssembly;
-                if (declaringAsm is null)
-                {
-                    var diagnostic = GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic.CreateDiagnostic(attr, type);
-                    throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
-                }
-                else
-                {
-                    ComputeAssembliesToExamine(declaringAsm, expandedAssemblies);
+                    yield return (entry.Key, member);
                 }
             }
-        }
-
-        // Returns descriptions of all data members (fields and properties)
-        private static IEnumerable<IMemberDescription> GetDataMembers(FieldIdAssignmentHelper fieldIdAssignmentHelper)
-        {
-            var members = new Dictionary<(uint, bool), IMemberDescription>();
-
-            foreach (var member in fieldIdAssignmentHelper.Members)
-            {
-                if (!fieldIdAssignmentHelper.TryGetSymbolKey(member, out var key))
-                    continue;
-                var (id, isConstructorParameter) = key;
-
-                // FieldDescription takes precedence over PropertyDescription (never replace)
-                if (member is IPropertySymbol property && !members.TryGetValue((id, isConstructorParameter), out _))
-                {
-                    members[(id, isConstructorParameter)] = new PropertyDescription(id, isConstructorParameter, property);
-                }
-
-                if (member is IFieldSymbol field)
-                {
-                    // FieldDescription takes precedence over PropertyDescription (add or replace)
-                    if (!members.TryGetValue((id, isConstructorParameter), out var existing) || existing is PropertyDescription)
-                    {
-                        members[(id, isConstructorParameter)] = new FieldDescription(id, isConstructorParameter, field);
-                    }
-                }
-            }
-            return members.Values;
         }
 
         public uint? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
@@ -566,46 +142,7 @@ namespace Orleans.CodeGenerator
                 return result.ToString();
             }
         }
-
-        private uint? GetWellKnownTypeId(ISymbol symbol) => GetId(symbol);
-
         public string GetAlias(ISymbol symbol) => (string)symbol.GetAttribute(LibraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
-
-        private CompoundTypeAliasComponent[] GetCompoundTypeAlias(ISymbol symbol)
-        {
-            var attr = symbol.GetAttribute(LibraryTypes.CompoundTypeAliasAttribute);
-            if (attr is null)
-            {
-                return null;
-            }
-
-            var allArgs = attr.ConstructorArguments;
-            if (allArgs.Length != 1 || allArgs[0].Values.Length == 0)
-            {
-                throw new ArgumentException($"Unsupported arguments in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]");
-            }
-
-            var args = allArgs[0].Values;
-            var result = new CompoundTypeAliasComponent[args.Length];
-            for (var i = 0; i < args.Length; i++)
-            {
-                var arg = args[i];
-                if (arg.IsNull)
-                {
-                    throw new ArgumentNullException($"Unsupported null argument in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]");
-                }
-
-                result[i] = arg.Value switch
-                {
-                    ITypeSymbol type => new CompoundTypeAliasComponent(type),
-                    string str => new CompoundTypeAliasComponent(str),
-                    _ => throw new ArgumentException($"Unrecognized argument type for argument {arg.ToCSharpString()} in attribute [{attr.AttributeClass.Name}({string.Join(", ", allArgs.Select(a => a.ToCSharpString()))})]"),
-                };
-            }
-
-            return result;
-        }
-
         internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
         private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
             AttributeList().AddAttributes(
@@ -762,8 +299,6 @@ namespace Orleans.CodeGenerator
                 AddMember(proxyDescription.InterfaceDescription.GeneratedNamespace, generatedClass);
             }
 
-            MetadataModel.GeneratedProxies.Add(proxyDescription);
-
             return description;
         }
 
@@ -795,14 +330,6 @@ namespace Orleans.CodeGenerator
                 {
                     // Emit the generated code on-demand.
                     AddMember(generatedInvokable.GeneratedNamespace, generatedInvokable.ClassDeclarationSyntax);
-
-                    // Ensure the type will have a serializer generated for it.
-                    MetadataModel.SerializableTypes.Add(generatedInvokable);
-
-                    foreach (var alias in generatedInvokable.CompoundTypeAliases)
-                    {
-                        MetadataModel.CompoundTypeAliases.Add(alias, generatedInvokable.OpenTypeSyntax);
-                    }
                 }
             }
 
@@ -815,12 +342,6 @@ namespace Orleans.CodeGenerator
                 var compatMethodDescription = InvokableMethodDescription.Create(compatInvokableId, interfaceType);
                 var compatInvokable = InvokableGenerator.Generate(compatMethodDescription);
                 AddMember(compatInvokable.GeneratedNamespace, compatInvokable.ClassDeclarationSyntax);
-                var alias =
-                    InvokableGenerator.GetCompoundTypeAliasComponents(
-                        compatInvokableId,
-                        interfaceType,
-                        compatMethodDescription.GeneratedMethodId);
-                MetadataModel.CompoundTypeAliases.Add(alias, compatInvokable.OpenTypeSyntax);
             }
 
             return proxyMethodDescription;

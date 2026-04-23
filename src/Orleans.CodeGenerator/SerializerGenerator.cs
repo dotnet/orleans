@@ -20,14 +20,18 @@ namespace Orleans.CodeGenerator
         private const string WriteFieldMethodName = "WriteField";
         private const string ReadValueMethodName = "ReadValue";
         private const string CodecFieldTypeFieldName = "_codecFieldType";
-        private readonly CodeGenerator _codeGenerator;
+        private readonly IGeneratorServices _generatorServices;
 
-        public SerializerGenerator(CodeGenerator codeGenerator)
+        public SerializerGenerator(CodeGenerator codeGenerator) : this((IGeneratorServices)codeGenerator)
         {
-            _codeGenerator = codeGenerator;
         }
 
-        private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+        public SerializerGenerator(IGeneratorServices generatorServices)
+        {
+            _generatorServices = generatorServices;
+        }
+
+        private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
 
         public ClassDeclarationSyntax Generate(ISerializableTypeDescription type)
         {
@@ -47,7 +51,7 @@ namespace Orleans.CodeGenerator
                 }
                 else if (member is IFieldDescription or IPropertyDescription)
                 {
-                    members.Add(new SerializableMember(_codeGenerator, member, members.Count));
+                    members.Add(new SerializableMember(_generatorServices, member, members.Count));
                 }
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {
@@ -1218,7 +1222,7 @@ namespace Orleans.CodeGenerator
         internal class SerializableMember : ISerializableMember
         {
             private readonly IMemberDescription _member;
-            private readonly CodeGenerator _codeGenerator;
+            private readonly IGeneratorServices _generatorServices;
             private IPropertySymbol _property;
 
             /// <summary>
@@ -1226,15 +1230,15 @@ namespace Orleans.CodeGenerator
             /// </summary>
             private readonly int _ordinal;
 
-            public SerializableMember(CodeGenerator codeGenerator, IMemberDescription member, int ordinal)
+            public SerializableMember(IGeneratorServices generatorServices, IMemberDescription member, int ordinal)
             {
-                _codeGenerator = codeGenerator;
+                _generatorServices = generatorServices;
                 _ordinal = ordinal;
                 _member = member;
             }
 
-            private Compilation Compilation => _codeGenerator.Compilation;
-            private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+            private Compilation Compilation => _generatorServices.Compilation;
+            private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
 
             public bool IsShallowCopyable =>
                 LibraryTypes.IsShallowCopyable(_member.Type)
@@ -1274,7 +1278,7 @@ namespace Orleans.CodeGenerator
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible field.
             /// </summary>
-            private bool IsGettableField => Field is { } fieldInfo && _codeGenerator.Compilation.IsSymbolAccessibleWithin(fieldInfo, Compilation.Assembly) && !IsObsolete;
+            private bool IsGettableField => Field is { } fieldInfo && _generatorServices.Compilation.IsSymbolAccessibleWithin(fieldInfo, Compilation.Assembly) && !IsObsolete;
 
             /// <summary>
             /// Gets a value indicating whether or not this member represents an accessible, mutable field.

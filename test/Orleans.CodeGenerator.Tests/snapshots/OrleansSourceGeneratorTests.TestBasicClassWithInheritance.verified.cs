@@ -11,6 +11,24 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_BaseData));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_DerivedData));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_BaseData));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_DerivedData));
+        }
+    }
+}
+
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_BaseData : global::Orleans.Serialization.Serializers.AbstractTypeSerializer<global::TestProject.BaseData>
     {
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -57,6 +75,12 @@ namespace OrleansCodeGen.TestProject
             output.BaseValue = input.BaseValue;
         }
     }
+}
+
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_DerivedData : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DerivedData>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.DerivedData>
@@ -170,17 +194,4 @@ namespace OrleansCodeGen.TestProject
             output.DerivedValue = input.DerivedValue;
         }
     }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_BaseData));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_DerivedData));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_BaseData));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_DerivedData));
-        }
-    }
 }
-#pragma warning restore CS1591, RS0016, RS0041

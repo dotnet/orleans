@@ -8,7 +8,7 @@ namespace Orleans.CodeGenerator
 {
     internal class ActivatorGenerator
     {
-        private readonly CodeGenerator _codeGenerator;
+        private readonly IGeneratorServices _generatorServices;
 
         private struct ConstructorArgument
         {
@@ -17,16 +17,16 @@ namespace Orleans.CodeGenerator
             public string ParameterName { get; set; }
         }
 
-        public ActivatorGenerator(CodeGenerator codeGenerator)
+        public ActivatorGenerator(IGeneratorServices generatorServices)
         {
-            _codeGenerator = codeGenerator;
+            _generatorServices = generatorServices;
         }
 
         public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
         {
             var simpleClassName = GetSimpleClassName(type);
 
-            var baseInterface = _codeGenerator.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
+            var baseInterface = _generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
 
             var orderedFields = new List<ConstructorArgument>();
             var index = 0;
@@ -68,7 +68,23 @@ namespace Orleans.CodeGenerator
             return classDeclaration;
         }
 
-        public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => $"Activator_{serializableType.Name}";
+        public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
+
+        public static string GetSimpleClassName(string name) => $"Activator_{name}";
+
+        /// <summary>
+        /// Determines whether an activator should be generated for the specified type.
+        /// </summary>
+        internal static bool ShouldGenerateActivator(ISerializableTypeDescription type)
+        {
+            return !type.IsAbstractType
+                && !type.IsEnumType
+                && (!type.IsValueType
+                    && type.IsEmptyConstructable
+                    && !type.UseActivator
+                    && type is not GeneratedInvokableDescription
+                    || type.HasActivatorConstructor);
+        }
 
         private ConstructorDeclarationSyntax GenerateConstructor(
             string simpleClassName,

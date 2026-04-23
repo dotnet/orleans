@@ -14,6 +14,7 @@ namespace Orleans.CodeGenerator;
 
 internal class FieldIdAssignmentHelper
 {
+    private const string NoAssignedFieldIdsFailureReason = "no field ids were assigned to any candidate serializable members";
     private readonly GenerateFieldIds _implicitMemberSelectionStrategy;
     private readonly ImmutableArray<IParameterSymbol> _constructorParameters;
     private readonly LibraryTypes _libraryTypes;
@@ -32,12 +33,43 @@ internal class FieldIdAssignmentHelper
         _libraryTypes = libraryTypes;
         _memberSymbols = GetMembers(typeSymbol).ToArray();
 
-        IsValidForSerialization = _implicitMemberSelectionStrategy != GenerateFieldIds.None && !HasMemberWithIdAnnotation() ? GenerateImplicitFieldIds() : ExtractFieldIdAnnotations();
+        var isValidForSerialization = _implicitMemberSelectionStrategy != GenerateFieldIds.None && !HasMemberWithIdAnnotation()
+            ? GenerateImplicitFieldIds()
+            : ExtractFieldIdAnnotations();
+        if (HasCandidateSerializableMembers() && _symbols.Count == 0)
+        {
+            FailureReason ??= NoAssignedFieldIdsFailureReason;
+            isValidForSerialization = false;
+        }
+
+        IsValidForSerialization = isValidForSerialization;
     }
 
     public bool TryGetSymbolKey(ISymbol symbol, out (uint, bool) key) => _symbols.TryGetValue(symbol, out key);
 
     private bool HasMemberWithIdAnnotation() => Array.Exists(_memberSymbols, member => member.HasAttribute(_libraryTypes.IdAttributeType));
+
+    private bool HasCandidateSerializableMembers()
+    {
+        foreach (var member in _memberSymbols)
+        {
+            if (member is IFieldSymbol)
+            {
+                return true;
+            }
+
+            if (member is IPropertySymbol property
+                && (_implicitMemberSelectionStrategy != GenerateFieldIds.None
+                    || property.HasAttribute(_libraryTypes.IdAttributeType)
+                    || PropertyUtility.GetMatchingPrimaryConstructorParameter(property, _constructorParameters) is not null
+                    || PropertyUtility.GetMatchingField(property, _memberSymbols) is not null))
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
 
     private IEnumerable<ISymbol> GetMembers(INamedTypeSymbol symbol)
     {
