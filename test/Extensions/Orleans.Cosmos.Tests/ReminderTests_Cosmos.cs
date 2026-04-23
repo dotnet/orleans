@@ -231,6 +231,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
                 Task.Run(() => PerGrainFailureTest(g5, cts.Token), cts.Token),
             };
 
+        await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
         await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), failAfter, cts.Token);
 
         // stop a couple of silos
@@ -269,6 +270,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
                 Task.Run(() => PerGrainFailureTest(g5, cts.Token), cts.Token),
             };
 
+        await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
         await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), failAfter, cts.Token);
 
         var siloToKill = silos[Random.Shared.Next(silos.Count)];
