@@ -1,0 +1,13 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0007  [#2 VarInt Id: 683817142 SchemaType: Expected] Value: 12 (0xC)
+0x000E  [#3 VarInt Id: 1001920021 SchemaType: Expected] Value: 10 (0xA)
+0x0015  [#4 VarInt Id: 1293108980 SchemaType: Expected] Value: 8 (0x8)
+0x001C  [#5 VarInt Id: 2346972374 SchemaType: Expected] Value: 14 (0xE)
+0x0022  [#6 VarInt Id: 2473733557 SchemaType: Expected] Value: 18 (0x12)
+0x0029  [#7 VarInt Id: 2866756706 SchemaType: Expected] Value: 22 (0x16)
+0x002F  [#8 VarInt Id: 3099124908 SchemaType: Expected] Value: 2 (0x2)
+0x0036  [#9 VarInt Id: 3409338170 SchemaType: Expected] Value: 16 (0x10)
+0x003C  [#10 VarInt Id: 3613925690 SchemaType: Expected] Value: 6 (0x6)
+0x0042  [#11 VarInt Id: 3711888802 SchemaType: Expected] Value: 4 (0x4)
+0x0049  [#12 VarInt Id: 4284050204 SchemaType: Expected] Value: 20 (0x14)
+0x004B }

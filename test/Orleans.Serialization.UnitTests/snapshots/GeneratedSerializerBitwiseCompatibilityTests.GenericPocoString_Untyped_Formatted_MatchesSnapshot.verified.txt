@@ -1,0 +1,9 @@
+0x0018 [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.UnitTests.GenericPoco`1[System.String] (name: Encoded "TypeName "gpoco`1[[string]]" (hash D694B33C)" (Orleans.Serialization.UnitTests.GenericPoco`1[[System.String]],Orleans.Serialization.UnitTests))] Value: {
+0x0019  [#2 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 16b) ["0123456789ABCDEF"]
+0x002D  [#3 TagDelimited Id: 1030 SchemaType: Expected] Value: {
+0x002E   [#4 VarInt Id: 0 SchemaType: Expected] Value: 3 (0x3)
+0x0030   [#5 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 1b) ["a"]
+0x0033   [#6 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 2b) ["bb"]
+0x0037   [#7 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 3b) ["ccc"]
+0x003C  }
+0x003D }
