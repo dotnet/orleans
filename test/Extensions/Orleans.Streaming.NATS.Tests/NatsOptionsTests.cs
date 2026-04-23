@@ -20,6 +20,14 @@ public sealed class NatsOptionsTests
         Assert.Equal(1, options.NumReplicas);
     }
 
+    [Fact]
+    public void DefaultStorageType_ShouldBeFile()
+    {
+        var options = new NatsOptions();
+
+        Assert.Equal(StreamConfigStorage.File, options.StorageType);
+    }
+
     [Theory]
     [InlineData(0)]
     [InlineData(-1)]
@@ -133,4 +141,53 @@ public sealed class NatsOptionsTests
     // cluster. A single NATS node only supports NumReplicas = 1. R3 integration
     // testing should be done in a CI environment with a 3-node cluster configured
     // via docker-compose or similar infrastructure.
+
+    [SkippableTheory]
+    [InlineData(StreamConfigStorage.File)]
+    [InlineData(StreamConfigStorage.Memory)]
+    public async Task StorageType_IsAppliedToJetStreamConfig(StreamConfigStorage storageType)
+    {
+        if (!NatsTestConstants.IsNatsAvailable)
+        {
+            throw new SkipException("Nats Server is not available");
+        }
+
+        var providerName = $"test-storage-{Guid.NewGuid():N}";
+        var streamName = $"test-storage-stream-{Guid.NewGuid():N}";
+        var options = new NatsOptions
+        {
+            StreamName = streamName,
+            NumReplicas = 1,
+            PartitionCount = 2,
+            ProducerCount = 1,
+            StorageType = storageType
+        };
+
+        var connectionManager = new NatsConnectionManager(providerName, NullLoggerFactory.Instance, options);
+        await connectionManager.Initialize();
+
+        await using var natsConnection = new NatsConnection();
+        var natsContext = new NatsJSContext(natsConnection);
+        await natsConnection.ConnectAsync();
+
+        try
+        {
+            var stream = await natsContext.GetStreamAsync(streamName);
+            var info = stream.Info;
+
+            Assert.Equal(storageType, info.Config.Storage);
+        }
+        finally
+        {
+            try
+            {
+                var stream = await natsContext.GetStreamAsync(streamName);
+                await stream.DeleteAsync();
+            }
+            catch (NatsJSApiException)
+            {
+                // Ignore cleanup errors
+            }
+        }
+    }
 }
