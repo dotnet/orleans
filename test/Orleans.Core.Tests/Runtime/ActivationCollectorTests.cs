@@ -87,9 +87,15 @@ namespace UnitTests.Runtime
             collector.ScheduleCollection(activation, farFuture, now);
             Assert.Equal(DateTime.MaxValue, activation.CollectionTicket);
 
-            var exception = Record.Exception(() => collector.TryRescheduleCollection(activation));
+            var rescheduled = false;
+            var exception = Record.Exception(() =>
+            {
+                rescheduled = collector.TryRescheduleCollection(activation);
+            });
 
             Assert.Null(exception);
+            Assert.True(rescheduled);
+            Assert.NotEqual(default, activation.CollectionTicket);
             Assert.NotEqual(DateTime.MaxValue, activation.CollectionTicket);
         }
 
