@@ -1003,7 +1003,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                _shared.Logger.LogError(exception, "Error in grain message loop");
+                LogErrorInGrainMessageLoop(_shared.Logger, exception);
             }
         }
 
@@ -2717,4 +2717,10 @@ internal sealed partial class ActivationData :
         Level = LogLevel.Error,
         Message = "Activation of grain {Grain} failed")]
     private static partial void LogActivationFailed(ILogger logger, Exception exception, ActivationData grain);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in grain message loop"
+    )]
+    private static partial void LogErrorInGrainMessageLoop(ILogger logger, Exception exception);
 }

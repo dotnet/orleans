@@ -189,7 +189,7 @@ public abstract class AsyncEnumerableRequest<T> : RequestBase, IAsyncEnumerable<
 /// <summary>
 /// A proxy for an <see cref="IAsyncEnumerator{T}"/> instance returned from a grain method.
 /// </summary>
-internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
+internal sealed partial class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
 {
     private readonly AsyncEnumerableRequest<T> _request;
     private readonly CancellationToken _cancellationToken;
@@ -282,7 +282,7 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             catch (Exception exception)
             {
                 var logger = ((GrainReference)_target).Shared.ServiceProvider.GetRequiredService<ILogger<AsyncEnumerableRequest<T>>>();
-                logger.LogWarning(exception, "Failed to dispose async enumerator.");
+                LogWarningFailedToDisposeAsyncEnumerator(logger, exception);
             }
             finally
             {
@@ -392,6 +392,12 @@ internal sealed class AsyncEnumeratorProxy<T> : IAsyncEnumerator<T>
             Activity.Current = previousActivity;
         }
     }
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to dispose async enumerator."
+    )]
+    private static partial void LogWarningFailedToDisposeAsyncEnumerator(ILogger logger, Exception exception);
 }
 
 public static class AsyncEnumerableExtensions

@@ -544,7 +544,7 @@ namespace Orleans.Runtime.ReminderService
             if (!logger.IsEnabled(LogLevel.Trace)) return;
 
             var str = $"{(msg ?? "Current list of reminders:")}{Environment.NewLine}{Utils.EnumerableToString(localReminders, null, Environment.NewLine)}";
-            logger.LogTrace("{Message}", str);
+            LogTraceReminders(str);
         }
 
         private IRemindable GetGrain(GrainId grainId) => (IRemindable)_referenceActivator.CreateReference(grainId, _grainInterfaceType);
@@ -915,6 +915,12 @@ namespace Orleans.Runtime.ReminderService
             Message = "Not in table, In local, Old, so removing. {Reminder}"
         )]
         private partial void LogTraceNotInTableInLocalOld(LocalReminderData reminder);
+
+        [LoggerMessage(
+            Level = LogLevel.Trace,
+            Message = "{Message}"
+        )]
+        private partial void LogTraceReminders(string message);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

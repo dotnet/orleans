@@ -158,7 +158,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 #if false
             if (logger.IsEnabled(LogLevel.Trace))
             {
-                logger.LogTrace("Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'.", operation, owner, grainId);
+                LogTraceInvokingOperation(logger, operation, owner, grainId);
             }
 #endif
 
@@ -249,7 +249,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                         // This activation has not completed registration or is not currently active.
                         // Abort the activation with a pre-canceled cancellation token so that it skips directory deregistration.
                         // TODO: Expand validity check to non-ActivationData activations.
-                        //logger.LogWarning("Deactivating activation '{Activation}' due to failure of a directory range owner.", activation);
+                        // Warning: deactivating activation '{Activation}' due to failure of a directory range owner.
                         activation.Deactivate(new DeactivationReason(DeactivationReasonCode.DirectoryFailure, "This activation's directory partition was salvaged while registration status was in-doubt."), cts.Token);
                         deactivationTasks.Add(activation.Deactivated);
                     }
@@ -464,4 +464,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         Message = "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms"
     )]
     private static partial void LogDebugSubmittingRegisteredActivations(ILogger logger, int count, RingRange range, MembershipVersion membershipVersion, int deactivationCount, long elapsedMilliseconds);
+
+    [LoggerMessage(
+        Level = LogLevel.Trace,
+        Message = "Invoking '{Operation}' on '{Owner}' for grain '{GrainId}'."
+    )]
+    private static partial void LogTraceInvokingOperation(ILogger logger, string operation, SiloAddress owner, GrainId grainId);
 }
