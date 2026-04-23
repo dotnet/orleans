@@ -20,6 +20,9 @@ namespace Orleans.Runtime.GrainDirectory;
 /// </summary>
 internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDirectoryPartition, IGrainDirectoryTestHooks
 {
+    private const float MaxActivationQueryRangePercent = 5f;
+    private const int MaxActivationQueryRangeCount = 32;
+
     internal static SystemTargetGrainId CreateGrainId(SiloAddress siloAddress, int partitionIndex) => SystemTargetGrainId.Create(Constants.GrainDirectoryPartitionType, siloAddress, partitionIndex.ToString(CultureInfo.InvariantCulture));
     private readonly Dictionary<GrainId, GrainAddress> _directory = [];
     private readonly int _partitionIndex;
@@ -509,14 +512,36 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             LogTraceRequestingEntries(_logger, addedRange, previousOwner, previousVersion);
 
             var partition = GetPartitionReference(previousOwner, partitionIndex);
-
-            // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
-            var snapshot = await partition.GetSnapshotAsync(current.Version, previousVersion, addedRange).AsTask().WaitAsync(ShutdownToken);
-
-            if (snapshot is null)
+            var transferredEntries = 0;
+            var waitedForRange = false;
+            foreach (var queryRange in GetActivationQueryRanges(addedRange))
             {
-                LogWarningExpectedValidSnapshot(_logger, previousOwner, addedRange);
-                return false;
+                // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
+                var snapshot = await partition.GetSnapshotAsync(current.Version, previousVersion, queryRange).AsTask().WaitAsync(ShutdownToken);
+
+                if (snapshot is null)
+                {
+                    LogWarningExpectedValidSnapshot(_logger, previousOwner, queryRange);
+                    return false;
+                }
+
+                if (!waitedForRange)
+                {
+                    // Wait for previous versions to be unlocked before proceeding.
+                    await WaitForRange(addedRange, previousVersion);
+                    waitedForRange = true;
+                }
+
+                // Incorporate the values into the grain directory.
+                foreach (var entry in snapshot.GrainAddresses)
+                {
+                    DebugAssertOwnership(current, entry.GrainId);
+
+                    LogTraceReceivedEntry(_logger, entry, previousOwner, previousVersion);
+                    _directory[entry.GrainId] = entry;
+                }
+
+                transferredEntries += snapshot.GrainAddresses.Count;
             }
 
             // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
@@ -526,19 +551,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 false,
                 nameof(IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync)).Ignore();
 
-            // Wait for previous versions to be unlocked before proceeding.
-            await WaitForRange(addedRange, previousVersion);
-
-            // Incorporate the values into the grain directory.
-            foreach (var entry in snapshot.GrainAddresses)
-            {
-                DebugAssertOwnership(current, entry.GrainId);
-
-                LogTraceReceivedEntry(_logger, entry, previousOwner, previousVersion);
-                _directory[entry.GrainId] = entry;
-            }
-
-            LogDebugTransferredEntries(_logger, snapshot.GrainAddresses.Count, addedRange, previousOwner);
+            LogDebugTransferredEntries(_logger, transferredEntries, addedRange, previousOwner);
 
             DirectoryInstruments.SnapshotTransferCount.Add(1);
             DirectoryInstruments.SnapshotTransferDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
@@ -588,26 +601,29 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         var clusterMembershipSnapshot = _owner.ClusterMembershipSnapshot;
         Debug.Assert(clusterMembershipSnapshot.Version >= current.Version);
 
-        var tasks = new List<Task<List<GrainAddress>>>();
-        foreach (var member in clusterMembershipSnapshot.Members.Values)
+        foreach (var queryRange in GetActivationQueryRanges(range))
         {
-            if (member.Status is not (SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown))
+            var tasks = new List<Task<List<GrainAddress>>>();
+            foreach (var member in clusterMembershipSnapshot.Members.Values)
             {
-                continue;
+                if (member.Status is not (SiloStatus.Active or SiloStatus.Joining or SiloStatus.ShuttingDown))
+                {
+                    continue;
+                }
+
+                tasks.Add(GetRegisteredActivationsFromClusterMember(current.Version, queryRange, member.SiloAddress, isValidation));
             }
 
-            tasks.Add(GetRegisteredActivationsFromClusterMember(current.Version, range, member.SiloAddress, isValidation));
-        }
+            await Task.WhenAll(tasks).WaitAsync(ShutdownToken).SuppressThrowing();
+            if (ShutdownToken.IsCancellationRequested)
+            {
+                yield break;
+            }
 
-        await Task.WhenAll(tasks).WaitAsync(ShutdownToken).SuppressThrowing();
-        if (ShutdownToken.IsCancellationRequested)
-        {
-            yield break;
-        }
-
-        foreach (var task in tasks)
-        {
-            yield return await task;
+            foreach (var task in tasks)
+            {
+                yield return await task;
+            }
         }
 
         async Task<List<GrainAddress>> GetRegisteredActivationsFromClusterMember(MembershipVersion version, RingRange range, SiloAddress siloAddress, bool isValidation)
@@ -637,6 +653,44 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             LogDebugRecoveredEntries(_logger, result.Value.Count, siloAddress, range, version, stopwatch.Elapsed.TotalMilliseconds);
 
             return result.Value;
+        }
+    }
+
+    // Directory recovery and validation can temporarily involve very large ranges.
+    // Split those requests so the returned GrainAddress list stays comfortably under MaxMessageBodySize.
+    internal static IEnumerable<RingRange> GetActivationQueryRanges(RingRange range)
+    {
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        var queryRangeCount = Math.Clamp(
+            (int)Math.Ceiling(range.SizePercent / MaxActivationQueryRangePercent),
+            1,
+            MaxActivationQueryRangeCount);
+        if (queryRangeCount == 1)
+        {
+            yield return range;
+            yield break;
+        }
+
+        var totalSize = range.IsFull ? (ulong)uint.MaxValue + 1 : range.Size;
+        queryRangeCount = (int)Math.Min((ulong)queryRangeCount, totalSize);
+        if (queryRangeCount == 1)
+        {
+            yield return range;
+            yield break;
+        }
+
+        var (baseSize, remainder) = Math.DivRem(totalSize, (ulong)queryRangeCount);
+        var start = range.Start;
+        for (var i = 0; i < queryRangeCount; i++)
+        {
+            var size = baseSize + ((ulong)i < remainder ? 1UL : 0UL);
+            var end = unchecked((uint)((ulong)start + size));
+            yield return RingRange.Create(start, end);
+            start = end;
         }
     }
 
