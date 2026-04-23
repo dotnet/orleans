@@ -11,6 +11,23 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_DemoClass));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_DemoClass));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_DemoClass));
+        }
+    }
+}
+
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_DemoClass : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.DemoClass>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.DemoClass>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.DemoClass);
@@ -111,16 +128,4 @@ namespace OrleansCodeGen.TestProject
     {
         public global::TestProject.DemoClass Create() => new global::TestProject.DemoClass();
     }
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_DemoClass));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_DemoClass));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_DemoClass));
-        }
-    }
 }
-#pragma warning restore CS1591, RS0016, RS0041

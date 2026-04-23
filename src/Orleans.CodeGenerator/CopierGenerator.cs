@@ -16,14 +16,18 @@ namespace Orleans.CodeGenerator
         private const string BaseTypeCopierFieldName = "_baseTypeCopier";
         private const string ActivatorFieldName = "_activator";
         private const string DeepCopyMethodName = "DeepCopy";
-        private readonly CodeGenerator _codeGenerator;
+        private readonly IGeneratorServices _generatorServices;
 
-        public CopierGenerator(CodeGenerator codeGenerator)
+        public CopierGenerator(CodeGenerator codeGenerator) : this((IGeneratorServices)codeGenerator)
         {
-            _codeGenerator = codeGenerator;
         }
 
-        private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+        public CopierGenerator(IGeneratorServices generatorServices)
+        {
+            _generatorServices = generatorServices;
+        }
+
+        private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
 
         public ClassDeclarationSyntax GenerateCopier(
             ISerializableTypeDescription type,
@@ -52,7 +56,7 @@ namespace Orleans.CodeGenerator
                 }
                 else if (member is IFieldDescription or IPropertyDescription)
                 {
-                    members.Add(new SerializableMember(_codeGenerator, member, members.Count));
+                    members.Add(new SerializableMember(_generatorServices, member, members.Count));
                 }
                 else if (member is MethodParameterFieldDescription methodParameter)
                 {
