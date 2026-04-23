@@ -158,10 +158,12 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
 
         // start two extra silos ... although it will take it a while before they stabilize
-        log.LogInformation("Starting 2 extra silos");
-
-        await StartAdditionalSilosAsync(2, true).WaitAsync(cts.Token);
-        await WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+        await using (await PauseReminderTimeAsync(cts.Token))
+        {
+            log.LogInformation("Starting 2 extra silos");
+            await StartAdditionalSilosAsync(2, true).WaitAsync(cts.Token);
+            await WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+        }
 
         //Block until all tasks complete.
         await Task.WhenAll(tasks).WaitAsync(cts.Token);

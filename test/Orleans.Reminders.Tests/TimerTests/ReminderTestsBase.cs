@@ -178,8 +178,12 @@ public class ReminderTestsBase : OrleansTestingBase, IDisposable
         await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
 
         // start another silo ... although it will take it a while before it stabilizes
-        log.LogInformation("Starting another silo");
-        await this.StartAdditionalSilosAsync(1, true).WaitAsync(cts.Token);
+        await using (await PauseReminderTimeAsync(cts.Token))
+        {
+            log.LogInformation("Starting another silo");
+            await this.StartAdditionalSilosAsync(1, true).WaitAsync(cts.Token);
+            await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+        }
 
         //Block until all tasks complete.
         await Task.WhenAll(tasks).WaitAsync(cts.Token);
