@@ -1,5 +1,4 @@
 using System.Diagnostics.Metrics;
-using System.Reflection;
 using Orleans.Runtime;
 using Orleans.Statistics;
 using Xunit;
@@ -11,23 +10,33 @@ public class EnvironmentStatisticsProviderTests
     [Fact, TestCategory("BVT"), TestCategory("Runtime")]
     public void RuntimeMemoryMetrics_AreObservableGauges()
     {
+        Instrument availableMemoryMetric = null!;
+        Instrument maximumAvailableMemoryMetric = null!;
+
+        using var listener = new MeterListener();
+        listener.InstrumentPublished = (instrument, meterListener) =>
+        {
+            if (instrument.Name == InstrumentNames.RUNTIME_MEMORY_AVAILABLE_MEMORY_MB)
+            {
+                availableMemoryMetric = instrument;
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+            else if (instrument.Name == InstrumentNames.RUNTIME_MEMORY_TOTAL_PHYSICAL_MEMORY_MB)
+            {
+                maximumAvailableMemoryMetric = instrument;
+                meterListener.EnableMeasurementEvents(instrument);
+            }
+        };
+
+        listener.SetMeasurementEventCallback<long>(static (_, _, _, _) => { });
+        listener.Start();
+
         using var provider = new EnvironmentStatisticsProvider();
+        listener.RecordObservableInstruments();
 
-        var availableMemoryMetric = GetInstrument(provider, "_availableMemoryCounter");
-        var maximumAvailableMemoryMetric = GetInstrument(provider, "_maximumAvailableMemoryCounter");
-
+        Assert.NotNull(availableMemoryMetric);
+        Assert.NotNull(maximumAvailableMemoryMetric);
         Assert.IsType<ObservableGauge<long>>(availableMemoryMetric);
         Assert.IsType<ObservableGauge<long>>(maximumAvailableMemoryMetric);
-    }
-
-    private static object GetInstrument(EnvironmentStatisticsProvider provider, string fieldName)
-    {
-        var field = typeof(EnvironmentStatisticsProvider).GetField(fieldName, BindingFlags.Instance | BindingFlags.NonPublic);
-        Assert.NotNull(field);
-
-        var result = field.GetValue(provider);
-        Assert.NotNull(result);
-
-        return result;
     }
 }
