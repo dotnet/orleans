@@ -1,0 +1,5 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 VarInt Id: 0 SchemaType: Expected] Value: 60 (0x3C)
+0x0004  [#3 VarInt Id: 1 SchemaType: Expected] Value: 4 (0x4)
+0x0058  [#4 VarInt Id: 2 SchemaType: Encoded RuntimeType: Orleans.Serialization.UnitTests.BaselineEnum (name: Encoded "TypeName "Orleans.Serialization.UnitTests.BaselineEnum,Orleans.Serialization.UnitTests" (hash 93EF31AD)" (Orleans.Serialization.UnitTests.BaselineEnum,Orleans.Serialization.UnitTests))] Value: 4 (0x4)
+0x005A }

@@ -1,0 +1,14 @@
+0x0023 [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.UnitTests.GenericPoco`1[Orleans.Serialization.UnitTests.GenericPoco`1[System.String]] (name: Encoded "TypeName "gpoco`1[[gpoco`1[[string]]]]" (hash D703826F)" (Orleans.Serialization.UnitTests.GenericPoco`1[[Orleans.Serialization.UnitTests.GenericPoco`1[[System.String]],Orleans.Serialization.UnitTests]],Orleans.Serialization.UnitTests))] Value: {
+0x0024  [#2 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0025   [#3 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 12b) ["nested-value"]
+0x0035   [#4 TagDelimited Id: 1030 SchemaType: Expected] Value: {
+0x0036    [#5 VarInt Id: 0 SchemaType: Expected] Value: 2 (0x2)
+0x0038    [#6 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 7b) ["inner-a"]
+0x0041    [#7 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 7b) ["inner-b"]
+0x004A   }
+0x004B  }
+0x004E  [#8 TagDelimited Id: 1030 SchemaType: Expected] Value: {
+0x004F   [#9 VarInt Id: 0 SchemaType: Expected] Value: 1 (0x1)
+0x0051   [#10 Reference Id: 1 SchemaType: Expected Reference: 2 (Position: 0x24, Field: [TagDelimited, IdDelta:0, SchemaType:Expected])]
+0x0053  }
+0x0054 }
