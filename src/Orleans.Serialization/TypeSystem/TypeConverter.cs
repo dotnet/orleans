@@ -10,581 +10,582 @@ using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Configuration;
 using Orleans.Serialization.Serializers;
 
-namespace Orleans.Serialization.TypeSystem
+namespace Orleans.Serialization.TypeSystem;
+
+/// <summary>
+/// Formats and parses <see cref="Type"/> instances using configured rules.
+/// </summary>
+public class TypeConverter
 {
+    private readonly ITypeConverter[] _converters;
+    private readonly ITypeNameFilter[] _typeNameFilters;
+    private readonly ITypeFilter[] _typeFilters;
+    private readonly bool _allowAllTypes;
+    private readonly CompoundTypeAliasTree _compoundTypeAliases;
+    private readonly TypeResolver _resolver;
+    private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertToDisplayName;
+    private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertFromDisplayName;
+    private readonly RuntimeTypeNameRewriter.CompoundAliasResolver<ValidationResult> _compoundAliasResolver;
+    private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
+    private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
+    private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
+    private readonly HashSet<string> _allowedTypesConfiguration;
+    private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases =
+    [
+        ("object", "System.Object"),
+        ("string", "System.String"),
+        ("char", "System.Char"),
+        ("sbyte", "System.SByte"),
+        ("byte", "System.Byte"),
+        ("bool", "System.Boolean"),
+        ("short", "System.Int16"),
+        ("ushort", "System.UInt16"),
+        ("int", "System.Int32"),
+        ("uint", "System.UInt32"),
+        ("long", "System.Int64"),
+        ("ulong", "System.UInt64"),
+        ("float", "System.Single"),
+        ("double", "System.Double"),
+        ("decimal", "System.Decimal"),
+        ("Guid", "System.Guid"),
+        ("TimeSpan", "System.TimeSpan"),
+        ("DateTime", "System.DateTime"),
+        ("DateTimeOffset", "System.DateTimeOffset"),
+        ("Type", "System.Type"),
+    ];
+
     /// <summary>
-    /// Formats and parses <see cref="Type"/> instances using configured rules.
+    /// Initializes a new instance of the <see cref="TypeConverter"/> class.
     /// </summary>
-    public class TypeConverter
+    /// <param name="formatters">The type name formatters.</param>
+    /// <param name="typeNameFilters">The type name filters.</param>
+    /// <param name="typeFilters">The type filters.</param>
+    /// <param name="options">The options.</param>
+    /// <param name="typeResolver">The type resolver.</param>
+    public TypeConverter(
+        IEnumerable<ITypeConverter> formatters,
+        IEnumerable<ITypeNameFilter> typeNameFilters,
+        IEnumerable<ITypeFilter> typeFilters,
+        IOptions<TypeManifestOptions> options,
+        TypeResolver typeResolver)
     {
-        private readonly ITypeConverter[] _converters;
-        private readonly ITypeNameFilter[] _typeNameFilters;
-        private readonly ITypeFilter[] _typeFilters;
-        private readonly bool _allowAllTypes;
-        private readonly CompoundTypeAliasTree _compoundTypeAliases;
-        private readonly TypeResolver _resolver;
-        private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertToDisplayName;
-        private readonly RuntimeTypeNameRewriter.Rewriter<ValidationResult> _convertFromDisplayName;
-        private readonly RuntimeTypeNameRewriter.CompoundAliasResolver<ValidationResult> _compoundAliasResolver;
-        private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownAliasToType;
-        private readonly Dictionary<QualifiedType, QualifiedType> _wellKnownTypeToAlias;
-        private readonly ConcurrentDictionary<QualifiedType, bool> _allowedTypes;
-        private readonly HashSet<string> _allowedTypesConfiguration;
-        private static readonly List<(string DisplayName, string RuntimeName)> WellKnownTypeAliases =
-        [
-            ("object", "System.Object"),
-            ("string", "System.String"),
-            ("char", "System.Char"),
-            ("sbyte", "System.SByte"),
-            ("byte", "System.Byte"),
-            ("bool", "System.Boolean"),
-            ("short", "System.Int16"),
-            ("ushort", "System.UInt16"),
-            ("int", "System.Int32"),
-            ("uint", "System.UInt32"),
-            ("long", "System.Int64"),
-            ("ulong", "System.UInt64"),
-            ("float", "System.Single"),
-            ("double", "System.Double"),
-            ("decimal", "System.Decimal"),
-            ("Guid", "System.Guid"),
-            ("TimeSpan", "System.TimeSpan"),
-            ("DateTime", "System.DateTime"),
-            ("DateTimeOffset", "System.DateTimeOffset"),
-            ("Type", "System.Type"),
-        ];
+        _resolver = typeResolver;
+        _converters = formatters.ToArray();
+        _typeNameFilters = typeNameFilters.ToArray();
+        _typeFilters = typeFilters.ToArray();
+        _allowAllTypes = options.Value.AllowAllTypes;
+        _compoundTypeAliases = options.Value.CompoundTypeAliases;
+        _convertToDisplayName = ConvertToDisplayName;
+        _convertFromDisplayName = ConvertFromDisplayName;
+        _compoundAliasResolver = ResolveCompoundAliasType;
 
-        /// <summary>
-        /// Initializes a new instance of the <see cref="TypeConverter"/> class.
-        /// </summary>
-        /// <param name="formatters">The type name formatters.</param>
-        /// <param name="typeNameFilters">The type name filters.</param>
-        /// <param name="typeFilters">The type filters.</param>
-        /// <param name="options">The options.</param>
-        /// <param name="typeResolver">The type resolver.</param>
-        public TypeConverter(
-            IEnumerable<ITypeConverter> formatters,
-            IEnumerable<ITypeNameFilter> typeNameFilters,
-            IEnumerable<ITypeFilter> typeFilters,
-            IOptions<TypeManifestOptions> options,
-            TypeResolver typeResolver)
+        _wellKnownAliasToType = [];
+        _wellKnownTypeToAlias = [];
+
+        _allowedTypes = new ConcurrentDictionary<QualifiedType, bool>(QualifiedType.EqualityComparer);
+        _allowedTypesConfiguration = new(StringComparer.Ordinal);
+
+        if (!_allowAllTypes)
         {
-            _resolver = typeResolver;
-            _converters = formatters.ToArray();
-            _typeNameFilters = typeNameFilters.ToArray();
-            _typeFilters = typeFilters.ToArray();
-            _allowAllTypes = options.Value.AllowAllTypes;
-            _compoundTypeAliases = options.Value.CompoundTypeAliases;
-            _convertToDisplayName = ConvertToDisplayName;
-            _convertFromDisplayName = ConvertFromDisplayName;
-            _compoundAliasResolver = ResolveCompoundAliasType;
+            foreach (var t in options.Value.AllowedTypes)
+            {
+                _allowedTypesConfiguration.Add(t);
+            }
 
-            _wellKnownAliasToType = [];
-            _wellKnownTypeToAlias = [];
+            ConsumeMetadata(options.Value);
+        }
 
-            _allowedTypes = new ConcurrentDictionary<QualifiedType, bool>(QualifiedType.EqualityComparer);
-            _allowedTypesConfiguration = new(StringComparer.Ordinal);
+        var aliases = options.Value.WellKnownTypeAliases;
+        foreach (var item in aliases)
+        {
+            var alias = new QualifiedType(null, item.Key);
+            var spec = RuntimeTypeNameParser.Parse(RuntimeTypeNameFormatter.Format(item.Value));
+            string? asmName = null;
+            if (spec is AssemblyQualifiedTypeSpec asm)
+            {
+                asmName = asm.Assembly;
+                spec = asm.Type;
+            }
 
+            var originalQualifiedType = new QualifiedType(asmName, spec.Format());
+            _wellKnownTypeToAlias[originalQualifiedType] = alias;
+            if (asmName is { Length: > 0 })
+            {
+                _wellKnownTypeToAlias[new QualifiedType(null, spec.Format())] = alias;
+            }
+
+            _wellKnownAliasToType[alias] = originalQualifiedType;
             if (!_allowAllTypes)
             {
-                foreach (var t in options.Value.AllowedTypes)
-                {
-                    _allowedTypesConfiguration.Add(t);
-                }
-
-                ConsumeMetadata(options.Value);
-            }
-
-            var aliases = options.Value.WellKnownTypeAliases;
-            foreach (var item in aliases)
-            {
-                var alias = new QualifiedType(null, item.Key);
-                var spec = RuntimeTypeNameParser.Parse(RuntimeTypeNameFormatter.Format(item.Value));
-                string? asmName = null;
-                if (spec is AssemblyQualifiedTypeSpec asm)
-                {
-                    asmName = asm.Assembly;
-                    spec = asm.Type;
-                }
-
-                var originalQualifiedType = new QualifiedType(asmName, spec.Format());
-                _wellKnownTypeToAlias[originalQualifiedType] = alias;
+                _allowedTypes[originalQualifiedType] = true;
                 if (asmName is { Length: > 0 })
                 {
-                    _wellKnownTypeToAlias[new QualifiedType(null, spec.Format())] = alias;
+                    _allowedTypes[new QualifiedType(null, spec.Format())] = true;
                 }
+            }
+        }
+    }
 
-                _wellKnownAliasToType[alias] = originalQualifiedType;
-                if (!_allowAllTypes)
+    private void ConsumeMetadata(TypeManifestOptions metadata)
+    {
+        AddFromMetadata(metadata.Serializers, typeof(IBaseCodec<>));
+        AddFromMetadata(metadata.Serializers, typeof(IValueSerializer<>));
+        AddFromMetadata(metadata.Serializers, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.FieldCodecs, typeof(IFieldCodec<>));
+        AddFromMetadata(metadata.Activators, typeof(IActivator<>));
+        AddFromMetadata(metadata.Copiers, typeof(IDeepCopier<>));
+        AddFromMetadata(metadata.Converters, typeof(IConverter<,>));
+        foreach (var type in metadata.InterfaceProxies)
+        {
+            AddAllowedType(type switch
+            {
+                { IsGenericType: true } => type.GetGenericTypeDefinition(),
+                _ => type
+            });
+        }
+
+        void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
+        {
+            Debug.Assert(genericType.GetGenericArguments().Length >= 1);
+
+            foreach (var type in metadataCollection)
+            {
+                var interfaces = type.GetInterfaces();
+                foreach (var @interface in interfaces)
                 {
-                    _allowedTypes[originalQualifiedType] = true;
-                    if (asmName is { Length: > 0 })
+                    if (!@interface.IsGenericType)
                     {
-                        _allowedTypes[new QualifiedType(null, spec.Format())] = true;
+                        continue;
+                    }
+
+                    if (genericType != @interface.GetGenericTypeDefinition())
+                    {
+                        continue;
+                    }
+
+                    foreach (var genericArgument in @interface.GetGenericArguments())
+                    {
+                        InspectGenericArgument(genericArgument);
                     }
                 }
             }
         }
 
-        private void ConsumeMetadata(TypeManifestOptions metadata)
+        void InspectGenericArgument(Type genericArgument)
         {
-            AddFromMetadata(metadata.Serializers, typeof(IBaseCodec<>));
-            AddFromMetadata(metadata.Serializers, typeof(IValueSerializer<>));
-            AddFromMetadata(metadata.Serializers, typeof(IFieldCodec<>));
-            AddFromMetadata(metadata.FieldCodecs, typeof(IFieldCodec<>));
-            AddFromMetadata(metadata.Activators, typeof(IActivator<>));
-            AddFromMetadata(metadata.Copiers, typeof(IDeepCopier<>));
-            AddFromMetadata(metadata.Converters, typeof(IConverter<,>));
-            foreach (var type in metadata.InterfaceProxies)
+            if (typeof(object) == genericArgument)
             {
-                AddAllowedType(type switch
-                {
-                    { IsGenericType: true } => type.GetGenericTypeDefinition(),
-                    _ => type
-                });
+                return;
             }
 
-            void AddFromMetadata(HashSet<Type> metadataCollection, Type genericType)
+            if (genericArgument.IsConstructedGenericType && Array.Exists(genericArgument.GenericTypeArguments, arg => arg.IsGenericParameter))
             {
-                Debug.Assert(genericType.GetGenericArguments().Length >= 1);
-
-                foreach (var type in metadataCollection)
-                {
-                    var interfaces = type.GetInterfaces();
-                    foreach (var @interface in interfaces)
-                    {
-                        if (!@interface.IsGenericType)
-                        {
-                            continue;
-                        }
-
-                        if (genericType != @interface.GetGenericTypeDefinition())
-                        {
-                            continue;
-                        }
-
-                        foreach (var genericArgument in @interface.GetGenericArguments())
-                        {
-                            InspectGenericArgument(genericArgument);
-                        }
-                    }
-                }
+                genericArgument = genericArgument.GetGenericTypeDefinition();
             }
 
-            void InspectGenericArgument(Type genericArgument)
+            if (genericArgument.IsGenericParameter || genericArgument.IsArray)
             {
-                if (typeof(object) == genericArgument)
-                {
-                    return;
-                }
-
-                if (genericArgument.IsConstructedGenericType && Array.Exists(genericArgument.GenericTypeArguments, arg => arg.IsGenericParameter))
-                {
-                    genericArgument = genericArgument.GetGenericTypeDefinition();
-                }
-
-                if (genericArgument.IsGenericParameter || genericArgument.IsArray)
-                {
-                    return;
-                }
-
-                AddAllowedType(genericArgument);
+                return;
             }
 
-            void AddAllowedType(Type type)
+            AddAllowedType(genericArgument);
+        }
+
+        void AddAllowedType(Type type)
+        {
+            FormatAndAddAllowedType(type);
+
+            if (type.DeclaringType is { } declaring)
             {
-                FormatAndAddAllowedType(type);
-
-                if (type.DeclaringType is { } declaring)
-                {
-                    AddAllowedType(declaring);
-                }
-
-                foreach (var @interface in type.GetInterfaces())
-                {
-                    FormatAndAddAllowedType(@interface);
-                }
+                AddAllowedType(declaring);
             }
 
-            void FormatAndAddAllowedType(Type type)
+            foreach (var @interface in type.GetInterfaces())
             {
-                var formatted = RuntimeTypeNameFormatter.Format(type);
-                var parsed = RuntimeTypeNameParser.Parse(formatted);
-
-                // Use the type name rewriter to visit every component of the type.
-                var converter = this;
-                _ = RuntimeTypeNameRewriter.Rewrite(parsed, AddQualifiedType, ResolveCompoundAliasType, ref converter);
-                static QualifiedType AddQualifiedType(in QualifiedType type, ref TypeConverter self)
-                {
-                    self._allowedTypes[type] = true;
-                    return type;
-                }
+                FormatAndAddAllowedType(@interface);
             }
         }
 
-        /// <summary>
-        /// Formats the provided type.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <param name="allowAllTypes">Whether all types are allowed or not.</param>
-        /// <returns>The formatted type name.</returns>
-        public string Format(Type type, bool allowAllTypes = false) => FormatInternal(type);
-
-        /// <summary>
-        /// Formats the provided type, rewriting elements using the provided delegate.
-        /// </summary>
-        /// <param name="type">The type.</param>
-        /// <param name="rewriter">A delegate used to rewrite the type.</param>
-        /// <param name="allowAllTypes">Whether all types are allowed or not.</param>
-        /// <returns>The formatted type name.</returns>
-        public string Format(Type type, Func<TypeSpec, TypeSpec> rewriter, bool allowAllTypes = false) => FormatInternal(type, rewriter);
-
-        /// <summary>
-        /// Parses the provided type string.
-        /// </summary>
-        /// <param name="formatted">The formatted type name.</param>
-        /// <returns>The parsed type.</returns>
-        /// <exception cref="TypeLoadException">Unable to load the resulting type.</exception>
-        public Type Parse(string formatted)
+        void FormatAndAddAllowedType(Type type)
         {
-            if (ParseInternal(formatted, out var type))
+            var formatted = RuntimeTypeNameFormatter.Format(type);
+            var parsed = RuntimeTypeNameParser.Parse(formatted);
+
+            // Use the type name rewriter to visit every component of the type.
+            var converter = this;
+            _ = RuntimeTypeNameRewriter.Rewrite(parsed, AddQualifiedType, ResolveCompoundAliasType, ref converter);
+            static QualifiedType AddQualifiedType(in QualifiedType type, ref TypeConverter self)
             {
+                self._allowedTypes[type] = true;
                 return type;
             }
+        }
+    }
 
-            throw new TypeLoadException($"Unable to parse or load type \"{formatted}\"");
+    /// <summary>
+    /// Formats the provided type.
+    /// </summary>
+    /// <param name="type">The type.</param>
+    /// <param name="allowAllTypes">Whether all types are allowed or not.</param>
+    /// <returns>The formatted type name.</returns>
+    public string Format(Type type, bool allowAllTypes = false) => FormatInternal(type);
+
+    /// <summary>
+    /// Formats the provided type, rewriting elements using the provided delegate.
+    /// </summary>
+    /// <param name="type">The type.</param>
+    /// <param name="rewriter">A delegate used to rewrite the type.</param>
+    /// <param name="allowAllTypes">Whether all types are allowed or not.</param>
+    /// <returns>The formatted type name.</returns>
+    public string Format(Type type, Func<TypeSpec, TypeSpec> rewriter, bool allowAllTypes = false) => FormatInternal(type, rewriter);
+
+    /// <summary>
+    /// Parses the provided type string.
+    /// </summary>
+    /// <param name="formatted">The formatted type name.</param>
+    /// <returns>The parsed type.</returns>
+    /// <exception cref="TypeLoadException">Unable to load the resulting type.</exception>
+    public Type Parse(string formatted)
+    {
+        if (ParseInternal(formatted, out var type))
+        {
+            return type;
         }
 
-        /// <summary>
-        /// Parses the provided type string.
-        /// </summary>
-        /// <param name="formatted">The formatted type name.</param>
-        /// <param name="result">The result.</param>
-        /// <returns><see langword="true"/> if the type was parsed and loaded; otherwise <see langword="false"/>.</returns>
-        public bool TryParse(string formatted, [NotNullWhen(true)] out Type result)
+        throw new TypeLoadException($"Unable to parse or load type \"{formatted}\"");
+    }
+
+    /// <summary>
+    /// Parses the provided type string.
+    /// </summary>
+    /// <param name="formatted">The formatted type name.</param>
+    /// <param name="result">The result.</param>
+    /// <returns><see langword="true"/> if the type was parsed and loaded; otherwise <see langword="false"/>.</returns>
+    public bool TryParse(string formatted, [NotNullWhen(true)] out Type result)
+    {
+        return ParseInternal(formatted, out result);
+    }
+
+    private string FormatInternal(Type type, Func<TypeSpec, TypeSpec>? rewriter = null)
+    {
+        string? runtimeType = null;
+        foreach (var converter in _converters)
         {
-            return ParseInternal(formatted, out result);
+            if (converter.TryFormat(type, out var value))
+            {
+                runtimeType = value;
+                break;
+            }
         }
 
-        private string FormatInternal(Type type, Func<TypeSpec, TypeSpec>? rewriter = null)
+        runtimeType = string.IsNullOrWhiteSpace(runtimeType) ? RuntimeTypeNameFormatter.Format(type) : runtimeType;
+
+        var runtimeTypeSpec = RuntimeTypeNameParser.Parse(runtimeType);
+        ValidationResult validationState = default;
+        var displayTypeSpec = RuntimeTypeNameRewriter.Rewrite(runtimeTypeSpec, _convertToDisplayName, compoundAliasRewriter: null, ref validationState);
+        if (rewriter is not null)
         {
-            string? runtimeType = null;
-            foreach (var converter in _converters)
+            displayTypeSpec = rewriter(displayTypeSpec);
+        }
+
+        var formatted = displayTypeSpec.Format();
+
+        if (validationState.IsTypeNameAllowed == false)
+        {
+            ThrowTypeNotAllowed(formatted, validationState.ErrorTypes);
+        }
+
+        if (!_allowAllTypes && validationState.IsTypeNameAllowed != true)
+        {
+            if (!InspectType(_typeFilters, type))
             {
-                if (converter.TryFormat(type, out var value))
-                {
-                    runtimeType = value;
-                    break;
-                }
+                ThrowTypeNotAllowed(type);
             }
+        }
 
-            runtimeType = string.IsNullOrWhiteSpace(runtimeType) ? RuntimeTypeNameFormatter.Format(type) : runtimeType;
+        return formatted;
+    }
 
-            var runtimeTypeSpec = RuntimeTypeNameParser.Parse(runtimeType);
-            ValidationResult validationState = default;
-            var displayTypeSpec = RuntimeTypeNameRewriter.Rewrite(runtimeTypeSpec, _convertToDisplayName, compoundAliasRewriter: null, ref validationState);
-            if (rewriter is not null)
+    private bool ParseInternal(string formatted, out Type type)
+    {
+        var parsed = RuntimeTypeNameParser.Parse(formatted);
+        return ParseInternal(parsed, out type);
+    }
+
+    private bool ParseInternal(TypeSpec parsed, out Type type)
+    {
+        ValidationResult validationState = default;
+        var runtimeTypeSpec = RuntimeTypeNameRewriter.Rewrite(parsed, _convertFromDisplayName, _compoundAliasResolver, ref validationState);
+        var runtimeType = runtimeTypeSpec.Format();
+
+        if (validationState.IsTypeNameAllowed == false)
+        {
+            ThrowTypeNotAllowed(parsed.Format(), validationState.ErrorTypes);
+        }
+
+        foreach (var converter in _converters)
+        {
+            if (converter.TryParse(runtimeType, out type))
             {
-                displayTypeSpec = rewriter(displayTypeSpec);
+                return true;
             }
+        }
 
-            var formatted = displayTypeSpec.Format();
-
-            if (validationState.IsTypeNameAllowed == false)
-            {
-                ThrowTypeNotAllowed(formatted, validationState.ErrorTypes);
-            }
-
+        if (_resolver.TryResolveType(runtimeType, out type))
+        {
             if (!_allowAllTypes && validationState.IsTypeNameAllowed != true)
             {
-                if (InspectType(_typeFilters, type) != true)
+                if (!InspectType(_typeFilters, type))
                 {
                     ThrowTypeNotAllowed(type);
                 }
             }
 
-            return formatted;
+            return true;
         }
 
-        private bool ParseInternal(string formatted, out Type type)
+        return false;
+    }
+
+    private bool? IsNameTypeAllowed(in QualifiedType type)
+    {
+        if (_allowAllTypes)
         {
-            var parsed = RuntimeTypeNameParser.Parse(formatted);
-            return ParseInternal(parsed, out type);
+            return true;
         }
 
-        private bool ParseInternal(TypeSpec parsed, out Type type)
+        if (_allowedTypes.TryGetValue(type, out var allowed))
         {
-            ValidationResult validationState = default;
-            var runtimeTypeSpec = RuntimeTypeNameRewriter.Rewrite(parsed, _convertFromDisplayName, _compoundAliasResolver, ref validationState);
-            var runtimeType = runtimeTypeSpec.Format();
-
-            if (validationState.IsTypeNameAllowed == false)
-            {
-                ThrowTypeNotAllowed(parsed.Format(), validationState.ErrorTypes);
-            }
-
-            foreach (var converter in _converters)
-            {
-                if (converter.TryParse(runtimeType, out type))
-                {
-                    return true;
-                }
-            }
-
-            if (_resolver.TryResolveType(runtimeType, out type))
-            {
-                if (!_allowAllTypes && validationState.IsTypeNameAllowed != true)
-                {
-                    if (InspectType(_typeFilters, type) != true)
-                    {
-                        ThrowTypeNotAllowed(type);
-                    }
-                }
-
-                return true;
-            }
-
-            return false;
+            return allowed;
         }
 
-        private bool? IsNameTypeAllowed(in QualifiedType type)
+        foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
         {
-            if (_allowAllTypes)
+            if (displayName.Equals(type.Type) || runtimeName.Equals(type.Type))
             {
                 return true;
             }
+        }
 
-            if (_allowedTypes.TryGetValue(type, out var allowed))
+        if (_allowedTypesConfiguration.Contains(type.Type))
+        {
+            return true;
+        }
+
+        foreach (var filter in _typeNameFilters)
+        {
+            var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly ?? string.Empty);
+            if (isAllowed.HasValue)
             {
+                allowed = _allowedTypes[type] = isAllowed.Value;
                 return allowed;
             }
-
-            foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
-            {
-                if (displayName.Equals(type.Type) || runtimeName.Equals(type.Type))
-                {
-                    return true;
-                }
-            }
-
-            if (_allowedTypesConfiguration.Contains(type.Type))
-            {
-                return true;
-            }
-
-            foreach (var filter in _typeNameFilters)
-            {
-                var isAllowed = filter.IsTypeNameAllowed(type.Type, type.Assembly ?? string.Empty);
-                if (isAllowed.HasValue)
-                {
-                    allowed = _allowedTypes[type] = isAllowed.Value;
-                    return allowed;
-                }
-            }
-
-            if (_wellKnownAliasToType.TryGetValue(type, out var runtimeType))
-            {
-                return IsNameTypeAllowed(runtimeType);
-            }
-
-            return null;
         }
 
-        private QualifiedType ConvertToDisplayName(in QualifiedType input, ref ValidationResult state)
+        if (_wellKnownAliasToType.TryGetValue(type, out var runtimeType))
         {
-            state = UpdateValidationResult(input, state);
-
-            foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
-            {
-                if (string.Equals(input.Type, runtimeName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return new QualifiedType(null, displayName);
-                }
-            }
-
-            if (_wellKnownTypeToAlias.TryGetValue(input, out var alias))
-            {
-                return alias;
-            }
-
-            return input;
+            return IsNameTypeAllowed(runtimeType);
         }
 
-        private QualifiedType ConvertFromDisplayName(in QualifiedType input, ref ValidationResult state)
+        return null;
+    }
+
+    private QualifiedType ConvertToDisplayName(in QualifiedType input, ref ValidationResult state)
+    {
+        state = UpdateValidationResult(input, state);
+
+        foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
         {
-            state = UpdateValidationResult(input, state);
-
-            foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
+            if (string.Equals(input.Type, runtimeName, StringComparison.OrdinalIgnoreCase))
             {
-                if (string.Equals(input.Type, displayName, StringComparison.OrdinalIgnoreCase))
-                {
-                    return new QualifiedType(null, runtimeName);
-                }
-            }
-
-            if (_wellKnownAliasToType.TryGetValue(input, out var type))
-            {
-                return type;
-            }
-
-            return input;
-        }
-
-        private ValidationResult UpdateValidationResult(QualifiedType input, ValidationResult state)
-        {
-            switch (IsNameTypeAllowed(input))
-            {
-                case true:
-                    return new(true, state.HasUnknownTypeNames, state.ErrorTypes);
-                case false:
-                    var newErrorList = state.ErrorTypes;
-                    newErrorList.Add(input);
-                    return new(state.HasAllowedTypeNames, state.HasUnknownTypeNames, newErrorList);
-                default:
-                    return new(state.HasAllowedTypeNames, true, state.ErrorTypes);
+                return new QualifiedType(null, displayName);
             }
         }
 
-        [DoesNotReturn]
-        private static void ThrowTypeNotAllowed(string fullTypeName, List<QualifiedType> errors)
+        if (_wellKnownTypeToAlias.TryGetValue(input, out var alias))
         {
-            if (errors is { Count: 1 })
-            {
-                var value = errors[0];
-
-                if (!string.IsNullOrWhiteSpace(value.Assembly))
-                {
-                    throw new InvalidOperationException($"Type \"{value.Type}\" from assembly \"{value.Assembly}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows it.");
-                }
-                else
-                {
-                    throw new InvalidOperationException($"Type \"{value.Type}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows it.");
-                }
-            }
-
-            StringBuilder message = new($"Some types in the type string \"{fullTypeName}\" are not allowed by configuration. To allow them, add them to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows them.");
-            foreach (var value in errors)
-            {
-                if (!string.IsNullOrWhiteSpace(value.Assembly))
-                {
-                    message.AppendLine($"Type \"{value.Type}\" from assembly \"{value.Assembly}\"");
-                }
-                else
-                {
-                    message.AppendLine($"Type \"{value.Type}\"");
-                }
-            }
-
-            throw new InvalidOperationException(message.ToString());
+            return alias;
         }
 
-        [DoesNotReturn]
-        private static void ThrowTypeNotAllowed(Type value)
+        return input;
+    }
+
+    private QualifiedType ConvertFromDisplayName(in QualifiedType input, ref ValidationResult state)
+    {
+        state = UpdateValidationResult(input, state);
+
+        foreach (var (displayName, runtimeName) in WellKnownTypeAliases)
         {
-            var message = $"Type \"{value.FullName}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} instance which allows it.";
-            throw new InvalidOperationException(message);
-        }
-
-        private readonly struct ValidationResult(bool hasAllowedTypeNames, bool hasUnknownTypeNames, List<QualifiedType>? errorTypes)
-        {
-            private readonly List<QualifiedType>? _errorTypes = errorTypes;
-
-            public bool HasAllowedTypeNames { get; } = hasAllowedTypeNames;
-            public bool HasUnknownTypeNames { get; } = hasUnknownTypeNames;
-            public List<QualifiedType> ErrorTypes => _errorTypes ?? [];
-
-            public bool? IsTypeNameAllowed =>
-                ErrorTypes is { Count: > 0 }
-                    ? false
-                    : HasAllowedTypeNames && !HasUnknownTypeNames
-                        ? true
-                        : null;
-        }
-
-        private static bool? InspectType(ITypeFilter[] filters, Type type)
-        {
-            bool? result = null;
-            if (type.HasElementType)
+            if (string.Equals(input.Type, displayName, StringComparison.OrdinalIgnoreCase))
             {
-                result = Combine(result, InspectType(filters, type.GetElementType()!));
-                return result;
+                return new QualifiedType(null, runtimeName);
             }
+        }
 
-            foreach (var filter in filters)
+        if (_wellKnownAliasToType.TryGetValue(input, out var type))
+        {
+            return type;
+        }
+
+        return input;
+    }
+
+    private ValidationResult UpdateValidationResult(QualifiedType input, ValidationResult state)
+    {
+        switch (IsNameTypeAllowed(input))
+        {
+            case true:
+                return new(true, state.HasUnknownTypeNames, state.ErrorTypes);
+            case false:
+                var newErrorList = state.ErrorTypes;
+                newErrorList.Add(input);
+                return new(state.HasAllowedTypeNames, state.HasUnknownTypeNames, newErrorList);
+            default:
+                return new(state.HasAllowedTypeNames, true, state.ErrorTypes);
+        }
+    }
+
+    [DoesNotReturn]
+    private static void ThrowTypeNotAllowed(string fullTypeName, List<QualifiedType> errors)
+    {
+        if (errors is { Count: 1 })
+        {
+            var value = errors[0];
+
+            if (!string.IsNullOrWhiteSpace(value.Assembly))
             {
-                result = Combine(result, filter.IsTypeAllowed(type));
+                throw new InvalidOperationException($"Type \"{value.Type}\" from assembly \"{value.Assembly}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows it.");
+            }
+            else
+            {
+                throw new InvalidOperationException($"Type \"{value.Type}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows it.");
+            }
+        }
+
+        StringBuilder message = new($"Some types in the type string \"{fullTypeName}\" are not allowed by configuration. To allow them, add them to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} instance which allows them.");
+        foreach (var value in errors)
+        {
+            if (!string.IsNullOrWhiteSpace(value.Assembly))
+            {
+                message.AppendLine($"Type \"{value.Type}\" from assembly \"{value.Assembly}\"");
+            }
+            else
+            {
+                message.AppendLine($"Type \"{value.Type}\"");
+            }
+        }
+
+        throw new InvalidOperationException(message.ToString());
+    }
+
+    [DoesNotReturn]
+    private static void ThrowTypeNotAllowed(Type value)
+    {
+        var message = $"Type \"{value.FullName}\" is not allowed. To allow it, add it to {nameof(TypeManifestOptions)}.{nameof(TypeManifestOptions.AllowedTypes)} or register an {nameof(ITypeNameFilter)} or {nameof(ITypeFilter)} instance which allows it.";
+        throw new InvalidOperationException(message);
+    }
+
+    private readonly struct ValidationResult(bool hasAllowedTypeNames, bool hasUnknownTypeNames, List<QualifiedType>? errorTypes)
+    {
+        private readonly List<QualifiedType>? _errorTypes = errorTypes;
+
+        public bool HasAllowedTypeNames { get; } = hasAllowedTypeNames;
+        public bool HasUnknownTypeNames { get; } = hasUnknownTypeNames;
+        public List<QualifiedType> ErrorTypes => _errorTypes ?? [];
+
+        public bool? IsTypeNameAllowed =>
+            ErrorTypes is { Count: > 0 }
+                ? false
+                : HasAllowedTypeNames && !HasUnknownTypeNames
+                    ? true
+                    : null;
+    }
+
+    private static bool InspectType(ITypeFilter[] filters, Type type) => InspectTypeCore(filters, type) == true;
+
+    private static bool? InspectTypeCore(ITypeFilter[] filters, Type type)
+    {
+        bool? result = null;
+        if (type.HasElementType)
+        {
+            result = Combine(result, InspectTypeCore(filters, type.GetElementType()!));
+            return result;
+        }
+
+        foreach (var filter in filters)
+        {
+            result = Combine(result, filter.IsTypeAllowed(type));
+            if (result == false)
+            {
+                return false;
+            }
+        }
+
+        if (type.IsConstructedGenericType)
+        {
+            foreach (var parameter in type.GenericTypeArguments)
+            {
+                result = Combine(result, InspectTypeCore(filters, parameter));
                 if (result == false)
                 {
                     return false;
                 }
             }
-
-            if (type.IsConstructedGenericType)
-            {
-                foreach (var parameter in type.GenericTypeArguments)
-                {
-                    result = Combine(result, InspectType(filters, parameter));
-                    if (result == false)
-                    {
-                        return false;
-                    }
-                }
-            }
-
-            return result;
-
-            static bool? Combine(bool? left, bool? right)
-            {
-                if (left == false || right == false)
-                {
-                    return false;
-                }
-                else if (left == true || right == true)
-                {
-                    return true;
-                }
-
-                return null;
-            }
         }
 
-        private TypeSpec ResolveCompoundAliasType<TState>(TupleTypeSpec input, ref TState state)
+        return result;
+
+        static bool? Combine(bool? left, bool? right)
         {
-            var resolvedElements = new object[input.Elements.Length];
-            for (var i = 0; i < input.Elements.Length; i++)
+            if (left == false || right == false)
             {
-                var inputElement = input.Elements[i];
-                if (inputElement is LiteralTypeSpec literal)
-                {
-                    resolvedElements[i] = literal.Value;
-                }
-                else
-                {
-                    if (!ParseInternal(inputElement, out var type))
-                    {
-                        throw new TypeLoadException($"Unable to parse or load type \"{inputElement.Format()}\".");
-                    }
-
-                    resolvedElements[i] = type;
-                }
+                return false;
+            }
+            else if (left == true || right == true)
+            {
+                return true;
             }
 
-            var tree = _compoundTypeAliases;
-            foreach (var element in resolvedElements)
-            {
-                tree = tree?.GetChildOrDefault(element);
-                if (tree is null) break;
-            }
-
-            var resultType = tree?.Value;
-            if (resultType is null)
-            {
-                throw new TypeLoadException($"Unable to resolve type alias \"{input.Format()}\".");
-            }
-
-            var formatted = RuntimeTypeNameFormatter.FormatInternalNoCache(resultType, allowAliases: false);
-            var parsed = RuntimeTypeNameParser.Parse(formatted);
-            return parsed;
+            return null;
         }
+    }
+
+    private TypeSpec ResolveCompoundAliasType<TState>(TupleTypeSpec input, ref TState state)
+    {
+        var resolvedElements = new object[input.Elements.Length];
+        for (var i = 0; i < input.Elements.Length; i++)
+        {
+            var inputElement = input.Elements[i];
+            if (inputElement is LiteralTypeSpec literal)
+            {
+                resolvedElements[i] = literal.Value;
+            }
+            else
+            {
+                if (!ParseInternal(inputElement, out var type))
+                {
+                    throw new TypeLoadException($"Unable to parse or load type \"{inputElement.Format()}\".");
+                }
+
+                resolvedElements[i] = type;
+            }
+        }
+
+        var tree = _compoundTypeAliases;
+        foreach (var element in resolvedElements)
+        {
+            tree = tree?.GetChildOrDefault(element);
+            if (tree is null) break;
+        }
+
+        var resultType = tree?.Value;
+        if (resultType is null)
+        {
+            throw new TypeLoadException($"Unable to resolve type alias \"{input.Format()}\".");
+        }
+
+        var formatted = RuntimeTypeNameFormatter.FormatInternalNoCache(resultType, allowAliases: false);
+        var parsed = RuntimeTypeNameParser.Parse(formatted);
+        return parsed;
     }
 }
