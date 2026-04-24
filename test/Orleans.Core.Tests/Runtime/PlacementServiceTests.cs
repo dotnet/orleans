@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 using System.Linq;
-using System.Reflection;
+using System.Net;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Logging.Abstractions;
@@ -8,7 +8,9 @@ using Microsoft.Extensions.Options;
 using NSubstitute;
 using Orleans.Configuration;
 using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Placement;
+using Orleans.TestingHost.Diagnostics;
 using TestExtensions;
 using Xunit;
 
@@ -17,26 +19,34 @@ namespace UnitTests.Runtime
     [TestCategory("BVT"), TestCategory("Placement")]
     public class PlacementServiceTests
     {
+        private static int _siloGeneration;
+
         [Fact]
         public async Task LifecycleStop_CompletesWorkerTasks()
         {
             var target = CreateTarget();
+            var testAccessor = GetTestAccessor(target);
+            using var collector = new DiagnosticEventCollector(PlacementServiceEvents.ListenerName);
 
             await StopAsync(target);
 
-            Assert.All(GetWorkerTasks(target), task => Assert.True(task.IsCompleted));
+            Assert.All(testAccessor.WorkerTasks, task => Assert.True(task.IsCompleted));
+            await AssertWorkerStopEventsAsync(target, collector);
         }
 
         [Fact]
         public async Task LifecycleStop_WithCanceledToken_CompletesWorkerTasks()
         {
             var target = CreateTarget();
+            var testAccessor = GetTestAccessor(target);
+            using var collector = new DiagnosticEventCollector(PlacementServiceEvents.ListenerName);
             using var cts = new CancellationTokenSource();
             cts.Cancel();
 
             await StopAsync(target, cts.Token);
 
-            Assert.All(GetWorkerTasks(target), task => Assert.True(task.IsCompleted));
+            Assert.All(testAccessor.WorkerTasks, task => Assert.True(task.IsCompleted));
+            await AssertWorkerStopEventsAsync(target, collector);
         }
 
         [Fact]
@@ -54,7 +64,7 @@ namespace UnitTests.Runtime
         }
 
         [Fact]
-        public async Task PlacementWorker_AfterLifecycleStop_ThrowsSiloUnavailableException()
+        public async Task GetOrPlaceActivationAsync_AfterLifecycleStop_ThrowsSiloUnavailableException()
         {
             var target = CreateTarget();
             var message = new Message
@@ -66,7 +76,7 @@ namespace UnitTests.Runtime
 
             await StopAsync(target);
 
-            await Assert.ThrowsAsync<SiloUnavailableException>(() => InvokeGetOrPlaceActivationAsync(target, message));
+            await Assert.ThrowsAsync<SiloUnavailableException>(() => GetTestAccessor(target).GetOrPlaceActivationAsync(message));
         }
 
         [Fact]
@@ -101,7 +111,7 @@ namespace UnitTests.Runtime
             optionsMonitor.CurrentValue.Returns(new SiloMessagingOptions());
 
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
-            localSiloDetails.SiloAddress.Returns(SiloAddress.FromParsableString("127.0.0.1:100@1"));
+            localSiloDetails.SiloAddress.Returns(SiloAddress.New(IPAddress.Loopback, 11111, Interlocked.Increment(ref _siloGeneration)));
 
             var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
             siloStatusOracle.CurrentStatus.Returns(SiloStatus.Active);
@@ -128,39 +138,26 @@ namespace UnitTests.Runtime
             await lifecycle.OnStop(cancellationToken);
         }
 
-        private static Task<SiloAddress> InvokeGetOrPlaceActivationAsync(PlacementService target, Message message)
+        private static PlacementService.ITestAccessor GetTestAccessor(PlacementService target) => target;
+
+        private static async Task AssertWorkerStopEventsAsync(PlacementService target, DiagnosticEventCollector collector)
         {
-            var worker = GetWorkers(target)[0];
-            var method = worker.GetType().GetMethod("GetOrPlaceActivationAsync", BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(method);
-            var result = method.Invoke(worker, [message]);
-            if (result is Task<SiloAddress> task)
+            var workerCount = GetTestAccessor(target).WorkerTasks.Length;
+            var stoppedEvents = new List<PlacementServiceEvents.WorkerStopped>(workerCount);
+
+            while (stoppedEvents.Count < workerCount)
             {
-                return task;
+                var diagnosticEvent = await collector.WaitForEventAsync(
+                    nameof(PlacementServiceEvents.WorkerStopped),
+                    evt => evt.Payload is PlacementServiceEvents.WorkerStopped stopped
+                        && stopped.SiloAddress == target.LocalSilo
+                        && stoppedEvents.All(existing => existing.WorkerIndex != stopped.WorkerIndex),
+                    TimeSpan.FromSeconds(10));
+
+                stoppedEvents.Add(Assert.IsType<PlacementServiceEvents.WorkerStopped>(diagnosticEvent.Payload));
             }
 
-            var taskProperty = result?.GetType().GetProperty("Task", BindingFlags.Instance | BindingFlags.Public);
-            Assert.NotNull(taskProperty);
-            return Assert.IsAssignableFrom<Task<SiloAddress>>(taskProperty.GetValue(result));
-        }
-
-        private static Task[] GetWorkerTasks(PlacementService target)
-        {
-            return GetWorkers(target)
-                .Select(worker =>
-                {
-                    var field = worker.GetType().GetField("_processLoopTask", BindingFlags.Instance | BindingFlags.NonPublic);
-                    Assert.NotNull(field);
-                    return Assert.IsAssignableFrom<Task>(field.GetValue(worker));
-                })
-                .ToArray();
-        }
-
-        private static object[] GetWorkers(PlacementService target)
-        {
-            var field = typeof(PlacementService).GetField("_workers", BindingFlags.Instance | BindingFlags.NonPublic);
-            Assert.NotNull(field);
-            return Assert.IsAssignableFrom<Array>(field.GetValue(target)).Cast<object>().ToArray();
+            Assert.Equal(workerCount, stoppedEvents.Count);
         }
     }
 }
