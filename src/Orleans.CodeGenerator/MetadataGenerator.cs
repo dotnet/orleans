@@ -17,6 +17,9 @@ namespace Orleans.CodeGenerator
         private readonly IGeneratorServices _generatorServices;
         private readonly MetadataAggregateModel _metadataModel;
         private readonly string _assemblyName;
+        // Cache for TryResolveOpenNamedType: keyed by normalized TypeRef syntax string.
+        // Null value means "looked up, not found". Using a sentinel avoids a separate HashSet.
+        private readonly Dictionary<string, INamedTypeSymbol> _resolvedTypeCache = new(StringComparer.Ordinal);
 
         public MetadataGenerator(IGeneratorServices generatorServices, MetadataAggregateModel metadataModel, string assemblyName)
         {
@@ -394,6 +397,23 @@ namespace Orleans.CodeGenerator
         {
             var target = NormalizeTypeRefSyntax(typeRef.SyntaxString);
 
+            // Check the cache first (null value means previously looked up but not found).
+            if (_resolvedTypeCache.TryGetValue(target, out symbol))
+            {
+                return symbol is not null;
+            }
+
+            // Open-type syntax strings (e.g. "List<>", "Dictionary<, >", "Outer<>.Inner") only contain
+            // commas and whitespace inside their angle brackets. Roslyn's FullyQualifiedFormat always
+            // uses named type parameters (e.g. "List<T>"), so an open-type TypeRef will never match
+            // any candidate. Short-circuit immediately to avoid an expensive full assembly scan.
+            if (IsOpenTypeSyntax(target))
+            {
+                _resolvedTypeCache[target] = null;
+                symbol = null;
+                return false;
+            }
+
             foreach (var assembly in EnumerateAssemblies(_generatorServices.Compilation))
             {
                 foreach (var type in EnumerateTypes(assembly.GlobalNamespace))
@@ -404,14 +424,49 @@ namespace Orleans.CodeGenerator
                         target,
                         StringComparison.Ordinal))
                     {
+                        _resolvedTypeCache[target] = candidate;
                         symbol = candidate;
                         return true;
                     }
                 }
             }
 
+            _resolvedTypeCache[target] = null;
             symbol = null;
             return false;
+        }
+
+        /// <summary>
+        /// Returns <see langword="true"/> if <paramref name="target"/> is an open-type syntax string —
+        /// one whose angle-bracket content consists solely of commas and whitespace
+        /// (e.g. <c>"List&lt;&gt;"</c>, <c>"Dictionary&lt;, &gt;"</c>, <c>"Outer&lt;&gt;.Inner"</c>).
+        /// Such strings never match a Roslyn <c>ToDisplayString(FullyQualifiedFormat)</c> result,
+        /// which always includes named type parameters.
+        /// </summary>
+        private static bool IsOpenTypeSyntax(string target)
+        {
+            int depth = 0;
+            bool hasAngleBrackets = false;
+
+            foreach (char c in target)
+            {
+                if (c == '<')
+                {
+                    depth++;
+                    hasAngleBrackets = true;
+                }
+                else if (c == '>')
+                {
+                    depth--;
+                }
+                else if (depth > 0 && c != ',' && c != ' ')
+                {
+                    // Found an identifier character inside angle brackets → not open-type syntax.
+                    return false;
+                }
+            }
+
+            return hasAngleBrackets;
         }
 
         private TypeSyntax GetOpenTypeSyntax(TypeRef typeRef)
