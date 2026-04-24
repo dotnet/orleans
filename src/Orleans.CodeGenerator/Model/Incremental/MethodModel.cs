@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 
 namespace Orleans.CodeGenerator.Model.Incremental
 {
@@ -52,8 +53,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
         public MethodModel(
             string name,
             TypeRef returnType,
-            EquatableArray<MethodParameterModel> parameters,
-            EquatableArray<TypeParameterModel> typeParameters,
+            ImmutableArray<MethodParameterModel> parameters,
+            ImmutableArray<TypeParameterModel> typeParameters,
             TypeRef containingInterfaceType,
             TypeRef originalContainingInterfaceType,
             string containingInterfaceName,
@@ -62,13 +63,13 @@ namespace Orleans.CodeGenerator.Model.Incremental
             string generatedMethodId,
             string methodId,
             long? responseTimeoutTicks,
-            EquatableArray<CustomInitializerModel> customInitializerMethods,
+            ImmutableArray<CustomInitializerModel> customInitializerMethods,
             bool isCancellable)
         {
             Name = name;
             ReturnType = returnType;
-            Parameters = parameters;
-            TypeParameters = typeParameters;
+            Parameters = ImmutableArrayValueComparer.Normalize(parameters);
+            TypeParameters = ImmutableArrayValueComparer.Normalize(typeParameters);
             ContainingInterfaceType = containingInterfaceType;
             OriginalContainingInterfaceType = originalContainingInterfaceType;
             ContainingInterfaceName = containingInterfaceName;
@@ -77,14 +78,14 @@ namespace Orleans.CodeGenerator.Model.Incremental
             GeneratedMethodId = generatedMethodId;
             MethodId = methodId;
             ResponseTimeoutTicks = responseTimeoutTicks;
-            CustomInitializerMethods = customInitializerMethods;
+            CustomInitializerMethods = ImmutableArrayValueComparer.Normalize(customInitializerMethods);
             IsCancellable = isCancellable;
         }
 
         public string Name { get; }
         public TypeRef ReturnType { get; }
-        public EquatableArray<MethodParameterModel> Parameters { get; }
-        public EquatableArray<TypeParameterModel> TypeParameters { get; }
+        public ImmutableArray<MethodParameterModel> Parameters { get; }
+        public ImmutableArray<TypeParameterModel> TypeParameters { get; }
         public TypeRef ContainingInterfaceType { get; }
         public TypeRef OriginalContainingInterfaceType { get; }
         public string ContainingInterfaceName { get; }
@@ -94,7 +95,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
         public string MethodId { get; }
         public bool HasAlias => !string.Equals(MethodId, GeneratedMethodId, StringComparison.Ordinal);
         public long? ResponseTimeoutTicks { get; }
-        public EquatableArray<CustomInitializerModel> CustomInitializerMethods { get; }
+        public ImmutableArray<CustomInitializerModel> CustomInitializerMethods { get; }
         public bool IsCancellable { get; }
 
         public bool Equals(MethodModel other)
@@ -106,8 +107,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
 
             return string.Equals(Name, other.Name, StringComparison.Ordinal)
                 && ReturnType.Equals(other.ReturnType)
-                && Parameters.Equals(other.Parameters)
-                && TypeParameters.Equals(other.TypeParameters)
+                && ImmutableArrayValueComparer.Equals(Parameters, other.Parameters)
+                && ImmutableArrayValueComparer.Equals(TypeParameters, other.TypeParameters)
                 && ContainingInterfaceType.Equals(other.ContainingInterfaceType)
                 && OriginalContainingInterfaceType.Equals(other.OriginalContainingInterfaceType)
                 && string.Equals(ContainingInterfaceName, other.ContainingInterfaceName, StringComparison.Ordinal)
@@ -116,7 +117,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 && string.Equals(GeneratedMethodId, other.GeneratedMethodId, StringComparison.Ordinal)
                 && string.Equals(MethodId, other.MethodId, StringComparison.Ordinal)
                 && ResponseTimeoutTicks == other.ResponseTimeoutTicks
-                && CustomInitializerMethods.Equals(other.CustomInitializerMethods)
+                && ImmutableArrayValueComparer.Equals(CustomInitializerMethods, other.CustomInitializerMethods)
                 && IsCancellable == other.IsCancellable;
         }
 
@@ -135,10 +136,10 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 hash = hash * 31 + ContainingInterfaceTypeParameterCount;
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(GeneratedMethodId ?? string.Empty);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(MethodId ?? string.Empty);
-                hash = hash * 31 + Parameters.GetHashCode();
-                hash = hash * 31 + TypeParameters.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(Parameters);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeParameters);
                 hash = hash * 31 + ResponseTimeoutTicks.GetHashCode();
-                hash = hash * 31 + CustomInitializerMethods.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(CustomInitializerMethods);
                 hash = hash * 31 + (IsCancellable ? 1 : 0);
                 return hash;
             }

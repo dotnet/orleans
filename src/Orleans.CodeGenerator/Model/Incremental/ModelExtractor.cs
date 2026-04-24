@@ -11,6 +11,7 @@ using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.Model.Incremental;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     /// <summary>
@@ -69,29 +70,20 @@ namespace Orleans.CodeGenerator
         /// </summary>
         public static SerializableTypeModel ExtractFromAttributeContext(
             GeneratorAttributeSyntaxContext context,
-            CancellationToken cancellationToken) => ExtractFromAttributeContextWithDiagnostics(context, new CodeGeneratorOptions(), cancellationToken).Model;
+            CancellationToken cancellationToken) => ExtractFromAttributeContextWithDiagnostics(context, new CodeGeneratorOptions(), cancellationToken).Model!;
 
         /// <summary>
         /// Extracts a <see cref="SerializableTypeModel"/> from a <see cref="GeneratorAttributeSyntaxContext"/>,
         /// preserving generator diagnostics so the incremental pipeline can surface them without silently dropping the type.
         /// </summary>
-        public static SerializableTypeExtractionResult ExtractFromAttributeContextWithDiagnostics(
-            GeneratorAttributeSyntaxContext context,
-            CancellationToken cancellationToken)
-            => ExtractFromAttributeContextWithDiagnostics(context, new CodeGeneratorOptions(), cancellationToken);
-
-        /// <summary>
-        /// Extracts a <see cref="SerializableTypeModel"/> from a <see cref="GeneratorAttributeSyntaxContext"/>,
-        /// preserving generator diagnostics so the incremental pipeline can surface them without silently dropping the type.
-        /// </summary>
-        public static SerializableTypeExtractionResult ExtractFromAttributeContextWithDiagnostics(
+        public static (SerializableTypeModel Model, Diagnostic Diagnostic) ExtractFromAttributeContextWithDiagnostics(
             GeneratorAttributeSyntaxContext context,
             CodeGeneratorOptions options,
             CancellationToken cancellationToken)
         {
             if (context.TargetSymbol is not INamedTypeSymbol typeSymbol)
             {
-                return SerializableTypeExtractionResult.Empty;
+                return (null, null);
             }
 
             try
@@ -103,8 +95,8 @@ namespace Orleans.CodeGenerator
                 cancellationToken.ThrowIfCancellationRequested();
                 var model = TryExtractSerializableTypeModel(typeSymbol, compilation, libraryTypes, options, throwOnFailure: true);
                 return model is null
-                    ? SerializableTypeExtractionResult.Empty
-                    : SerializableTypeExtractionResult.FromModel(model);
+                    ? (null, null)
+                    : (model, null);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -112,16 +104,16 @@ namespace Orleans.CodeGenerator
             }
             catch (OrleansGeneratorDiagnosticAnalysisException exception)
             {
-                return SerializableTypeExtractionResult.FromDiagnostic(exception.Diagnostic);
+                return (null, exception.Diagnostic);
             }
             catch
             {
-                return SerializableTypeExtractionResult.Empty;
+                return (null, null);
             }
         }
 
         /// <summary>
-        /// Extracts reference-assembly metadata from the compilation.
+        /// Extracts reference-assembly metadata from the compilation using the provided code generation options.
         /// This isolates reference-assembly scanning into a cacheable pipeline step so that
         /// downstream work can be skipped when references don't change.
         /// </summary>
@@ -258,7 +250,6 @@ namespace Orleans.CodeGenerator
 
             var sortedParts = applicationParts
                 .OrderBy(static part => part, StringComparer.Ordinal)
-                .Select(static part => new EquatableString(part))
                 .ToImmutableArray();
 
             var sortedWellKnownTypeIds = wellKnownTypeIds
@@ -299,14 +290,14 @@ namespace Orleans.CodeGenerator
 
             return new ReferenceAssemblyModel(
                 assemblyName: compilation.AssemblyName ?? string.Empty,
-                applicationParts: new EquatableArray<EquatableString>(sortedParts),
-                wellKnownTypeIds: new EquatableArray<WellKnownTypeIdModel>(sortedWellKnownTypeIds),
-                typeAliases: new EquatableArray<TypeAliasModel>(sortedTypeAliases),
-                compoundTypeAliases: new EquatableArray<CompoundTypeAliasModel>(sortedCompoundTypeAliases),
-                referencedSerializableTypes: new EquatableArray<SerializableTypeModel>(sortedReferencedSerializableTypes),
-                referencedProxyInterfaces: new EquatableArray<ProxyInterfaceModel>(sortedReferencedProxyInterfaces),
-                registeredCodecs: new EquatableArray<RegisteredCodecModel>(sortedRegisteredCodecs),
-                interfaceImplementations: new EquatableArray<InterfaceImplementationModel>(sortedInterfaceImplementations));
+                applicationParts: sortedParts,
+                wellKnownTypeIds: sortedWellKnownTypeIds,
+                typeAliases: sortedTypeAliases,
+                compoundTypeAliases: sortedCompoundTypeAliases,
+                referencedSerializableTypes: sortedReferencedSerializableTypes,
+                referencedProxyInterfaces: sortedReferencedProxyInterfaces,
+                registeredCodecs: sortedRegisteredCodecs,
+                interfaceImplementations: sortedInterfaceImplementations);
         }
 
         private static void ComputeAssembliesToExamine(
@@ -359,12 +350,12 @@ namespace Orleans.CodeGenerator
         private static bool TryExtractCompoundTypeAlias(
             INamedTypeSymbol symbol,
             INamedTypeSymbol compoundTypeAliasAttribute,
-            out EquatableArray<CompoundAliasComponentModel> components)
+            out ImmutableArray<CompoundAliasComponentModel> components)
         {
             var attr = symbol.GetAttribute(compoundTypeAliasAttribute);
             if (attr is null)
             {
-                components = EquatableArray<CompoundAliasComponentModel>.Empty;
+                components = ImmutableArray<CompoundAliasComponentModel>.Empty;
                 return false;
             }
 
@@ -394,13 +385,13 @@ namespace Orleans.CodeGenerator
                 });
             }
 
-            components = new EquatableArray<CompoundAliasComponentModel>(result.MoveToImmutable());
+            components = result.MoveToImmutable();
             return true;
         }
 
         private static string GetCompoundTypeAliasOrderKey(CompoundTypeAliasModel entry)
         {
-            if (entry.Components.Count == 0)
+            if (entry.Components.Length == 0)
             {
                 return string.Empty;
             }
@@ -408,7 +399,7 @@ namespace Orleans.CodeGenerator
             return string.Join(
                 "\u001F",
                 entry.Components.Select(static component => component.IsString
-                    ? $"S:{component.StringValue}"
+                    ? $"S:{component.StringValue ?? string.Empty}"
                     : component.IsType
                         ? $"T:{component.TypeValue.SyntaxString}"
                         : string.Empty));
@@ -435,8 +426,8 @@ namespace Orleans.CodeGenerator
 
             return new MetadataAggregateModel(
                 assemblyName: assemblyName,
-                serializableTypes: new EquatableArray<SerializableTypeModel>(normalizedSerializableTypes),
-                proxyInterfaces: new EquatableArray<ProxyInterfaceModel>(normalizedProxyInterfaces),
+                serializableTypes: normalizedSerializableTypes,
+                proxyInterfaces: normalizedProxyInterfaces,
                 registeredCodecs: normalizedReferenceData.RegisteredCodecs,
                 referenceAssemblyData: normalizedReferenceData,
                 activatableTypes: activatableTypes,
@@ -448,74 +439,74 @@ namespace Orleans.CodeGenerator
 
         private static ReferenceAssemblyModel NormalizeReferenceAssemblyData(ReferenceAssemblyModel referenceData)
         {
-            var applicationParts = referenceData.ApplicationParts.AsImmutableArray()
+            var applicationParts = referenceData.ApplicationParts
                 .Distinct()
-                .OrderBy(static part => part.Value, StringComparer.Ordinal)
+                .OrderBy(static part => part, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var wellKnownTypeIds = referenceData.WellKnownTypeIds.AsImmutableArray()
+            var wellKnownTypeIds = referenceData.WellKnownTypeIds
                 .Distinct()
                 .OrderBy(static entry => entry.Type.SyntaxString, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.Id)
                 .ToImmutableArray();
 
-            var typeAliases = referenceData.TypeAliases.AsImmutableArray()
+            var typeAliases = referenceData.TypeAliases
                 .Distinct()
                 .OrderBy(static entry => entry.Type.SyntaxString, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.Alias, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var compoundTypeAliases = referenceData.CompoundTypeAliases.AsImmutableArray()
+            var compoundTypeAliases = referenceData.CompoundTypeAliases
                 .Distinct()
                 .OrderBy(static entry => GetCompoundTypeAliasOrderKey(entry), StringComparer.Ordinal)
                 .ThenBy(static entry => entry.TargetType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var referencedSerializableTypes = referenceData.ReferencedSerializableTypes.AsImmutableArray()
+            var referencedSerializableTypes = referenceData.ReferencedSerializableTypes
                 .Distinct()
                 .OrderBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var referencedProxyInterfaces = referenceData.ReferencedProxyInterfaces.AsImmutableArray()
+            var referencedProxyInterfaces = referenceData.ReferencedProxyInterfaces
                 .Distinct()
                 .OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var registeredCodecs = referenceData.RegisteredCodecs.AsImmutableArray()
+            var registeredCodecs = referenceData.RegisteredCodecs
                 .Distinct()
                 .OrderBy(static entry => entry.Type.SyntaxString, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.Kind)
                 .ToImmutableArray();
 
-            var interfaceImplementations = referenceData.InterfaceImplementations.AsImmutableArray()
+            var interfaceImplementations = referenceData.InterfaceImplementations
                 .Distinct()
                 .OrderBy(static entry => entry.ImplementationType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
             return new ReferenceAssemblyModel(
                 assemblyName: referenceData.AssemblyName ?? string.Empty,
-                applicationParts: new EquatableArray<EquatableString>(applicationParts),
-                wellKnownTypeIds: new EquatableArray<WellKnownTypeIdModel>(wellKnownTypeIds),
-                typeAliases: new EquatableArray<TypeAliasModel>(typeAliases),
-                compoundTypeAliases: new EquatableArray<CompoundTypeAliasModel>(compoundTypeAliases),
-                referencedSerializableTypes: new EquatableArray<SerializableTypeModel>(referencedSerializableTypes),
-                referencedProxyInterfaces: new EquatableArray<ProxyInterfaceModel>(referencedProxyInterfaces),
-                registeredCodecs: new EquatableArray<RegisteredCodecModel>(registeredCodecs),
-                interfaceImplementations: new EquatableArray<InterfaceImplementationModel>(interfaceImplementations));
+                applicationParts: applicationParts,
+                wellKnownTypeIds: wellKnownTypeIds,
+                typeAliases: typeAliases,
+                compoundTypeAliases: compoundTypeAliases,
+                referencedSerializableTypes: referencedSerializableTypes,
+                referencedProxyInterfaces: referencedProxyInterfaces,
+                registeredCodecs: registeredCodecs,
+                interfaceImplementations: interfaceImplementations);
         }
 
         internal static ImmutableArray<SerializableTypeModel> MergeSerializableTypes(
             ImmutableArray<SerializableTypeModel> source,
-            EquatableArray<SerializableTypeModel> referenced)
+            ImmutableArray<SerializableTypeModel> referenced)
         {
             var merged = source.IsDefault ? ImmutableArray<SerializableTypeModel>.Empty : source;
-            if (referenced.Count > 0)
+            if (!referenced.IsDefaultOrEmpty)
             {
-                merged = merged.AddRange(referenced.AsImmutableArray());
+                merged = merged.AddRange(referenced);
             }
 
             return merged
@@ -528,12 +519,12 @@ namespace Orleans.CodeGenerator
 
         internal static ImmutableArray<ProxyInterfaceModel> MergeProxyInterfaces(
             ImmutableArray<ProxyInterfaceModel> source,
-            EquatableArray<ProxyInterfaceModel> referenced)
+            ImmutableArray<ProxyInterfaceModel> referenced)
         {
             var merged = source.IsDefault ? ImmutableArray<ProxyInterfaceModel>.Empty : source;
-            if (referenced.Count > 0)
+            if (!referenced.IsDefaultOrEmpty)
             {
-                merged = merged.AddRange(referenced.AsImmutableArray());
+                merged = merged.AddRange(referenced);
             }
 
             return merged
@@ -544,69 +535,9 @@ namespace Orleans.CodeGenerator
                 .ToImmutableArray();
         }
 
-        internal static ImmutableArray<ProxyOutputModel> CreateProxyOutputModels(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
-        {
-            var orderedModels = (proxyInterfaces.IsDefault ? ImmutableArray<ProxyInterfaceModel>.Empty : proxyInterfaces)
-                .Distinct()
-                .OrderBy(static entry => GetProxyHintOrderKey(entry), StringComparer.Ordinal)
-                .ThenBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
-                .ToImmutableArray();
-
-            var ownerByInvokableMetadataName = new Dictionary<string, string>(StringComparer.Ordinal);
-            var ownedInvokablesByModel = new Dictionary<string, HashSet<string>>(StringComparer.Ordinal);
-
-            foreach (var model in orderedModels)
-            {
-                ownedInvokablesByModel[GetProxyOutputModelKey(model)] = new HashSet<string>(StringComparer.Ordinal);
-            }
-
-            foreach (var model in orderedModels)
-            {
-                var ownerKey = GetProxyOutputModelKey(model);
-                foreach (var metadataName in GetOwnedInvokableMetadataNames(model))
-                {
-                    if (ownerByInvokableMetadataName.ContainsKey(metadataName))
-                    {
-                        continue;
-                    }
-
-                    ownerByInvokableMetadataName.Add(metadataName, ownerKey);
-                    ownedInvokablesByModel[ownerKey].Add(metadataName);
-                }
-            }
-
-            return orderedModels
-                .Select(model =>
-                {
-                    var modelKey = GetProxyOutputModelKey(model);
-                    var ownedInvokables = ownedInvokablesByModel[modelKey]
-                        .OrderBy(static value => value, StringComparer.Ordinal)
-                        .Select(static value => new EquatableString(value))
-                        .ToImmutableArray();
-
-                    return new ProxyOutputModel(model, new EquatableArray<EquatableString>(ownedInvokables), useDeclaredInvokableFallback: false);
-                })
-                .ToImmutableArray();
-        }
-
-        private static IEnumerable<string> GetOwnedInvokableMetadataNames(ProxyInterfaceModel model)
-        {
-            var seen = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var method in model.Methods.AsImmutableArray())
-            {
-                var metadataName = GetInvokableMetadataName(model.ProxyBase, method);
-                if (seen.Add(metadataName))
-                {
-                    yield return metadataName;
-                }
-            }
-        }
-
         private static string GetInvokableMetadataName(ProxyBaseModel proxyBase, MethodModel method)
         {
-            var totalTypeParameterCount = method.ContainingInterfaceTypeParameterCount + method.TypeParameters.Count;
+            var totalTypeParameterCount = method.ContainingInterfaceTypeParameterCount + method.TypeParameters.Length;
             var genericAritySuffix = totalTypeParameterCount > 0 ? "_" + totalTypeParameterCount.ToString(CultureInfo.InvariantCulture) : string.Empty;
             var generatedClassName = $"Invokable_{method.ContainingInterfaceName}_{proxyBase.GeneratedClassNameComponent}_{method.GeneratedMethodId}{genericAritySuffix}";
 
@@ -614,12 +545,6 @@ namespace Orleans.CodeGenerator
                 ? $"{method.ContainingInterfaceGeneratedNamespace}.{generatedClassName}"
                 : $"{method.ContainingInterfaceGeneratedNamespace}.{generatedClassName}`{totalTypeParameterCount.ToString(CultureInfo.InvariantCulture)}";
         }
-
-        private static string GetProxyOutputModelKey(ProxyInterfaceModel model)
-            => $"{model.InterfaceType.SyntaxString}|{model.GeneratedNamespace}|{model.Name}|{model.ProxyBase.GeneratedClassNameComponent}";
-
-        private static string GetProxyHintOrderKey(ProxyInterfaceModel model)
-            => SanitizeHintComponent(model.InterfaceType.SyntaxString);
 
         private static string SanitizeHintComponent(string value)
         {
@@ -650,46 +575,33 @@ namespace Orleans.CodeGenerator
             return sanitized.Length > 0 ? sanitized : "generated";
         }
 
-        private static EquatableArray<TypeRef> GetActivatableTypes(ImmutableArray<SerializableTypeModel> serializableTypes)
-        {
-            var result = serializableTypes
+        private static ImmutableArray<TypeRef> GetActivatableTypes(ImmutableArray<SerializableTypeModel> serializableTypes)
+            => serializableTypes
                 .Where(static type => ShouldGenerateActivator(type))
                 .Select(static type => type.TypeSyntax)
                 .Distinct()
                 .OrderBy(static type => type.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            return result.Length > 0 ? new EquatableArray<TypeRef>(result) : EquatableArray<TypeRef>.Empty;
-        }
-
-        private static EquatableArray<TypeRef> GetGeneratedProxyTypes(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
-        {
-            var result = proxyInterfaces
+        private static ImmutableArray<TypeRef> GetGeneratedProxyTypes(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
+            => proxyInterfaces
                 .Select(static proxy => CreateGeneratedTypeRef(
                     proxy.GeneratedNamespace,
                     ProxyGenerator.GetSimpleClassName(proxy.Name),
-                    proxy.TypeParameters.Count))
+                    proxy.TypeParameters.Length))
                 .Distinct()
                 .OrderBy(static type => type.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            return result.Length > 0 ? new EquatableArray<TypeRef>(result) : EquatableArray<TypeRef>.Empty;
-        }
-
-        private static EquatableArray<TypeRef> GetInvokableInterfaces(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
-        {
-            var result = proxyInterfaces
+        private static ImmutableArray<TypeRef> GetInvokableInterfaces(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
+            => proxyInterfaces
                 .Select(static proxy => proxy.InterfaceType)
                 .Distinct()
                 .OrderBy(static type => type.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            return result.Length > 0 ? new EquatableArray<TypeRef>(result) : EquatableArray<TypeRef>.Empty;
-        }
-
-        private static EquatableArray<DefaultCopierModel> GetDefaultCopiers(ImmutableArray<SerializableTypeModel> serializableTypes)
-        {
-            var result = serializableTypes
+        private static ImmutableArray<DefaultCopierModel> GetDefaultCopiers(ImmutableArray<SerializableTypeModel> serializableTypes)
+            => serializableTypes
                 .Where(static type => type.IsShallowCopyable && !type.IsGenericType)
                 .Select(static type => new DefaultCopierModel(
                     type.TypeSyntax,
@@ -697,9 +609,6 @@ namespace Orleans.CodeGenerator
                 .Distinct()
                 .OrderBy(static entry => entry.OriginalType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
-
-            return result.Length > 0 ? new EquatableArray<DefaultCopierModel>(result) : EquatableArray<DefaultCopierModel>.Empty;
-        }
 
         private static bool ShouldGenerateActivator(SerializableTypeModel type)
         {
@@ -729,12 +638,12 @@ namespace Orleans.CodeGenerator
                 kind);
         }
 
-        private static EquatableArray<TypeParameterModel> ExtractTypeParameters(
+        private static ImmutableArray<TypeParameterModel> ExtractTypeParameters(
             List<(string Name, ITypeParameterSymbol Parameter)> typeParameters)
         {
             if (typeParameters is null || typeParameters.Count == 0)
             {
-                return EquatableArray<TypeParameterModel>.Empty;
+                return ImmutableArray<TypeParameterModel>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<TypeParameterModel>(typeParameters.Count);
@@ -743,14 +652,14 @@ namespace Orleans.CodeGenerator
                 var (name, param) = typeParameters[i];
                 builder.Add(new TypeParameterModel(name, param.Name, param.Ordinal));
             }
-            return new EquatableArray<TypeParameterModel>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
-        private static EquatableArray<MemberModel> ExtractMembers(List<IMemberDescription> members)
+        private static ImmutableArray<MemberModel> ExtractMembers(List<IMemberDescription> members)
         {
             if (members is null || members.Count == 0)
             {
-                return EquatableArray<MemberModel>.Empty;
+                return ImmutableArray<MemberModel>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<MemberModel>(members.Count);
@@ -758,7 +667,7 @@ namespace Orleans.CodeGenerator
             {
                 builder.Add(ExtractMember(member));
             }
-            return new EquatableArray<MemberModel>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
         private static MemberModel ExtractMember(IMemberDescription member)
@@ -866,11 +775,11 @@ namespace Orleans.CodeGenerator
             return AccessStrategy.GeneratedAccessor;
         }
 
-        private static EquatableArray<TypeRef> ExtractTypeRefs(List<INamedTypeSymbol> symbols)
+        private static ImmutableArray<TypeRef> ExtractTypeRefs(List<INamedTypeSymbol> symbols)
         {
             if (symbols is null || symbols.Count == 0)
             {
-                return EquatableArray<TypeRef>.Empty;
+                return ImmutableArray<TypeRef>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<TypeRef>(symbols.Count);
@@ -878,15 +787,15 @@ namespace Orleans.CodeGenerator
             {
                 builder.Add(new TypeRef(s.ToTypeSyntax().ToString()));
             }
-            return new EquatableArray<TypeRef>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
-        private static EquatableArray<TypeRef> ExtractTypeRefSyntaxList(
+        private static ImmutableArray<TypeRef> ExtractTypeRefSyntaxList(
             List<Microsoft.CodeAnalysis.CSharp.Syntax.TypeSyntax> syntaxList)
         {
             if (syntaxList is null || syntaxList.Count == 0)
             {
-                return EquatableArray<TypeRef>.Empty;
+                return ImmutableArray<TypeRef>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<TypeRef>(syntaxList.Count);
@@ -894,7 +803,7 @@ namespace Orleans.CodeGenerator
             {
                 builder.Add(new TypeRef(ts.ToString()));
             }
-            return new EquatableArray<TypeRef>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
         private static ObjectCreationStrategy DetermineCreationStrategy(ISerializableTypeDescription description)
@@ -1276,14 +1185,14 @@ namespace Orleans.CodeGenerator
             return true;
         }
 
-        private static EquatableArray<InvokableBaseTypeMapping> ExtractInvokableBaseTypeMappings(
+        private static ImmutableArray<InvokableBaseTypeMapping> ExtractInvokableBaseTypeMappings(
             INamedTypeSymbol proxyBaseType,
             LibraryTypes libraryTypes,
             CancellationToken cancellationToken)
         {
             if (!proxyBaseType.GetAttributes(libraryTypes.DefaultInvokableBaseTypeAttribute, out var invokableBaseTypeAttributes))
             {
-                return EquatableArray<InvokableBaseTypeMapping>.Empty;
+                return ImmutableArray<InvokableBaseTypeMapping>.Empty;
             }
 
             var mappings = new Dictionary<string, InvokableBaseTypeMapping>(StringComparer.Ordinal);
@@ -1306,7 +1215,7 @@ namespace Orleans.CodeGenerator
 
             if (mappings.Count == 0)
             {
-                return EquatableArray<InvokableBaseTypeMapping>.Empty;
+                return ImmutableArray<InvokableBaseTypeMapping>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<InvokableBaseTypeMapping>(mappings.Count);
@@ -1315,14 +1224,14 @@ namespace Orleans.CodeGenerator
                 builder.Add(mapping.Value);
             }
 
-            return new EquatableArray<InvokableBaseTypeMapping>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
-        private static EquatableArray<TypeParameterModel> ExtractInterfaceTypeParameters(INamedTypeSymbol typeSymbol)
+        private static ImmutableArray<TypeParameterModel> ExtractInterfaceTypeParameters(INamedTypeSymbol typeSymbol)
         {
             if (typeSymbol.TypeParameters.Length == 0)
             {
-                return EquatableArray<TypeParameterModel>.Empty;
+                return ImmutableArray<TypeParameterModel>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<TypeParameterModel>(typeSymbol.TypeParameters.Length);
@@ -1331,10 +1240,10 @@ namespace Orleans.CodeGenerator
                 builder.Add(new TypeParameterModel(tp.Name, tp.Name, tp.Ordinal));
             }
 
-            return new EquatableArray<TypeParameterModel>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
-        private static EquatableArray<MethodModel> ExtractInterfaceMethods(
+        private static ImmutableArray<MethodModel> ExtractInterfaceMethods(
             INamedTypeSymbol interfaceType,
             LibraryTypes libraryTypes,
             bool isExtension,
@@ -1373,7 +1282,7 @@ namespace Orleans.CodeGenerator
 
             if (methods.Count == 0)
             {
-                return EquatableArray<MethodModel>.Empty;
+                return ImmutableArray<MethodModel>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<MethodModel>(methods.Count);
@@ -1382,7 +1291,7 @@ namespace Orleans.CodeGenerator
                 builder.Add(method);
             }
 
-            return new EquatableArray<MethodModel>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
         private static IEnumerable<INamedTypeSymbol> GetAllInterfaces(INamedTypeSymbol symbol)
@@ -1495,13 +1404,13 @@ namespace Orleans.CodeGenerator
                 isCancellable);
         }
 
-        private static EquatableArray<MethodParameterModel> ExtractMethodParameters(
+        private static ImmutableArray<MethodParameterModel> ExtractMethodParameters(
             IMethodSymbol method,
             LibraryTypes libraryTypes)
         {
             if (method.Parameters.Length == 0)
             {
-                return EquatableArray<MethodParameterModel>.Empty;
+                return ImmutableArray<MethodParameterModel>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<MethodParameterModel>(method.Parameters.Length);
@@ -1515,14 +1424,14 @@ namespace Orleans.CodeGenerator
                     isCancellationToken));
             }
 
-            return new EquatableArray<MethodParameterModel>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
-        private static EquatableArray<TypeParameterModel> ExtractMethodTypeParameters(IMethodSymbol method)
+        private static ImmutableArray<TypeParameterModel> ExtractMethodTypeParameters(IMethodSymbol method)
         {
             if (method.TypeParameters.Length == 0)
             {
-                return EquatableArray<TypeParameterModel>.Empty;
+                return ImmutableArray<TypeParameterModel>.Empty;
             }
 
             var builder = ImmutableArray.CreateBuilder<TypeParameterModel>(method.TypeParameters.Length);
@@ -1531,10 +1440,10 @@ namespace Orleans.CodeGenerator
                 builder.Add(new TypeParameterModel(tp.Name, tp.Name, tp.Ordinal));
             }
 
-            return new EquatableArray<TypeParameterModel>(builder.MoveToImmutable());
+            return builder.MoveToImmutable();
         }
 
-        private static EquatableArray<CustomInitializerModel> ExtractCustomInitializers(
+        private static ImmutableArray<CustomInitializerModel> ExtractCustomInitializers(
             IMethodSymbol method,
             LibraryTypes libraryTypes)
         {
@@ -1592,8 +1501,8 @@ namespace Orleans.CodeGenerator
             }
 
             return builder is not null
-                ? new EquatableArray<CustomInitializerModel>(builder.ToImmutable())
-                : EquatableArray<CustomInitializerModel>.Empty;
+                ? builder.ToImmutable()
+                : ImmutableArray<CustomInitializerModel>.Empty;
         }
 
         private static bool TryGetNamedArgument(

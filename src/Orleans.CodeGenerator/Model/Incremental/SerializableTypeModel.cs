@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Model.Incremental
@@ -23,19 +24,19 @@ namespace Orleans.CodeGenerator.Model.Incremental
             bool isAbstractType,
             bool isEnumType,
             bool isGenericType,
-            EquatableArray<TypeParameterModel> typeParameters,
-            EquatableArray<MemberModel> members,
+            ImmutableArray<TypeParameterModel> typeParameters,
+            ImmutableArray<MemberModel> members,
             bool useActivator,
             bool isEmptyConstructable,
             bool hasActivatorConstructor,
             bool trackReferences,
             bool omitDefaultMemberValues,
-            EquatableArray<TypeRef> serializationHooks,
+            ImmutableArray<TypeRef> serializationHooks,
             bool isShallowCopyable,
             bool isUnsealedImmutable,
             bool isImmutable,
             bool isExceptionType,
-            EquatableArray<TypeRef> activatorConstructorParameters,
+            ImmutableArray<TypeRef> activatorConstructorParameters,
             ObjectCreationStrategy creationStrategy)
         {
             Accessibility = accessibility;
@@ -51,19 +52,19 @@ namespace Orleans.CodeGenerator.Model.Incremental
             IsAbstractType = isAbstractType;
             IsEnumType = isEnumType;
             IsGenericType = isGenericType;
-            TypeParameters = typeParameters;
-            Members = members;
+            TypeParameters = ImmutableArrayValueComparer.Normalize(typeParameters);
+            Members = ImmutableArrayValueComparer.Normalize(members);
             UseActivator = useActivator;
             IsEmptyConstructable = isEmptyConstructable;
             HasActivatorConstructor = hasActivatorConstructor;
             TrackReferences = trackReferences;
             OmitDefaultMemberValues = omitDefaultMemberValues;
-            SerializationHooks = serializationHooks;
+            SerializationHooks = ImmutableArrayValueComparer.Normalize(serializationHooks);
             IsShallowCopyable = isShallowCopyable;
             IsUnsealedImmutable = isUnsealedImmutable;
             IsImmutable = isImmutable;
             IsExceptionType = isExceptionType;
-            ActivatorConstructorParameters = activatorConstructorParameters;
+            ActivatorConstructorParameters = ImmutableArrayValueComparer.Normalize(activatorConstructorParameters);
             CreationStrategy = creationStrategy;
         }
 
@@ -80,19 +81,19 @@ namespace Orleans.CodeGenerator.Model.Incremental
         public bool IsAbstractType { get; }
         public bool IsEnumType { get; }
         public bool IsGenericType { get; }
-        public EquatableArray<TypeParameterModel> TypeParameters { get; }
-        public EquatableArray<MemberModel> Members { get; }
+        public ImmutableArray<TypeParameterModel> TypeParameters { get; }
+        public ImmutableArray<MemberModel> Members { get; }
         public bool UseActivator { get; }
         public bool IsEmptyConstructable { get; }
         public bool HasActivatorConstructor { get; }
         public bool TrackReferences { get; }
         public bool OmitDefaultMemberValues { get; }
-        public EquatableArray<TypeRef> SerializationHooks { get; }
+        public ImmutableArray<TypeRef> SerializationHooks { get; }
         public bool IsShallowCopyable { get; }
         public bool IsUnsealedImmutable { get; }
         public bool IsImmutable { get; }
         public bool IsExceptionType { get; }
-        public EquatableArray<TypeRef> ActivatorConstructorParameters { get; }
+        public ImmutableArray<TypeRef> ActivatorConstructorParameters { get; }
         public ObjectCreationStrategy CreationStrategy { get; }
 
         public bool Equals(SerializableTypeModel other)
@@ -115,19 +116,19 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 && IsAbstractType == other.IsAbstractType
                 && IsEnumType == other.IsEnumType
                 && IsGenericType == other.IsGenericType
-                && TypeParameters.Equals(other.TypeParameters)
-                && Members.Equals(other.Members)
+                && ImmutableArrayValueComparer.Equals(TypeParameters, other.TypeParameters)
+                && ImmutableArrayValueComparer.Equals(Members, other.Members)
                 && UseActivator == other.UseActivator
                 && IsEmptyConstructable == other.IsEmptyConstructable
                 && HasActivatorConstructor == other.HasActivatorConstructor
                 && TrackReferences == other.TrackReferences
                 && OmitDefaultMemberValues == other.OmitDefaultMemberValues
-                && SerializationHooks.Equals(other.SerializationHooks)
+                && ImmutableArrayValueComparer.Equals(SerializationHooks, other.SerializationHooks)
                 && IsShallowCopyable == other.IsShallowCopyable
                 && IsUnsealedImmutable == other.IsUnsealedImmutable
                 && IsImmutable == other.IsImmutable
                 && IsExceptionType == other.IsExceptionType
-                && ActivatorConstructorParameters.Equals(other.ActivatorConstructorParameters)
+                && ImmutableArrayValueComparer.Equals(ActivatorConstructorParameters, other.ActivatorConstructorParameters)
                 && CreationStrategy == other.CreationStrategy;
         }
 
@@ -148,12 +149,13 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 hash = hash * 31 + (IsAbstractType ? 1 : 0);
                 hash = hash * 31 + (IsEnumType ? 1 : 0);
                 hash = hash * 31 + (IsGenericType ? 1 : 0);
-                hash = hash * 31 + TypeParameters.GetHashCode();
-                hash = hash * 31 + Members.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeParameters);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(Members);
                 hash = hash * 31 + (UseActivator ? 1 : 0);
                 hash = hash * 31 + (TrackReferences ? 1 : 0);
                 hash = hash * 31 + (OmitDefaultMemberValues ? 1 : 0);
-                hash = hash * 31 + SerializationHooks.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(SerializationHooks);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(ActivatorConstructorParameters);
                 hash = hash * 31 + (int)CreationStrategy;
                 return hash;
             }

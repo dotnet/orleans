@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 
 namespace Orleans.CodeGenerator.Model.Incremental
 {
@@ -53,7 +54,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
     /// </summary>
     internal readonly struct CompoundAliasComponentModel : IEquatable<CompoundAliasComponentModel>
     {
-        private readonly string _stringValue;
+        private readonly string? _stringValue;
         private readonly TypeRef _typeValue;
         private readonly bool _isType;
 
@@ -73,7 +74,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
 
         public bool IsString => !_isType && _stringValue is not null;
         public bool IsType => _isType;
-        public string StringValue => _stringValue;
+        public string? StringValue => _stringValue;
         public TypeRef TypeValue => _typeValue;
 
         public bool Equals(CompoundAliasComponentModel other)
@@ -102,20 +103,20 @@ namespace Orleans.CodeGenerator.Model.Incremental
     /// </summary>
     internal readonly struct CompoundTypeAliasModel : IEquatable<CompoundTypeAliasModel>
     {
-        public CompoundTypeAliasModel(EquatableArray<CompoundAliasComponentModel> components, TypeRef targetType)
+        public CompoundTypeAliasModel(ImmutableArray<CompoundAliasComponentModel> components, TypeRef targetType)
         {
-            Components = components;
+            Components = ImmutableArrayValueComparer.Normalize(components);
             TargetType = targetType;
         }
 
-        public EquatableArray<CompoundAliasComponentModel> Components { get; }
+        public ImmutableArray<CompoundAliasComponentModel> Components { get; }
         public TypeRef TargetType { get; }
 
         public bool Equals(CompoundTypeAliasModel other) =>
-            Components.Equals(other.Components) && TargetType.Equals(other.TargetType);
+            ImmutableArrayValueComparer.Equals(Components, other.Components) && TargetType.Equals(other.TargetType);
 
         public override bool Equals(object obj) => obj is CompoundTypeAliasModel other && Equals(other);
-        public override int GetHashCode() { unchecked { return Components.GetHashCode() * 31 + TargetType.GetHashCode(); } }
+        public override int GetHashCode() { unchecked { return ImmutableArrayValueComparer.GetHashCode(Components) * 31 + TargetType.GetHashCode(); } }
 
         public static bool operator ==(CompoundTypeAliasModel left, CompoundTypeAliasModel right) => left.Equals(right);
         public static bool operator !=(CompoundTypeAliasModel left, CompoundTypeAliasModel right) => !left.Equals(right);
@@ -150,35 +151,35 @@ namespace Orleans.CodeGenerator.Model.Incremental
     {
         public ReferenceAssemblyModel(
             string assemblyName,
-            EquatableArray<EquatableString> applicationParts,
-            EquatableArray<WellKnownTypeIdModel> wellKnownTypeIds,
-            EquatableArray<TypeAliasModel> typeAliases,
-            EquatableArray<CompoundTypeAliasModel> compoundTypeAliases,
-            EquatableArray<SerializableTypeModel> referencedSerializableTypes,
-            EquatableArray<ProxyInterfaceModel> referencedProxyInterfaces,
-            EquatableArray<RegisteredCodecModel> registeredCodecs,
-            EquatableArray<InterfaceImplementationModel> interfaceImplementations)
+            ImmutableArray<string> applicationParts,
+            ImmutableArray<WellKnownTypeIdModel> wellKnownTypeIds,
+            ImmutableArray<TypeAliasModel> typeAliases,
+            ImmutableArray<CompoundTypeAliasModel> compoundTypeAliases,
+            ImmutableArray<SerializableTypeModel> referencedSerializableTypes,
+            ImmutableArray<ProxyInterfaceModel> referencedProxyInterfaces,
+            ImmutableArray<RegisteredCodecModel> registeredCodecs,
+            ImmutableArray<InterfaceImplementationModel> interfaceImplementations)
         {
             AssemblyName = assemblyName;
-            ApplicationParts = applicationParts;
-            WellKnownTypeIds = wellKnownTypeIds;
-            TypeAliases = typeAliases;
-            CompoundTypeAliases = compoundTypeAliases;
-            ReferencedSerializableTypes = referencedSerializableTypes;
-            ReferencedProxyInterfaces = referencedProxyInterfaces;
-            RegisteredCodecs = registeredCodecs;
-            InterfaceImplementations = interfaceImplementations;
+            ApplicationParts = ImmutableArrayValueComparer.Normalize(applicationParts);
+            WellKnownTypeIds = ImmutableArrayValueComparer.Normalize(wellKnownTypeIds);
+            TypeAliases = ImmutableArrayValueComparer.Normalize(typeAliases);
+            CompoundTypeAliases = ImmutableArrayValueComparer.Normalize(compoundTypeAliases);
+            ReferencedSerializableTypes = ImmutableArrayValueComparer.Normalize(referencedSerializableTypes);
+            ReferencedProxyInterfaces = ImmutableArrayValueComparer.Normalize(referencedProxyInterfaces);
+            RegisteredCodecs = ImmutableArrayValueComparer.Normalize(registeredCodecs);
+            InterfaceImplementations = ImmutableArrayValueComparer.Normalize(interfaceImplementations);
         }
 
         public string AssemblyName { get; }
-        public EquatableArray<EquatableString> ApplicationParts { get; }
-        public EquatableArray<WellKnownTypeIdModel> WellKnownTypeIds { get; }
-        public EquatableArray<TypeAliasModel> TypeAliases { get; }
-        public EquatableArray<CompoundTypeAliasModel> CompoundTypeAliases { get; }
-        public EquatableArray<SerializableTypeModel> ReferencedSerializableTypes { get; }
-        public EquatableArray<ProxyInterfaceModel> ReferencedProxyInterfaces { get; }
-        public EquatableArray<RegisteredCodecModel> RegisteredCodecs { get; }
-        public EquatableArray<InterfaceImplementationModel> InterfaceImplementations { get; }
+        public ImmutableArray<string> ApplicationParts { get; }
+        public ImmutableArray<WellKnownTypeIdModel> WellKnownTypeIds { get; }
+        public ImmutableArray<TypeAliasModel> TypeAliases { get; }
+        public ImmutableArray<CompoundTypeAliasModel> CompoundTypeAliases { get; }
+        public ImmutableArray<SerializableTypeModel> ReferencedSerializableTypes { get; }
+        public ImmutableArray<ProxyInterfaceModel> ReferencedProxyInterfaces { get; }
+        public ImmutableArray<RegisteredCodecModel> RegisteredCodecs { get; }
+        public ImmutableArray<InterfaceImplementationModel> InterfaceImplementations { get; }
 
         public bool Equals(ReferenceAssemblyModel other)
         {
@@ -188,14 +189,14 @@ namespace Orleans.CodeGenerator.Model.Incremental
             }
 
             return string.Equals(AssemblyName, other.AssemblyName, StringComparison.Ordinal)
-                && ApplicationParts.Equals(other.ApplicationParts)
-                && WellKnownTypeIds.Equals(other.WellKnownTypeIds)
-                && TypeAliases.Equals(other.TypeAliases)
-                && CompoundTypeAliases.Equals(other.CompoundTypeAliases)
-                && ReferencedSerializableTypes.Equals(other.ReferencedSerializableTypes)
-                && ReferencedProxyInterfaces.Equals(other.ReferencedProxyInterfaces)
-                && RegisteredCodecs.Equals(other.RegisteredCodecs)
-                && InterfaceImplementations.Equals(other.InterfaceImplementations);
+                && ImmutableArrayValueComparer.Equals(ApplicationParts, other.ApplicationParts)
+                && ImmutableArrayValueComparer.Equals(WellKnownTypeIds, other.WellKnownTypeIds)
+                && ImmutableArrayValueComparer.Equals(TypeAliases, other.TypeAliases)
+                && ImmutableArrayValueComparer.Equals(CompoundTypeAliases, other.CompoundTypeAliases)
+                && ImmutableArrayValueComparer.Equals(ReferencedSerializableTypes, other.ReferencedSerializableTypes)
+                && ImmutableArrayValueComparer.Equals(ReferencedProxyInterfaces, other.ReferencedProxyInterfaces)
+                && ImmutableArrayValueComparer.Equals(RegisteredCodecs, other.RegisteredCodecs)
+                && ImmutableArrayValueComparer.Equals(InterfaceImplementations, other.InterfaceImplementations);
         }
 
         public override bool Equals(object obj) => obj is ReferenceAssemblyModel other && Equals(other);
@@ -205,14 +206,14 @@ namespace Orleans.CodeGenerator.Model.Incremental
             unchecked
             {
                 var hash = StringComparer.Ordinal.GetHashCode(AssemblyName ?? string.Empty);
-                hash = hash * 31 + ApplicationParts.GetHashCode();
-                hash = hash * 31 + WellKnownTypeIds.GetHashCode();
-                hash = hash * 31 + TypeAliases.GetHashCode();
-                hash = hash * 31 + CompoundTypeAliases.GetHashCode();
-                hash = hash * 31 + ReferencedSerializableTypes.GetHashCode();
-                hash = hash * 31 + ReferencedProxyInterfaces.GetHashCode();
-                hash = hash * 31 + RegisteredCodecs.GetHashCode();
-                hash = hash * 31 + InterfaceImplementations.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(ApplicationParts);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(WellKnownTypeIds);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeAliases);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(CompoundTypeAliases);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(ReferencedSerializableTypes);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(ReferencedProxyInterfaces);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(RegisteredCodecs);
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(InterfaceImplementations);
                 return hash;
             }
         }

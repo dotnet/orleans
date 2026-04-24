@@ -33,7 +33,7 @@ namespace Orleans.CodeGenerator
             var configParam = "config".ToIdentifierName();
             var body = new List<StatementSyntax>();
             var model = _metadataModel;
-            var orderedProxyInterfaces = GetOrderedProxyInterfaces(model.ProxyInterfaces.AsImmutableArray());
+            var orderedProxyInterfaces = GetOrderedProxyInterfaces(model.ProxyInterfaces);
             var generatedInvokables = GetGeneratedInvokableMetadata(orderedProxyInterfaces);
             var serializableRegistrations = GetOrderedSerializableRegistrations(model, generatedInvokables);
 
@@ -43,7 +43,7 @@ namespace Orleans.CodeGenerator
                 AddRegistration(body, addSerializerMethod, registration.SerializerTypeSyntax);
             }
 
-            foreach (var type in model.RegisteredCodecs.AsImmutableArray().Where(static codec => codec.Kind == RegisteredCodecKind.Serializer))
+            foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Serializer))
             {
                 AddRegistration(body, addSerializerMethod, GetOpenTypeSyntax(type.Type));
             }
@@ -57,13 +57,13 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            foreach (var type in model.RegisteredCodecs.AsImmutableArray().Where(static codec => codec.Kind == RegisteredCodecKind.Copier))
+            foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Copier))
             {
                 AddRegistration(body, addCopierMethod, GetOpenTypeSyntax(type.Type));
             }
 
             var addConverterMethod = configParam.Member("Converters").Member("Add");
-            foreach (var type in model.RegisteredCodecs.AsImmutableArray().Where(static codec => codec.Kind == RegisteredCodecKind.Converter))
+            foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Converter))
             {
                 AddRegistration(body, addConverterMethod, GetOpenTypeSyntax(type.Type));
             }
@@ -81,7 +81,7 @@ namespace Orleans.CodeGenerator
             }
 
             var addInvokableInterfaceImplementationMethod = configParam.Member("InterfaceImplementations").Member("Add");
-            foreach (var type in GetOrderedInterfaceImplementations(model.InterfaceImplementations.AsImmutableArray()))
+            foreach (var type in GetOrderedInterfaceImplementations(model.InterfaceImplementations))
             {
                 AddRegistration(body, addInvokableInterfaceImplementationMethod, GetOpenTypeSyntax(type.ImplementationType));
             }
@@ -95,13 +95,13 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            foreach (var type in model.RegisteredCodecs.AsImmutableArray().Where(static codec => codec.Kind == RegisteredCodecKind.Activator))
+            foreach (var type in model.RegisteredCodecs.Where(static codec => codec.Kind == RegisteredCodecKind.Activator))
             {
                 AddRegistration(body, addActivatorMethod, GetOpenTypeSyntax(type.Type));
             }
 
             var addWellKnownTypeIdMethod = configParam.Member("WellKnownTypeIds").Member("Add");
-            foreach (var type in model.ReferenceAssemblyData.WellKnownTypeIds.AsImmutableArray())
+            foreach (var type in model.ReferenceAssemblyData.WellKnownTypeIds)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addWellKnownTypeIdMethod,
                     ArgumentList(SeparatedList(new[]
@@ -112,7 +112,7 @@ namespace Orleans.CodeGenerator
             }
 
             var addTypeAliasMethod = configParam.Member("WellKnownTypeAliases").Member("Add");
-            foreach (var type in model.ReferenceAssemblyData.TypeAliases.AsImmutableArray())
+            foreach (var type in model.ReferenceAssemblyData.TypeAliases)
             {
                 body.Add(ExpressionStatement(InvocationExpression(addTypeAliasMethod,
                     ArgumentList(SeparatedList(new[]
@@ -148,8 +148,8 @@ namespace Orleans.CodeGenerator
             List<StatementSyntax> body,
             ImmutableArray<GeneratedInvokableMetadata> generatedInvokables)
         {
-            var aliases = _metadataModel.ReferenceAssemblyData.CompoundTypeAliases.AsImmutableArray()
-                .OrderBy(static entry => entry.Components.Count)
+            var aliases = _metadataModel.ReferenceAssemblyData.CompoundTypeAliases
+                .OrderBy(static entry => entry.Components.Length)
                 .ThenBy(static entry => entry.TargetType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
@@ -160,7 +160,7 @@ namespace Orleans.CodeGenerator
             var aliasTree = IncrementalCompoundTypeAliasTree.Create();
             foreach (var alias in aliases.Concat(generatedAliases))
             {
-                aliasTree.Add(alias.Components.AsImmutableArray(), alias.TargetType);
+                aliasTree.Add(alias.Components, alias.TargetType);
             }
 
             var nodeId = 0;
@@ -253,7 +253,7 @@ namespace Orleans.CodeGenerator
 
             foreach (var proxy in proxyInterfaces)
             {
-                foreach (var method in proxy.Methods.AsImmutableArray())
+                foreach (var method in proxy.Methods)
                 {
                     var metadata = CreateGeneratedInvokableMetadata(proxy, method);
                     var key = metadata.TypeSyntax.ToString();
@@ -271,25 +271,25 @@ namespace Orleans.CodeGenerator
             MetadataAggregateModel model,
             ImmutableArray<GeneratedInvokableMetadata> generatedInvokables)
         {
-            var registrations = new List<SerializableMetadataRegistration>(model.SerializableTypes.Count + generatedInvokables.Length);
+            var registrations = new List<SerializableMetadataRegistration>(model.SerializableTypes.Length + generatedInvokables.Length);
 
-            foreach (var type in model.SerializableTypes.AsImmutableArray())
+            foreach (var type in model.SerializableTypes)
             {
                 TypeSyntax copierType = null;
                 if (!type.IsEnumType)
                 {
                     copierType = TryGetDefaultCopierType(type.TypeSyntax, model.DefaultCopiers)
-                        ?? GetCopierTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Count);
+                        ?? GetCopierTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Length);
                 }
 
                 var activatorType = ShouldGenerateActivator(type)
-                    ? GetActivatorTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Count)
+                    ? GetActivatorTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Length)
                     : null;
 
                 registrations.Add(new SerializableMetadataRegistration(
                     sourceType: type.TypeSyntax,
                     sortKey: type.TypeSyntax.SyntaxString,
-                    serializerTypeSyntax: GetCodecTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Count),
+                    serializerTypeSyntax: GetCodecTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Length),
                     copierTypeSyntax: copierType,
                     activatorTypeSyntax: activatorType));
             }
@@ -328,7 +328,7 @@ namespace Orleans.CodeGenerator
         {
             var generatedNamespace = method.ContainingInterfaceGeneratedNamespace;
             var name = GetGeneratedInvokableClassName(proxy, method);
-            var genericArity = method.ContainingInterfaceTypeParameterCount + method.TypeParameters.Count;
+            var genericArity = method.ContainingInterfaceTypeParameterCount + method.TypeParameters.Length;
             var typeSyntax = CreateGeneratedTypeSyntax(generatedNamespace, name, genericArity);
             var targetType = new TypeRef(typeSyntax.ToString());
             var aliases = CreateGeneratedInvokableAliases(proxy, method, targetType);
@@ -345,7 +345,7 @@ namespace Orleans.CodeGenerator
 
         private static string GetGeneratedInvokableClassName(ProxyInterfaceModel proxy, MethodModel method)
         {
-            var genericArity = method.ContainingInterfaceTypeParameterCount + method.TypeParameters.Count;
+            var genericArity = method.ContainingInterfaceTypeParameterCount + method.TypeParameters.Length;
             var typeArgs = genericArity > 0 ? "_" + genericArity : string.Empty;
             return $"Invokable_{method.ContainingInterfaceName}_{proxy.ProxyBase.GeneratedClassNameComponent}_{method.GeneratedMethodId}{typeArgs}";
         }
@@ -387,7 +387,7 @@ namespace Orleans.CodeGenerator
             }
 
             components.Add(new CompoundAliasComponentModel(methodId));
-            return new CompoundTypeAliasModel(new EquatableArray<CompoundAliasComponentModel>(components.MoveToImmutable()), targetType);
+            return new CompoundTypeAliasModel(components.MoveToImmutable(), targetType);
         }
 
         private bool TryResolveOpenNamedType(TypeRef typeRef, out INamedTypeSymbol symbol)
@@ -421,14 +421,14 @@ namespace Orleans.CodeGenerator
         {
             var genericArity = TryResolveOpenNamedType(proxy.InterfaceType, out var symbol)
                 ? symbol.GetAllTypeParameters().Count()
-                : proxy.TypeParameters.Count;
+                : proxy.TypeParameters.Length;
 
             return CreateGeneratedTypeSyntax(proxy.GeneratedNamespace, ProxyGenerator.GetSimpleClassName(proxy.Name), genericArity);
         }
 
-        private static TypeSyntax TryGetDefaultCopierType(TypeRef originalType, EquatableArray<DefaultCopierModel> defaultCopiers)
+        private static TypeSyntax TryGetDefaultCopierType(TypeRef originalType, ImmutableArray<DefaultCopierModel> defaultCopiers)
         {
-            foreach (var copier in defaultCopiers.AsImmutableArray())
+            foreach (var copier in defaultCopiers)
             {
                 if (copier.OriginalType.Equals(originalType))
                 {

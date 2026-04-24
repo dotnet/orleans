@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 
 namespace Orleans.CodeGenerator.Model.Incremental
 {
@@ -39,18 +40,18 @@ namespace Orleans.CodeGenerator.Model.Incremental
             TypeRef proxyBaseType,
             bool isExtension,
             string generatedClassNameComponent,
-            EquatableArray<InvokableBaseTypeMapping> invokableBaseTypes)
+            ImmutableArray<InvokableBaseTypeMapping> invokableBaseTypes)
         {
             ProxyBaseType = proxyBaseType;
             IsExtension = isExtension;
             GeneratedClassNameComponent = generatedClassNameComponent;
-            InvokableBaseTypes = invokableBaseTypes;
+            InvokableBaseTypes = ImmutableArrayValueComparer.Normalize(invokableBaseTypes);
         }
 
         public TypeRef ProxyBaseType { get; }
         public bool IsExtension { get; }
         public string GeneratedClassNameComponent { get; }
-        public EquatableArray<InvokableBaseTypeMapping> InvokableBaseTypes { get; }
+        public ImmutableArray<InvokableBaseTypeMapping> InvokableBaseTypes { get; }
 
         public bool Equals(ProxyBaseModel other)
         {
@@ -62,7 +63,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             return ProxyBaseType.Equals(other.ProxyBaseType)
                 && IsExtension == other.IsExtension
                 && string.Equals(GeneratedClassNameComponent, other.GeneratedClassNameComponent, StringComparison.Ordinal)
-                && InvokableBaseTypes.Equals(other.InvokableBaseTypes);
+                && ImmutableArrayValueComparer.Equals(InvokableBaseTypes, other.InvokableBaseTypes);
         }
 
         public override bool Equals(object obj) => obj is ProxyBaseModel other && Equals(other);
@@ -74,7 +75,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 var hash = ProxyBaseType.GetHashCode();
                 hash = hash * 31 + (IsExtension ? 1 : 0);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(GeneratedClassNameComponent ?? string.Empty);
-                hash = hash * 31 + InvokableBaseTypes.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(InvokableBaseTypes);
                 return hash;
             }
         }
@@ -89,24 +90,24 @@ namespace Orleans.CodeGenerator.Model.Incremental
             TypeRef interfaceType,
             string name,
             string generatedNamespace,
-            EquatableArray<TypeParameterModel> typeParameters,
+            ImmutableArray<TypeParameterModel> typeParameters,
             ProxyBaseModel proxyBase,
-            EquatableArray<MethodModel> methods)
+            ImmutableArray<MethodModel> methods)
         {
             InterfaceType = interfaceType;
             Name = name;
             GeneratedNamespace = generatedNamespace;
-            TypeParameters = typeParameters;
+            TypeParameters = ImmutableArrayValueComparer.Normalize(typeParameters);
             ProxyBase = proxyBase;
-            Methods = methods;
+            Methods = ImmutableArrayValueComparer.Normalize(methods);
         }
 
         public TypeRef InterfaceType { get; }
         public string Name { get; }
         public string GeneratedNamespace { get; }
-        public EquatableArray<TypeParameterModel> TypeParameters { get; }
+        public ImmutableArray<TypeParameterModel> TypeParameters { get; }
         public ProxyBaseModel ProxyBase { get; }
-        public EquatableArray<MethodModel> Methods { get; }
+        public ImmutableArray<MethodModel> Methods { get; }
 
         public bool Equals(ProxyInterfaceModel other)
         {
@@ -118,9 +119,9 @@ namespace Orleans.CodeGenerator.Model.Incremental
             return InterfaceType.Equals(other.InterfaceType)
                 && string.Equals(Name, other.Name, StringComparison.Ordinal)
                 && string.Equals(GeneratedNamespace, other.GeneratedNamespace, StringComparison.Ordinal)
-                && TypeParameters.Equals(other.TypeParameters)
+                && ImmutableArrayValueComparer.Equals(TypeParameters, other.TypeParameters)
                 && ProxyBase.Equals(other.ProxyBase)
-                && Methods.Equals(other.Methods);
+                && ImmutableArrayValueComparer.Equals(Methods, other.Methods);
         }
 
         public override bool Equals(object obj) => obj is ProxyInterfaceModel other && Equals(other);
@@ -132,9 +133,9 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 var hash = InterfaceType.GetHashCode();
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(Name ?? string.Empty);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(GeneratedNamespace ?? string.Empty);
-                hash = hash * 31 + TypeParameters.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeParameters);
                 hash = hash * 31 + (ProxyBase?.GetHashCode() ?? 0);
-                hash = hash * 31 + Methods.GetHashCode();
+                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(Methods);
                 return hash;
             }
         }

@@ -77,7 +77,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             bool isShallowCopyable,
             bool isValueType,
             bool containingTypeIsValueType,
-            string backingPropertyName)
+            string? backingPropertyName)
         {
             FieldId = fieldId;
             Name = name;
@@ -116,7 +116,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
         public bool IsShallowCopyable { get; }
         public bool IsValueType { get; }
         public bool ContainingTypeIsValueType { get; }
-        public string BackingPropertyName { get; }
+        public string? BackingPropertyName { get; }
 
         public bool Equals(MemberModel other)
         {

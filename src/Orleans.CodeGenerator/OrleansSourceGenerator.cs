@@ -16,6 +16,7 @@ using Orleans.CodeGenerator.Model.Incremental;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 #pragma warning disable RS1035 // Do not use APIs banned for analyzers
+#nullable disable
 namespace Orleans.CodeGenerator
 {
     [Generator]
@@ -72,7 +73,7 @@ namespace Orleans.CodeGenerator
             var collectedProxies = directProxyInterfaces
                 .Collect()
                 .Combine(inheritedProxyInterfaces)
-                .Select(static (input, _) => ModelExtractor.MergeProxyInterfaces(input.Left, new EquatableArray<ProxyInterfaceModel>(input.Right)));
+                .Select(static (input, _) => ModelExtractor.MergeProxyInterfaces(input.Left, input.Right));
             var preparedProxyOutputs = collectedProxies
                 .Combine(compilationProvider)
                 .Combine(generatorOptions)
@@ -87,7 +88,7 @@ namespace Orleans.CodeGenerator
             });
 
             var proxyOutputModels = preparedProxyOutputs
-                .SelectMany(static (result, _) => result.ProxyOutputModels.AsImmutableArray());
+                .SelectMany(static (result, _) => result.ProxyOutputModels);
 
             // Extract reference assembly data (application parts, well-known type IDs, aliases)
             var refAssemblyData = compilationProvider
@@ -177,7 +178,7 @@ namespace Orleans.CodeGenerator
         {
             var resolver = new TypeSymbolResolver(compilation);
             var builder = ImmutableArray.CreateBuilder<SerializableTypeModel>();
-            foreach (var model in referenceData.ReferencedSerializableTypes.AsImmutableArray())
+            foreach (var model in referenceData.ReferencedSerializableTypes)
             {
                 if (!resolver.TryResolveSerializableType(model, out var symbol)
                     || SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, compilation.Assembly))
@@ -284,7 +285,7 @@ namespace Orleans.CodeGenerator
                 var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
                 var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
                 var ownedInvokableMetadataNames = new HashSet<string>(
-                    proxyOutputModel.OwnedInvokableMetadataNames.AsImmutableArray().Select(static value => value.Value),
+                    proxyOutputModel.OwnedInvokableMetadataNames,
                     StringComparer.Ordinal);
                 var emitDeclaredMethodsFallback = proxyOutputModel.UseDeclaredInvokableFallback;
                 var generatedInvokables = GetGeneratedInvokables(codeGenerator, interfaceDescription).ToImmutableArray();
@@ -360,7 +361,7 @@ namespace Orleans.CodeGenerator
             try
             {
                 return ProxyOutputPreparationResult.FromModels(
-                    new EquatableArray<ProxyOutputModel>(CreateProxyOutputModels(compilation, models, options, cancellationToken)));
+                    CreateProxyOutputModels(compilation, models, options, cancellationToken));
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -423,17 +424,16 @@ namespace Orleans.CodeGenerator
                             && string.Equals(ownerHintName, targetHintName, StringComparison.Ordinal))
                         .Distinct(StringComparer.Ordinal)
                         .OrderBy(static value => value, StringComparer.Ordinal)
-                        .Select(static value => new EquatableString(value))
                         .ToImmutableArray();
                     var useDeclaredInvokableFallback =
                         generatedInvokables.Length == 0
-                            ? model.Methods.AsImmutableArray().Any(method => method.ContainingInterfaceType.Equals(model.InterfaceType))
+                            ? model.Methods.Any(method => method.ContainingInterfaceType.Equals(model.InterfaceType))
                             : ownedInvokableMetadataNames.Length == 0
                                 && !generatedInvokables.Any(invokable => invokableOwners.ContainsKey(invokable.MetadataName));
 
                     return new ProxyOutputModel(
                         model,
-                        new EquatableArray<EquatableString>(ownedInvokableMetadataNames),
+                        ownedInvokableMetadataNames,
                         useDeclaredInvokableFallback);
                 })
                 .ToImmutableArray();
@@ -848,7 +848,7 @@ namespace Orleans.CodeGenerator
                 symbol = _allTypes.FirstOrDefault(candidate =>
                     string.Equals(candidate.Name, model.Name, StringComparison.Ordinal)
                     && string.Equals(candidate.GetNamespaceAndNesting(), model.Namespace, StringComparison.Ordinal)
-                    && candidate.GetAllTypeParameters().Count() == model.TypeParameters.Count);
+                    && candidate.GetAllTypeParameters().Count() == model.TypeParameters.Length);
                 return symbol is not null;
             }
 
@@ -1203,16 +1203,16 @@ namespace Orleans.CodeGenerator
             public static ProxySourceOutputResult FromDiagnostic(Diagnostic diagnostic) => new(null, diagnostic);
         }
 
-        private readonly struct ProxyOutputPreparationResult(EquatableArray<ProxyOutputModel> proxyOutputModels, Diagnostic diagnostic)
+        private readonly struct ProxyOutputPreparationResult(ImmutableArray<ProxyOutputModel> proxyOutputModels, Diagnostic diagnostic)
         {
-            public EquatableArray<ProxyOutputModel> ProxyOutputModels { get; } = proxyOutputModels;
+            public ImmutableArray<ProxyOutputModel> ProxyOutputModels { get; } = proxyOutputModels;
             public Diagnostic Diagnostic { get; } = diagnostic;
 
-            public static ProxyOutputPreparationResult FromModels(EquatableArray<ProxyOutputModel> proxyOutputModels)
+            public static ProxyOutputPreparationResult FromModels(ImmutableArray<ProxyOutputModel> proxyOutputModels)
                 => new(proxyOutputModels, diagnostic: null);
 
             public static ProxyOutputPreparationResult FromDiagnostic(Diagnostic diagnostic)
-                => new(EquatableArray<ProxyOutputModel>.Empty, diagnostic);
+                => new(ImmutableArray<ProxyOutputModel>.Empty, diagnostic);
         }
 
     }
