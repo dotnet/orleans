@@ -95,6 +95,22 @@ namespace UnitTests.StreamingTests
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task ReadFromQueue_DoesNotStartQueueReadAfterShutdownStarts()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            var agent = CreateAgent(pubSub: null, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+
+            await testAccessor.Shutdown();
+
+            var readResult = await testAccessor.ReadFromQueue(queueId, receiver, 1);
+
+            Assert.False(readResult);
+            Assert.Empty(receiver.ReceivedCalls());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_RemovesCacheEntryWhenProducerRegistrationTerminates()
         {
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
@@ -105,6 +121,22 @@ namespace UnitTests.StreamingTests
             await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
             Assert.Empty(await testAccessor.GetPubSubCache());
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task RegisterStream_DoesNotRegisterProducerAfterShutdownStarts()
+        {
+            var pubSub = Substitute.For<IStreamPubSub>();
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
+            var agent = CreateAgent(pubSub, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+
+            await testAccessor.Shutdown();
+            await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
+
+            Assert.Empty(await testAccessor.GetPubSubCache());
+            Assert.Empty(pubSub.ReceivedCalls());
         }
 
         private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub pubSub, QueueId queueId)
@@ -169,6 +201,36 @@ namespace UnitTests.StreamingTests
             var cache = await testAccessor.GetPubSubCache();
             Assert.True(cache.ContainsKey(streamId), "Stream entry must remain in pubsub cache after a subscriber-handshake failure.");
             Assert.True(cache[streamId].StreamRegistered, "StreamRegistered must be true once producer registration succeeds.");
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task Shutdown_WaitsForInFlightPumpWork()
+        {
+            var queueReadStarted = new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var queueReadReleased = new TaskCompletionSource<IList<IBatchContainer>>(TaskCreationOptions.RunContinuationsAsynchronously);
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+                .Returns(async _ =>
+                {
+                    queueReadStarted.TrySetResult(true);
+                    return await queueReadReleased.Task;
+                });
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
+
+            var agent = CreateAgent(pubSub: null, queueId);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+
+            var pumpTask = testAccessor.PumpQueue(queueId, receiver, CancellationToken.None);
+            await queueReadStarted.Task;
+
+            var shutdownTask = testAccessor.Shutdown();
+            Assert.False(shutdownTask.IsCompleted);
+
+            queueReadReleased.SetResult(new List<IBatchContainer>());
+
+            await shutdownTask;
+            await pumpTask;
         }
     }
 }

@@ -42,7 +42,9 @@ namespace Orleans.Streams
         private IGrainTimer timer;
 
         private Task receiverInitTask;
-        private bool IsShutdown => timer == null;
+        private Task _activePumpTask = Task.CompletedTask;
+        private bool _isStopping;
+        private bool IsShutdown => _isStopping;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
         internal interface ITestAccessor
@@ -50,6 +52,8 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
+            Task PumpQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, CancellationToken cancellationToken);
+            Task Shutdown();
         }
 
         internal PersistentStreamPullingAgent(
@@ -90,7 +94,7 @@ namespace Orleans.Streams
         }
 
         Task<bool> ITestAccessor.ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount)
-            => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount)).Unwrap();
+            => this.RunOrQueueTaskResult(() => ReadFromQueue(myQueueId, receiver, maxCacheAddCount, CancellationToken.None)).Unwrap();
 
         Task ITestAccessor.RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
             => this.RunOrQueueTaskResult(() =>
@@ -108,6 +112,15 @@ namespace Orleans.Streams
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
 
+        Task ITestAccessor.PumpQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, CancellationToken cancellationToken)
+            => this.RunOrQueueTask(() =>
+            {
+                this.receiver = receiver;
+                return _activePumpTask = PumpQueue(myQueueId, cancellationToken);
+            });
+
+        Task ITestAccessor.Shutdown() => this.RunOrQueueTask(() => Shutdown());
+
         /// <summary>
         /// Take responsibility for a new queues that was assigned to me via a new range.
         /// We first store the new queue in our internal data structure, try to initialize it and start a pumping timer.
@@ -123,6 +136,8 @@ namespace Orleans.Streams
         {
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
+            _isStopping = false;
+            _activePumpTask = Task.CompletedTask;
             lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
             try
@@ -181,11 +196,10 @@ namespace Orleans.Streams
             // Stop pulling from queues that are not in my range anymore.
             LogInfoShutdown(GetType().Name, new(QueueId));
 
+            _isStopping = true;
             var asyncTimer = timer;
             timer = null;
-            asyncTimer.Dispose();
-
-            this.queueCache = null;
+            asyncTimer?.Dispose();
 
             Task localReceiverInitTask = receiverInitTask;
             if (localReceiverInitTask != null)
@@ -193,6 +207,10 @@ namespace Orleans.Streams
                 await localReceiverInitTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
                 receiverInitTask = null;
             }
+
+            await _activePumpTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+
+            this.queueCache = null;
 
             try
             {
@@ -213,7 +231,7 @@ namespace Orleans.Streams
             }
 
             // Drain any in-progress background registration tasks before proceeding.
-            // Setting timer = null above makes IsShutdown = true, which causes registrations
+            // Setting _isStopping = true above makes IsShutdown = true, which causes registrations
             // to stop retrying, so these tasks will complete quickly.
             var inFlightRegistrations = pubSubCache.Values
                 .Select(v => v.RegistrationTask)
@@ -301,6 +319,8 @@ namespace Orleans.Streams
             StreamConsumerData consumerData,
             StreamSequenceToken cacheToken)
         {
+            if (IsShutdown) return false;
+
             StreamHandshakeToken requestedHandshakeToken = null;
             // if not cache, then we can't get cursor and there is no reason to ask consumer for token.
             if (queueCache != null)
@@ -388,7 +408,17 @@ namespace Orleans.Streams
         private Task AsyncTimerCallback(QueueId queueId, CancellationToken cancellationToken)
         {
             using var _ = new ExecutionContextSuppressor();
-            return PumpQueue(queueId, cancellationToken);
+            if (IsShutdown)
+            {
+                return Task.CompletedTask;
+            }
+
+            if (!_activePumpTask.IsCompleted)
+            {
+                return _activePumpTask;
+            }
+
+            return _activePumpTask = PumpQueue(queueId, cancellationToken);
         }
 
         private async Task PumpQueue(QueueId queueId, CancellationToken cancellationToken)
@@ -405,7 +435,7 @@ namespace Orleans.Streams
                 if (IsShutdown || cancellationToken.IsCancellationRequested) return; // timer was already removed, last tick
 
                 // loop through the queue until it is empty.
-                while (!IsShutdown && !cancellationToken.IsCancellationRequested) // timer will be set to null when we are asked to shutdown.
+                while (!IsShutdown && !cancellationToken.IsCancellationRequested) // shutdown sets IsShutdown and cancels the timer token.
                 {
                     int maxCacheAddCount = queueCache?.GetMaxAddCount() ?? QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG;
                     if (maxCacheAddCount != QueueAdapterConstants.UNLIMITED_GET_QUEUE_MSG && maxCacheAddCount <= 0)
@@ -416,7 +446,7 @@ namespace Orleans.Streams
                     // If read fails, we retry 6 more times, with backoff policy.
                     //    we log each failure as warnings. After 6 times retry if still fail, we break out of loop and log an error
                     bool moreData = await AsyncExecutorWithRetries.ExecuteWithRetries(
-                        i => ReadFromQueue(queueId, receiver, maxCacheAddCount),
+                        i => ReadFromQueue(queueId, receiver, maxCacheAddCount, cancellationToken),
                         ReadLoopRetryMax,
                         ReadLoopRetryExceptionFilter,
                         Timeout.InfiniteTimeSpan,
@@ -447,9 +477,9 @@ namespace Orleans.Streams
         /// <param name="rcvr"></param>
         /// <param name="maxCacheAddCount"></param>
         /// <returns></returns>
-        private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver rcvr, int maxCacheAddCount)
+        private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver rcvr, int maxCacheAddCount, CancellationToken cancellationToken)
         {
-            if (rcvr == null)
+            if (rcvr == null || IsShutdown || cancellationToken.IsCancellationRequested)
             {
                 return false;
             }
@@ -460,6 +490,11 @@ namespace Orleans.Streams
             {
                 lastTimeCleanedPubSubCache = now;
                 CleanupPubSubCache(now);
+            }
+
+            if (IsShutdown || cancellationToken.IsCancellationRequested)
+            {
+                return false;
             }
 
             if (queueCache != null)
@@ -478,6 +513,11 @@ namespace Orleans.Streams
                 }
             }
 
+            if (IsShutdown || cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
+
             if (queueCache != null && queueCache.IsUnderPressure())
             {
                 // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
@@ -487,6 +527,11 @@ namespace Orleans.Streams
 
             // Retrieve one multiBatch from the queue. Every multiBatch has an IEnumerable of IBatchContainers, each IBatchContainer may have multiple events.
             IList<IBatchContainer> multiBatch = await rcvr.GetQueueMessagesAsync(maxCacheAddCount);
+
+            if (IsShutdown || cancellationToken.IsCancellationRequested)
+            {
+                return false;
+            }
 
             if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
@@ -501,6 +546,11 @@ namespace Orleans.Streams
                 .Where(m => m != null)
                 .GroupBy(container => container.StreamId))
             {
+                if (IsShutdown || cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
                 var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
                 StreamSequenceToken startToken = group.First().SequenceToken;
                 StreamConsumerCollection streamData;
@@ -535,6 +585,11 @@ namespace Orleans.Streams
 
         private void RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now)
         {
+            if (IsShutdown)
+            {
+                return;
+            }
+
             var streamData = new StreamConsumerCollection(now);
 
             // Create a fake cursor to point into a cache.
@@ -549,9 +604,19 @@ namespace Orleans.Streams
             {
                 await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
+                if (IsShutdown)
+                {
+                    return;
+                }
+
                 try
                 {
                     var subscribers = await RegisterAsStreamProducer(streamId);
+
+                    if (IsShutdown)
+                    {
+                        return;
+                    }
 
                     // Producer registration succeeded; the stream entry is now established.
                     // Subscriber-handshake failures must not tear down the entry from here on.
@@ -603,6 +668,11 @@ namespace Orleans.Streams
 
             async Task SubscribeWithIsolation(PubSubSubscriptionState item)
             {
+                if (IsShutdown)
+                {
+                    return;
+                }
+
                 try
                 {
                     await AddSubscriber_Impl(item.SubscriptionId, item.Stream, item.Consumer, item.FilterData, firstToken);
@@ -618,6 +688,11 @@ namespace Orleans.Streams
         {
             foreach (StreamConsumerData consumerData in streamData.AllConsumers())
             {
+                if (IsShutdown)
+                {
+                    return;
+                }
+
                 // Some consumer might not be fully registered yet
                 if (consumerData.IsRegistered)
                 {
@@ -649,7 +724,7 @@ namespace Orleans.Streams
 
                 consumerData.State = StreamConsumerDataState.Active;
                 var deliveredAny = false;
-                while (consumerData.Cursor != null)
+                while (!IsShutdown && consumerData.Cursor != null)
                 {
                     IBatchContainer batch = null;
                     Exception exceptionOccured = null;
@@ -682,6 +757,11 @@ namespace Orleans.Streams
                     try
                     {
                         StreamInstruments.PersistentStreamSentMessages.Add(1);
+                        if (IsShutdown)
+                        {
+                            break;
+                        }
+
                         if (batch != null)
                         {
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
@@ -893,6 +973,10 @@ namespace Orleans.Streams
         private async Task<ISet<PubSubSubscriptionState>> RegisterAsStreamProducer(QualifiedStreamId streamId)
         {
             if (pubSub == null) throw new NullReferenceException("Found pubSub reference not set up correctly in RetrieveNewStream");
+            if (IsShutdown)
+            {
+                return new HashSet<PubSubSubscriptionState>();
+            }
 
             ISet<PubSubSubscriptionState> subscribers = null;
             await AsyncExecutorWithRetries.ExecuteWithRetries(
