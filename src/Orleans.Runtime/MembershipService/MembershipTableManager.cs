@@ -8,12 +8,12 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Core.Diagnostics;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Utilities;
 using Orleans.Serialization.TypeSystem;
 
-#nullable disable
 namespace Orleans.Runtime.MembershipService
 {
     internal partial class MembershipTableManager : IMembershipManager, IHealthCheckParticipant, ILifecycleParticipant<ISiloLifecycle>, IDisposable
@@ -97,16 +97,14 @@ namespace Orleans.Runtime.MembershipService
         SiloStatus IMembershipManager.LocalSiloStatus => this.CurrentStatus;
         Task IMembershipManager.UpdateLocalStatus(SiloStatus status, CancellationToken cancellationToken) => this.UpdateStatus(status);
         Task<bool> IMembershipManager.TryKillSilo(SiloAddress silo, CancellationToken cancellationToken) => this.TryKill(silo);
-#nullable enable
         Task<bool> IMembershipManager.TrySuspectSilo(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken) => this.TryToSuspectOrKill(silo, indirectProbingSilo);
-#nullable disable
         Task IMembershipManager.Refresh(MembershipVersion? targetVersion, CancellationToken cancellationToken) => this.Refresh(targetVersion, cancellationToken);
         Task IMembershipManager.ProcessGossipSnapshot(MembershipTableSnapshot snapshot, CancellationToken cancellationToken) => this.RefreshFromSnapshot(snapshot);
         Task IMembershipManager.UpdateIAmAlive(CancellationToken cancellationToken) => this.UpdateIAmAlive();
 
         private bool IsStopping => this.siloLifecycle.LowestStoppedStage <= ServiceLifecycleStage.Active;
 
-        private Task pendingRefresh;
+        private Task? pendingRefresh;
 
         public async Task Refresh(MembershipVersion? targetVersion = null, CancellationToken cancellationToken = default)
         {
@@ -115,7 +113,7 @@ namespace Orleans.Runtime.MembershipService
                 cancellationToken.ThrowIfCancellationRequested();
 
                 var pending = this.pendingRefresh;
-                if (pending == null || pending.IsCompleted)
+                if (pending is null || pending.IsCompleted)
                 {
                     pending = this.pendingRefresh = this.RefreshInternal(requireCleanup: false);
                 }
@@ -159,7 +157,6 @@ namespace Orleans.Runtime.MembershipService
         private async Task<bool> RefreshInternal(bool requireCleanup)
         {
             var table = await this.membershipTableProvider.ReadAll();
-            this.ProcessTableUpdate(table, "Refresh");
 
             bool success;
             try
@@ -171,6 +168,10 @@ namespace Orleans.Runtime.MembershipService
                 success = false;
                 LogWarningExceptionWhileCleaningUpTableEntries(this.log, exception);
             }
+
+            // Publish after cleanup so that other components do not observe
+            // predecessor entries that are about to be declared dead.
+            this.ProcessTableUpdate(table, "Refresh");
 
             // If cleanup was not required then the cleanup result is ignored.
             return !requireCleanup || success;
@@ -225,17 +226,17 @@ namespace Orleans.Runtime.MembershipService
         private void DetectNodeMigration(MembershipTableSnapshot snapshot, string myHostname)
         {
             string mySiloName = this.localSiloDetails.Name;
-            MembershipEntry mostRecentPreviousEntry = null;
+            MembershipEntry? mostRecentPreviousEntry = null;
             // look for silo instances that are same as me, find most recent with Generation before me.
             foreach (var entry in snapshot.Entries.Select(entry => entry.Value).Where(data => mySiloName.Equals(data.SiloName)))
             {
                 bool iAmLater = myAddress.Generation.CompareTo(entry.SiloAddress.Generation) > 0;
                 // more recent
-                if (iAmLater && (mostRecentPreviousEntry == null || entry.SiloAddress.Generation.CompareTo(mostRecentPreviousEntry.SiloAddress.Generation) > 0))
+                if (iAmLater && (mostRecentPreviousEntry is null || entry.SiloAddress.Generation.CompareTo(mostRecentPreviousEntry.SiloAddress.Generation) > 0))
                     mostRecentPreviousEntry = entry;
             }
 
-            if (mostRecentPreviousEntry != null)
+            if (mostRecentPreviousEntry is not null)
             {
                 bool physicalHostChanged = !myHostname.Equals(mostRecentPreviousEntry.HostName) || !myAddress.Endpoint.Equals(mostRecentPreviousEntry.SiloAddress.Endpoint);
                 if (physicalHostChanged)
@@ -416,7 +417,7 @@ namespace Orleans.Runtime.MembershipService
 
             bool ok;
             TableVersion next = table.Version.Next();
-            if (myEtag != null) // no previous etag for my entry -> its the first write to this entry, so insert instead of update.
+            if (myEtag is not null) // existing etag for my entry -> there is a previous row, so update instead of insert.
             {
                 ok = await membershipTableProvider.UpdateRow(myEntry, myEtag, next);
             }
@@ -437,7 +438,7 @@ namespace Orleans.Runtime.MembershipService
             return ok;
         }
 
-        private (MembershipEntry Entry, string ETag) GetOrCreateLocalSiloEntry(MembershipTableData table, SiloStatus currentStatus)
+        private (MembershipEntry Entry, string? ETag) GetOrCreateLocalSiloEntry(MembershipTableData table, SiloStatus currentStatus)
         {
             if (table.TryGet(myAddress) is { } myTuple)
             {
@@ -478,6 +479,7 @@ namespace Orleans.Runtime.MembershipService
                 this.LogMissedIAmAlives(table);
 
                 LogDebugProcessTableUpdateWithTable(this.log, caller, new(table));
+                MembershipEvents.EmitViewChanged(this.snapshot, this.myAddress);
             }
         }
 
@@ -548,12 +550,18 @@ namespace Orleans.Runtime.MembershipService
 
             LogDebugCleanupTableEntriesAboutToDeclareDead(this.log, silosToDeclareDead.Count, Utils.EnumerableToString(silosToDeclareDead.Select(tuple => tuple.Item1)));
 
+            var completions = new List<Task>(silosToDeclareDead.Count);
             foreach (var siloData in silosToDeclareDead)
             {
-                await _trySuspectOrKillChannel.Writer.WriteAsync(
-                    SuspectOrKillRequest.CreateKillRequest(siloData.Item1.SiloAddress));
+                var (request, completion) = SuspectOrKillRequest.CreateAcknowledgedKillRequest(siloData.Item1.SiloAddress);
+                await _trySuspectOrKillChannel.Writer.WaitToWriteAsync(_shutdownCts.Token);
+                if (_trySuspectOrKillChannel.Writer.TryWrite(request))
+                {
+                    completions.Add(completion);
+                }
             }
 
+            await Task.WhenAll(completions).WaitAsync(_shutdownCts.Token);
             return true;
         }
 
@@ -597,9 +605,10 @@ namespace Orleans.Runtime.MembershipService
 
         private class SuspectOrKillRequest
         {
-            public SiloAddress SiloAddress { get; set; }
-            public SiloAddress OtherSilo { get; set; }
-            public RequestType Type { get; set; }
+            public required SiloAddress SiloAddress { get; init; }
+            public SiloAddress? OtherSilo { get; init; }
+            public required RequestType Type { get; init; }
+            public TaskCompletionSource? Completion { get; init; }
 
             public enum RequestType
             {
@@ -613,12 +622,23 @@ namespace Orleans.Runtime.MembershipService
                 return new SuspectOrKillRequest
                 {
                     SiloAddress = silo,
-                    OtherSilo = null,
                     Type = RequestType.Kill
                 };
             }
 
-            public static SuspectOrKillRequest CreateSuspectOrKillRequest(SiloAddress silo, SiloAddress otherSilo)
+            public static (SuspectOrKillRequest Request, Task Completion) CreateAcknowledgedKillRequest(SiloAddress silo)
+            {
+                var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                var request = new SuspectOrKillRequest
+                {
+                    SiloAddress = silo,
+                    Type = RequestType.Kill,
+                    Completion = completion
+                };
+                return (request, completion.Task);
+            }
+
+            public static SuspectOrKillRequest CreateSuspectOrKillRequest(SiloAddress silo, SiloAddress? otherSilo)
             {
                 return new SuspectOrKillRequest
                 {
@@ -659,12 +679,20 @@ namespace Orleans.Runtime.MembershipService
                                 break;
                         }
                         runningFailureCount = 0;
+                        request.Completion?.TrySetResult();
                     }
                     catch (Exception ex)
                     {
                         runningFailureCount += 1;
                         LogErrorProcessingSuspectOrKillLists(this.log, ex, runningFailureCount);
-                        await _trySuspectOrKillChannel.Writer.WriteAsync(request, _shutdownCts.Token);
+                        if (request.Completion is not null)
+                        {
+                            request.Completion.TrySetException(ex);
+                        }
+                        else
+                        {
+                            await _trySuspectOrKillChannel.Writer.WriteAsync(request, _shutdownCts.Token);
+                        }
                     }
 
                     if (!reader.TryPeek(out _))
@@ -717,13 +745,13 @@ namespace Orleans.Runtime.MembershipService
             return await DeclareDead(entry, eTag, table.Version, GetDateTimeUtcNow()).WaitAsync(cancellationToken);
         }
 
-        public async Task<bool> TryToSuspectOrKill(SiloAddress silo, SiloAddress indirectProbingSilo = null)
+        public async Task<bool> TryToSuspectOrKill(SiloAddress silo, SiloAddress? indirectProbingSilo = null)
         {
             await _trySuspectOrKillChannel.Writer.WriteAsync(SuspectOrKillRequest.CreateSuspectOrKillRequest(silo, indirectProbingSilo));
             return true;
         }
 
-        private async Task<bool> InnerTryToSuspectOrKill(SiloAddress silo, SiloAddress indirectProbingSilo, CancellationToken cancellationToken)
+        private async Task<bool> InnerTryToSuspectOrKill(SiloAddress silo, SiloAddress? indirectProbingSilo, CancellationToken cancellationToken)
         {
             var table = await membershipTableProvider.ReadAll().WaitAsync(cancellationToken);
             var now = GetDateTimeUtcNow();
@@ -812,9 +840,9 @@ namespace Orleans.Runtime.MembershipService
 
             return ok;
 
-            string PrintSuspectList(IEnumerable<Tuple<SiloAddress, DateTime>> list)
+            string PrintSuspectList(IEnumerable<Tuple<SiloAddress, DateTime>>? list)
             {
-                return Utils.EnumerableToString(list, t => $"<{t.Item1}, {LogFormatter.PrintDate(t.Item2)}>");
+                return Utils.EnumerableToString(list ?? [], t => $"<{t.Item1}, {LogFormatter.PrintDate(t.Item2)}>");
             }
         }
 

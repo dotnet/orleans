@@ -62,7 +62,7 @@ namespace Orleans.Transactions.TestKit
         }
     }
 
-    public class MultiStateTransactionalGrainBaseClass : Grain, ITransactionTestGrain
+    public partial class MultiStateTransactionalGrainBaseClass : Grain, ITransactionTestGrain
     {
         protected ITransactionalState<GrainData>[] dataArray;
         private readonly ILoggerFactory loggerFactory;
@@ -88,9 +88,9 @@ namespace Orleans.Transactions.TestKit
             {
                 await data.PerformUpdate(state =>
                 {
-                    this.logger.LogInformation("Setting from {Value} to {NewValue}.", state.Value, newValue);
+                    LogInformationSettingValue(this.logger, state.Value, newValue);
                     state.Value = newValue;
-                    this.logger.LogInformation("Set to {Value}.", state.Value);
+                    LogInformationSetValue(this.logger, state.Value);
                 });
             }
         }
@@ -102,9 +102,9 @@ namespace Orleans.Transactions.TestKit
             {
                 result[i] = await dataArray[i].PerformUpdate(state =>
                 {
-                    this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, state.Value);
+                    LogInformationAddingValue(this.logger, numberToAdd, state.Value);
                     state.Value += numberToAdd;
-                    this.logger.LogInformation("Value after Adding {NumberToAdd} is {Value}.", numberToAdd, state.Value);
+                    LogInformationValueAfterAdd(this.logger, numberToAdd, state.Value);
                     return state.Value;
                 });
             }
@@ -118,7 +118,7 @@ namespace Orleans.Transactions.TestKit
             {
                 result[i] = await dataArray[i].PerformRead(state =>
                 {
-                    this.logger.LogInformation("Get {Value}.", state.Value);
+                    LogInformationGetValue(this.logger, state.Value);
                     return state.Value;
                 });
             }
@@ -142,6 +142,36 @@ namespace Orleans.Transactions.TestKit
             DeactivateOnIdle();
             return Task.CompletedTask;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Setting from {Value} to {NewValue}."
+        )]
+        private static partial void LogInformationSettingValue(ILogger logger, int value, int newValue);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Set to {Value}."
+        )]
+        private static partial void LogInformationSetValue(ILogger logger, int value);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Adding {NumberToAdd} to value {Value}."
+        )]
+        private static partial void LogInformationAddingValue(ILogger logger, int numberToAdd, int value);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Value after Adding {NumberToAdd} is {Value}."
+        )]
+        private static partial void LogInformationValueAfterAdd(ILogger logger, int numberToAdd, int value);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Get {Value}."
+        )]
+        private static partial void LogInformationGetValue(ILogger logger, int value);
     }
 
     [Serializable]

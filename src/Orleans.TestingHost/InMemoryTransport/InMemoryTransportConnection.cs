@@ -9,7 +9,7 @@ using Orleans.Networking.Shared;
 
 namespace Orleans.TestingHost.InMemoryTransport;
 
-internal class InMemoryTransportConnection : TransportConnection
+internal partial class InMemoryTransportConnection : TransportConnection
 {
     private readonly CancellationTokenSource _connectionClosedTokenSource = new();
     private readonly ILogger _logger;
@@ -52,7 +52,7 @@ internal class InMemoryTransportConnection : TransportConnection
 
     public override void Abort(ConnectionAbortedException? abortReason)
     {
-        _logger.LogDebug(@"Connection id ""{ConnectionId}"" closing because: ""{Message}""", ConnectionId, abortReason?.Message);
+        LogDebugConnectionClosing(_logger, ConnectionId, abortReason?.Message);
 
         Transport.Input.CancelPendingRead();
         Transport.Output.CancelPendingFlush();
@@ -88,4 +88,10 @@ internal class InMemoryTransportConnection : TransportConnection
     }
 
     public override string ToString() => $"InMem({LocalEndPoint}<->{RemoteEndPoint})";
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Connection id \"{ConnectionId}\" closing because: \"{Message}\""
+    )]
+    private static partial void LogDebugConnectionClosing(ILogger logger, string connectionId, string? message);
 }

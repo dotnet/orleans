@@ -529,6 +529,36 @@ namespace UnitTests.ActivationsLifeCycleTests
             Assert.Equal(0, activationsNotCollected);
         }
 
+        [Fact, TestCategory("ActivationCollector"), TestCategory("Functional")]
+        public async Task ActivationCollectorShouldCollectAfterCancellingKeepAlive()
+        {
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
+
+            var fullGrainTypeName = RuntimeTypeNameFormatter.Format(typeof(KeepAliveActivationGcTestGrain));
+
+            // Activate the grain and extend its lifetime to 5 minutes.
+            var grain = this.testCluster.GrainFactory.GetGrain<IKeepAliveActivationGcTestGrain>(Guid.NewGuid());
+            await grain.SetKeepAlive(TimeSpan.FromMinutes(5));
+
+            // Verify the grain is not collected while it has an active keep-alive.
+            await Task.Delay(WAIT_TIME);
+            int activationsWithKeepAlive = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(1, activationsWithKeepAlive);
+
+            // Cancel the keep-alive. The grain should now be collectable after the standard idle timeout.
+            await grain.CancelKeepAlive();
+
+            // Wait for the grain to become idle past the collection age limit.
+            await Task.Delay(DEFAULT_IDLE_TIMEOUT + DEFAULT_COLLECTION_QUANTUM);
+
+            // Force collection to deterministically verify the grain is now collectable.
+            var mgmtGrain = this.testCluster.GrainFactory.GetGrain<IManagementGrain>(0);
+            await mgmtGrain.ForceActivationCollection(DEFAULT_IDLE_TIMEOUT);
+
+            int activationsNotCollected = await TestUtils.GetActivationCount(this.testCluster.GrainFactory, fullGrainTypeName);
+            Assert.Equal(0, activationsNotCollected);
+        }
+
         [Fact, TestCategory("SlowBVT"), TestCategory("Timers")]
         public async Task NonReentrantGrainTimer_NoKeepAlive_Test()
         {
@@ -546,6 +576,40 @@ namespace UnitTests.ActivationsLifeCycleTests
 
             // The grain should have been deactivated.
             Assert.Equal(0, tickCount);
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Diagnostics"), TestCategory("Timers")]
+        public async Task GrainAndTimerDiagnosticsExposeRuntimeInstances()
+        {
+            await Initialize(DEFAULT_IDLE_TIMEOUT);
+
+            using var grainObserver = GrainDiagnosticObserver.Create();
+            using var timerObserver = TimerDiagnosticObserver.Create();
+
+            const string timerName = nameof(GrainAndTimerDiagnosticsExposeRuntimeInstances);
+            var grain = this.testCluster.GrainFactory.GetGrain<INonReentrantTimerCallGrain>(GetRandomGrainId());
+
+            await grain.StartTimer(timerName, TimeSpan.FromMilliseconds(100), keepAlive: true);
+
+            var created = await grainObserver.WaitForCreatedAsync(grain);
+            var activated = await grainObserver.WaitForActivatedAsync(grain);
+            var timerCreated = await timerObserver.WaitForTimerCreatedAsync(grain);
+            var tickStop = await timerObserver.WaitForTimerTickAsync(grain);
+
+            await grain.StopTimer(timerName);
+
+            var disposed = await timerObserver.WaitForTimerDisposedAsync(grain);
+
+            Assert.Equal(created.GrainContext.GrainId, grain.GetGrainId());
+            Assert.Equal(activated.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.Equal(activated.GrainContext.ActivationId, created.GrainContext.ActivationId);
+
+            Assert.Equal(timerCreated.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.NotNull(timerCreated.Timer);
+            Assert.Equal(tickStop.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.NotNull(tickStop.Timer);
+            Assert.Equal(disposed.GrainContext.GrainId, created.GrainContext.GrainId);
+            Assert.NotNull(disposed.Timer);
         }
 
     }

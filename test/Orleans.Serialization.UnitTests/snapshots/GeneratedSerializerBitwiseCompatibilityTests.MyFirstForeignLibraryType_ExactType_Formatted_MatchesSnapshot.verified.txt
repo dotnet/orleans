@@ -1,0 +1,8 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 VarInt Id: 0 SchemaType: Expected] Value: 4 (0x4)
+0x0004  [#3 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 5b) ["three"]
+0x000B  [#4 TagDelimited Id: 2 SchemaType: Expected] Value: {
+0x000C   [#5 Fixed64 Id: 0 SchemaType: Expected] Value: 0x8DC0B3F7ABFC080
+0x0015   [#6 Fixed64 Id: 1 SchemaType: Expected] Value: 0 (0x0)
+0x001E  }
+0x001F }

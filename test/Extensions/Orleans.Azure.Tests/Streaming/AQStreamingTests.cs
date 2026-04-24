@@ -19,7 +19,7 @@ namespace Tester.AzureUtils.Streaming
     public class AQStreamingTests(AQStreamingTests.Fixture fixture) : IClassFixture<AQStreamingTests.Fixture>
     {
         public const string AzureQueueStreamProviderName = StreamTestsConstants.AZURE_QUEUE_STREAM_PROVIDER_NAME;
-        public const string SmsStreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+        public const string MemoryStreamProviderName = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
         private const int queueCount = 8;
 
         public sealed class Fixture : IAsyncLifetime

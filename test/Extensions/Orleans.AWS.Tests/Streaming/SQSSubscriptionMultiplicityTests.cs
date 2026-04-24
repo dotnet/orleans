@@ -13,6 +13,7 @@ namespace AWSUtils.Tests.Streaming
     /// <summary>
     /// Tests multiple subscription scenarios for SQS streams including parallel, linear, and resubscription patterns.
     /// </summary>
+    [TestCategory("AWS"), TestCategory("SQS")]
     public class SQSSubscriptionMultiplicityTests : TestClusterPerTest
     {
         private const string SQSStreamProviderName = "SQSProvider";
@@ -115,10 +116,10 @@ namespace AWSUtils.Tests.Streaming
         }
 
         [SkippableFact, TestCategory("AWS")]
-        public async Task SQSTwoIntermitentStreamTest()
+        public async Task SQSTwoIntermittentStreamTest()
         {
-            logger.LogInformation("************************ SQSTwoIntermitentStreamTest *********************************");
-            await runner.TwoIntermitentStreamTest(Guid.NewGuid());
+            logger.LogInformation("************************ SQSTwoIntermittentStreamTest *********************************");
+            await runner.TwoIntermittentStreamTest(Guid.NewGuid());
         }
 
         [SkippableFact, TestCategory("AWS")]

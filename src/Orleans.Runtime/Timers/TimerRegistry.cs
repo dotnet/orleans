@@ -1,8 +1,5 @@
-using System;
-using System.Threading;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Timers;
 
@@ -19,6 +16,7 @@ internal class TimerRegistry(ILoggerFactory loggerFactory, TimeProvider timeProv
         ArgumentNullException.ThrowIfNull(callback);
         var timer = new InterleavingGrainTimer(this, grainContext, callback, state);
         grainContext.GetComponent<IGrainTimerRegistry>()?.OnTimerCreated(timer);
+        GrainTimerEvents.EmitCreated(grainContext, dueTime, period, timer);
         timer.Change(dueTime, period);
         return timer;
     }
@@ -29,6 +27,7 @@ internal class TimerRegistry(ILoggerFactory loggerFactory, TimeProvider timeProv
         ArgumentNullException.ThrowIfNull(callback);
         var timer = new GrainTimer<T>(this, grainContext, callback, state, options.Interleave, options.KeepAlive);
         grainContext.GetComponent<IGrainTimerRegistry>()?.OnTimerCreated(timer);
+        GrainTimerEvents.EmitCreated(grainContext, options.DueTime, options.Period, timer);
         timer.Change(options.DueTime, options.Period);
         return timer;
     }

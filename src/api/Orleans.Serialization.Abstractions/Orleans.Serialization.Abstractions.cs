@@ -63,7 +63,7 @@ namespace Orleans
     }
 
     [System.AttributeUsage(System.AttributeTargets.Constructor)]
-    public sealed partial class GeneratedActivatorConstructorAttribute : System.Attribute
+    public sealed partial class GeneratedActivatorConstructorAttribute : Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute
     {
     }
 
@@ -169,6 +169,7 @@ namespace Orleans
     }
 
     [System.AttributeUsage(System.AttributeTargets.Constructor)]
+    [System.Obsolete("Use GeneratedActivatorConstructorAttribute instead. This attribute is not recognized by Orleans.")]
     public sealed partial class OrleansConstructorAttribute : Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute
     {
     }

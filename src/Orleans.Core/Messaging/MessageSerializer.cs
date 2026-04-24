@@ -23,6 +23,7 @@ namespace Orleans.Runtime.Messaging
     {
         private const int FramingLength = Message.LENGTH_HEADER_SIZE;
         private const int MessageSizeHint = 4096;
+        private const int MaxRequestContextInitialCapacity = 1024;
         private readonly Dictionary<Type, ResponseCodec> _rawResponseCodecs = [];
         private readonly CodecProvider _codecProvider;
         private readonly IFieldCodec<GrainAddressCacheUpdate> _grainAddressCacheUpdateCodec;
@@ -381,7 +382,7 @@ namespace Orleans.Runtime.Messaging
         private static Dictionary<string, object> ReadRequestContext<TInput>(ref Reader<TInput> reader)
         {
             var size = (int)reader.ReadVarUInt32();
-            var result = new Dictionary<string, object>(size);
+            var result = new Dictionary<string, object>(GetRequestContextInitialCapacity(size));
             for (var i = 0; i < size; i++)
             {
                 var key = ReadString(ref reader);
@@ -393,6 +394,8 @@ namespace Orleans.Runtime.Messaging
 
             return result;
         }
+
+        internal static int GetRequestContextInitialCapacity(int size) => size > MaxRequestContextInitialCapacity ? MaxRequestContextInitialCapacity : size;
 
         private GrainId ReadGrainId<TInput>(ref Reader<TInput> reader)
         {

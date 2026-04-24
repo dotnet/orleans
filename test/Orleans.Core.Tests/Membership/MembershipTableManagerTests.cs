@@ -223,7 +223,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 this.lifecycle);
 
             // Validate that the initial snapshot is valid and contains the local silo.
@@ -256,8 +256,8 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(nameof(IMembershipTable.InitializeMembershipTable), calls[0].Method);
             Assert.Contains(calls, call => call.Method.Equals(nameof(IMembershipTable.ReadAll)));
             
-            // During initialization, a first read from the table will be performed, transitioning
-            // membership to a valid version.Assert.True(membershipUpdates.MoveNextAsync().Result);
+            // During initialization, the table is read and predecessor entries are declared dead
+            // before the table snapshot is published to other components.
             Assert.True(await membershipUpdates.MoveNextAsync());
             var update1 = membershipUpdates.Current;
 
@@ -268,11 +268,11 @@ namespace NonSilo.Tests.Membership
             Assert.Equal(SiloStatus.Joining, snapshot.Entries[localSilo].Status);
 
             Assert.True(await membershipUpdates.MoveNextAsync());
-            Assert.True(await membershipUpdates.MoveNextAsync());
             Assert.Equal(membershipUpdates.Current.Version, manager.MembershipTableSnapshot.Version);
 
-            // The predecessor should have been marked dead during startup.
-            Assert.Equal(SiloStatus.Active, update1.GetSiloStatus(predecessor.SiloAddress));
+            // The predecessor should have been marked dead during startup,
+            // before the first snapshot was published.
+            Assert.Equal(SiloStatus.Dead, update1.GetSiloStatus(predecessor.SiloAddress));
             var latest = membershipUpdates.Current;
             Assert.Equal(SiloStatus.Dead, latest.GetSiloStatus(predecessor.SiloAddress));
 
@@ -319,7 +319,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
@@ -361,7 +361,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
@@ -399,7 +399,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -445,7 +445,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -487,7 +487,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -519,7 +519,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();
@@ -561,7 +561,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 siloLifecycle: this.lifecycle);
 
             // Rig the local clock.
@@ -634,7 +634,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 siloLifecycle: this.lifecycle);
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);
             await this.lifecycle.OnStart();

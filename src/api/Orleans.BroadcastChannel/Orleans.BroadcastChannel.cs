@@ -171,7 +171,7 @@ namespace Orleans.Hosting
 
 namespace OrleansCodeGen.Orleans.BroadcastChannel
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_ChannelId : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.BroadcastChannel.ChannelId>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.BroadcastChannel.ChannelId>, global::Orleans.Serialization.Serializers.IValueSerializer

@@ -31,9 +31,14 @@ public abstract class JobShardManager
     /// Assigns orphaned job shards to this silo.
     /// </summary>
     /// <param name="maxDueTime">Maximum due time for shards to consider.</param>
+    /// <param name="maxNewClaims">
+    /// The maximum number of orphaned shards to claim in this call.
+    /// Use <see cref="int.MaxValue"/> for unlimited.
+    /// Shards already owned by this silo are always returned regardless of this limit.
+    /// </param>
     /// <param name="cancellationToken">Cancellation token.</param>
     /// <returns>A list of job shards assigned to this silo.</returns>
-    public abstract Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken);
+    public abstract Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken);
 
     /// <summary>
     /// Creates a new job shard owned by this silo.
@@ -112,7 +117,7 @@ internal class InMemoryJobShardManager : JobShardManager
         }
     }
 
-    public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
+    public override async Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
     {
         var alreadyOwnedShards = new List<IJobShard>();
         var adoptedShards = new List<IJobShard>();
@@ -159,6 +164,14 @@ internal class InMemoryJobShardManager : JobShardManager
                 {
                     if (ownership.Shard.StartTime <= maxDueTime)
                     {
+                        // Respect the slow-start budget: skip claiming if we've exhausted the budget.
+                        // This must be checked before incrementing AdoptedCount to avoid
+                        // inflating the count when the shard isn't actually claimed.
+                        if (adoptedShards.Count >= maxNewClaims)
+                        {
+                            continue;
+                        }
+
                         // If adopted from dead silo, increment adopted count
                         if (isFromDeadSilo)
                         {

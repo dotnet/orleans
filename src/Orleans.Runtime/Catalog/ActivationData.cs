@@ -11,6 +11,7 @@ using Orleans.Core.Internal;
 using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -125,6 +126,8 @@ internal sealed partial class ActivationData :
                 var instance = grainActivator.CreateInstance(this);
                 SetGrainInstance(instance);
                 _activationActivity?.AddEvent(new ActivityEvent("instance-created"));
+
+                GrainLifecycleEvents.EmitCreated(this);
             }
             catch (Exception exception)
             {
@@ -482,13 +485,20 @@ internal sealed partial class ActivationData :
     {
         if (timespan == TimeSpan.MaxValue || timespan == Timeout.InfiniteTimeSpan)
         {
-            // otherwise creates negative time.
+            // Adding these values to the current time would overflow, so use DateTime.MaxValue directly.
             KeepAliveUntil = DateTime.MaxValue;
         }
         else if (timespan <= TimeSpan.Zero)
         {
-            // reset any current keepAliveUntil
+            // Cancel the previous DelayDeactivation and revert to normal collection behavior.
+            // If there was an active keep-alive, reschedule collection so the grain can be collected
+            // after CollectionAgeLimit rather than waiting for the previously scheduled far-future time.
+            var hadActiveKeepAlive = KeepAliveUntil > GrainRuntime.TimeProvider.GetUtcNow().UtcDateTime;
             ResetKeepAliveRequest();
+            if (hadActiveKeepAlive)
+            {
+                _shared.InternalRuntime.ActivationCollector.TryRescheduleCollection(this);
+            }
         }
         else
         {
@@ -618,6 +628,8 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Creating or ActivationState.Activating or ActivationState.Valid)
                 {
+                    GrainLifecycleEvents.EmitDeactivating(this, DeactivationReason);
+
                     CancelPendingOperations();
 
                     _shared.InternalRuntime.ActivationWorkingSet.OnDeactivating(this);
@@ -824,12 +836,17 @@ internal sealed partial class ActivationData :
     private string GetActivationInfoString()
     {
         var placement = PlacementStrategy?.GetType().Name;
-        var grainTypeName = _shared.GrainTypeName ?? GrainInstance switch
+        var grainTypeName = TryGetGrainTypeName();
+        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
+    }
+
+    private string? TryGetGrainTypeName()
+    {
+        return _shared.GrainTypeName ?? GrainInstance switch
         {
             { } grainInstance => RuntimeTypeNameFormatter.Format(grainInstance.GetType()),
             _ => null
         };
-        return grainTypeName is null ? $"#Placement={placement}" : $"#GrainType={grainTypeName} Placement={placement}";
     }
 
     public void Dispose() => DisposeAsync().AsTask().Wait();
@@ -986,7 +1003,7 @@ internal sealed partial class ActivationData :
             }
             catch (Exception exception)
             {
-                _shared.InternalRuntime.MessagingTrace.LogError(exception, "Error in grain message loop");
+                LogErrorInGrainMessageLoop(_shared.Logger, exception);
             }
         }
 
@@ -1717,7 +1734,6 @@ internal sealed partial class ActivationData :
                 SetState(ActivationState.Activating);
             }
             _activationActivity?.AddEvent(new ActivityEvent("state-activating"));
-
             LogActivatingGrain(_shared.Logger, this);
 
             try
@@ -1806,6 +1822,8 @@ internal sealed partial class ActivationData :
                 _activationActivity?.AddEvent(new ActivityEvent("state-valid"));
                 _activationActivity?.Dispose();
                 _activationActivity = null;
+
+                GrainLifecycleEvents.EmitActivated(this);
 
                 LogFinishedActivatingGrain(_shared.Logger, this);
             }
@@ -1999,6 +2017,11 @@ internal sealed partial class ActivationData :
         {
             SetActivityError(deactivateCommand.Activity, exception, "Error in FinishDeactivating");
             LogExceptionDisposing(_shared.Logger, exception, this);
+        }
+
+        if (DeactivationStartTime is not null)
+        {
+            GrainLifecycleEvents.EmitDeactivated(this, DeactivationReason);
         }
 
         // Signal deactivation
@@ -2694,4 +2717,10 @@ internal sealed partial class ActivationData :
         Level = LogLevel.Error,
         Message = "Activation of grain {Grain} failed")]
     private static partial void LogActivationFailed(ILogger logger, Exception exception, ActivationData grain);
+
+    [LoggerMessage(
+        Level = LogLevel.Error,
+        Message = "Error in grain message loop"
+    )]
+    private static partial void LogErrorInGrainMessageLoop(ILogger logger, Exception exception);
 }

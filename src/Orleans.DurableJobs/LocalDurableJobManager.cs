@@ -11,6 +11,7 @@ using Orleans.Hosting;
 using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
+using Orleans.Runtime.Messaging;
 
 namespace Orleans.DurableJobs;
 
@@ -20,6 +21,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private readonly JobShardManager _shardManager;
     private readonly ShardExecutor _shardExecutor;
     private readonly IAsyncEnumerable<ClusterMembershipSnapshot> _clusterMembershipUpdates;
+    private readonly IOverloadDetector _overloadDetector;
+    private readonly TimeProvider _timeProvider;
     private readonly ILogger<LocalDurableJobManager> _logger;
     private readonly DurableJobsOptions _options;
     private readonly CancellationTokenSource _cts = new();
@@ -33,12 +36,18 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private readonly SemaphoreSlim _shardCreationLock = new(1, 1);
     private readonly SemaphoreSlim _shardCheckSignal = new(0);
 
+    // Slow-start state
+    private long _startTimestamp;
+    private int _totalClaimedShards;
+
     private static readonly IDictionary<string, string> EmptyMetadata = new Dictionary<string, string>();
 
     public LocalDurableJobManager(
         JobShardManager shardManager,
         ShardExecutor shardExecutor,
         IClusterMembershipService clusterMembership,
+        IOverloadDetector overloadDetector,
+        TimeProvider timeProvider,
         IOptions<DurableJobsOptions> options,
         SystemTargetShared shared,
         ILogger<LocalDurableJobManager> logger)
@@ -47,6 +56,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
         _shardManager = shardManager;
         _shardExecutor = shardExecutor;
         _clusterMembershipUpdates = clusterMembership.MembershipUpdates;
+        _overloadDetector = overloadDetector;
+        _timeProvider = timeProvider;
         _logger = logger;
         _options = options.Value;
     }
@@ -114,6 +125,8 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     private Task Start(CancellationToken ct)
     {
         LogStarting(_logger);
+
+        _startTimestamp = _timeProvider.GetTimestamp();
 
         using (var _ = new ExecutionContextSuppressor())
         {
@@ -247,14 +260,23 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                     }
                 }
 
+                // Compute the slow-start budget for this cycle
+                var budget = ComputeClaimBudget();
+
                 // Query ShardManager for assigned shards (source of truth)
-                var shards = await _shardManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), _cts.Token);
+                var shards = await _shardManager.AssignJobShardsAsync(DateTime.UtcNow.AddHours(1), budget, _cts.Token);
+
+                // Count newly claimed shards (those not already in our cache)
+                var newClaimsThisCycle = 0;
                 if (shards.Count > 0)
                 {
                     LogAssignedShards(_logger, shards.Count);
                     foreach (var shard in shards)
                     {
-                        _shardCache.TryAdd(shard.Id, shard);
+                        if (_shardCache.TryAdd(shard.Id, shard))
+                        {
+                            newClaimsThisCycle++;
+                        }
 
                         if (!_runningShards.ContainsKey(shard.Id))
                         {
@@ -265,6 +287,12 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 else
                 {
                     LogNoShardsToAssign(_logger);
+                }
+
+                if (newClaimsThisCycle > 0)
+                {
+                    _totalClaimedShards += newClaimsThisCycle;
+                    LogOrphanedShardsClaimed(_logger, newClaimsThisCycle, _totalClaimedShards);
                 }
             }
             catch (OperationCanceledException)
@@ -277,6 +305,66 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
                 await Task.Delay(TimeSpan.FromSeconds(5), _cts.Token).SuppressThrowing();
             }
         }
+    }
+
+    /// <summary>
+    /// Computes the maximum number of orphaned shards this silo may claim in the current check cycle.
+    /// Returns <see cref="int.MaxValue"/> when unlimited (ramp-up complete or disabled).
+    /// Returns <c>0</c> when the silo is overloaded, pausing all new claims.
+    /// </summary>
+    private int ComputeClaimBudget()
+    {
+        // If overloaded, claim nothing new regardless of ramp-up phase
+        if (_overloadDetector.IsOverloaded)
+        {
+            LogOverloadPausingShardClaims(_logger);
+            return 0;
+        }
+
+        var elapsed = _timeProvider.GetElapsedTime(_startTimestamp);
+        var budget = ComputeClaimBudget(
+            _options.ShardClaimRampUpDuration,
+            _options.ShardClaimInitialBudget,
+            _options.ShardClaimMaxBudget,
+            elapsed,
+            _totalClaimedShards);
+
+        if (budget < int.MaxValue)
+        {
+            LogShardClaimBudget(_logger, budget, _options.ShardClaimInitialBudget + (int)(elapsed.TotalMilliseconds / _options.ShardClaimRampUpDuration.TotalMilliseconds * (_options.ShardClaimMaxBudget - _options.ShardClaimInitialBudget)), _totalClaimedShards, elapsed, _options.ShardClaimRampUpDuration);
+        }
+
+        return budget;
+    }
+
+    /// <summary>
+    /// Pure computation of shard-claim budget based on ramp-up parameters and elapsed time.
+    /// Returns <see cref="int.MaxValue"/> when unlimited (ramp-up complete or disabled).
+    /// </summary>
+    internal static int ComputeClaimBudget(
+        TimeSpan rampUpDuration,
+        int initialBudget,
+        int maxBudget,
+        TimeSpan elapsed,
+        int totalClaimedShards)
+    {
+        // Shard-claim ramp-up disabled
+        if (rampUpDuration <= TimeSpan.Zero)
+        {
+            return int.MaxValue;
+        }
+
+        // After ramp-up period, no limit
+        if (elapsed >= rampUpDuration)
+        {
+            return int.MaxValue;
+        }
+
+        // Linear interpolation: initialBudget at t=0, maxBudget at t=rampUpDuration
+        var progress = elapsed.TotalMilliseconds / rampUpDuration.TotalMilliseconds;
+        var totalBudget = initialBudget + (int)(progress * (maxBudget - initialBudget));
+        var remaining = totalBudget - totalClaimedShards;
+        return Math.Max(0, remaining);
     }
 
     private void TryActivateShard(IJobShard shard)

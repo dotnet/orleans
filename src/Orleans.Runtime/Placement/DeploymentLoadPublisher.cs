@@ -6,6 +6,7 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Statistics;
@@ -105,6 +106,7 @@ namespace Orleans.Runtime
                 // Update statistics locally.
                 LocalRuntimeStatistics = myStats;
                 UpdateRuntimeStatisticsInternal(_siloDetails.SiloAddress, myStats);
+                DeploymentLoadPublisherEvents.EmitPublished(_siloDetails.SiloAddress, myStats);
 
                 // Inform other cluster members about our refreshed statistics.
                 var members = _siloStatusOracle.GetApproximateSiloStatuses(true).Keys;
@@ -129,6 +131,7 @@ namespace Orleans.Runtime
                 }
 
                 await Task.WhenAll(tasks);
+                DeploymentLoadPublisherEvents.EmitClusterRefreshed(_siloDetails.SiloAddress, _periodicStats);
             }
             catch (Exception exc)
             {
@@ -158,6 +161,7 @@ namespace Orleans.Runtime
 
             _periodicStats[siloAddress] = siloStats;
             NotifyAllStatisticsChangeEventsSubscribers(siloAddress, siloStats);
+            DeploymentLoadPublisherEvents.EmitReceived(siloAddress, _siloDetails.SiloAddress, siloStats);
         }
 
         internal async Task RefreshClusterStatistics()
@@ -238,6 +242,7 @@ namespace Orleans.Runtime
         {
             if (!status.IsTerminating()) return;
 
+            DeploymentLoadPublisherEvents.EmitRemoved(updatedSilo, _siloDetails.SiloAddress);
             _periodicStats.TryRemove(updatedSilo, out _);
             NotifyAllStatisticsChangeEventsSubscribers(updatedSilo, null);
         }

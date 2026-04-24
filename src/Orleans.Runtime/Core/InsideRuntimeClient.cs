@@ -192,7 +192,7 @@ namespace Orleans.Runtime
 
         public void SendResponse(Message request, Response response)
         {
-            OrleansInsideRuntimeClientEvent.Log.SendResponse(request);
+            OrleansInsideRuntimeClientEvent.Instance.SendResponse(request);
 
             // Don't process messages that have already timed out
             if (request.IsExpired)
@@ -383,7 +383,7 @@ namespace Orleans.Runtime
 
         public void ReceiveResponse(Message message)
         {
-            OrleansInsideRuntimeClientEvent.Log.ReceiveResponse(message);
+            OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
             if (message.Result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))
@@ -448,7 +448,7 @@ namespace Orleans.Runtime
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogDebug("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", message, diagnosticsString);
+                        LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
                     }
                 }
 
@@ -638,9 +638,9 @@ namespace Orleans.Runtime
         private static partial void LogInformationReceivedStatusUpdate(ILogger logger, Message requestMessage, IEnumerable<string> diagnostics);
 
         [LoggerMessage(
-            Level = LogLevel.Information,
+            Level = LogLevel.Debug,
             Message = "Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}")]
-        private static partial void LogInformationReceivedStatusUpdateUnknownRequest(ILogger logger, Message statusMessage, IEnumerable<string> diagnostics);
+        private static partial void LogDebugReceivedStatusUpdateUnknownRequest(ILogger logger, Message statusMessage, string diagnostics);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
