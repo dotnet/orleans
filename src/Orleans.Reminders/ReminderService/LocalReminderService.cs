@@ -1,3 +1,5 @@
+using System.Runtime.InteropServices;
+using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.CodeGeneration;
@@ -9,7 +11,6 @@ using Orleans.Runtime.ConsistentRing;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
-#nullable disable
 namespace Orleans.Runtime.ReminderService
 {
     internal sealed partial class LocalReminderService : GrainService, IReminderService, ILifecycleParticipant<ISiloLifecycle>
@@ -29,7 +30,7 @@ namespace Orleans.Runtime.ReminderService
         private readonly TimeProvider _timeProvider;
         private long localTableSequence;
         private uint initialReadCallCount = 0;
-        private Task runTask;
+        private Task? runTask;
 
         public LocalReminderService(
             GrainReferenceActivator referenceActivator,
@@ -41,7 +42,7 @@ namespace Orleans.Runtime.ReminderService
             TimeProvider timeProvider,
             SystemTargetShared shared)
             : base(
-                  SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null, shared.SiloAddress),
+                  SystemTargetGrainId.CreateGrainServiceGrainId(GrainInterfaceUtils.GetGrainClassTypeCode(typeof(IReminderService)), null!, shared.SiloAddress),
                   ringProvider,
                   shared)
         {
@@ -109,7 +110,7 @@ namespace Orleans.Runtime.ReminderService
         }
 
         /// <summary>
-        /// Attempt to retrieve reminders, that are my responsibility, from the global reminder table when starting this silo (reminder service instance)
+        /// Initializes the reminder table.
         /// </summary>
         /// <returns></returns>
         private async Task Initialize(CancellationToken cancellationToken)
@@ -125,20 +126,19 @@ namespace Orleans.Runtime.ReminderService
         {
             await base.Stop();
 
-            if (listRefreshTimer != null)
+            listRefreshTimer.Dispose();
+            if (this.runTask is { } task)
             {
-                listRefreshTimer.Dispose();
-                if (this.runTask is Task task)
-                {
-                    await task;
-                }
+                await task;
             }
 
+            var disposeTasks = new List<Task>(localReminders.Count);
             foreach (LocalReminderData r in localReminders.Values)
             {
-                r.StopReminder();
+                disposeTasks.Add(r.StopAsync(ReminderEvents.LocalReminderStopReason.ServiceStopped));
             }
 
+            await Task.WhenAll(disposeTasks);
             await reminderTable.StopAsync();
 
             // For a graceful shutdown, also handover reminder responsibilities to new owner, and update the ReminderTable
@@ -157,13 +157,14 @@ namespace Orleans.Runtime.ReminderService
 
             LogDebugRegisterOrUpdateReminder(entry);
             await DoResponsibilitySanityCheck(grainId, "RegisterReminder");
-            var newEtag = await reminderTable.UpsertRow(entry);
+            string? newEtag = await reminderTable.UpsertRow(entry);
 
             if (newEtag != null)
             {
                 LogDebugRegisterReminder(entry, localTableSequence);
                 entry.ETag = newEtag;
-                StartAndAddTimer(entry);
+                AddOrUpdateLocalReminder(entry);
+
                 if (logger.IsEnabled(LogLevel.Trace)) PrintReminders();
                 var reminder = new ReminderData(grainId, reminderName, newEtag);
                 ReminderEvents.EmitRegistered(grainId, reminderName, Silo);
@@ -198,9 +199,10 @@ namespace Orleans.Runtime.ReminderService
             var success = await reminderTable.RemoveRow(grainId, reminderName, eTag);
             if (success)
             {
-                bool removed = TryStopPreviousTimer(grainId, reminderName);
-                if (removed)
+                if (localReminders.Remove(new(grainId, reminderName), out var localRem))
                 {
+                    localTableSequence++;
+                    ObserveLocalReminderStop(localRem.StopAsync(ReminderEvents.LocalReminderStopReason.Unregistered), grainId, reminderName);
                     LogStoppedReminder(reminder);
                     if (logger.IsEnabled(LogLevel.Trace)) PrintReminders($"After removing {reminder}.");
                 }
@@ -218,12 +220,31 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        public async Task<IGrainReminder> GetReminder(GrainId grainId, string reminderName)
+        private void ObserveLocalReminderStop(Task stopTask, GrainId grainId, string reminderName)
+        {
+            ArgumentNullException.ThrowIfNull(stopTask);
+
+            stopTask.ContinueWith(
+                static (task, state) =>
+                {
+                    var (service, grainId, reminderName) = ((LocalReminderService Service, GrainId GrainId, string ReminderName))state!;
+                    service.LogErrorStoppingLocalReminder(task.Exception!, grainId, reminderName);
+                },
+                (this, grainId, reminderName),
+                CancellationToken.None,
+                TaskContinuationOptions.OnlyOnFaulted | TaskContinuationOptions.ExecuteSynchronously,
+                TaskScheduler.Default);
+        }
+
+        public async Task<IGrainReminder?> GetReminder(GrainId grainId, string reminderName)
         {
             LogDebugGetReminder(grainId, reminderName);
-            var entry = await reminderTable.ReadRow(grainId, reminderName);
-            return entry == null ? null : entry.ToIGrainReminder();
+            ReminderEntry? entry = await reminderTable.ReadRow(grainId, reminderName);
+            return entry?.ToIGrainReminder();
         }
+
+        async Task<IGrainReminder> IReminderService.GetReminder(GrainId grainId, string reminderName)
+            => (await GetReminder(grainId, reminderName))!;
 
         public async Task<List<IGrainReminder>> GetReminders(GrainId grainId)
         {
@@ -239,22 +260,22 @@ namespace Orleans.Runtime.ReminderService
         {
             if (StoppedCancellationTokenSource.IsCancellationRequested) return Task.CompletedTask;
 
-            RemoveOutOfRangeReminders();
+            var tasks = new List<Task>();
+            RemoveOutOfRangeReminders(tasks);
 
             // try to retrieve reminders from all my subranges
             var rangeSerialNumberCopy = RangeSerialNumber;
             LogTraceRingRange(RingRange, RangeSerialNumber, localReminders.Count);
-            var acks = new List<Task>();
             foreach (var range in RangeFactory.GetSubRanges(RingRange))
             {
-                acks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
+                tasks.Add(ReadTableAndStartTimers(range, rangeSerialNumberCopy));
             }
-            var task = Task.WhenAll(acks);
+            var task = Task.WhenAll(tasks);
             if (logger.IsEnabled(LogLevel.Trace)) task.ContinueWith(_ => PrintReminders(), TaskContinuationOptions.OnlyOnRanToCompletion | TaskContinuationOptions.ExecuteSynchronously);
             return task;
         }
 
-        private void RemoveOutOfRangeReminders()
+        private void RemoveOutOfRangeReminders(List<Task> removedReminderTasks)
         {
             var remindersOutOfRange = 0;
 
@@ -264,8 +285,9 @@ namespace Orleans.Runtime.ReminderService
                 remindersOutOfRange++;
 
                 LogTraceRemovingReminder(r.Value);
+
                 // remove locally
-                r.Value.StopReminder();
+                removedReminderTasks.Add(r.Value.StopAsync(ReminderEvents.LocalReminderStopReason.RemovedFromRange));
                 localReminders.Remove(r.Key);
             }
 
@@ -286,7 +308,7 @@ namespace Orleans.Runtime.ReminderService
 
         private async Task RunAsync()
         {
-            await Task.Yield();
+            await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
             TimeSpan? overrideDelay = RandomTimeSpan.Next(InitialReadRetryPeriod);
             while (await listRefreshTimer.NextTick(overrideDelay))
             {
@@ -374,6 +396,7 @@ namespace Orleans.Runtime.ReminderService
                         remindersNotInTable.Add(r.Key, r.Value);
 
                 LogDebugReadRemindersFromTable(range, table.Reminders.Count, localTableSequence, cachedSequence);
+                var tasks = new List<Task>();
                 foreach (var entry in table.Reminders)
                 {
                     var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
@@ -385,14 +408,11 @@ namespace Orleans.Runtime.ReminderService
                             {
                                 LogTraceInTableInLocalOldTicking(localRem);
                                 // it might happen that our local reminder is different than the one in the table, i.e., eTag is different
-                                // if so, stop the local timer for the old reminder, and start again with new info
-                                if (!localRem.ETag.Equals(entry.ETag))
-                                // this reminder needs a restart
+                                // if so, update the local timer in place with the new info
+                                if (!StringComparer.Ordinal.Equals(localRem.Entry.ETag, entry.ETag))
                                 {
-                                    LogTraceLocalReminderNeedsRestart(localRem);
-                                    localRem.StopReminder();
-                                    localReminders.Remove(localRem.Identity);
-                                    StartAndAddTimer(entry);
+                                    LogTraceLocalReminderNeedsUpdate(localRem);
+                                    AddOrUpdateLocalReminder(entry);
                                 }
                             }
                             else // if not ticking
@@ -419,8 +439,9 @@ namespace Orleans.Runtime.ReminderService
                     {
                         LogTraceInTableNotInLocal(entry);
                         // create and start the reminder
-                        StartAndAddTimer(entry);
+                        AddOrUpdateLocalReminder(entry);
                     }
+
                     // keep a track of extra reminders ... this 'reminder' is useful, so remove it from extra list
                     remindersNotInTable.Remove(key);
                 } // foreach reminder read from table
@@ -439,12 +460,16 @@ namespace Orleans.Runtime.ReminderService
                     else // cachedSequence > reminder.LocalSequenceNumber
                     {
                         LogTraceNotInTableInLocalOld(reminder);
+
                         // remove locally
-                        reminder.StopReminder();
-                        localReminders.Remove(reminder.Identity);
+                        var reminderEntry = reminder.Entry;
+                        tasks.Add(reminder.StopAsync(ReminderEvents.LocalReminderStopReason.RemovedFromTable));
+                        localReminders.Remove(new(reminderEntry.GrainId, reminderEntry.ReminderName));
                     }
                 }
-                LogDebugRemovedRemindersFromLocalTable(localReminders.Count - remindersCountBeforeRemove);
+
+                LogDebugRemovedRemindersFromLocalTable(remindersCountBeforeRemove - localReminders.Count);
+                await Task.WhenAll(tasks);
             }
             catch (Exception exc)
             {
@@ -453,37 +478,26 @@ namespace Orleans.Runtime.ReminderService
             }
         }
 
-        private void StartAndAddTimer(ReminderEntry entry)
+        private void AddOrUpdateLocalReminder(ReminderEntry entry)
         {
-            // it might happen that we already have a local reminder with a different eTag
-            // if so, stop the local timer for the old reminder, and start again with new info
-            // Note: it can happen here that we restart a reminder that has the same eTag as what we just registered ... its a rare case, and restarting it doesn't hurt, so we don't check for it
-            if (localReminders.TryGetValue(new(entry.GrainId, entry.ReminderName), out var prevReminder)) // if found locally
+            localTableSequence++;
+            var key = new ReminderIdentity(entry.GrainId, entry.ReminderName);
+            ref var reminderData = ref CollectionsMarshal.GetValueRefOrAddDefault(localReminders, key, out var exists);
+            if (exists && reminderData is { } existingReminder)
             {
-                LogDebugLocallyStoppingReminder(prevReminder, entry);
-                prevReminder.StopReminder();
-                localReminders.Remove(prevReminder.Identity);
+                existingReminder.LocalSequenceNumber = localTableSequence;
+                existingReminder.Update(entry);
+                LogDebugUpdatedReminder(entry);
+                return;
             }
 
-            var newReminder = new LocalReminderData(entry, this);
-            localTableSequence++;
-            newReminder.LocalSequenceNumber = localTableSequence;
-            localReminders.Add(newReminder.Identity, newReminder);
-            newReminder.StartTimer();
+            var newReminder = new LocalReminderData(entry, this)
+            {
+                LocalSequenceNumber = localTableSequence,
+            };
+            newReminder.Start();
+            reminderData = newReminder;
             LogDebugStartedReminder(entry);
-        }
-
-        // stop without removing it. will remove later.
-        private bool TryStopPreviousTimer(GrainId grainId, string reminderName)
-        {
-            // we stop the locally running timer for this reminder
-            if (!localReminders.TryGetValue(new(grainId, reminderName), out var localRem)) return false;
-
-            // if we have it locally
-            localTableSequence++; // move to next sequence
-            localRem.LocalSequenceNumber = localTableSequence;
-            localRem.StopReminder();
-            return true;
         }
 
         private Task DoResponsibilitySanityCheck(GrainId grainId, string debugInfo)
@@ -539,7 +553,7 @@ namespace Orleans.Runtime.ReminderService
         }
 
         // Note: The list of reminders can be huge in production!
-        private void PrintReminders(string msg = null)
+        private void PrintReminders(string? msg = null)
         {
             if (!logger.IsEnabled(LogLevel.Trace)) return;
 
@@ -551,89 +565,232 @@ namespace Orleans.Runtime.ReminderService
 
         private sealed class LocalReminderData
         {
-            private readonly IRemindable remindable;
-            private readonly DateTime firstTickTime; // time for the first tick of this reminder
-            private readonly TimeSpan period;
-            private readonly ILogger logger;
-            private readonly IAsyncTimer timer;
-            private readonly SiloAddress siloAddress;
-            private readonly TimeProvider timeProvider;
+            private readonly LocalReminderService _shared;
+            private readonly PeriodicTimer _timer;
+#if NET10_0_OR_GREATER
+            private readonly System.Threading.Lock _lock = new();
+#else
+            private readonly object _lock = new();
+#endif
+            private ReminderEntry _entry;
+            private bool _isFirstTickPending;
 
-            private ValueStopwatch stopwatch;
-            private Task runTask;
+            private int _stopReason;
+            private long _localSequenceNumber;
+            private Task? _runTask;
 
             internal LocalReminderData(ReminderEntry entry, LocalReminderService reminderService)
             {
-                Identity = new ReminderIdentity(entry.GrainId, entry.ReminderName);
-                firstTickTime = entry.StartAt;
-                period = entry.Period;
-                remindable = reminderService.GetGrain(entry.GrainId);
-                ETag = entry.ETag;
-                LocalSequenceNumber = -1;
-                logger = reminderService.logger;
-                siloAddress = reminderService.Silo;
-                timeProvider = reminderService._timeProvider;
-                this.timer = reminderService.asyncTimerFactory.Create(period, "");
+                _shared = reminderService;
+                _entry = entry;
+                _localSequenceNumber = -1;
+                _timer = new(GetInitialDueTime(entry), _shared._timeProvider);
+                _isFirstTickPending = true;
             }
 
-            public ReminderIdentity Identity { get; }
-
-            public string ETag { get; }
+            public ReminderEntry Entry
+            {
+                get
+                {
+                    lock (_lock)
+                    {
+                        return _entry;
+                    }
+                }
+            }
 
             /// <summary>
             /// Locally, we use this for resolving races between the periodic table reader, and any concurrent local register/unregister requests
             /// </summary>
-            public long LocalSequenceNumber { get; set; }
+            public long LocalSequenceNumber
+            {
+                get
+                {
+                    lock (_lock)
+                    {
+                        return _localSequenceNumber;
+                    }
+                }
+                set
+                {
+                    lock (_lock)
+                    {
+                        _localSequenceNumber = value;
+                    }
+                }
+            }
 
             /// <summary>
             /// Gets a value indicating whether this instance is running.
             /// </summary>
-            public bool IsRunning => runTask is Task task && !task.IsCompleted;
-
-            public void StartTimer()
+            public bool IsRunning
             {
-                if (runTask is null)
+                get
                 {
+                    lock (_lock)
+                    {
+                        return _runTask is Task task && !task.IsCompleted;
+                    }
+                }
+            }
+
+            public void Start()
+            {
+                GrainId grainId;
+                string reminderName;
+                lock (_lock)
+                {
+                    if (_runTask is not null)
+                    {
+                        throw new InvalidOperationException($"{nameof(Start)} may only be called once per instance and has already been called on this instance.");
+                    }
+
+                    grainId = _entry.GrainId;
+                    reminderName = _entry.ReminderName;
                     using var suppressExecutionContext = new ExecutionContextSuppressor();
-                    this.runTask = this.RunAsync();
+                    _runTask = RunAsync(grainId, reminderName);
                 }
-                else
-                {
-                    throw new InvalidOperationException($"{nameof(StartTimer)} may only be called once per instance and has already been called on this instance.");
-                }
+
+                ReminderEvents.EmitLocalReminderStarted(grainId, reminderName, this, _shared.Silo);
             }
 
-            public void StopReminder()
+            public void Update(ReminderEntry entry)
             {
-                timer.Dispose();
-            }
+                ArgumentNullException.ThrowIfNull(entry);
 
-            private async Task RunAsync()
-            {
-                TimeSpan? dueTimeSpan = CalculateDueTime();
-                while (await this.timer.NextTick(dueTimeSpan))
+                lock (_lock)
                 {
-                    try
+                    if (_entry.GrainId != entry.GrainId || !StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName))
                     {
-                        await OnTimerTick();
-                        ReminderInstruments.TicksDelivered.Add(1);
-                    }
-                    catch (Exception exception)
-                    {
-                        LogWarningFiringReminder(logger, Identity.ReminderName, Identity.GrainId, exception);
+                        throw new InvalidOperationException($"Cannot update reminder {new ReminderIdentity(_entry.GrainId, _entry.ReminderName)} with {entry} because the reminder identity changed.");
                     }
 
-                    dueTimeSpan = CalculateDueTime();
+                    _entry = entry;
+                    _isFirstTickPending = true;
+                    _timer.Period = GetInitialDueTime(entry);
                 }
             }
 
-            private TimeSpan CalculateDueTime()
+            public Task StopAsync(ReminderEvents.LocalReminderStopReason reason)
+            {
+                ReminderEntry entry;
+                PeriodicTimer timerToDispose;
+                Task? runTask;
+                lock (_lock)
+                {
+                    entry = _entry;
+                    if (_stopReason == (int)ReminderEvents.LocalReminderStopReason.Unknown)
+                    {
+                        _stopReason = (int)reason;
+                    }
+
+                    timerToDispose = _timer;
+                    runTask = _runTask;
+                }
+
+                _shared.LogDebugStoppingReminder(entry, reason);
+                timerToDispose.Dispose();
+                return runTask ?? Task.CompletedTask;
+            }
+
+            private async Task RunAsync(GrainId grainId, string reminderName)
+            {
+                await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
+
+                try
+                {
+                    while (await _timer.WaitForNextTickAsync())
+                    {
+                        var entry = PrepareTick();
+                        if (entry is null)
+                        {
+                            break;
+                        }
+
+                        try
+                        {
+                            var before = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                            var status = new TickStatus(entry.StartAt, entry.Period, before);
+
+                            LogTraceTriggeringTick(_shared.logger, this, status, before);
+                            ReminderEvents.EmitTickFiring(entry.GrainId, entry.ReminderName, status, _shared.Silo);
+                            if (ReminderInstruments.TardinessSeconds.Enabled)
+                            {
+                                var tardiness = CalculateTardiness(status);
+                                ReminderInstruments.TardinessSeconds.Record(tardiness.TotalSeconds);
+                            }
+
+                            try
+                            {
+                                var grainRef = _shared.GetGrain(entry.GrainId);
+                                await grainRef.ReceiveReminder(entry.ReminderName, status);
+
+                                if (_shared.logger.IsEnabled(LogLevel.Trace))
+                                {
+                                    var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                                    var elapsed = after - before;
+                                    LogTraceTickTriggered(_shared.logger, this, elapsed.TotalSeconds, after + entry.Period);
+                                }
+
+                                ReminderEvents.EmitTickCompleted(entry.GrainId, entry.ReminderName, status, _shared.Silo);
+                                ReminderInstruments.TicksDelivered.Add(1);
+                            }
+                            catch (Exception exc)
+                            {
+                                var after = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                                LogErrorDeliveringReminderTick(_shared.logger, this, after + entry.Period, exc);
+                                ReminderEvents.EmitTickFailed(entry.GrainId, entry.ReminderName, status, exc, _shared.Silo);
+
+                                // What to do with repeated failures to deliver a reminder's ticks?
+                            }
+                        }
+                        catch (Exception exception)
+                        {
+                            LogWarningFiringReminder(_shared.logger, entry.ReminderName, entry.GrainId, exception);
+                        }
+                    }
+                }
+                finally
+                {
+                    ReminderEvents.EmitLocalReminderStopped(
+                        grainId,
+                        reminderName,
+                        this,
+                        (ReminderEvents.LocalReminderStopReason)_stopReason,
+                        _shared.Silo);
+                }
+            }
+
+            private ReminderEntry? PrepareTick()
+            {
+                lock (_lock)
+                {
+                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
+                    {
+                        return null;
+                    }
+
+                    var entry = _entry;
+                    if (_isFirstTickPending)
+                    {
+                        _isFirstTickPending = false;
+                        if (_timer.Period != entry.Period)
+                        {
+                            _timer.Period = entry.Period;
+                        }
+                    }
+
+                    return entry;
+                }
+            }
+
+            private TimeSpan GetInitialDueTime(ReminderEntry entry)
             {
                 TimeSpan dueTimeSpan;
-                var now = timeProvider.GetUtcNow().UtcDateTime;
-                if (now < firstTickTime) // if the time for first tick hasn't passed yet
+                var now = _shared._timeProvider.GetUtcNow().UtcDateTime;
+                if (now < entry.StartAt) // if the time for first tick hasn't passed yet
                 {
-                    dueTimeSpan = firstTickTime.Subtract(now); // then duetime is duration between now and the first tick time
+                    dueTimeSpan = entry.StartAt.Subtract(now); // then duetime is duration between now and the first tick time
                 }
                 else // the first tick happened in the past ... compute duetime based on the first tick time, and period
                 {
@@ -643,85 +800,46 @@ namespace Orleans.Runtime.ReminderService
                     // explanation of formula:
                     // (Now - FirstTickTime) => gives amount of time since first tick happened
                     // (Now - FirstTickTime) % period => gives amount of time passed since the last tick should have triggered
-                    var sinceFirstTick = now.Subtract(firstTickTime);
-                    var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % period.Ticks);
-                    dueTimeSpan = period.Subtract(sinceLastTick);
+                    var sinceFirstTick = now.Subtract(entry.StartAt);
+                    var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % entry.Period.Ticks);
+                    dueTimeSpan = entry.Period.Subtract(sinceLastTick);
 
                     // in corner cases, dueTime can be equal to period ... so, take another mod
-                    dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % period.Ticks);
-                }
-
-                // If the previous tick took no percievable time, be sure to wait at least one period until the next tick.
-                // If the previous tick took one period or greater, then we will skip up to one period.
-                // That is preferable over double-firing for fast ticks, which are expected to be more common.
-                if (dueTimeSpan <= TimeSpan.FromMilliseconds(30))
-                {
-                    dueTimeSpan = period;
+                    dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % entry.Period.Ticks);
                 }
 
                 return dueTimeSpan;
             }
 
-            public async Task OnTimerTick()
+            private static TimeSpan CalculateTardiness(TickStatus status)
             {
-                var before = timeProvider.GetUtcNow().UtcDateTime;
-                var status = new TickStatus(firstTickTime, period, before);
-
-                LogTraceTriggeringTick(logger, this, status, before);
-                ReminderEvents.EmitTickFiring(Identity.GrainId, Identity.ReminderName, status, siloAddress, remindable);
-
-                try
+                if (status.Period <= TimeSpan.Zero || status.CurrentTickTime <= status.FirstTickTime)
                 {
-                    if (stopwatch.IsRunning)
-                    {
-                        stopwatch.Stop();
-                        var tardiness = stopwatch.Elapsed - period;
-                        ReminderInstruments.TardinessSeconds.Record(Math.Max(0, tardiness.TotalSeconds));
-                    }
-
-                    await remindable.ReceiveReminder(Identity.ReminderName, status);
-
-                    stopwatch.Restart();
-
-                    var after = timeProvider.GetUtcNow().UtcDateTime;
-                    var elapsed = after - before;
-                    LogTraceTickTriggered(logger, this, elapsed.TotalSeconds, after + period);
-                    ReminderEvents.EmitTickCompleted(Identity.GrainId, Identity.ReminderName, status, siloAddress, remindable);
+                    return TimeSpan.Zero;
                 }
-                catch (Exception exc)
-                {
-                    var after = timeProvider.GetUtcNow().UtcDateTime;
-                    LogErrorDeliveringReminderTick(logger, this, after + period, exc);
-                    ReminderEvents.EmitTickFailed(Identity.GrainId, Identity.ReminderName, status, exc, siloAddress, remindable);
 
-                    // What to do with repeated failures to deliver a reminder's ticks?
-                }
+                var sinceFirstTick = status.CurrentTickTime - status.FirstTickTime;
+                return TimeSpan.FromTicks(sinceFirstTick.Ticks % status.Period.Ticks);
             }
 
             public override string ToString()
-                => $"[{Identity.ReminderName}, {Identity.GrainId}, {period}, {LogFormatter.PrintDate(firstTickTime)}, {ETag}, {LocalSequenceNumber}, {(timer == null ? "Not_ticking" : "Ticking")}]";
+            {
+                lock (_lock)
+                {
+                    var isRunning = _runTask is Task task && !task.IsCompleted;
+                    return $"[{_entry.ReminderName}, {_entry.GrainId}, {_entry.Period}, {LogFormatter.PrintDate(_entry.StartAt)}, {_entry.ETag}, {_localSequenceNumber}, {(isRunning ? "Ticking" : "Stopped")}]";
+                }
+            }
         }
 
-        private readonly struct ReminderIdentity : IEquatable<ReminderIdentity>
+        private readonly struct ReminderIdentity(GrainId grainId, string reminderName) : IEquatable<ReminderIdentity>
         {
-            public readonly GrainId GrainId;
-            public readonly string ReminderName;
-
-            public ReminderIdentity(GrainId grainId, string reminderName)
-            {
-                if (grainId.IsDefault)
-                    throw new ArgumentNullException(nameof(grainId));
-
-                if (string.IsNullOrWhiteSpace(reminderName))
-                    throw new ArgumentException("The reminder name is either null or whitespace.", nameof(reminderName));
-
-                this.GrainId = grainId;
-                this.ReminderName = reminderName;
-            }
+            public readonly GrainId GrainId = grainId;
+            public readonly string ReminderName = reminderName;
 
             public readonly bool Equals(ReminderIdentity other) => GrainId.Equals(other.GrainId) && ReminderName.Equals(other.ReminderName);
 
-            public override readonly bool Equals(object other) => other is ReminderIdentity id && Equals(id);
+            public override readonly bool Equals(object? other) => other is ReminderIdentity id && Equals(id);
 
             public override readonly int GetHashCode() => HashCode.Combine(GrainId, ReminderName);
         }
@@ -774,7 +892,7 @@ namespace Orleans.Runtime.ReminderService
         [LoggerMessage(
             Level = LogLevel.Debug,
             EventId = (int)ErrorCode.RS_Stop,
-            Message = "Stopped reminder {Entry}"
+            Message = "Requested stop for reminder {Entry}"
         )]
         private partial void LogStoppedReminder(IGrainReminder entry);
 
@@ -791,6 +909,12 @@ namespace Orleans.Runtime.ReminderService
             Message = "Could not unregister reminder {Reminder} from the reminder table, due to tag mismatch. You can retry."
         )]
         private partial void LogErrorUnregisterReminder(IGrainReminder reminder);
+
+        [LoggerMessage(
+            Level = LogLevel.Error,
+            Message = "Local reminder stop failed for GrainId={GrainId}, ReminderName={ReminderName}"
+        )]
+        private partial void LogErrorStoppingLocalReminder(Exception exception, GrainId grainId, string reminderName);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
@@ -876,9 +1000,9 @@ namespace Orleans.Runtime.ReminderService
 
         [LoggerMessage(
             Level = LogLevel.Trace,
-            Message = "{LocalReminder} Needs a restart"
+            Message = "{LocalReminder} needs an in-place update"
         )]
-        private partial void LogTraceLocalReminderNeedsRestart(LocalReminderData localReminder);
+        private partial void LogTraceLocalReminderNeedsUpdate(LocalReminderData localReminder);
 
         [LoggerMessage(
             Level = LogLevel.Trace,
@@ -938,9 +1062,9 @@ namespace Orleans.Runtime.ReminderService
         [LoggerMessage(
             Level = LogLevel.Debug,
             EventId = (int)ErrorCode.RS_LocalStop,
-            Message = "Locally stopping reminder {PreviousReminder} as it is different than newly registered reminder {Reminder}"
+            Message = "Locally stopping reminder {Reminder} with reason {Reason}"
         )]
-        private partial void LogDebugLocallyStoppingReminder(LocalReminderData previousReminder, ReminderEntry reminder);
+        private partial void LogDebugStoppingReminder(ReminderEntry reminder, ReminderEvents.LocalReminderStopReason reason);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
@@ -948,6 +1072,13 @@ namespace Orleans.Runtime.ReminderService
             Message = "Started reminder {Reminder}."
         )]
         private partial void LogDebugStartedReminder(ReminderEntry reminder);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            EventId = (int)ErrorCode.RS_Started,
+            Message = "Updated reminder {Reminder} in place."
+        )]
+        private partial void LogDebugUpdatedReminder(ReminderEntry reminder);
 
         [LoggerMessage(
             Level = LogLevel.Warning,
@@ -967,6 +1098,14 @@ namespace Orleans.Runtime.ReminderService
             Message = "Triggering tick for {Instance}, status {Status}, now {CurrentTime}"
         )]
         private static partial void LogTraceTriggeringTick(ILogger logger, LocalReminderData instance, TickStatus status, DateTime currentTime);
+
+        private void LogTraceTickTriggeredHelper(LocalReminderData instance, double dueTime, DateTime nextDueTime)
+        {
+            if (logger.IsEnabled(LogLevel.Trace))
+            {
+
+            }
+        }
 
         [LoggerMessage(
             Level = LogLevel.Trace,

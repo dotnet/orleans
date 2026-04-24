@@ -18,6 +18,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Reminders.Tests\Orleans.Reminders.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.DurableJobs.Tests\Orleans.DurableJobs.Tests.csproj" />
