@@ -44,7 +44,7 @@ public class DemoData
         Assert.False(model.IsEnumType);
         Assert.False(model.IsAbstractType);
         Assert.False(model.IsGenericType);
-        Assert.Equal(2, model.Members.Count);
+        Assert.Equal(2, model.Members.Length);
 
         // Auto-properties are stored as backing fields; match via BackingPropertyName
         var valueMember = Assert.Single(model.Members, m => m.BackingPropertyName == "Value");
@@ -256,12 +256,12 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         var model = ModelExtractor.ExtractReferenceAssemblyData(consumerCompilation, default);
 
         Assert.Equal(
-            model.ApplicationParts.Select(static part => part.Value).OrderBy(static part => part, StringComparer.Ordinal),
-            model.ApplicationParts.Select(static part => part.Value));
-        Assert.Contains("ConsumerProject", model.ApplicationParts.Select(static part => part.Value));
-        Assert.Contains("LibraryA", model.ApplicationParts.Select(static part => part.Value));
-        Assert.Contains("Alpha.Part", model.ApplicationParts.Select(static part => part.Value));
-        Assert.Contains("Zeta.Part", model.ApplicationParts.Select(static part => part.Value));
+            model.ApplicationParts.OrderBy(static part => part, StringComparer.Ordinal),
+            model.ApplicationParts);
+        Assert.Contains("ConsumerProject", model.ApplicationParts);
+        Assert.Contains("LibraryA", model.ApplicationParts);
+        Assert.Contains("Alpha.Part", model.ApplicationParts);
+        Assert.Contains("Zeta.Part", model.ApplicationParts);
 
         Assert.Contains(model.WellKnownTypeIds, entry => entry.Type.SyntaxString == "global::LibraryA.AlphaType" && entry.Id == 100u);
         Assert.Contains(model.WellKnownTypeIds, entry => entry.Type.SyntaxString == "global::LibraryB.BetaType" && entry.Id == 200u);
@@ -270,7 +270,7 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         Assert.Contains(model.TypeAliases, entry => entry.Type.SyntaxString == "global::LibraryB.BetaType" && entry.Alias == "B.Alias");
 
         var compoundAlias = Assert.Single(model.CompoundTypeAliases, entry => entry.TargetType.SyntaxString == "global::LibraryB.BetaType");
-        Assert.Equal(2, compoundAlias.Components.Count);
+        Assert.Equal(2, compoundAlias.Components.Length);
         Assert.True(compoundAlias.Components[0].IsString);
         Assert.Equal("B", compoundAlias.Components[0].StringValue);
         Assert.True(compoundAlias.Components[1].IsType);

@@ -13,63 +13,48 @@ namespace Orleans.CodeGenerator.Tests;
 /// </summary>
 public class IncrementalModelEqualityTests
 {
-    #region EquatableArray<T>
+    #region ImmutableArrayValueComparer
 
     [Fact]
-    public void EquatableArray_Empty_Equals_Empty()
+    public void ImmutableArrayValueComparer_DefaultEquals_Empty()
     {
-        var a = EquatableArray<EquatableString>.Empty;
-        var b = EquatableArray<EquatableString>.Empty;
-        Assert.Equal(a, b);
-        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+        var a = default(ImmutableArray<string>);
+        var b = ImmutableArray<string>.Empty;
+
+        Assert.True(ImmutableArrayValueComparer.Equals(a, b));
+        Assert.Equal(
+            ImmutableArrayValueComparer.GetHashCode(a),
+            ImmutableArrayValueComparer.GetHashCode(b));
     }
 
     [Fact]
-    public void EquatableArray_DefaultEquals_Empty()
+    public void ImmutableArrayValueComparer_SameElements_AreEqual()
     {
-        var a = default(EquatableArray<EquatableString>);
-        var b = EquatableArray<EquatableString>.Empty;
-        Assert.Equal(a, b);
+        var a = ImmutableArray.Create("foo", "bar");
+        var b = ImmutableArray.Create("foo", "bar");
+
+        Assert.True(ImmutableArrayValueComparer.Equals(a, b));
+        Assert.Equal(
+            ImmutableArrayValueComparer.GetHashCode(a),
+            ImmutableArrayValueComparer.GetHashCode(b));
     }
 
     [Fact]
-    public void EquatableArray_SameElements_AreEqual()
+    public void ImmutableArrayValueComparer_DifferentElements_AreNotEqual()
     {
-        var a = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("foo", "bar"));
-        var b = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("foo", "bar"));
-        Assert.Equal(a, b);
-        Assert.Equal(a.GetHashCode(), b.GetHashCode());
+        var a = ImmutableArray.Create("foo", "bar");
+        var b = ImmutableArray.Create("foo", "baz");
+
+        Assert.False(ImmutableArrayValueComparer.Equals(a, b));
     }
 
     [Fact]
-    public void EquatableArray_DifferentElements_AreNotEqual()
+    public void ImmutableArrayValueComparer_DifferentLength_AreNotEqual()
     {
-        var a = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("foo", "bar"));
-        var b = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("foo", "baz"));
-        Assert.NotEqual(a, b);
-    }
+        var a = ImmutableArray.Create("foo");
+        var b = ImmutableArray.Create("foo", "bar");
 
-    [Fact]
-    public void EquatableArray_DifferentLength_AreNotEqual()
-    {
-        var a = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("foo"));
-        var b = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("foo", "bar"));
-        Assert.NotEqual(a, b);
-    }
-
-    [Fact]
-    public void EquatableArray_Count_ReturnsCorrectValue()
-    {
-        var a = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("x", "y", "z"));
-        Assert.Equal(3, a.Count);
-    }
-
-    [Fact]
-    public void EquatableArray_Indexer_ReturnsCorrectValue()
-    {
-        var a = new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("alpha", "beta"));
-        Assert.Equal("alpha", a[0].Value);
-        Assert.Equal("beta", a[1].Value);
+        Assert.False(ImmutableArrayValueComparer.Equals(a, b));
     }
 
     #endregion
@@ -106,43 +91,6 @@ public class IncrementalModelEqualityTests
         var typeRef = new TypeRef("int");
         var syntax = typeRef.ToTypeSyntax();
         Assert.Equal("int", syntax.ToString());
-    }
-
-    #endregion
-
-    #region EquatableString
-
-    [Fact]
-    public void EquatableString_SameValue_AreEqual()
-    {
-        var a = new EquatableString("hello");
-        var b = new EquatableString("hello");
-        Assert.Equal(a, b);
-        Assert.Equal(a.GetHashCode(), b.GetHashCode());
-    }
-
-    [Fact]
-    public void EquatableString_DifferentValue_AreNotEqual()
-    {
-        var a = new EquatableString("hello");
-        var b = new EquatableString("world");
-        Assert.NotEqual(a, b);
-    }
-
-    [Fact]
-    public void EquatableString_CaseSensitive()
-    {
-        var a = new EquatableString("Hello");
-        var b = new EquatableString("hello");
-        Assert.NotEqual(a, b);
-    }
-
-    [Fact]
-    public void EquatableString_ImplicitConversions()
-    {
-        EquatableString es = "test";
-        string s = es;
-        Assert.Equal("test", s);
     }
 
     #endregion
@@ -223,7 +171,7 @@ public class IncrementalModelEqualityTests
     public void MemberModel_NullDoesNotEqual()
     {
         var a = CreateMemberModel(fieldId: 0, name: "Value", type: "int");
-        Assert.False(a.Equals(null));
+        Assert.False(a.Equals(null!));
     }
 
     #endregion
@@ -271,11 +219,11 @@ public class IncrementalModelEqualityTests
     [Fact]
     public void SerializableTypeModel_DifferentMembers_AreNotEqual()
     {
-        var members1 = new EquatableArray<MemberModel>(ImmutableArray.Create(
-            CreateMemberModel(0, "X", "int")));
-        var members2 = new EquatableArray<MemberModel>(ImmutableArray.Create(
+        var members1 = ImmutableArray.Create(
+            CreateMemberModel(0, "X", "int"));
+        var members2 = ImmutableArray.Create(
             CreateMemberModel(0, "X", "int"),
-            CreateMemberModel(1, "Y", "int")));
+            CreateMemberModel(1, "Y", "int"));
 
         var a = CreateSerializableTypeModel("MyType", "MyNamespace", members: members1);
         var b = CreateSerializableTypeModel("MyType", "MyNamespace", members: members2);
@@ -294,7 +242,7 @@ public class IncrementalModelEqualityTests
     public void SerializableTypeModel_NullDoesNotEqual()
     {
         var a = CreateSerializableTypeModel("MyType", "MyNamespace");
-        Assert.False(a.Equals(null));
+        Assert.False(a.Equals(null!));
     }
 
     #endregion
@@ -321,11 +269,11 @@ public class IncrementalModelEqualityTests
     [Fact]
     public void ProxyInterfaceModel_DifferentMethods_AreNotEqual()
     {
-        var methods1 = new EquatableArray<MethodModel>(ImmutableArray.Create(
-            CreateMethodModel("DoSomething")));
-        var methods2 = new EquatableArray<MethodModel>(ImmutableArray.Create(
+        var methods1 = ImmutableArray.Create(
+            CreateMethodModel("DoSomething"));
+        var methods2 = ImmutableArray.Create(
             CreateMethodModel("DoSomething"),
-            CreateMethodModel("DoSomethingElse")));
+            CreateMethodModel("DoSomethingElse"));
 
         var a = CreateProxyInterfaceModel("IMyGrain", methods: methods1);
         var b = CreateProxyInterfaceModel("IMyGrain", methods: methods2);
@@ -336,7 +284,7 @@ public class IncrementalModelEqualityTests
     public void ProxyInterfaceModel_NullDoesNotEqual()
     {
         var a = CreateProxyInterfaceModel("IMyGrain");
-        Assert.False(a.Equals(null));
+        Assert.False(a.Equals(null!));
     }
 
     #endregion
@@ -366,8 +314,8 @@ public class IncrementalModelEqualityTests
         var m = new MethodModel(
             "DoWork",
             new TypeRef("global::System.Threading.Tasks.Task"),
-            EquatableArray<MethodParameterModel>.Empty,
-            EquatableArray<TypeParameterModel>.Empty,
+            ImmutableArray<MethodParameterModel>.Empty,
+            ImmutableArray<TypeParameterModel>.Empty,
             new TypeRef("global::MyNamespace.IMyGrain"),
             new TypeRef("global::MyNamespace.IMyGrain"),
             "IMyGrain",
@@ -376,7 +324,7 @@ public class IncrementalModelEqualityTests
             "AABB1122",
             "MyAlias",
             null,
-            EquatableArray<CustomInitializerModel>.Empty,
+            ImmutableArray<CustomInitializerModel>.Empty,
             false);
         Assert.True(m.HasAlias);
     }
@@ -413,7 +361,7 @@ public class IncrementalModelEqualityTests
     public void ReferenceAssemblyModel_NullDoesNotEqual()
     {
         var a = CreateReferenceAssemblyModel("PartA");
-        Assert.False(a.Equals(null));
+        Assert.False(a.Equals(null!));
     }
 
     #endregion
@@ -441,7 +389,7 @@ public class IncrementalModelEqualityTests
     public void MetadataAggregateModel_NullDoesNotEqual()
     {
         var a = CreateMetadataAggregateModel("TestAssembly");
-        Assert.False(a.Equals(null));
+        Assert.False(a.Equals(null!));
     }
 
     [Fact]
@@ -455,19 +403,19 @@ public class IncrementalModelEqualityTests
             CreateProxyInterfaceModel("IAlpha"));
 
         var refData = CreateReferenceAssemblyModel(
-            applicationParts: new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("PartZ", "PartA")),
-            referencedSerializableTypes: new EquatableArray<SerializableTypeModel>(ImmutableArray.Create(
+            applicationParts: ImmutableArray.Create("PartZ", "PartA"),
+            referencedSerializableTypes: ImmutableArray.Create(
                 CreateSerializableTypeModel("MiddleType", "MyNamespace"),
-                CreateSerializableTypeModel("AlphaType", "MyNamespace"))),
-            referencedProxyInterfaces: new EquatableArray<ProxyInterfaceModel>(ImmutableArray.Create(
+                CreateSerializableTypeModel("AlphaType", "MyNamespace")),
+            referencedProxyInterfaces: ImmutableArray.Create(
                 CreateProxyInterfaceModel("IMiddle"),
-                CreateProxyInterfaceModel("IAlpha"))),
-            registeredCodecs: new EquatableArray<RegisteredCodecModel>(ImmutableArray.Create(
+                CreateProxyInterfaceModel("IAlpha")),
+            registeredCodecs: ImmutableArray.Create(
                 new RegisteredCodecModel(new TypeRef("global::Codecs.ZuluCodec"), RegisteredCodecKind.Serializer),
-                new RegisteredCodecModel(new TypeRef("global::Codecs.AlphaCodec"), RegisteredCodecKind.Serializer))),
-            interfaceImplementations: new EquatableArray<InterfaceImplementationModel>(ImmutableArray.Create(
+                new RegisteredCodecModel(new TypeRef("global::Codecs.AlphaCodec"), RegisteredCodecKind.Serializer)),
+            interfaceImplementations: ImmutableArray.Create(
                 new InterfaceImplementationModel(new TypeRef("global::Impl.Zulu")),
-                new InterfaceImplementationModel(new TypeRef("global::Impl.Alpha")))));
+                new InterfaceImplementationModel(new TypeRef("global::Impl.Alpha"))));
 
         var aggregate = ModelExtractor.CreateMetadataAggregate("TestAssembly", sourceSerializableTypes, sourceProxyInterfaces, refData);
 
@@ -485,7 +433,7 @@ public class IncrementalModelEqualityTests
             aggregate.InterfaceImplementations.Select(static implementation => implementation.ImplementationType.SyntaxString).ToArray());
         Assert.Equal(
             ["PartA", "PartZ"],
-            aggregate.ReferenceAssemblyData.ApplicationParts.Select(static part => part.Value).ToArray());
+            aggregate.ReferenceAssemblyData.ApplicationParts.ToArray());
     }
 
     [Fact]
@@ -503,30 +451,30 @@ public class IncrementalModelEqualityTests
             ImmutableArray.Create(serializableBeta, serializableAlpha),
             ImmutableArray.Create(proxyBeta, proxyAlpha),
             CreateReferenceAssemblyModel(
-                applicationParts: new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("PartZ", "PartA")),
-                referencedSerializableTypes: new EquatableArray<SerializableTypeModel>(ImmutableArray.Create(serializableGamma, serializableAlpha)),
-                referencedProxyInterfaces: new EquatableArray<ProxyInterfaceModel>(ImmutableArray.Create(proxyGamma, proxyAlpha)),
-                registeredCodecs: new EquatableArray<RegisteredCodecModel>(ImmutableArray.Create(
+                applicationParts: ImmutableArray.Create("PartZ", "PartA"),
+                referencedSerializableTypes: ImmutableArray.Create(serializableGamma, serializableAlpha),
+                referencedProxyInterfaces: ImmutableArray.Create(proxyGamma, proxyAlpha),
+                registeredCodecs: ImmutableArray.Create(
                     new RegisteredCodecModel(new TypeRef("global::Codecs.ZuluCodec"), RegisteredCodecKind.Serializer),
-                    new RegisteredCodecModel(new TypeRef("global::Codecs.AlphaCodec"), RegisteredCodecKind.Serializer))),
-                interfaceImplementations: new EquatableArray<InterfaceImplementationModel>(ImmutableArray.Create(
+                    new RegisteredCodecModel(new TypeRef("global::Codecs.AlphaCodec"), RegisteredCodecKind.Serializer)),
+                interfaceImplementations: ImmutableArray.Create(
                     new InterfaceImplementationModel(new TypeRef("global::Impl.Zulu")),
-                    new InterfaceImplementationModel(new TypeRef("global::Impl.Alpha"))))));
+                    new InterfaceImplementationModel(new TypeRef("global::Impl.Alpha")))));
 
         var aggregateB = ModelExtractor.CreateMetadataAggregate(
             "TestAssembly",
             ImmutableArray.Create(serializableAlpha, serializableBeta),
             ImmutableArray.Create(proxyAlpha, proxyBeta),
             CreateReferenceAssemblyModel(
-                applicationParts: new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>("PartA", "PartZ")),
-                referencedSerializableTypes: new EquatableArray<SerializableTypeModel>(ImmutableArray.Create(serializableAlpha, serializableGamma)),
-                referencedProxyInterfaces: new EquatableArray<ProxyInterfaceModel>(ImmutableArray.Create(proxyAlpha, proxyGamma)),
-                registeredCodecs: new EquatableArray<RegisteredCodecModel>(ImmutableArray.Create(
+                applicationParts: ImmutableArray.Create("PartA", "PartZ"),
+                referencedSerializableTypes: ImmutableArray.Create(serializableAlpha, serializableGamma),
+                referencedProxyInterfaces: ImmutableArray.Create(proxyAlpha, proxyGamma),
+                registeredCodecs: ImmutableArray.Create(
                     new RegisteredCodecModel(new TypeRef("global::Codecs.AlphaCodec"), RegisteredCodecKind.Serializer),
-                    new RegisteredCodecModel(new TypeRef("global::Codecs.ZuluCodec"), RegisteredCodecKind.Serializer))),
-                interfaceImplementations: new EquatableArray<InterfaceImplementationModel>(ImmutableArray.Create(
+                    new RegisteredCodecModel(new TypeRef("global::Codecs.ZuluCodec"), RegisteredCodecKind.Serializer)),
+                interfaceImplementations: ImmutableArray.Create(
                     new InterfaceImplementationModel(new TypeRef("global::Impl.Alpha")),
-                    new InterfaceImplementationModel(new TypeRef("global::Impl.Zulu"))))));
+                    new InterfaceImplementationModel(new TypeRef("global::Impl.Zulu")))));
 
         Assert.Equal(aggregateA, aggregateB);
         Assert.Equal(aggregateA.GetHashCode(), aggregateB.GetHashCode());
@@ -540,15 +488,15 @@ public class IncrementalModelEqualityTests
             ImmutableArray<SerializableTypeModel>.Empty,
             ImmutableArray<ProxyInterfaceModel>.Empty,
             CreateReferenceAssemblyModel(
-                interfaceImplementations: EquatableArray<InterfaceImplementationModel>.Empty));
+                interfaceImplementations: ImmutableArray<InterfaceImplementationModel>.Empty));
 
         var b = ModelExtractor.CreateMetadataAggregate(
             "TestAssembly",
             ImmutableArray<SerializableTypeModel>.Empty,
             ImmutableArray<ProxyInterfaceModel>.Empty,
             CreateReferenceAssemblyModel(
-                interfaceImplementations: new EquatableArray<InterfaceImplementationModel>(ImmutableArray.Create(
-                    new InterfaceImplementationModel(new TypeRef("global::MyNamespace.MyImplementation"))))));
+                interfaceImplementations: ImmutableArray.Create(
+                    new InterfaceImplementationModel(new TypeRef("global::MyNamespace.MyImplementation")))));
 
         Assert.NotEqual(a, b);
         Assert.NotEqual(a.GetHashCode(), b.GetHashCode());
@@ -649,8 +597,7 @@ public class IncrementalModelEqualityTests
     [Fact]
     public void CompoundTypeAliasModel_SameValues_AreEqual()
     {
-        var components = new EquatableArray<CompoundAliasComponentModel>(
-            ImmutableArray.Create(new CompoundAliasComponentModel("part1")));
+        var components = ImmutableArray.Create(new CompoundAliasComponentModel("part1"));
         var a = new CompoundTypeAliasModel(components, new TypeRef("global::MyType"));
         var b = new CompoundTypeAliasModel(components, new TypeRef("global::MyType"));
         Assert.Equal(a, b);
@@ -660,10 +607,8 @@ public class IncrementalModelEqualityTests
     [Fact]
     public void CompoundTypeAliasModel_DifferentComponents_AreNotEqual()
     {
-        var compsA = new EquatableArray<CompoundAliasComponentModel>(
-            ImmutableArray.Create(new CompoundAliasComponentModel("part1")));
-        var compsB = new EquatableArray<CompoundAliasComponentModel>(
-            ImmutableArray.Create(new CompoundAliasComponentModel("part2")));
+        var compsA = ImmutableArray.Create(new CompoundAliasComponentModel("part1"));
+        var compsB = ImmutableArray.Create(new CompoundAliasComponentModel("part2"));
         var a = new CompoundTypeAliasModel(compsA, new TypeRef("global::MyType"));
         var b = new CompoundTypeAliasModel(compsB, new TypeRef("global::MyType"));
         Assert.NotEqual(a, b);
@@ -672,8 +617,7 @@ public class IncrementalModelEqualityTests
     [Fact]
     public void CompoundTypeAliasModel_DifferentTargetType_AreNotEqual()
     {
-        var components = new EquatableArray<CompoundAliasComponentModel>(
-            ImmutableArray.Create(new CompoundAliasComponentModel("part1")));
+        var components = ImmutableArray.Create(new CompoundAliasComponentModel("part1"));
         var a = new CompoundTypeAliasModel(components, new TypeRef("global::TypeA"));
         var b = new CompoundTypeAliasModel(components, new TypeRef("global::TypeB"));
         Assert.NotEqual(a, b);
@@ -740,12 +684,12 @@ public class IncrementalModelEqualityTests
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
         var b = new ProxyBaseModel(
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
         Assert.Equal(a, b);
         Assert.Equal(a.GetHashCode(), b.GetHashCode());
     }
@@ -757,12 +701,12 @@ public class IncrementalModelEqualityTests
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
         var b = new ProxyBaseModel(
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: true,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
         Assert.NotEqual(a, b);
     }
 
@@ -773,12 +717,12 @@ public class IncrementalModelEqualityTests
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
         var b = new ProxyBaseModel(
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "OtherReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
         Assert.NotEqual(a, b);
     }
 
@@ -790,12 +734,12 @@ public class IncrementalModelEqualityTests
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: new EquatableArray<InvokableBaseTypeMapping>(ImmutableArray.Create(mappingA)));
+            invokableBaseTypes: ImmutableArray.Create(mappingA));
         var b = new ProxyBaseModel(
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
         Assert.NotEqual(a, b);
     }
 
@@ -806,8 +750,8 @@ public class IncrementalModelEqualityTests
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
-        Assert.False(a.Equals(null));
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
+        Assert.False(a.Equals(null!));
     }
 
     #endregion
@@ -941,7 +885,7 @@ public class IncrementalModelEqualityTests
         string name = "MyType",
         string ns = "MyNamespace",
         bool isValueType = false,
-        EquatableArray<MemberModel>? members = null)
+        ImmutableArray<MemberModel> members = default)
     {
         return new SerializableTypeModel(
             accessibility: Accessibility.Public,
@@ -957,19 +901,19 @@ public class IncrementalModelEqualityTests
             isAbstractType: false,
             isEnumType: false,
             isGenericType: false,
-            typeParameters: EquatableArray<TypeParameterModel>.Empty,
-            members: members ?? EquatableArray<MemberModel>.Empty,
+            typeParameters: ImmutableArray<TypeParameterModel>.Empty,
+            members: members.IsDefault ? ImmutableArray<MemberModel>.Empty : members,
             useActivator: false,
             isEmptyConstructable: true,
             hasActivatorConstructor: false,
             trackReferences: true,
             omitDefaultMemberValues: false,
-            serializationHooks: EquatableArray<TypeRef>.Empty,
+            serializationHooks: ImmutableArray<TypeRef>.Empty,
             isShallowCopyable: false,
             isUnsealedImmutable: false,
             isImmutable: false,
             isExceptionType: false,
-            activatorConstructorParameters: EquatableArray<TypeRef>.Empty,
+            activatorConstructorParameters: ImmutableArray<TypeRef>.Empty,
             creationStrategy: ObjectCreationStrategy.NewExpression);
     }
 
@@ -978,8 +922,8 @@ public class IncrementalModelEqualityTests
         return new MethodModel(
             name: name,
             returnType: new TypeRef("global::System.Threading.Tasks.Task"),
-            parameters: EquatableArray<MethodParameterModel>.Empty,
-            typeParameters: EquatableArray<TypeParameterModel>.Empty,
+            parameters: ImmutableArray<MethodParameterModel>.Empty,
+            typeParameters: ImmutableArray<TypeParameterModel>.Empty,
             containingInterfaceType: new TypeRef("global::MyNamespace.IMyGrain"),
             originalContainingInterfaceType: new TypeRef("global::MyNamespace.IMyGrain"),
             containingInterfaceName: "IMyGrain",
@@ -988,65 +932,65 @@ public class IncrementalModelEqualityTests
             generatedMethodId: "AABB1122",
             methodId: "AABB1122",
             responseTimeoutTicks: null,
-            customInitializerMethods: EquatableArray<CustomInitializerModel>.Empty,
+            customInitializerMethods: ImmutableArray<CustomInitializerModel>.Empty,
             isCancellable: false);
     }
 
     private static ProxyInterfaceModel CreateProxyInterfaceModel(
         string name = "IMyGrain",
-        EquatableArray<MethodModel>? methods = null)
+        ImmutableArray<MethodModel> methods = default)
     {
         var proxyBase = new ProxyBaseModel(
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
             isExtension: false,
             generatedClassNameComponent: "GrainReference",
-            invokableBaseTypes: EquatableArray<InvokableBaseTypeMapping>.Empty);
+            invokableBaseTypes: ImmutableArray<InvokableBaseTypeMapping>.Empty);
 
         return new ProxyInterfaceModel(
             interfaceType: new TypeRef($"global::MyNamespace.{name}"),
             name: name,
             generatedNamespace: "OrleansCodeGen.MyNamespace",
-            typeParameters: EquatableArray<TypeParameterModel>.Empty,
+            typeParameters: ImmutableArray<TypeParameterModel>.Empty,
             proxyBase: proxyBase,
-            methods: methods ?? new EquatableArray<MethodModel>(ImmutableArray.Create(CreateMethodModel())));
+            methods: methods.IsDefault ? ImmutableArray.Create(CreateMethodModel()) : methods);
     }
 
     private static ReferenceAssemblyModel CreateReferenceAssemblyModel(
         string partName = "PartA",
-        EquatableArray<EquatableString>? applicationParts = null,
-        EquatableArray<WellKnownTypeIdModel>? wellKnownTypeIds = null,
-        EquatableArray<TypeAliasModel>? typeAliases = null,
-        EquatableArray<CompoundTypeAliasModel>? compoundTypeAliases = null,
-        EquatableArray<SerializableTypeModel>? referencedSerializableTypes = null,
-        EquatableArray<ProxyInterfaceModel>? referencedProxyInterfaces = null,
-        EquatableArray<RegisteredCodecModel>? registeredCodecs = null,
-        EquatableArray<InterfaceImplementationModel>? interfaceImplementations = null)
+        ImmutableArray<string> applicationParts = default,
+        ImmutableArray<WellKnownTypeIdModel> wellKnownTypeIds = default,
+        ImmutableArray<TypeAliasModel> typeAliases = default,
+        ImmutableArray<CompoundTypeAliasModel> compoundTypeAliases = default,
+        ImmutableArray<SerializableTypeModel> referencedSerializableTypes = default,
+        ImmutableArray<ProxyInterfaceModel> referencedProxyInterfaces = default,
+        ImmutableArray<RegisteredCodecModel> registeredCodecs = default,
+        ImmutableArray<InterfaceImplementationModel> interfaceImplementations = default)
     {
         return new ReferenceAssemblyModel(
             assemblyName: "TestAssembly",
-            applicationParts: applicationParts ?? new EquatableArray<EquatableString>(ImmutableArray.Create<EquatableString>(partName)),
-            wellKnownTypeIds: wellKnownTypeIds ?? EquatableArray<WellKnownTypeIdModel>.Empty,
-            typeAliases: typeAliases ?? EquatableArray<TypeAliasModel>.Empty,
-            compoundTypeAliases: compoundTypeAliases ?? EquatableArray<CompoundTypeAliasModel>.Empty,
-            referencedSerializableTypes: referencedSerializableTypes ?? EquatableArray<SerializableTypeModel>.Empty,
-            referencedProxyInterfaces: referencedProxyInterfaces ?? EquatableArray<ProxyInterfaceModel>.Empty,
-            registeredCodecs: registeredCodecs ?? EquatableArray<RegisteredCodecModel>.Empty,
-            interfaceImplementations: interfaceImplementations ?? EquatableArray<InterfaceImplementationModel>.Empty);
+            applicationParts: applicationParts.IsDefault ? ImmutableArray.Create(partName) : applicationParts,
+            wellKnownTypeIds: wellKnownTypeIds.IsDefault ? ImmutableArray<WellKnownTypeIdModel>.Empty : wellKnownTypeIds,
+            typeAliases: typeAliases.IsDefault ? ImmutableArray<TypeAliasModel>.Empty : typeAliases,
+            compoundTypeAliases: compoundTypeAliases.IsDefault ? ImmutableArray<CompoundTypeAliasModel>.Empty : compoundTypeAliases,
+            referencedSerializableTypes: referencedSerializableTypes.IsDefault ? ImmutableArray<SerializableTypeModel>.Empty : referencedSerializableTypes,
+            referencedProxyInterfaces: referencedProxyInterfaces.IsDefault ? ImmutableArray<ProxyInterfaceModel>.Empty : referencedProxyInterfaces,
+            registeredCodecs: registeredCodecs.IsDefault ? ImmutableArray<RegisteredCodecModel>.Empty : registeredCodecs,
+            interfaceImplementations: interfaceImplementations.IsDefault ? ImmutableArray<InterfaceImplementationModel>.Empty : interfaceImplementations);
     }
 
     private static MetadataAggregateModel CreateMetadataAggregateModel(string assemblyName = "TestAssembly")
     {
         return new MetadataAggregateModel(
             assemblyName: assemblyName,
-            serializableTypes: EquatableArray<SerializableTypeModel>.Empty,
-            proxyInterfaces: EquatableArray<ProxyInterfaceModel>.Empty,
-            registeredCodecs: EquatableArray<RegisteredCodecModel>.Empty,
+            serializableTypes: ImmutableArray<SerializableTypeModel>.Empty,
+            proxyInterfaces: ImmutableArray<ProxyInterfaceModel>.Empty,
+            registeredCodecs: ImmutableArray<RegisteredCodecModel>.Empty,
             referenceAssemblyData: CreateReferenceAssemblyModel(),
-            activatableTypes: EquatableArray<TypeRef>.Empty,
-            generatedProxyTypes: EquatableArray<TypeRef>.Empty,
-            invokableInterfaces: EquatableArray<TypeRef>.Empty,
-            interfaceImplementations: EquatableArray<InterfaceImplementationModel>.Empty,
-            defaultCopiers: EquatableArray<DefaultCopierModel>.Empty);
+            activatableTypes: ImmutableArray<TypeRef>.Empty,
+            generatedProxyTypes: ImmutableArray<TypeRef>.Empty,
+            invokableInterfaces: ImmutableArray<TypeRef>.Empty,
+            interfaceImplementations: ImmutableArray<InterfaceImplementationModel>.Empty,
+            defaultCopiers: ImmutableArray<DefaultCopierModel>.Empty);
     }
 
     #endregion

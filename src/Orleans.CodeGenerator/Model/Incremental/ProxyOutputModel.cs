@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Immutable;
 
 namespace Orleans.CodeGenerator.Model.Incremental
 {
@@ -9,16 +10,16 @@ namespace Orleans.CodeGenerator.Model.Incremental
     {
         public ProxyOutputModel(
             ProxyInterfaceModel proxyInterface,
-            EquatableArray<EquatableString> ownedInvokableMetadataNames,
+            ImmutableArray<string> ownedInvokableMetadataNames,
             bool useDeclaredInvokableFallback)
         {
             ProxyInterface = proxyInterface;
-            OwnedInvokableMetadataNames = ownedInvokableMetadataNames;
+            OwnedInvokableMetadataNames = ImmutableArrayValueComparer.Normalize(ownedInvokableMetadataNames);
             UseDeclaredInvokableFallback = useDeclaredInvokableFallback;
         }
 
         public ProxyInterfaceModel ProxyInterface { get; }
-        public EquatableArray<EquatableString> OwnedInvokableMetadataNames { get; }
+        public ImmutableArray<string> OwnedInvokableMetadataNames { get; }
         public bool UseDeclaredInvokableFallback { get; }
 
         public bool Equals(ProxyOutputModel other)
@@ -29,7 +30,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             }
 
             return ProxyInterface.Equals(other.ProxyInterface)
-                && OwnedInvokableMetadataNames.Equals(other.OwnedInvokableMetadataNames)
+                && ImmutableArrayValueComparer.Equals(OwnedInvokableMetadataNames, other.OwnedInvokableMetadataNames)
                 && UseDeclaredInvokableFallback == other.UseDeclaredInvokableFallback;
         }
 
@@ -39,7 +40,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
         {
             unchecked
             {
-                return ((ProxyInterface.GetHashCode() * 31) + OwnedInvokableMetadataNames.GetHashCode()) * 31
+                return ((ProxyInterface.GetHashCode() * 31) + ImmutableArrayValueComparer.GetHashCode(OwnedInvokableMetadataNames)) * 31
                     + (UseDeclaredInvokableFallback ? 1 : 0);
             }
         }
