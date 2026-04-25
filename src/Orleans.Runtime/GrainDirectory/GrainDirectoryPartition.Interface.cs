@@ -1,7 +1,5 @@
-using System;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
-using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Runtime.GrainDirectory;
@@ -21,6 +19,47 @@ internal sealed partial class GrainDirectoryPartition
         }
 
         DebugAssertOwnership(address.GrainId);
+
+        if (_leaseHoldDuration > TimeSpan.Zero)
+        {
+            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+            var rangeHash = address.GrainId.GetUniformHashCode();
+
+            // Range lease holds
+            for (var i = _rangeLeaseHolds.Count - 1; i >= 0; i--)
+            {
+                var (lockedRange, expiration) = _rangeLeaseHolds[i];
+
+                if (utcNow >= expiration)
+                {
+                    // We use this opportunity to cleanup this expired range lease hold.
+                    _rangeLeaseHolds.RemoveAt(i);
+                    continue;
+                }
+
+                // If it is still active, does it block this request?
+                if (lockedRange.Contains(rangeHash))
+                {
+                    return DirectoryResult.RetryAfter<GrainAddress>(expiration - utcNow);
+                }
+            }
+
+            // Grain lease holds
+            if (_directory.TryGetValue(address.GrainId, out var existingActivation))
+            {
+                if (_siloLeaseHolds.TryGetValue(existingActivation.SiloAddress!, out var expiration) && utcNow < expiration)
+                {
+                    // This grain belongs to this partition, and the activation is sitting on a silo that has an active lease hold.
+                    // We need to check if the request includes the previous activation id, and if it does it's a valid update/override,
+                    // otherwise it's a new activation trying to "steal" the id while the lease is active, so we reject it!
+                    if (currentRegistration is null || !existingActivation.Matches(currentRegistration))
+                    {
+                        return DirectoryResult.RetryAfter<GrainAddress>(expiration - utcNow);
+                    }
+                }
+            }
+        }
+
         return DirectoryResult.FromResult(RegisterCore(address, currentRegistration), version);
     }
 
