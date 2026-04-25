@@ -22,8 +22,10 @@ namespace Orleans.Providers.Streams.AzureQueue
 
         protected readonly string ServiceId;
         protected readonly AzureQueueOptions queueOptions;
-        protected readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
         protected readonly IQueueDataAdapter<string, IBatchContainer> dataAdapter;
+
+        // internal for testing
+        protected internal readonly ConcurrentDictionary<QueueId, AzureQueueDataManager> Queues = new ConcurrentDictionary<QueueId, AzureQueueDataManager>();
 
         public string Name { get; }
         public bool IsRewindable => false;
