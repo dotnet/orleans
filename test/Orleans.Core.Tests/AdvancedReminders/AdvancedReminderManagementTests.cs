@@ -796,7 +796,7 @@ public class ReminderManagementGrainTests
 
     private sealed class TestJobShardManager() : JobShardManager(SiloAddress.Zero)
     {
-        public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, CancellationToken cancellationToken)
+        public override Task<List<IJobShard>> AssignJobShardsAsync(DateTimeOffset maxDueTime, int maxNewClaims, CancellationToken cancellationToken)
             => Task.FromResult(new List<IJobShard>());
 
         public override Task<IJobShard> CreateShardAsync(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string> metadata, CancellationToken cancellationToken)

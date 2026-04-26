@@ -10,7 +10,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AdvancedDynamoDBRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseDynamoDBAdvancedReminderService(options =>
             {

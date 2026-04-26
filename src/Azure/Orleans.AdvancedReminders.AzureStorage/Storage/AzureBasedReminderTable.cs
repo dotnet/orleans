@@ -181,10 +181,10 @@ namespace Orleans.AdvancedReminders.AzureStorage
 
                 StartAt = LogFormatter.PrintDate(remEntry.StartAt),
                 Period = remEntry.Period.ToString("c", CultureInfo.InvariantCulture),
-                CronExpression = remEntry.CronExpression,
-                CronTimeZoneId = remEntry.CronTimeZoneId,
-                NextDueUtc = remEntry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture),
-                LastFireUtc = remEntry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture),
+                CronExpression = remEntry.CronExpression ?? string.Empty,
+                CronTimeZoneId = remEntry.CronTimeZoneId ?? string.Empty,
+                NextDueUtc = remEntry.NextDueUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
+                LastFireUtc = remEntry.LastFireUtc?.ToString("O", CultureInfo.InvariantCulture) ?? string.Empty,
                 Priority = (int)remEntry.Priority,
                 Action = (int)remEntry.Action,
 
@@ -244,7 +244,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
 
                 LogDebugReadRow(grainId, reminderName);
                 var result = await this.remTableManager.FindReminderEntry(grainId, reminderName);
-                return result.Entity is null ? null : ConvertFromTableEntry(result.Entity, result.ETag);
+                return result.Entity is null ? null! : ConvertFromTableEntry(result.Entity, result.ETag);
             }
             catch (Exception exc)
             {
@@ -262,12 +262,12 @@ namespace Orleans.AdvancedReminders.AzureStorage
                 LogDebugUpsertRow(entry);
                 ReminderTableEntry remTableEntry = ConvertToTableEntry(entry, this.clusterOptions.ServiceId, this.clusterOptions.ClusterId);
 
-                string result = await this.remTableManager.UpsertRow(remTableEntry);
+                string? result = await this.remTableManager.UpsertRow(remTableEntry);
                 if (result == null)
                 {
                     LogWarningReminderUpsertFailed(entry);
                 }
-                return result;
+                return result!;
             }
             catch (Exception exc)
             {
@@ -307,7 +307,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
 
         private readonly struct RingRangeLogValue(uint Begin, uint End)
         {
-            public override string ToString() => RangeFactory.CreateRange(Begin, End).ToString();
+            public override string ToString() => RangeFactory.CreateRange(Begin, End).ToString() ?? string.Empty;
         }
 
         [LoggerMessage(

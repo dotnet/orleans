@@ -222,7 +222,7 @@ internal partial class CosmosReminderTable : IReminderTable
 
             return true;
         }
-        catch (CosmosException dce) when (dce.StatusCode is HttpStatusCode.PreconditionFailed)
+        catch (CosmosException dce) when (dce.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
         {
             return false;
         }

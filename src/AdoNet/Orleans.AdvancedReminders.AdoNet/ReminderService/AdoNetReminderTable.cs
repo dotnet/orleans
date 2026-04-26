@@ -11,7 +11,7 @@ namespace Orleans.AdvancedReminders.Runtime.ReminderService
     {
         private readonly AdoNetReminderTableOptions options;
         private readonly string serviceId;
-        private RelationalOrleansQueries orleansQueries;
+        private RelationalOrleansQueries orleansQueries = default!;
 
         public AdoNetReminderTable(
             IOptions<ClusterOptions> clusterOptions, 

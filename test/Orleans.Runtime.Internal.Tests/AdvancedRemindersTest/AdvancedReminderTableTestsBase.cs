@@ -69,6 +69,12 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
     [SkippableFact]
     public async Task RemindersTable_DurableRangeQueries() => await RemindersRange(iterations: 128);
 
+    [SkippableFact]
+    public async Task RemindersTable_DurableAddUpdateDeleteRoundTrip() => await ReminderAddUpdateDeleteRoundTrip();
+
+    [SkippableFact]
+    public async Task RemindersTable_DurableDeleteMissingReturnsFalse() => await ReminderDeleteMissingReturnsFalse();
+
     protected async Task RemindersParallelUpsert()
     {
         var upserts = await Task.WhenAll(Enumerable.Range(0, 5).Select(i =>
@@ -104,6 +110,55 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
         Assert.False(await remindersTable.RemoveRow(reminder.GrainId, "missing", reminder.ETag));
         Assert.True(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag));
         Assert.False(await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, reminder.ETag));
+    }
+
+    protected async Task ReminderAddUpdateDeleteRoundTrip()
+    {
+        var grainId = MakeTestGrainReference();
+        var reminder = CreateReminder(grainId, "add_update_delete");
+        reminder.NextDueUtc = reminder.StartAt.AddMinutes(1);
+
+        var createdETag = await remindersTable.UpsertRow(reminder);
+        Assert.False(string.IsNullOrWhiteSpace(createdETag));
+
+        var created = await remindersTable.ReadRow(grainId, reminder.ReminderName);
+        Assert.NotNull(created);
+        reminder.ETag = created.ETag;
+        AssertReminderMatches(reminder, created);
+
+        reminder.StartAt = reminder.StartAt.AddMinutes(2);
+        reminder.Period = TimeSpan.FromMinutes(7);
+        reminder.CronExpression = "0 */15 * * * *";
+        reminder.CronTimeZoneId = "Europe/Warsaw";
+        reminder.NextDueUtc = reminder.StartAt.AddMinutes(15);
+        reminder.LastFireUtc = reminder.StartAt.AddMinutes(-5);
+        reminder.Priority = ReminderPriority.High;
+        reminder.Action = MissedReminderAction.FireImmediately;
+
+        var updatedETag = await remindersTable.UpsertRow(reminder);
+        Assert.False(string.IsNullOrWhiteSpace(updatedETag));
+
+        var updated = await remindersTable.ReadRow(grainId, reminder.ReminderName);
+        Assert.NotNull(updated);
+        reminder.ETag = updated.ETag;
+        AssertReminderMatches(reminder, updated);
+
+        var rows = await remindersTable.ReadRows(grainId);
+        var row = Assert.Single(rows.Reminders);
+        AssertReminderMatches(reminder, row);
+
+        Assert.False(await remindersTable.RemoveRow(grainId, reminder.ReminderName, created.ETag));
+        Assert.True(await remindersTable.RemoveRow(grainId, reminder.ReminderName, updated.ETag));
+        Assert.Null(await remindersTable.ReadRow(grainId, reminder.ReminderName));
+        Assert.Empty((await remindersTable.ReadRows(grainId)).Reminders);
+        Assert.False(await remindersTable.RemoveRow(grainId, reminder.ReminderName, updated.ETag));
+    }
+
+    protected async Task ReminderDeleteMissingReturnsFalse()
+    {
+        var grainId = MakeTestGrainReference();
+        Assert.False(await remindersTable.RemoveRow(grainId, "missing", "missing-etag"));
+        Assert.Null(await remindersTable.ReadRow(grainId, "missing"));
     }
 
     protected async Task ReminderCronRoundTrip()
@@ -216,6 +271,21 @@ public abstract class AdvancedReminderTableTestsBase : IAsyncLifetime, IClassFix
             Period = TimeSpan.FromMinutes(1),
             StartAt = now,
         };
+    }
+
+    private static void AssertReminderMatches(AdvancedReminderEntry expected, AdvancedReminderEntry actual)
+    {
+        Assert.Equal(expected.GrainId, actual.GrainId);
+        Assert.Equal(expected.ReminderName, actual.ReminderName);
+        AssertTimestampClose(expected.StartAt, actual.StartAt);
+        Assert.Equal(expected.Period, actual.Period);
+        Assert.Equal(expected.CronExpression, actual.CronExpression);
+        Assert.Equal(expected.CronTimeZoneId, actual.CronTimeZoneId);
+        AssertTimestampClose(expected.NextDueUtc, actual.NextDueUtc);
+        AssertTimestampClose(expected.LastFireUtc, actual.LastFireUtc);
+        Assert.Equal(expected.Priority, actual.Priority);
+        Assert.Equal(expected.Action, actual.Action);
+        Assert.False(string.IsNullOrWhiteSpace(actual.ETag));
     }
 
     private static GrainId MakeTestGrainReference() => LegacyGrainId.GetGrainId(12345, Guid.NewGuid(), "foo/bar\\#baz?");

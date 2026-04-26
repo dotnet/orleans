@@ -24,8 +24,8 @@ namespace Orleans.AdvancedReminders.Redis
         private readonly RedisReminderTableOptions _redisOptions;
         private readonly ClusterOptions _clusterOptions;
         private readonly ILogger _logger;
-        private IConnectionMultiplexer _muxer;
-        private IDatabase _db;
+        private IConnectionMultiplexer _muxer = default!;
+        private IDatabase _db = default!;
 
         public RedisReminderTable(
             ILogger<RedisReminderTable> logger,
@@ -65,11 +65,11 @@ namespace Orleans.AdvancedReminders.Redis
                 RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
                 if (values.Length == 0)
                 {
-                    return null;
+                    return null!;
                 }
                 else
                 {
-                    return ConvertToEntry(values.SingleOrDefault());
+                    return ConvertToEntry(values.Single().ToString());
                 }
             }
             catch (Exception exception)
@@ -84,7 +84,7 @@ namespace Orleans.AdvancedReminders.Redis
             {
                 var (from, to) = GetFilter(grainId);
                 RedisValue[] values = await _db.SortedSetRangeByValueAsync(_hashSetKey, from, to);
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v.ToString()));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -113,7 +113,7 @@ namespace Orleans.AdvancedReminders.Redis
                     values = values1.Concat(values2);
                 }
 
-                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v));
+                IEnumerable<ReminderEntry> records = values.Select(static v => ConvertToEntry(v.ToString()));
                 return new ReminderTableData(records);
             }
             catch (Exception exception)
@@ -172,7 +172,7 @@ namespace Orleans.AdvancedReminders.Redis
                 var (newETag, value) = ConvertFromEntry(entry);
                 var (from, to) = GetFilter(entry.GrainId, entry.ReminderName);
                 var res = await _db.ScriptEvaluateAsync(UpsertScript, keys: new[] { _hashSetKey }, values: new[] { from, to, value });
-                return newETag;
+                return newETag.ToString();
             }
             catch (Exception exception) when (exception is not Runtime.ReminderException)
             {
@@ -224,25 +224,25 @@ namespace Orleans.AdvancedReminders.Redis
         {
             if (segments.GetArrayLength() <= index)
             {
-                return null;
+                return string.Empty;
             }
 
             var segment = segments[index];
             if (segment.ValueKind is JsonValueKind.Null or JsonValueKind.Undefined)
             {
-                return null;
+                return string.Empty;
             }
 
             var value = segment.ValueKind is JsonValueKind.String
                 ? segment.GetString()
                 : segment.ToString();
-            return string.IsNullOrWhiteSpace(value) ? null : value;
+            return string.IsNullOrWhiteSpace(value) ? string.Empty : value;
         }
 
         private static DateTime? ReadNullableDateTime(JsonElement segments, int index)
         {
             var value = ReadNullableString(segments, index);
-            return value is null ? null : DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
+            return string.IsNullOrWhiteSpace(value) ? null : DateTime.Parse(value, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind);
         }
 
         private static ReminderPriority ReadReminderPriority(JsonElement segments, int index)
@@ -391,7 +391,7 @@ namespace Orleans.AdvancedReminders.Redis
 
         private readonly struct ReminderEntryLogValue(ReminderEntry entry)
         {
-            public override string ToString() => entry.ToString();
+            public override string ToString() => entry.ToString() ?? string.Empty;
         }
 
         [LoggerMessage(

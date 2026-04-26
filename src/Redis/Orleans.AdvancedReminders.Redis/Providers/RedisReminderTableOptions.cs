@@ -15,7 +15,7 @@ namespace Orleans.AdvancedReminders.Redis
         /// Gets or sets the Redis client options.
         /// </summary>
         [RedactRedisConfigurationOptions]
-        public ConfigurationOptions ConfigurationOptions { get; set; }
+        public ConfigurationOptions ConfigurationOptions { get; set; } = new();
 
         /// <summary>
         /// The delegate used to create a Redis connection multiplexer.

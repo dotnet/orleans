@@ -15,7 +15,7 @@ namespace Orleans.Hosting;
 
 internal sealed class AdvancedRedisRemindersProviderBuilder : IProviderBuilder<ISiloBuilder>
 {
-    public void Configure(ISiloBuilder builder, string name, IConfigurationSection configurationSection)
+    public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
         builder.UseRedisAdvancedReminderService(_ => { });
         builder.Services.AddOptions<RedisReminderTableOptions>()

@@ -13,22 +13,22 @@ namespace Orleans.AdvancedReminders.AzureStorage
 {
     internal sealed class ReminderTableEntry : ITableEntity
     {
-        public string GrainReference        { get; set; }    // Part of RowKey
-        public string ReminderName          { get; set; }    // Part of RowKey
-        public string ServiceId             { get; set; }    // Part of PartitionKey
-        public string DeploymentId          { get; set; }
-        public string StartAt               { get; set; }
-        public string Period                { get; set; }
-        public string CronExpression        { get; set; }
-        public string CronTimeZoneId        { get; set; }
-        public string NextDueUtc            { get; set; }
-        public string LastFireUtc           { get; set; }
+        public string GrainReference        { get; set; } = string.Empty;    // Part of RowKey
+        public string ReminderName          { get; set; } = string.Empty;    // Part of RowKey
+        public string ServiceId             { get; set; } = string.Empty;    // Part of PartitionKey
+        public string DeploymentId          { get; set; } = string.Empty;
+        public string StartAt               { get; set; } = string.Empty;
+        public string Period                { get; set; } = string.Empty;
+        public string CronExpression        { get; set; } = string.Empty;
+        public string CronTimeZoneId        { get; set; } = string.Empty;
+        public string NextDueUtc            { get; set; } = string.Empty;
+        public string LastFireUtc           { get; set; } = string.Empty;
         public int Priority                 { get; set; } = (int)ReminderPriority.Normal;
         public int Action                   { get; set; } = (int)MissedReminderAction.Skip;
-        public string GrainRefConsistentHash { get; set; }    // Part of PartitionKey
+        public string GrainRefConsistentHash { get; set; } = string.Empty;    // Part of PartitionKey
 
-        public string PartitionKey { get; set; }
-        public string RowKey { get; set; }
+        public string PartitionKey { get; set; } = string.Empty;
+        public string RowKey { get; set; } = string.Empty;
         public DateTimeOffset? Timestamp { get; set; }
         public ETag ETag { get; set; }
 
@@ -136,7 +136,7 @@ namespace Orleans.AdvancedReminders.AzureStorage
             return FindReminderEntries(0, 0);
         }
 
-        internal async Task<string> UpsertRow(ReminderTableEntry reminderEntry)
+        internal async Task<string?> UpsertRow(ReminderTableEntry reminderEntry)
         {
             try
             {

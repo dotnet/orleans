@@ -38,7 +38,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
         private readonly DynamoDBReminderStorageOptions options;
         private readonly string serviceId;
 
-        private DynamoDBStorage storage;
+        private DynamoDBStorage storage = default!;
 
         /// <summary>Initializes a new instance of the <see cref="DynamoDBReminderTable"/> class.</summary>
         /// <param name="loggerFactory">logger factory to use</param>
@@ -129,7 +129,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
 
             try
             {
-                return await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve).ConfigureAwait(false);
+                return (await this.storage.ReadSingleEntryAsync(this.options.TableName, keys, this.Resolve).ConfigureAwait(false))!;
             }
             catch (Exception exc)
             {
@@ -173,7 +173,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
         /// <returns> Return the RemiderTableData if the rows were read successfully </returns>
         public async Task<ReminderTableData> ReadRows(uint begin, uint end)
         {
-            Dictionary<string, AttributeValue> expressionValues = null;
+            Dictionary<string, AttributeValue> expressionValues = new();
 
             try
             {
@@ -239,7 +239,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
         }
 
         private static string ReadOptionalString(Dictionary<string, AttributeValue> item, string propertyName)
-            => item.TryGetValue(propertyName, out var value) ? value.S : null;
+            => item.TryGetValue(propertyName, out var value) ? value.S ?? string.Empty : string.Empty;
 
         private static DateTime? ReadOptionalDateTime(Dictionary<string, AttributeValue> item, string propertyName)
         {
@@ -437,7 +437,7 @@ namespace Orleans.AdvancedReminders.DynamoDB
 
         private readonly struct DictionaryLogRecord(Dictionary<string, AttributeValue> keys)
         {
-            public override string ToString() => Utils.DictionaryToString(keys);
+            public override string ToString() => Utils.DictionaryToString(keys) ?? string.Empty;
         }
 
         [LoggerMessage(
