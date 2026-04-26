@@ -1,14 +1,17 @@
 #nullable enable
 
+using System.Collections.Concurrent;
 using System.Text;
 using Microsoft.Extensions.Logging;
 using Orleans.Internal;
 using Orleans.Runtime;
+using Orleans.Testing.Reminders;
 using Orleans.TestingHost;
 using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
+using ReminderEvents = Orleans.Reminders.Diagnostics.ReminderEvents;
 
 // ReSharper disable InconsistentNaming
 // ReSharper disable UnusedVariable
@@ -19,16 +22,16 @@ namespace UnitTests.TimerTests;
 /// Base class for reminder tests providing common test operations and utilities.
 /// Uses <see cref="ReminderDiagnosticObserver"/> for event-driven waiting instead of Task.Delay.
 /// </summary>
-public class ReminderTests_Base : OrleansTestingBase, IDisposable
+public class ReminderTestsBase : OrleansTestingBase, IDisposable
 {
-    protected TestCluster HostedCluster { get; private set; }
-    internal static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500);
-    internal static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(2);
-    internal static readonly TimeSpan CHURN_ENDWAIT = TimeSpan.FromMinutes(5);
+    protected InProcessTestCluster HostedCluster { get; }
+    protected static readonly TimeSpan LEEWAY = TimeSpan.FromMilliseconds(500);
+    protected static readonly TimeSpan ENDWAIT = TimeSpan.FromMinutes(2);
+    protected static readonly TimeSpan CHURN_ENDWAIT = TimeSpan.FromMinutes(5);
 
-    internal const string DR = "DEFAULT_REMINDER";
-    internal const string R1 = "REMINDER_1";
-    internal const string R2 = "REMINDER_2";
+    protected const string DR = "DEFAULT_REMINDER";
+    protected const string R1 = "REMINDER_1";
+    protected const string R2 = "REMINDER_2";
 
     protected const long retries = 3;
 
@@ -37,11 +40,22 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
 
     protected ILogger log;
     protected ReminderDiagnosticObserver observer;
+    private ReminderTestClock ReminderClock { get; }
 
-    public ReminderTests_Base(BaseTestClusterFixture fixture)
+    public ReminderTestsBase(ReminderTestClock reminderClock, InProcessTestCluster hostedCluster)
     {
-        HostedCluster = fixture.HostedCluster;
-        GrainFactory = fixture.GrainFactory;
+        ArgumentNullException.ThrowIfNull(reminderClock);
+        ArgumentNullException.ThrowIfNull(hostedCluster);
+
+        var grainFactory = hostedCluster.Client;
+        if (grainFactory is null)
+        {
+            throw new InvalidOperationException($"{nameof(InProcessTestCluster)} client is not initialized.");
+        }
+
+        HostedCluster = hostedCluster;
+        GrainFactory = grainFactory;
+        ReminderClock = reminderClock;
 
         var filters = new LoggerFilterOptions();
 #if DEBUG
@@ -49,7 +63,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         filters.AddFilter("Reminder", LogLevel.Trace);
 #endif
 
-        log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("client", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters).CreateLogger<ReminderTests_Base>();
+        log = TestingUtils.CreateDefaultLoggerFactory(TestingUtils.CreateTraceFileName("client", DateTime.Now.ToString("yyyyMMdd_hhmmss")), filters).CreateLogger<ReminderTestsBase>();
         observer = ReminderDiagnosticObserver.Create();
     }
 
@@ -131,7 +145,7 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         using var cts = new CancellationTokenSource(ENDWAIT);
         for (int i = 0; i < count; i++)
         {
-            await observer.WaitForTickCountAsync(grain, 2, cts.Token, DR + "_" + i);
+            await WaitForReminderCounterAsync(grain, DR + "_" + i, () => grain.GetCounter(DR + "_" + i), 2, cts.Token);
         }
 
         // Verify via grain counters
@@ -164,8 +178,12 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
 
         // start another silo ... although it will take it a while before it stabilizes
-        log.LogInformation("Starting another silo");
-        await this.HostedCluster.StartAdditionalSilosAsync(1, true).WaitAsync(cts.Token);
+        await using (await PauseReminderTimeAsync(cts.Token))
+        {
+            log.LogInformation("Starting another silo");
+            await this.StartAdditionalSilosAsync(1, true).WaitAsync(cts.Token);
+            await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+        }
 
         //Block until all tasks complete.
         await Task.WhenAll(tasks).WaitAsync(cts.Token);
@@ -180,6 +198,61 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         Assert.Null(reminder);
     }
 
+    public async Task Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder(CancellationToken cancellationToken = default)
+    {
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
+        cts.CancelAfter(ENDWAIT);
+
+        var grain = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
+        var grainId = grain.GetGrainId();
+
+        await grain.StartReminder(DR);
+        var firstTickCount = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 1, cts.Token);
+        Assert.Equal(1, observer.GetActiveReminderCount(grainId, DR));
+
+        using (var recorder = new ReminderEventRecorder(ReminderEvents.AllEvents))
+        {
+            await grain.StartReminder(DR);
+            await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), firstTickCount + 1, cts.Token);
+
+            Assert.Contains(recorder.Events, evt => evt is ReminderEvents.Registered registered && registered.GrainId == grainId && registered.ReminderName == DR);
+            Assert.DoesNotContain(recorder.Events, evt => evt is ReminderEvents.LocalReminderStarted { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
+            Assert.DoesNotContain(recorder.Events, evt => evt is ReminderEvents.LocalReminderStopped { GrainId: var eventGrainId, ReminderName: DR } && eventGrainId == grainId);
+        }
+
+        Assert.Equal(1, observer.GetActiveReminderCount(grainId, DR));
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cts.Token);
+        Assert.Equal(0, observer.GetActiveReminderCount(grainId, DR));
+    }
+
+    protected Task<List<InProcessSiloHandle>> StartAdditionalSilosAsync(int silosToStart, bool startAdditionalSiloOnNewPort = false)
+    {
+        return HostedCluster.StartSilosAsync(silosToStart);
+    }
+
+    protected Task WaitForLivenessToStabilizeAsync(bool didKill = false)
+    {
+        return HostedCluster.WaitForLivenessToStabilizeAsync(didKill);
+    }
+
+    protected InProcessSiloHandle GetSecondarySilo()
+    {
+        foreach (var silo in HostedCluster.GetActiveSilos())
+        {
+            if (silo.InstanceNumber != 0)
+            {
+                return silo;
+            }
+        }
+
+        throw new InvalidOperationException("Expected at least one non-primary silo.");
+    }
+
+    protected Task StopSiloAsync(InProcessSiloHandle silo)
+    {
+        return HostedCluster.StopSiloAsync(silo);
+    }
+
     protected async Task WaitForInitialReminderTicksAsync(CancellationToken cancellationToken, params IReminderTestGrain2[] grains)
     {
         ArgumentNullException.ThrowIfNull(grains);
@@ -187,11 +260,11 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         foreach (var grain in grains)
         {
             ArgumentNullException.ThrowIfNull(grain);
-            await observer.WaitForReminderTickAsync(grain, cancellationToken: cancellationToken);
+            await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), 1, cancellationToken);
         }
     }
 
-    internal async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g, CancellationToken cancellationToken = default)
+    protected async Task<bool> PerGrainMultiReminderTestChurn(IReminderTestGrain2 g, CancellationToken cancellationToken = default)
     {
         // for churn cases, we do execute start and stop reminders with retries as we don't have the queue-ing
         // functionality implemented on the LocalReminderService yet
@@ -212,18 +285,22 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         // Wait for 1 more DR counter increment to verify all reminders are still running.
         await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken);
 
+        // If this test asserts that R1 reached 4 ticks, wait on R1 itself rather than
+        // inferring progress from DR. This turns the old flaky floor into an explicit contract.
+        await WaitForReminderCounterAsync(g, R1, () => g.GetCounter(R1), 4, cancellationToken);
+
         // Stop R1
-        await ExecuteWithRetriesStop(g.StopReminder, R1);
+        await StopReminderAndWaitForQuiescenceAsync(g, R1, g.StopReminder, cancellationToken);
         // Wait for 2 more DR counter increments to let things settle after R1 stop.
         await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 2, cancellationToken);
 
         // Stop R2
-        await ExecuteWithRetriesStop(g.StopReminder, R2);
+        await StopReminderAndWaitForQuiescenceAsync(g, R2, g.StopReminder, cancellationToken);
         // Wait for 1 more DR counter increment.
         await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken);
 
         // Stop Default reminder
-        await ExecuteWithRetriesStop(g.StopReminder, DR);
+        await StopReminderAndWaitForQuiescenceAsync(g, DR, g.StopReminder, cancellationToken);
 
         long lastR1 = await g.GetCounter(R1);
         const long minimumReminder1Ticks = 4;
@@ -252,44 +329,52 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), failCheckAfter, cancellationToken);
         Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
-        await grain.StopReminder(DR);
-        // Brief pause to confirm no more ticks after stopping
-        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cancellationToken);
+        var stoppedCount = await grain.GetCounter(DR);
+        await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grain, DR), cancellationToken);
+
         long curr = await grain.GetCounter(DR);
-        // After stopping, at most one extra tick could have been in-flight
-        AssertIsInRange(curr, last, last + 1, grain, DR, TimeSpan.FromMilliseconds(200));
+        Assert.Equal(stoppedCount, curr);
 
         return true;
     }
 
-    private async Task<long> WaitForReminderCounterAsync(IAddressable grain, string reminderName, Func<Task<long>> getCounter, long minimumCount, CancellationToken cancellationToken = default)
+    protected async Task<long> WaitForReminderCounterAsync(IAddressable grain, string reminderName, Func<Task<long>> getCounter, long minimumCount, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(getCounter);
         ArgumentOutOfRangeException.ThrowIfNegative(minimumCount);
 
         long result = 0;
-        await observer.WaitForTickConditionAsync(
-            grain,
-            async ct =>
+        async Task<bool> Condition(CancellationToken ct)
+        {
+            try
             {
-                try
-                {
-                    result = await getCounter();
-                    return result >= minimumCount;
-                }
-                catch (FileNotFoundException) when (!ct.IsCancellationRequested)
-                {
-                    return false;
-                }
-            },
-            cancellationToken,
-            reminderName);
+                result = await getCounter();
+                return result >= minimumCount;
+            }
+            catch (FileNotFoundException) when (!ct.IsCancellationRequested)
+            {
+                return false;
+            }
+        }
 
-        return result;
+        while (true)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (await Condition(cancellationToken))
+            {
+                return result;
+            }
+
+            var nextTickTarget = observer.GetTickCount(grain.GetGrainId(), reminderName) + 1;
+            var waitTask = observer.WaitForTickCountAsync(grain, nextTickTarget, cancellationToken, reminderName);
+            await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grain, reminderName), cancellationToken);
+            await waitTask;
+        }
     }
 
-    private async Task<long> WaitForAdditionalReminderCounterAsync(IAddressable grain, string reminderName, Func<Task<long>> getCounter, long additionalCount, CancellationToken cancellationToken = default)
+    protected async Task<long> WaitForAdditionalReminderCounterAsync(IAddressable grain, string reminderName, Func<Task<long>> getCounter, long additionalCount, CancellationToken cancellationToken = default)
     {
         ArgumentNullException.ThrowIfNull(grain);
         ArgumentNullException.ThrowIfNull(getCounter);
@@ -317,49 +402,52 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
 
         // Start Default Reminder and wait for first tick
         await g.StartReminder(DR);
-        await observer.WaitForTickCountAsync(g, 1, cancellationToken, DR);
+        await WaitForReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken);
         var reminders = await g.GetReminderStates();
         Assert.True(reminders[DR].Fired.Count >= 1, $"DR should have fired at least 1 time, got {reminders[DR].Fired.Count}");
 
         // Start R1 and wait for first tick
         await g.StartReminder(R1);
-        await observer.WaitForTickCountAsync(g, 1, cancellationToken, R1);
+        await WaitForReminderCounterAsync(g, R1, () => g.GetCounter(R1), 1, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should have fired at least 1 time, got {reminders[R1].Fired.Count}");
 
         // Start R2 and wait for first tick
         await g.StartReminder(R2);
-        await observer.WaitForTickCountAsync(g, 1, cancellationToken, R2);
+        await WaitForReminderCounterAsync(g, R2, () => g.GetCounter(R2), 1, cancellationToken);
         reminders = await g.GetReminderStates();
         Assert.True(reminders[R2].Fired.Count >= 1, $"R2 should have fired at least 1 time, got {reminders[R2].Fired.Count}");
         Assert.True(reminders[R1].Fired.Count >= 1, $"R1 should still be running, got {reminders[R1].Fired.Count}");
         Assert.True(reminders[DR].Fired.Count >= 1, $"DR should still be running, got {reminders[DR].Fired.Count}");
 
-        // Stop R1 — record its count, then wait for another R2 tick to confirm R2/DR continue
-        int r1CountAtStop = reminders[R1].Fired.Count;
-        await g.StopReminder(R1);
-        await observer.WaitForAdditionalTickCountAsync(g, 1, cancellationToken, R2);
+        // Stop R1, wait for quiescence, then confirm R2/DR continue while R1 remains stable.
+        await StopReminderAndWaitForQuiescenceAsync(g, R1, g.StopReminder, cancellationToken);
         reminders = await g.GetReminderStates();
-        // R1 should be stable (at most 1 in-flight tick)
-        Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should have stopped, but count went from {r1CountAtStop} to {reminders[R1].Fired.Count}");
+        int r1CountAtStop = reminders[R1].Fired.Count;
+        await WaitForAdditionalReminderCounterAsync(g, R2, () => g.GetCounter(R2), 1, cancellationToken);
+        reminders = await g.GetReminderStates();
+        Assert.Equal(r1CountAtStop, reminders[R1].Fired.Count);
         Assert.True(reminders[R2].Fired.Count >= 2, $"R2 should still be running, got {reminders[R2].Fired.Count}");
 
-        // Stop R2 — record its count, then wait for another DR tick
-        int r2CountAtStop = reminders[R2].Fired.Count;
-        await g.StopReminder(R2);
-        await observer.WaitForAdditionalTickCountAsync(g, 1, cancellationToken, DR);
+        // Stop R2, wait for quiescence, then confirm DR continues while R1/R2 remain stable.
+        await StopReminderAndWaitForQuiescenceAsync(g, R2, g.StopReminder, cancellationToken);
         reminders = await g.GetReminderStates();
-        Assert.True(reminders[R2].Fired.Count <= r2CountAtStop + 1, $"R2 should have stopped, but count went from {r2CountAtStop} to {reminders[R2].Fired.Count}");
-        Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should still be stopped");
+        int r2CountAtStop = reminders[R2].Fired.Count;
+        await WaitForAdditionalReminderCounterAsync(g, DR, () => g.GetCounter(DR), 1, cancellationToken);
+        reminders = await g.GetReminderStates();
+        Assert.Equal(r2CountAtStop, reminders[R2].Fired.Count);
+        Assert.Equal(r1CountAtStop, reminders[R1].Fired.Count);
 
         // Stop Default reminder
-        int drCountAtStop = reminders[DR].Fired.Count;
-        await g.StopReminder(DR);
-        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        await StopReminderAndWaitForQuiescenceAsync(g, DR, g.StopReminder, cancellationToken);
         reminders = await g.GetReminderStates();
-        Assert.True(reminders[DR].Fired.Count <= drCountAtStop + 1, $"DR should have stopped, but count went from {drCountAtStop} to {reminders[DR].Fired.Count}");
-        Assert.True(reminders[R1].Fired.Count <= r1CountAtStop + 1, $"R1 should still be stopped");
-        Assert.True(reminders[R2].Fired.Count <= r2CountAtStop + 1, $"R2 should still be stopped");
+        int drCountAtStop = reminders[DR].Fired.Count;
+        await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(g, DR), cancellationToken);
+
+        reminders = await g.GetReminderStates();
+        Assert.Equal(drCountAtStop, reminders[DR].Fired.Count);
+        Assert.Equal(r1CountAtStop, reminders[R1].Fired.Count);
+        Assert.Equal(r2CountAtStop, reminders[R2].Fired.Count);
 
         return true;
     }
@@ -372,12 +460,24 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         long last = await WaitForReminderCounterAsync(grain, DR, () => grain.GetCounter(DR), failCheckAfter, cancellationToken);
         Assert.True(last >= failCheckAfter, $"Expected at least {failCheckAfter} ticks, got {last}");
 
-        await grain.StopReminder(DR);
-        await Task.Delay(TimeSpan.FromMilliseconds(200));
+        await StopReminderAndWaitForQuiescenceAsync(grain, DR, grain.StopReminder, cancellationToken);
+        var stoppedCount = await grain.GetCounter(DR);
+        await AdvanceReminderTimeAsync(await GetReminderPeriodAsync(grain, DR), cancellationToken);
+
         long curr = await grain.GetCounter(DR);
-        AssertIsInRange(curr, last, last + 1, grain, DR, TimeSpan.FromMilliseconds(200));
+        Assert.Equal(stoppedCount, curr);
 
         return true;
+    }
+
+    protected async Task AdvanceReminderTimeAsync(TimeSpan amount, CancellationToken cancellationToken = default)
+    {
+        await ReminderClock.AdvanceAsync(amount, cancellationToken);
+    }
+
+    protected async Task<IAsyncDisposable> PauseReminderTimeAsync(CancellationToken cancellationToken = default)
+    {
+        return await ReminderClock.FreezeAsync(cancellationToken);
     }
 
     protected static string Time()
@@ -449,6 +549,41 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         await function(reminderName).WaitAsync(TestConstants.InitTimeout);
     }
 
+    protected async Task StopReminderAndWaitForQuiescenceAsync(IAddressable grain, string reminderName, Func<string, Task> stopReminder, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(grain);
+        ArgumentNullException.ThrowIfNull(stopReminder);
+
+        var unregisteredTask = observer.WaitForReminderUnregisteredAsync(grain, reminderName, cancellationToken);
+        await ExecuteWithRetriesStop(stopReminder, reminderName);
+        await unregisteredTask;
+        await WaitForReminderQuiescenceAsync(grain, reminderName, cancellationToken);
+    }
+
+    private async Task WaitForReminderQuiescenceAsync(IAddressable grain, string reminderName, CancellationToken cancellationToken)
+    {
+        while (true)
+        {
+            while (observer.GetActiveReminderCount(grain.GetGrainId(), reminderName) > 0)
+            {
+                var quiescenceTask = observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellationToken);
+                if (quiescenceTask.IsCompleted)
+                {
+                    await quiescenceTask;
+                    break;
+                }
+
+                await AdvanceReminderTimeAsync(ReminderClock.RefreshReminderListPeriod, cancellationToken);
+            }
+
+            await AdvanceReminderTimeAsync(ReminderClock.RefreshReminderListPeriod, cancellationToken);
+            if (observer.GetActiveReminderCount(grain.GetGrainId(), reminderName) == 0)
+            {
+                return;
+            }
+        }
+    }
+
     private async Task<bool> HandleError(Exception ex, long i)
     {
         if (ex is AggregateException aggregateException)
@@ -464,6 +599,41 @@ public class ReminderTests_Base : OrleansTestingBase, IDisposable
         }
 
         return false;
+    }
+
+    private static Task<TimeSpan> GetReminderPeriodAsync(IAddressable grain, string reminderName)
+    {
+        return grain switch
+        {
+            IReminderTestGrain2 reminderTestGrain2 => reminderTestGrain2.GetReminderPeriod(reminderName),
+            IReminderTestCopyGrain reminderTestCopyGrain => reminderTestCopyGrain.GetReminderPeriod(reminderName),
+            _ => throw new InvalidOperationException($"Unsupported reminder test grain type: {grain.GetType().FullName}")
+        };
+    }
+
+    private sealed class ReminderEventRecorder : IObserver<ReminderEvents.ReminderEvent>, IDisposable
+    {
+        private readonly IDisposable _subscription;
+        private readonly ConcurrentQueue<ReminderEvents.ReminderEvent> _events = new();
+
+        public ReminderEventRecorder(IObservable<ReminderEvents.ReminderEvent> observable)
+        {
+            _subscription = observable.Subscribe(this);
+        }
+
+        public ReminderEvents.ReminderEvent[] Events => _events.ToArray();
+
+        public void Dispose() => _subscription.Dispose();
+
+        public void OnCompleted()
+        {
+        }
+
+        public void OnError(Exception error)
+        {
+        }
+
+        public void OnNext(ReminderEvents.ReminderEvent value) => _events.Enqueue(value);
     }
 }
 // ReSharper restore InconsistentNaming

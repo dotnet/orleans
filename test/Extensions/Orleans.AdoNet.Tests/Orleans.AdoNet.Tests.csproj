@@ -35,6 +35,7 @@
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.AdvancedReminders.AdoNet\Orleans.AdvancedReminders.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Persistence.AdoNet\Orleans.Persistence.AdoNet.csproj" />
     <ProjectReference Include="$(SourceRoot)src\AdoNet\Orleans.Reminders.AdoNet\Orleans.Reminders.AdoNet.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Reminders.Tests\Orleans.Reminders.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Streaming.Tests\Orleans.Streaming.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Reminders\Orleans.Reminders.csproj" />

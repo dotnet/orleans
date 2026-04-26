@@ -1,8 +1,11 @@
+#nullable enable
+
 using Orleans.Runtime;
 using Orleans.TestingHost;
 using UnitTests.GrainInterfaces;
 using Xunit;
 using Microsoft.Extensions.Logging;
+using Orleans.Testing.Reminders;
 using UnitTests.TimerTests;
 using Orleans.Internal;
 
@@ -15,28 +18,39 @@ namespace Tester.AzureUtils.TimerTests
     /// Tests for Azure Table Storage-based reminder service, including basic operations, failover, and multi-grain scenarios.
     /// </summary>
     [TestCategory("Reminders"), TestCategory("AzureStorage")]
-    public class ReminderTests_AzureTable : ReminderTests_Base, IClassFixture<ReminderTests_AzureTable.Fixture>
+    public class ReminderTests_AzureTable : ReminderTestsBase, IClassFixture<ReminderTests_AzureTable.Fixture>
     {
-        public class Fixture : BaseAzureTestClusterFixture
+        public class Fixture : BaseInProcessAzureTestClusterFixture
         {
-            protected override void ConfigureTestCluster(TestClusterBuilder builder)
-            {
-                builder.AddSiloBuilderConfigurator<SiloConfigurator>();
-            }
-        }
+            private ReminderTestClock? _reminderClock;
+            internal ReminderTestClock ReminderClock => _reminderClock ?? throw new InvalidOperationException($"{nameof(ReminderTestClock)} has not been configured.");
 
-        public class SiloConfigurator : ISiloConfigurator
-        {
-            public void Configure(ISiloBuilder hostBuilder)
+            protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
             {
-                hostBuilder.UseAzureTableReminderService(options =>
+                _reminderClock = builder.AddReminderTestClock();
+                builder.ConfigureSilo((_, siloBuilder) =>
                 {
-                    options.ConfigureTestDefaults();
+                    siloBuilder.UseAzureTableReminderService(options =>
+                    {
+                        options.ConfigureTestDefaults();
+                    });
                 });
             }
+
+            public override async Task DisposeAsync()
+            {
+                try
+                {
+                    await base.DisposeAsync();
+                }
+                finally
+                {
+                    _reminderClock?.Dispose();
+                }
+            }
         }
 
-        public ReminderTests_AzureTable(Fixture fixture) : base(fixture)
+        public ReminderTests_AzureTable(Fixture fixture) : base(fixture.ReminderClock, fixture.HostedCluster)
         {
             fixture.EnsurePreconditionsMet();
         }
@@ -47,6 +61,12 @@ namespace Tester.AzureUtils.TimerTests
         public async Task Rem_Azure_Basic_StopByRef()
         {
             await Test_Reminders_Basic_StopByRef();
+        }
+
+        [SkippableFact, TestCategory("Functional")]
+        public async Task Rem_Azure_UpdateReminder_DoesNotRestartLocalReminder()
+        {
+            await Test_Reminders_UpdateReminder_DoesNotRestartLocalReminder();
         }
 
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/9337"), TestCategory("Functional")]
@@ -145,10 +165,12 @@ namespace Tester.AzureUtils.TimerTests
             await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
 
             // start two extra silos ... although it will take it a while before they stabilize
-            log.LogInformation("Starting 2 extra silos");
-
-            await this.HostedCluster.StartAdditionalSilosAsync(2, true).WaitAsync(cts.Token);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+            await using (await PauseReminderTimeAsync(cts.Token))
+            {
+                log.LogInformation("Starting 2 extra silos");
+                await this.StartAdditionalSilosAsync(2, true).WaitAsync(cts.Token);
+                await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+            }
 
             //Block until all tasks complete.
             await Task.WhenAll(tasks).WaitAsync(cts.Token);
@@ -183,14 +205,16 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             using var cts = new CancellationTokenSource(ENDWAIT);
 
-            TimeSpan period = await g1.GetReminderPeriod(DR);
-
             Task<bool> test = Task.Run(() => PerGrainFailureTest(g1, cts.Token), cts.Token);
 
-            Thread.Sleep(period.Multiply(failAfter));
-            // stop the secondary silo
-            log.LogInformation("Stopping secondary silo");
-            await this.HostedCluster.StopSiloAsync(this.HostedCluster.SecondarySilos.First());
+            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), failAfter, cts.Token);
+                // stop the secondary silo
+                await using (await PauseReminderTimeAsync(cts.Token))
+                {
+                    log.LogInformation("Stopping secondary silo");
+                    await this.StopSiloAsync(this.GetSecondarySilo());
+                    await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+                }
 
             await test.WaitAsync(cts.Token); // Block until test completes.
         }
@@ -198,7 +222,7 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_2F_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(2,true);
+            var silos = await this.StartAdditionalSilosAsync(2, true);
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -206,8 +230,6 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             using var cts = new CancellationTokenSource(ENDWAIT);
-
-            TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
             {
@@ -218,14 +240,19 @@ namespace Tester.AzureUtils.TimerTests
                 Task.Run(() => PerGrainFailureTest(g5, cts.Token), cts.Token),
             };
 
-            Thread.Sleep(period.Multiply(failAfter));
+            await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
+            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), failAfter, cts.Token);
 
             // stop a couple of silos
-            log.LogInformation("Stopping 2 silos");
-            int i = Random.Shared.Next(silos.Count);
-            await this.HostedCluster.StopSiloAsync(silos[i]);
-            silos.RemoveAt(i);
-            await this.HostedCluster.StopSiloAsync(silos[Random.Shared.Next(silos.Count)]);
+            await using (await PauseReminderTimeAsync(cts.Token))
+            {
+                log.LogInformation("Stopping 2 silos");
+                int i = Random.Shared.Next(silos.Count);
+                    await this.StopSiloAsync(silos[i]);
+                    silos.RemoveAt(i);
+                    await this.StopSiloAsync(silos[Random.Shared.Next(silos.Count)]);
+                    await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+                }
 
             await Task.WhenAll(tasks).WaitAsync(cts.Token); // Block until all tasks complete.
         }
@@ -233,8 +260,8 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact, TestCategory("Functional")]
         public async Task Rem_Azure_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            var silos = await this.StartAdditionalSilosAsync(1);
+            await this.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -242,8 +269,6 @@ namespace Tester.AzureUtils.TimerTests
             IReminderTestGrain2 g4 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g5 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             using var cts = new CancellationTokenSource(ENDWAIT);
-
-            TimeSpan period = await g1.GetReminderPeriod(DR);
 
             Task[] tasks =
             {
@@ -254,17 +279,19 @@ namespace Tester.AzureUtils.TimerTests
                 Task.Run(() => PerGrainFailureTest(g5, cts.Token), cts.Token),
             };
 
-            Thread.Sleep(period.Multiply(failAfter));
+            await WaitForInitialReminderTicksAsync(cts.Token, g1, g2, g3, g4, g5);
+            await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), failAfter, cts.Token);
 
             var siloToKill = silos[Random.Shared.Next(silos.Count)];
-            // stop a silo and join a new one in parallel
-            log.LogInformation("Stopping a silo and joining a silo");
-            Task t1 = Task.Factory.StartNew(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
-            Task t2 = this.HostedCluster.StartAdditionalSilosAsync(1, true).ContinueWith(t =>
-            {
-                t.GetAwaiter().GetResult();
-            });
-            await Task.WhenAll(new[] { t1, t2 }).WaitAsync(cts.Token);
+                // stop a silo and join a new one in parallel
+                await using (await PauseReminderTimeAsync(cts.Token))
+                {
+                    log.LogInformation("Stopping a silo and joining a silo");
+                    Task t1 = this.StopSiloAsync(siloToKill);
+                    Task t2 = this.StartAdditionalSilosAsync(1, true);
+                    await Task.WhenAll(new[] { t1, t2 }).WaitAsync(cts.Token);
+                    await this.WaitForLivenessToStabilizeAsync().WaitAsync(cts.Token);
+                }
 
             await Task.WhenAll(tasks).WaitAsync(cts.Token); // Block until all tasks complete.
             log.LogInformation("\n\n\nReminderTest_1F1J_MultiGrain passed OK.\n\n\n");
@@ -310,8 +337,8 @@ namespace Tester.AzureUtils.TimerTests
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
         public async Task Rem_Azure_GT_1F1J_MultiGrain()
         {
-            List<SiloHandle> silos = await this.HostedCluster.StartAdditionalSilosAsync(1);
-            await this.HostedCluster.WaitForLivenessToStabilizeAsync();
+            var silos = await this.StartAdditionalSilosAsync(1);
+            await this.WaitForLivenessToStabilizeAsync();
 
             IReminderTestGrain2 g1 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
             IReminderTestGrain2 g2 = this.GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
@@ -334,8 +361,8 @@ namespace Tester.AzureUtils.TimerTests
             var siloToKill = silos[Random.Shared.Next(silos.Count)];
             // stop a silo and join a new one in parallel
             log.LogInformation("Stopping a silo and joining a silo");
-            Task t1 = Task.Run(async () => await this.HostedCluster.StopSiloAsync(siloToKill));
-            Task t2 = Task.Run(async () => await this.HostedCluster.StartAdditionalSilosAsync(1));
+            Task t1 = this.StopSiloAsync(siloToKill);
+            Task t2 = this.StartAdditionalSilosAsync(1);
             await Task.WhenAll(new[] { t1, t2 }).WaitAsync(cts.Token);
 
             await Task.WhenAll(tasks).WaitAsync(cts.Token); // Block until all tasks complete.

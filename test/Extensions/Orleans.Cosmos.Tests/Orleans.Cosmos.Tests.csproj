@@ -16,6 +16,7 @@
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Reminders.Cosmos\Orleans.Reminders.Cosmos.csproj" />
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Clustering.Cosmos\Orleans.Clustering.Cosmos.csproj" />
     <ProjectReference Include="..\..\..\src\Azure\Orleans.Persistence.Cosmos\Orleans.Persistence.Cosmos.csproj" />
+    <ProjectReference Include="$(SourceRoot)test\Orleans.Reminders.Tests\Orleans.Reminders.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Tests\Orleans.Runtime.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Runtime.Internal.Tests\Orleans.Runtime.Internal.Tests.csproj" />
   </ItemGroup>
