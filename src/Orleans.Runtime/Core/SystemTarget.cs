@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
+using Orleans.Timers;
 
 namespace Orleans.Runtime
 {
@@ -112,6 +113,10 @@ namespace Orleans.Runtime
             else if (typeof(TComponent) == typeof(PlacementStrategy))
             {
                 result = (TComponent)(object)SystemTargetPlacementStrategy.Instance;
+            }
+            else if (typeof(TComponent) == typeof(ITimerRegistry))
+            {
+                result = (TComponent)(object)_shared.TimerRegistry;
             }
             else
             {
