@@ -18,6 +18,7 @@ namespace Orleans.Runtime.ReminderService
         private const int InitialReadRetryCountBeforeFastFailForUpdates = 2;
         private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan MinimumReminderDueTime = TimeSpan.FromMilliseconds(1);
         private readonly ILogger logger;
         private readonly ReminderOptions reminderOptions;
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
@@ -579,16 +580,56 @@ namespace Orleans.Runtime.ReminderService
 
         private IRemindable GetGrain(GrainId grainId) => (IRemindable)_referenceActivator.CreateReference(grainId, _grainInterfaceType);
 
+        internal static TimeSpan CalculateInitialDueTime(ReminderEntry entry, DateTime now)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            if (entry.Period <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(entry), entry.Period, "Reminder period must be greater than zero.");
+            }
+
+            TimeSpan dueTimeSpan;
+            if (now < entry.StartAt) // if the time for first tick hasn't passed yet
+            {
+                dueTimeSpan = entry.StartAt.Subtract(now); // then duetime is duration between now and the first tick time
+            }
+            else // the first tick happened in the past ... compute duetime based on the first tick time, and period
+            {
+                // formula used:
+                // due = period - 'time passed since last tick (==sinceLast)'
+                // due = period - ((Now - FirstTickTime) % period)
+                // explanation of formula:
+                // (Now - FirstTickTime) => gives amount of time since first tick happened
+                // (Now - FirstTickTime) % period => gives amount of time passed since the last tick should have triggered
+                var sinceFirstTick = now.Subtract(entry.StartAt);
+                var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % entry.Period.Ticks);
+                dueTimeSpan = entry.Period.Subtract(sinceLastTick);
+
+                // in corner cases, dueTime can be equal to period ... so, take another mod
+                dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % entry.Period.Ticks);
+            }
+
+            // PeriodicTimer requires a positive period, so clamp immediate ticks to a small positive delay.
+            if (dueTimeSpan < MinimumReminderDueTime)
+            {
+                dueTimeSpan = MinimumReminderDueTime;
+            }
+
+            return dueTimeSpan;
+        }
+
         private sealed class LocalReminderData
         {
             private readonly LocalReminderService _shared;
-            private readonly PeriodicTimer _timer;
+            private PeriodicTimer? _timer;
+            private readonly CancellationTokenSource _stopCancellation = new();
 #if NET10_0_OR_GREATER
             private readonly System.Threading.Lock _lock = new();
 #else
             private readonly object _lock = new();
 #endif
             private ReminderEntry _entry;
+            private CancellationTokenSource _scheduleChangedCancellation = new();
             private bool _isFirstTickPending;
 
             private int _stopReason;
@@ -600,7 +641,6 @@ namespace Orleans.Runtime.ReminderService
                 _shared = reminderService;
                 _entry = entry;
                 _localSequenceNumber = -1;
-                _timer = new(GetInitialDueTime(entry), _shared._timeProvider);
                 _isFirstTickPending = true;
             }
 
@@ -674,6 +714,8 @@ namespace Orleans.Runtime.ReminderService
             {
                 ArgumentNullException.ThrowIfNull(entry);
 
+                CancellationTokenSource scheduleChangedCancellation;
+                PeriodicTimer? timerToDispose;
                 lock (_lock)
                 {
                     if (_entry.GrainId != entry.GrainId || !StringComparer.Ordinal.Equals(_entry.ReminderName, entry.ReminderName))
@@ -683,14 +725,21 @@ namespace Orleans.Runtime.ReminderService
 
                     _entry = entry;
                     _isFirstTickPending = true;
-                    _timer.Period = GetInitialDueTime(entry);
+                    timerToDispose = _timer;
+                    _timer = null;
+                    scheduleChangedCancellation = _scheduleChangedCancellation;
+                    _scheduleChangedCancellation = new();
                 }
+
+                scheduleChangedCancellation.Cancel();
+                timerToDispose?.Dispose();
             }
 
             public Task StopAsync(ReminderEvents.LocalReminderStopReason reason)
             {
                 ReminderEntry entry;
-                PeriodicTimer timerToDispose;
+                PeriodicTimer? timerToDispose;
+                CancellationTokenSource scheduleChangedCancellation;
                 Task? runTask;
                 lock (_lock)
                 {
@@ -701,11 +750,14 @@ namespace Orleans.Runtime.ReminderService
                     }
 
                     timerToDispose = _timer;
+                    scheduleChangedCancellation = _scheduleChangedCancellation;
                     runTask = _runTask;
                 }
 
                 _shared.LogDebugStoppingReminder(entry, reason);
-                timerToDispose.Dispose();
+                _stopCancellation.Cancel();
+                scheduleChangedCancellation.Cancel();
+                timerToDispose?.Dispose();
                 return runTask ?? Task.CompletedTask;
             }
 
@@ -715,12 +767,12 @@ namespace Orleans.Runtime.ReminderService
 
                 try
                 {
-                    while (await _timer.WaitForNextTickAsync())
+                    while (await WaitForNextTick())
                     {
                         var entry = PrepareTick();
                         if (entry is null)
                         {
-                            break;
+                            continue;
                         }
 
                         try
@@ -777,6 +829,87 @@ namespace Orleans.Runtime.ReminderService
                 }
             }
 
+            private async Task<bool> WaitForNextTick()
+            {
+                while (true)
+                {
+                    TimeSpan? initialDueTime;
+                    PeriodicTimer? periodicTimer;
+                    CancellationToken scheduleChangedToken;
+                    lock (_lock)
+                    {
+                        if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown)
+                        {
+                            return false;
+                        }
+
+                        if (_isFirstTickPending)
+                        {
+                            _isFirstTickPending = false;
+                            initialDueTime = GetInitialDueTime(_entry);
+                        }
+                        else
+                        {
+                            initialDueTime = null;
+                            _timer ??= new(_entry.Period, _shared._timeProvider);
+                        }
+
+                        periodicTimer = _timer;
+                        scheduleChangedToken = _scheduleChangedCancellation.Token;
+                    }
+
+                    using var waitCancellation = CancellationTokenSource.CreateLinkedTokenSource(_stopCancellation.Token, scheduleChangedToken);
+                    try
+                    {
+                        if (initialDueTime is { } delay)
+                        {
+                            await Task.Delay(delay, _shared._timeProvider, waitCancellation.Token);
+                            if (!TryStartPeriodicTimer(scheduleChangedToken))
+                            {
+                                if (_stopCancellation.IsCancellationRequested)
+                                {
+                                    return false;
+                                }
+
+                                continue;
+                            }
+
+                            return true;
+                        }
+
+                        var result = await periodicTimer!.WaitForNextTickAsync(waitCancellation.Token);
+                        if (!result && scheduleChangedToken.IsCancellationRequested)
+                        {
+                            continue;
+                        }
+
+                        return result;
+                    }
+                    catch (OperationCanceledException) when (_stopCancellation.IsCancellationRequested)
+                    {
+                        return false;
+                    }
+                    catch (OperationCanceledException) when (scheduleChangedToken.IsCancellationRequested)
+                    {
+                        continue;
+                    }
+                }
+            }
+
+            private bool TryStartPeriodicTimer(CancellationToken scheduleChangedToken)
+            {
+                lock (_lock)
+                {
+                    if (_stopReason != (int)ReminderEvents.LocalReminderStopReason.Unknown || scheduleChangedToken.IsCancellationRequested || _isFirstTickPending)
+                    {
+                        return false;
+                    }
+
+                    _timer ??= new(_entry.Period, _shared._timeProvider);
+                    return true;
+                }
+            }
+
             private ReminderEntry? PrepareTick()
             {
                 lock (_lock)
@@ -786,45 +919,18 @@ namespace Orleans.Runtime.ReminderService
                         return null;
                     }
 
-                    var entry = _entry;
                     if (_isFirstTickPending)
                     {
-                        _isFirstTickPending = false;
-                        if (_timer.Period != entry.Period)
-                        {
-                            _timer.Period = entry.Period;
-                        }
+                        return null;
                     }
 
-                    return entry;
+                    return _entry;
                 }
             }
 
             private TimeSpan GetInitialDueTime(ReminderEntry entry)
             {
-                TimeSpan dueTimeSpan;
-                var now = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                if (now < entry.StartAt) // if the time for first tick hasn't passed yet
-                {
-                    dueTimeSpan = entry.StartAt.Subtract(now); // then duetime is duration between now and the first tick time
-                }
-                else // the first tick happened in the past ... compute duetime based on the first tick time, and period
-                {
-                    // formula used:
-                    // due = period - 'time passed since last tick (==sinceLast)'
-                    // due = period - ((Now - FirstTickTime) % period)
-                    // explanation of formula:
-                    // (Now - FirstTickTime) => gives amount of time since first tick happened
-                    // (Now - FirstTickTime) % period => gives amount of time passed since the last tick should have triggered
-                    var sinceFirstTick = now.Subtract(entry.StartAt);
-                    var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % entry.Period.Ticks);
-                    dueTimeSpan = entry.Period.Subtract(sinceLastTick);
-
-                    // in corner cases, dueTime can be equal to period ... so, take another mod
-                    dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % entry.Period.Ticks);
-                }
-
-                return dueTimeSpan;
+                return CalculateInitialDueTime(entry, _shared._timeProvider.GetUtcNow().UtcDateTime);
             }
 
             private static TimeSpan CalculateTardiness(TickStatus status)
