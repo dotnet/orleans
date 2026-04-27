@@ -18,6 +18,7 @@ namespace Orleans.Runtime.ReminderService
         private const int InitialReadRetryCountBeforeFastFailForUpdates = 2;
         private static readonly TimeSpan InitialReadMaxWaitTimeForUpdates = TimeSpan.FromSeconds(20);
         private static readonly TimeSpan InitialReadRetryPeriod = TimeSpan.FromSeconds(30);
+        private static readonly TimeSpan MinimumReminderDueTime = TimeSpan.FromMilliseconds(1);
         private readonly ILogger logger;
         private readonly ReminderOptions reminderOptions;
         private readonly Dictionary<ReminderIdentity, LocalReminderData> localReminders = new();
@@ -579,6 +580,44 @@ namespace Orleans.Runtime.ReminderService
 
         private IRemindable GetGrain(GrainId grainId) => (IRemindable)_referenceActivator.CreateReference(grainId, _grainInterfaceType);
 
+        internal static TimeSpan CalculateInitialDueTime(ReminderEntry entry, DateTime now)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            if (entry.Period <= TimeSpan.Zero)
+            {
+                throw new ArgumentOutOfRangeException(nameof(entry), entry.Period, "Reminder period must be greater than zero.");
+            }
+
+            TimeSpan dueTimeSpan;
+            if (now < entry.StartAt) // if the time for first tick hasn't passed yet
+            {
+                dueTimeSpan = entry.StartAt.Subtract(now); // then duetime is duration between now and the first tick time
+            }
+            else // the first tick happened in the past ... compute duetime based on the first tick time, and period
+            {
+                // formula used:
+                // due = period - 'time passed since last tick (==sinceLast)'
+                // due = period - ((Now - FirstTickTime) % period)
+                // explanation of formula:
+                // (Now - FirstTickTime) => gives amount of time since first tick happened
+                // (Now - FirstTickTime) % period => gives amount of time passed since the last tick should have triggered
+                var sinceFirstTick = now.Subtract(entry.StartAt);
+                var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % entry.Period.Ticks);
+                dueTimeSpan = entry.Period.Subtract(sinceLastTick);
+
+                // in corner cases, dueTime can be equal to period ... so, take another mod
+                dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % entry.Period.Ticks);
+            }
+
+            // PeriodicTimer requires a positive period, so clamp immediate ticks to a small positive delay.
+            if (dueTimeSpan < MinimumReminderDueTime)
+            {
+                dueTimeSpan = MinimumReminderDueTime;
+            }
+
+            return dueTimeSpan;
+        }
+
         private sealed class LocalReminderData
         {
             private readonly LocalReminderService _shared;
@@ -802,29 +841,7 @@ namespace Orleans.Runtime.ReminderService
 
             private TimeSpan GetInitialDueTime(ReminderEntry entry)
             {
-                TimeSpan dueTimeSpan;
-                var now = _shared._timeProvider.GetUtcNow().UtcDateTime;
-                if (now < entry.StartAt) // if the time for first tick hasn't passed yet
-                {
-                    dueTimeSpan = entry.StartAt.Subtract(now); // then duetime is duration between now and the first tick time
-                }
-                else // the first tick happened in the past ... compute duetime based on the first tick time, and period
-                {
-                    // formula used:
-                    // due = period - 'time passed since last tick (==sinceLast)'
-                    // due = period - ((Now - FirstTickTime) % period)
-                    // explanation of formula:
-                    // (Now - FirstTickTime) => gives amount of time since first tick happened
-                    // (Now - FirstTickTime) % period => gives amount of time passed since the last tick should have triggered
-                    var sinceFirstTick = now.Subtract(entry.StartAt);
-                    var sinceLastTick = TimeSpan.FromTicks(sinceFirstTick.Ticks % entry.Period.Ticks);
-                    dueTimeSpan = entry.Period.Subtract(sinceLastTick);
-
-                    // in corner cases, dueTime can be equal to period ... so, take another mod
-                    dueTimeSpan = TimeSpan.FromTicks(dueTimeSpan.Ticks % entry.Period.Ticks);
-                }
-
-                return dueTimeSpan;
+                return CalculateInitialDueTime(entry, _shared._timeProvider.GetUtcNow().UtcDateTime);
             }
 
             private static TimeSpan CalculateTardiness(TickStatus status)
