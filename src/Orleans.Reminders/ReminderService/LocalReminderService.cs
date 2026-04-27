@@ -197,6 +197,11 @@ namespace Orleans.Runtime.ReminderService
 
             // remove from persistent/memory store
             var success = await reminderTable.RemoveRow(grainId, reminderName, eTag);
+            if (!success)
+            {
+                success = await IsReminderAlreadyRemoved(grainId, reminderName, reminder);
+            }
+
             if (success)
             {
                 if (localReminders.Remove(new(grainId, reminderName), out var localRem))
@@ -218,6 +223,17 @@ namespace Orleans.Runtime.ReminderService
                 LogErrorUnregisterReminder(reminder);
                 throw new ReminderException($"Could not unregister reminder {reminder} from the reminder table, due to tag mismatch. You can retry.");
             }
+        }
+
+        private async Task<bool> IsReminderAlreadyRemoved(GrainId grainId, string reminderName, IGrainReminder reminder)
+        {
+            if (await reminderTable.ReadRow(grainId, reminderName) is not null)
+            {
+                return false;
+            }
+
+            LogDebugReminderAlreadyRemoved(reminder);
+            return true;
         }
 
         private void ObserveLocalReminderStop(Task stopTask, GrainId grainId, string reminderName)
@@ -902,6 +918,12 @@ namespace Orleans.Runtime.ReminderService
             Message = "Removed reminder from table which I didn't have locally: {Entry}."
         )]
         private partial void LogRemovedReminderFromTable(IGrainReminder entry);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "Reminder was already absent from the reminder table during unregister: {Entry}."
+        )]
+        private partial void LogDebugReminderAlreadyRemoved(IGrainReminder entry);
 
         [LoggerMessage(
             Level = LogLevel.Error,
