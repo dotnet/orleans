@@ -356,6 +356,7 @@ internal partial class CosmosReminderTable : IReminderTable
         return new ReminderEntity
         {
             Id = ReminderEntity.ConstructId(entry.GrainId, entry.ReminderName),
+            ETag = entry.ETag,
             PartitionKey = ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainId),
             ServiceId = _clusterOptions.ServiceId,
             GrainHash = entry.GrainId.GetUniformHashCode(),
