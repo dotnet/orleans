@@ -1,5 +1,8 @@
+using System.Collections.Concurrent;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Concurrency;
+using Orleans.Configuration;
 using Orleans.Core.Internal;
 using Orleans.Placement;
 using Orleans.Runtime;
@@ -299,6 +302,110 @@ namespace DefaultCluster.Tests.General
             // The grain should have lost its state during the failed migration.
             var newState = await grain.GetState();
             Assert.NotEqual(expectedState, newState);
+        }
+    }
+
+    public class StuckDeactivationRecoveryTests : TestClusterPerTest
+    {
+        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        {
+            builder.AddSiloBuilderConfigurator<Configurator>();
+        }
+
+        [Fact, TestCategory("BVT")]
+        public async Task StuckDeactivatingActivationIsAbandoned()
+        {
+            var grain = GrainFactory.GetGrain<IStuckDeactivationTestGrain>(GetRandomGrainId());
+            var grainId = grain.GetGrainId();
+            var originalAddress = await grain.GetGrainAddress();
+            var targetHost = HostedCluster.GetActiveSilos().Select(s => s.SiloAddress).First(address => !address.Equals(originalAddress.SiloAddress));
+            var blockingCall = grain.BlockUntilReleased();
+
+            try
+            {
+                await grain.WaitUntilBlocked().WaitAsync(TimeSpan.FromSeconds(10));
+                await grain.StartMigrationTo(targetHost).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+                await Task.Delay(TimeSpan.FromSeconds(1));
+
+                var newAddress = await grain.GetGrainAddress().AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+                Assert.NotEqual(originalAddress.ActivationId, newAddress.ActivationId);
+            }
+            finally
+            {
+                StuckDeactivationTestGrain.Release(grainId);
+            }
+
+            var completed = await Task.WhenAny(blockingCall, Task.Delay(TimeSpan.FromSeconds(10)));
+            Assert.Same(blockingCall, completed);
+            await blockingCall;
+        }
+
+        private sealed class Configurator : ISiloConfigurator
+        {
+            public void Configure(ISiloBuilder hostBuilder)
+            {
+                hostBuilder
+                    .Configure<SiloMessagingOptions>(options =>
+                    {
+                        options.MaxRequestProcessingTime = TimeSpan.FromMilliseconds(250);
+                        options.ResponseTimeout = TimeSpan.FromSeconds(20);
+                    })
+                    .Configure<GrainCollectionOptions>(options => options.DeactivationTimeout = TimeSpan.FromMilliseconds(250));
+            }
+        }
+    }
+
+    public interface IStuckDeactivationTestGrain : IGrainWithIntegerKey
+    {
+        Task BlockUntilReleased();
+
+        [AlwaysInterleave]
+        Task WaitUntilBlocked();
+
+        [AlwaysInterleave]
+        ValueTask StartMigrationTo(SiloAddress targetHost);
+
+        ValueTask<GrainAddress> GetGrainAddress();
+    }
+
+    [RandomPlacement]
+    public class StuckDeactivationTestGrain : Grain, IStuckDeactivationTestGrain
+    {
+        private static readonly ConcurrentDictionary<GrainId, BlockState> BlockStates = new();
+
+        public Task BlockUntilReleased()
+        {
+            var state = GetBlockState();
+            state.Started.TrySetResult();
+            return state.Released.Task;
+        }
+
+        public Task WaitUntilBlocked() => GetBlockState().Started.Task;
+
+        public ValueTask StartMigrationTo(SiloAddress targetHost)
+        {
+            RequestContext.Set(IPlacementDirector.PlacementHintKey, targetHost);
+            MigrateOnIdle();
+            return default;
+        }
+
+        public ValueTask<GrainAddress> GetGrainAddress() => new(GrainContext.Address);
+
+        public static void Release(GrainId grainId)
+        {
+            if (BlockStates.TryRemove(grainId, out var state))
+            {
+                state.Released.TrySetResult();
+            }
+        }
+
+        private BlockState GetBlockState() => BlockStates.GetOrAdd(GrainContext.GrainId, static _ => new());
+
+        private sealed class BlockState
+        {
+            public readonly TaskCompletionSource Started = new(TaskCreationOptions.RunContinuationsAsynchronously);
+            public readonly TaskCompletionSource Released = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
     }
 
