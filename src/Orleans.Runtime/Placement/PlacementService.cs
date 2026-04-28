@@ -7,7 +7,9 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Diagnostics;
+using Orleans.Internal;
 using Orleans.Placement;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Placement.Filtering;
@@ -19,7 +21,7 @@ namespace Orleans.Runtime.Placement
     /// <summary>
     /// Central point for placement decisions.
     /// </summary>
-    internal partial class PlacementService : IPlacementContext
+    internal partial class PlacementService : IPlacementContext, ILifecycleParticipant<ISiloLifecycle>, PlacementService.ITestAccessor
     {
         private const int PlacementWorkerCount = 16;
         private readonly PlacementStrategyResolver _strategyResolver;
@@ -33,6 +35,14 @@ namespace Orleans.Runtime.Placement
         private readonly PlacementWorker[] _workers;
         private readonly PlacementFilterStrategyResolver _filterStrategyResolver;
         private readonly PlacementFilterDirectorResolver _placementFilterDirectoryResolver;
+        private readonly CancellationTokenSource _shutdownCts = new();
+
+        internal interface ITestAccessor
+        {
+            Task[] WorkerTasks { get; }
+
+            Task<SiloAddress> GetOrPlaceActivationAsync(Message message);
+        }
 
         /// <summary>
         /// Create a <see cref="PlacementService"/> instance.
@@ -64,13 +74,60 @@ namespace Orleans.Runtime.Placement
             _workers = new PlacementWorker[PlacementWorkerCount];
             for (var i = 0; i < PlacementWorkerCount; i++)
             {
-                _workers[i] = new(this);
+                _workers[i] = new(this, i);
             }
         }
 
         public SiloAddress LocalSilo { get; }
 
         public SiloStatus LocalSiloStatus => _siloStatusOracle.CurrentStatus;
+
+        Task[] ITestAccessor.WorkerTasks => _workers.Select(static worker => worker.CompletionTask).ToArray();
+
+        Task<SiloAddress> ITestAccessor.GetOrPlaceActivationAsync(Message message)
+        {
+            if (message.TargetGrain.IsDefault)
+            {
+                throw new InvalidOperationException("Cannot address a message without a target");
+            }
+
+            var worker = _workers[message.TargetGrain.GetUniformHashCode() % PlacementWorkerCount];
+            return worker.GetOrPlaceActivationAsyncForTest(message);
+        }
+
+        private bool IsStopping => _shutdownCts.IsCancellationRequested;
+
+        void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
+        {
+            lifecycle.Subscribe(
+                nameof(PlacementService),
+                ServiceLifecycleStage.RuntimeInitialize + 1,
+                static _ => Task.CompletedTask,
+                StopAsync);
+        }
+
+        private async Task StopAsync(CancellationToken cancellationToken)
+        {
+            if (!_shutdownCts.IsCancellationRequested)
+            {
+                _shutdownCts.Cancel();
+            }
+
+            foreach (var worker in _workers)
+            {
+                worker.Stop();
+            }
+
+            var completionTask = Task.WhenAll(_workers.Select(static worker => worker.CompletionTask));
+            if (cancellationToken.IsCancellationRequested)
+            {
+                await completionTask.SuppressThrowing();
+            }
+            else
+            {
+                await completionTask.WaitAsync(cancellationToken).SuppressThrowing();
+            }
+        }
 
         /// <summary>
         /// Gets or places an activation.
@@ -79,6 +136,7 @@ namespace Orleans.Runtime.Placement
         {
             if (message.IsTargetFullyAddressed) return Task.CompletedTask;
             if (message.TargetGrain.IsDefault) ThrowMissingAddress();
+            ThrowIfStopping();
 
             var grainId = message.TargetGrain;
             if (_grainLocator.TryLookupInCache(grainId, out var result) && CachedAddressIsValid(message, result))
@@ -103,6 +161,8 @@ namespace Orleans.Runtime.Placement
 
         public SiloAddress[] GetCompatibleSilos(PlacementTarget target)
         {
+            ThrowIfStopping();
+
             // For test only: if we have silos that are not yet in the Cluster TypeMap, we assume that they are compatible
             // with the current silo
             if (_assumeHomogeneousSilosForTesting)
@@ -117,6 +177,7 @@ namespace Orleans.Runtime.Placement
 
             var compatibleSilos = silos.Intersect(AllActiveSilos).ToArray();
 
+            ThrowIfStopping();
             var filters = _filterStrategyResolver.GetPlacementFilterStrategies(grainType);
             if (filters.Length > 0)
             {
@@ -128,6 +189,7 @@ namespace Orleans.Runtime.Placement
                 IEnumerable<SiloAddress> filteredSilos = compatibleSilos;
                 foreach (var placementFilter in filters)
                 {
+                    ThrowIfStopping();
                     var director = _placementFilterDirectoryResolver.GetFilterDirector(placementFilter);
                     filteredSilos = InstrumentFilteredSilos(
                         director.Filter(placementFilter, target, filteredSilos),
@@ -136,6 +198,7 @@ namespace Orleans.Runtime.Placement
                         parentActivityContext);
                 }
 
+                ThrowIfStopping();
                 compatibleSilos = filteredSilos.ToArray();
             }
 
@@ -173,6 +236,7 @@ namespace Orleans.Runtime.Placement
                 throw new ArgumentException("Interface version not provided", nameof(target));
             }
 
+            ThrowIfStopping();
             var grainType = target.GrainIdentity.Type;
             var silos = _versionSelectorManager
                 .GetSuitableSilos(grainType, target.InterfaceType, target.InterfaceVersion)
@@ -233,9 +297,20 @@ namespace Orleans.Runtime.Placement
         {
             using var _ = TryRestoreActivityContext(requestContextData, ActivityNames.PlaceGrain);
             var target = new PlacementTarget(grainId, requestContextData, default, 0);
+            ThrowIfStopping();
             var director = _directorResolver.GetPlacementDirector(placementStrategy);
             return await director.OnAddActivation(placementStrategy, target, this);
         }
+
+        private void ThrowIfStopping()
+        {
+            if (IsStopping)
+            {
+                throw CreateStoppingException();
+            }
+        }
+
+        private SiloUnavailableException CreateStoppingException() => new($"Silo '{LocalSilo}' is shutting down.");
 
         private class PlacementWorker
         {
@@ -251,23 +326,37 @@ namespace Orleans.Runtime.Placement
             private readonly object _lockObj = new();
 #endif
             private readonly PlacementService _placementService;
+            private readonly int _workerIndex;
             private List<(Message Message, TaskCompletionSource Completion)> _messages = new();
 
-            public PlacementWorker(PlacementService placementService)
+            public PlacementWorker(PlacementService placementService, int workerIndex)
             {
                 _logger = placementService._logger;
                 _placementService = placementService;
+                _workerIndex = workerIndex;
 
                 using var _ = new ExecutionContextSuppressor();
                 _processLoopTask = Task.Run(ProcessLoop);
             }
 
+            public Task CompletionTask => _processLoopTask;
+
+            internal Task<SiloAddress> GetOrPlaceActivationAsyncForTest(Message message) => GetOrPlaceActivationAsync(message);
+
+            public void Stop() => _workSignal.Signal();
+
             public Task AddressMessage(Message message)
             {
-                var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+                TaskCompletionSource completion;
 
                 lock (_lockObj)
                 {
+                    if (_placementService.IsStopping)
+                    {
+                        return Task.FromException(_placementService.CreateStoppingException());
+                    }
+
+                    completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                     _messages ??= new();
                     _messages.Add((message, completion));
                 }
@@ -290,61 +379,98 @@ namespace Orleans.Runtime.Placement
                 }
             }
 
+            private bool HasPendingMessages()
+            {
+                lock (_lockObj)
+                {
+                    return _messages is { Count: > 0 };
+                }
+            }
+
             private async Task ProcessLoop()
             {
-                Action signalWaiter = _workSignal.Signal;
-                while (true)
+                try
                 {
-                    try
+                    Action signalWaiter = _workSignal.Signal;
+                    while (true)
                     {
-                        // Start processing new requests
-                        var messages = GetMessages();
-                        if (messages is not null)
+                        try
                         {
-                            foreach (var message in messages)
+                            // Start processing new requests
+                            var messages = GetMessages();
+                            if (messages is not null)
                             {
-                                var target = message.Message.TargetGrain;
-                                var workItem = GetOrAddWorkItem(target);
-                                workItem.Messages.Add(message);
-                                if (workItem.Result is null)
+                                if (_placementService.IsStopping)
                                 {
-                                    // Note that the first message is used as the target to place the message,
-                                    // so if subsequent messages do not agree with the first message's interface
-                                    // type or version, then they may be sent to an incompatible silo, which is
-                                    // fine since the remote silo will handle that incompatibility.
-                                    workItem.Result = GetOrPlaceActivationAsync(message.Message);
+                                    FailWaitingMessages(messages);
+                                }
+                                else
+                                {
+                                    foreach (var message in messages)
+                                    {
+                                        var target = message.Message.TargetGrain;
+                                        var workItem = GetOrAddWorkItem(target);
+                                        workItem.Messages.Add(message);
+                                        if (workItem.Result is null)
+                                        {
+                                            // Note that the first message is used as the target to place the message,
+                                            // so if subsequent messages do not agree with the first message's interface
+                                            // type or version, then they may be sent to an incompatible silo, which is
+                                            // fine since the remote silo will handle that incompatibility.
+                                            workItem.Result = GetOrPlaceActivationAsync(message.Message);
 
-                                    // Wake up this processing loop when the task completes
-                                    workItem.Result.GetAwaiter().UnsafeOnCompleted(signalWaiter);
+                                            // Wake up this processing loop when the task completes
+                                            workItem.Result.GetAwaiter().UnsafeOnCompleted(signalWaiter);
+                                        }
+                                    }
+                                }
+                            }
+
+                            // Complete processing any completed request
+                            foreach (var pair in _inProgress)
+                            {
+                                var workItem = pair.Value;
+                                if (workItem.Result.IsCompleted)
+                                {
+                                    AddressWaitingMessages(workItem);
+                                    _inProgress.Remove(pair.Key);
                                 }
                             }
                         }
-
-                        // Complete processing any completed request
-                        foreach (var pair in _inProgress)
+                        catch (Exception exception)
                         {
-                            var workItem = pair.Value;
-                            if (workItem.Result.IsCompleted)
-                            {
-                                AddressWaitingMessages(workItem);
-                                _inProgress.Remove(pair.Key);
-                            }
+                            LogWarnInPlacementWorker(_logger, exception);
                         }
+
+                        if (_placementService.IsStopping && _inProgress.Count == 0 && !HasPendingMessages())
+                        {
+                            break;
+                        }
+
+                        await _workSignal.WaitAsync();
                     }
-                    catch (Exception exception)
+
+                    GrainPlacementWorkItem GetOrAddWorkItem(GrainId target)
                     {
-                        LogWarnInPlacementWorker(_logger, exception);
+                        ref var workItem = ref CollectionsMarshal.GetValueRefOrAddDefault(_inProgress, target, out _);
+                        workItem ??= new();
+                        return workItem;
                     }
-
-                    await _workSignal.WaitAsync();
                 }
-
-                GrainPlacementWorkItem GetOrAddWorkItem(GrainId target)
+                finally
                 {
-                    ref var workItem = ref CollectionsMarshal.GetValueRefOrAddDefault(_inProgress, target, out _);
-                    workItem ??= new();
-                    return workItem;
+                    PlacementServiceEvents.EmitWorkerStopped(_placementService.LocalSilo, _workerIndex);
                 }
+            }
+
+            private void FailWaitingMessages(List<(Message Message, TaskCompletionSource Completion)> messages)
+            {
+                foreach (var message in messages)
+                {
+                    message.Completion.TrySetException(_placementService.CreateStoppingException());
+                }
+
+                messages.Clear();
             }
 
             private void AddressWaitingMessages(GrainPlacementWorkItem completedWorkItem)
@@ -381,6 +507,7 @@ namespace Orleans.Runtime.Placement
             private async Task<SiloAddress> GetOrPlaceActivationAsync(Message firstMessage)
             {
                 await Task.Yield();
+                _placementService.ThrowIfStopping();
 
                 // InnerGetOrPlaceActivationAsync may set a new activity as current from the RequestContextData,
                 // so we need to save and restore the current activity.
@@ -409,6 +536,7 @@ namespace Orleans.Runtime.Placement
                         return result.SiloAddress;
                     }
 
+                    _placementService.ThrowIfStopping();
                     var strategy = _placementService._strategyResolver.GetPlacementStrategy(target.GrainIdentity.Type);
                     var director = _placementService._directorResolver.GetPlacementDirector(strategy);
                     var siloAddress = await director.OnAddActivation(strategy, target, _placementService);
@@ -438,12 +566,13 @@ namespace Orleans.Runtime.Placement
         /// sequence is actually enumerated, not when the filter is composed. This avoids
         /// per-filter array materialization while still giving accurate span timings.
         /// </summary>
-        private static IEnumerable<SiloAddress> InstrumentFilteredSilos(
+        private IEnumerable<SiloAddress> InstrumentFilteredSilos(
             IEnumerable<SiloAddress> silos,
             PlacementFilterStrategy filter,
             GrainType grainType,
             ActivityContext? parentActivityContext)
         {
+            ThrowIfStopping();
             using var filterSpan = parentActivityContext is { } parentContext
                 ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates, ActivityKind.Internal, parentContext)
                 : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.FilterPlacementCandidates);
@@ -452,6 +581,7 @@ namespace Orleans.Runtime.Placement
 
             foreach (var silo in silos)
             {
+                ThrowIfStopping();
                 yield return silo;
             }
         }
