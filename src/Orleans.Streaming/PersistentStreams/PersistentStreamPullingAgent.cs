@@ -52,7 +52,7 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
-            Task PumpQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, CancellationToken cancellationToken);
+            Task PumpQueue(QueueId myQueueId, CancellationToken cancellationToken);
             Task Shutdown();
         }
 
@@ -112,12 +112,8 @@ namespace Orleans.Streams
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
 
-        Task ITestAccessor.PumpQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, CancellationToken cancellationToken)
-            => this.RunOrQueueTask(() =>
-            {
-                this.receiver = receiver;
-                return _activePumpTask = PumpQueue(myQueueId, cancellationToken);
-            });
+        Task ITestAccessor.PumpQueue(QueueId myQueueId, CancellationToken cancellationToken)
+            => this.RunOrQueueTask(() => _activePumpTask = PumpQueue(myQueueId, cancellationToken));
 
         Task ITestAccessor.Shutdown() => this.RunOrQueueTask(() => Shutdown());
 

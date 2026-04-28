@@ -8,8 +8,10 @@ using Orleans.Internal;
 using Orleans.Providers.Streams.Common;
 using Orleans.Providers.Streams.Generator;
 using Orleans.Runtime;
+using Orleans.Runtime.Scheduler;
 using Orleans.Streams;
 using Orleans.Streams.Filtering;
+using Orleans.Timers;
 using TestExtensions;
 using Xunit;
 
@@ -139,11 +141,18 @@ namespace UnitTests.StreamingTests
             Assert.Empty(pubSub.ReceivedCalls());
         }
 
-        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub pubSub, QueueId queueId)
+        private static PersistentStreamPullingAgent CreateAgent(IStreamPubSub pubSub, QueueId queueId, IQueueAdapterReceiver receiver = null)
         {
             var siloAddress = SiloAddress.New(IPAddress.Loopback, 11111, 1);
             var localSiloDetails = Substitute.For<ILocalSiloDetails>();
             localSiloDetails.SiloAddress.Returns(siloAddress);
+            var timerRegistry = Substitute.For<ITimerRegistry>();
+            timerRegistry.RegisterGrainTimer(
+                    Arg.Any<IGrainContext>(),
+                    Arg.Any<Func<QueueId, CancellationToken, Task>>(),
+                    Arg.Any<QueueId>(),
+                    Arg.Any<GrainTimerCreationOptions>())
+                .Returns(Substitute.For<IGrainTimer>());
 
             var shared = new SystemTargetShared(
                 runtimeClient: null!,
@@ -151,11 +160,15 @@ namespace UnitTests.StreamingTests
                 NullLoggerFactory.Instance,
                 Options.Create(new SchedulingOptions()),
                 grainReferenceActivator: null!,
-                timerRegistry: null!,
+                timerRegistry,
                 activations: new ActivationDirectory());
+
+            receiver ??= Substitute.For<IQueueAdapterReceiver>();
+            receiver.Initialize(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
             var queueAdapter = Substitute.For<IQueueAdapter>();
             queueAdapter.Name.Returns("provider");
+            queueAdapter.CreateReceiver(Arg.Any<QueueId>()).Returns(receiver);
 
             return new PersistentStreamPullingAgent(
                 SystemTargetGrainId.Create(SystemTargetGrainId.CreateGrainType("persistent-stream-pulling-agent-test"), siloAddress),
@@ -172,6 +185,8 @@ namespace UnitTests.StreamingTests
                 TimeProvider.System,
                 shared);
         }
+
+        private static Task InitializeAgent(PersistentStreamPullingAgent agent) => agent.RunOrQueueTask(() => agent.Initialize());
 
         [Fact, TestCategory("BVT"), TestCategory("Streaming")]
         public async Task RegisterStream_KeepsCacheEntryWhenSubscriberHandshakeFails()
@@ -218,10 +233,12 @@ namespace UnitTests.StreamingTests
                 });
             receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
 
-            var agent = CreateAgent(pubSub: null, queueId);
+            var agent = CreateAgent(pubSub: null, queueId, receiver);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
 
-            var pumpTask = testAccessor.PumpQueue(queueId, receiver, CancellationToken.None);
+            await InitializeAgent(agent);
+
+            var pumpTask = testAccessor.PumpQueue(queueId, CancellationToken.None);
             await queueReadStarted.Task;
 
             var shutdownTask = testAccessor.Shutdown();
