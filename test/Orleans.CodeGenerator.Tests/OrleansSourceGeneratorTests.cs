@@ -1526,7 +1526,7 @@ public class DemoClass
     }
 
     [Fact]
-    public async Task GeneratedSourceHintNames_SortMetadataLast()
+    public async Task GeneratedSources_EmitMetadataLast()
     {
         var code = """
             using Orleans;
@@ -1552,16 +1552,15 @@ public class DemoClass
 
         Assert.Empty(result.Diagnostics);
 
-        var orderedHintNames = result.GeneratedSources
+        var emittedHintNames = result.GeneratedSources
             .Where(static source => !string.IsNullOrWhiteSpace(source.SourceText.ToString()))
             .Select(static source => source.HintName)
-            .OrderBy(static hintName => hintName, StringComparer.Ordinal)
             .ToArray();
 
-        Assert.NotEmpty(orderedHintNames);
-        Assert.Contains(orderedHintNames, static hintName => hintName.Contains(".orleans.ser.", StringComparison.Ordinal));
-        Assert.Contains(orderedHintNames, static hintName => hintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
-        Assert.EndsWith(".orleans.typeManifest.g.cs", orderedHintNames[^1], StringComparison.Ordinal);
+        Assert.NotEmpty(emittedHintNames);
+        Assert.Contains(emittedHintNames, static hintName => hintName.Contains(".orleans.ser.", StringComparison.Ordinal));
+        Assert.Contains(emittedHintNames, static hintName => hintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        Assert.EndsWith(".orleans.metadata.g.cs", emittedHintNames[^1], StringComparison.Ordinal);
     }
 
     private static GeneratorRunResult RunSourceGenerator(

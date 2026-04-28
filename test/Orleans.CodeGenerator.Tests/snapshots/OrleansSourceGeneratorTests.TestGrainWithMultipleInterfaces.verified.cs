@@ -1,4 +1,40 @@
-﻿namespace OrleansCodeGen.TestProject
+﻿#pragma warning disable CS1591, RS0016, RS0041
+[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
+[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainA_GrainReference_11405B98));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainB_GrainReference_6B5D7809));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainA_GrainReference_11405B98));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
+            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
+            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
+            config.Interfaces.Add(typeof(global::TestProject.IGrainA));
+            config.Interfaces.Add(typeof(global::TestProject.IGrainB));
+            config.InterfaceImplementations.Add(typeof(global::TestProject.RealGrain));
+            var n1 = config.CompoundTypeAliases.Add("inv");
+            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.Add(typeof(global::TestProject.IGrainA));
+            n3.Add("11405B98", typeof(OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98));
+            var n5 = n2.Add(typeof(global::TestProject.IGrainB));
+            n5.Add("6B5D7809", typeof(OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809));
+        }
+    }
+}
+
+namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
@@ -284,42 +320,6 @@ namespace OrleansCodeGen.TestProject
             var result = new OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809();
             result.arg0 = original.arg0;
             return result;
-        }
-    }
-}
-
-#pragma warning disable CS1591, RS0016, RS0041
-[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
-[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainA_GrainReference_11405B98));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IGrainB_GrainReference_6B5D7809));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainA_GrainReference_11405B98));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IGrainB_GrainReference_6B5D7809));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IGrainA));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IGrainB));
-            config.Interfaces.Add(typeof(global::TestProject.IGrainA));
-            config.Interfaces.Add(typeof(global::TestProject.IGrainB));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.RealGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IGrainA));
-            n3.Add("11405B98", typeof(OrleansCodeGen.TestProject.Invokable_IGrainA_GrainReference_11405B98));
-            var n5 = n2.Add(typeof(global::TestProject.IGrainB));
-            n5.Add("6B5D7809", typeof(OrleansCodeGen.TestProject.Invokable_IGrainB_GrainReference_6B5D7809));
         }
     }
 }

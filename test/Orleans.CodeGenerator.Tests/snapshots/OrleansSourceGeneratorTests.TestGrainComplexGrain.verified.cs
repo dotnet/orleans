@@ -1,4 +1,40 @@
-﻿namespace OrleansCodeGen.TestProject
+﻿#pragma warning disable CS1591, RS0016, RS0041
+[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
+[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_ComplexData));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IComplexGrain_GrainReference_67FE5808));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_ComplexGrain));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_ComplexData));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IComplexGrain_GrainReference_67FE5808));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain));
+            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain));
+            config.Interfaces.Add(typeof(global::TestProject.IComplexGrain));
+            config.InterfaceImplementations.Add(typeof(global::TestProject.ComplexGrain));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_ComplexData));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_ComplexGrain));
+            var n1 = config.CompoundTypeAliases.Add("inv");
+            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.Add(typeof(global::TestProject.IComplexGrain));
+            n3.Add("67FE5808", typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808));
+        }
+    }
+}
+
+namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
@@ -440,41 +476,5 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Activator_ComplexGrain : global::Orleans.Serialization.Activators.IActivator<global::TestProject.ComplexGrain>
     {
         public global::TestProject.ComplexGrain Create() => new global::TestProject.ComplexGrain();
-    }
-}
-
-#pragma warning disable CS1591, RS0016, RS0041
-[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
-[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_ComplexData));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IComplexGrain_GrainReference_67FE5808));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_ComplexGrain));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_ComplexData));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IComplexGrain_GrainReference_67FE5808));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_ComplexGrain));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IComplexGrain));
-            config.Interfaces.Add(typeof(global::TestProject.IComplexGrain));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.ComplexGrain));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_ComplexData));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_ComplexGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IComplexGrain));
-            n3.Add("67FE5808", typeof(OrleansCodeGen.TestProject.Invokable_IComplexGrain_GrainReference_67FE5808));
-        }
     }
 }

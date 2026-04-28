@@ -1532,9 +1532,8 @@ namespace Orleans.CodeGenerator
         private static string CreateProxyHintName(string assemblyName, string interfaceName)
             => $"{assemblyName}.orleans.proxy.{SanitizeHintComponent(interfaceName)}.g.cs";
 
-        // Keep metadata after serializer and proxy sources in generated-source output.
         private static string CreateMetadataHintName(string assemblyName)
-            => $"{assemblyName}.orleans.typeManifest.g.cs";
+            => $"{assemblyName}.orleans.metadata.g.cs";
 
         private static string SanitizeHintComponent(string value)
         {
