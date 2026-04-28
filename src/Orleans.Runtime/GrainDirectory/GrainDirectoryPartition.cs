@@ -329,7 +329,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         Debug.Assert(!addedRange.Intersects(removedRange));
         Debug.Assert(addedRange.IsEmpty || addedRange.Intersects(_currentRange));
         Debug.Assert(!addedRange.Intersects(previousRange));
-        Debug.Assert(previousRange.IsEmpty || _currentRange.IsEmpty || previousRange.Start == _currentRange.Start);
+        Debug.Assert(previousRange.IsEmpty || previousRange.IsFull || _currentRange.IsEmpty || _currentRange.IsFull || previousRange.Start == _currentRange.Start);
 #endif
 
         if (!removedRange.IsEmpty)
@@ -443,7 +443,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                         var previousOwnerRange = previousOwnerRanges[partitionIndex];
                         if (previousOwnerRange.Intersects(addedRange))
                         {
-                            tasks.Add(TransferSnapshotAsync(current, addedRange, previousOwner, partitionIndex, previous.Version));
+                            tasks.Add(TransferSnapshotAsync(current, previousOwnerRange, addedRange, previousOwner, partitionIndex, previous.Version));
                         }
                     }
                 }
@@ -504,18 +504,37 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
-    private async Task<bool> TransferSnapshotAsync(DirectoryMembershipSnapshot current, RingRange addedRange, SiloAddress previousOwner, int partitionIndex, MembershipVersion previousVersion)
+    private async Task<bool> TransferSnapshotAsync(
+        DirectoryMembershipSnapshot current,
+        RingRange previousOwnerRange,
+        RingRange addedRange,
+        SiloAddress previousOwner,
+        int partitionIndex,
+        MembershipVersion previousVersion)
     {
+        var currentTransferRange = addedRange;
         try
         {
             var stopwatch = ValueStopwatch.StartNew();
-            LogTraceRequestingEntries(_logger, addedRange, previousOwner, previousVersion);
 
             var partition = GetPartitionReference(previousOwner, partitionIndex);
-            var transferredEntries = 0;
             var waitedForRange = false;
-            foreach (var queryRange in GetActivationQueryRanges(addedRange))
+            var transferredEntries = 0;
+            var previousTransferRange = RingRange.Empty;
+            foreach (var (transferRange, queryRange) in GetSnapshotTransferQueryRanges(previousOwnerRange, addedRange))
             {
+                if (transferRange != previousTransferRange)
+                {
+                    if (!previousTransferRange.IsEmpty)
+                    {
+                        LogDebugTransferredEntries(_logger, transferredEntries, previousTransferRange, previousOwner);
+                        transferredEntries = 0;
+                    }
+
+                    currentTransferRange = previousTransferRange = transferRange;
+                    LogTraceRequestingEntries(_logger, transferRange, previousOwner, previousVersion);
+                }
+
                 // Alternatively, the previous owner could push the snapshot. The pull-based approach is used here because it is simpler.
                 var snapshot = await partition.GetSnapshotAsync(current.Version, previousVersion, queryRange).AsTask().WaitAsync(ShutdownToken);
 
@@ -544,14 +563,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 transferredEntries += snapshot.GrainAddresses.Count;
             }
 
+            if (!previousTransferRange.IsEmpty)
+            {
+                LogDebugTransferredEntries(_logger, transferredEntries, previousTransferRange, previousOwner);
+            }
+
             // The acknowledgement step lets the previous owner know that the snapshot has been received so that it can proceed.
             InvokeOnClusterMember(
                 previousOwner,
                 async () => await partition.AcknowledgeSnapshotTransferAsync(_id, _partitionIndex, previousVersion),
                 false,
                 nameof(IGrainDirectoryPartition.AcknowledgeSnapshotTransferAsync)).Ignore();
-
-            LogDebugTransferredEntries(_logger, transferredEntries, addedRange, previousOwner);
 
             DirectoryInstruments.SnapshotTransferCount.Add(1);
             DirectoryInstruments.SnapshotTransferDuration.Record((long)stopwatch.Elapsed.TotalMilliseconds);
@@ -562,11 +584,11 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         {
             if (exception is SiloUnavailableException)
             {
-                LogWarningRemoteHostUnavailable(_logger, addedRange);
+                LogWarningRemoteHostUnavailable(_logger, currentTransferRange);
             }
             else
             {
-                LogWarningErrorTransferringOwnership(_logger, exception, addedRange);
+                LogWarningErrorTransferringOwnership(_logger, exception, currentTransferRange);
             }
 
             return false;
@@ -658,6 +680,17 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     // Directory recovery and validation can temporarily involve very large ranges.
     // Split those requests so the returned GrainAddress list stays comfortably under MaxMessageBodySize.
+    internal static IEnumerable<(RingRange TransferRange, RingRange QueryRange)> GetSnapshotTransferQueryRanges(RingRange previousOwnerRange, RingRange addedRange)
+    {
+        foreach (var transferRange in previousOwnerRange.Intersections(addedRange))
+        {
+            foreach (var queryRange in GetActivationQueryRanges(transferRange))
+            {
+                yield return (transferRange, queryRange);
+            }
+        }
+    }
+
     internal static IEnumerable<RingRange> GetActivationQueryRanges(RingRange range)
     {
         if (range.IsEmpty)
@@ -895,13 +928,13 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
     [LoggerMessage(
         Level = LogLevel.Trace,
-        Message = "Requesting entries for ranges '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'."
+        Message = "Requesting entries for range '{Range}' from '{PreviousOwner}' at version '{PreviousVersion}'."
     )]
     private static partial void LogTraceRequestingEntries(ILogger logger, RingRange range, SiloAddress previousOwner, MembershipVersion previousVersion);
 
     [LoggerMessage(
         Level = LogLevel.Warning,
-        Message = "Expected a valid snapshot from previous owner '{PreviousOwner}' for part of ranges '{Range}', but found none."
+        Message = "Expected a valid snapshot from previous owner '{PreviousOwner}' for range '{Range}', but found none."
     )]
     private static partial void LogWarningExpectedValidSnapshot(ILogger logger, SiloAddress previousOwner, RingRange range);
 
