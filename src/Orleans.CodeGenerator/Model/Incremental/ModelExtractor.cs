@@ -64,7 +64,10 @@ namespace Orleans.CodeGenerator
                 isExceptionType: description.IsExceptionType,
                 activatorConstructorParameters: activatorCtorParams,
                 creationStrategy: creationStrategy,
-                sourceLocation: sourceLocation);
+                sourceLocation: sourceLocation,
+                metadataIdentity: description is SerializableTypeDescription serializableDescription
+                    ? TypeMetadataIdentity.Create(serializableDescription.Type)
+                    : TypeMetadataIdentity.Empty);
         }
 
         /// <summary>
@@ -268,16 +271,10 @@ namespace Orleans.CodeGenerator
                 .ThenBy(static entry => entry.TargetType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var sortedReferencedSerializableTypes = referencedSerializableTypes
-                .OrderBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            var sortedReferencedSerializableTypes = OrderSerializableTypeModels(referencedSerializableTypes)
                 .ToImmutableArray();
 
-            var sortedReferencedProxyInterfaces = referencedProxyInterfaces
-                .OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            var sortedReferencedProxyInterfaces = OrderProxyInterfaceModels(referencedProxyInterfaces)
                 .ToImmutableArray();
 
             var sortedRegisteredCodecs = registeredCodecs
@@ -470,18 +467,10 @@ namespace Orleans.CodeGenerator
                 .ThenBy(static entry => entry.TargetType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var referencedSerializableTypes = referenceData.ReferencedSerializableTypes
-                .Distinct()
-                .OrderBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            var referencedSerializableTypes = OrderSerializableTypeModels(referenceData.ReferencedSerializableTypes.Distinct())
                 .ToImmutableArray();
 
-            var referencedProxyInterfaces = referenceData.ReferencedProxyInterfaces
-                .Distinct()
-                .OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            var referencedProxyInterfaces = OrderProxyInterfaceModels(referenceData.ReferencedProxyInterfaces.Distinct())
                 .ToImmutableArray();
 
             var registeredCodecs = referenceData.RegisteredCodecs
@@ -517,11 +506,7 @@ namespace Orleans.CodeGenerator
                 merged = merged.AddRange(referenced);
             }
 
-            return merged
-                .Distinct()
-                .OrderBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            return OrderSerializableTypeModels(merged.Distinct())
                 .ToImmutableArray();
         }
 
@@ -535,13 +520,27 @@ namespace Orleans.CodeGenerator
                 merged = merged.AddRange(referenced);
             }
 
-            return merged
-                .Distinct()
-                .OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
+            return OrderProxyInterfaceModels(merged.Distinct())
                 .ToImmutableArray();
         }
+
+        private static IOrderedEnumerable<SerializableTypeModel> OrderSerializableTypeModels(IEnumerable<SerializableTypeModel> entries)
+            => entries
+                .OrderBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.Name, StringComparer.Ordinal);
+
+        private static IOrderedEnumerable<ProxyInterfaceModel> OrderProxyInterfaceModels(IEnumerable<ProxyInterfaceModel> entries)
+            => entries
+                .OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.Name, StringComparer.Ordinal);
 
         private static string GetInvokableMetadataName(ProxyBaseModel proxyBase, MethodModel method)
         {
@@ -1106,7 +1105,8 @@ namespace Orleans.CodeGenerator
                 typeParameters,
                 proxyBase,
                 methods,
-                GetSourceLocation(typeSymbol));
+                sourceLocation: GetSourceLocation(typeSymbol),
+                metadataIdentity: TypeMetadataIdentity.Create(typeSymbol));
         }
 
         private static string GetProxyInterfaceName(INamedTypeSymbol typeSymbol, LibraryTypes libraryTypes)

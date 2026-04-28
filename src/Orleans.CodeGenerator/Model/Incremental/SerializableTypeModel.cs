@@ -38,10 +38,12 @@ namespace Orleans.CodeGenerator.Model.Incremental
             bool isExceptionType,
             ImmutableArray<TypeRef> activatorConstructorParameters,
             ObjectCreationStrategy creationStrategy,
-            SourceLocationModel sourceLocation = default)
+            SourceLocationModel sourceLocation = default,
+            TypeMetadataIdentity metadataIdentity = default)
         {
             Accessibility = accessibility;
             TypeSyntax = typeSyntax;
+            MetadataIdentity = metadataIdentity;
             HasComplexBaseType = hasComplexBaseType;
             IncludePrimaryConstructorParameters = includePrimaryConstructorParameters;
             BaseTypeSyntax = baseTypeSyntax;
@@ -72,6 +74,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
 
         public Accessibility Accessibility { get; }
         public TypeRef TypeSyntax { get; }
+        public TypeMetadataIdentity MetadataIdentity { get; }
         public bool HasComplexBaseType { get; }
         public bool IncludePrimaryConstructorParameters { get; }
         public TypeRef BaseTypeSyntax { get; }
@@ -108,6 +111,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
 
             return Accessibility == other.Accessibility
                 && TypeSyntax.Equals(other.TypeSyntax)
+                && MetadataIdentity.Equals(other.MetadataIdentity)
                 && HasComplexBaseType == other.HasComplexBaseType
                 && IncludePrimaryConstructorParameters == other.IncludePrimaryConstructorParameters
                 && BaseTypeSyntax.Equals(other.BaseTypeSyntax)
@@ -143,6 +147,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             unchecked
             {
                 var hash = TypeSyntax.GetHashCode();
+                hash = hash * 31 + MetadataIdentity.GetHashCode();
                 hash = hash * 31 + (int)Accessibility;
                 hash = hash * 31 + (HasComplexBaseType ? 1 : 0);
                 hash = hash * 31 + (IncludePrimaryConstructorParameters ? 1 : 0);

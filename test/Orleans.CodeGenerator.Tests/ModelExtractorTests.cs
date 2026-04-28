@@ -94,6 +94,65 @@ public class GenericData<T>
     }
 
     [Fact]
+    public async Task ExtractSerializableTypeModel_MetadataIdentity_CapturesTopLevelGenericAndNestedTypes()
+    {
+        const string code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public sealed class TopLevelDto
+            {
+                [Id(0)]
+                public int Value { get; set; }
+            }
+
+            [GenerateSerializer]
+            public sealed class GenericDto<T>
+            {
+                [Id(0)]
+                public T Value { get; set; } = default!;
+            }
+
+            public sealed class Container
+            {
+                [GenerateSerializer]
+                public sealed class NestedDto
+                {
+                    [Id(0)]
+                    public int Value { get; set; }
+                }
+
+                [GenerateSerializer]
+                public sealed class NestedGenericDto<T>
+                {
+                    [Id(0)]
+                    public T Value { get; set; } = default!;
+                }
+            }
+            """;
+        var compilation = await CreateCompilation(code);
+
+        AssertMetadataIdentity(
+            ExtractSerializableTypeModel(compilation, "TestProject.TopLevelDto").MetadataIdentity,
+            compilation,
+            "TestProject.TopLevelDto");
+        AssertMetadataIdentity(
+            ExtractSerializableTypeModel(compilation, "TestProject.GenericDto`1").MetadataIdentity,
+            compilation,
+            "TestProject.GenericDto`1");
+        AssertMetadataIdentity(
+            ExtractSerializableTypeModel(compilation, "TestProject.Container+NestedDto").MetadataIdentity,
+            compilation,
+            "TestProject.Container+NestedDto");
+        AssertMetadataIdentity(
+            ExtractSerializableTypeModel(compilation, "TestProject.Container+NestedGenericDto`1").MetadataIdentity,
+            compilation,
+            "TestProject.Container+NestedGenericDto`1");
+    }
+
+    [Fact]
     public async Task ExtractSerializableTypeModel_SameInput_ProducesEqualModels()
     {
         var code = @"
@@ -353,6 +412,63 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
     }
 
     [Fact]
+    public async Task ExtractProxyInterfaceModel_MetadataIdentity_CapturesTopLevelGenericAndNestedInterfaces()
+    {
+        const string code = """
+            using Orleans;
+            using Orleans.Runtime;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface ITopLevelGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface IGenericGrain<T> : IGrainWithIntegerKey
+            {
+                Task<T> Echo(T value);
+            }
+
+            public sealed class Container
+            {
+                [GenerateMethodSerializers(typeof(GrainReference))]
+                public interface INestedGrain : IGrainWithIntegerKey
+                {
+                    Task Ping();
+                }
+
+                [GenerateMethodSerializers(typeof(GrainReference))]
+                public interface INestedGenericGrain<T> : IGrainWithIntegerKey
+                {
+                    Task<T> Echo(T value);
+                }
+            }
+            """;
+        var compilation = await CreateCompilation(code);
+
+        AssertMetadataIdentity(
+            ExtractProxyInterfaceModel(compilation, "TestProject.ITopLevelGrain").MetadataIdentity,
+            compilation,
+            "TestProject.ITopLevelGrain");
+        AssertMetadataIdentity(
+            ExtractProxyInterfaceModel(compilation, "TestProject.IGenericGrain`1").MetadataIdentity,
+            compilation,
+            "TestProject.IGenericGrain`1");
+        AssertMetadataIdentity(
+            ExtractProxyInterfaceModel(compilation, "TestProject.Container+INestedGrain").MetadataIdentity,
+            compilation,
+            "TestProject.Container+INestedGrain");
+        AssertMetadataIdentity(
+            ExtractProxyInterfaceModel(compilation, "TestProject.Container+INestedGenericGrain`1").MetadataIdentity,
+            compilation,
+            "TestProject.Container+INestedGenericGrain`1");
+    }
+
+    [Fact]
     public async Task ExtractProxyInterfaceModel_BaseInterfaceOrder_DoesNotAffectMethodOrdering()
     {
         const string code1 = """
@@ -548,6 +664,16 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         return ModelExtractor.ExtractFromAttributeContext(context, default);
     }
 
+    private static SerializableTypeModel ExtractSerializableTypeModel(CSharpCompilation compilation, string metadataName)
+    {
+        var typeSymbol = compilation.GetTypeByMetadataName(metadataName);
+        Assert.NotNull(typeSymbol);
+
+        var declaration = Assert.Single(typeSymbol.DeclaringSyntaxReferences).GetSyntax();
+        var context = CreateSerializableAttributeContext(compilation, declaration, typeSymbol);
+        return ModelExtractor.ExtractFromAttributeContext(context, default);
+    }
+
     private static FieldIdAssignmentHelper CreateFieldIdAssignmentHelper(
         CSharpCompilation compilation,
         string metadataName,
@@ -574,6 +700,16 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         var typeSymbol = semanticModel.GetDeclaredSymbol(typeDeclaration);
         Assert.NotNull(typeSymbol);
 
+        return CreateSerializableAttributeContext(compilation, typeDeclaration, typeSymbol);
+    }
+
+    private static GeneratorAttributeSyntaxContext CreateSerializableAttributeContext(
+        CSharpCompilation compilation,
+        SyntaxNode declaration,
+        INamedTypeSymbol typeSymbol)
+    {
+        var semanticModel = compilation.GetSemanticModel(declaration.SyntaxTree);
+
         var generateSerializerAttribute = compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
         Assert.NotNull(generateSerializerAttribute);
 
@@ -589,7 +725,7 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
             modifiers: null);
         Assert.NotNull(constructor);
 
-        return (GeneratorAttributeSyntaxContext)constructor.Invoke([typeDeclaration, typeSymbol, semanticModel, attributes]);
+        return (GeneratorAttributeSyntaxContext)constructor.Invoke([declaration, typeSymbol, semanticModel, attributes]);
     }
 
     private static GeneratorAttributeSyntaxContext CreateFirstSerializableAttributeContext(CSharpCompilation compilation)
@@ -642,6 +778,17 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         var model = ModelExtractor.ExtractProxyInterfaceModel(interfaceType, compilation, default);
         Assert.NotNull(model);
         return model;
+    }
+
+    private static void AssertMetadataIdentity(
+        TypeMetadataIdentity metadataIdentity,
+        CSharpCompilation compilation,
+        string expectedMetadataName)
+    {
+        Assert.False(metadataIdentity.IsEmpty);
+        Assert.Equal(expectedMetadataName, metadataIdentity.MetadataName);
+        Assert.Equal(compilation.Assembly.Identity.Name, metadataIdentity.AssemblyName);
+        Assert.Equal(compilation.Assembly.Identity.GetDisplayName(), metadataIdentity.AssemblyIdentity);
     }
 
     private static Task<CSharpCompilation> CreateCompilation(

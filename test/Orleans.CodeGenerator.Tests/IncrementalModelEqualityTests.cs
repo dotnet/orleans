@@ -217,6 +217,21 @@ public class IncrementalModelEqualityTests
     }
 
     [Fact]
+    public void SerializableTypeModel_DifferentMetadataIdentity_AreNotEqual()
+    {
+        var a = CreateSerializableTypeModel(
+            "MyType",
+            "MyNamespace",
+            metadataIdentity: new TypeMetadataIdentity("MyNamespace.MyType", "AssemblyA", "AssemblyA, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"));
+        var b = CreateSerializableTypeModel(
+            "MyType",
+            "MyNamespace",
+            metadataIdentity: new TypeMetadataIdentity("MyNamespace.MyType", "AssemblyB", "AssemblyB, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"));
+
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
     public void SerializableTypeModel_DifferentMembers_AreNotEqual()
     {
         var members1 = ImmutableArray.Create(
@@ -263,6 +278,19 @@ public class IncrementalModelEqualityTests
     {
         var a = CreateProxyInterfaceModel("IMyGrain");
         var b = CreateProxyInterfaceModel("IOtherGrain");
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void ProxyInterfaceModel_DifferentMetadataIdentity_AreNotEqual()
+    {
+        var a = CreateProxyInterfaceModel(
+            "IMyGrain",
+            metadataIdentity: new TypeMetadataIdentity("MyNamespace.IMyGrain", "AssemblyA", "AssemblyA, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"));
+        var b = CreateProxyInterfaceModel(
+            "IMyGrain",
+            metadataIdentity: new TypeMetadataIdentity("MyNamespace.IMyGrain", "AssemblyB", "AssemblyB, Version=1.0.0.0, Culture=neutral, PublicKeyToken=null"));
+
         Assert.NotEqual(a, b);
     }
 
@@ -885,7 +913,8 @@ public class IncrementalModelEqualityTests
         string name = "MyType",
         string ns = "MyNamespace",
         bool isValueType = false,
-        ImmutableArray<MemberModel> members = default)
+        ImmutableArray<MemberModel> members = default,
+        TypeMetadataIdentity metadataIdentity = default)
     {
         return new SerializableTypeModel(
             accessibility: Accessibility.Public,
@@ -914,7 +943,8 @@ public class IncrementalModelEqualityTests
             isImmutable: false,
             isExceptionType: false,
             activatorConstructorParameters: ImmutableArray<TypeRef>.Empty,
-            creationStrategy: ObjectCreationStrategy.NewExpression);
+            creationStrategy: ObjectCreationStrategy.NewExpression,
+            metadataIdentity: metadataIdentity);
     }
 
     private static MethodModel CreateMethodModel(string name = "DoWork")
@@ -938,7 +968,8 @@ public class IncrementalModelEqualityTests
 
     private static ProxyInterfaceModel CreateProxyInterfaceModel(
         string name = "IMyGrain",
-        ImmutableArray<MethodModel> methods = default)
+        ImmutableArray<MethodModel> methods = default,
+        TypeMetadataIdentity metadataIdentity = default)
     {
         var proxyBase = new ProxyBaseModel(
             proxyBaseType: new TypeRef("global::Orleans.Runtime.GrainReference"),
@@ -952,7 +983,8 @@ public class IncrementalModelEqualityTests
             generatedNamespace: "OrleansCodeGen.MyNamespace",
             typeParameters: ImmutableArray<TypeParameterModel>.Empty,
             proxyBase: proxyBase,
-            methods: methods.IsDefault ? ImmutableArray.Create(CreateMethodModel()) : methods);
+            methods: methods.IsDefault ? ImmutableArray.Create(CreateMethodModel()) : methods,
+            metadataIdentity: metadataIdentity);
     }
 
     private static ReferenceAssemblyModel CreateReferenceAssemblyModel(

@@ -93,9 +93,11 @@ namespace Orleans.CodeGenerator.Model.Incremental
             ImmutableArray<TypeParameterModel> typeParameters,
             ProxyBaseModel proxyBase,
             ImmutableArray<MethodModel> methods,
-            SourceLocationModel sourceLocation = default)
+            SourceLocationModel sourceLocation = default,
+            TypeMetadataIdentity metadataIdentity = default)
         {
             InterfaceType = interfaceType;
+            MetadataIdentity = metadataIdentity;
             Name = name;
             GeneratedNamespace = generatedNamespace;
             TypeParameters = ImmutableArrayValueComparer.Normalize(typeParameters);
@@ -105,6 +107,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
         }
 
         public TypeRef InterfaceType { get; }
+        public TypeMetadataIdentity MetadataIdentity { get; }
         public string Name { get; }
         public string GeneratedNamespace { get; }
         public ImmutableArray<TypeParameterModel> TypeParameters { get; }
@@ -120,6 +123,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             }
 
             return InterfaceType.Equals(other.InterfaceType)
+                && MetadataIdentity.Equals(other.MetadataIdentity)
                 && string.Equals(Name, other.Name, StringComparison.Ordinal)
                 && string.Equals(GeneratedNamespace, other.GeneratedNamespace, StringComparison.Ordinal)
                 && ImmutableArrayValueComparer.Equals(TypeParameters, other.TypeParameters)
@@ -135,6 +139,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             unchecked
             {
                 var hash = InterfaceType.GetHashCode();
+                hash = hash * 31 + MetadataIdentity.GetHashCode();
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(Name ?? string.Empty);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(GeneratedNamespace ?? string.Empty);
                 hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeParameters);

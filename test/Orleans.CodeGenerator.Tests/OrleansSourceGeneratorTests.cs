@@ -1117,6 +1117,177 @@ public class DemoClass
         Assert.Contains("Codec", generatedSource);
     }
 
+    [Fact]
+    public async Task GeneratesSerializersForReferencedNestedAndGenericAssemblyTypesViaGenerateCodeForDeclaringAssembly()
+    {
+        var libraryCode = """
+            using Orleans;
+
+            namespace LibraryProject;
+
+            [GenerateSerializer]
+            public sealed class GenericDto<T>
+            {
+                [Id(0)]
+                public T Value { get; set; } = default!;
+            }
+
+            public sealed class Container
+            {
+                [GenerateSerializer]
+                public sealed class NestedDto
+                {
+                    [Id(0)]
+                    public int Value { get; set; }
+                }
+
+                [GenerateSerializer]
+                public sealed class NestedGenericDto<T>
+                {
+                    [Id(0)]
+                    public T Value { get; set; } = default!;
+                }
+            }
+        """;
+
+        var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
+        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryProject.Container.NestedGenericDto<>))]
+        """;
+
+        var consumerCompilation = (await CreateCompilation(consumerCode, "ConsumerProject"))
+            .AddReferences(libraryCompilation.ToMetadataReference());
+        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerResult = RunSourceGenerator(consumerCompilation);
+        Assert.Empty(consumerResult.Diagnostics);
+
+        Assert.Contains(
+            consumerResult.GeneratedSources,
+            source => source.HintName.Contains("LibraryProject.GenericDto", StringComparison.Ordinal));
+        Assert.Contains(
+            consumerResult.GeneratedSources,
+            source => source.HintName.Contains("LibraryProject.Container.NestedDto", StringComparison.Ordinal));
+        Assert.Contains(
+            consumerResult.GeneratedSources,
+            source => source.HintName.Contains("LibraryProject.Container.NestedGenericDto", StringComparison.Ordinal));
+
+        var generatedSource = ConcatenateGeneratedSources(consumerResult);
+        Assert.Contains("global::LibraryProject.GenericDto", generatedSource);
+        Assert.Contains("global::LibraryProject.Container.NestedDto", generatedSource);
+        Assert.Contains("global::LibraryProject.Container.NestedGenericDto", generatedSource);
+    }
+
+    [Fact]
+    public async Task ReferencedSerializerResolutionUsesAssemblyMetadataIdentityWhenConsumerShadowsFullName()
+    {
+        var libraryCode = """
+            using Orleans;
+
+            namespace LibraryProject
+            {
+                public sealed class Marker
+                {
+                }
+            }
+
+            namespace Shadowed
+            {
+                [GenerateSerializer]
+                public sealed class DuplicateDto
+                {
+                    [Id(0)]
+                    public int LibraryValue { get; set; }
+                }
+            }
+        """;
+
+        var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
+        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryProject.Marker))]
+
+            namespace Shadowed;
+
+            public sealed class DuplicateDto
+            {
+                public string ConsumerValue { get; set; } = string.Empty;
+            }
+        """;
+
+        var consumerCompilation = (await CreateCompilation(consumerCode, "ConsumerProject"))
+            .AddReferences(libraryCompilation.ToMetadataReference());
+        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerResult = RunSourceGenerator(consumerCompilation);
+        Assert.Empty(consumerResult.Diagnostics);
+
+        var generatedSource = ConcatenateGeneratedSources(consumerResult);
+        Assert.Contains("LibraryValue", generatedSource);
+        Assert.DoesNotContain("ConsumerValue", generatedSource);
+    }
+
+    [Fact]
+    public async Task GeneratesProxiesForGenericAndNestedInterfaces()
+    {
+        var code = """
+            using Orleans;
+            using Orleans.Runtime;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface IGenericGrain<T> : IGrainWithIntegerKey
+            {
+                Task<T> Echo(T value);
+            }
+
+            public sealed class Container
+            {
+                [GenerateMethodSerializers(typeof(GrainReference))]
+                public interface INestedGrain : IGrainWithIntegerKey
+                {
+                    Task Ping();
+                }
+
+                [GenerateMethodSerializers(typeof(GrainReference))]
+                public interface INestedGenericGrain<T> : IGrainWithIntegerKey
+                {
+                    Task<T> Echo(T value);
+                }
+            }
+        """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        Assert.Contains(
+            result.GeneratedSources,
+            source => source.HintName.Contains("IGenericGrain", StringComparison.Ordinal));
+        Assert.Contains(
+            result.GeneratedSources,
+            source => source.HintName.Contains("Container.INestedGrain", StringComparison.Ordinal));
+        Assert.Contains(
+            result.GeneratedSources,
+            source => source.HintName.Contains("Container.INestedGenericGrain", StringComparison.Ordinal));
+
+        var generatedSource = ConcatenateGeneratedSources(result);
+        Assert.Contains("Proxy_IGenericGrain", generatedSource);
+        Assert.Contains("Proxy_INestedGrain", generatedSource);
+        Assert.Contains("Proxy_INestedGenericGrain", generatedSource);
+    }
+
     /// <summary>
     /// Tests that the generator emits a warning when [GenerateSerializer] is used in a reference assembly.
     /// Reference assemblies contain only metadata, no implementation, so generating serializers
