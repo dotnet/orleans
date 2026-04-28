@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
+using Google.Protobuf;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
 namespace Orleans.Journaling.Protobuf;
@@ -22,8 +22,9 @@ public static class ProtobufJournalingExtensions
     /// the state machine id and the durable entry payload.
     /// </para>
     /// <para>
-    /// Each entry type is serialized using protobuf wire-format tags. String user values use native
-    /// protobuf payload encoding. Other user values fall back to <see cref="ILogDataCodec{T}"/>
+    /// Each entry type is serialized using protobuf wire-format tags. Common scalar values
+    /// (<see cref="string"/>, byte arrays, numeric primitives, and <see cref="bool"/>)
+    /// use native protobuf payload encoding. Other user values fall back to <see cref="ILogDataCodec{T}"/>
     /// unless native protobuf message encoding is configured using
     /// <see cref="ProtobufJournalingOptions.AddMessageParser{T}(Google.Protobuf.MessageParser{T})"/>.
     /// </para>
@@ -66,7 +67,7 @@ public static class ProtobufJournalingExtensions
     {
         ArgumentNullException.ThrowIfNull(builder);
 
-        builder.Services.TryAddSingleton<IProtobufValueCodec<string>>(ProtobufStringValueCodec.Instance);
+        ProtobufBuiltInValueCodecs.AddTo(builder.Services);
         if (configure is not null)
         {
             var options = new ProtobufJournalingOptions();
@@ -168,7 +169,28 @@ internal sealed class ProtobufLogEntryCodecProvider(IServiceProvider serviceProv
             return new ProtobufValueConverter<T>();
         }
 
-        var codec = serviceProvider.GetRequiredService<ILogDataCodec<T>>();
-        return new ProtobufValueConverter<T>(codec);
+        var codec = serviceProvider.GetService<ILogDataCodec<T>>();
+        if (codec is not null)
+        {
+            return new ProtobufValueConverter<T>(codec);
+        }
+
+        throw CreateMissingValueCodecException<T>();
+    }
+
+    private static InvalidOperationException CreateMissingValueCodecException<T>()
+    {
+        var typeName = typeof(T).FullName ?? typeof(T).Name;
+        if (typeof(IMessage).IsAssignableFrom(typeof(T)))
+        {
+            return new InvalidOperationException(
+                $"Protocol Buffers journaling does not have a native parser or fallback codec for message type '{typeName}'. "
+                + $"Register the generated parser with UseProtobufCodec(options => options.AddMessageParser({typeof(T).Name}.Parser)) "
+                + $"or register {nameof(ILogDataCodec<T>)}.");
+        }
+
+        return new InvalidOperationException(
+            $"Protocol Buffers journaling does not have a native value codec for type '{typeName}' and no {nameof(ILogDataCodec<T>)} fallback was registered. "
+            + $"Use a supported native protobuf value type or register {nameof(ILogDataCodec<T>)}.");
     }
 }

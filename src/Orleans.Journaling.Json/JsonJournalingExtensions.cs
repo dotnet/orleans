@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections.Concurrent;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
 
@@ -21,6 +22,30 @@ public sealed class JsonJournalingOptions
     /// with source-generated metadata for journaled value, key, and state types when trimming or using Native AOT.
     /// </remarks>
     public JsonSerializerOptions SerializerOptions { get; set; } = new JsonSerializerOptions(JsonSerializerDefaults.General);
+
+    /// <summary>
+    /// Adds source-generated JSON metadata to the serializer options used for journaled payload values.
+    /// </summary>
+    /// <param name="typeInfoResolver">The resolver, typically a generated <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> instance.</param>
+    /// <returns>This options instance for chaining.</returns>
+    /// <remarks>
+    /// Use this method to register metadata for every journaled key, value, and state type when trimming or using Native AOT.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.AddStateMachineStorage().UseJsonCodec(options =>
+    /// {
+    ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
+    /// });
+    /// </code>
+    /// </example>
+    public JsonJournalingOptions AddTypeInfoResolver(IJsonTypeInfoResolver typeInfoResolver)
+    {
+        ArgumentNullException.ThrowIfNull(typeInfoResolver);
+
+        SerializerOptions.TypeInfoResolverChain.Add(typeInfoResolver);
+        return this;
+    }
 }
 
 /// <summary>
@@ -38,10 +63,12 @@ public static class JsonJournalingExtensions
     /// <code>
     /// builder.AddStateMachineStorage().UseJsonCodec();
     ///
+    /// builder.AddStateMachineStorage().UseJsonCodec(MyJournalJsonContext.Default);
+    ///
     /// builder.AddStateMachineStorage().UseJsonCodec(options =>
     /// {
     ///     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-    ///     options.SerializerOptions.TypeInfoResolverChain.Add(MyJournalJsonContext.Default);
+    ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
     /// });
     /// </code>
     /// </example>
@@ -66,6 +93,28 @@ public static class JsonJournalingExtensions
         builder.Services.AddSingleton<IDurableTaskCompletionSourceCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
 
         return builder;
+    }
+
+    /// <summary>
+    /// Configures Orleans.Journaling to use JSON Lines and registers source-generated metadata for journaled payload values.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="typeInfoResolver">The resolver, typically a generated <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> instance.</param>
+    /// <returns>The silo builder for chaining.</returns>
+    /// <remarks>
+    /// This overload is the recommended low-friction entry point for trimming and Native AOT. The supplied resolver
+    /// must include every journaled key, value, and state type.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.AddStateMachineStorage().UseJsonCodec(MyJournalJsonContext.Default);
+    /// </code>
+    /// </example>
+    public static ISiloBuilder UseJsonCodec(this ISiloBuilder builder, IJsonTypeInfoResolver typeInfoResolver)
+    {
+        ArgumentNullException.ThrowIfNull(typeInfoResolver);
+
+        return builder.UseJsonCodec(options => options.AddTypeInfoResolver(typeInfoResolver));
     }
 }
 

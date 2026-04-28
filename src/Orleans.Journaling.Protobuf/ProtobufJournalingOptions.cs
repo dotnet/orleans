@@ -8,9 +8,10 @@ namespace Orleans.Journaling.Protobuf;
 /// </summary>
 /// <remarks>
 /// <para>
-/// String values are encoded natively by default. Google Protocol Buffers message values are encoded
-/// natively only when their generated <see cref="MessageParser{T}"/> is registered explicitly.
-/// Unregistered values fall back to <see cref="ILogDataCodec{T}"/>.
+/// Common scalar values (<see cref="string"/>, byte arrays, numeric primitives, and <see cref="bool"/>)
+/// are encoded natively by default. Google Protocol Buffers message values are encoded natively only
+/// when their generated <see cref="MessageParser{T}"/> is registered explicitly. Other unregistered
+/// values fall back to <see cref="ILogDataCodec{T}"/>.
 /// </para>
 /// </remarks>
 public sealed class ProtobufJournalingOptions
@@ -22,6 +23,7 @@ public sealed class ProtobufJournalingOptions
     /// </summary>
     /// <typeparam name="T">The generated Protocol Buffers message type.</typeparam>
     /// <param name="parser">The generated parser, typically the message type's static <c>Parser</c> property.</param>
+    /// <returns>This options instance for chaining.</returns>
     /// <remarks>
     /// <para>
     /// Registering a parser lets journaling encode <typeparamref name="T"/> values directly as protobuf
@@ -37,12 +39,13 @@ public sealed class ProtobufJournalingOptions
     /// });
     /// </code>
     /// </example>
-    public void AddMessageParser<T>(MessageParser<T> parser)
+    public ProtobufJournalingOptions AddMessageParser<T>(MessageParser<T> parser)
         where T : IMessage<T>
     {
         ArgumentNullException.ThrowIfNull(parser);
 
         _configureServices.Add(services => services.AddSingleton<IProtobufValueCodec<T>>(new ProtobufMessageValueCodec<T>(parser)));
+        return this;
     }
 
     internal void Apply(IServiceCollection services)

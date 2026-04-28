@@ -11,6 +11,26 @@ namespace Orleans.Journaling.Protobuf.Tests;
 public class ProtobufValueConverterTests
 {
     [Fact]
+    public void ProtobufValueConverter_BuiltInScalars_RoundTrip()
+    {
+        AssertNativeRoundTrip(true);
+        AssertNativeRoundTrip(42);
+        AssertNativeRoundTrip(-42);
+        AssertNativeRoundTrip(42u);
+        AssertNativeRoundTrip(42L);
+        AssertNativeRoundTrip(-42L);
+        AssertNativeRoundTrip(42UL);
+        AssertNativeRoundTrip(1.5F);
+        AssertNativeRoundTrip(2.5D);
+
+        var converter = new ProtobufValueConverter<byte[]>();
+        var value = new byte[] { 1, 2, 3 };
+
+        Assert.True(ProtobufValueConverter<byte[]>.IsNativeType);
+        Assert.Equal(value, converter.FromBytes(new ReadOnlySequence<byte>(converter.ToBytes(value))));
+    }
+
+    [Fact]
     public void ProtobufCodecProvider_RegisteredMessageParser_UsesNativePayload()
     {
         var builder = new TestSiloBuilder();
@@ -46,6 +66,41 @@ public class ProtobufValueConverterTests
         Assert.Equal("fallback", consumer.Value?.Value);
         Assert.Equal(1, fallbackCodec.WriteCount);
         Assert.Equal(1, fallbackCodec.ReadCount);
+    }
+
+    [Fact]
+    public void ProtobufCodecProvider_UnregisteredMessageWithoutFallback_ThrowsHelpfulMessage()
+    {
+        var builder = new TestSiloBuilder();
+        builder.UseProtobufCodec();
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var provider = serviceProvider.GetRequiredService<IDurableValueCodecProvider>();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => provider.GetCodec<StringValue>());
+
+        Assert.Contains("AddMessageParser(StringValue.Parser)", exception.Message);
+    }
+
+    [Fact]
+    public void ProtobufCodecProvider_UnsupportedTypeWithoutFallback_ThrowsHelpfulMessage()
+    {
+        var builder = new TestSiloBuilder();
+        builder.UseProtobufCodec();
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var provider = serviceProvider.GetRequiredService<IDurableValueCodecProvider>();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => provider.GetCodec<UnsupportedValue>());
+
+        Assert.Contains("ILogDataCodec", exception.Message);
+        Assert.Contains(typeof(UnsupportedValue).FullName!, exception.Message);
+    }
+
+    private static void AssertNativeRoundTrip<T>(T value)
+    {
+        Assert.True(ProtobufValueConverter<T>.IsNativeType);
+        var converter = new ProtobufValueConverter<T>();
+
+        Assert.Equal(value, converter.FromBytes(new ReadOnlySequence<byte>(converter.ToBytes(value))));
     }
 
     private sealed class StringValueFallbackCodec : ILogDataCodec<StringValue>
@@ -84,4 +139,6 @@ public class ProtobufValueConverterTests
 
         public void ApplySet(T value) => Value = value;
     }
+
+    private sealed record UnsupportedValue(int Value);
 }
