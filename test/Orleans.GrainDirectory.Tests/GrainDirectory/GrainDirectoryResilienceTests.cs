@@ -57,7 +57,7 @@ public sealed class GrainDirectoryResilienceTests
                 var time = Stopwatch.StartNew();
                 var tasks = Enumerable.Range(0, CallsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
                 var workTask = Task.WhenAll(tasks);
-                
+
                 try
                 {
                     await workTask;
@@ -68,7 +68,7 @@ public sealed class GrainDirectoryResilienceTests
                 }
                 catch (OrleansMessageRejectionException omre)
                 {
-                   log.LogInformation(omre, "Swallowed rejection.");
+                    log.LogInformation(omre, "Swallowed rejection.");
                 }
                 catch (Exception exception)
                 {
@@ -93,24 +93,7 @@ public sealed class GrainDirectoryResilienceTests
                         reconfigurationTimer.Restart();
                         await clusterOperation;
 
-                        // Check integrity
-                        var integrityChecks = new List<Task>();
-                        foreach (var silo in testCluster.Silos)
-                        {
-                            var address = silo.SiloAddress;
-                            var partitionsPerSilo = ((InProcessSiloHandle)silo).ServiceProvider.GetRequiredService<DirectoryMembershipService>().PartitionsPerSilo;
-                            for (var partitionIndex = 0; partitionIndex < partitionsPerSilo; partitionIndex++)
-                            {
-                                var replica = ((IInternalGrainFactory)client).GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryPartition.CreateGrainId(address, partitionIndex).GrainId);
-                                integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
-                            }
-                        }
-
-                        await Task.WhenAll(integrityChecks);
-                        foreach (var task in integrityChecks)
-                        {
-                            await task;
-                        }
+                        await CheckIntegrityAsync(testCluster, client);
 
                         clusterOperation = Task.Run(async () =>
                         {
@@ -167,6 +150,99 @@ public sealed class GrainDirectoryResilienceTests
         await Task.WhenAll(loadTask, chaosTask);
         await testCluster.StopAllSilosAsync();
         await testCluster.DisposeAsync();
+    }
+
+    [Fact]
+    public async Task JoiningSilo_DoesNotLeaveStaleEntriesOnPreviousOwner()
+    {
+        var testClusterBuilder = new TestClusterBuilder(1);
+        testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
+        var testCluster = testClusterBuilder.Build();
+        await testCluster.DeployAsync();
+        var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
+        var client = ((InProcessSiloHandle)testCluster.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>();
+        const int CallsPerIteration = 100;
+        var nextGrainId = 0L;
+
+        try
+        {
+            for (var i = 0; i < 10; i++)
+            {
+                await RunPingBatchAsync(client, log, nextGrainId, CallsPerIteration);
+                nextGrainId += CallsPerIteration;
+            }
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromMinutes(1));
+            var loadGrainId = nextGrainId;
+            var loadTask = Task.Run(async () =>
+            {
+                while (!cts.IsCancellationRequested)
+                {
+                    await RunPingBatchAsync(client, log, loadGrainId, CallsPerIteration);
+                    loadGrainId += CallsPerIteration;
+                }
+            });
+
+            try
+            {
+                log.LogInformation("Starting new silo.");
+                var newSilo = await testCluster.StartAdditionalSiloAsync();
+                log.LogInformation("Started '{Silo}'.", newSilo.SiloAddress);
+
+                for (var i = 0; i < 5; i++)
+                {
+                    await Task.Delay(TimeSpan.FromSeconds(2));
+                    await CheckIntegrityAsync(testCluster, client);
+                }
+            }
+            finally
+            {
+                cts.Cancel();
+                await loadTask;
+            }
+        }
+        finally
+        {
+            await testCluster.StopAllSilosAsync();
+            await testCluster.DisposeAsync();
+        }
+    }
+
+    private static async Task CheckIntegrityAsync(TestCluster testCluster, IGrainFactory client)
+    {
+        var integrityChecks = new List<Task>();
+        var internalGrainFactory = (IInternalGrainFactory)client;
+        foreach (var silo in testCluster.Silos)
+        {
+            var address = silo.SiloAddress;
+            var partitionsPerSilo = ((InProcessSiloHandle)silo).ServiceProvider.GetRequiredService<DirectoryMembershipService>().PartitionsPerSilo;
+            for (var partitionIndex = 0; partitionIndex < partitionsPerSilo; partitionIndex++)
+            {
+                var replica = internalGrainFactory.GetSystemTarget<IGrainDirectoryTestHooks>(GrainDirectoryPartition.CreateGrainId(address, partitionIndex).GrainId);
+                integrityChecks.Add(replica.CheckIntegrityAsync().AsTask());
+            }
+        }
+
+        await Task.WhenAll(integrityChecks);
+    }
+
+    private static async Task RunPingBatchAsync(IGrainFactory client, ILogger log, long idBase, int callsPerIteration)
+    {
+        var tasks = Enumerable.Range(0, callsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
+        var workTask = Task.WhenAll(tasks);
+
+        try
+        {
+            await workTask;
+        }
+        catch (SiloUnavailableException sue)
+        {
+            log.LogInformation(sue, "Swallowed transient exception.");
+        }
+        catch (OrleansMessageRejectionException omre)
+        {
+            log.LogInformation(omre, "Swallowed rejection.");
+        }
     }
 
     private class SiloBuilderConfigurator : ISiloConfigurator
