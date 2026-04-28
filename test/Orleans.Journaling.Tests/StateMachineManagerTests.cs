@@ -48,6 +48,29 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal(42, queue.Peek());
     }
 
+    [Fact]
+    public async Task StateMachineManager_Initialize_UsesStreamingStorageRead()
+    {
+        var storage = new StreamingOnlyStorage();
+        var sut = CreateTestSystem(storage: storage);
+
+        await sut.Lifecycle.OnStart();
+
+        Assert.True(storage.StreamingReadCalled);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_PreservesUnknownStateMachineEntry()
+    {
+        var storage = new VolatileStateMachineStorage();
+        using var segment = new LogExtentBuilder();
+        segment.AppendEntry(new StateMachineId(99), new byte[] { 1, 2, 3 });
+        await storage.AppendAsync(segment, CancellationToken.None);
+        var sut = CreateTestSystem(storage: storage);
+
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
     /// <summary>
     /// Tests that all registered state machines are correctly recovered together.
     /// Verifies that the manager maintains consistency across multiple collections
@@ -377,5 +400,24 @@ public class StateMachineManagerTests : StateMachineTestBase
                 await manager.WriteStateAsync(CancellationToken.None);
             }
         }
+    }
+
+    private sealed class StreamingOnlyStorage : IStateMachineStorage
+    {
+        public bool StreamingReadCalled { get; private set; }
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, CancellationToken cancellationToken)
+        {
+            StreamingReadCalled = true;
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(LogExtentBuilder value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(LogExtentBuilder value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 }

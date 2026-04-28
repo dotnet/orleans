@@ -16,7 +16,7 @@ public sealed class ProtobufValueEntryCodec<T>(
     public void WriteSet(T value, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
-        ProtobufWire.WriteBytesField(output, ValueField, converter.ToBytes(value));
+        converter.WriteField(output, ValueField, value);
     }
 
     /// <inheritdoc/>
@@ -79,7 +79,7 @@ public sealed class ProtobufStateEntryCodec<T>(
     public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
-        ProtobufWire.WriteBytesField(output, StateField, converter.ToBytes(state));
+        converter.WriteField(output, StateField, state);
         ProtobufWire.WriteUInt64Field(output, VersionField, version);
     }
 
@@ -168,7 +168,7 @@ public sealed class ProtobufTcsEntryCodec<T>(
     public void WriteCompleted(T value, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, CompletedCommand);
-        ProtobufWire.WriteBytesField(output, ValueField, converter.ToBytes(value));
+        converter.WriteField(output, ValueField, value);
     }
 
     /// <inheritdoc/>

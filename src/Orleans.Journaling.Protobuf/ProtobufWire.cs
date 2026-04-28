@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
 using System.Text;
 
@@ -40,6 +41,18 @@ internal static class ProtobufWire
     {
         WriteTag(output, fieldNumber, WireTypeLengthDelimited);
         WriteLengthDelimited(output, value);
+    }
+
+    public static void WriteBytesField<TState>(IBufferWriter<byte> output, uint fieldNumber, int length, TState state, Action<TState, IBufferWriter<byte>> write)
+    {
+        if (length < 0)
+        {
+            throw new InvalidOperationException("Length-delimited protobuf value cannot have a negative length.");
+        }
+
+        WriteTag(output, fieldNumber, WireTypeLengthDelimited);
+        WriteVarUInt32(output, (uint)length);
+        write(state, output);
     }
 
     public static void WriteLengthDelimited(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
@@ -127,6 +140,145 @@ internal static class ProtobufWire
         return Encoding.UTF8.GetString(bytes.ToArray());
     }
 
+    public static int ComputeVarUInt32Size(uint value)
+    {
+        if (value < 1u << 7)
+        {
+            return 1;
+        }
+
+        if (value < 1u << 14)
+        {
+            return 2;
+        }
+
+        if (value < 1u << 21)
+        {
+            return 3;
+        }
+
+        if (value < 1u << 28)
+        {
+            return 4;
+        }
+
+        return 5;
+    }
+
+    public static int ComputeVarUInt64Size(ulong value)
+    {
+        if (value < 1UL << 7)
+        {
+            return 1;
+        }
+
+        if (value < 1UL << 14)
+        {
+            return 2;
+        }
+
+        if (value < 1UL << 21)
+        {
+            return 3;
+        }
+
+        if (value < 1UL << 28)
+        {
+            return 4;
+        }
+
+        if (value < 1UL << 35)
+        {
+            return 5;
+        }
+
+        if (value < 1UL << 42)
+        {
+            return 6;
+        }
+
+        if (value < 1UL << 49)
+        {
+            return 7;
+        }
+
+        if (value < 1UL << 56)
+        {
+            return 8;
+        }
+
+        if (value < 1UL << 63)
+        {
+            return 9;
+        }
+
+        return 10;
+    }
+
+    public static void WriteInt32Value(IBufferWriter<byte> output, int value)
+    {
+        if (value >= 0)
+        {
+            WriteVarUInt32(output, (uint)value);
+        }
+        else
+        {
+            WriteVarUInt64(output, unchecked((ulong)value));
+        }
+    }
+
+    public static void WriteUInt32Value(IBufferWriter<byte> output, uint value) => WriteVarUInt32(output, value);
+
+    public static void WriteInt64Value(IBufferWriter<byte> output, long value) => WriteVarUInt64(output, unchecked((ulong)value));
+
+    public static void WriteUInt64Value(IBufferWriter<byte> output, ulong value) => WriteVarUInt64(output, value);
+
+    public static void WriteFixed32Value(IBufferWriter<byte> output, uint value)
+    {
+        var span = output.GetSpan(4);
+        BinaryPrimitives.WriteUInt32LittleEndian(span, value);
+        output.Advance(4);
+    }
+
+    public static void WriteFixed64Value(IBufferWriter<byte> output, ulong value)
+    {
+        var span = output.GetSpan(8);
+        BinaryPrimitives.WriteUInt64LittleEndian(span, value);
+        output.Advance(8);
+    }
+
+    public static int ReadInt32Value(ref SequenceReader<byte> reader) => unchecked((int)ReadVarUInt64(ref reader));
+
+    public static uint ReadUInt32Value(ref SequenceReader<byte> reader) => ReadVarUInt32(ref reader);
+
+    public static long ReadInt64Value(ref SequenceReader<byte> reader) => unchecked((long)ReadVarUInt64(ref reader));
+
+    public static ulong ReadUInt64Value(ref SequenceReader<byte> reader) => ReadVarUInt64(ref reader);
+
+    public static uint ReadFixed32Value(ref SequenceReader<byte> reader)
+    {
+        Span<byte> bytes = stackalloc byte[4];
+        if (!reader.TryCopyTo(bytes))
+        {
+            throw new InvalidOperationException("Malformed protobuf value payload: insufficient data for fixed32 value.");
+        }
+
+        reader.Advance(4);
+        return BinaryPrimitives.ReadUInt32LittleEndian(bytes);
+    }
+
+    public static ulong ReadFixed64Value(ref SequenceReader<byte> reader)
+    {
+        Span<byte> bytes = stackalloc byte[8];
+        if (!reader.TryCopyTo(bytes))
+        {
+            throw new InvalidOperationException("Malformed protobuf value payload: insufficient data for fixed64 value.");
+        }
+
+        reader.Advance(8);
+        return BinaryPrimitives.ReadUInt64LittleEndian(bytes);
+    }
+
     public static void SkipField(ref SequenceReader<byte> reader, uint tag)
     {
         switch (tag & 0b111)
@@ -152,7 +304,7 @@ internal static class ProtobufWire
         }
     }
 
-    private static void WriteRaw(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
+    public static void WriteRaw(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
     {
         var span = output.GetSpan(value.Length);
         value.CopyTo(span);
@@ -176,7 +328,7 @@ internal static class ProtobufWire
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void WriteVarUInt32(IBufferWriter<byte> output, uint value)
+    public static void WriteVarUInt32(IBufferWriter<byte> output, uint value)
     {
         var span = output.GetSpan(5);
         var count = 0;
@@ -197,7 +349,7 @@ internal static class ProtobufWire
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    private static void WriteVarUInt64(IBufferWriter<byte> output, ulong value)
+    public static void WriteVarUInt64(IBufferWriter<byte> output, ulong value)
     {
         var span = output.GetSpan(10);
         var count = 0;

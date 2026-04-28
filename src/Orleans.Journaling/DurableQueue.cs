@@ -60,20 +60,34 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
     {
-        snapshotWriter.AppendEntry(static (self, bufferWriter) =>
+        var writer = snapshotWriter.BeginEntry();
+        try
         {
-            self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
-        }, this);
+            _codec.WriteSnapshot(_items, _items.Count, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
     }
 
     public void Clear()
     {
-        ApplyClear();
-        GetStorage().AppendEntry(static (self, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            self._codec.WriteClear(bufferWriter);
-        },
-        this);
+            _codec.WriteClear(writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyClear();
     }
 
     public T Peek() => _items.Peek();
@@ -83,37 +97,61 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
     public void Enqueue(T item)
     {
-        ApplyEnqueue(item);
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            var (self, value) = state;
-            self._codec.WriteEnqueue(value!, bufferWriter);
-        },
-        (this, item));
+            _codec.WriteEnqueue(item, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyEnqueue(item);
     }
 
     public T Dequeue()
     {
-        var result = ApplyDequeue();
-        GetStorage().AppendEntry(static (self, bufferWriter) =>
+        var result = _items.Peek();
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            self._codec.WriteDequeue(bufferWriter);
-        }, this);
+            _codec.WriteDequeue(writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        _ = ApplyDequeue();
         return result;
     }
 
     public bool TryDequeue([MaybeNullWhen(false)] out T item)
     {
-        if (ApplyTryDequeue(out item))
+        if (!_items.TryPeek(out item))
         {
-            GetStorage().AppendEntry(static (self, bufferWriter) =>
-            {
-                self._codec.WriteDequeue(bufferWriter);
-            }, this);
-            return true;
+            return false;
         }
 
-        return false;
+        var writer = GetStorage().BeginEntry();
+        try
+        {
+            _codec.WriteDequeue(writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        _ = ApplyTryDequeue(out _);
+        return true;
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();

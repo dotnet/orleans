@@ -23,15 +23,15 @@ public sealed class ProtobufDictionaryEntryCodec<TKey, TValue>(
     public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
-        ProtobufWire.WriteBytesField(output, KeyField, keyConverter.ToBytes(key));
-        ProtobufWire.WriteBytesField(output, ValueField, valueConverter.ToBytes(value));
+        keyConverter.WriteField(output, KeyField, key);
+        valueConverter.WriteField(output, ValueField, value);
     }
 
     /// <inheritdoc/>
     public void WriteRemove(TKey key, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, RemoveCommand);
-        ProtobufWire.WriteBytesField(output, KeyField, keyConverter.ToBytes(key));
+        keyConverter.WriteField(output, KeyField, key);
     }
 
     /// <inheritdoc/>
@@ -47,8 +47,8 @@ public sealed class ProtobufDictionaryEntryCodec<TKey, TValue>(
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var (key, value) in items)
         {
-            ProtobufWire.WriteBytesField(output, KeyField, keyConverter.ToBytes(key));
-            ProtobufWire.WriteBytesField(output, ValueField, valueConverter.ToBytes(value));
+            keyConverter.WriteField(output, KeyField, key);
+            valueConverter.WriteField(output, ValueField, value);
         }
     }
 

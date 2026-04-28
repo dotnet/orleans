@@ -1,6 +1,5 @@
 using Orleans.Serialization.Buffers;
 using System.Collections.Concurrent;
-using System.Runtime.CompilerServices;
 
 namespace Orleans.Journaling;
 
@@ -43,7 +42,7 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
     internal IReadOnlyList<byte[]> Segments => _segments;
 
     /// <inheritdoc/>
-    public async IAsyncEnumerable<LogExtent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, CancellationToken cancellationToken)
     {
         await Task.CompletedTask;
         using var buffer = new ArcBufferWriter();
@@ -51,7 +50,7 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
         {
             cancellationToken.ThrowIfCancellationRequested();
             buffer.Write(segment);
-            yield return _codec.Decode(buffer.ConsumeSlice(segment.Length));
+            _codec.Read(buffer.ConsumeSlice(segment.Length), consumer);
         }
     }
 
@@ -59,7 +58,7 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
     public ValueTask AppendAsync(LogExtentBuilder segment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _segments.Add(_codec.Encode(segment));
+        _segments.Add(Encode(segment));
         return default;
     }
 
@@ -68,7 +67,7 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
     {
         cancellationToken.ThrowIfCancellationRequested();
         _segments.Clear();
-        _segments.Add(_codec.Encode(snapshot));
+        _segments.Add(Encode(snapshot));
         return default;
     }
 
@@ -77,6 +76,14 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
         cancellationToken.ThrowIfCancellationRequested();
         _segments.Clear();
         return default;
+    }
+
+    private byte[] Encode(LogExtentBuilder segment)
+    {
+        using var stream = _codec.EncodeToStream(segment);
+        using var output = stream.CanSeek ? new MemoryStream((int)stream.Length) : new MemoryStream();
+        stream.CopyTo(output);
+        return output.ToArray();
     }
 }
 

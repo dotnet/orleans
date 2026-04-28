@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections;
 using System.Diagnostics;
 using Orleans.Serialization.Buffers;
@@ -10,11 +11,12 @@ namespace Orleans.Journaling;
 /// <summary>
 /// A mutable builder for creating log segments.
 /// </summary>
-public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposable, IBufferWriter<byte>
+public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposable, ILogEntryWriterTarget
 {
     private readonly List<uint> _entryLengths = [];
     private readonly byte[] _scratch = new byte[8];
     private readonly ArcBufferWriter _buffer = buffer;
+    private readonly LogEntryWriter _entryWriter = new();
 
     public LogExtentBuilder() : this(new())
     {
@@ -56,6 +58,16 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
         _entryLengths.Add((uint)(endOffset - startOffset));
     }
 
+    internal LogEntryWriter BeginEntry(StateMachineId id, ILogEntryWriterCompletion completion = null)
+    {
+        var startOffset = _buffer.Length;
+        var writer = Writer.Create(this, session: null);
+        writer.WriteVarUInt64(id.Value);
+        writer.Commit();
+        _entryWriter.Initialize(this, startOffset, completion);
+        return _entryWriter;
+    }
+
     internal void AppendEntry(StateMachineId id, ReadOnlySequence<byte> value)
     {
         var startOffset = _buffer.Length;
@@ -65,19 +77,6 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
         writer.Commit();
 
         _buffer.Write(value);
-
-        var endOffset = _buffer.Length;
-        _entryLengths.Add((uint)(endOffset - startOffset));
-    }
-
-    internal void AppendEntry<T>(StateMachineId id, Action<T, IBufferWriter<byte>> valueWriter, T value)
-    {
-        var startOffset = _buffer.Length;
-
-        var writer = Writer.Create(this, session: null);
-        writer.WriteVarUInt64(id.Value);
-        writer.Commit();
-        valueWriter(value, this);
 
         var endOffset = _buffer.Length;
         _entryLengths.Add((uint)(endOffset - startOffset));
@@ -95,6 +94,9 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
     void IBufferWriter<byte>.Advance(int count) => _buffer.AdvanceWriter(count);
     Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => _buffer.GetMemory(sizeHint);
     Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint) => _buffer.GetSpan(sizeHint);
+    void ILogEntryWriterTarget.Write(ReadOnlySpan<byte> value) => _buffer.Write(value);
+    void ILogEntryWriterTarget.CommitEntry(int entryStart) => _entryLengths.Add((uint)(_buffer.Length - entryStart));
+    void ILogEntryWriterTarget.AbortEntry(int entryStart) => _buffer.Truncate(entryStart);
 
     public async ValueTask CopyToAsync(Stream destination, int bufferSize, CancellationToken cancellationToken)
     {
@@ -160,9 +162,8 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
 
     private static ReadOnlyMemory<byte> GetLengthBytes(byte[] scratch, uint length)
     {
-        var writer = Writer.Create(scratch, null);
-        writer.WriteVarUInt32(length);
-        return new ReadOnlyMemory<byte>(scratch, 0, writer.Position);
+        BinaryPrimitives.WriteUInt32LittleEndian(scratch, length);
+        return new ReadOnlyMemory<byte>(scratch, 0, sizeof(uint));
     }
 
     private struct EntryEnumerator : IEnumerable<LogExtent.Entry>, IEnumerator<LogExtent.Entry>

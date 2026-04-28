@@ -12,5 +12,7 @@ internal sealed class BinaryLogExtentCodec : IStateMachineLogExtentCodec
 
     public byte[] Encode(LogExtentBuilder value) => value.ToArray();
 
+    public Stream EncodeToStream(LogExtentBuilder value) => value.AsReadOnlyStream();
+
     public LogExtent Decode(ArcBuffer value) => new(value);
 }

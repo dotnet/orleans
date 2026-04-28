@@ -24,7 +24,7 @@ public sealed class ProtobufListEntryCodec<T>(
     public void WriteAdd(T item, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, AddCommand);
-        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        converter.WriteField(output, ItemField, item);
     }
 
     /// <inheritdoc/>
@@ -32,7 +32,7 @@ public sealed class ProtobufListEntryCodec<T>(
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
         ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
-        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        converter.WriteField(output, ItemField, item);
     }
 
     /// <inheritdoc/>
@@ -40,7 +40,7 @@ public sealed class ProtobufListEntryCodec<T>(
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, InsertCommand);
         ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
-        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        converter.WriteField(output, ItemField, item);
     }
 
     /// <inheritdoc/>
@@ -63,7 +63,7 @@ public sealed class ProtobufListEntryCodec<T>(
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var item in items)
         {
-            ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+            converter.WriteField(output, ItemField, item);
         }
     }
 
@@ -199,7 +199,7 @@ public sealed class ProtobufQueueEntryCodec<T>(
     public void WriteEnqueue(T item, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, EnqueueCommand);
-        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        converter.WriteField(output, ItemField, item);
     }
 
     /// <inheritdoc/>
@@ -221,7 +221,7 @@ public sealed class ProtobufQueueEntryCodec<T>(
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var item in items)
         {
-            ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+            converter.WriteField(output, ItemField, item);
         }
     }
 
@@ -326,14 +326,14 @@ public sealed class ProtobufSetEntryCodec<T>(
     public void WriteAdd(T item, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, AddCommand);
-        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        converter.WriteField(output, ItemField, item);
     }
 
     /// <inheritdoc/>
     public void WriteRemove(T item, IBufferWriter<byte> output)
     {
         ProtobufWire.WriteUInt32Field(output, CommandField, RemoveCommand);
-        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        converter.WriteField(output, ItemField, item);
     }
 
     /// <inheritdoc/>
@@ -349,7 +349,7 @@ public sealed class ProtobufSetEntryCodec<T>(
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var item in items)
         {
-            ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+            converter.WriteField(output, ItemField, item);
         }
     }
 

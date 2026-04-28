@@ -62,22 +62,24 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
     {
-        snapshotWriter.AppendEntry(WriteSnapshotToBufferWriter, this);
-    }
-
-    private static void WriteSnapshotToBufferWriter(DurableSet<T> self, IBufferWriter<byte> bufferWriter)
-    {
-        self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
+        WriteSnapshot(_items, _items.Count, snapshotWriter.BeginEntry());
     }
 
     public void Clear()
     {
-        ApplyClear();
-        GetStorage().AppendEntry(static (self, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            self._codec.WriteClear(bufferWriter);
-        },
-        this);
+            _codec.WriteClear(writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyClear();
     }
 
     public bool Contains(T item) => _items.Contains(item);
@@ -85,34 +87,62 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
     public bool Add(T item)
     {
-        if (ApplyAdd(item))
+        if (_items.Contains(item))
         {
-            GetStorage().AppendEntry(static (state, bufferWriter) =>
-            {
-                var (self, item) = state;
-                self._codec.WriteAdd(item!, bufferWriter);
-            },
-            (this, item));
-            return true;
+            return false;
         }
 
-        return false;
+        var writer = GetStorage().BeginEntry();
+        try
+        {
+            _codec.WriteAdd(item, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        _ = ApplyAdd(item);
+        return true;
     }
 
     public bool Remove(T item)
     {
-        if (ApplyRemove(item))
+        if (!_items.Contains(item))
         {
-            GetStorage().AppendEntry(static (state, bufferWriter) =>
-            {
-                var (self, item) = state;
-                self._codec.WriteRemove(item!, bufferWriter);
-            },
-            (this, item));
-            return true;
+            return false;
         }
 
-        return false;
+        var writer = GetStorage().BeginEntry();
+        try
+        {
+            _codec.WriteRemove(item, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        _ = ApplyRemove(item);
+        return true;
+    }
+
+    private void WriteSnapshot(IEnumerable<T> items, int count, LogEntryWriter writer)
+    {
+        try
+        {
+            _codec.WriteSnapshot(items, count, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
@@ -159,21 +189,25 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     public void IntersectWith(IEnumerable<T> other)
     {
-        var initialCount = Count;
-        _items.IntersectWith(other);
-        if (Count != initialCount)
+        var next = new HashSet<T>(_items, _items.Comparer);
+        next.IntersectWith(other);
+        if (!_items.SetEquals(next))
         {
-            GetStorage().AppendEntry(WriteSnapshotToBufferWriter, this);
+            WriteSnapshot(next, next.Count, GetStorage().BeginEntry());
+            _items.Clear();
+            _items.UnionWith(next);
         }
     }
 
     public void SymmetricExceptWith(IEnumerable<T> other)
     {
-        var initialCount = Count;
-        _items.SymmetricExceptWith(other);
-        if (Count != initialCount)
+        var next = new HashSet<T>(_items, _items.Comparer);
+        next.SymmetricExceptWith(other);
+        if (!_items.SetEquals(next))
         {
-            GetStorage().AppendEntry(WriteSnapshotToBufferWriter, this);
+            WriteSnapshot(next, next.Count, GetStorage().BeginEntry());
+            _items.Clear();
+            _items.UnionWith(next);
         }
     }
 

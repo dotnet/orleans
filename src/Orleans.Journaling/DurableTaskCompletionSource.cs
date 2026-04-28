@@ -151,24 +151,32 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     private void WriteState(StateMachineStorageWriter writer)
     {
-        writer.AppendEntry(static (self, bufferWriter) =>
+        var entry = writer.BeginEntry();
+        try
         {
-            switch (self._status)
+            switch (_status)
             {
                 case DurableTaskCompletionSourceStatus.Completed:
-                    self._codec.WriteCompleted(self._value!, bufferWriter);
+                    _codec.WriteCompleted(_value!, entry);
                     break;
                 case DurableTaskCompletionSourceStatus.Faulted:
-                    self._codec.WriteFaulted(self._exception!, bufferWriter);
+                    _codec.WriteFaulted(_exception!, entry);
                     break;
                 case DurableTaskCompletionSourceStatus.Canceled:
-                    self._codec.WriteCanceled(bufferWriter);
+                    _codec.WriteCanceled(entry);
                     break;
                 default:
-                    self._codec.WritePending(bufferWriter);
+                    _codec.WritePending(entry);
                     break;
             }
-        }, this);
+
+            entry.Commit();
+        }
+        catch
+        {
+            entry.Abort();
+            throw;
+        }
     }
 
     void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
