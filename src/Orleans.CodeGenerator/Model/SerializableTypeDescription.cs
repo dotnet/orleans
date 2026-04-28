@@ -105,7 +105,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private INamedTypeSymbol Type { get; }
+        public INamedTypeSymbol Type { get; }
 
         public Accessibility Accessibility { get; }
 

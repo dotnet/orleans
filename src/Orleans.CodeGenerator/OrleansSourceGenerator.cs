@@ -245,28 +245,55 @@ namespace Orleans.CodeGenerator
         {
             try
             {
+                if (referenceData is null || referenceData.ReferencedSerializableTypes.IsDefaultOrEmpty)
+                {
+                    return ImmutableArray<SourceOutputResult>.Empty;
+                }
+
+                var processedModelTypes = new HashSet<string>(StringComparer.Ordinal);
+                var modelsToResolve = ImmutableArray.CreateBuilder<SerializableTypeModel>();
+                foreach (var model in referenceData.ReferencedSerializableTypes
+                    .Distinct()
+                    .OrderBy(static model => model.TypeSyntax.SyntaxString, StringComparer.Ordinal)
+                    .ThenBy(static model => model.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                    .ThenBy(static model => model.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                    .ThenBy(static model => model.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                    .ThenBy(static model => model.GeneratedNamespace, StringComparer.Ordinal)
+                    .ThenBy(static model => model.Name, StringComparer.Ordinal))
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (IsCurrentCompilationAssembly(model.MetadataIdentity, compilation))
+                    {
+                        continue;
+                    }
+
+                    var modelTypeKey = $"{model.MetadataIdentity.AssemblyIdentity}|{model.MetadataIdentity.AssemblyName}|{model.MetadataIdentity.MetadataName}|{model.GeneratedNamespace}|{model.Name}|{model.TypeSyntax.SyntaxString}";
+                    if (processedModelTypes.Add(modelTypeKey))
+                    {
+                        modelsToResolve.Add(model);
+                    }
+                }
+
+                if (modelsToResolve.Count == 0)
+                {
+                    return ImmutableArray<SourceOutputResult>.Empty;
+                }
+
                 AttachDebuggerIfRequested(options);
                 var codeGeneratorOptions = CreateCodeGeneratorOptions(options);
                 var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
                 var resolver = new TypeSymbolResolver(compilation);
                 var assemblyName = compilation.AssemblyName ?? "assembly";
-                var processedModelTypes = new HashSet<string>(StringComparer.Ordinal);
                 var sourceEntries = ImmutableArray.CreateBuilder<SourceOutputResult>();
                 var defaultCopiers = new Dictionary<ISerializableTypeDescription, TypeSyntax>();
                 var serializerGenerator = new SerializerGenerator(generatorServices);
                 var copierGenerator = new CopierGenerator(generatorServices);
                 var activatorGenerator = new ActivatorGenerator(generatorServices);
 
-                foreach (var model in referenceData.ReferencedSerializableTypes
-                    .Distinct()
-                    .OrderBy(static model => model.TypeSyntax.SyntaxString, StringComparer.Ordinal)
-                    .ThenBy(static model => model.GeneratedNamespace, StringComparer.Ordinal)
-                    .ThenBy(static model => model.Name, StringComparer.Ordinal))
+                foreach (var model in modelsToResolve)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    var modelTypeKey = $"{model.GeneratedNamespace}|{model.Name}|{model.TypeSyntax.SyntaxString}";
-                    if (!processedModelTypes.Add(modelTypeKey)
-                        || !resolver.TryResolveSerializableType(model, out var symbol)
+                    if (!resolver.TryResolveSerializableType(model, cancellationToken, out var symbol)
                         || SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, compilation.Assembly))
                     {
                         continue;
@@ -343,6 +370,7 @@ namespace Orleans.CodeGenerator
 
         private static SourceOutputResult CreateProxySourceOutput(
             Compilation compilation,
+            TypeSymbolResolver resolver,
             ProxyOutputModel proxyOutputModel,
             GeneratorOptions options,
             CancellationToken cancellationToken)
@@ -354,10 +382,10 @@ namespace Orleans.CodeGenerator
                 var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
                 var codeGenerator = new CodeGenerator(compilation, codeGeneratorOptions);
                 var model = proxyOutputModel.ProxyInterface;
-                PopulateProxyInterfaces(codeGenerator, ImmutableArray.Create(model), cancellationToken);
+                PopulateProxyInterfaces(codeGenerator, resolver, ImmutableArray.Create(model), cancellationToken);
 
                 var assemblyName = compilation.AssemblyName ?? "assembly";
-                var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, model);
+                var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model, cancellationToken);
                 var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
                 var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
                 var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
@@ -441,7 +469,7 @@ namespace Orleans.CodeGenerator
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var model = proxyOutputModel.ProxyInterface;
-                var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model);
+                var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model, cancellationToken);
                 var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
                 var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
                 var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
@@ -567,7 +595,7 @@ namespace Orleans.CodeGenerator
                 foreach (var proxyOutputModel in proxyOutputModels)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    sourceOutputs.Add(CreateProxySourceOutput(compilation, proxyOutputModel, options, cancellationToken));
+                    sourceOutputs.Add(CreateProxySourceOutput(compilation, resolver, proxyOutputModel, options, cancellationToken));
                 }
             }
             else
@@ -614,7 +642,7 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var invokable in GetGeneratedInvokables(codeGenerator, entry.Description))
                 {
-                    if (!invokableOwners.ContainsKey(invokable.MetadataName))
+                    if (!invokableOwners.TryGetValue(invokable.MetadataName, out _))
                     {
                         invokableOwners.Add(invokable.MetadataName, entry.HintName);
                     }
@@ -624,11 +652,14 @@ namespace Orleans.CodeGenerator
             return models
                 .Distinct()
                 .OrderBy(static model => model.InterfaceType.SyntaxString, StringComparer.Ordinal)
+                .ThenBy(static model => model.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .ThenBy(static model => model.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                .ThenBy(static model => model.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
                 .ThenBy(static model => model.GeneratedNamespace, StringComparer.Ordinal)
                 .ThenBy(static model => model.Name, StringComparer.Ordinal)
                 .Select(model =>
                 {
-                    var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model);
+                    var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model, cancellationToken);
                     var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
                     var generatedInvokables = GetGeneratedInvokables(codeGenerator, interfaceDescription)
                         .ToImmutableArray();
@@ -684,15 +715,6 @@ namespace Orleans.CodeGenerator
 
         private static void PopulateProxyInterfaces(
             CodeGenerator codeGenerator,
-            ImmutableArray<ProxyInterfaceModel> models,
-            CancellationToken cancellationToken)
-        {
-            var resolver = new TypeSymbolResolver(codeGenerator.Compilation);
-            PopulateProxyInterfaces(codeGenerator, resolver, models, cancellationToken);
-        }
-
-        private static void PopulateProxyInterfaces(
-            CodeGenerator codeGenerator,
             TypeSymbolResolver resolver,
             ImmutableArray<ProxyInterfaceModel> models,
             CancellationToken cancellationToken)
@@ -703,13 +725,13 @@ namespace Orleans.CodeGenerator
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
-                var modelKey = $"{model.InterfaceType.SyntaxString}|{model.GeneratedNamespace}|{model.Name}";
+                var modelKey = $"{model.MetadataIdentity.AssemblyIdentity}|{model.MetadataIdentity.AssemblyName}|{model.MetadataIdentity.MetadataName}|{model.InterfaceType.SyntaxString}|{model.GeneratedNamespace}|{model.Name}";
                 if (!processed.Add(modelKey))
                 {
                     continue;
                 }
 
-                if (!resolver.TryResolveProxyInterface(model, out var interfaceType))
+                if (!resolver.TryResolveProxyInterface(model, cancellationToken, out var interfaceType))
                 {
                     throw new InvalidOperationException($"Unable to resolve proxy interface '{model.InterfaceType.SyntaxString}'.");
                 }
@@ -734,18 +756,13 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private static ProxyInterfaceDescription GetProxyInterfaceDescription(CodeGenerator codeGenerator, ProxyInterfaceModel model)
-        {
-            var resolver = new TypeSymbolResolver(codeGenerator.Compilation);
-            return GetProxyInterfaceDescription(codeGenerator, resolver, model);
-        }
-
         private static ProxyInterfaceDescription GetProxyInterfaceDescription(
             CodeGenerator codeGenerator,
             TypeSymbolResolver resolver,
-            ProxyInterfaceModel model)
+            ProxyInterfaceModel model,
+            CancellationToken cancellationToken)
         {
-            if (!resolver.TryResolveProxyInterface(model, out var interfaceType)
+            if (!resolver.TryResolveProxyInterface(model, cancellationToken, out var interfaceType)
                 || !codeGenerator.TryGetInvokableInterfaceDescription(interfaceType.OriginalDefinition, out var description))
             {
                 throw new InvalidOperationException($"Unable to resolve proxy interface '{model.InterfaceType.SyntaxString}'.");
@@ -1013,55 +1030,193 @@ namespace Orleans.CodeGenerator
             return members.Values;
         }
 
+        private static bool IsCurrentCompilationAssembly(TypeMetadataIdentity metadataIdentity, Compilation compilation)
+        {
+            if (metadataIdentity.IsEmpty)
+            {
+                return false;
+            }
+
+            var assemblyIdentity = compilation.Assembly.Identity;
+            if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity))
+            {
+                return string.Equals(metadataIdentity.AssemblyIdentity, assemblyIdentity.GetDisplayName(), StringComparison.Ordinal);
+            }
+
+            return !string.IsNullOrEmpty(metadataIdentity.AssemblyName)
+                && string.Equals(metadataIdentity.AssemblyName, assemblyIdentity.Name, StringComparison.Ordinal);
+        }
+
         private sealed class TypeSymbolResolver
         {
             private readonly Compilation _compilation;
-            private readonly Dictionary<string, INamedTypeSymbol> _types = new(StringComparer.Ordinal);
-            private readonly List<INamedTypeSymbol> _allTypes = new();
+            private FallbackIndex _fallbackIndex;
 
             public TypeSymbolResolver(Compilation compilation)
             {
                 _compilation = compilation;
-                AddAssembly(compilation.Assembly);
-
-                foreach (var reference in compilation.References)
-                {
-                    if (compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly)
-                    {
-                        AddAssembly(assembly);
-                    }
-                }
             }
 
-            public bool TryResolveSerializableType(SerializableTypeModel model, out INamedTypeSymbol symbol)
+            public bool TryResolveSerializableType(
+                SerializableTypeModel model,
+                CancellationToken cancellationToken,
+                out INamedTypeSymbol symbol)
             {
-                if (TryResolve(model.TypeSyntax.SyntaxString, out symbol))
+                if (model is null)
+                {
+                    symbol = null;
+                    return false;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                if (TryResolveMetadataIdentity(model.MetadataIdentity, cancellationToken, out symbol)
+                    || TryResolveTypeSyntax(model.TypeSyntax.SyntaxString, cancellationToken, out symbol))
                 {
                     return true;
                 }
 
-                symbol = _allTypes.FirstOrDefault(candidate =>
-                    string.Equals(candidate.Name, model.Name, StringComparison.Ordinal)
-                    && string.Equals(candidate.GetNamespaceAndNesting(), model.Namespace, StringComparison.Ordinal)
-                    && candidate.GetAllTypeParameters().Count() == model.TypeParameters.Length);
-                return symbol is not null;
+                foreach (var candidate in GetFallbackIndex(cancellationToken).AllTypes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (string.Equals(candidate.Name, model.Name, StringComparison.Ordinal)
+                        && string.Equals(candidate.GetNamespaceAndNesting(), model.Namespace, StringComparison.Ordinal)
+                        && candidate.GetAllTypeParameters().Count() == model.TypeParameters.Length)
+                    {
+                        symbol = candidate;
+                        return true;
+                    }
+                }
+
+                symbol = null;
+                return false;
             }
 
-            public bool TryResolveProxyInterface(ProxyInterfaceModel model, out INamedTypeSymbol symbol)
+            public bool TryResolveProxyInterface(
+                ProxyInterfaceModel model,
+                CancellationToken cancellationToken,
+                out INamedTypeSymbol symbol)
             {
-                if (TryResolve(model.InterfaceType.SyntaxString, out symbol))
+                if (model is null)
+                {
+                    symbol = null;
+                    return false;
+                }
+
+                cancellationToken.ThrowIfCancellationRequested();
+                if (TryResolveMetadataIdentity(model.MetadataIdentity, cancellationToken, out symbol)
+                    || TryResolveTypeSyntax(model.InterfaceType.SyntaxString, cancellationToken, out symbol))
                 {
                     return symbol.TypeKind == TypeKind.Interface;
                 }
 
-                symbol = _allTypes.FirstOrDefault(candidate =>
-                    candidate.TypeKind == TypeKind.Interface
-                    && string.Equals(candidate.Name, model.Name, StringComparison.Ordinal)
-                    && string.Equals(candidate.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), model.InterfaceType.SyntaxString, StringComparison.Ordinal));
-                return symbol is not null;
+                foreach (var candidate in GetFallbackIndex(cancellationToken).AllTypes)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (candidate.TypeKind == TypeKind.Interface
+                        && string.Equals(candidate.Name, model.Name, StringComparison.Ordinal)
+                        && string.Equals(candidate.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), model.InterfaceType.SyntaxString, StringComparison.Ordinal))
+                    {
+                        symbol = candidate;
+                        return true;
+                    }
+                }
+
+                symbol = null;
+                return false;
             }
 
-            public bool TryResolve(string typeSyntax, out INamedTypeSymbol symbol)
+            private bool TryResolveMetadataIdentity(
+                TypeMetadataIdentity metadataIdentity,
+                CancellationToken cancellationToken,
+                out INamedTypeSymbol symbol)
+            {
+                if (metadataIdentity.IsEmpty)
+                {
+                    symbol = null;
+                    return false;
+                }
+
+                if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity)
+                    || !string.IsNullOrEmpty(metadataIdentity.AssemblyName))
+                {
+                    if (TryGetAssembly(metadataIdentity, cancellationToken, out var assembly))
+                    {
+                        symbol = assembly.GetTypeByMetadataName(metadataIdentity.MetadataName);
+                        return symbol is not null;
+                    }
+
+                    symbol = null;
+                    return false;
+                }
+
+                return TryResolveMetadataName(metadataIdentity.MetadataName, out symbol);
+            }
+
+            private bool TryGetAssembly(
+                TypeMetadataIdentity metadataIdentity,
+                CancellationToken cancellationToken,
+                out IAssemblySymbol assembly)
+            {
+                if (IsMatchingAssembly(_compilation.Assembly, metadataIdentity))
+                {
+                    assembly = _compilation.Assembly;
+                    return true;
+                }
+
+                IAssemblySymbol assemblyByName = null;
+                foreach (var reference in _compilation.References)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (_compilation.GetAssemblyOrModuleSymbol(reference) is not IAssemblySymbol candidate)
+                    {
+                        continue;
+                    }
+
+                    if (IsMatchingAssembly(candidate, metadataIdentity))
+                    {
+                        assembly = candidate;
+                        return true;
+                    }
+
+                    if (string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity)
+                        && !string.IsNullOrEmpty(metadataIdentity.AssemblyName)
+                        && string.Equals(candidate.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal))
+                    {
+                        if (assemblyByName is not null)
+                        {
+                            assembly = null;
+                            return false;
+                        }
+
+                        assemblyByName = candidate;
+                    }
+                }
+
+                if (assemblyByName is not null)
+                {
+                    assembly = assemblyByName;
+                    return true;
+                }
+
+                assembly = null;
+                return false;
+            }
+
+            private static bool IsMatchingAssembly(IAssemblySymbol assembly, TypeMetadataIdentity metadataIdentity)
+            {
+                if (!string.IsNullOrEmpty(metadataIdentity.AssemblyIdentity))
+                {
+                    return string.Equals(assembly.Identity.GetDisplayName(), metadataIdentity.AssemblyIdentity, StringComparison.Ordinal);
+                }
+
+                return !string.IsNullOrEmpty(metadataIdentity.AssemblyName)
+                    && string.Equals(assembly.Identity.Name, metadataIdentity.AssemblyName, StringComparison.Ordinal);
+            }
+
+            private bool TryResolveTypeSyntax(
+                string typeSyntax,
+                CancellationToken cancellationToken,
+                out INamedTypeSymbol symbol)
             {
                 if (string.IsNullOrWhiteSpace(typeSyntax))
                 {
@@ -1069,12 +1224,36 @@ namespace Orleans.CodeGenerator
                     return false;
                 }
 
-                if (_types.TryGetValue(NormalizeTypeKey(typeSyntax), out symbol))
+                if (TryGetMetadataName(typeSyntax, allowGenericSyntax: false, out var metadataName)
+                    && TryResolveMetadataName(metadataName, out symbol))
                 {
                     return true;
                 }
 
-                var metadataName = typeSyntax;
+                var fallbackIndex = GetFallbackIndex(cancellationToken);
+                if (fallbackIndex.TypesByKey.TryGetValue(NormalizeTypeKey(typeSyntax), out symbol))
+                {
+                    return true;
+                }
+
+                return TryGetMetadataName(typeSyntax, allowGenericSyntax: true, out metadataName)
+                    && TryResolveMetadataName(metadataName, out symbol);
+            }
+
+            private bool TryResolveMetadataName(string metadataName, out INamedTypeSymbol symbol)
+            {
+                symbol = _compilation.GetTypeByMetadataName(metadataName);
+                if (symbol is null && TryGetSpecialType(metadataName, out var specialType))
+                {
+                    symbol = _compilation.GetSpecialType(specialType);
+                }
+
+                return symbol is not null;
+            }
+
+            private static bool TryGetMetadataName(string typeSyntax, bool allowGenericSyntax, out string metadataName)
+            {
+                metadataName = typeSyntax.Trim();
                 if (metadataName.StartsWith("global::", StringComparison.Ordinal))
                 {
                     metadataName = metadataName.Substring("global::".Length);
@@ -1083,6 +1262,12 @@ namespace Orleans.CodeGenerator
                 var genericStart = metadataName.IndexOf('<');
                 if (genericStart >= 0)
                 {
+                    if (!allowGenericSyntax)
+                    {
+                        metadataName = null;
+                        return false;
+                    }
+
                     metadataName = metadataName.Substring(0, genericStart);
                 }
 
@@ -1112,68 +1297,105 @@ namespace Orleans.CodeGenerator
                     _ => metadataName,
                 };
 
-                symbol = _compilation.GetTypeByMetadataName(metadataName);
-                if (symbol is null && TryGetSpecialType(metadataName, out var specialType))
+                return !string.IsNullOrWhiteSpace(metadataName);
+            }
+
+            private static bool TryGetSpecialType(string metadataName, out SpecialType specialType)
+            {
+                specialType = metadataName switch
                 {
-                    symbol = _compilation.GetSpecialType(specialType);
+                    "System.Boolean" => SpecialType.System_Boolean,
+                    "System.Byte" => SpecialType.System_Byte,
+                    "System.SByte" => SpecialType.System_SByte,
+                    "System.Int16" => SpecialType.System_Int16,
+                    "System.UInt16" => SpecialType.System_UInt16,
+                    "System.Int32" => SpecialType.System_Int32,
+                    "System.UInt32" => SpecialType.System_UInt32,
+                    "System.Int64" => SpecialType.System_Int64,
+                    "System.UInt64" => SpecialType.System_UInt64,
+                    "System.Single" => SpecialType.System_Single,
+                    "System.Double" => SpecialType.System_Double,
+                    "System.Decimal" => SpecialType.System_Decimal,
+                    "System.Char" => SpecialType.System_Char,
+                    "System.String" => SpecialType.System_String,
+                    "System.Object" => SpecialType.System_Object,
+                    _ => SpecialType.None,
+                };
+
+                return specialType != SpecialType.None;
+            }
+
+            private FallbackIndex GetFallbackIndex(CancellationToken cancellationToken)
+            {
+                if (_fallbackIndex is { } fallbackIndex)
+                {
+                    return fallbackIndex;
                 }
 
-                return symbol is not null;
+                fallbackIndex = BuildFallbackIndex(cancellationToken);
+                _fallbackIndex = fallbackIndex;
+                return fallbackIndex;
+            }
 
-                static bool TryGetSpecialType(string metadataName, out SpecialType specialType)
+            private FallbackIndex BuildFallbackIndex(CancellationToken cancellationToken)
+            {
+                var typesByKey = new Dictionary<string, INamedTypeSymbol>(StringComparer.Ordinal);
+                var allTypes = new List<INamedTypeSymbol>();
+                AddAssembly(_compilation.Assembly);
+
+                foreach (var reference in _compilation.References)
                 {
-                    specialType = metadataName switch
+                    cancellationToken.ThrowIfCancellationRequested();
+                    if (_compilation.GetAssemblyOrModuleSymbol(reference) is IAssemblySymbol assembly)
                     {
-                        "System.Boolean" => SpecialType.System_Boolean,
-                        "System.Byte" => SpecialType.System_Byte,
-                        "System.SByte" => SpecialType.System_SByte,
-                        "System.Int16" => SpecialType.System_Int16,
-                        "System.UInt16" => SpecialType.System_UInt16,
-                        "System.Int32" => SpecialType.System_Int32,
-                        "System.UInt32" => SpecialType.System_UInt32,
-                        "System.Int64" => SpecialType.System_Int64,
-                        "System.UInt64" => SpecialType.System_UInt64,
-                        "System.Single" => SpecialType.System_Single,
-                        "System.Double" => SpecialType.System_Double,
-                        "System.Decimal" => SpecialType.System_Decimal,
-                        "System.Char" => SpecialType.System_Char,
-                        "System.String" => SpecialType.System_String,
-                        "System.Object" => SpecialType.System_Object,
-                        _ => SpecialType.None,
-                    };
+                        AddAssembly(assembly);
+                    }
+                }
 
-                    return specialType != SpecialType.None;
+                return new FallbackIndex(typesByKey, allTypes);
+
+                void AddAssembly(IAssemblySymbol assembly)
+                {
+                    foreach (var type in assembly.GetDeclaredTypes())
+                    {
+                        cancellationToken.ThrowIfCancellationRequested();
+                        AddType(type);
+                    }
+                }
+
+                void AddType(INamedTypeSymbol type)
+                {
+                    allTypes.Add(type);
+                    AddKey(type.ToOpenTypeSyntax().ToString(), type);
+                    AddKey(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), type);
+                    AddKey(type.ToDisplayString(), type);
+                }
+
+                void AddKey(string key, INamedTypeSymbol type)
+                {
+                    if (string.IsNullOrWhiteSpace(key))
+                    {
+                        return;
+                    }
+
+                    var normalizedKey = NormalizeTypeKey(key);
+                    if (!typesByKey.TryGetValue(normalizedKey, out _))
+                    {
+                        typesByKey.Add(normalizedKey, type);
+                    }
                 }
             }
 
-            private void AddAssembly(IAssemblySymbol assembly)
+            private sealed class FallbackIndex
             {
-                foreach (var type in assembly.GetDeclaredTypes())
+                public FallbackIndex(Dictionary<string, INamedTypeSymbol> typesByKey, List<INamedTypeSymbol> allTypes)
                 {
-                    AddType(type);
-                }
-            }
-
-            private void AddType(INamedTypeSymbol type)
-            {
-                _allTypes.Add(type);
-                AddKey(type.ToOpenTypeSyntax().ToString(), type);
-                AddKey(type.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), type);
-                AddKey(type.ToDisplayString(), type);
-            }
-
-            private void AddKey(string key, INamedTypeSymbol type)
-            {
-                if (string.IsNullOrWhiteSpace(key))
-                {
-                    return;
+                    TypesByKey = typesByKey;
+                    AllTypes = allTypes;
                 }
 
-                var normalizedKey = NormalizeTypeKey(key);
-                if (!_types.ContainsKey(normalizedKey))
-                {
-                    _types[normalizedKey] = type;
-                }
+                public Dictionary<string, INamedTypeSymbol> TypesByKey { get; }
+                public List<INamedTypeSymbol> AllTypes { get; }
             }
         }
 
