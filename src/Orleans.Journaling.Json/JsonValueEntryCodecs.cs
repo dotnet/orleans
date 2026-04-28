@@ -9,7 +9,7 @@ namespace Orleans.Journaling.Json;
 public sealed class JsonValueEntryCodec<T>(JsonSerializerOptions? options = null)
     : IDurableValueCodec<T>
 {
-    private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
+    private readonly JsonValueSerializer<T> _valueSerializer = new(options);
 
     /// <inheritdoc/>
     public void WriteSet(T value, IBufferWriter<byte> output)
@@ -18,7 +18,7 @@ public sealed class JsonValueEntryCodec<T>(JsonSerializerOptions? options = null
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
         writer.WritePropertyName(JsonLogEntryFields.Value);
-        JsonSerializer.Serialize(writer, value, _options);
+        _valueSerializer.Serialize(writer, value);
         writer.WriteEndObject();
     }
 
@@ -32,7 +32,7 @@ public sealed class JsonValueEntryCodec<T>(JsonSerializerOptions? options = null
         switch (command)
         {
             case JsonLogEntryCommands.Set:
-                consumer.ApplySet(root.GetProperty(JsonLogEntryFields.Value).Deserialize<T>(_options)!);
+                consumer.ApplySet(_valueSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Value))!);
                 break;
             default:
                 throw new NotSupportedException($"Command type '{command}' is not supported");
@@ -46,7 +46,7 @@ public sealed class JsonValueEntryCodec<T>(JsonSerializerOptions? options = null
 public sealed class JsonStateEntryCodec<T>(JsonSerializerOptions? options = null)
     : IDurableStateCodec<T>
 {
-    private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
+    private readonly JsonValueSerializer<T> _stateSerializer = new(options);
 
     /// <inheritdoc/>
     public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
@@ -55,7 +55,7 @@ public sealed class JsonStateEntryCodec<T>(JsonSerializerOptions? options = null
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
         writer.WritePropertyName(JsonLogEntryFields.State);
-        JsonSerializer.Serialize(writer, state, _options);
+        _stateSerializer.Serialize(writer, state);
         writer.WriteNumber(JsonLogEntryFields.Version, version);
         writer.WriteEndObject();
     }
@@ -79,7 +79,7 @@ public sealed class JsonStateEntryCodec<T>(JsonSerializerOptions? options = null
         switch (command)
         {
             case JsonLogEntryCommands.Set:
-                consumer.ApplySet(root.GetProperty(JsonLogEntryFields.State).Deserialize<T>(_options)!, root.GetProperty(JsonLogEntryFields.Version).GetUInt64());
+                consumer.ApplySet(_stateSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.State))!, root.GetProperty(JsonLogEntryFields.Version).GetUInt64());
                 break;
             case JsonLogEntryCommands.Clear:
                 consumer.ApplyClear();
@@ -96,7 +96,7 @@ public sealed class JsonStateEntryCodec<T>(JsonSerializerOptions? options = null
 public sealed class JsonTcsEntryCodec<T>(JsonSerializerOptions? options = null)
     : IDurableTaskCompletionSourceCodec<T>
 {
-    private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
+    private readonly JsonValueSerializer<T> _valueSerializer = new(options);
 
     /// <inheritdoc/>
     public void WritePending(IBufferWriter<byte> output)
@@ -114,7 +114,7 @@ public sealed class JsonTcsEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Completed);
         writer.WritePropertyName(JsonLogEntryFields.Value);
-        JsonSerializer.Serialize(writer, value, _options);
+        _valueSerializer.Serialize(writer, value);
         writer.WriteEndObject();
     }
 
@@ -150,7 +150,7 @@ public sealed class JsonTcsEntryCodec<T>(JsonSerializerOptions? options = null)
                 consumer.ApplyPending();
                 break;
             case JsonLogEntryCommands.Completed:
-                consumer.ApplyCompleted(root.GetProperty(JsonLogEntryFields.Value).Deserialize<T>(_options)!);
+                consumer.ApplyCompleted(_valueSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Value))!);
                 break;
             case JsonLogEntryCommands.Faulted:
                 consumer.ApplyFaulted(new Exception(root.GetProperty(JsonLogEntryFields.Message).GetString()));

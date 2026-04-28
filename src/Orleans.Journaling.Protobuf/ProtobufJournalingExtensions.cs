@@ -1,6 +1,6 @@
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Hosting;
 
 namespace Orleans.Journaling.Protobuf;
@@ -22,8 +22,10 @@ public static class ProtobufJournalingExtensions
     /// the state machine id and the durable entry payload.
     /// </para>
     /// <para>
-    /// Each entry type is serialized using protobuf wire-format tags. User values use native
-    /// protobuf payload encoding where supported and fall back to <see cref="ILogDataCodec{T}"/>.
+    /// Each entry type is serialized using protobuf wire-format tags. String user values use native
+    /// protobuf payload encoding. Other user values fall back to <see cref="ILogDataCodec{T}"/>
+    /// unless native protobuf message encoding is configured using
+    /// <see cref="ProtobufJournalingOptions.AddMessageParser{T}(Google.Protobuf.MessageParser{T})"/>.
     /// </para>
     /// </remarks>
     /// <example>
@@ -32,7 +34,46 @@ public static class ProtobufJournalingExtensions
     /// </code>
     /// </example>
     public static ISiloBuilder UseProtobufCodec(this ISiloBuilder builder)
+        => UseProtobufCodecCore(builder, configure: null);
+
+    /// <summary>
+    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log extent and entry serialization.
+    /// </summary>
+    /// <param name="builder">The silo builder.</param>
+    /// <param name="configure">A delegate used to configure protobuf journaling options.</param>
+    /// <returns>The silo builder for chaining.</returns>
+    /// <remarks>
+    /// Use <see cref="ProtobufJournalingOptions.AddMessageParser{T}(Google.Protobuf.MessageParser{T})"/>
+    /// to register generated protobuf message parsers for native, reflection-free message value encoding.
+    /// Unregistered message values fall back to <see cref="ILogDataCodec{T}"/>.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.AddStateMachineStorage().UseProtobufCodec(options =>
+    /// {
+    ///     options.AddMessageParser(MyMessage.Parser);
+    /// });
+    /// </code>
+    /// </example>
+    public static ISiloBuilder UseProtobufCodec(this ISiloBuilder builder, Action<ProtobufJournalingOptions> configure)
     {
+        ArgumentNullException.ThrowIfNull(configure);
+
+        return UseProtobufCodecCore(builder, configure);
+    }
+
+    private static ISiloBuilder UseProtobufCodecCore(ISiloBuilder builder, Action<ProtobufJournalingOptions>? configure)
+    {
+        ArgumentNullException.ThrowIfNull(builder);
+
+        builder.Services.TryAddSingleton<IProtobufValueCodec<string>>(ProtobufStringValueCodec.Instance);
+        if (configure is not null)
+        {
+            var options = new ProtobufJournalingOptions();
+            configure(options);
+            options.Apply(builder.Services);
+        }
+
         builder.Services.AddSingleton<IStateMachineLogExtentCodec, ProtobufLogExtentCodec>();
         builder.Services.AddSingleton<ProtobufLogEntryCodecProvider>();
         builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
@@ -54,8 +95,9 @@ public static class ProtobufJournalingExtensions
 /// <para>
 /// Each <c>GetCodec</c> method constructs the appropriate protobuf codec using <c>new</c>.
 /// For each type argument, a <see cref="ProtobufValueConverter{T}"/> is created that uses native
-/// protobuf encoding for well-known types and falls back to <see cref="ILogDataCodec{T}"/> only
-/// when needed. No reflection (<c>MakeGenericType</c>, <c>GetGenericTypeDefinition</c>, etc.) is used.
+/// protobuf encoding for built-in and explicitly registered types and falls back to
+/// <see cref="ILogDataCodec{T}"/> only when needed. No reflection (<c>MakeGenericType</c>,
+/// <c>GetGenericTypeDefinition</c>, parser property lookup, etc.) is used.
 /// </para>
 /// </remarks>
 internal sealed class ProtobufLogEntryCodecProvider(IServiceProvider serviceProvider) :
@@ -113,8 +155,14 @@ internal sealed class ProtobufLogEntryCodecProvider(IServiceProvider serviceProv
             typeof(IDurableTaskCompletionSourceCodec<T>),
             _ => new ProtobufTcsEntryCodec<T>(CreateConverter<T>()));
 
-    private ProtobufValueConverter<T> CreateConverter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>()
+    private ProtobufValueConverter<T> CreateConverter<T>()
     {
+        var nativeCodec = serviceProvider.GetService<IProtobufValueCodec<T>>();
+        if (nativeCodec is not null)
+        {
+            return new ProtobufValueConverter<T>(nativeCodec);
+        }
+
         if (ProtobufValueConverter<T>.IsNativeType)
         {
             return new ProtobufValueConverter<T>();

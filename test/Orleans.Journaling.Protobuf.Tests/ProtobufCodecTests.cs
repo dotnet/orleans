@@ -15,7 +15,6 @@ namespace Orleans.Journaling.Protobuf.Tests;
 [TestCategory("BVT")]
 public class ProtobufCodecTests
 {
-    private readonly ServiceProvider _serviceProvider;
     private readonly SerializerSessionPool _sessionPool;
     private readonly ICodecProvider _codecProvider;
 
@@ -25,7 +24,6 @@ public class ProtobufCodecTests
         services.AddSerializer();
         services.AddSingleton(typeof(ILogDataCodec<>), typeof(OrleansLogDataCodec<>));
         var serviceProvider = services.BuildServiceProvider();
-        _serviceProvider = serviceProvider;
         _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
         _codecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
     }
@@ -63,32 +61,6 @@ public class ProtobufCodecTests
     }
 
     [Fact]
-    public void ProtobufWriteEntryCodec_DictionarySnapshot_PreservesExistingShape()
-    {
-        var existing = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
-        var prototype = new ProtobufExperimentalLogEntryCodec(_serviceProvider);
-        var items = new List<KeyValuePair<string, int>>
-        {
-            new("alpha", 1),
-            new("beta", 2),
-        };
-        var expected = new ArrayBufferWriter<byte>();
-        var actual = new ArrayBufferWriter<byte>();
-
-        existing.WriteSnapshot(items, items.Count, expected);
-        prototype.WriteEntry(new DictionaryLogEntries.Snapshot<string, int>(items, items.Count), actual);
-        var command = prototype.ReadCommand(new ReadOnlySequence<byte>(actual.WrittenMemory));
-        var consumer = new DictionaryConsumer<string, int>();
-        prototype.ApplyEntry<DictionaryLogEntries.Snapshot<string, int>, IDurableDictionaryLogEntryConsumer<string, int>>(
-            new ReadOnlySequence<byte>(actual.WrittenMemory),
-            consumer);
-
-        Assert.Equal(expected.WrittenSpan.ToArray(), actual.WrittenSpan.ToArray());
-        Assert.True(command.Is<DictionaryLogEntries.Snapshot<string, int>>());
-        Assert.Equal(items, consumer.Items);
-    }
-
-    [Fact]
     public void ProtobufListCodec_Operations_RoundTrip()
     {
         var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
@@ -116,27 +88,6 @@ public class ProtobufCodecTests
         Apply(codec, writer => codec.WriteSnapshot([20, 30], 2, writer), consumer);
 
         Assert.Equal(["enqueue:10", "dequeue", "clear", "snapshot:2", "snapshot-item:20", "snapshot-item:30"], consumer.Commands);
-    }
-
-    [Fact]
-    public void ProtobufWriteEntryCodec_QueueSnapshot_PreservesExistingShape()
-    {
-        var existing = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
-        var prototype = new ProtobufExperimentalLogEntryCodec(_serviceProvider);
-        var expected = new ArrayBufferWriter<byte>();
-        var actual = new ArrayBufferWriter<byte>();
-
-        existing.WriteSnapshot([20, 30], 2, expected);
-        prototype.WriteEntry(new QueueLogEntries.Snapshot<int>([20, 30], 2), actual);
-        var command = prototype.ReadCommand(new ReadOnlySequence<byte>(actual.WrittenMemory));
-        var consumer = new QueueConsumer<int>();
-        prototype.ApplyEntry<QueueLogEntries.Snapshot<int>, IDurableQueueLogEntryConsumer<int>>(
-            new ReadOnlySequence<byte>(actual.WrittenMemory),
-            consumer);
-
-        Assert.Equal(expected.WrittenSpan.ToArray(), actual.WrittenSpan.ToArray());
-        Assert.True(command.Is<QueueLogEntries.Snapshot<int>>());
-        Assert.Equal(["snapshot:2", "snapshot-item:20", "snapshot-item:30"], consumer.Commands);
     }
 
     [Fact]

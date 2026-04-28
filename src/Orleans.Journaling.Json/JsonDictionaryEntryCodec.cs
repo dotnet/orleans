@@ -15,7 +15,8 @@ namespace Orleans.Journaling.Json;
 public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions? options = null)
     : IDurableDictionaryCodec<TKey, TValue> where TKey : notnull
 {
-    private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
+    private readonly JsonValueSerializer<TKey> _keySerializer = new(options);
+    private readonly JsonValueSerializer<TValue> _valueSerializer = new(options);
 
     /// <inheritdoc/>
     public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
@@ -24,9 +25,9 @@ public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
         writer.WritePropertyName(JsonLogEntryFields.Key);
-        JsonSerializer.Serialize(writer, key, _options);
+        _keySerializer.Serialize(writer, key);
         writer.WritePropertyName(JsonLogEntryFields.Value);
-        JsonSerializer.Serialize(writer, value, _options);
+        _valueSerializer.Serialize(writer, value);
         writer.WriteEndObject();
     }
 
@@ -37,7 +38,7 @@ public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Remove);
         writer.WritePropertyName(JsonLogEntryFields.Key);
-        JsonSerializer.Serialize(writer, key, _options);
+        _keySerializer.Serialize(writer, key);
         writer.WriteEndObject();
     }
 
@@ -62,9 +63,9 @@ public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions
         {
             writer.WriteStartObject();
             writer.WritePropertyName(JsonLogEntryFields.Key);
-            JsonSerializer.Serialize(writer, key, _options);
+            _keySerializer.Serialize(writer, key);
             writer.WritePropertyName(JsonLogEntryFields.Value);
-            JsonSerializer.Serialize(writer, value, _options);
+            _valueSerializer.Serialize(writer, value);
             writer.WriteEndObject();
         }
 
@@ -83,11 +84,11 @@ public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions
         {
             case JsonLogEntryCommands.Set:
                 consumer.ApplySet(
-                    root.GetProperty(JsonLogEntryFields.Key).Deserialize<TKey>(_options)!,
-                    root.GetProperty(JsonLogEntryFields.Value).Deserialize<TValue>(_options)!);
+                    _keySerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Key))!,
+                    _valueSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Value))!);
                 break;
             case JsonLogEntryCommands.Remove:
-                consumer.ApplyRemove(root.GetProperty(JsonLogEntryFields.Key).Deserialize<TKey>(_options)!);
+                consumer.ApplyRemove(_keySerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Key))!);
                 break;
             case JsonLogEntryCommands.Clear:
                 consumer.ApplyClear();
@@ -98,8 +99,8 @@ public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions
                 foreach (var item in items.EnumerateArray())
                 {
                     consumer.ApplySnapshotItem(
-                        item.GetProperty(JsonLogEntryFields.Key).Deserialize<TKey>(_options)!,
-                        item.GetProperty(JsonLogEntryFields.Value).Deserialize<TValue>(_options)!);
+                        _keySerializer.Deserialize(item.GetProperty(JsonLogEntryFields.Key))!,
+                        _valueSerializer.Deserialize(item.GetProperty(JsonLogEntryFields.Value))!);
                 }
 
                 break;
