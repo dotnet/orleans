@@ -98,7 +98,14 @@ public class IncrementalCachingTests
         var newCompilation = ReplaceSource(compilation, modifiedCode);
         var (result1, result2) = await RunTwice(compilation, newCompilation);
 
-        AssertAttributeStepsCachedOrUnchanged(result2);
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.SerializableTypeResultsTrackingName,
+            OrleansSerializationSourceGenerator.CollectedSerializableTypesTrackingName,
+            OrleansSerializationSourceGenerator.SerializerOutputsTrackingName,
+            OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName,
+            OrleansSerializationSourceGenerator.MetadataAggregateTrackingName,
+            OrleansSerializationSourceGenerator.MetadataOutputsTrackingName);
         AssertGeneratedSourcesIdentical(result1, result2);
     }
 
@@ -245,6 +252,45 @@ public class IncrementalCachingTests
     }
 
     [Fact]
+    public async Task AddedSyntaxTreeWithoutProxyInterfaces_ProducesIdenticalOutput()
+    {
+        const string code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                Task<string> SayHello(string name);
+            }
+            """;
+
+        const string additionalFile = """
+            namespace TestProject;
+
+            public static class Helpers
+            {
+                public static string Format(string input) => input.ToUpperInvariant();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var newCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(additionalFile));
+        var (result1, result2) = await RunTwice(compilation, newCompilation);
+
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.InheritedProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName,
+            OrleansSerializationSourceGenerator.ProxyOutputsTrackingName,
+            OrleansSerializationSourceGenerator.MetadataAggregateTrackingName,
+            OrleansSerializationSourceGenerator.MetadataOutputsTrackingName);
+        AssertGeneratedSourcesIdentical(result1, result2);
+    }
+
+    [Fact]
     public async Task AddedSyntaxTreeWithoutSerializableTypes_ProducesIdenticalOutput()
     {
         const string code = """
@@ -271,6 +317,14 @@ public class IncrementalCachingTests
         var newCompilation = compilation.AddSyntaxTrees(CSharpSyntaxTree.ParseText(additionalFile));
         var (result1, result2) = await RunTwice(compilation, newCompilation);
 
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.SerializableTypeResultsTrackingName,
+            OrleansSerializationSourceGenerator.CollectedSerializableTypesTrackingName,
+            OrleansSerializationSourceGenerator.SerializerOutputsTrackingName,
+            OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName,
+            OrleansSerializationSourceGenerator.MetadataAggregateTrackingName,
+            OrleansSerializationSourceGenerator.MetadataOutputsTrackingName);
         AssertGeneratedSourcesIdentical(result1, result2);
     }
 
@@ -520,24 +574,25 @@ public class IncrementalCachingTests
             reason is IncrementalStepRunReason.Modified or IncrementalStepRunReason.New);
     }
 
-    private static void AssertAttributeStepsCachedOrUnchanged(GeneratorRunResult result)
+    private static void AssertTrackedStepsCachedOrUnchanged(GeneratorRunResult result, params string[] stepNames)
     {
-        var outputSteps = result.TrackedOutputSteps;
-        Assert.NotEmpty(outputSteps);
+        var trackedSteps = result.TrackedSteps;
+        Assert.NotEmpty(trackedSteps);
 
-        var attributeStepReasons = outputSteps
-            .Where(kvp => kvp.Key.Contains("ForAttributeWithMetadataName", StringComparison.OrdinalIgnoreCase))
-            .SelectMany(kvp => kvp.Value)
-            .SelectMany(step => step.Outputs)
-            .Select(o => o.Reason)
-            .ToList();
-
-        if (attributeStepReasons.Count > 0)
+        foreach (var stepName in stepNames)
         {
-            Assert.All(attributeStepReasons, reason =>
-                Assert.True(
-                    reason is IncrementalStepRunReason.Cached or IncrementalStepRunReason.Unchanged,
-                    $"Attribute step had reason '{reason}' — expected Cached or Unchanged."));
+            Assert.True(trackedSteps.TryGetValue(stepName, out var steps), $"Missing tracked step '{stepName}'.");
+            Assert.NotEmpty(steps);
+
+            foreach (var step in steps)
+            {
+                foreach (var (_, reason) in step.Outputs)
+                {
+                    Assert.True(
+                        reason is IncrementalStepRunReason.Cached or IncrementalStepRunReason.Unchanged,
+                        $"Step '{stepName}' had reason '{reason}' — expected Cached or Unchanged.");
+                }
+            }
         }
     }
 

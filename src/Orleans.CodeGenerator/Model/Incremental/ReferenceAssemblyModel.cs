@@ -127,16 +127,27 @@ namespace Orleans.CodeGenerator.Model.Incremental
     /// </summary>
     internal readonly struct InterfaceImplementationModel : IEquatable<InterfaceImplementationModel>
     {
-        public InterfaceImplementationModel(TypeRef implementationType)
+        public InterfaceImplementationModel(TypeRef implementationType, SourceLocationModel sourceLocation = default)
         {
             ImplementationType = implementationType;
+            SourceLocation = sourceLocation;
         }
 
         public TypeRef ImplementationType { get; }
+        public SourceLocationModel SourceLocation { get; }
 
-        public bool Equals(InterfaceImplementationModel other) => ImplementationType.Equals(other.ImplementationType);
+        public bool Equals(InterfaceImplementationModel other)
+            => ImplementationType.Equals(other.ImplementationType)
+                && SourceLocation.Equals(other.SourceLocation);
+
         public override bool Equals(object obj) => obj is InterfaceImplementationModel other && Equals(other);
-        public override int GetHashCode() => ImplementationType.GetHashCode();
+        public override int GetHashCode()
+        {
+            unchecked
+            {
+                return ImplementationType.GetHashCode() * 31 + SourceLocation.GetHashCode();
+            }
+        }
 
         public static bool operator ==(InterfaceImplementationModel left, InterfaceImplementationModel right) => left.Equals(right);
         public static bool operator !=(InterfaceImplementationModel left, InterfaceImplementationModel right) => !left.Equals(right);

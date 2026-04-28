@@ -155,6 +155,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(Name ?? string.Empty);
                 hash = hash * 31 + Type.GetHashCode();
                 hash = hash * 31 + ContainingType.GetHashCode();
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(AssemblyName ?? string.Empty);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(TypeNameIdentifier ?? string.Empty);
                 hash = hash * 31 + (int)Kind;
                 hash = hash * 31 + (int)GetterStrategy;
                 hash = hash * 31 + (int)SetterStrategy;
@@ -166,6 +168,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 hash = hash * 31 + (IsShallowCopyable ? 1 : 0);
                 hash = hash * 31 + (IsValueType ? 1 : 0);
                 hash = hash * 31 + (ContainingTypeIsValueType ? 1 : 0);
+                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(BackingPropertyName ?? string.Empty);
                 return hash;
             }
         }

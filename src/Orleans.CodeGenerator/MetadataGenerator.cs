@@ -14,18 +14,16 @@ namespace Orleans.CodeGenerator
     #nullable disable
     internal class MetadataGenerator
     {
-        private readonly IGeneratorServices _generatorServices;
+        private static readonly TypeSyntax TypeManifestOptionsType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestOptions");
+        private static readonly TypeSyntax TypeManifestProviderBaseType = ParseTypeName("global::Orleans.Serialization.Configuration.TypeManifestProviderBase");
+
         private readonly MetadataAggregateModel _metadataModel;
         private readonly string _assemblyName;
-        // Cache for TryResolveOpenNamedType: keyed by normalized TypeRef syntax string.
-        // Null value means "looked up, not found". Using a sentinel avoids a separate HashSet.
-        private readonly Dictionary<string, INamedTypeSymbol> _resolvedTypeCache = new(StringComparer.Ordinal);
 
-        public MetadataGenerator(IGeneratorServices generatorServices, MetadataAggregateModel metadataModel, string assemblyName)
+        public MetadataGenerator(MetadataAggregateModel metadataModel, string assemblyName)
         {
-            _generatorServices = generatorServices;
             _metadataModel = metadataModel;
-            _assemblyName = assemblyName ?? generatorServices.Compilation.AssemblyName ?? "Assembly";
+            _assemblyName = assemblyName ?? "Assembly";
         }
 
         public ClassDeclarationSyntax GenerateMetadata()
@@ -110,7 +108,7 @@ namespace Orleans.CodeGenerator
                     ArgumentList(SeparatedList(new[]
                     {
                         Argument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(type.Id))),
-                        Argument(TypeOfExpression(GetOpenTypeSyntax(type.Type))),
+                        Argument(CreateTypeOfExpression(type.Type)),
                     })))));
             }
 
@@ -121,7 +119,7 @@ namespace Orleans.CodeGenerator
                     ArgumentList(SeparatedList(new[]
                     {
                         Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))),
-                        Argument(TypeOfExpression(GetOpenTypeSyntax(type.Type))),
+                        Argument(CreateTypeOfExpression(type.Type)),
                     })))));
             }
 
@@ -131,16 +129,14 @@ namespace Orleans.CodeGenerator
 
         private ClassDeclarationSyntax CreateMetadataClass(List<StatementSyntax> body, IdentifierNameSyntax configParam)
         {
-            var configType = _generatorServices.LibraryTypes.TypeManifestOptions;
             var configureMethod = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "ConfigureInner")
                 .AddModifiers(Token(SyntaxKind.ProtectedKeyword), Token(SyntaxKind.OverrideKeyword))
                 .AddParameterListParameters(
-                    Parameter(configParam.Identifier).WithType(configType.ToTypeSyntax()))
+                    Parameter(configParam.Identifier).WithType(TypeManifestOptionsType))
                 .AddBodyStatements(body.ToArray());
 
-            var interfaceType = _generatorServices.LibraryTypes.TypeManifestProviderBase;
             return ClassDeclaration("Metadata_" + SyntaxGeneration.Identifier.SanitizeIdentifierName(_assemblyName))
-                .AddBaseListTypes(SimpleBaseType(interfaceType.ToTypeSyntax()))
+                .AddBaseListTypes(SimpleBaseType(TypeManifestProviderBaseType))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
                 .AddMembers(configureMethod);
@@ -188,7 +184,7 @@ namespace Orleans.CodeGenerator
                 var addArguments = new List<ArgumentSyntax>(2) { CreateCompoundAliasArgument(aliases.Key) };
                 if (aliases.HasValue)
                 {
-                    addArguments.Add(Argument(TypeOfExpression(GetOpenTypeSyntax(aliases.Value))));
+                    addArguments.Add(Argument(CreateTypeOfExpression(aliases.Value)));
                 }
 
                 if (aliases.Children is { Count: > 0 })
@@ -216,29 +212,29 @@ namespace Orleans.CodeGenerator
 
         private ArgumentSyntax CreateCompoundAliasArgument(CompoundAliasComponentModel component)
             => component.IsType
-                ? Argument(TypeOfExpression(GetOpenTypeSyntax(component.TypeValue)))
+                ? Argument(CreateTypeOfExpression(component.TypeValue))
                 : Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(component.StringValue)));
 
         private ImmutableArray<ProxyInterfaceModel> GetOrderedProxyInterfaces(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
-            => OrderBySourceLocation(proxyInterfaces, static proxy => proxy.InterfaceType, static proxy => proxy.InterfaceType.SyntaxString);
+            => OrderBySourceLocation(proxyInterfaces, static proxy => proxy.SourceLocation, static proxy => proxy.InterfaceType.SyntaxString);
 
         private ImmutableArray<InterfaceImplementationModel> GetOrderedInterfaceImplementations(ImmutableArray<InterfaceImplementationModel> interfaceImplementations)
-            => OrderBySourceLocation(interfaceImplementations, static implementation => implementation.ImplementationType, static implementation => implementation.ImplementationType.SyntaxString);
+            => OrderBySourceLocation(interfaceImplementations, static implementation => implementation.SourceLocation, static implementation => implementation.ImplementationType.SyntaxString);
 
-        private ImmutableArray<T> OrderBySourceLocation<T>(ImmutableArray<T> entries, Func<T, TypeRef> typeSelector, Func<T, string> sortKeySelector)
+        private static ImmutableArray<T> OrderBySourceLocation<T>(
+            ImmutableArray<T> entries,
+            Func<T, SourceLocationModel> locationSelector,
+            Func<T, string> sortKeySelector)
         {
             return entries
                 .Select(entry =>
                 {
-                    var sourceLocation = TryResolveOpenNamedType(typeSelector(entry), out var symbol)
-                        ? symbol.Locations.FirstOrDefault(static location => location.IsInSource)
-                        : null;
-
+                    var sourceLocation = locationSelector(entry);
                     return (
                         Entry: entry,
-                        SourceOrderGroup: sourceLocation is null ? 1 : 0,
-                        FilePath: sourceLocation?.SourceTree?.FilePath ?? string.Empty,
-                        Position: sourceLocation?.SourceSpan.Start ?? int.MaxValue,
+                        sourceLocation.SourceOrderGroup,
+                        sourceLocation.FilePath,
+                        sourceLocation.Position,
                         SortKey: sortKeySelector(entry));
                 })
                 .OrderBy(static entry => entry.SourceOrderGroup)
@@ -294,7 +290,8 @@ namespace Orleans.CodeGenerator
                     sortKey: type.TypeSyntax.SyntaxString,
                     serializerTypeSyntax: GetCodecTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Length),
                     copierTypeSyntax: copierType,
-                    activatorTypeSyntax: activatorType));
+                    activatorTypeSyntax: activatorType,
+                    sourceLocation: type.SourceLocation));
             }
 
             foreach (var type in generatedInvokables)
@@ -304,20 +301,18 @@ namespace Orleans.CodeGenerator
                     sortKey: type.TypeSyntax.ToString(),
                     serializerTypeSyntax: type.CodecTypeSyntax,
                     copierTypeSyntax: type.CopierTypeSyntax,
-                    activatorTypeSyntax: null));
+                    activatorTypeSyntax: null,
+                    sourceLocation: type.SourceLocation));
             }
 
             return registrations
                 .Select(registration =>
                 {
-                    var sourceLocation = TryResolveOpenNamedType(registration.SourceType, out var symbol)
-                        ? symbol.Locations.FirstOrDefault(static location => location.IsInSource)
-                        : null;
                     return (
                         Registration: registration,
-                        SourceOrderGroup: sourceLocation is null ? 1 : 0,
-                        FilePath: sourceLocation?.SourceTree?.FilePath ?? string.Empty,
-                        Position: sourceLocation?.SourceSpan.Start ?? int.MaxValue);
+                        registration.SourceLocation.SourceOrderGroup,
+                        registration.SourceLocation.FilePath,
+                        registration.SourceLocation.Position);
                 })
                 .OrderBy(static entry => entry.SourceOrderGroup)
                 .ThenBy(static entry => entry.FilePath, StringComparer.Ordinal)
@@ -343,7 +338,8 @@ namespace Orleans.CodeGenerator
                 method.ContainingInterfaceType,
                 aliases,
                 codecTypeSyntax,
-                copierTypeSyntax);
+                copierTypeSyntax,
+                proxy.SourceLocation);
         }
 
         private static string GetGeneratedInvokableClassName(ProxyInterfaceModel proxy, MethodModel method)
@@ -393,92 +389,101 @@ namespace Orleans.CodeGenerator
             return new CompoundTypeAliasModel(components.MoveToImmutable(), targetType);
         }
 
-        private bool TryResolveOpenNamedType(TypeRef typeRef, out INamedTypeSymbol symbol)
+        private static TypeSyntax GetOpenTypeSyntax(TypeRef typeRef)
         {
-            var target = NormalizeTypeRefSyntax(typeRef.SyntaxString);
-
-            // Check the cache first (null value means previously looked up but not found).
-            if (_resolvedTypeCache.TryGetValue(target, out symbol))
+            var syntax = typeRef.SyntaxString.Trim();
+            if (syntax.StartsWith("global::", StringComparison.Ordinal))
             {
-                return symbol is not null;
+                syntax = syntax.Substring("global::".Length);
             }
 
-            // Open-type syntax strings (e.g. "List<>", "Dictionary<, >", "Outer<>.Inner") only contain
-            // commas and whitespace inside their angle brackets. Roslyn's FullyQualifiedFormat always
-            // uses named type parameters (e.g. "List<T>"), so an open-type TypeRef will never match
-            // any candidate. Short-circuit immediately to avoid an expensive full assembly scan.
-            if (IsOpenTypeSyntax(target))
+            var typeSyntax = syntax switch
             {
-                _resolvedTypeCache[target] = null;
-                symbol = null;
-                return false;
-            }
+                "bool" or "System.Boolean" => ParseName("bool"),
+                "byte" or "System.Byte" => ParseName("byte"),
+                "sbyte" or "System.SByte" => ParseName("sbyte"),
+                "short" or "System.Int16" => ParseName("short"),
+                "ushort" or "System.UInt16" => ParseName("ushort"),
+                "int" or "System.Int32" => ParseName("int"),
+                "uint" or "System.UInt32" => ParseName("uint"),
+                "long" or "System.Int64" => ParseName("long"),
+                "ulong" or "System.UInt64" => ParseName("ulong"),
+                "float" or "System.Single" => ParseName("float"),
+                "double" or "System.Double" => ParseName("double"),
+                "decimal" or "System.Decimal" => ParseName("decimal"),
+                "char" or "System.Char" => ParseName("char"),
+                "string" or "System.String" => ParseName("string"),
+                "object" or "System.Object" => ParseName("object"),
+                _ => typeRef.ToTypeSyntax(),
+            };
 
-            foreach (var assembly in EnumerateAssemblies(_generatorServices.Compilation))
-            {
-                foreach (var type in EnumerateTypes(assembly.GlobalNamespace))
-                {
-                    var candidate = type.OriginalDefinition;
-                    if (string.Equals(
-                        NormalizeTypeRefSyntax(candidate.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
-                        target,
-                        StringComparison.Ordinal))
-                    {
-                        _resolvedTypeCache[target] = candidate;
-                        symbol = candidate;
-                        return true;
-                    }
-                }
-            }
-
-            _resolvedTypeCache[target] = null;
-            symbol = null;
-            return false;
+            return (TypeSyntax)OpenGenericTypeSyntaxRewriter.Instance.Visit(typeSyntax);
         }
 
-        /// <summary>
-        /// Returns <see langword="true"/> if <paramref name="target"/> is an open-type syntax string —
-        /// one whose angle-bracket content consists solely of commas and whitespace
-        /// (e.g. <c>"List&lt;&gt;"</c>, <c>"Dictionary&lt;, &gt;"</c>, <c>"Outer&lt;&gt;.Inner"</c>).
-        /// Such strings never match a Roslyn <c>ToDisplayString(FullyQualifiedFormat)</c> result,
-        /// which always includes named type parameters.
-        /// </summary>
-        private static bool IsOpenTypeSyntax(string target)
+        private static TypeOfExpressionSyntax CreateTypeOfExpression(TypeRef typeRef)
         {
-            int depth = 0;
-            bool hasAngleBrackets = false;
-
-            foreach (char c in target)
-            {
-                if (c == '<')
-                {
-                    depth++;
-                    hasAngleBrackets = true;
-                }
-                else if (c == '>')
-                {
-                    depth--;
-                }
-                else if (depth > 0 && c != ',' && c != ' ')
-                {
-                    // Found an identifier character inside angle brackets → not open-type syntax.
-                    return false;
-                }
-            }
-
-            return hasAngleBrackets;
+            var result = TypeOfExpression(GetOpenTypeSyntax(typeRef));
+            return IsPredefinedTypeRef(typeRef)
+                ? result
+                    .WithOpenParenToken(Token(TriviaList(Space), SyntaxKind.OpenParenToken, TriviaList(Space)))
+                    .WithCloseParenToken(Token(TriviaList(Space), SyntaxKind.CloseParenToken, TriviaList(Space)))
+                : result;
         }
 
-        private TypeSyntax GetOpenTypeSyntax(TypeRef typeRef)
-            => TryResolveOpenNamedType(typeRef, out var symbol) ? symbol.ToOpenTypeSyntax() : typeRef.ToTypeSyntax();
+        private static bool IsPredefinedTypeRef(TypeRef typeRef)
+        {
+            var syntax = typeRef.SyntaxString.Trim();
+            if (syntax.StartsWith("global::", StringComparison.Ordinal))
+            {
+                syntax = syntax.Substring("global::".Length);
+            }
+
+            return syntax is "bool" or "System.Boolean"
+                or "byte" or "System.Byte"
+                or "sbyte" or "System.SByte"
+                or "short" or "System.Int16"
+                or "ushort" or "System.UInt16"
+                or "int" or "System.Int32"
+                or "uint" or "System.UInt32"
+                or "long" or "System.Int64"
+                or "ulong" or "System.UInt64"
+                or "float" or "System.Single"
+                or "double" or "System.Double"
+                or "decimal" or "System.Decimal"
+                or "char" or "System.Char"
+                or "string" or "System.String"
+                or "object" or "System.Object";
+        }
+
+        private sealed class OpenGenericTypeSyntaxRewriter : CSharpSyntaxRewriter
+        {
+            public static readonly OpenGenericTypeSyntaxRewriter Instance = new();
+
+            public override SyntaxNode VisitGenericName(GenericNameSyntax node)
+            {
+                var visited = (GenericNameSyntax)base.VisitGenericName(node);
+                var argumentCount = visited.TypeArgumentList.Arguments.Count;
+                return visited.WithTypeArgumentList(TypeArgumentList(SeparatedList<TypeSyntax>(
+                    Enumerable.Range(0, argumentCount).Select(static _ => OmittedTypeArgument()))));
+            }
+        }
 
         private TypeSyntax GetGeneratedProxyTypeSyntax(ProxyInterfaceModel proxy)
         {
-            var genericArity = TryResolveOpenNamedType(proxy.InterfaceType, out var symbol)
-                ? symbol.GetAllTypeParameters().Count()
-                : proxy.TypeParameters.Length;
-
+            var genericArity = Math.Max(proxy.TypeParameters.Length, CountGenericArguments(proxy.InterfaceType));
             return CreateGeneratedTypeSyntax(proxy.GeneratedNamespace, ProxyGenerator.GetSimpleClassName(proxy.Name), genericArity);
+        }
+
+        private static int CountGenericArguments(TypeRef typeRef)
+        {
+            var typeSyntax = typeRef.ToTypeSyntax();
+            var count = 0;
+            foreach (var genericName in typeSyntax.DescendantNodesAndSelf().OfType<GenericNameSyntax>())
+            {
+                count += genericName.TypeArgumentList.Arguments.Count;
+            }
+
+            return count;
         }
 
         private static TypeSyntax TryGetDefaultCopierType(TypeRef originalType, ImmutableArray<DefaultCopierModel> defaultCopiers)
@@ -504,58 +509,6 @@ namespace Orleans.CodeGenerator
             => !type.IsAbstractType
                 && !type.IsEnumType
                 && ((!type.IsValueType && type.IsEmptyConstructable && !type.UseActivator) || type.HasActivatorConstructor);
-
-        private static IEnumerable<IAssemblySymbol> EnumerateAssemblies(Compilation compilation)
-        {
-            yield return compilation.Assembly;
-
-            foreach (var assembly in compilation.SourceModule.ReferencedAssemblySymbols)
-            {
-                yield return assembly;
-            }
-        }
-
-        private static IEnumerable<INamedTypeSymbol> EnumerateTypes(INamespaceSymbol @namespace)
-        {
-            foreach (var member in @namespace.GetMembers())
-            {
-                if (member is INamespaceSymbol childNamespace)
-                {
-                    foreach (var nestedType in EnumerateTypes(childNamespace))
-                    {
-                        yield return nestedType;
-                    }
-
-                    continue;
-                }
-
-                if (member is INamedTypeSymbol type)
-                {
-                    foreach (var nested in EnumerateTypeAndNestedTypes(type))
-                    {
-                        yield return nested;
-                    }
-                }
-            }
-        }
-
-        private static IEnumerable<INamedTypeSymbol> EnumerateTypeAndNestedTypes(INamedTypeSymbol type)
-        {
-            yield return type;
-
-            foreach (var nested in type.GetTypeMembers())
-            {
-                foreach (var child in EnumerateTypeAndNestedTypes(nested))
-                {
-                    yield return child;
-                }
-            }
-        }
-
-        private static string NormalizeTypeRefSyntax(string syntaxString)
-            => syntaxString.StartsWith("global::", StringComparison.Ordinal)
-                ? syntaxString.Substring("global::".Length)
-                : syntaxString;
 
         public static TypeSyntax GetCodecTypeName(ISerializableTypeDescription type)
             => GetCodecTypeName(type.GeneratedNamespace, type.Name, type.TypeParameters.Count);
@@ -588,13 +541,15 @@ namespace Orleans.CodeGenerator
                 TypeRef sourceType,
                 ImmutableArray<CompoundTypeAliasModel> aliases,
                 TypeSyntax codecTypeSyntax,
-                TypeSyntax copierTypeSyntax)
+                TypeSyntax copierTypeSyntax,
+                SourceLocationModel sourceLocation)
             {
                 TypeSyntax = typeSyntax;
                 SourceType = sourceType;
                 Aliases = aliases;
                 CodecTypeSyntax = codecTypeSyntax;
                 CopierTypeSyntax = copierTypeSyntax;
+                SourceLocation = sourceLocation;
             }
 
             public TypeSyntax TypeSyntax { get; }
@@ -602,6 +557,7 @@ namespace Orleans.CodeGenerator
             public ImmutableArray<CompoundTypeAliasModel> Aliases { get; }
             public TypeSyntax CodecTypeSyntax { get; }
             public TypeSyntax CopierTypeSyntax { get; }
+            public SourceLocationModel SourceLocation { get; }
         }
 
         private sealed class IncrementalCompoundTypeAliasTree
@@ -697,13 +653,15 @@ namespace Orleans.CodeGenerator
                 string sortKey,
                 TypeSyntax serializerTypeSyntax,
                 TypeSyntax copierTypeSyntax,
-                TypeSyntax activatorTypeSyntax)
+                TypeSyntax activatorTypeSyntax,
+                SourceLocationModel sourceLocation)
             {
                 SourceType = sourceType;
                 SortKey = sortKey;
                 SerializerTypeSyntax = serializerTypeSyntax;
                 CopierTypeSyntax = copierTypeSyntax;
                 ActivatorTypeSyntax = activatorTypeSyntax;
+                SourceLocation = sourceLocation;
             }
 
             public TypeRef SourceType { get; }
@@ -711,6 +669,7 @@ namespace Orleans.CodeGenerator
             public TypeSyntax SerializerTypeSyntax { get; }
             public TypeSyntax CopierTypeSyntax { get; }
             public TypeSyntax ActivatorTypeSyntax { get; }
+            public SourceLocationModel SourceLocation { get; }
         }
     }
 }

@@ -37,7 +37,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
             bool isImmutable,
             bool isExceptionType,
             ImmutableArray<TypeRef> activatorConstructorParameters,
-            ObjectCreationStrategy creationStrategy)
+            ObjectCreationStrategy creationStrategy,
+            SourceLocationModel sourceLocation = default)
         {
             Accessibility = accessibility;
             TypeSyntax = typeSyntax;
@@ -66,6 +67,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             IsExceptionType = isExceptionType;
             ActivatorConstructorParameters = ImmutableArrayValueComparer.Normalize(activatorConstructorParameters);
             CreationStrategy = creationStrategy;
+            SourceLocation = sourceLocation;
         }
 
         public Accessibility Accessibility { get; }
@@ -95,6 +97,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
         public bool IsExceptionType { get; }
         public ImmutableArray<TypeRef> ActivatorConstructorParameters { get; }
         public ObjectCreationStrategy CreationStrategy { get; }
+        public SourceLocationModel SourceLocation { get; }
 
         public bool Equals(SerializableTypeModel other)
         {
@@ -129,7 +132,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 && IsImmutable == other.IsImmutable
                 && IsExceptionType == other.IsExceptionType
                 && ImmutableArrayValueComparer.Equals(ActivatorConstructorParameters, other.ActivatorConstructorParameters)
-                && CreationStrategy == other.CreationStrategy;
+                && CreationStrategy == other.CreationStrategy
+                && SourceLocation.Equals(other.SourceLocation);
         }
 
         public override bool Equals(object obj) => obj is SerializableTypeModel other && Equals(other);
@@ -140,6 +144,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
             {
                 var hash = TypeSyntax.GetHashCode();
                 hash = hash * 31 + (int)Accessibility;
+                hash = hash * 31 + (HasComplexBaseType ? 1 : 0);
+                hash = hash * 31 + (IncludePrimaryConstructorParameters ? 1 : 0);
                 hash = hash * 31 + BaseTypeSyntax.GetHashCode();
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(Name ?? string.Empty);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(Namespace ?? string.Empty);
@@ -152,11 +158,18 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeParameters);
                 hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(Members);
                 hash = hash * 31 + (UseActivator ? 1 : 0);
+                hash = hash * 31 + (IsEmptyConstructable ? 1 : 0);
+                hash = hash * 31 + (HasActivatorConstructor ? 1 : 0);
                 hash = hash * 31 + (TrackReferences ? 1 : 0);
                 hash = hash * 31 + (OmitDefaultMemberValues ? 1 : 0);
                 hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(SerializationHooks);
+                hash = hash * 31 + (IsShallowCopyable ? 1 : 0);
+                hash = hash * 31 + (IsUnsealedImmutable ? 1 : 0);
+                hash = hash * 31 + (IsImmutable ? 1 : 0);
+                hash = hash * 31 + (IsExceptionType ? 1 : 0);
                 hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(ActivatorConstructorParameters);
                 hash = hash * 31 + (int)CreationStrategy;
+                hash = hash * 31 + SourceLocation.GetHashCode();
                 return hash;
             }
         }

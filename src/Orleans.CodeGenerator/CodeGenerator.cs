@@ -33,10 +33,15 @@ namespace Orleans.CodeGenerator
         private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
 
         public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
+            : this(compilation, options, LibraryTypes.FromCompilation(compilation, options))
+        {
+        }
+
+        internal CodeGenerator(Compilation compilation, CodeGeneratorOptions options, LibraryTypes libraryTypes)
         {
             Compilation = compilation;
             Options = options;
-            LibraryTypes = LibraryTypes.FromCompilation(compilation, options);
+            LibraryTypes = libraryTypes;
             MetadataModel = new MetadataModel();
             ProxyGenerator = new ProxyGenerator(this, new CopierGenerator(this));
             InvokableGenerator = new InvokableGenerator(this);

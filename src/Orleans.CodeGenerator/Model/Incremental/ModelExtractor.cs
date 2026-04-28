@@ -6,6 +6,7 @@ using System.Linq;
 using System.Text;
 using System.Threading;
 using Microsoft.CodeAnalysis;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.Model.Incremental;
@@ -25,7 +26,9 @@ namespace Orleans.CodeGenerator
         /// This is a bridge method for Stage 1 — it allows the existing symbol-based descriptions
         /// to be converted into equatable value models for incremental pipeline caching.
         /// </summary>
-        public static SerializableTypeModel ExtractSerializableTypeModel(ISerializableTypeDescription description)
+        public static SerializableTypeModel ExtractSerializableTypeModel(
+            ISerializableTypeDescription description,
+            SourceLocationModel sourceLocation = default)
         {
             var typeParameters = ExtractTypeParameters(description.TypeParameters);
             var members = ExtractMembers(description.Members);
@@ -60,7 +63,8 @@ namespace Orleans.CodeGenerator
                 isImmutable: description.IsImmutable,
                 isExceptionType: description.IsExceptionType,
                 activatorConstructorParameters: activatorCtorParams,
-                creationStrategy: creationStrategy);
+                creationStrategy: creationStrategy,
+                sourceLocation: sourceLocation);
         }
 
         /// <summary>
@@ -132,10 +136,9 @@ namespace Orleans.CodeGenerator
         {
             var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
 
-            var applicationParts = new HashSet<string>(StringComparer.Ordinal)
-            {
-                compilation.Assembly.MetadataName
-            };
+            var applicationParts = new List<string>();
+            var applicationPartSet = new HashSet<string>(StringComparer.Ordinal);
+            AddApplicationPart(compilation.Assembly.MetadataName);
 
             var assembliesToExamine = new HashSet<IAssemblySymbol>(SymbolEqualityComparer.Default);
             ComputeAssembliesToExamine(
@@ -166,13 +169,13 @@ namespace Orleans.CodeGenerator
                     continue;
                 }
 
-                applicationParts.Add(asm.MetadataName);
+                AddApplicationPart(asm.MetadataName);
                 foreach (var attr in attrs)
                 {
                     if (attr.ConstructorArguments.Length > 0
                         && attr.ConstructorArguments[0].Value is string partName)
                     {
-                        applicationParts.Add(partName);
+                        AddApplicationPart(partName);
                     }
                 }
             }
@@ -240,7 +243,7 @@ namespace Orleans.CodeGenerator
                         {
                             if (iface.GetAttribute(libraryTypes.GenerateMethodSerializersAttribute, inherited: true) is not null)
                             {
-                                interfaceImplementations.Add(new InterfaceImplementationModel(typeRef));
+                            interfaceImplementations.Add(new InterfaceImplementationModel(typeRef, GetSourceLocation(symbol)));
                                 break;
                             }
                         }
@@ -248,9 +251,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            var sortedParts = applicationParts
-                .OrderBy(static part => part, StringComparer.Ordinal)
-                .ToImmutableArray();
+            var orderedApplicationParts = applicationParts.ToImmutableArray();
 
             var sortedWellKnownTypeIds = wellKnownTypeIds
                 .OrderBy(static entry => entry.Type.SyntaxString, StringComparer.Ordinal)
@@ -290,7 +291,7 @@ namespace Orleans.CodeGenerator
 
             return new ReferenceAssemblyModel(
                 assemblyName: compilation.AssemblyName ?? string.Empty,
-                applicationParts: sortedParts,
+                applicationParts: orderedApplicationParts,
                 wellKnownTypeIds: sortedWellKnownTypeIds,
                 typeAliases: sortedTypeAliases,
                 compoundTypeAliases: sortedCompoundTypeAliases,
@@ -298,6 +299,14 @@ namespace Orleans.CodeGenerator
                 referencedProxyInterfaces: sortedReferencedProxyInterfaces,
                 registeredCodecs: sortedRegisteredCodecs,
                 interfaceImplementations: sortedInterfaceImplementations);
+
+            void AddApplicationPart(string applicationPart)
+            {
+                if (applicationPartSet.Add(applicationPart))
+                {
+                    applicationParts.Add(applicationPart);
+                }
+            }
         }
 
         private static void ComputeAssembliesToExamine(
@@ -441,7 +450,6 @@ namespace Orleans.CodeGenerator
         {
             var applicationParts = referenceData.ApplicationParts
                 .Distinct()
-                .OrderBy(static part => part, StringComparer.Ordinal)
                 .ToImmutableArray();
 
             var wellKnownTypeIds = referenceData.WellKnownTypeIds
@@ -849,7 +857,7 @@ namespace Orleans.CodeGenerator
                 }
 
                 var fsharpUnionCaseDescription = new FSharpUtilities.FSharpUnionCaseTypeDescription(compilation, typeSymbol, libraryTypes);
-                return ExtractSerializableTypeModel(fsharpUnionCaseDescription);
+                return ExtractSerializableTypeModel(fsharpUnionCaseDescription, GetSourceLocation(typeSymbol));
             }
 
             if (!typeSymbol.HasAttribute(libraryTypes.GenerateSerializerAttribute)
@@ -861,7 +869,7 @@ namespace Orleans.CodeGenerator
             if (FSharpUtilities.IsRecord(libraryTypes, typeSymbol))
             {
                 var fsharpDescription = new FSharpUtilities.FSharpRecordTypeDescription(compilation, typeSymbol, libraryTypes);
-                return ExtractSerializableTypeModel(fsharpDescription);
+                return ExtractSerializableTypeModel(fsharpDescription, GetSourceLocation(typeSymbol));
             }
 
             var includePrimaryCtorParams = GetIncludePrimaryConstructorParameters(typeSymbol, libraryTypes);
@@ -886,7 +894,7 @@ namespace Orleans.CodeGenerator
 
             var members = CollectDataMembers(helper);
             var description = new SerializableTypeDescription(compilation, typeSymbol, includePrimaryCtorParams, members, libraryTypes);
-            return ExtractSerializableTypeModel(description);
+            return ExtractSerializableTypeModel(description, GetSourceLocation(typeSymbol));
         }
 
         private static bool GetIncludePrimaryConstructorParameters(INamedTypeSymbol typeSymbol, LibraryTypes libraryTypes)
@@ -1021,55 +1029,43 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public static ImmutableArray<ProxyInterfaceModel> ExtractInheritedProxyInterfaceModels(
-            Compilation compilation,
+        public static ProxyInterfaceModel ExtractInheritedProxyInterfaceFromSyntaxContext(
+            GeneratorSyntaxContext context,
             CancellationToken cancellationToken)
         {
-            var options = new CodeGeneratorOptions();
-            var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
-            var result = ImmutableArray.CreateBuilder<ProxyInterfaceModel>();
-
-            foreach (var typeSymbol in compilation.Assembly.GetDeclaredTypes())
+            if (context.Node is not InterfaceDeclarationSyntax interfaceDeclaration)
             {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                if (typeSymbol.TypeKind != TypeKind.Interface
-                    || !typeSymbol.Locations.Any(static location => location.IsInSource))
-                {
-                    continue;
-                }
-
-                if (typeSymbol.GetAttributes(libraryTypes.GenerateMethodSerializersAttribute, out var directAttributes, inherited: false)
-                    && directAttributes.Any(static attribute => TryGetProxyBaseInfo(attribute, out _, out _)))
-                {
-                    continue;
-                }
-
-                try
-                {
-                    var model = ExtractProxyInterfaceModel(typeSymbol, compilation, ImmutableArray<AttributeData>.Empty, cancellationToken);
-                    if (model is not null)
-                    {
-                        result.Add(model);
-                    }
-                }
-                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-                {
-                    throw;
-                }
-                catch
-                {
-                    // Errors will be reported through the monolithic code generation path.
-                }
+                return null;
             }
 
-            return result
-                .ToImmutable()
-                .Distinct()
-                .OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.Name, StringComparer.Ordinal)
-                .ToImmutableArray();
+            var compilation = context.SemanticModel.Compilation;
+            if (context.SemanticModel.GetDeclaredSymbol(interfaceDeclaration, cancellationToken) is not INamedTypeSymbol typeSymbol
+                || typeSymbol.TypeKind != TypeKind.Interface)
+            {
+                return null;
+            }
+
+            var options = new CodeGeneratorOptions();
+            var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
+            if (typeSymbol.GetAttributes(libraryTypes.GenerateMethodSerializersAttribute, out var directAttributes, inherited: false)
+                && directAttributes.Any(static attribute => TryGetProxyBaseInfo(attribute, out _, out _)))
+            {
+                return null;
+            }
+
+            try
+            {
+                return ExtractProxyInterfaceModel(typeSymbol, compilation, ImmutableArray<AttributeData>.Empty, cancellationToken);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch
+            {
+                // Errors will be reported through the monolithic code generation path.
+                return null;
+            }
         }
 
         private static ProxyInterfaceModel ExtractProxyInterfaceModel(
@@ -1109,7 +1105,8 @@ namespace Orleans.CodeGenerator
                 generatedNamespace,
                 typeParameters,
                 proxyBase,
-                methods);
+                methods,
+                GetSourceLocation(typeSymbol));
         }
 
         private static string GetProxyInterfaceName(INamedTypeSymbol typeSymbol, LibraryTypes libraryTypes)
@@ -1127,6 +1124,17 @@ namespace Orleans.CodeGenerator
             }
 
             return name;
+        }
+
+        internal static SourceLocationModel GetSourceLocation(ISymbol symbol)
+        {
+            var sourceLocation = symbol?.Locations.FirstOrDefault(static location => location.IsInSource);
+            return sourceLocation is null
+                ? new SourceLocationModel(sourceOrderGroup: 1, filePath: string.Empty, position: int.MaxValue)
+                : new SourceLocationModel(
+                    sourceOrderGroup: 0,
+                    filePath: sourceLocation.SourceTree?.FilePath ?? string.Empty,
+                    position: sourceLocation.SourceSpan.Start);
         }
 
         private static bool TryGetGenerateMethodSerializersAttribute(
