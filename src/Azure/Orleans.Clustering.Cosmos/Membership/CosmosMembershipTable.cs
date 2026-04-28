@@ -1,4 +1,5 @@
 using System.Net;
+using System.Threading;
 using Orleans.Clustering.Cosmos.Models;
 
 namespace Orleans.Clustering.Cosmos;
@@ -7,6 +8,8 @@ internal partial class CosmosMembershipTable : IMembershipTable
 {
     private const string PARTITION_KEY = "/ClusterId";
     private const string CLUSTER_VERSION_ID = "ClusterVersion";
+    // The Linux emulator does not enforce TransactionalBatch ETag conditions, so localhost tests use guarded point operations.
+    private static readonly SemaphoreSlim EmulatorMembershipLock = new(1, 1);
     private readonly ILogger _logger;
     private readonly CosmosClusteringOptions _options;
     private readonly IServiceProvider _serviceProvider;
@@ -16,6 +19,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
     private CosmosClient _client = default!;
     private Container _container = default!;
     private SiloEntity? _self = null;
+    private bool _useEmulatorCompatibilityMode;
 
     public CosmosMembershipTable(
         ILoggerFactory loggerFactory,
@@ -234,6 +238,11 @@ internal partial class CosmosMembershipTable : IMembershipTable
     {
         try
         {
+            if (_useEmulatorCompatibilityMode)
+            {
+                return await InsertRowWithPointOperations(entry, tableVersion).ConfigureAwait(false);
+            }
+
             var siloEntity = ConvertToEntity(entry, _clusterId);
             var versionEntity = BuildVersionEntity(tableVersion);
 
@@ -256,6 +265,11 @@ internal partial class CosmosMembershipTable : IMembershipTable
     {
         try
         {
+            if (_useEmulatorCompatibilityMode)
+            {
+                return await UpdateRowWithPointOperations(entry, etag, tableVersion).ConfigureAwait(false);
+            }
+
             var siloEntity = ConvertToEntity(entry, _clusterId);
             siloEntity.ETag = etag;
 
@@ -317,6 +331,7 @@ internal partial class CosmosMembershipTable : IMembershipTable
         try
         {
             _client = await _options.CreateClient!(_serviceProvider).ConfigureAwait(false);
+            _useEmulatorCompatibilityMode = _client.Endpoint.IsLoopback;
         }
         catch (Exception ex)
         {
@@ -517,6 +532,103 @@ internal partial class CosmosMembershipTable : IMembershipTable
             ETag = tableVersion.VersionEtag
         };
     }
+
+    private async Task<bool> InsertRowWithPointOperations(MembershipEntry entry, TableVersion tableVersion)
+    {
+        await EmulatorMembershipLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var currentVersion = await ReadClusterVersion().ConfigureAwait(false);
+            if (!IsExpectedVersion(currentVersion, tableVersion))
+            {
+                return false;
+            }
+
+            var siloEntity = ConvertToEntity(entry, _clusterId);
+            if (await ReadSiloEntity(siloEntity.Id).ConfigureAwait(false) is not null)
+            {
+                return false;
+            }
+
+            var versionEntity = BuildVersionEntity(tableVersion);
+            await _container.ReplaceItemAsync(
+                versionEntity,
+                versionEntity.Id,
+                _partitionKey,
+                new ItemRequestOptions { IfMatchEtag = currentVersion!.ETag }).ConfigureAwait(false);
+
+            await _container.CreateItemAsync(siloEntity, _partitionKey).ConfigureAwait(false);
+            return true;
+        }
+        catch (CosmosException exc) when (exc.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
+        {
+            return false;
+        }
+        finally
+        {
+            EmulatorMembershipLock.Release();
+        }
+    }
+
+    private async Task<bool> UpdateRowWithPointOperations(MembershipEntry entry, string etag, TableVersion tableVersion)
+    {
+        await EmulatorMembershipLock.WaitAsync().ConfigureAwait(false);
+        try
+        {
+            var currentVersion = await ReadClusterVersion().ConfigureAwait(false);
+            if (!IsExpectedVersion(currentVersion, tableVersion))
+            {
+                return false;
+            }
+
+            var siloEntity = ConvertToEntity(entry, _clusterId);
+            var currentSilo = await ReadSiloEntity(siloEntity.Id).ConfigureAwait(false);
+            if (currentSilo is null || !string.Equals(currentSilo.ETag, etag, StringComparison.Ordinal))
+            {
+                return false;
+            }
+
+            var versionEntity = BuildVersionEntity(tableVersion);
+            await _container.ReplaceItemAsync(
+                versionEntity,
+                versionEntity.Id,
+                _partitionKey,
+                new ItemRequestOptions { IfMatchEtag = currentVersion!.ETag }).ConfigureAwait(false);
+
+            await _container.ReplaceItemAsync(
+                siloEntity,
+                siloEntity.Id,
+                _partitionKey,
+                new ItemRequestOptions { IfMatchEtag = currentSilo.ETag }).ConfigureAwait(false);
+
+            return true;
+        }
+        catch (CosmosException exc) when (exc.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.Conflict)
+        {
+            return false;
+        }
+        finally
+        {
+            EmulatorMembershipLock.Release();
+        }
+    }
+
+    private async Task<SiloEntity?> ReadSiloEntity(string id)
+    {
+        try
+        {
+            return (await _container.ReadItemAsync<SiloEntity>(id, _partitionKey).ConfigureAwait(false)).Resource;
+        }
+        catch (CosmosException exc) when (exc.StatusCode == HttpStatusCode.NotFound)
+        {
+            return null;
+        }
+    }
+
+    private static bool IsExpectedVersion(ClusterVersionEntity? currentVersion, TableVersion nextVersion) =>
+        currentVersion is not null
+        && currentVersion.ClusterVersion == nextVersion.Version - 1
+        && string.Equals(currentVersion.ETag, nextVersion.VersionEtag, StringComparison.Ordinal);
 
     private readonly struct MembershipEntryLogValue(MembershipEntry membershipEntry)
     {
