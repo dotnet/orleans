@@ -36,6 +36,7 @@ public class ReferencedAssemblyDiagnosticParityTests
         var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Id == InaccessibleSerializableTypeDiagnostic.RuleId);
 
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(Location.None, diagnostic.Location);
         Assert.Contains("InternalDto", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
@@ -69,6 +70,7 @@ public class ReferencedAssemblyDiagnosticParityTests
         var diagnostic = Assert.Single(result.Diagnostics, diagnostic => diagnostic.Id == CanNotGenerateImplicitFieldIdsDiagnostic.DiagnosticId);
 
         Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Equal(Location.None, diagnostic.Location);
         Assert.Contains("AutoDto", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
