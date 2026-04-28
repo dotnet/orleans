@@ -115,6 +115,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
+            _interfaceProxyBases[interfaceType] = result;
             return result;
         }
 

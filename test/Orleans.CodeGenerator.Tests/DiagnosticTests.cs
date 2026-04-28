@@ -323,10 +323,8 @@ public class DiagnosticTests
     }
 
     [Fact]
-    public async Task UnhandledException_IsReportedAsDiagnostic()
+    public async Task CompilationErrors_DoNotPreventSourceGeneration()
     {
-        // A compilation with missing references can trigger internal errors in the generator.
-        // The generator wraps these as ORLEANS0103 diagnostics rather than crashing.
         const string code = """
             using Orleans;
 
@@ -341,15 +339,12 @@ public class DiagnosticTests
             """;
 
         var compilation = await CreateCompilation(code);
-        // The compilation itself will have errors for the missing type,
-        // but the generator should still handle it gracefully
+        Assert.Contains(compilation.GetDiagnostics(), diagnostic => diagnostic.Severity == DiagnosticSeverity.Error);
+
         var result = RunGeneratorOnCompilation(compilation);
 
-        // Generator should not crash — it either reports a diagnostic or produces no output
-        // for the problematic type. The key assertion is that it doesn't throw.
-        Assert.True(
-            result.GeneratedSources.Length >= 0,
-            "Generator should not crash on compilation errors.");
+        Assert.Empty(result.Diagnostics);
+        Assert.Contains("Codec_DtoWithMissingType", ConcatenateGeneratedSources(result));
     }
 
     [Fact]
