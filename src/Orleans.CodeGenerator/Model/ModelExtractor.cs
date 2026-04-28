@@ -970,7 +970,7 @@ namespace Orleans.CodeGenerator
                 if (throwOnFailure && HasReferenceAssemblyAttribute(sumType.ContainingAssembly))
                 {
                     throw new OrleansGeneratorDiagnosticAnalysisException(
-                        ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(sumType));
+                        ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(sumType, Location.None));
                 }
 
                 if (!compilation.IsSymbolAccessibleWithin(sumType, compilation.Assembly))
@@ -978,7 +978,7 @@ namespace Orleans.CodeGenerator
                     if (throwOnFailure)
                     {
                         throw new OrleansGeneratorDiagnosticAnalysisException(
-                            InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(sumType));
+                            InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(sumType, Location.None));
                     }
 
                     return null;
@@ -996,7 +996,7 @@ namespace Orleans.CodeGenerator
             if (throwOnFailure && HasReferenceAssemblyAttribute(typeSymbol.ContainingAssembly))
             {
                 throw new OrleansGeneratorDiagnosticAnalysisException(
-                    ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(typeSymbol));
+                    ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(typeSymbol, Location.None));
             }
 
             if (!compilation.IsSymbolAccessibleWithin(typeSymbol, compilation.Assembly))
@@ -1004,7 +1004,7 @@ namespace Orleans.CodeGenerator
                 if (throwOnFailure)
                 {
                     throw new OrleansGeneratorDiagnosticAnalysisException(
-                        InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(typeSymbol));
+                        InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(typeSymbol, Location.None));
                 }
 
                 return null;
@@ -1030,7 +1030,7 @@ namespace Orleans.CodeGenerator
                 if (throwOnFailure)
                 {
                     throw new OrleansGeneratorDiagnosticAnalysisException(
-                        CanNotGenerateImplicitFieldIdsDiagnostic.CreateDiagnostic(typeSymbol, helper.FailureReason));
+                        CanNotGenerateImplicitFieldIdsDiagnostic.CreateDiagnostic(typeSymbol, helper.FailureReason, Location.None));
                 }
 
                 return null;
