@@ -1563,6 +1563,57 @@ public class DemoClass
         Assert.EndsWith(".orleans.metadata.g.cs", emittedHintNames[^1], StringComparison.Ordinal);
     }
 
+    [Fact]
+    public async Task GeneratedInvokableActivators_AreRegisteredInMetadata()
+    {
+        var code = """
+            using System;
+            using System.Threading.Tasks;
+            using Orleans;
+            using Orleans.Runtime;
+
+            namespace TestProject;
+
+            [InvokableBaseType(typeof(GrainReference), typeof(Task<>), typeof(ActivatingTaskRequest<>))]
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class ActivatingAttribute : Attribute
+            {
+            }
+
+            public abstract class ActivatingTaskRequest<TResult> : TaskRequest<TResult>
+            {
+                [GeneratedActivatorConstructor]
+                protected ActivatingTaskRequest(IServiceProvider serviceProvider)
+                {
+                }
+            }
+
+            public interface IActivatingGrain : IGrainWithIntegerKey
+            {
+                [Activating]
+                Task<string> GetValue();
+            }
+
+            public interface INormalGrain : IGrainWithIntegerKey
+            {
+                Task<string> GetValue();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var result = RunSourceGenerator(compilation);
+
+        Assert.Empty(result.Diagnostics);
+
+        var emittedActivatorNames = GetGeneratedClassNames(result, ".orleans.proxy.", "Activator_Invokable_");
+        var registeredActivatorNames = GetRegisteredGeneratedInvokableActivatorNames(result);
+
+        Assert.Single(emittedActivatorNames);
+        Assert.Equal(emittedActivatorNames, registeredActivatorNames);
+        Assert.Contains(emittedActivatorNames, static name => name.Contains("IActivatingGrain", StringComparison.Ordinal));
+        Assert.DoesNotContain(registeredActivatorNames, static name => name.Contains("INormalGrain", StringComparison.Ordinal));
+    }
+
     private static GeneratorRunResult RunSourceGenerator(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
@@ -1812,6 +1863,38 @@ public class DemoClass
     private static int CountGeneratedInvokableClasses(string source)
         => source.Split(Environment.NewLine)
             .Count(line => line.Contains("public sealed class Invokable_", StringComparison.Ordinal));
+
+    private static string[] GetGeneratedClassNames(GeneratorRunResult result, string hintNameFragment, string classNamePrefix)
+        => result.GeneratedSources
+            .Where(source => source.HintName.Contains(hintNameFragment, StringComparison.Ordinal))
+            .SelectMany(static source => CSharpSyntaxTree.ParseText(source.SourceText.ToString().TrimStart('\uFEFF')).GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<ClassDeclarationSyntax>())
+            .Select(static declaration => declaration.Identifier.ValueText)
+            .Where(name => name.StartsWith(classNamePrefix, StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+
+    private static string[] GetRegisteredGeneratedInvokableActivatorNames(GeneratorRunResult result)
+        => result.GeneratedSources
+            .Where(static source => source.HintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal))
+            .SelectMany(static source => CSharpSyntaxTree.ParseText(source.SourceText.ToString().TrimStart('\uFEFF')).GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>())
+            .Where(static invocation =>
+                invocation.Expression is MemberAccessExpressionSyntax
+                {
+                    Name.Identifier.ValueText: "Add",
+                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Activators" }
+                })
+            .Select(static invocation => invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression)
+            .OfType<TypeOfExpressionSyntax>()
+            .Select(static typeOfExpression => GetGeneratedClassIdentifier(typeOfExpression.Type.ToString().Split('.').Last()))
+            .Where(static name => name.StartsWith("Activator_Invokable_", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
 
     private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
     {

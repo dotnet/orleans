@@ -19,6 +19,7 @@ namespace Orleans.CodeGenerator.Model
             ImmutableArray<TypeRef> activatableTypes,
             ImmutableArray<TypeRef> generatedProxyTypes,
             ImmutableArray<TypeRef> invokableInterfaces,
+            ImmutableArray<string> generatedInvokableActivatorMetadataNames,
             ImmutableArray<InterfaceImplementationModel> interfaceImplementations,
             ImmutableArray<DefaultCopierModel> defaultCopiers)
         {
@@ -30,6 +31,7 @@ namespace Orleans.CodeGenerator.Model
             ActivatableTypes = StructuralEquality.Normalize(activatableTypes);
             GeneratedProxyTypes = StructuralEquality.Normalize(generatedProxyTypes);
             InvokableInterfaces = StructuralEquality.Normalize(invokableInterfaces);
+            GeneratedInvokableActivatorMetadataNames = StructuralEquality.Normalize(generatedInvokableActivatorMetadataNames);
             InterfaceImplementations = StructuralEquality.Normalize(interfaceImplementations);
             DefaultCopiers = StructuralEquality.Normalize(defaultCopiers);
         }
@@ -42,6 +44,7 @@ namespace Orleans.CodeGenerator.Model
         public ImmutableArray<TypeRef> ActivatableTypes { get; }
         public ImmutableArray<TypeRef> GeneratedProxyTypes { get; }
         public ImmutableArray<TypeRef> InvokableInterfaces { get; }
+        public ImmutableArray<string> GeneratedInvokableActivatorMetadataNames { get; }
         public ImmutableArray<InterfaceImplementationModel> InterfaceImplementations { get; }
         public ImmutableArray<DefaultCopierModel> DefaultCopiers { get; }
 
@@ -60,6 +63,7 @@ namespace Orleans.CodeGenerator.Model
                 && StructuralEquality.SequenceEqual(ActivatableTypes, other.ActivatableTypes)
                 && StructuralEquality.SequenceEqual(GeneratedProxyTypes, other.GeneratedProxyTypes)
                 && StructuralEquality.SequenceEqual(InvokableInterfaces, other.InvokableInterfaces)
+                && StructuralEquality.SequenceEqual(GeneratedInvokableActivatorMetadataNames, other.GeneratedInvokableActivatorMetadataNames)
                 && StructuralEquality.SequenceEqual(InterfaceImplementations, other.InterfaceImplementations)
                 && StructuralEquality.SequenceEqual(DefaultCopiers, other.DefaultCopiers);
         }
@@ -78,6 +82,7 @@ namespace Orleans.CodeGenerator.Model
                 hash = hash * 31 + StructuralEquality.GetSequenceHashCode(ActivatableTypes);
                 hash = hash * 31 + StructuralEquality.GetSequenceHashCode(GeneratedProxyTypes);
                 hash = hash * 31 + StructuralEquality.GetSequenceHashCode(InvokableInterfaces);
+                hash = hash * 31 + StructuralEquality.GetSequenceHashCode(GeneratedInvokableActivatorMetadataNames);
                 hash = hash * 31 + StructuralEquality.GetSequenceHashCode(InterfaceImplementations);
                 hash = hash * 31 + StructuralEquality.GetSequenceHashCode(DefaultCopiers);
                 return hash;

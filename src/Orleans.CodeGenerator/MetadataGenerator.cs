@@ -35,7 +35,10 @@ namespace Orleans.CodeGenerator
             var body = new List<StatementSyntax>();
             var model = _metadataModel;
             var orderedProxyInterfaces = GetOrderedProxyInterfaces(model.ProxyInterfaces);
-            var generatedInvokables = GetGeneratedInvokableMetadata(orderedProxyInterfaces);
+            var generatedInvokableActivatorMetadataNames = new HashSet<string>(
+                model.GeneratedInvokableActivatorMetadataNames,
+                StringComparer.Ordinal);
+            var generatedInvokables = GetGeneratedInvokableMetadata(orderedProxyInterfaces, generatedInvokableActivatorMetadataNames);
             var serializableRegistrations = GetOrderedSerializableRegistrations(model, generatedInvokables);
 
             var addSerializerMethod = configParam.Member("Serializers").Member("Add");
@@ -245,7 +248,9 @@ namespace Orleans.CodeGenerator
                 .ToImmutableArray();
         }
 
-        private ImmutableArray<GeneratedInvokableMetadata> GetGeneratedInvokableMetadata(ImmutableArray<ProxyInterfaceModel> proxyInterfaces)
+        private ImmutableArray<GeneratedInvokableMetadata> GetGeneratedInvokableMetadata(
+            ImmutableArray<ProxyInterfaceModel> proxyInterfaces,
+            HashSet<string> generatedInvokableActivatorMetadataNames)
         {
             var result = ImmutableArray.CreateBuilder<GeneratedInvokableMetadata>();
             var seen = new HashSet<string>(StringComparer.Ordinal);
@@ -254,7 +259,7 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var method in proxy.Methods)
                 {
-                    var metadata = CreateGeneratedInvokableMetadata(proxy, method);
+                    var metadata = CreateGeneratedInvokableMetadata(proxy, method, generatedInvokableActivatorMetadataNames);
                     var key = metadata.TypeSyntax.ToString();
                     if (seen.Add(key))
                     {
@@ -301,7 +306,7 @@ namespace Orleans.CodeGenerator
                     sortKey: type.TypeSyntax.ToString(),
                     serializerTypeSyntax: type.CodecTypeSyntax,
                     copierTypeSyntax: type.CopierTypeSyntax,
-                    activatorTypeSyntax: null,
+                    activatorTypeSyntax: type.ActivatorTypeSyntax,
                     sourceLocation: type.SourceLocation));
             }
 
@@ -322,7 +327,10 @@ namespace Orleans.CodeGenerator
                 .ToImmutableArray();
         }
 
-        private GeneratedInvokableMetadata CreateGeneratedInvokableMetadata(ProxyInterfaceModel proxy, MethodModel method)
+        private GeneratedInvokableMetadata CreateGeneratedInvokableMetadata(
+            ProxyInterfaceModel proxy,
+            MethodModel method,
+            HashSet<string> generatedInvokableActivatorMetadataNames)
         {
             var generatedNamespace = method.ContainingInterfaceGeneratedNamespace;
             var name = GetGeneratedInvokableClassName(proxy, method);
@@ -332,6 +340,10 @@ namespace Orleans.CodeGenerator
             var aliases = CreateGeneratedInvokableAliases(proxy, method, targetType);
             var codecTypeSyntax = GetCodecTypeName(generatedNamespace, name, genericArity);
             var copierTypeSyntax = GetCopierTypeName(generatedNamespace, name, genericArity);
+            var metadataName = GetGeneratedInvokableMetadataName(generatedNamespace, name, genericArity);
+            var activatorTypeSyntax = generatedInvokableActivatorMetadataNames.Contains(metadataName)
+                ? GetActivatorTypeName(generatedNamespace, name, genericArity)
+                : null;
 
             return new GeneratedInvokableMetadata(
                 typeSyntax,
@@ -339,8 +351,14 @@ namespace Orleans.CodeGenerator
                 aliases,
                 codecTypeSyntax,
                 copierTypeSyntax,
+                activatorTypeSyntax,
                 proxy.SourceLocation);
         }
+
+        private static string GetGeneratedInvokableMetadataName(string generatedNamespace, string name, int genericArity)
+            => genericArity == 0
+                ? $"{generatedNamespace}.{name}"
+                : $"{generatedNamespace}.{name}`{genericArity}";
 
         private static string GetGeneratedInvokableClassName(ProxyInterfaceModel proxy, MethodModel method)
         {
@@ -542,6 +560,7 @@ namespace Orleans.CodeGenerator
                 ImmutableArray<CompoundTypeAliasModel> aliases,
                 TypeSyntax codecTypeSyntax,
                 TypeSyntax copierTypeSyntax,
+                TypeSyntax activatorTypeSyntax,
                 SourceLocationModel sourceLocation)
             {
                 TypeSyntax = typeSyntax;
@@ -549,6 +568,7 @@ namespace Orleans.CodeGenerator
                 Aliases = aliases;
                 CodecTypeSyntax = codecTypeSyntax;
                 CopierTypeSyntax = copierTypeSyntax;
+                ActivatorTypeSyntax = activatorTypeSyntax;
                 SourceLocation = sourceLocation;
             }
 
@@ -557,6 +577,7 @@ namespace Orleans.CodeGenerator
             public ImmutableArray<CompoundTypeAliasModel> Aliases { get; }
             public TypeSyntax CodecTypeSyntax { get; }
             public TypeSyntax CopierTypeSyntax { get; }
+            public TypeSyntax ActivatorTypeSyntax { get; }
             public SourceLocationModel SourceLocation { get; }
         }
 
