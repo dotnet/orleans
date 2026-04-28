@@ -1,6 +1,7 @@
 using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling.Protobuf;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
@@ -198,12 +199,56 @@ public class ProtobufCodecTests
         Assert.Contains("declared 2 snapshot item(s) but contained 1", exception.Message);
     }
 
+    [Fact]
+    public void ProtobufLogExtentCodec_Encode_WritesDelimitedLogExtent()
+    {
+        var codec = new ProtobufLogExtentCodec();
+        using var builder = new LogExtentBuilder();
+        var writer = builder.CreateLogWriter(new(8));
+        writer.AppendEntry((ReadOnlySpan<byte>)[8, 0]);
+
+        var encoded = codec.Encode(builder);
+
+        Assert.Equal([8, 10, 6, 8, 8, 18, 2, 8, 0], encoded);
+    }
+
+    [Fact]
+    public void ProtobufLogExtentCodec_Decode_RoundTripsEntries()
+    {
+        var codec = new ProtobufLogExtentCodec();
+        using var extent = Decode(codec, [8, 10, 6, 8, 8, 18, 2, 8, 0]);
+        var entry = Assert.Single(extent.Entries);
+
+        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal([8, 0], entry.Payload.ToArray());
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 4, 10, 2, 18, 0 }, "stream_id")]
+    [InlineData(new byte[] { 4, 10, 2, 8, 8 }, "entry")]
+    [InlineData(new byte[] { 8, 10, 6, 8 }, "insufficient data")]
+    public void ProtobufLogExtentCodec_Decode_InvalidExtent_Throws(byte[] bytes, string expectedMessage)
+    {
+        var codec = new ProtobufLogExtentCodec();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Decode(codec, bytes));
+
+        Assert.Contains(expectedMessage, exception.Message);
+    }
+
     private ProtobufValueConverter<T> CreateConverter<T>()
         => ProtobufValueConverter<T>.IsNativeType
             ? new ProtobufValueConverter<T>()
             : new ProtobufValueConverter<T>(new OrleansLogDataCodec<T>(_codecProvider.GetCodec<T>(), _sessionPool));
 
     private static ReadOnlySequence<byte> Sequence(byte[] bytes) => new(bytes);
+
+    private static LogExtent Decode(IStateMachineLogExtentCodec codec, byte[] bytes)
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        return codec.Decode(buffer.ConsumeSlice(buffer.Length));
+    }
 
     private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
     {

@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Text;
 using System.Text.Json;
 using Orleans.Journaling.Json;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
@@ -145,6 +146,63 @@ public class JsonCodecTests
         Assert.Equal(["pending", "completed:5", "faulted:boom", "canceled"], consumer.Commands);
     }
 
+    [Fact]
+    public void JsonLinesLogExtentCodec_Encode_WritesOneExtentPerLine()
+    {
+        var codec = new JsonLinesLogExtentCodec();
+        using var builder = new LogExtentBuilder();
+        var writer = builder.CreateLogWriter(new(8));
+        writer.AppendEntry(Encoding.UTF8.GetBytes("""{"cmd":"set","value":42}"""));
+        writer.AppendEntry(Encoding.UTF8.GetBytes("""{"cmd":"set","value":43}"""));
+
+        var encoded = Encoding.UTF8.GetString(codec.Encode(builder));
+
+        Assert.Equal("""{"records":[{"streamId":8,"entry":{"cmd":"set","value":42}},{"streamId":8,"entry":{"cmd":"set","value":43}}]}""" + "\n", encoded);
+    }
+
+    [Fact]
+    public void JsonLinesLogExtentCodec_Decode_RoundTripsEntries()
+    {
+        var codec = new JsonLinesLogExtentCodec();
+        using var extent = Decode(codec, """{"records":[{"streamId":8,"entry":{"cmd":"set","value":42}}]}""" + "\n");
+        var entry = Assert.Single(extent.Entries);
+        var valueCodec = new JsonValueEntryCodec<int>(Options);
+        var consumer = new ValueConsumer<int>();
+
+        valueCodec.Apply(entry.Payload, consumer);
+
+        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal(42, consumer.Value);
+    }
+
+    [Theory]
+    [InlineData("\n", "blank lines")]
+    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", "records")]
+    [InlineData("""{"records":null}""" + "\n", "must be a JSON array")]
+    [InlineData("""{"records":[null]}""" + "\n", "each record")]
+    [InlineData("""{"records":[{"entry":{"cmd":"set","value":42}}]}""" + "\n", "streamId")]
+    [InlineData("""{"records":[{"streamId":8}]}""" + "\n", "entry")]
+    [InlineData("""{"records":[{"streamId":8,"entry":null}]}""" + "\n", "must be a JSON object")]
+    public void JsonLinesLogExtentCodec_Decode_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
+    {
+        var codec = new JsonLinesLogExtentCodec();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Decode(codec, jsonLines));
+
+        Assert.Contains(expectedMessage, exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesLogExtentCodec_Decode_Bom_Throws()
+    {
+        var codec = new JsonLinesLogExtentCodec();
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""{"records":[{"streamId":8,"entry":{"cmd":"set","value":42}}]}""" + "\n")).ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Decode(codec, bytes));
+
+        Assert.Contains("byte order marks", exception.Message);
+    }
+
     private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
@@ -181,6 +239,15 @@ public class JsonCodecTests
     }
 
     private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
+
+    private static LogExtent Decode(IStateMachineLogExtentCodec codec, string jsonLines) => Decode(codec, Encoding.UTF8.GetBytes(jsonLines));
+
+    private static LogExtent Decode(IStateMachineLogExtentCodec codec, byte[] bytes)
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        return codec.Decode(buffer.ConsumeSlice(buffer.Length));
+    }
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
     {

@@ -2,6 +2,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
+using System.Text;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
@@ -53,7 +54,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task JsonCodec_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateJsonStorage();
         var jsonOptions = new System.Text.Json.JsonSerializerOptions();
 
         // Write phase
@@ -64,6 +65,8 @@ public class CodecRecoveryTests : StateMachineTestBase
         dict.Add("alpha", 1);
         dict.Add("beta", 2);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
+        var log = Encoding.UTF8.GetString(storage.Segments.Single());
+        Assert.Equal("""{"records":[{"streamId":0,"entry":{"cmd":"set","key":"dict","value":8}},{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}},{"streamId":8,"entry":{"cmd":"set","key":"beta","value":2}}]}""" + "\n", log);
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -81,7 +84,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task JsonCodec_DurableList_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateJsonStorage();
         var jsonOptions = new System.Text.Json.JsonSerializerOptions();
 
         // Write phase
@@ -111,7 +114,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task JsonCodec_DurableValue_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateJsonStorage();
         var jsonOptions = new System.Text.Json.JsonSerializerOptions();
 
         // Write phase
@@ -132,7 +135,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
     internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(IStateMachineStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
-        storage ??= CreateStorage();
+        storage ??= CreateJsonStorage();
         jsonOptions ??= new System.Text.Json.JsonSerializerOptions();
 
         var stateMachineIdsCodec = new JsonDictionaryEntryCodec<string, ulong>(jsonOptions);
@@ -142,6 +145,8 @@ public class CodecRecoveryTests : StateMachineTestBase
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
+
+    private static VolatileStateMachineStorage CreateJsonStorage() => new(new JsonLinesLogExtentCodec());
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {

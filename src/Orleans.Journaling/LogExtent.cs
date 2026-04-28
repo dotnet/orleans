@@ -11,14 +11,25 @@ namespace Orleans.Journaling;
 public sealed class LogExtent(ArcBuffer buffer) : IDisposable
 {
     private ArcBuffer _buffer = buffer;
+    private readonly IReadOnlyList<Entry>? _entries;
 
-    public LogExtent() : this(new())
+    public LogExtent() : this(default(ArcBuffer))
     {
     }
 
-    public bool IsEmpty => _buffer.Length == 0;
+    /// <summary>
+    /// Initializes a log extent from decoded entries.
+    /// </summary>
+    /// <param name="entries">The decoded log entries.</param>
+    public LogExtent(IReadOnlyList<Entry> entries) : this(default(ArcBuffer))
+    {
+        ArgumentNullException.ThrowIfNull(entries);
+        _entries = entries;
+    }
 
-    internal EntryEnumerator Entries => EntryEnumerator.Create(this);
+    public bool IsEmpty => _entries is not null ? _entries.Count == 0 : _buffer.Length == 0;
+
+    internal IEnumerable<Entry> Entries => _entries is not null ? _entries : EntryEnumerator.Create(this);
 
     public void Dispose() => _buffer.Dispose();
 

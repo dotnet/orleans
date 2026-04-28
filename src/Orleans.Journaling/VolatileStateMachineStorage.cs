@@ -6,8 +6,19 @@ namespace Orleans.Journaling;
 
 public sealed class VolatileStateMachineStorageProvider : IStateMachineStorageProvider
 {
+    private readonly IStateMachineLogExtentCodec _codec;
     private readonly ConcurrentDictionary<GrainId, VolatileStateMachineStorage> _storage = new();
-    public IStateMachineStorage Create(IGrainContext grainContext) => _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileStateMachineStorage());
+
+    public VolatileStateMachineStorageProvider() : this(BinaryLogExtentCodec.Instance)
+    {
+    }
+
+    public VolatileStateMachineStorageProvider(IStateMachineLogExtentCodec codec)
+    {
+        _codec = codec;
+    }
+
+    public IStateMachineStorage Create(IGrainContext grainContext) => _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileStateMachineStorage(_codec));
 }
 
 /// <summary>
@@ -16,8 +27,20 @@ public sealed class VolatileStateMachineStorageProvider : IStateMachineStoragePr
 public sealed class VolatileStateMachineStorage : IStateMachineStorage
 {
     private readonly List<byte[]> _segments = [];
+    private readonly IStateMachineLogExtentCodec _codec;
+
+    public VolatileStateMachineStorage() : this(BinaryLogExtentCodec.Instance)
+    {
+    }
+
+    public VolatileStateMachineStorage(IStateMachineLogExtentCodec codec)
+    {
+        _codec = codec;
+    }
 
     public bool IsCompactionRequested => _segments.Count > 10;
+
+    internal IReadOnlyList<byte[]> Segments => _segments;
 
     /// <inheritdoc/>
     public async IAsyncEnumerable<LogExtent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
@@ -28,7 +51,7 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
         {
             cancellationToken.ThrowIfCancellationRequested();
             buffer.Write(segment);
-            yield return new LogExtent(buffer.ConsumeSlice(segment.Length));
+            yield return _codec.Decode(buffer.ConsumeSlice(segment.Length));
         }
     }
 
@@ -36,7 +59,7 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
     public ValueTask AppendAsync(LogExtentBuilder segment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
-        _segments.Add(segment.ToArray());
+        _segments.Add(_codec.Encode(segment));
         return default;
     }
 
@@ -45,7 +68,7 @@ public sealed class VolatileStateMachineStorage : IStateMachineStorage
     {
         cancellationToken.ThrowIfCancellationRequested();
         _segments.Clear();
-        _segments.Add(snapshot.ToArray());
+        _segments.Add(_codec.Encode(snapshot));
         return default;
     }
 

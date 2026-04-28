@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections;
 using System.Diagnostics;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
@@ -31,6 +32,11 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
     public StateMachineStorageWriter CreateLogWriter(StateMachineId id) => new(id, this);
 
     public bool IsEmpty => _buffer.Length == 0;
+
+    /// <summary>
+    /// Gets the logical log entries currently collected in this extent.
+    /// </summary>
+    public IEnumerable<LogExtent.Entry> Entries => EntryEnumerator.Create(this);
 
     internal void AppendEntry(StateMachineId id, byte[] value) => AppendEntry(id, (ReadOnlySpan<byte>)value);
     internal void AppendEntry(StateMachineId id, Span<byte> value) => AppendEntry(id, (ReadOnlySpan<byte>)value);
@@ -157,5 +163,89 @@ public sealed partial class LogExtentBuilder(ArcBufferWriter buffer) : IDisposab
         var writer = Writer.Create(scratch, null);
         writer.WriteVarUInt32(length);
         return new ReadOnlyMemory<byte>(scratch, 0, writer.Position);
+    }
+
+    private struct EntryEnumerator : IEnumerable<LogExtent.Entry>, IEnumerator<LogExtent.Entry>
+    {
+        private LogExtentBuilder _builder;
+        private Orleans.Serialization.Buffers.ArcBuffer _buffer;
+        private ReadOnlySequence<byte> _current;
+        private int _index;
+        private int _length;
+
+        private EntryEnumerator(LogExtentBuilder builder)
+        {
+            _builder = builder;
+            _buffer = builder._buffer.PeekSlice(builder._buffer.Length);
+            _current = _buffer.AsReadOnlySequence();
+            _index = 0;
+            _length = -2;
+        }
+
+        public readonly EntryEnumerator GetEnumerator() => this;
+
+        public static EntryEnumerator Create(LogExtentBuilder builder) => new(builder);
+
+        public bool MoveNext()
+        {
+            if (_length == -1)
+            {
+                ThrowEnumerationNotStartedOrEnded();
+            }
+
+            if (_length >= 0)
+            {
+                _current = _current.Slice(_length);
+            }
+
+            if (_index >= _builder._entryLengths.Count)
+            {
+                _length = -1;
+                _buffer.Dispose();
+                return false;
+            }
+
+            _length = (int)_builder._entryLengths[_index++];
+            return true;
+        }
+
+        public readonly LogExtent.Entry Current
+        {
+            get
+            {
+                if (_length < 0)
+                {
+                    ThrowEnumerationNotStartedOrEnded();
+                }
+
+                var slice = _current.Slice(0, _length);
+                var reader = Reader.Create(slice, null);
+                var id = reader.ReadVarUInt64();
+                return new(new(id), slice.Slice(reader.Position));
+            }
+        }
+
+        private readonly void ThrowEnumerationNotStartedOrEnded()
+        {
+            Debug.Assert(_length is (-1) or (-2));
+            throw new InvalidOperationException(_length == -2 ? "Enumeration has not started." : "Enumeration has completed.");
+        }
+
+        readonly object IEnumerator.Current => Current;
+
+        public void Reset()
+        {
+            _buffer.Dispose();
+            this = new(_builder);
+        }
+
+        public void Dispose()
+        {
+            _length = -1;
+            _buffer.Dispose();
+        }
+
+        readonly IEnumerator<LogExtent.Entry> IEnumerable<LogExtent.Entry>.GetEnumerator() => GetEnumerator();
+        readonly IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

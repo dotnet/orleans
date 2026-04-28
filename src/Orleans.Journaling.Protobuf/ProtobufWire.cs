@@ -36,6 +36,29 @@ internal static class ProtobufWire
         WriteRaw(output, value);
     }
 
+    public static void WriteBytesField(IBufferWriter<byte> output, uint fieldNumber, ReadOnlySequence<byte> value)
+    {
+        WriteTag(output, fieldNumber, WireTypeLengthDelimited);
+        WriteLengthDelimited(output, value);
+    }
+
+    public static void WriteLengthDelimited(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
+    {
+        WriteVarUInt32(output, (uint)value.Length);
+        WriteRaw(output, value);
+    }
+
+    public static void WriteLengthDelimited(IBufferWriter<byte> output, ReadOnlySequence<byte> value)
+    {
+        if (value.Length > uint.MaxValue)
+        {
+            throw new InvalidOperationException("Length-delimited protobuf value is too large.");
+        }
+
+        WriteVarUInt32(output, (uint)value.Length);
+        WriteRaw(output, value);
+    }
+
     public static uint ReadTag(ref SequenceReader<byte> reader)
     {
         var tag = ReadVarUInt32(ref reader);
@@ -134,6 +157,14 @@ internal static class ProtobufWire
         var span = output.GetSpan(value.Length);
         value.CopyTo(span);
         output.Advance(value.Length);
+    }
+
+    private static void WriteRaw(IBufferWriter<byte> output, ReadOnlySequence<byte> value)
+    {
+        foreach (var segment in value)
+        {
+            WriteRaw(output, segment.Span);
+        }
     }
 
     private static void EnsureRemaining(ref SequenceReader<byte> reader, uint length, string fieldKind)

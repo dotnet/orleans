@@ -8,7 +8,8 @@ namespace Orleans.Journaling;
 internal sealed class AzureAppendBlobStateMachineStorageProvider(
     IOptions<AzureAppendBlobStateMachineStorageOptions> options,
     IServiceProvider serviceProvider,
-    ILogger<AzureAppendBlobLogStorage> logger) : IStateMachineStorageProvider, ILifecycleParticipant<ISiloLifecycle>
+    ILogger<AzureAppendBlobLogStorage> logger,
+    IStateMachineLogExtentCodec codec) : IStateMachineStorageProvider, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly IBlobContainerFactory _containerFactory = options.Value.BuildContainerFactory(serviceProvider, options.Value);
     private readonly AzureAppendBlobStateMachineStorageOptions _options = options.Value;
@@ -24,7 +25,7 @@ internal sealed class AzureAppendBlobStateMachineStorageProvider(
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
         var blobName = _options.GetBlobName(grainContext.GrainId);
         var blobClient = container.GetAppendBlobClient(blobName);
-        return new AzureAppendBlobLogStorage(blobClient, logger);
+        return new AzureAppendBlobLogStorage(blobClient, logger, codec);
     }
 
     public void Participate(ISiloLifecycle observer)

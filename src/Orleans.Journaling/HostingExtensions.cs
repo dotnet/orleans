@@ -14,6 +14,7 @@ public static class HostingExtensions
 
         // Register the default data codec (Orleans IFieldCodec adapter).
         builder.Services.TryAddSingleton(typeof(ILogDataCodec<>), typeof(OrleansLogDataCodec<>));
+        builder.Services.TryAddSingleton<IStateMachineLogExtentCodec>(_ => BinaryLogExtentCodec.Instance);
 
         // Register the binary codec providers for each durable type.
         // Each durable type injects its specific provider interface and calls GetCodec<...>() with

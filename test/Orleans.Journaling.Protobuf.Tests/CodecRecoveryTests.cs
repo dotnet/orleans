@@ -50,7 +50,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task ProtobufCodec_Dictionary_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateProtobufStorage();
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var dict = new DurableDictionary<string, int>("dict", sut.Manager,
@@ -60,6 +60,8 @@ public class CodecRecoveryTests : StateMachineTestBase
         dict.Add("alpha", 1);
         dict.Add("beta", 2);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.NotEmpty(storage.Segments.Single());
 
         var sut2 = CreateTestSystemWithProtobufCodec(storage);
         var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager,
@@ -77,7 +79,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task ProtobufCodec_DurableList_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateProtobufStorage();
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var list = new DurableList<string>("list", sut.Manager,
@@ -106,7 +108,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task ProtobufCodec_DurableValue_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateProtobufStorage();
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var value = new DurableValue<int>("val", sut.Manager,
@@ -130,7 +132,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task ProtobufCodec_DurableSet_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateProtobufStorage();
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var set = new DurableSet<string>("set", sut.Manager,
@@ -159,7 +161,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     [Fact]
     public async Task ProtobufCodec_DurableQueue_WriteAndRecover()
     {
-        var storage = CreateStorage();
+        var storage = CreateProtobufStorage();
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var queue = new DurableQueue<string>("queue", sut.Manager,
@@ -189,7 +191,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
     internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithProtobufCodec(IStateMachineStorage? storage = null)
     {
-        storage ??= CreateStorage();
+        storage ??= CreateProtobufStorage();
 
         var stringConverter = CreateConverter<string>();
         var ulongConverter = CreateConverter<ulong>();
@@ -202,6 +204,8 @@ public class CodecRecoveryTests : StateMachineTestBase
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
+
+    private static VolatileStateMachineStorage CreateProtobufStorage() => new(new ProtobufLogExtentCodec());
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {
