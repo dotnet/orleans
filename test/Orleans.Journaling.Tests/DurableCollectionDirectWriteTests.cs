@@ -192,7 +192,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableQueueLogEntryConsumer<T> consumer) => throw new NotSupportedException();
     }
@@ -224,7 +224,7 @@ public sealed class DurableCollectionDirectWriteTests
             }
         }
 
-        public override void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+        public override void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
         {
             WriteByte(output);
             if (throwOnSnapshot)
@@ -242,7 +242,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
 
-        public virtual void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableSetLogEntryConsumer<T> consumer) => throw new NotSupportedException();
     }
@@ -283,7 +283,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer) => throw new NotSupportedException();
     }

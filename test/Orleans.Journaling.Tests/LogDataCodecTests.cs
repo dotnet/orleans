@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
@@ -96,7 +97,7 @@ public class LogDataCodecTests
             new("beta", 2),
         };
         var buffer = new ArrayBufferWriter<byte>();
-        codec.WriteSnapshot(items, items.Count, buffer);
+        codec.WriteSnapshot(items, buffer);
 
         var consumer = new DictionaryConsumer<string, int>();
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
@@ -104,6 +105,58 @@ public class LogDataCodecTests
         Assert.Equal(2, consumer.Items.Count);
         Assert.Equal("alpha", consumer.Items[0].Key);
         Assert.Equal(2, consumer.Items[1].Value);
+    }
+
+    [Fact]
+    public void BinaryListCodec_Rejects_Overflowed_SnapshotCount()
+    {
+        var valueCodec = new OrleansLogDataCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var codec = new OrleansBinaryListEntryCodec<int>(valueCodec);
+        var buffer = new ArrayBufferWriter<byte>();
+
+        WriteVersionAndCommand(buffer, 5);
+        VarIntHelper.WriteVarUInt32(buffer, 0x80000000);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), new ListConsumer<int>()));
+
+        Assert.Contains("snapshot count", exception.Message);
+    }
+
+    [Fact]
+    public void BinaryListCodec_Rejects_Overflowed_Index()
+    {
+        var valueCodec = new OrleansLogDataCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var codec = new OrleansBinaryListEntryCodec<int>(valueCodec);
+        var buffer = new ArrayBufferWriter<byte>();
+
+        WriteVersionAndCommand(buffer, 3);
+        VarIntHelper.WriteVarUInt32(buffer, 0x80000000);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), new ListConsumer<int>()));
+
+        Assert.Contains("list index", exception.Message);
+    }
+
+    [Fact]
+    public void BinaryDictionaryCodec_WriteSnapshot_Rejects_MismatchedCollectionCount()
+    {
+        var keyCodec = new OrleansLogDataCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
+        var valueCodec = new OrleansLogDataCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var codec = new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec, valueCodec);
+        var items = new MiscountedReadOnlyCollection<KeyValuePair<string, int>>(
+            1,
+            new[]
+            {
+                new KeyValuePair<string, int>("alpha", 1),
+                new KeyValuePair<string, int>("beta", 2),
+            });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.WriteSnapshot(items, new ArrayBufferWriter<byte>()));
+
+        Assert.Contains("did not match", exception.Message);
     }
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
@@ -122,5 +175,31 @@ public class LogDataCodecTests
         public void ApplyClear() => Items.Clear();
         public void ApplySnapshotStart(int count) => Items.Clear();
         public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
+    }
+
+    private sealed class ListConsumer<T> : IDurableListLogEntryConsumer<T>
+    {
+        public void ApplyAdd(T item) { }
+        public void ApplySet(int index, T item) { }
+        public void ApplyInsert(int index, T item) { }
+        public void ApplyRemoveAt(int index) { }
+        public void ApplyClear() { }
+        public void ApplySnapshotStart(int count) { }
+        public void ApplySnapshotItem(T item) { }
+    }
+
+    private sealed class MiscountedReadOnlyCollection<T>(int count, IReadOnlyCollection<T> items) : IReadOnlyCollection<T>
+    {
+        public int Count => count;
+        public IEnumerator<T> GetEnumerator() => items.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+    }
+
+    private static void WriteVersionAndCommand(IBufferWriter<byte> output, uint command)
+    {
+        var span = output.GetSpan(1);
+        span[0] = 0;
+        output.Advance(1);
+        VarIntHelper.WriteVarUInt32(output, command);
     }
 }

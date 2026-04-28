@@ -20,7 +20,7 @@ namespace Orleans.Journaling.MessagePack
 
         public void WriteSet(TKey key, TValue value, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public static partial class MessagePackJournalingExtensions
@@ -51,7 +51,7 @@ namespace Orleans.Journaling.MessagePack
 
         public void WriteSet(int index, T item, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public sealed partial class MessagePackQueueEntryCodec<T> : IDurableQueueCodec<T>
@@ -66,7 +66,7 @@ namespace Orleans.Journaling.MessagePack
 
         public void WriteEnqueue(T item, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public sealed partial class MessagePackSetEntryCodec<T> : IDurableSetCodec<T>
@@ -81,7 +81,7 @@ namespace Orleans.Journaling.MessagePack
 
         public void WriteRemove(T item, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public sealed partial class MessagePackStateEntryCodec<T> : IDurableStateCodec<T>

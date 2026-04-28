@@ -41,18 +41,23 @@ public sealed class MessagePackDictionaryEntryCodec<TKey, TValue>(MessagePackSer
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
+        var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);
-        writer.WriteArrayHeader(2 + (count * 2));
+        writer.WriteArrayHeader(MessagePackCodecHelpers.GetSnapshotArrayHeaderCount(count, 2));
         writer.Write(SnapshotCommand);
         writer.Write(count);
+        var written = 0;
         foreach (var (key, value) in items)
         {
+            MessagePackCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
             MessagePackCodecHelpers.WriteValue(ref writer, key, options);
             MessagePackCodecHelpers.WriteValue(ref writer, value, options);
+            written++;
         }
 
+        MessagePackCodecHelpers.RequireSnapshotWriteCount(count, written);
         MessagePackCodecHelpers.Flush(ref writer);
     }
 

@@ -61,17 +61,22 @@ public sealed class MessagePackListEntryCodec<T>(MessagePackSerializerOptions op
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);
-        writer.WriteArrayHeader(2 + count);
+        writer.WriteArrayHeader(MessagePackCodecHelpers.GetSnapshotArrayHeaderCount(count, 1));
         writer.Write(SnapshotCommand);
         writer.Write(count);
+        var written = 0;
         foreach (var item in items)
         {
+            MessagePackCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
             MessagePackCodecHelpers.WriteValue(ref writer, item, options);
+            written++;
         }
 
+        MessagePackCodecHelpers.RequireSnapshotWriteCount(count, written);
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
@@ -161,17 +166,22 @@ public sealed class MessagePackQueueEntryCodec<T>(MessagePackSerializerOptions o
 
     public void WriteClear(IBufferWriter<byte> output) => WriteCommand(ClearCommand, output);
 
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);
-        writer.WriteArrayHeader(2 + count);
+        writer.WriteArrayHeader(MessagePackCodecHelpers.GetSnapshotArrayHeaderCount(count, 1));
         writer.Write(SnapshotCommand);
         writer.Write(count);
+        var written = 0;
         foreach (var item in items)
         {
+            MessagePackCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
             MessagePackCodecHelpers.WriteValue(ref writer, item, options);
+            written++;
         }
 
+        MessagePackCodecHelpers.RequireSnapshotWriteCount(count, written);
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
@@ -254,17 +264,22 @@ public sealed class MessagePackSetEntryCodec<T>(MessagePackSerializerOptions opt
 
     public void WriteClear(IBufferWriter<byte> output) => WriteCommand(ClearCommand, output);
 
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);
-        writer.WriteArrayHeader(2 + count);
+        writer.WriteArrayHeader(MessagePackCodecHelpers.GetSnapshotArrayHeaderCount(count, 1));
         writer.Write(SnapshotCommand);
         writer.Write(count);
+        var written = 0;
         foreach (var item in items)
         {
+            MessagePackCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
             MessagePackCodecHelpers.WriteValue(ref writer, item, options);
+            written++;
         }
 
+        MessagePackCodecHelpers.RequireSnapshotWriteCount(count, written);
         MessagePackCodecHelpers.Flush(ref writer);
     }
 

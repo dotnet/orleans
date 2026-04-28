@@ -63,7 +63,7 @@ namespace Orleans.Journaling
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteRemove(TKey key, System.Buffers.IBufferWriter<byte> output);
         void WriteSet(TKey key, TValue value, System.Buffers.IBufferWriter<byte> output);
-        void WriteSnapshot(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, int count, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, System.Buffers.IBufferWriter<byte> output);
     }
 
     public partial interface IDurableDictionaryLogEntryConsumer<TKey, TValue>
@@ -92,7 +92,7 @@ namespace Orleans.Journaling
         void WriteInsert(int index, T item, System.Buffers.IBufferWriter<byte> output);
         void WriteRemoveAt(int index, System.Buffers.IBufferWriter<byte> output);
         void WriteSet(int index, T item, System.Buffers.IBufferWriter<byte> output);
-        void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
     }
 
     public partial interface IDurableListLogEntryConsumer<T>
@@ -127,7 +127,7 @@ namespace Orleans.Journaling
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteDequeue(System.Buffers.IBufferWriter<byte> output);
         void WriteEnqueue(T item, System.Buffers.IBufferWriter<byte> output);
-        void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
     }
 
     public partial interface IDurableQueueLogEntryConsumer<T>
@@ -162,7 +162,7 @@ namespace Orleans.Journaling
         void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output);
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteRemove(T item, System.Buffers.IBufferWriter<byte> output);
-        void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
     }
 
     public partial interface IDurableSetLogEntryConsumer<T>

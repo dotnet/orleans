@@ -85,7 +85,47 @@ internal static class ProtobufWire
 
     public static uint ReadUInt32(ref SequenceReader<byte> reader) => ReadVarUInt32(ref reader);
 
+    public static int ReadNonNegativeInt32(ref SequenceReader<byte> reader, string fieldName)
+    {
+        var value = ReadUInt32(ref reader);
+        if (value > int.MaxValue)
+        {
+            throw new InvalidOperationException($"Malformed protobuf log entry: field '{fieldName}' value {value} exceeds the maximum supported value {int.MaxValue}.");
+        }
+
+        return (int)value;
+    }
+
     public static ulong ReadUInt64(ref SequenceReader<byte> reader) => ReadVarUInt64(ref reader);
+
+    public static int GetSnapshotCount<T>(IReadOnlyCollection<T> items)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        var count = items.Count;
+        if (count < 0)
+        {
+            throw new InvalidOperationException($"Snapshot collection count {count} is negative.");
+        }
+
+        return count;
+    }
+
+    public static void ThrowIfSnapshotItemCountExceeded(int expectedCount, int actualCount)
+    {
+        if (actualCount >= expectedCount)
+        {
+            throw new InvalidOperationException($"Snapshot collection count {expectedCount} did not match the number of items produced by the collection ({(long)actualCount + 1}).");
+        }
+    }
+
+    public static void RequireSnapshotWriteCount(int expectedCount, int actualCount)
+    {
+        if (actualCount != expectedCount)
+        {
+            throw new InvalidOperationException($"Snapshot collection count {expectedCount} did not match the number of items produced by the collection ({actualCount}).");
+        }
+    }
 
     public static void RequireCommand(bool hasCommand)
     {

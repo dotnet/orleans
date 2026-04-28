@@ -63,7 +63,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
         var writer = snapshotWriter.BeginEntry();
         try
         {
-            _codec.WriteSnapshot(_items, _items.Count, writer);
+            _codec.WriteSnapshot(_items, writer);
             writer.Commit();
         }
         catch

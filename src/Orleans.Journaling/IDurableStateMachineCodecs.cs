@@ -93,8 +93,8 @@ public interface IDurableDictionaryCodec<TKey, TValue> where TKey : notnull
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
-    /// <summary>Writes a snapshot command.</summary>
-    void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output);
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer);
@@ -120,8 +120,8 @@ public interface IDurableListCodec<T>
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
-    /// <summary>Writes a snapshot command.</summary>
-    void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output);
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer);
@@ -141,8 +141,8 @@ public interface IDurableQueueCodec<T>
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
-    /// <summary>Writes a snapshot command.</summary>
-    void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output);
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableQueueLogEntryConsumer<T> consumer);
@@ -162,8 +162,8 @@ public interface IDurableSetCodec<T>
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
-    /// <summary>Writes a snapshot command.</summary>
-    void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output);
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableSetLogEntryConsumer<T> consumer);

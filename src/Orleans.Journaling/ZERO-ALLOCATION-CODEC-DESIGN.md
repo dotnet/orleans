@@ -223,8 +223,7 @@ internal interface IDurableListCodec<T>
     void WriteInsert(int index, T item, IBufferWriter<byte> output);
     void WriteRemoveAt(int index, IBufferWriter<byte> output);
     void WriteClear(IBufferWriter<byte> output);
-    void WriteSnapshot<TEnumerator>(ref TEnumerator items, int count, IBufferWriter<byte> output)
-        where TEnumerator : struct, IEnumerator<T>;
+    void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output);
 
     void Apply(ref LogEntryReader input, IDurableListStateMachine<T> stateMachine);
 }
@@ -468,7 +467,7 @@ void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWrite
     var writer = snapshotWriter.BeginEntry();
     try
     {
-        _codec.WriteSnapshot(_items, _items.Count, writer);
+        _codec.WriteSnapshot(_items, writer);
         writer.Commit();
     }
     catch
@@ -478,6 +477,8 @@ void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWrite
     }
 }
 ```
+
+Snapshot writers should derive the count from the countable source they are given. They should reject sources whose reported count does not match enumeration, since buffering a non-countable source just to discover the count would violate the allocation contract and writing a caller-supplied count can corrupt replay.
 
 Do not add specialized batch durable operations initially. APIs such as `IDurableList<T>.AddRange` should write repeated existing entries, ideally under one extent/batch writer to avoid repeated lock acquisition. Set operations which mutate wholesale can continue to write a snapshot. Specialized batch commands can be added later if benchmarks or log-size pressure justify them.
 

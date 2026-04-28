@@ -20,7 +20,7 @@ namespace Orleans.Journaling.Protobuf
 
         public void WriteSet(TKey key, TValue value, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public static partial class ProtobufJournalingExtensions
@@ -52,7 +52,7 @@ namespace Orleans.Journaling.Protobuf
 
         public void WriteSet(int index, T item, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public sealed partial class ProtobufQueueEntryCodec<T> : IDurableQueueCodec<T>
@@ -67,7 +67,7 @@ namespace Orleans.Journaling.Protobuf
 
         public void WriteEnqueue(T item, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public sealed partial class ProtobufSetEntryCodec<T> : IDurableSetCodec<T>
@@ -82,7 +82,7 @@ namespace Orleans.Journaling.Protobuf
 
         public void WriteRemove(T item, System.Buffers.IBufferWriter<byte> output) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IEnumerable<T> items, int count, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public sealed partial class ProtobufStateEntryCodec<T> : IDurableStateCodec<T>

@@ -66,8 +66,10 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        ArgumentNullException.ThrowIfNull(items);
+
         using var writer = new Utf8JsonWriter(output);
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Snapshot);
@@ -159,8 +161,10 @@ public sealed class JsonQueueEntryCodec<T>(JsonSerializerOptions? options = null
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        ArgumentNullException.ThrowIfNull(items);
+
         using var writer = new Utf8JsonWriter(output);
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Snapshot);
@@ -248,8 +252,10 @@ public sealed class JsonSetEntryCodec<T>(JsonSerializerOptions? options = null)
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        ArgumentNullException.ThrowIfNull(items);
+
         using var writer = new Utf8JsonWriter(output);
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Snapshot);

@@ -87,7 +87,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
         var writer = snapshotWriter.BeginEntry();
         try
         {
-            _codec.WriteSnapshot(_items, _items.Count, writer);
+            _codec.WriteSnapshot(_items, writer);
             writer.Commit();
         }
         catch
