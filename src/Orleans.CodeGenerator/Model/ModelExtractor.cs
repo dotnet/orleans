@@ -77,6 +77,13 @@ namespace Orleans.CodeGenerator
             Compilation compilation,
             CodeGeneratorOptions options,
             CancellationToken cancellationToken)
+            => ExtractReferenceAssemblyData(compilation, options, cancellationToken, out _);
+
+        internal static ReferenceAssemblyModel ExtractReferenceAssemblyData(
+            Compilation compilation,
+            CodeGeneratorOptions options,
+            CancellationToken cancellationToken,
+            out ImmutableArray<Diagnostic> diagnostics)
         {
             var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
 
@@ -98,6 +105,7 @@ namespace Orleans.CodeGenerator
             var referencedProxyInterfaces = new HashSet<ProxyInterfaceModel>();
             var registeredCodecs = new HashSet<RegisteredCodecModel>();
             var interfaceImplementations = new HashSet<InterfaceImplementationModel>();
+            var diagnosticBuilder = ImmutableArray.CreateBuilder<Diagnostic>();
 
             foreach (var reference in compilation.References)
             {
@@ -128,13 +136,21 @@ namespace Orleans.CodeGenerator
             {
                 cancellationToken.ThrowIfCancellationRequested();
 
+                var reportSerializableTypeDiagnostics = !SymbolEqualityComparer.Default.Equals(asm, compilation.Assembly);
                 foreach (var symbol in asm.GetDeclaredTypes())
                 {
                     cancellationToken.ThrowIfCancellationRequested();
 
-                    if (TryExtractSerializableTypeModel(symbol, compilation, libraryTypes, options) is { } serializableTypeModel)
+                    try
                     {
-                        referencedSerializableTypes.Add(serializableTypeModel);
+                        if (TryExtractSerializableTypeModel(symbol, compilation, libraryTypes, options, reportSerializableTypeDiagnostics) is { } serializableTypeModel)
+                        {
+                            referencedSerializableTypes.Add(serializableTypeModel);
+                        }
+                    }
+                    catch (OrleansGeneratorDiagnosticAnalysisException exception) when (reportSerializableTypeDiagnostics)
+                    {
+                        diagnosticBuilder.Add(exception.Diagnostic);
                     }
 
                     if (ExtractProxyInterfaceModel(symbol, compilation, cancellationToken) is { } proxyInterfaceModel)
@@ -226,6 +242,8 @@ namespace Orleans.CodeGenerator
             var sortedInterfaceImplementations = interfaceImplementations
                 .OrderBy(static entry => entry.ImplementationType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
+
+            diagnostics = diagnosticBuilder.ToImmutable();
 
             return new ReferenceAssemblyModel(
                 assemblyName: compilation.AssemblyName ?? string.Empty,
@@ -426,11 +444,9 @@ namespace Orleans.CodeGenerator
                 .ThenBy(static entry => entry.TargetType.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
 
-            var referencedSerializableTypes = OrderSerializableTypeModels(referenceData.ReferencedSerializableTypes.Distinct())
-                .ToImmutableArray();
+            var referencedSerializableTypes = DeduplicateSerializableTypes(referenceData.ReferencedSerializableTypes);
 
-            var referencedProxyInterfaces = OrderProxyInterfaceModels(referenceData.ReferencedProxyInterfaces.Distinct())
-                .ToImmutableArray();
+            var referencedProxyInterfaces = DeduplicateProxyInterfaces(referenceData.ReferencedProxyInterfaces);
 
             var registeredCodecs = referenceData.RegisteredCodecs
                 .Distinct()
@@ -465,8 +481,7 @@ namespace Orleans.CodeGenerator
                 merged = merged.AddRange(referenced);
             }
 
-            return OrderSerializableTypeModels(merged.Distinct())
-                .ToImmutableArray();
+            return DeduplicateSerializableTypes(merged);
         }
 
         internal static ImmutableArray<ProxyInterfaceModel> MergeProxyInterfaces(
@@ -479,25 +494,150 @@ namespace Orleans.CodeGenerator
                 merged = merged.AddRange(referenced);
             }
 
-            return OrderProxyInterfaceModels(merged.Distinct())
+            return DeduplicateProxyInterfaces(merged);
+        }
+
+        internal static ImmutableArray<SerializableTypeModel> DeduplicateSerializableTypes(
+            ImmutableArray<SerializableTypeModel> entries)
+        {
+            if (entries.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SerializableTypeModel>.Empty;
+            }
+
+            var selected = new Dictionary<string, SerializableTypeModel>(StringComparer.Ordinal);
+            foreach (var entry in entries
+                .Where(static entry => entry is not null)
+                .OrderBy(static entry => entry.SourceLocation.SourceOrderGroup)
+                .ThenBy(static entry => entry.SourceLocation.FilePath, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.SourceLocation.Position)
+                .ThenBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.Name, StringComparer.Ordinal))
+            {
+                var key = CreateTypeDedupeKey(
+                    entry.MetadataIdentity,
+                    entry.TypeSyntax.SyntaxString,
+                    entry.GeneratedNamespace,
+                    entry.Name);
+                if (!selected.ContainsKey(key))
+                {
+                    selected.Add(key, entry);
+                }
+            }
+
+            return OrderSerializableTypeModels(selected.Values)
                 .ToImmutableArray();
+        }
+
+        internal static ImmutableArray<ProxyInterfaceModel> DeduplicateProxyInterfaces(
+            ImmutableArray<ProxyInterfaceModel> entries)
+        {
+            if (entries.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<ProxyInterfaceModel>.Empty;
+            }
+
+            var selected = new Dictionary<string, ProxyInterfaceModel>(StringComparer.Ordinal);
+            foreach (var entry in entries
+                .Where(static entry => entry is not null)
+                .OrderBy(static entry => entry.SourceLocation.SourceOrderGroup)
+                .ThenBy(static entry => entry.SourceLocation.FilePath, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.SourceLocation.Position)
+                .ThenBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.Name, StringComparer.Ordinal))
+            {
+                var key = CreateTypeDedupeKey(
+                    entry.MetadataIdentity,
+                    entry.InterfaceType.SyntaxString,
+                    entry.GeneratedNamespace,
+                    entry.Name);
+                if (!selected.ContainsKey(key))
+                {
+                    selected.Add(key, entry);
+                }
+            }
+
+            return OrderProxyInterfaceModels(selected.Values)
+                .ToImmutableArray();
+        }
+
+        internal static ImmutableArray<SerializableTypeModel> NormalizeSerializableTypeModels(
+            ImmutableArray<SerializableTypeModel> entries)
+        {
+            if (entries.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SerializableTypeModel>.Empty;
+            }
+
+            return OrderSerializableTypeModels(entries.Where(static entry => entry is not null))
+                .ToImmutableArray();
+        }
+
+        internal static ImmutableArray<ProxyInterfaceModel> NormalizeProxyInterfaceModels(
+            ImmutableArray<ProxyInterfaceModel> entries)
+        {
+            if (entries.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<ProxyInterfaceModel>.Empty;
+            }
+
+            return OrderProxyInterfaceModels(entries.Where(static entry => entry is not null))
+                .ToImmutableArray();
+        }
+
+        private static string CreateTypeDedupeKey(
+            TypeMetadataIdentity metadataIdentity,
+            string typeSyntax,
+            string generatedNamespace,
+            string name)
+        {
+            if (!metadataIdentity.IsEmpty)
+            {
+                return string.Join(
+                    "|",
+                    "M",
+                    metadataIdentity.AssemblyIdentity ?? string.Empty,
+                    metadataIdentity.AssemblyName ?? string.Empty,
+                    metadataIdentity.MetadataName ?? string.Empty);
+            }
+
+            return string.Join(
+                "|",
+                "S",
+                typeSyntax ?? string.Empty,
+                generatedNamespace ?? string.Empty,
+                name ?? string.Empty);
         }
 
         private static IOrderedEnumerable<SerializableTypeModel> OrderSerializableTypeModels(IEnumerable<SerializableTypeModel> entries)
             => entries
-                .OrderBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .OrderBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.TypeSyntax.SyntaxString, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.SourceLocation.SourceOrderGroup)
+                .ThenBy(static entry => entry.SourceLocation.FilePath, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.SourceLocation.Position)
                 .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.Name, StringComparer.Ordinal);
 
         private static IOrderedEnumerable<ProxyInterfaceModel> OrderProxyInterfaceModels(IEnumerable<ProxyInterfaceModel> entries)
             => entries
-                .OrderBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
-                .ThenBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .OrderBy(static entry => entry.MetadataIdentity.MetadataName, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.InterfaceType.SyntaxString, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.SourceLocation.SourceOrderGroup)
+                .ThenBy(static entry => entry.SourceLocation.FilePath, StringComparer.Ordinal)
+                .ThenBy(static entry => entry.SourceLocation.Position)
                 .ThenBy(static entry => entry.GeneratedNamespace, StringComparer.Ordinal)
                 .ThenBy(static entry => entry.Name, StringComparer.Ordinal);
 
@@ -822,9 +962,25 @@ namespace Orleans.CodeGenerator
 
             if (FSharpUtilities.IsUnionCase(libraryTypes, typeSymbol, out var sumType))
             {
-                if (!sumType.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                    || !compilation.IsSymbolAccessibleWithin(sumType, compilation.Assembly))
+                if (!sumType.HasAttribute(libraryTypes.GenerateSerializerAttribute))
                 {
+                    return null;
+                }
+
+                if (throwOnFailure && HasReferenceAssemblyAttribute(sumType.ContainingAssembly))
+                {
+                    throw new OrleansGeneratorDiagnosticAnalysisException(
+                        ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(sumType));
+                }
+
+                if (!compilation.IsSymbolAccessibleWithin(sumType, compilation.Assembly))
+                {
+                    if (throwOnFailure)
+                    {
+                        throw new OrleansGeneratorDiagnosticAnalysisException(
+                            InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(sumType));
+                    }
+
                     return null;
                 }
 
@@ -832,9 +988,25 @@ namespace Orleans.CodeGenerator
                 return ExtractSerializableTypeModel(fsharpUnionCaseDescription, GetSourceLocation(typeSymbol));
             }
 
-            if (!typeSymbol.HasAttribute(libraryTypes.GenerateSerializerAttribute)
-                || !compilation.IsSymbolAccessibleWithin(typeSymbol, compilation.Assembly))
+            if (!typeSymbol.HasAttribute(libraryTypes.GenerateSerializerAttribute))
             {
+                return null;
+            }
+
+            if (throwOnFailure && HasReferenceAssemblyAttribute(typeSymbol.ContainingAssembly))
+            {
+                throw new OrleansGeneratorDiagnosticAnalysisException(
+                    ReferenceAssemblyWithGenerateSerializerDiagnostic.CreateDiagnostic(typeSymbol));
+            }
+
+            if (!compilation.IsSymbolAccessibleWithin(typeSymbol, compilation.Assembly))
+            {
+                if (throwOnFailure)
+                {
+                    throw new OrleansGeneratorDiagnosticAnalysisException(
+                        InaccessibleSerializableTypeDiagnostic.CreateDiagnostic(typeSymbol));
+                }
+
                 return null;
             }
 
@@ -867,6 +1039,27 @@ namespace Orleans.CodeGenerator
             var members = CollectDataMembers(helper);
             var description = new SerializableTypeDescription(compilation, typeSymbol, includePrimaryCtorParams, members, libraryTypes);
             return ExtractSerializableTypeModel(description, GetSourceLocation(typeSymbol));
+        }
+
+        private static bool HasReferenceAssemblyAttribute(IAssemblySymbol assembly)
+        {
+            return assembly?.GetAttributes().Any(attributeData => attributeData.AttributeClass is
+            {
+                Name: "ReferenceAssemblyAttribute",
+                ContainingNamespace:
+                {
+                    Name: "CompilerServices",
+                    ContainingNamespace:
+                    {
+                        Name: "Runtime",
+                        ContainingNamespace:
+                        {
+                            Name: "System",
+                            ContainingNamespace.IsGlobalNamespace: true,
+                        },
+                    },
+                },
+            }) == true;
         }
 
         private static bool GetIncludePrimaryConstructorParameters(INamedTypeSymbol typeSymbol, LibraryTypes libraryTypes)
