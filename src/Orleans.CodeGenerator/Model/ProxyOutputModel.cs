@@ -12,14 +12,29 @@ namespace Orleans.CodeGenerator.Model
             ProxyInterfaceModel proxyInterface,
             ImmutableArray<string> ownedInvokableMetadataNames,
             bool useDeclaredInvokableFallback)
+            : this(
+                proxyInterface,
+                ownedInvokableMetadataNames,
+                ImmutableArray<string>.Empty,
+                useDeclaredInvokableFallback)
+        {
+        }
+
+        public ProxyOutputModel(
+            ProxyInterfaceModel proxyInterface,
+            ImmutableArray<string> ownedInvokableMetadataNames,
+            ImmutableArray<string> ownedInvokableActivatorMetadataNames,
+            bool useDeclaredInvokableFallback)
         {
             ProxyInterface = proxyInterface;
             OwnedInvokableMetadataNames = StructuralEquality.Normalize(ownedInvokableMetadataNames);
+            OwnedInvokableActivatorMetadataNames = StructuralEquality.Normalize(ownedInvokableActivatorMetadataNames);
             UseDeclaredInvokableFallback = useDeclaredInvokableFallback;
         }
 
         public ProxyInterfaceModel ProxyInterface { get; }
         public ImmutableArray<string> OwnedInvokableMetadataNames { get; }
+        public ImmutableArray<string> OwnedInvokableActivatorMetadataNames { get; }
         public bool UseDeclaredInvokableFallback { get; }
 
         public bool Equals(ProxyOutputModel other)
@@ -31,6 +46,7 @@ namespace Orleans.CodeGenerator.Model
 
             return ProxyInterface.Equals(other.ProxyInterface)
                 && StructuralEquality.SequenceEqual(OwnedInvokableMetadataNames, other.OwnedInvokableMetadataNames)
+                && StructuralEquality.SequenceEqual(OwnedInvokableActivatorMetadataNames, other.OwnedInvokableActivatorMetadataNames)
                 && UseDeclaredInvokableFallback == other.UseDeclaredInvokableFallback;
         }
 
@@ -40,8 +56,11 @@ namespace Orleans.CodeGenerator.Model
         {
             unchecked
             {
-                return ((ProxyInterface.GetHashCode() * 31) + StructuralEquality.GetSequenceHashCode(OwnedInvokableMetadataNames)) * 31
-                    + (UseDeclaredInvokableFallback ? 1 : 0);
+                var hash = ProxyInterface.GetHashCode();
+                hash = hash * 31 + StructuralEquality.GetSequenceHashCode(OwnedInvokableMetadataNames);
+                hash = hash * 31 + StructuralEquality.GetSequenceHashCode(OwnedInvokableActivatorMetadataNames);
+                hash = hash * 31 + (UseDeclaredInvokableFallback ? 1 : 0);
+                return hash;
             }
         }
     }

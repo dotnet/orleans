@@ -132,9 +132,13 @@ namespace Orleans.CodeGenerator
                     ct))
                 .WithTrackingName(ReferenceAssemblyDataTrackingName);
 
+            var preparedProxyOutputModels = preparedProxyOutputs
+                .Select(static (result, _) => result.ProxyOutputModels)
+                .WithComparer(ImmutableArrayComparer<ProxyOutputModel>.Instance);
+
             // Combine source/reference models before metadata generation.
             var metadataAggregate = collectedTypes
-                .Combine(collectedProxies)
+                .Combine(preparedProxyOutputModels)
                 .Combine(refAssemblyData)
                 .Select(static (input, ct) => ModelExtractor.CreateMetadataAggregate(
                     input.Right.AssemblyName,
@@ -409,9 +413,11 @@ namespace Orleans.CodeGenerator
                 var copierGenerator = new CopierGenerator(generatorServices);
                 var activatorGenerator = new ActivatorGenerator(generatorServices);
                 var emittedInvokables = generatedInvokables
-                    .Where(invokable => ownedInvokableMetadataNames.Contains(invokable.MetadataName)
-                        || (emitDeclaredMethodsFallback
-                            && SymbolEqualityComparer.Default.Equals(invokable.MethodDescription.ContainingInterface, interfaceDescription.InterfaceType)))
+                    .Where(invokable => ShouldEmitInvokable(
+                        invokable,
+                        interfaceDescription.InterfaceType,
+                        ownedInvokableMetadataNames,
+                        emitDeclaredMethodsFallback))
                     .ToImmutableArray();
 
                 var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
@@ -484,9 +490,11 @@ namespace Orleans.CodeGenerator
                 var defaultCopiers = new Dictionary<ISerializableTypeDescription, TypeSyntax>();
                 var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription).ToImmutableArray();
                 var emittedInvokables = generatedInvokables
-                    .Where(invokable => ownedInvokableMetadataNames.Contains(invokable.MetadataName)
-                        || (emitDeclaredMethodsFallback
-                            && SymbolEqualityComparer.Default.Equals(invokable.MethodDescription.ContainingInterface, interfaceDescription.InterfaceType)))
+                    .Where(invokable => ShouldEmitInvokable(
+                        invokable,
+                        interfaceDescription.InterfaceType,
+                        ownedInvokableMetadataNames,
+                        emitDeclaredMethodsFallback))
                     .ToImmutableArray();
 
                 var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
@@ -681,14 +689,36 @@ namespace Orleans.CodeGenerator
                             ? model.Methods.Any(method => method.ContainingInterfaceType.Equals(model.InterfaceType))
                             : ownedInvokableMetadataNames.Length == 0
                                 && !generatedInvokables.Any(invokable => invokableOwners.ContainsKey(invokable.MetadataName));
+                    var ownedInvokableMetadataNameSet = new HashSet<string>(ownedInvokableMetadataNames, StringComparer.Ordinal);
+                    var ownedInvokableActivatorMetadataNames = generatedInvokables
+                        .Where(invokable => ShouldEmitInvokable(
+                            invokable,
+                            interfaceDescription.InterfaceType,
+                            ownedInvokableMetadataNameSet,
+                            useDeclaredInvokableFallback))
+                        .Where(static invokable => ActivatorGenerator.ShouldGenerateActivator(invokable))
+                        .Select(static invokable => invokable.MetadataName)
+                        .Distinct(StringComparer.Ordinal)
+                        .OrderBy(static value => value, StringComparer.Ordinal)
+                        .ToImmutableArray();
 
                     return new ProxyOutputModel(
                         model,
                         ownedInvokableMetadataNames,
+                        ownedInvokableActivatorMetadataNames,
                         useDeclaredInvokableFallback);
                 })
                 .ToImmutableArray();
         }
+
+        private static bool ShouldEmitInvokable(
+            GeneratedInvokableDescription invokable,
+            INamedTypeSymbol interfaceType,
+            HashSet<string> ownedInvokableMetadataNames,
+            bool useDeclaredInvokableFallback)
+            => ownedInvokableMetadataNames.Contains(invokable.MetadataName)
+                || (useDeclaredInvokableFallback
+                    && SymbolEqualityComparer.Default.Equals(invokable.MethodDescription.ContainingInterface, interfaceType));
 
         private static SourceOutputResult CreateMetadataSourceOutput(
             MetadataAggregateModel metadataModel,

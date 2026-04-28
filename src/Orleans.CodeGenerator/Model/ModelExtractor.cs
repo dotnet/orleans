@@ -362,13 +362,30 @@ namespace Orleans.CodeGenerator
             ImmutableArray<SerializableTypeModel> serializableTypes,
             ImmutableArray<ProxyInterfaceModel> proxyInterfaces,
             ReferenceAssemblyModel refData)
+            => CreateMetadataAggregate(
+                assemblyName,
+                serializableTypes,
+                proxyInterfaces.IsDefaultOrEmpty
+                    ? ImmutableArray<ProxyOutputModel>.Empty
+                    : proxyInterfaces.Select(static proxy => new ProxyOutputModel(proxy, ImmutableArray<string>.Empty, useDeclaredInvokableFallback: false)).ToImmutableArray(),
+                refData);
+
+        public static MetadataAggregateModel CreateMetadataAggregate(
+            string assemblyName,
+            ImmutableArray<SerializableTypeModel> serializableTypes,
+            ImmutableArray<ProxyOutputModel> proxyOutputs,
+            ReferenceAssemblyModel refData)
         {
             var normalizedReferenceData = NormalizeReferenceAssemblyData(refData);
             var normalizedSerializableTypes = MergeSerializableTypes(serializableTypes, normalizedReferenceData.ReferencedSerializableTypes);
-            var normalizedProxyInterfaces = MergeProxyInterfaces(proxyInterfaces, normalizedReferenceData.ReferencedProxyInterfaces);
+            var sourceProxyInterfaces = proxyOutputs.IsDefaultOrEmpty
+                ? ImmutableArray<ProxyInterfaceModel>.Empty
+                : proxyOutputs.Select(static output => output.ProxyInterface).ToImmutableArray();
+            var normalizedProxyInterfaces = MergeProxyInterfaces(sourceProxyInterfaces, normalizedReferenceData.ReferencedProxyInterfaces);
             var activatableTypes = GetActivatableTypes(normalizedSerializableTypes);
             var generatedProxyTypes = GetGeneratedProxyTypes(normalizedProxyInterfaces);
             var invokableInterfaces = GetInvokableInterfaces(normalizedProxyInterfaces);
+            var generatedInvokableActivatorMetadataNames = GetGeneratedInvokableActivatorMetadataNames(proxyOutputs);
             var defaultCopiers = GetDefaultCopiers(normalizedSerializableTypes);
 
             return new MetadataAggregateModel(
@@ -380,6 +397,7 @@ namespace Orleans.CodeGenerator
                 activatableTypes: activatableTypes,
                 generatedProxyTypes: generatedProxyTypes,
                 invokableInterfaces: invokableInterfaces,
+                generatedInvokableActivatorMetadataNames: generatedInvokableActivatorMetadataNames,
                 interfaceImplementations: normalizedReferenceData.InterfaceImplementations,
                 defaultCopiers: defaultCopiers);
         }
@@ -547,6 +565,20 @@ namespace Orleans.CodeGenerator
                 .Distinct()
                 .OrderBy(static type => type.SyntaxString, StringComparer.Ordinal)
                 .ToImmutableArray();
+
+        private static ImmutableArray<string> GetGeneratedInvokableActivatorMetadataNames(ImmutableArray<ProxyOutputModel> proxyOutputs)
+        {
+            if (proxyOutputs.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<string>.Empty;
+            }
+
+            return proxyOutputs
+                .SelectMany(static output => output.OwnedInvokableActivatorMetadataNames)
+                .Distinct(StringComparer.Ordinal)
+                .OrderBy(static metadataName => metadataName, StringComparer.Ordinal)
+                .ToImmutableArray();
+        }
 
         private static ImmutableArray<DefaultCopierModel> GetDefaultCopiers(ImmutableArray<SerializableTypeModel> serializableTypes)
             => serializableTypes
