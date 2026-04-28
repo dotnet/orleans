@@ -123,7 +123,7 @@ namespace Orleans.CodeGenerator
                     })))));
             }
 
-            AddIncrementalCompoundTypeAliases(configParam, body, generatedInvokables);
+            AddCompoundTypeAliases(configParam, body, generatedInvokables);
             return CreateMetadataClass(body, configParam);
         }
 
@@ -142,7 +142,7 @@ namespace Orleans.CodeGenerator
                 .AddMembers(configureMethod);
         }
 
-        private void AddIncrementalCompoundTypeAliases(
+        private void AddCompoundTypeAliases(
             IdentifierNameSyntax configParam,
             List<StatementSyntax> body,
             ImmutableArray<GeneratedInvokableMetadata> generatedInvokables)
@@ -156,20 +156,20 @@ namespace Orleans.CodeGenerator
                 .SelectMany(static invokable => invokable.Aliases)
                 .ToImmutableArray();
 
-            var aliasTree = IncrementalCompoundTypeAliasTree.Create();
+            var aliasTree = CompoundTypeAliasEmissionTree.Create();
             foreach (var alias in aliases.Concat(generatedAliases))
             {
                 aliasTree.Add(alias.Components, alias.TargetType);
             }
 
             var nodeId = 0;
-            AddIncrementalCompoundTypeAliases(body, configParam.Member("CompoundTypeAliases"), aliasTree, ref nodeId);
+            AddCompoundTypeAliases(body, configParam.Member("CompoundTypeAliases"), aliasTree, ref nodeId);
         }
 
-        private void AddIncrementalCompoundTypeAliases(
+        private void AddCompoundTypeAliases(
             List<StatementSyntax> body,
             ExpressionSyntax tree,
-            IncrementalCompoundTypeAliasTree aliases,
+            CompoundTypeAliasEmissionTree aliases,
             ref int nodeId)
         {
             ExpressionSyntax node;
@@ -205,7 +205,7 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var child in aliases.Children.Values)
                 {
-                    AddIncrementalCompoundTypeAliases(body, node, child, ref nodeId);
+                    AddCompoundTypeAliases(body, node, child, ref nodeId);
                 }
             }
         }
@@ -560,13 +560,13 @@ namespace Orleans.CodeGenerator
             public SourceLocationModel SourceLocation { get; }
         }
 
-        private sealed class IncrementalCompoundTypeAliasTree
+        private sealed class CompoundTypeAliasEmissionTree
         {
-            private Dictionary<CompoundAliasComponentModel, IncrementalCompoundTypeAliasTree> _children;
+            private Dictionary<CompoundAliasComponentModel, CompoundTypeAliasEmissionTree> _children;
             private TypeRef _value;
             private bool _hasValue;
 
-            private IncrementalCompoundTypeAliasTree(CompoundAliasComponentModel key, TypeRef value, bool hasKey, bool hasValue)
+            private CompoundTypeAliasEmissionTree(CompoundAliasComponentModel key, TypeRef value, bool hasKey, bool hasValue)
             {
                 Key = key;
                 _value = value;
@@ -574,13 +574,13 @@ namespace Orleans.CodeGenerator
                 _hasValue = hasValue;
             }
 
-            public static IncrementalCompoundTypeAliasTree Create() => new(default, TypeRef.Empty, hasKey: false, hasValue: false);
+            public static CompoundTypeAliasEmissionTree Create() => new(default, TypeRef.Empty, hasKey: false, hasValue: false);
 
             public CompoundAliasComponentModel Key { get; }
             public bool HasKey { get; }
             public bool HasValue => _hasValue;
             public TypeRef Value => _value;
-            public Dictionary<CompoundAliasComponentModel, IncrementalCompoundTypeAliasTree> Children => _children;
+            public Dictionary<CompoundAliasComponentModel, CompoundTypeAliasEmissionTree> Children => _children;
 
             public void Add(ImmutableArray<CompoundAliasComponentModel> keys, TypeRef value) => Add(keys.AsSpan(), value);
 
@@ -603,13 +603,13 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            private IncrementalCompoundTypeAliasTree GetChildOrDefault(CompoundAliasComponentModel key)
+            private CompoundTypeAliasEmissionTree GetChildOrDefault(CompoundAliasComponentModel key)
             {
                 TryGetChild(key, out var result);
                 return result;
             }
 
-            private bool TryGetChild(CompoundAliasComponentModel key, out IncrementalCompoundTypeAliasTree result)
+            private bool TryGetChild(CompoundAliasComponentModel key, out CompoundTypeAliasEmissionTree result)
             {
                 if (_children is { } children)
                 {
@@ -620,7 +620,7 @@ namespace Orleans.CodeGenerator
                 return false;
             }
 
-            private IncrementalCompoundTypeAliasTree AddInternal(CompoundAliasComponentModel key, TypeRef value, bool hasValue)
+            private CompoundTypeAliasEmissionTree AddInternal(CompoundAliasComponentModel key, TypeRef value, bool hasValue)
             {
                 _children ??= new();
 
@@ -640,7 +640,7 @@ namespace Orleans.CodeGenerator
                     return existing;
                 }
 
-                var child = new IncrementalCompoundTypeAliasTree(key, value, hasKey: true, hasValue: hasValue);
+                var child = new CompoundTypeAliasEmissionTree(key, value, hasKey: true, hasValue: hasValue);
                 _children.Add(key, child);
                 return child;
             }
