@@ -1,37 +1,4 @@
-﻿#pragma warning disable CS1591, RS0016, RS0041
-[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
-[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IHelloGrain_GrainReference_5336307F));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
-            config.Interfaces.Add(typeof(global::TestProject.IHelloGrain));
-            config.InterfaceImplementations.Add(typeof(global::TestProject.HelloGrain));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::TestProject.IHelloGrain));
-            n3.Add("5336307F", typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
-        }
-    }
-}
-
-namespace OrleansCodeGen.TestProject
+﻿namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
@@ -279,5 +246,38 @@ namespace OrleansCodeGen.TestProject
     internal sealed class Activator_HelloGrain : global::Orleans.Serialization.Activators.IActivator<global::TestProject.HelloGrain>
     {
         public global::TestProject.HelloGrain Create() => new global::TestProject.HelloGrain();
+    }
+}
+
+#pragma warning disable CS1591, RS0016, RS0041
+[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
+[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_Invokable_IHelloGrain_GrainReference_5336307F));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_HelloGrain));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_Invokable_IHelloGrain_GrainReference_5336307F));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_HelloGrain));
+            config.InterfaceProxies.Add(typeof(OrleansCodeGen.TestProject.Proxy_IHelloGrain));
+            config.Interfaces.Add(typeof(global::TestProject.IHelloGrain));
+            config.InterfaceImplementations.Add(typeof(global::TestProject.HelloGrain));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_HelloGrain));
+            var n1 = config.CompoundTypeAliases.Add("inv");
+            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.Add(typeof(global::TestProject.IHelloGrain));
+            n3.Add("5336307F", typeof(OrleansCodeGen.TestProject.Invokable_IHelloGrain_GrainReference_5336307F));
+        }
     }
 }
