@@ -21,23 +21,23 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
+internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDurableSetLogEntryConsumer<T>
 {
-    private readonly ILogEntryCodec<DurableSetEntry<T>> _entryCodec;
+    private readonly IDurableSetCodec<T> _codec;
     private readonly HashSet<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
     public DurableSet([ServiceKey] string key, IStateMachineManager manager, IDurableSetCodecProvider codecProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = codecProvider.GetCodec<T>();
+        _codec = codecProvider.GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableSet(string key, IStateMachineManager manager, ILogEntryCodec<DurableSetEntry<T>> entryCodec)
+    internal DurableSet(string key, IStateMachineManager manager, IDurableSetCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = entryCodec;
+        _codec = codec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -52,28 +52,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        var entry = _entryCodec.Read(logEntry);
-        switch (entry)
-        {
-            case SetAddEntry<T>(var item):
-                ApplyAdd(item);
-                break;
-            case SetRemoveEntry<T>(var item):
-                ApplyRemove(item);
-                break;
-            case SetClearEntry<T>:
-                ApplyClear();
-                break;
-            case SetSnapshotEntry<T>(var items):
-                ApplyClear();
-                _items.EnsureCapacity(items.Count);
-                foreach (var item in items)
-                {
-                    ApplyAdd(item);
-                }
-
-                break;
-        }
+        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
@@ -88,8 +67,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
 
     private static void WriteSnapshotToBufferWriter(DurableSet<T> self, IBufferWriter<byte> bufferWriter)
     {
-        self._entryCodec.Write(
-            new SetSnapshotEntry<T>(self._items.ToList()), bufferWriter);
+        self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
     }
 
     public void Clear()
@@ -97,7 +75,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
         ApplyClear();
         GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(new SetClearEntry<T>(), bufferWriter);
+            self._codec.WriteClear(bufferWriter);
         },
         this);
     }
@@ -112,7 +90,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
             GetStorage().AppendEntry(static (state, bufferWriter) =>
             {
                 var (self, item) = state;
-                self._entryCodec.Write(new SetAddEntry<T>(item!), bufferWriter);
+                self._codec.WriteAdd(item!, bufferWriter);
             },
             (this, item));
             return true;
@@ -128,7 +106,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
             GetStorage().AppendEntry(static (state, bufferWriter) =>
             {
                 var (self, item) = state;
-                self._entryCodec.Write(new SetRemoveEntry<T>(item!), bufferWriter);
+                self._codec.WriteRemove(item!, bufferWriter);
             },
             (this, item));
             return true;
@@ -142,6 +120,16 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine
     protected bool ApplyAdd(T item) => _items.Add(item);
     protected bool ApplyRemove(T item) => _items.Remove(item);
     protected void ApplyClear() => _items.Clear();
+    void IDurableSetLogEntryConsumer<T>.ApplyAdd(T item) => ApplyAdd(item);
+    void IDurableSetLogEntryConsumer<T>.ApplyRemove(T item) => ApplyRemove(item);
+    void IDurableSetLogEntryConsumer<T>.ApplyClear() => ApplyClear();
+    void IDurableSetLogEntryConsumer<T>.ApplySnapshotStart(int count)
+    {
+        ApplyClear();
+        _items.EnsureCapacity(count);
+    }
+
+    void IDurableSetLogEntryConsumer<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");

@@ -23,52 +23,52 @@ internal sealed class OrleansBinaryLogEntryCodecProvider(IServiceProvider servic
     private readonly ConcurrentDictionary<Type, object> _codecs = new();
 
     /// <inheritdoc/>
-    public ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>> GetCodec<TKey, TValue>() where TKey : notnull
-        => (ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>>)_codecs.GetOrAdd(
-            typeof(DurableDictionaryEntry<TKey, TValue>),
+    public IDurableDictionaryCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
+        => (IDurableDictionaryCodec<TKey, TValue>)_codecs.GetOrAdd(
+            typeof(IDurableDictionaryCodec<TKey, TValue>),
             _ => new OrleansBinaryDictionaryEntryCodec<TKey, TValue>(
                 serviceProvider.GetRequiredService<ILogDataCodec<TKey>>(),
                 serviceProvider.GetRequiredService<ILogDataCodec<TValue>>()));
 
     /// <inheritdoc/>
-    public ILogEntryCodec<DurableListEntry<T>> GetCodec<T>()
-        => (ILogEntryCodec<DurableListEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableListEntry<T>),
+    public IDurableListCodec<T> GetCodec<T>()
+        => (IDurableListCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableListCodec<T>),
             _ => new OrleansBinaryListEntryCodec<T>(
                 serviceProvider.GetRequiredService<ILogDataCodec<T>>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableQueueEntry<T>> IDurableQueueCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableQueueEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableQueueEntry<T>),
+    IDurableQueueCodec<T> IDurableQueueCodecProvider.GetCodec<T>()
+        => (IDurableQueueCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableQueueCodec<T>),
             _ => new OrleansBinaryQueueEntryCodec<T>(
                 serviceProvider.GetRequiredService<ILogDataCodec<T>>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableSetEntry<T>> IDurableSetCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableSetEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableSetEntry<T>),
+    IDurableSetCodec<T> IDurableSetCodecProvider.GetCodec<T>()
+        => (IDurableSetCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableSetCodec<T>),
             _ => new OrleansBinarySetEntryCodec<T>(
                 serviceProvider.GetRequiredService<ILogDataCodec<T>>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableValueEntry<T>> IDurableValueCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableValueEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableValueEntry<T>),
+    IDurableValueCodec<T> IDurableValueCodecProvider.GetCodec<T>()
+        => (IDurableValueCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableValueCodec<T>),
             _ => new OrleansBinaryValueEntryCodec<T>(
                 serviceProvider.GetRequiredService<ILogDataCodec<T>>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableStateEntry<T>> IDurableStateCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableStateEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableStateEntry<T>),
+    IDurableStateCodec<T> IDurableStateCodecProvider.GetCodec<T>()
+        => (IDurableStateCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableStateCodec<T>),
             _ => new OrleansBinaryStateEntryCodec<T>(
                 serviceProvider.GetRequiredService<ILogDataCodec<T>>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableTaskCompletionSourceEntry<T>),
+    IDurableTaskCompletionSourceCodec<T> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
+        => (IDurableTaskCompletionSourceCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableTaskCompletionSourceCodec<T>),
             _ => new OrleansBinaryTcsEntryCodec<T>(
                 serviceProvider.GetRequiredService<ILogDataCodec<T>>(),
                 serviceProvider.GetRequiredService<ILogDataCodec<Exception>>()));

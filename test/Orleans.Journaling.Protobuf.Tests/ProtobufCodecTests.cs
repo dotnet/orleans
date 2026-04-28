@@ -1,15 +1,15 @@
 using System.Buffers;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling.Protobuf;
 using Orleans.Serialization;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
-using Microsoft.Extensions.DependencyInjection;
 using Xunit;
 
 namespace Orleans.Journaling.Protobuf.Tests;
 
 /// <summary>
-/// Round-trip tests for the Protocol Buffers log entry codecs.
+/// Round-trip tests for the direct Protocol Buffers log entry codecs.
 /// </summary>
 [TestCategory("BVT")]
 public class ProtobufCodecTests
@@ -26,403 +26,288 @@ public class ProtobufCodecTests
         _codecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
     }
 
+    [Fact]
+    public void ProtobufDictionaryCodec_Set_RoundTrips()
+    {
+        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
+        var buffer = new ArrayBufferWriter<byte>();
+
+        codec.WriteSet("key", 42, buffer);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+
+        Assert.Equal("key", consumer.LastSetKey);
+        Assert.Equal(42, consumer.LastSetValue);
+    }
+
+    [Fact]
+    public void ProtobufDictionaryCodec_Snapshot_RoundTrips()
+    {
+        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
+        var items = new List<KeyValuePair<string, int>>
+        {
+            new("alpha", 1),
+            new("beta", 2),
+        };
+        var buffer = new ArrayBufferWriter<byte>();
+
+        codec.WriteSnapshot(items, items.Count, buffer);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+
+        Assert.Equal(items, consumer.Items);
+    }
+
+    [Fact]
+    public void ProtobufListCodec_Operations_RoundTrip()
+    {
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
+        var consumer = new ListConsumer<string>();
+
+        Apply(codec, writer => codec.WriteAdd("one", writer), consumer);
+        Apply(codec, writer => codec.WriteSet(0, "updated", writer), consumer);
+        Apply(codec, writer => codec.WriteInsert(1, "two", writer), consumer);
+        Apply(codec, writer => codec.WriteRemoveAt(0, writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(["three", "four"], 2, writer), consumer);
+
+        Assert.Equal(["add:one", "set:0:updated", "insert:1:two", "remove:0", "clear", "snapshot:2", "snapshot-item:three", "snapshot-item:four"], consumer.Commands);
+    }
+
+    [Fact]
+    public void ProtobufQueueCodec_Operations_RoundTrip()
+    {
+        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
+        var consumer = new QueueConsumer<int>();
+
+        Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
+        Apply(codec, writer => codec.WriteDequeue(writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot([20, 30], 2, writer), consumer);
+
+        Assert.Equal(["enqueue:10", "dequeue", "clear", "snapshot:2", "snapshot-item:20", "snapshot-item:30"], consumer.Commands);
+    }
+
+    [Fact]
+    public void ProtobufSetCodec_Operations_RoundTrip()
+    {
+        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
+        var consumer = new SetConsumer<string>();
+
+        Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
+        Apply(codec, writer => codec.WriteRemove("a", writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(["b", "c"], 2, writer), consumer);
+
+        Assert.Equal(["add:a", "remove:a", "clear", "snapshot:2", "snapshot-item:b", "snapshot-item:c"], consumer.Commands);
+    }
+
+    [Fact]
+    public void ProtobufValueCodec_Set_RoundTrips()
+    {
+        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+        var consumer = new ValueConsumer<int>();
+        var buffer = new ArrayBufferWriter<byte>();
+
+        codec.WriteSet(42, buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+
+        Assert.Equal(42, consumer.Value);
+    }
+
+    [Fact]
+    public void ProtobufValueCodec_NullString_RoundTrips()
+    {
+        var codec = new ProtobufValueEntryCodec<string>(CreateConverter<string>());
+        var consumer = new ValueConsumer<string>();
+        var buffer = new ArrayBufferWriter<byte>();
+
+        codec.WriteSet(null!, buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+
+        Assert.Null(consumer.Value);
+    }
+
+    [Fact]
+    public void ProtobufStateCodec_SetAndClear_RoundTrip()
+    {
+        var codec = new ProtobufStateEntryCodec<string>(CreateConverter<string>());
+        var consumer = new StateConsumer<string>();
+
+        Apply(codec, writer => codec.WriteSet("state", 7, writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+
+        Assert.Equal(["set:state:7", "clear"], consumer.Commands);
+    }
+
+    [Fact]
+    public void ProtobufTcsCodec_States_RoundTrip()
+    {
+        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
+        var consumer = new TcsConsumer<int>();
+
+        Apply(codec, writer => codec.WritePending(writer), consumer);
+        Apply(codec, writer => codec.WriteCompleted(5, writer), consumer);
+        Apply(codec, writer => codec.WriteFaulted(new InvalidOperationException("boom"), writer), consumer);
+        Apply(codec, writer => codec.WriteCanceled(writer), consumer);
+
+        Assert.Equal(["pending", "completed:5", "faulted:boom", "canceled"], consumer.Commands);
+    }
+
+    [Fact]
+    public void ProtobufValueCodec_MissingValueField_Throws()
+    {
+        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(Sequence([8, 0]), new ValueConsumer<int>()));
+
+        Assert.Contains("missing required field 'value'", exception.Message);
+    }
+
+    [Fact]
+    public void ProtobufValueCodec_InvalidPayloadMarker_Throws()
+    {
+        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(Sequence([8, 0, 18, 1, 2]), new ValueConsumer<int>()));
+
+        Assert.Contains("Invalid protobuf value payload marker", exception.Message);
+    }
+
+    [Fact]
+    public void ProtobufValueCodec_TruncatedLengthDelimitedField_Throws()
+    {
+        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(Sequence([8, 0, 18, 2, 1]), new ValueConsumer<int>()));
+
+        Assert.Contains("insufficient data", exception.Message);
+    }
+
+    [Fact]
+    public void ProtobufListCodec_SnapshotCountMismatch_Throws()
+    {
+        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(Sequence([8, 5, 32, 2, 26, 2, 1, 97]), new ListConsumer<string>()));
+
+        Assert.Contains("declared 2 snapshot item(s) but contained 1", exception.Message);
+    }
+
     private ProtobufValueConverter<T> CreateConverter<T>()
         => ProtobufValueConverter<T>.IsNativeType
             ? new ProtobufValueConverter<T>()
             : new ProtobufValueConverter<T>(new OrleansLogDataCodec<T>(_codecProvider.GetCodec<T>(), _sessionPool));
 
-    #region Dictionary
+    private static ReadOnlySequence<byte> Sequence(byte[] bytes) => new(bytes);
 
-    [Fact]
-    public void ProtobufDictionaryCodec_RoundTrips_Set()
+    private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
-
-        var entry = new DictionarySetEntry<string, int>("key", 42);
         var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var set = Assert.IsType<DictionarySetEntry<string, int>>(result);
-        Assert.Equal("key", set.Key);
-        Assert.Equal(42, set.Value);
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    [Fact]
-    public void ProtobufDictionaryCodec_RoundTrips_Remove()
+    private static void Apply<T>(IDurableQueueCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueLogEntryConsumer<T> consumer)
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
-
-        var entry = new DictionaryRemoveEntry<string, int>("removeMe");
         var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var remove = Assert.IsType<DictionaryRemoveEntry<string, int>>(result);
-        Assert.Equal("removeMe", remove.Key);
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    [Fact]
-    public void ProtobufDictionaryCodec_RoundTrips_Clear()
+    private static void Apply<T>(IDurableSetCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetLogEntryConsumer<T> consumer)
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
-
-        var entry = new DictionaryClearEntry<string, int>();
         var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<DictionaryClearEntry<string, int>>(result);
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    [Fact]
-    public void ProtobufDictionaryCodec_RoundTrips_Snapshot()
+    private static void Apply<T>(IDurableStateCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateLogEntryConsumer<T> consumer)
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
+        var buffer = new ArrayBufferWriter<byte>();
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+    }
 
-        var items = new List<KeyValuePair<string, int>>
+    private static void Apply<T>(IDurableTaskCompletionSourceCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+    }
+
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
+    {
+        public TKey? LastSetKey { get; private set; }
+        public TValue? LastSetValue { get; private set; }
+        public List<KeyValuePair<TKey, TValue>> Items { get; } = [];
+        public void ApplySet(TKey key, TValue value)
         {
-            new("alpha", 1),
-            new("beta", 2),
-            new("gamma", 3),
-        };
-        var entry = new DictionarySnapshotEntry<string, int>(items);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
+            LastSetKey = key;
+            LastSetValue = value;
+        }
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var snapshot = Assert.IsType<DictionarySnapshotEntry<string, int>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-        Assert.Equal("alpha", snapshot.Items[0].Key);
-        Assert.Equal(1, snapshot.Items[0].Value);
-        Assert.Equal("beta", snapshot.Items[1].Key);
-        Assert.Equal(2, snapshot.Items[1].Value);
-        Assert.Equal("gamma", snapshot.Items[2].Key);
-        Assert.Equal(3, snapshot.Items[2].Value);
+        public void ApplyRemove(TKey key) { }
+        public void ApplyClear() => Items.Clear();
+        public void ApplySnapshotStart(int count) => Items.Clear();
+        public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
     }
 
-    #endregion
-
-    #region List
-
-    [Fact]
-    public void ProtobufListCodec_RoundTrips_Add()
+    private sealed class ListConsumer<T> : IDurableListLogEntryConsumer<T>
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new ListAddEntry<string>("hello");
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var add = Assert.IsType<ListAddEntry<string>>(result);
-        Assert.Equal("hello", add.Item);
+        public List<string> Commands { get; } = [];
+        public void ApplyAdd(T item) => Commands.Add($"add:{item}");
+        public void ApplySet(int index, T item) => Commands.Add($"set:{index}:{item}");
+        public void ApplyInsert(int index, T item) => Commands.Add($"insert:{index}:{item}");
+        public void ApplyRemoveAt(int index) => Commands.Add($"remove:{index}");
+        public void ApplyClear() => Commands.Add("clear");
+        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
+        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    [Fact]
-    public void ProtobufListCodec_RoundTrips_Set()
+    private sealed class QueueConsumer<T> : IDurableQueueLogEntryConsumer<T>
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new ListSetEntry<string>(3, "updated");
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var set = Assert.IsType<ListSetEntry<string>>(result);
-        Assert.Equal(3, set.Index);
-        Assert.Equal("updated", set.Item);
+        public List<string> Commands { get; } = [];
+        public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
+        public void ApplyDequeue() => Commands.Add("dequeue");
+        public void ApplyClear() => Commands.Add("clear");
+        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
+        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    [Fact]
-    public void ProtobufListCodec_RoundTrips_Insert()
+    private sealed class SetConsumer<T> : IDurableSetLogEntryConsumer<T>
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new ListInsertEntry<string>(1, "inserted");
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var insert = Assert.IsType<ListInsertEntry<string>>(result);
-        Assert.Equal(1, insert.Index);
-        Assert.Equal("inserted", insert.Item);
+        public List<string> Commands { get; } = [];
+        public void ApplyAdd(T item) => Commands.Add($"add:{item}");
+        public void ApplyRemove(T item) => Commands.Add($"remove:{item}");
+        public void ApplyClear() => Commands.Add("clear");
+        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
+        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    [Fact]
-    public void ProtobufListCodec_RoundTrips_RemoveAt()
+    private sealed class ValueConsumer<T> : IDurableValueLogEntryConsumer<T>
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new ListRemoveAtEntry<string>(5);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var removeAt = Assert.IsType<ListRemoveAtEntry<string>>(result);
-        Assert.Equal(5, removeAt.Index);
+        public T? Value { get; private set; }
+        public void ApplySet(T value) => Value = value;
     }
 
-    [Fact]
-    public void ProtobufListCodec_RoundTrips_Clear()
+    private sealed class StateConsumer<T> : IDurableStateLogEntryConsumer<T>
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new ListClearEntry<string>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<ListClearEntry<string>>(result);
+        public List<string> Commands { get; } = [];
+        public void ApplySet(T state, ulong version) => Commands.Add($"set:{state}:{version}");
+        public void ApplyClear() => Commands.Add("clear");
     }
 
-    [Fact]
-    public void ProtobufListCodec_RoundTrips_Snapshot()
+    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceLogEntryConsumer<T>
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new ListSnapshotEntry<string>(["one", "two", "three"]);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var snapshot = Assert.IsType<ListSnapshotEntry<string>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-        Assert.Equal("one", snapshot.Items[0]);
-        Assert.Equal("two", snapshot.Items[1]);
-        Assert.Equal("three", snapshot.Items[2]);
+        public List<string> Commands { get; } = [];
+        public void ApplyPending() => Commands.Add("pending");
+        public void ApplyCompleted(T value) => Commands.Add($"completed:{value}");
+        public void ApplyFaulted(Exception exception) => Commands.Add($"faulted:{exception.Message}");
+        public void ApplyCanceled() => Commands.Add("canceled");
     }
-
-    #endregion
-
-    #region Queue
-
-    [Fact]
-    public void ProtobufQueueCodec_RoundTrips_Enqueue()
-    {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new QueueEnqueueEntry<int>(99);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var enqueue = Assert.IsType<QueueEnqueueEntry<int>>(result);
-        Assert.Equal(99, enqueue.Item);
-    }
-
-    [Fact]
-    public void ProtobufQueueCodec_RoundTrips_Dequeue()
-    {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new QueueDequeueEntry<int>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<QueueDequeueEntry<int>>(result);
-    }
-
-    [Fact]
-    public void ProtobufQueueCodec_RoundTrips_Clear()
-    {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new QueueClearEntry<int>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<QueueClearEntry<int>>(result);
-    }
-
-    [Fact]
-    public void ProtobufQueueCodec_RoundTrips_Snapshot()
-    {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new QueueSnapshotEntry<int>([10, 20, 30]);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var snapshot = Assert.IsType<QueueSnapshotEntry<int>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-        Assert.Equal(10, snapshot.Items[0]);
-        Assert.Equal(20, snapshot.Items[1]);
-        Assert.Equal(30, snapshot.Items[2]);
-    }
-
-    #endregion
-
-    #region Set
-
-    [Fact]
-    public void ProtobufSetCodec_RoundTrips_Add()
-    {
-        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new SetAddEntry<string>("item1");
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var add = Assert.IsType<SetAddEntry<string>>(result);
-        Assert.Equal("item1", add.Item);
-    }
-
-    [Fact]
-    public void ProtobufSetCodec_RoundTrips_Remove()
-    {
-        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new SetRemoveEntry<string>("item2");
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var remove = Assert.IsType<SetRemoveEntry<string>>(result);
-        Assert.Equal("item2", remove.Item);
-    }
-
-    [Fact]
-    public void ProtobufSetCodec_RoundTrips_Clear()
-    {
-        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new SetClearEntry<string>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<SetClearEntry<string>>(result);
-    }
-
-    [Fact]
-    public void ProtobufSetCodec_RoundTrips_Snapshot()
-    {
-        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new SetSnapshotEntry<string>(["a", "b", "c"]);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var snapshot = Assert.IsType<SetSnapshotEntry<string>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-        Assert.Equal("a", snapshot.Items[0]);
-        Assert.Equal("b", snapshot.Items[1]);
-        Assert.Equal("c", snapshot.Items[2]);
-    }
-
-    #endregion
-
-    #region Value
-
-    [Fact]
-    public void ProtobufValueCodec_RoundTrips_Set()
-    {
-        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new ValueSetEntry<int>(42);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var set = Assert.IsType<ValueSetEntry<int>>(result);
-        Assert.Equal(42, set.Value);
-    }
-
-    #endregion
-
-    #region State
-
-    [Fact]
-    public void ProtobufStateCodec_RoundTrips_Set()
-    {
-        var codec = new ProtobufStateEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new StateSetEntry<string>("myState", 7);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var set = Assert.IsType<StateSetEntry<string>>(result);
-        Assert.Equal("myState", set.State);
-        Assert.Equal(7UL, set.Version);
-    }
-
-    [Fact]
-    public void ProtobufStateCodec_RoundTrips_Clear()
-    {
-        var codec = new ProtobufStateEntryCodec<string>(CreateConverter<string>());
-
-        var entry = new StateClearEntry<string>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<StateClearEntry<string>>(result);
-    }
-
-    #endregion
-
-    #region TaskCompletionSource
-
-    [Fact]
-    public void ProtobufTcsCodec_RoundTrips_Completed()
-    {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new TcsCompletedEntry<int>(100);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var completed = Assert.IsType<TcsCompletedEntry<int>>(result);
-        Assert.Equal(100, completed.Value);
-    }
-
-    [Fact]
-    public void ProtobufTcsCodec_RoundTrips_Faulted()
-    {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new TcsFaultedEntry<int>(new InvalidOperationException("test error"));
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var faulted = Assert.IsType<TcsFaultedEntry<int>>(result);
-        Assert.Contains("test error", faulted.Exception.Message);
-    }
-
-    [Fact]
-    public void ProtobufTcsCodec_RoundTrips_Canceled()
-    {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new TcsCanceledEntry<int>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<TcsCanceledEntry<int>>(result);
-    }
-
-    [Fact]
-    public void ProtobufTcsCodec_RoundTrips_Pending()
-    {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
-
-        var entry = new TcsPendingEntry<int>();
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        Assert.IsType<TcsPendingEntry<int>>(result);
-    }
-
-    #endregion
 }

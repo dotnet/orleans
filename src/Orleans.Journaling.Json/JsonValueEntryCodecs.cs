@@ -4,127 +4,162 @@ using System.Text.Json;
 namespace Orleans.Journaling.Json;
 
 /// <summary>
-/// JSON <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableValueEntry{T}"/>.
+/// JSON codec for durable value log entries.
 /// </summary>
 public sealed class JsonValueEntryCodec<T>(JsonSerializerOptions? options = null)
-    : ILogEntryCodec<DurableValueEntry<T>>
+    : IDurableValueCodec<T>
 {
     private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
 
     /// <inheritdoc/>
-    public void Write(DurableValueEntry<T> entry, IBufferWriter<byte> output)
+    public void WriteSet(T value, IBufferWriter<byte> output)
     {
-        JsonValueEntry jsonEntry = entry switch
-        {
-            ValueSetEntry<T>(var value) => new JsonValueSetEntry(JsonSerializer.SerializeToElement(value, _options)),
-            _ => throw new NotSupportedException($"Unknown entry type: {entry.GetType()}")
-        };
-
         using var writer = new Utf8JsonWriter(output);
-        JsonSerializer.Serialize(writer, (object)jsonEntry, _options);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
+        writer.WritePropertyName(JsonLogEntryFields.Value);
+        JsonSerializer.Serialize(writer, value, _options);
+        writer.WriteEndObject();
     }
 
     /// <inheritdoc/>
-    public DurableValueEntry<T> Read(ReadOnlySequence<byte> input)
+    public void Apply(ReadOnlySequence<byte> input, IDurableValueLogEntryConsumer<T> consumer)
     {
         var reader = new Utf8JsonReader(input);
-        var jsonEntry = JsonSerializer.Deserialize<JsonValueEntry>(ref reader, _options)
-            ?? throw new InvalidOperationException("Failed to deserialize value entry.");
-
-        return jsonEntry switch
+        using var document = JsonDocument.ParseValue(ref reader);
+        var root = document.RootElement;
+        var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
+        switch (command)
         {
-            JsonValueSetEntry(var value) => new ValueSetEntry<T>(value.Deserialize<T>(_options)!),
-            _ => throw new NotSupportedException($"Unknown JSON entry type: {jsonEntry.GetType()}")
-        };
+            case JsonLogEntryCommands.Set:
+                consumer.ApplySet(root.GetProperty(JsonLogEntryFields.Value).Deserialize<T>(_options)!);
+                break;
+            default:
+                throw new NotSupportedException($"Command type '{command}' is not supported");
+        }
     }
 }
 
 /// <summary>
-/// JSON <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableStateEntry{T}"/>.
+/// JSON codec for durable persistent state log entries.
 /// </summary>
 public sealed class JsonStateEntryCodec<T>(JsonSerializerOptions? options = null)
-    : ILogEntryCodec<DurableStateEntry<T>>
+    : IDurableStateCodec<T>
 {
     private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
 
     /// <inheritdoc/>
-    public void Write(DurableStateEntry<T> entry, IBufferWriter<byte> output)
+    public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
     {
-        JsonStateEntry jsonEntry = entry switch
-        {
-            StateSetEntry<T>(var state, var version) =>
-                new JsonStateSetEntry(JsonSerializer.SerializeToElement(state, _options), version),
-            StateClearEntry<T> => new JsonStateClearEntry(),
-            _ => throw new NotSupportedException($"Unknown entry type: {entry.GetType()}")
-        };
-
         using var writer = new Utf8JsonWriter(output);
-        JsonSerializer.Serialize(writer, (object)jsonEntry, _options);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
+        writer.WritePropertyName(JsonLogEntryFields.State);
+        JsonSerializer.Serialize(writer, state, _options);
+        writer.WriteNumber(JsonLogEntryFields.Version, version);
+        writer.WriteEndObject();
     }
 
     /// <inheritdoc/>
-    public DurableStateEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteClear(IBufferWriter<byte> output)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Clear);
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableStateLogEntryConsumer<T> consumer)
     {
         var reader = new Utf8JsonReader(input);
-        var jsonEntry = JsonSerializer.Deserialize<JsonStateEntry>(ref reader, _options)
-            ?? throw new InvalidOperationException("Failed to deserialize state entry.");
-
-        return jsonEntry switch
+        using var document = JsonDocument.ParseValue(ref reader);
+        var root = document.RootElement;
+        var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
+        switch (command)
         {
-            JsonStateSetEntry(var state, var version) =>
-                new StateSetEntry<T>(state.Deserialize<T>(_options)!, version),
-            JsonStateClearEntry => new StateClearEntry<T>(),
-            _ => throw new NotSupportedException($"Unknown JSON entry type: {jsonEntry.GetType()}")
-        };
+            case JsonLogEntryCommands.Set:
+                consumer.ApplySet(root.GetProperty(JsonLogEntryFields.State).Deserialize<T>(_options)!, root.GetProperty(JsonLogEntryFields.Version).GetUInt64());
+                break;
+            case JsonLogEntryCommands.Clear:
+                consumer.ApplyClear();
+                break;
+            default:
+                throw new NotSupportedException($"Command type '{command}' is not supported");
+        }
     }
 }
 
 /// <summary>
-/// JSON <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableTaskCompletionSourceEntry{T}"/>.
+/// JSON codec for durable task completion source log entries.
 /// </summary>
-/// <remarks>
-/// Exceptions are serialized as their string representation. On deserialization,
-/// a new <see cref="Exception"/> is created with the stored message.
-/// </remarks>
 public sealed class JsonTcsEntryCodec<T>(JsonSerializerOptions? options = null)
-    : ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>
+    : IDurableTaskCompletionSourceCodec<T>
 {
     private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
 
     /// <inheritdoc/>
-    public void Write(DurableTaskCompletionSourceEntry<T> entry, IBufferWriter<byte> output)
+    public void WritePending(IBufferWriter<byte> output)
     {
-        JsonTcsEntry jsonEntry = entry switch
-        {
-            TcsCompletedEntry<T>(var value) =>
-                new JsonTcsCompletedEntry(JsonSerializer.SerializeToElement(value, _options)),
-            TcsFaultedEntry<T>(var exception) =>
-                new JsonTcsFaultedEntry(exception.ToString()),
-            TcsCanceledEntry<T> => new JsonTcsCanceledEntry(),
-            TcsPendingEntry<T> => new JsonTcsPendingEntry(),
-            _ => throw new NotSupportedException($"Unknown entry type: {entry.GetType()}")
-        };
-
         using var writer = new Utf8JsonWriter(output);
-        JsonSerializer.Serialize(writer, (object)jsonEntry, _options);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Pending);
+        writer.WriteEndObject();
     }
 
     /// <inheritdoc/>
-    public DurableTaskCompletionSourceEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteCompleted(T value, IBufferWriter<byte> output)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Completed);
+        writer.WritePropertyName(JsonLogEntryFields.Value);
+        JsonSerializer.Serialize(writer, value, _options);
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc/>
+    public void WriteFaulted(Exception exception, IBufferWriter<byte> output)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Faulted);
+        writer.WriteString(JsonLogEntryFields.Message, exception.Message);
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc/>
+    public void WriteCanceled(IBufferWriter<byte> output)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Canceled);
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
     {
         var reader = new Utf8JsonReader(input);
-        var jsonEntry = JsonSerializer.Deserialize<JsonTcsEntry>(ref reader, _options)
-            ?? throw new InvalidOperationException("Failed to deserialize TCS entry.");
-
-        return jsonEntry switch
+        using var document = JsonDocument.ParseValue(ref reader);
+        var root = document.RootElement;
+        var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
+        switch (command)
         {
-            JsonTcsCompletedEntry(var value) =>
-                new TcsCompletedEntry<T>(value.Deserialize<T>(_options)!),
-            JsonTcsFaultedEntry(var exception) =>
-                new TcsFaultedEntry<T>(new Exception(exception)),
-            JsonTcsCanceledEntry => new TcsCanceledEntry<T>(),
-            JsonTcsPendingEntry => new TcsPendingEntry<T>(),
-            _ => throw new NotSupportedException($"Unknown JSON entry type: {jsonEntry.GetType()}")
-        };
+            case JsonLogEntryCommands.Pending:
+                consumer.ApplyPending();
+                break;
+            case JsonLogEntryCommands.Completed:
+                consumer.ApplyCompleted(root.GetProperty(JsonLogEntryFields.Value).Deserialize<T>(_options)!);
+                break;
+            case JsonLogEntryCommands.Faulted:
+                consumer.ApplyFaulted(new Exception(root.GetProperty(JsonLogEntryFields.Message).GetString()));
+                break;
+            case JsonLogEntryCommands.Canceled:
+                consumer.ApplyCanceled();
+                break;
+            default:
+                throw new NotSupportedException($"Command type '{command}' is not supported");
+        }
     }
 }

@@ -15,23 +15,23 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
+internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, IDurableListLogEntryConsumer<T>
 {
-    private readonly ILogEntryCodec<DurableListEntry<T>> _entryCodec;
+    private readonly IDurableListCodec<T> _codec;
     private readonly List<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
     public DurableList([ServiceKey] string key, IStateMachineManager manager, IDurableListCodecProvider codecProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = codecProvider.GetCodec<T>();
+        _codec = codecProvider.GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableList(string key, IStateMachineManager manager, ILogEntryCodec<DurableListEntry<T>> entryCodec)
+    internal DurableList(string key, IStateMachineManager manager, IDurableListCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = entryCodec;
+        _codec = codec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -50,7 +50,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
             GetStorage().AppendEntry(static (state, bufferWriter) =>
             {
                 var (self, index, value) = state;
-                self._entryCodec.Write(new ListSetEntry<T>(index, value!), bufferWriter);
+                self._codec.WriteSet(index, value!, bufferWriter);
             },
             (this, index, value));
         }
@@ -68,34 +68,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        var entry = _entryCodec.Read(logEntry);
-        switch (entry)
-        {
-            case ListAddEntry<T>(var item):
-                ApplyAdd(item);
-                break;
-            case ListSetEntry<T>(var index, var value):
-                ApplySet(index, value);
-                break;
-            case ListInsertEntry<T>(var index, var value):
-                ApplyInsert(index, value);
-                break;
-            case ListRemoveAtEntry<T>(var index):
-                ApplyRemoveAt(index);
-                break;
-            case ListClearEntry<T>:
-                ApplyClear();
-                break;
-            case ListSnapshotEntry<T>(var items):
-                ApplyClear();
-                _items.EnsureCapacity(items.Count);
-                foreach (var item in items)
-                {
-                    ApplyAdd(item);
-                }
-
-                break;
-        }
+        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
@@ -107,8 +80,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
     {
         snapshotWriter.AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(
-                new ListSnapshotEntry<T>(self._items.ToList()), bufferWriter);
+            self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
         }, this);
     }
 
@@ -118,7 +90,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, item) = state;
-            self._entryCodec.Write(new ListAddEntry<T>(item!), bufferWriter);
+            self._codec.WriteAdd(item!, bufferWriter);
         },
         (this, item));
     }
@@ -128,7 +100,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         ApplyClear();
         GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(new ListClearEntry<T>(), bufferWriter);
+            self._codec.WriteClear(bufferWriter);
         },
         this);
     }
@@ -143,7 +115,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, index, value) = state;
-            self._entryCodec.Write(new ListInsertEntry<T>(index, value!), bufferWriter);
+            self._codec.WriteInsert(index, value!, bufferWriter);
         },
         (this, index, item));
     }
@@ -167,7 +139,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, index) = state;
-            self._entryCodec.Write(new ListRemoveAtEntry<T>(index), bufferWriter);
+            self._codec.WriteRemoveAt(index, bufferWriter);
         }, (this, index));
     }
 
@@ -178,6 +150,18 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine
     protected void ApplyInsert(int index, T item) => _items.Insert(index, item);
     protected void ApplyRemoveAt(int index) => _items.RemoveAt(index);
     protected void ApplyClear() => _items.Clear();
+    void IDurableListLogEntryConsumer<T>.ApplyAdd(T item) => ApplyAdd(item);
+    void IDurableListLogEntryConsumer<T>.ApplySet(int index, T item) => ApplySet(index, item);
+    void IDurableListLogEntryConsumer<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
+    void IDurableListLogEntryConsumer<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
+    void IDurableListLogEntryConsumer<T>.ApplyClear() => ApplyClear();
+    void IDurableListLogEntryConsumer<T>.ApplySnapshotStart(int count)
+    {
+        ApplyClear();
+        _items.EnsureCapacity(count);
+    }
+
+    void IDurableListLogEntryConsumer<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");

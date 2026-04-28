@@ -4,8 +4,7 @@ using System.Text.Json;
 namespace Orleans.Journaling.Json;
 
 /// <summary>
-/// JSON <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableDictionaryEntry{TKey, TValue}"/>.
-/// Serializes entries as JSON with a <c>"cmd"</c> discriminator.
+/// JSON codec for durable dictionary log entries.
 /// </summary>
 /// <example>
 /// <code>
@@ -14,58 +13,98 @@ namespace Orleans.Journaling.Json;
 /// </code>
 /// </example>
 public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions? options = null)
-    : ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>>
+    : IDurableDictionaryCodec<TKey, TValue> where TKey : notnull
 {
     private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
 
     /// <inheritdoc/>
-    public void Write(DurableDictionaryEntry<TKey, TValue> entry, IBufferWriter<byte> output)
+    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
     {
-        JsonDictionaryEntry jsonEntry = entry switch
-        {
-            DictionarySetEntry<TKey, TValue>(var key, var value) =>
-                new JsonDictionarySetEntry(
-                    JsonSerializer.SerializeToElement(key, _options),
-                    JsonSerializer.SerializeToElement(value, _options)),
-            DictionaryRemoveEntry<TKey, TValue>(var key) =>
-                new JsonDictionaryRemoveEntry(JsonSerializer.SerializeToElement(key, _options)),
-            DictionaryClearEntry<TKey, TValue> =>
-                new JsonDictionaryClearEntry(),
-            DictionarySnapshotEntry<TKey, TValue>(var items) =>
-                new JsonDictionarySnapshotEntry(items.Select(kv =>
-                    new JsonDictionarySnapshotItem(
-                        JsonSerializer.SerializeToElement(kv.Key, _options),
-                        JsonSerializer.SerializeToElement(kv.Value, _options))).ToList()),
-            _ => throw new NotSupportedException($"Unknown entry type: {entry.GetType()}")
-        };
-
         using var writer = new Utf8JsonWriter(output);
-        JsonSerializer.Serialize(writer, (object)jsonEntry, _options);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
+        writer.WritePropertyName(JsonLogEntryFields.Key);
+        JsonSerializer.Serialize(writer, key, _options);
+        writer.WritePropertyName(JsonLogEntryFields.Value);
+        JsonSerializer.Serialize(writer, value, _options);
+        writer.WriteEndObject();
     }
 
     /// <inheritdoc/>
-    public DurableDictionaryEntry<TKey, TValue> Read(ReadOnlySequence<byte> input)
+    public void WriteRemove(TKey key, IBufferWriter<byte> output)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Remove);
+        writer.WritePropertyName(JsonLogEntryFields.Key);
+        JsonSerializer.Serialize(writer, key, _options);
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Clear);
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        writer.WriteStartObject();
+        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Snapshot);
+        writer.WritePropertyName(JsonLogEntryFields.Items);
+        writer.WriteStartArray();
+        foreach (var (key, value) in items)
+        {
+            writer.WriteStartObject();
+            writer.WritePropertyName(JsonLogEntryFields.Key);
+            JsonSerializer.Serialize(writer, key, _options);
+            writer.WritePropertyName(JsonLogEntryFields.Value);
+            JsonSerializer.Serialize(writer, value, _options);
+            writer.WriteEndObject();
+        }
+
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer)
     {
         var reader = new Utf8JsonReader(input);
-        var jsonEntry = JsonSerializer.Deserialize<JsonDictionaryEntry>(ref reader, _options)
-            ?? throw new InvalidOperationException("Failed to deserialize dictionary entry.");
-
-        return jsonEntry switch
+        using var document = JsonDocument.ParseValue(ref reader);
+        var root = document.RootElement;
+        var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
+        switch (command)
         {
-            JsonDictionarySetEntry(var key, var value) =>
-                new DictionarySetEntry<TKey, TValue>(
-                    key.Deserialize<TKey>(_options)!,
-                    value.Deserialize<TValue>(_options)!),
-            JsonDictionaryRemoveEntry(var key) =>
-                new DictionaryRemoveEntry<TKey, TValue>(key.Deserialize<TKey>(_options)!),
-            JsonDictionaryClearEntry =>
-                new DictionaryClearEntry<TKey, TValue>(),
-            JsonDictionarySnapshotEntry(var items) =>
-                new DictionarySnapshotEntry<TKey, TValue>(items.Select(i =>
-                    new KeyValuePair<TKey, TValue>(
-                        i.Key.Deserialize<TKey>(_options)!,
-                        i.Value.Deserialize<TValue>(_options)!)).ToList()),
-            _ => throw new NotSupportedException($"Unknown JSON entry type: {jsonEntry.GetType()}")
-        };
+            case JsonLogEntryCommands.Set:
+                consumer.ApplySet(
+                    root.GetProperty(JsonLogEntryFields.Key).Deserialize<TKey>(_options)!,
+                    root.GetProperty(JsonLogEntryFields.Value).Deserialize<TValue>(_options)!);
+                break;
+            case JsonLogEntryCommands.Remove:
+                consumer.ApplyRemove(root.GetProperty(JsonLogEntryFields.Key).Deserialize<TKey>(_options)!);
+                break;
+            case JsonLogEntryCommands.Clear:
+                consumer.ApplyClear();
+                break;
+            case JsonLogEntryCommands.Snapshot:
+                var items = root.GetProperty(JsonLogEntryFields.Items);
+                consumer.ApplySnapshotStart(items.GetArrayLength());
+                foreach (var item in items.EnumerateArray())
+                {
+                    consumer.ApplySnapshotItem(
+                        item.GetProperty(JsonLogEntryFields.Key).Deserialize<TKey>(_options)!,
+                        item.GetProperty(JsonLogEntryFields.Value).Deserialize<TValue>(_options)!);
+                }
+
+                break;
+            default:
+                throw new NotSupportedException($"Command type '{command}' is not supported");
+        }
     }
 }

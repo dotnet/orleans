@@ -7,10 +7,10 @@ using Xunit;
 namespace Orleans.Journaling.Json.Tests;
 
 /// <summary>
-/// Tests that verify backward compatibility and migration between serialization formats.
+/// Tests that verify same-format recovery for JSON journaling and the Orleans binary compatibility baseline.
 /// </summary>
 [TestCategory("BVT")]
-public class CodecMigrationTests : StateMachineTestBase
+public class CodecRecoveryTests : StateMachineTestBase
 {
     /// <summary>
     /// Writes data with the Orleans binary codec, then reads it back.
