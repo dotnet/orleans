@@ -130,13 +130,14 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             }
             else if (grainState.ETag == ANY_ETAG)
             {
+                var requestOptions = new ItemRequestOptions { IfMatchEtag = grainState.ETag };
                 response = await _executor.ExecuteOperation(
                     static args =>
                     {
-                        var (self, entity, pk) = args;
-                        return self._container.ReplaceItemAsync(entity, entity.Id, pk);
+                        var (self, entity, pk, requestOptions) = args;
+                        return self._container.UpsertItemAsync(entity, pk, requestOptions);
                     },
-                    (this, entity, pk)).ConfigureAwait(false);
+                    (this, entity, pk, requestOptions)).ConfigureAwait(false);
             }
             else
             {
@@ -228,7 +229,7 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
                     return grainState.ETag switch
                     {
                         null or { Length: 0 } => self._container.CreateItemAsync(entity, pk),
-                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk),
+                        ANY_ETAG => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
                         _ => self._container.ReplaceItemAsync(entity, entity.Id, pk, requestOptions),
                     };
                 },
