@@ -94,6 +94,49 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonWriteEntryCodec_QueueSnapshot_PreservesExistingShape()
+    {
+        var codec = new JsonExperimentalLogEntryCodec(Options);
+        var buffer = new ArrayBufferWriter<byte>();
+
+        codec.WriteEntry(new QueueLogEntries.Snapshot<int>([20, 30], 2), buffer);
+        var json = GetString(buffer);
+        var command = codec.ReadCommand(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var consumer = new QueueConsumer<int>();
+        codec.ApplyEntry<QueueLogEntries.Snapshot<int>, IDurableQueueLogEntryConsumer<int>>(
+            new ReadOnlySequence<byte>(buffer.WrittenMemory),
+            consumer);
+
+        Assert.Equal("""{"cmd":"snapshot","items":[20,30]}""", json);
+        Assert.True(command.Is<QueueLogEntries.Snapshot<int>>());
+        Assert.Equal(["snapshot:2", "snapshot-item:20", "snapshot-item:30"], consumer.Commands);
+    }
+
+    [Fact]
+    public void JsonWriteEntryCodec_DictionarySnapshot_PreservesExistingShape()
+    {
+        var codec = new JsonExperimentalLogEntryCodec(Options);
+        var items = new List<KeyValuePair<string, int>>
+        {
+            new("alpha", 1),
+            new("beta", 2),
+        };
+        var buffer = new ArrayBufferWriter<byte>();
+
+        codec.WriteEntry(new DictionaryLogEntries.Snapshot<string, int>(items, items.Count), buffer);
+        var json = GetString(buffer);
+        var command = codec.ReadCommand(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.ApplyEntry<DictionaryLogEntries.Snapshot<string, int>, IDurableDictionaryLogEntryConsumer<string, int>>(
+            new ReadOnlySequence<byte>(buffer.WrittenMemory),
+            consumer);
+
+        Assert.Equal("""{"cmd":"snapshot","items":[{"key":"alpha","value":1},{"key":"beta","value":2}]}""", json);
+        Assert.True(command.Is<DictionaryLogEntries.Snapshot<string, int>>());
+        Assert.Equal(items, consumer.Items);
+    }
+
+    [Fact]
     public void JsonSetCodec_Operations_RoundTrip()
     {
         var codec = new JsonSetEntryCodec<string>(Options);
