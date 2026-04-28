@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Collections.Immutable;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Text;
 using System.Threading;
@@ -11,6 +12,7 @@ using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Orleans.CodeGenerator.Diagnostics;
+using Orleans.CodeGenerator.Hashing;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
@@ -36,6 +38,8 @@ namespace Orleans.CodeGenerator
         internal const string ProxyOutputsTrackingName = "Orleans.ProxyOutputs";
         internal const string MetadataOutputsTrackingName = "Orleans.MetadataOutputs";
 
+        private const string GeneratedCodeWarningDisable = "#pragma warning disable CS1591, RS0016, RS0041";
+        private const string GeneratedCodeWarningRestore = "#pragma warning restore CS1591, RS0016, RS0041";
         private static int _debuggerLaunchState;
 
         public void Initialize(IncrementalGeneratorInitializationContext context)
@@ -63,16 +67,17 @@ namespace Orleans.CodeGenerator
                     ct))
                 .WithTrackingName(SerializableTypeResultsTrackingName);
 
-            var serializableTypes = serializableTypeResults
-                .Where(static result => result.Model is not null)
-                .Select(static (result, _) => result.Model!);
-
-            var collectedTypes = serializableTypes
+            var collectedSerializableTypeResults = serializableTypeResults
                 .Collect()
+                .Select(static (input, _) => DeduplicateSerializableTypeResults(input))
+                .WithComparer(ImmutableArrayComparer<SerializableTypeResult>.Instance);
+
+            var collectedTypes = collectedSerializableTypeResults
+                .Select(static (input, _) => GetSerializableTypeModels(input))
                 .WithComparer(ImmutableArrayComparer<SerializableTypeModel>.Instance)
                 .WithTrackingName(CollectedSerializableTypesTrackingName);
 
-            context.RegisterSourceOutput(serializableTypeResults, static (productionContext, result) =>
+            context.RegisterSourceOutput(collectedSerializableTypeResults.SelectMany(static (input, _) => input), static (productionContext, result) =>
             {
                 if (result.Diagnostic is { } diagnostic)
                 {
@@ -98,12 +103,16 @@ namespace Orleans.CodeGenerator
                 .Where(static model => model is not null)
                 .Select(static (model, _) => model!)
                 .Collect()
+                .Select(static (input, _) => ModelExtractor.NormalizeProxyInterfaceModels(input))
                 .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance)
                 .WithTrackingName(InheritedProxyInterfacesTrackingName);
 
-            var collectedProxies = directProxyInterfaces
+            var collectedDirectProxyInterfaces = directProxyInterfaces
                 .Collect()
-                .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance)
+                .Select(static (input, _) => ModelExtractor.NormalizeProxyInterfaceModels(input))
+                .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance);
+
+            var collectedProxies = collectedDirectProxyInterfaces
                 .Combine(inheritedProxyInterfaces)
                 .Select(static (input, _) => ModelExtractor.MergeProxyInterfaces(input.Left, input.Right))
                 .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance)
@@ -124,13 +133,27 @@ namespace Orleans.CodeGenerator
             });
 
             // Extract reference assembly data (application parts, well-known type IDs, aliases)
-            var refAssemblyData = compilationProvider
+            var refAssemblyDataResults = compilationProvider
                 .Combine(generatorOptions)
-                .Select(static (input, ct) => ModelExtractor.ExtractReferenceAssemblyData(
+                .Select(static (input, ct) => CreateReferenceAssemblyDataResult(
                     input.Left,
-                    CreateCodeGeneratorOptions(input.Right),
+                    input.Right,
                     ct))
                 .WithTrackingName(ReferenceAssemblyDataTrackingName);
+
+            context.RegisterSourceOutput(refAssemblyDataResults, static (productionContext, result) =>
+            {
+                if (!result.Diagnostics.IsDefaultOrEmpty)
+                {
+                    foreach (var diagnostic in result.Diagnostics)
+                    {
+                        productionContext.ReportDiagnostic(diagnostic);
+                    }
+                }
+            });
+
+            var refAssemblyData = refAssemblyDataResults
+                .Select(static (result, _) => result.Model);
 
             var preparedProxyOutputModels = preparedProxyOutputs
                 .Select(static (result, _) => result.ProxyOutputModels)
@@ -147,12 +170,14 @@ namespace Orleans.CodeGenerator
                     input.Right))
                 .WithTrackingName(MetadataAggregateTrackingName);
 
-            var serializerOutputs = serializableTypeResults
-                .Where(static result => result.SourceOutput.HasValue)
-                .Select(static (result, _) => result.SourceOutput.GetValueOrDefault())
-                .Collect()
-                .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
-                .Select(static (input, _) => DeduplicateSourceOutputs(input))
+            var serializerOutputs = collectedTypes
+                .Combine(compilationProvider)
+                .Combine(generatorOptions)
+                .Select(static (input, ct) => CreateSerializableSourceOutputs(
+                    input.Left.Right,
+                    input.Left.Left,
+                    input.Right,
+                    ct))
                 .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
                 .WithTrackingName(SerializerOutputsTrackingName);
 
@@ -212,6 +237,10 @@ namespace Orleans.CodeGenerator
                 return default;
             }
 
+            var sourceLocation = ModelExtractor.GetSourceLocation(symbol);
+            var metadataIdentity = TypeMetadataIdentity.Create(symbol);
+            var typeSyntax = symbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+
             try
             {
                 cancellationToken.ThrowIfCancellationRequested();
@@ -226,9 +255,8 @@ namespace Orleans.CodeGenerator
                     return default;
                 }
 
-                var model = ModelExtractor.ExtractSerializableTypeModel(typeDescription, ModelExtractor.GetSourceLocation(symbol));
-                var sourceOutput = CreateSerializableSourceOutput(compilation, codeGeneratorOptions, libraryTypes, typeDescription);
-                return SerializableTypeResult.FromModelAndSource(model, sourceOutput);
+                var model = ModelExtractor.ExtractSerializableTypeModel(typeDescription, sourceLocation);
+                return SerializableTypeResult.FromModel(model);
             }
             catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
             {
@@ -236,7 +264,103 @@ namespace Orleans.CodeGenerator
             }
             catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
             {
-                return SerializableTypeResult.FromDiagnostic(analysisException.Diagnostic);
+                return SerializableTypeResult.FromDiagnostic(
+                    analysisException.Diagnostic,
+                    metadataIdentity,
+                    sourceLocation,
+                    typeSyntax);
+            }
+        }
+
+        private static ImmutableArray<SourceOutputResult> CreateSerializableSourceOutputs(
+            Compilation compilation,
+            ImmutableArray<SerializableTypeModel> models,
+            GeneratorOptions options,
+            CancellationToken cancellationToken)
+        {
+            if (models.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SourceOutputResult>.Empty;
+            }
+
+            AttachDebuggerIfRequested(options);
+            var codeGeneratorOptions = CreateCodeGeneratorOptions(options);
+            var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
+            var resolver = new TypeSymbolResolver(compilation);
+            var assemblyName = compilation.AssemblyName ?? "assembly";
+            var sourceEntries = ImmutableArray.CreateBuilder<SourceOutputResult>();
+            var defaultCopiers = new Dictionary<ISerializableTypeDescription, TypeSyntax>();
+            var serializerGenerator = new SerializerGenerator(generatorServices);
+            var copierGenerator = new CopierGenerator(generatorServices);
+            var activatorGenerator = new ActivatorGenerator(generatorServices);
+
+            foreach (var model in ModelExtractor.DeduplicateSerializableTypes(models))
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+
+                try
+                {
+                    if (!resolver.TryResolveSerializableType(model, cancellationToken, out var symbol)
+                        || !SymbolEqualityComparer.Default.Equals(symbol.ContainingAssembly, compilation.Assembly))
+                    {
+                        continue;
+                    }
+
+                    var typeDescription = CreateSerializableTypeDescription(generatorServices, symbol);
+                    if (typeDescription is null)
+                    {
+                        continue;
+                    }
+
+                    sourceEntries.Add(CreateSerializableSourceOutput(
+                        assemblyName,
+                        typeDescription,
+                        serializerGenerator,
+                        copierGenerator,
+                        activatorGenerator,
+                        defaultCopiers,
+                        model.MetadataIdentity,
+                        model.TypeSyntax.SyntaxString,
+                        model.GeneratedNamespace,
+                        model.TypeParameters.Length));
+                }
+                catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                {
+                    throw;
+                }
+                catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
+                {
+                    sourceEntries.Add(SourceOutputResult.FromDiagnostic(analysisException.Diagnostic));
+                }
+            }
+
+            return DeduplicateSourceOutputs(sourceEntries);
+        }
+
+        private static ReferenceAssemblyDataResult CreateReferenceAssemblyDataResult(
+            Compilation compilation,
+            GeneratorOptions options,
+            CancellationToken cancellationToken)
+        {
+            try
+            {
+                var model = ModelExtractor.ExtractReferenceAssemblyData(
+                    compilation,
+                    CreateCodeGeneratorOptions(options),
+                    cancellationToken,
+                    out var diagnostics);
+
+                return ReferenceAssemblyDataResult.FromModelAndDiagnostics(model, diagnostics);
+            }
+            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+            {
+                throw;
+            }
+            catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
+            {
+                return ReferenceAssemblyDataResult.FromModelAndDiagnostics(
+                    CreateEmptyReferenceAssemblyModel(compilation.AssemblyName ?? string.Empty),
+                    ImmutableArray.Create(analysisException.Diagnostic));
             }
         }
 
@@ -314,7 +438,11 @@ namespace Orleans.CodeGenerator
                         serializerGenerator,
                         copierGenerator,
                         activatorGenerator,
-                        defaultCopiers));
+                        defaultCopiers,
+                        model.MetadataIdentity,
+                        model.TypeSyntax.SyntaxString,
+                        model.GeneratedNamespace,
+                        model.TypeParameters.Length));
                 }
 
                 return DeduplicateSourceOutputs(sourceEntries);
@@ -333,7 +461,11 @@ namespace Orleans.CodeGenerator
             Compilation compilation,
             CodeGeneratorOptions options,
             LibraryTypes libraryTypes,
-            ISerializableTypeDescription typeDescription)
+            ISerializableTypeDescription typeDescription,
+            TypeMetadataIdentity metadataIdentity,
+            string typeSyntax,
+            string hintGeneratedNamespace,
+            int genericArity)
         {
             var generatorServices = new GeneratorServices(compilation, options, libraryTypes);
             return CreateSerializableSourceOutput(
@@ -342,7 +474,11 @@ namespace Orleans.CodeGenerator
                 new SerializerGenerator(generatorServices),
                 new CopierGenerator(generatorServices),
                 new ActivatorGenerator(generatorServices),
-                new Dictionary<ISerializableTypeDescription, TypeSyntax>());
+                new Dictionary<ISerializableTypeDescription, TypeSyntax>(),
+                metadataIdentity,
+                typeSyntax,
+                hintGeneratedNamespace,
+                genericArity);
         }
 
         private static SourceOutputResult CreateSerializableSourceOutput(
@@ -351,7 +487,11 @@ namespace Orleans.CodeGenerator
             SerializerGenerator serializerGenerator,
             CopierGenerator copierGenerator,
             ActivatorGenerator activatorGenerator,
-            Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers)
+            Dictionary<ISerializableTypeDescription, TypeSyntax> defaultCopiers,
+            TypeMetadataIdentity metadataIdentity,
+            string typeSyntax,
+            string hintGeneratedNamespace,
+            int genericArity)
         {
             var serializer = serializerGenerator.Generate(typeDescription);
             var copier = typeDescription.IsShallowCopyable && defaultCopiers.ContainsKey(typeDescription)
@@ -364,7 +504,10 @@ namespace Orleans.CodeGenerator
             return SourceOutputResult.FromSource(
                 CreateSerializableSourceEntry(
                     assemblyName,
-                    typeDescription.TypeSyntax.ToString(),
+                    typeSyntax,
+                    metadataIdentity,
+                    hintGeneratedNamespace,
+                    genericArity,
                     serializer,
                     copier,
                     activatorClass,
@@ -391,7 +534,7 @@ namespace Orleans.CodeGenerator
                 var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
                 var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
                 var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
-                var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+                var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription);
                 var ownedInvokableMetadataNames = new HashSet<string>(
                     proxyOutputModel.OwnedInvokableMetadataNames,
                     StringComparer.Ordinal);
@@ -479,7 +622,7 @@ namespace Orleans.CodeGenerator
                 var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
                 var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
                 var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
-                var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+                var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription);
                 var ownedInvokableMetadataNames = new HashSet<string>(
                     proxyOutputModel.OwnedInvokableMetadataNames,
                     StringComparer.Ordinal);
@@ -645,7 +788,7 @@ namespace Orleans.CodeGenerator
             var proxyEntries = proxyContext.MetadataModel.InvokableInterfaces.Values
                 .Where(desc => SymbolEqualityComparer.Default.Equals(desc.InterfaceType.ContainingAssembly, compilation.Assembly))
                 .OrderBy(static desc => desc.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), StringComparer.Ordinal)
-                .Select(desc => (HintName: CreateProxyHintName(assemblyName, desc.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)), Description: desc))
+                .Select(desc => (HintName: CreateProxyHintName(assemblyName, desc), Description: desc))
                 .ToImmutableArray();
 
             var invokableOwners = new Dictionary<string, string>(StringComparer.Ordinal);
@@ -660,8 +803,7 @@ namespace Orleans.CodeGenerator
                 }
             }
 
-            return models
-                .Distinct()
+            return ModelExtractor.DeduplicateProxyInterfaces(models)
                 .OrderBy(static model => model.SourceLocation.SourceOrderGroup)
                 .ThenBy(static model => model.SourceLocation.FilePath, StringComparer.Ordinal)
                 .ThenBy(static model => model.SourceLocation.Position)
@@ -674,7 +816,7 @@ namespace Orleans.CodeGenerator
                 .Select(model =>
                 {
                     var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
-                    var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
+                    var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription);
                     var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription)
                         .ToImmutableArray();
                     var ownedInvokableMetadataNames = generatedInvokables
@@ -828,36 +970,7 @@ namespace Orleans.CodeGenerator
                                             SyntaxFactory.IdentifierName(metadataClassName)))))));
             assemblyAttributes.Add(metadataAttribute);
 
-            if (assemblyAttributes.Count > 0)
-            {
-                assemblyAttributes[0] = assemblyAttributes[0]
-                    .WithLeadingTrivia(
-                        SyntaxFactory.TriviaList(
-                            SyntaxFactory.Trivia(
-                                SyntaxFactory.PragmaWarningDirectiveTrivia(
-                                    SyntaxFactory.Token(SyntaxKind.DisableKeyword),
-                                    SyntaxFactory.SeparatedList<ExpressionSyntax>(
-                                        new[]
-                                        {
-                                            CreatePragmaWarning("CS1591"),
-                                            CreatePragmaWarning("RS0016"),
-                                            CreatePragmaWarning("RS0041"),
-                                        }),
-                                    isActive: true))));
-            }
-
             return SyntaxFactory.List(assemblyAttributes);
-
-            static ExpressionSyntax CreatePragmaWarning(string warningCode)
-            {
-                var syntaxToken = SyntaxFactory.Literal(
-                    SyntaxFactory.TriviaList(),
-                    warningCode,
-                    warningCode,
-                    SyntaxFactory.TriviaList());
-
-                return SyntaxFactory.LiteralExpression(SyntaxKind.StringLiteralExpression, syntaxToken);
-            }
         }
 
         private static ISerializableTypeDescription CreateSerializableTypeDescription(IGeneratorServices services, INamedTypeSymbol symbol)
@@ -1452,6 +1565,104 @@ namespace Orleans.CodeGenerator
             }
         }
 
+        private static ImmutableArray<SerializableTypeResult> DeduplicateSerializableTypeResults(
+            ImmutableArray<SerializableTypeResult> results)
+        {
+            if (results.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SerializableTypeResult>.Empty;
+            }
+
+            var models = new Dictionary<string, SerializableTypeResult>(StringComparer.Ordinal);
+            var diagnostics = new Dictionary<string, SerializableTypeResult>(StringComparer.Ordinal);
+            foreach (var result in OrderSerializableTypeResultsForCanonicalSelection(results))
+            {
+                if (result.Model is not null)
+                {
+                    var key = CreateSerializableTypeDedupeKey(result);
+                    if (!models.ContainsKey(key))
+                    {
+                        models.Add(key, result);
+                    }
+                }
+                else if (result.Diagnostic is { } diagnostic)
+                {
+                    var key = $"{CreateSerializableTypeDedupeKey(result)}|{diagnostic.Id}";
+                    if (!diagnostics.ContainsKey(key))
+                    {
+                        diagnostics.Add(key, result);
+                    }
+                }
+            }
+
+            return OrderSerializableTypeResultsForEmission(models.Values.Concat(diagnostics.Values))
+                .ToImmutableArray();
+        }
+
+        private static ImmutableArray<SerializableTypeModel> GetSerializableTypeModels(
+            ImmutableArray<SerializableTypeResult> results)
+        {
+            if (results.IsDefaultOrEmpty)
+            {
+                return ImmutableArray<SerializableTypeModel>.Empty;
+            }
+
+            var builder = ImmutableArray.CreateBuilder<SerializableTypeModel>();
+            foreach (var result in results)
+            {
+                if (result.Model is { } model)
+                {
+                    builder.Add(model);
+                }
+            }
+
+            return ModelExtractor.DeduplicateSerializableTypes(builder.ToImmutable());
+        }
+
+        private static IOrderedEnumerable<SerializableTypeResult> OrderSerializableTypeResultsForCanonicalSelection(
+            IEnumerable<SerializableTypeResult> results)
+            => results
+                .Where(static result => result.Model is not null || result.Diagnostic is not null)
+                .OrderBy(static result => result.SourceLocation.SourceOrderGroup)
+                .ThenBy(static result => result.SourceLocation.FilePath, StringComparer.Ordinal)
+                .ThenBy(static result => result.SourceLocation.Position)
+                .ThenBy(static result => result.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .ThenBy(static result => result.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                .ThenBy(static result => result.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static result => result.TypeSyntax, StringComparer.Ordinal)
+                .ThenBy(static result => result.Diagnostic?.Id ?? string.Empty, StringComparer.Ordinal);
+
+        private static IOrderedEnumerable<SerializableTypeResult> OrderSerializableTypeResultsForEmission(
+            IEnumerable<SerializableTypeResult> results)
+            => results
+                .OrderBy(static result => result.Model is null ? 1 : 0)
+                .ThenBy(static result => result.MetadataIdentity.MetadataName, StringComparer.Ordinal)
+                .ThenBy(static result => result.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
+                .ThenBy(static result => result.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
+                .ThenBy(static result => result.TypeSyntax, StringComparer.Ordinal)
+                .ThenBy(static result => result.Diagnostic?.Id ?? string.Empty, StringComparer.Ordinal)
+                .ThenBy(static result => result.SourceLocation.SourceOrderGroup)
+                .ThenBy(static result => result.SourceLocation.FilePath, StringComparer.Ordinal)
+                .ThenBy(static result => result.SourceLocation.Position);
+
+        private static string CreateSerializableTypeDedupeKey(SerializableTypeResult result)
+            => CreateTypeDedupeKey(result.MetadataIdentity, result.TypeSyntax);
+
+        private static string CreateTypeDedupeKey(TypeMetadataIdentity metadataIdentity, string typeSyntax)
+        {
+            if (!metadataIdentity.IsEmpty)
+            {
+                return string.Join(
+                    "|",
+                    "M",
+                    metadataIdentity.AssemblyIdentity ?? string.Empty,
+                    metadataIdentity.AssemblyName ?? string.Empty,
+                    metadataIdentity.MetadataName ?? string.Empty);
+            }
+
+            return string.Join("|", "S", typeSyntax ?? string.Empty);
+        }
+
         private static ImmutableArray<SourceOutputResult> DeduplicateSourceOutputs(
             ImmutableArray<SourceOutputResult>.Builder sourceEntries)
             => DeduplicateSourceOutputs(sourceEntries.ToImmutable());
@@ -1459,25 +1670,61 @@ namespace Orleans.CodeGenerator
         private static ImmutableArray<SourceOutputResult> DeduplicateSourceOutputs(
             ImmutableArray<SourceOutputResult> sourceEntries)
         {
-            var emittedHintNames = new HashSet<string>(StringComparer.Ordinal);
-            var result = ImmutableArray.CreateBuilder<SourceOutputResult>(sourceEntries.Length);
-            foreach (var sourceEntry in sourceEntries)
+            var emittedSourcesByOriginalHintName = new Dictionary<string, Dictionary<string, string>>(StringComparer.Ordinal);
+            var emittedSourceByHintName = new Dictionary<string, string>(StringComparer.Ordinal);
+            var result = ImmutableArray.CreateBuilder<SourceOutputResult>();
+            foreach (var sourceOutput in sourceEntries)
             {
-                if (sourceEntry.SourceEntry is { } entry
-                    && !emittedHintNames.Add(entry.HintName))
+                if (sourceOutput.SourceEntry is not { } entry)
+                {
+                    result.Add(sourceOutput);
+                    continue;
+                }
+
+                var source = entry.Source ?? string.Empty;
+                if (!emittedSourcesByOriginalHintName.TryGetValue(entry.HintName, out var emittedSources))
+                {
+                    emittedSources = new Dictionary<string, string>(StringComparer.Ordinal);
+                    emittedSourcesByOriginalHintName.Add(entry.HintName, emittedSources);
+                }
+
+                if (emittedSources.ContainsKey(source))
                 {
                     continue;
                 }
 
-                result.Add(sourceEntry);
+                if (!emittedSourceByHintName.TryGetValue(entry.HintName, out var emittedSource))
+                {
+                    emittedSources.Add(source, entry.HintName);
+                    emittedSourceByHintName.Add(entry.HintName, source);
+                    result.Add(sourceOutput);
+                    continue;
+                }
+
+                if (string.Equals(emittedSource, source, StringComparison.Ordinal))
+                {
+                    emittedSources.Add(source, entry.HintName);
+                    continue;
+                }
+
+                var uniqueHintName = CreateDistinctSourceHintName(entry.HintName, source, emittedSourceByHintName);
+                emittedSources.Add(source, uniqueHintName);
+                emittedSourceByHintName.Add(uniqueHintName, source);
+                result.Add(SourceOutputResult.FromSource(new GeneratedSourceEntry(uniqueHintName, entry.Source)));
             }
 
-            return result.MoveToImmutable();
+            return NormalizeSourceOutputs(result.ToImmutable());
         }
+
+        private static ImmutableArray<SourceOutputResult> NormalizeSourceOutputs(ImmutableArray<SourceOutputResult> sourceOutputs)
+            => StructuralEquality.Normalize(sourceOutputs);
 
         private static GeneratedSourceEntry CreateSerializableSourceEntry(
             string assemblyName,
             string typeName,
+            TypeMetadataIdentity metadataIdentity,
+            string hintGeneratedNamespace,
+            int genericArity,
             ClassDeclarationSyntax serializer,
             ClassDeclarationSyntax copier,
             ClassDeclarationSyntax activator,
@@ -1496,7 +1743,7 @@ namespace Orleans.CodeGenerator
             }
 
             return new GeneratedSourceEntry(
-                CreateSerializableHintName(assemblyName, typeName),
+                CreateSerializableHintName(assemblyName, typeName, metadataIdentity, hintGeneratedNamespace, genericArity),
                 CreateSourceString(CreateCompilationUnit(namespacedMembers)));
         }
 
@@ -1520,7 +1767,7 @@ namespace Orleans.CodeGenerator
 
         private static string CreateSourceString(CompilationUnitSyntax unit)
         {
-            return unit.NormalizeWhitespace().ToFullString();
+            return $"{GeneratedCodeWarningDisable}\r\n{unit.NormalizeWhitespace().ToFullString()}\r\n{GeneratedCodeWarningRestore}";
         }
 
         private static CompilationUnitSyntax CreateCompilationUnit(
@@ -1561,14 +1808,99 @@ namespace Orleans.CodeGenerator
             };
         }
 
-        private static string CreateSerializableHintName(string assemblyName, string typeName)
-            => $"{assemblyName}.orleans.ser.{SanitizeHintComponent(typeName)}.g.cs";
+        private static string CreateSerializableHintName(
+            string assemblyName,
+            string typeName,
+            TypeMetadataIdentity metadataIdentity,
+            string generatedNamespace,
+            int genericArity)
+        {
+            var hash = CreateHintNameHash(metadataIdentity, generatedNamespace, typeName, genericArity);
 
-        private static string CreateProxyHintName(string assemblyName, string interfaceName)
-            => $"{assemblyName}.orleans.proxy.{SanitizeHintComponent(interfaceName)}.g.cs";
+            return $"{assemblyName}.orleans.ser.{SanitizeHintComponent(typeName)}.{hash}.g.cs";
+        }
+
+        private static string CreateProxyHintName(string assemblyName, ProxyInterfaceDescription interfaceDescription)
+        {
+            var interfaceName = interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat);
+            var hash = CreateHintNameHash(
+                TypeMetadataIdentity.Create(interfaceDescription.InterfaceType),
+                interfaceDescription.GeneratedNamespace,
+                interfaceName,
+                interfaceDescription.TypeParameters.Count);
+
+            return $"{assemblyName}.orleans.proxy.{SanitizeHintComponent(interfaceName)}.{hash}.g.cs";
+        }
 
         private static string CreateMetadataHintName(string assemblyName)
             => $"{assemblyName}.orleans.metadata.g.cs";
+
+        private static string CreateHintNameHash(
+            TypeMetadataIdentity metadataIdentity,
+            string generatedNamespace,
+            string syntaxString,
+            int genericArity)
+        {
+            var builder = new StringBuilder();
+            AppendHashComponent(builder, metadataIdentity.AssemblyIdentity);
+            AppendHashComponent(builder, metadataIdentity.AssemblyName);
+            AppendHashComponent(builder, metadataIdentity.MetadataName);
+            AppendHashComponent(builder, generatedNamespace);
+            AppendHashComponent(builder, syntaxString);
+            AppendHashComponent(builder, genericArity.ToString(CultureInfo.InvariantCulture));
+
+            return CreateStableHash(builder.ToString());
+        }
+
+        private static string CreateStableHash(string value)
+            => HexConverter.ToString(XxHash32.Hash(Encoding.UTF8.GetBytes(value ?? string.Empty)));
+
+        private static void AppendHashComponent(StringBuilder builder, string value)
+        {
+            builder.Append(value?.Length ?? 0);
+            builder.Append(':');
+            builder.Append(value ?? string.Empty);
+            builder.Append('|');
+        }
+
+        private static string CreateDistinctSourceHintName(
+            string hintName,
+            string source,
+            Dictionary<string, string> emittedSourceByHintName)
+        {
+            var sourceHash = CreateStableHash(source);
+            var candidate = InsertHintNameComponent(hintName, $"collision.{sourceHash}");
+            if (!emittedSourceByHintName.ContainsKey(candidate))
+            {
+                return candidate;
+            }
+
+            for (var index = 1; ; index++)
+            {
+                candidate = InsertHintNameComponent(hintName, $"collision.{sourceHash}.{index}");
+                if (!emittedSourceByHintName.ContainsKey(candidate))
+                {
+                    return candidate;
+                }
+            }
+        }
+
+        private static string InsertHintNameComponent(string hintName, string component)
+        {
+            const string GeneratedSourceSuffix = ".g.cs";
+            if (hintName.EndsWith(GeneratedSourceSuffix, StringComparison.Ordinal))
+            {
+                return $"{hintName.Substring(0, hintName.Length - GeneratedSourceSuffix.Length)}.{component}{GeneratedSourceSuffix}";
+            }
+
+            const string SourceSuffix = ".cs";
+            if (hintName.EndsWith(SourceSuffix, StringComparison.Ordinal))
+            {
+                return $"{hintName.Substring(0, hintName.Length - SourceSuffix.Length)}.{component}{SourceSuffix}";
+            }
+
+            return $"{hintName}.{component}";
+        }
 
         private static string SanitizeHintComponent(string value)
         {
@@ -1696,6 +2028,18 @@ namespace Orleans.CodeGenerator
             }
         }
 
+        private static ReferenceAssemblyModel CreateEmptyReferenceAssemblyModel(string assemblyName)
+            => new(
+                assemblyName,
+                ImmutableArray<string>.Empty,
+                ImmutableArray<WellKnownTypeIdModel>.Empty,
+                ImmutableArray<TypeAliasModel>.Empty,
+                ImmutableArray<CompoundTypeAliasModel>.Empty,
+                ImmutableArray<SerializableTypeModel>.Empty,
+                ImmutableArray<ProxyInterfaceModel>.Empty,
+                ImmutableArray<RegisteredCodecModel>.Empty,
+                ImmutableArray<InterfaceImplementationModel>.Empty);
+
         private readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, Diagnostic diagnostic) : IEquatable<SourceOutputResult>
         {
             public GeneratedSourceEntry? SourceEntry { get; } = sourceEntry;
@@ -1721,22 +2065,65 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        private readonly struct SerializableTypeResult(SerializableTypeModel model, SourceOutputResult? sourceOutput, Diagnostic diagnostic) : IEquatable<SerializableTypeResult>
+        private readonly struct ReferenceAssemblyDataResult(ReferenceAssemblyModel model, ImmutableArray<Diagnostic> diagnostics) : IEquatable<ReferenceAssemblyDataResult>
+        {
+            public ReferenceAssemblyModel Model { get; } = model;
+            public ImmutableArray<Diagnostic> Diagnostics { get; } = diagnostics.IsDefault ? ImmutableArray<Diagnostic>.Empty : diagnostics;
+
+            public static ReferenceAssemblyDataResult FromModelAndDiagnostics(ReferenceAssemblyModel model, ImmutableArray<Diagnostic> diagnostics)
+                => new(model, diagnostics);
+
+            public bool Equals(ReferenceAssemblyDataResult other)
+                => EqualityComparer<ReferenceAssemblyModel>.Default.Equals(Model, other.Model)
+                    && AreDiagnosticSequencesEqual(Diagnostics, other.Diagnostics);
+
+            public override bool Equals(object obj) => obj is ReferenceAssemblyDataResult other && Equals(other);
+
+            public override int GetHashCode()
+            {
+                unchecked
+                {
+                    var hash = Model?.GetHashCode() ?? 0;
+                    hash = hash * 31 + GetDiagnosticSequenceHashCode(Diagnostics);
+                    return hash;
+                }
+            }
+        }
+
+        private readonly struct SerializableTypeResult(
+            SerializableTypeModel model,
+            Diagnostic diagnostic,
+            TypeMetadataIdentity metadataIdentity,
+            SourceLocationModel sourceLocation,
+            string typeSyntax) : IEquatable<SerializableTypeResult>
         {
             public SerializableTypeModel Model { get; } = model;
-            public SourceOutputResult? SourceOutput { get; } = sourceOutput;
             public Diagnostic Diagnostic { get; } = diagnostic;
+            public TypeMetadataIdentity MetadataIdentity { get; } = metadataIdentity;
+            public SourceLocationModel SourceLocation { get; } = sourceLocation;
+            public string TypeSyntax { get; } = typeSyntax;
 
-            public static SerializableTypeResult FromModelAndSource(SerializableTypeModel model, SourceOutputResult sourceOutput)
-                => new(model, sourceOutput, diagnostic: null);
+            public static SerializableTypeResult FromModel(SerializableTypeModel model)
+                => new(
+                    model,
+                    diagnostic: null,
+                    model?.MetadataIdentity ?? TypeMetadataIdentity.Empty,
+                    model?.SourceLocation ?? default,
+                    model?.TypeSyntax.SyntaxString ?? string.Empty);
 
-            public static SerializableTypeResult FromDiagnostic(Diagnostic diagnostic)
-                => new(model: null, sourceOutput: null, diagnostic);
+            public static SerializableTypeResult FromDiagnostic(
+                Diagnostic diagnostic,
+                TypeMetadataIdentity metadataIdentity,
+                SourceLocationModel sourceLocation,
+                string typeSyntax)
+                => new(model: null, diagnostic, metadataIdentity, sourceLocation, typeSyntax ?? string.Empty);
 
             public bool Equals(SerializableTypeResult other)
                 => EqualityComparer<SerializableTypeModel>.Default.Equals(Model, other.Model)
-                    && Nullable.Equals(SourceOutput, other.SourceOutput)
-                    && AreDiagnosticsEqual(Diagnostic, other.Diagnostic);
+                    && AreDiagnosticsEqual(Diagnostic, other.Diagnostic)
+                    && MetadataIdentity.Equals(other.MetadataIdentity)
+                    && SourceLocation.Equals(other.SourceLocation)
+                    && string.Equals(TypeSyntax, other.TypeSyntax, StringComparison.Ordinal);
 
             public override bool Equals(object obj) => obj is SerializableTypeResult other && Equals(other);
 
@@ -1745,8 +2132,10 @@ namespace Orleans.CodeGenerator
                 unchecked
                 {
                     var hash = Model?.GetHashCode() ?? 0;
-                    hash = hash * 31 + SourceOutput.GetHashCode();
                     hash = hash * 31 + GetDiagnosticHashCode(Diagnostic);
+                    hash = hash * 31 + MetadataIdentity.GetHashCode();
+                    hash = hash * 31 + SourceLocation.GetHashCode();
+                    hash = hash * 31 + StringComparer.Ordinal.GetHashCode(TypeSyntax ?? string.Empty);
                     return hash;
                 }
             }
@@ -1785,6 +2174,48 @@ namespace Orleans.CodeGenerator
                     hash = hash * 31 + GetDiagnosticHashCode(Diagnostic);
                     return hash;
                 }
+            }
+        }
+
+        private static bool AreDiagnosticSequencesEqual(ImmutableArray<Diagnostic> left, ImmutableArray<Diagnostic> right)
+        {
+            if (left.IsDefaultOrEmpty)
+            {
+                return right.IsDefaultOrEmpty;
+            }
+
+            if (right.IsDefaultOrEmpty || left.Length != right.Length)
+            {
+                return false;
+            }
+
+            for (var i = 0; i < left.Length; i++)
+            {
+                if (!AreDiagnosticsEqual(left[i], right[i]))
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static int GetDiagnosticSequenceHashCode(ImmutableArray<Diagnostic> diagnostics)
+        {
+            if (diagnostics.IsDefaultOrEmpty)
+            {
+                return 0;
+            }
+
+            unchecked
+            {
+                var hash = 0;
+                foreach (var diagnostic in diagnostics)
+                {
+                    hash = hash * 31 + GetDiagnosticHashCode(diagnostic);
+                }
+
+                return hash;
             }
         }
 
