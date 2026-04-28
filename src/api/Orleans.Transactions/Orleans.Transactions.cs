@@ -64,6 +64,7 @@ namespace Orleans
     }
 
     [GenerateSerializer]
+    [SerializationCallbacks(typeof(Runtime.OnDeserializedCallbacks))]
     public abstract partial class TransactionRequestBase : Runtime.RequestBase, IOutgoingGrainCallFilter, Serialization.IOnDeserialized
     {
         [GeneratedActivatorConstructor]

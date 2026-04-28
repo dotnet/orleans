@@ -76,6 +76,7 @@ namespace Orleans
     }
 
     [GenerateSerializer]
+    [SerializationCallbacks(typeof(OnDeserializedCallbacks))]
     public abstract class TransactionRequestBase : RequestBase, IOutgoingGrainCallFilter, IOnDeserialized
     {
         [NonSerialized]
@@ -94,6 +95,9 @@ namespace Orleans
 
         [Id(2)]
         public bool UseExclusiveLock { get; set; }
+
+        [Id(3)]
+        private InvokeMethodOptions _methodOptions;
 
         [GeneratedActivatorConstructor]
         protected TransactionRequestBase(Serializer<OrleansTransactionAbortedException> exceptionSerializer, IServiceProvider serviceProvider)
@@ -124,6 +128,12 @@ namespace Orleans
         protected void SetTransactionOptions(TransactionOption txOption)
         {
             this.TransactionOption = txOption;
+        }
+
+        protected new void AddInvokeMethodOptions(InvokeMethodOptions options)
+        {
+            base.AddInvokeMethodOptions(options);
+            _methodOptions |= options;
         }
 
         protected void SetExclusiveLock(bool value)
@@ -206,7 +216,8 @@ namespace Orleans
                     var transactionTimeout = Debugger.IsAttached ? TimeSpan.FromMinutes(30) : TimeSpan.FromSeconds(10);
 
                     // Start a new transaction
-                    var isReadOnly = this.Options.HasFlag(InvokeMethodOptions.ReadOnly);
+                    var isReadOnly = this.Options.HasFlag(InvokeMethodOptions.ReadOnly)
+                        || _methodOptions.HasFlag(InvokeMethodOptions.ReadOnly);
                     transactionInfo = await TransactionAgent.StartTransaction(isReadOnly, transactionTimeout);
                     startedNewTransaction = true;
                 }
