@@ -17,14 +17,14 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal class InvokableGenerator
     {
-        private readonly CodeGenerator _codeGenerator;
+        private readonly ProxyGenerationContext _generationContext;
 
-        public InvokableGenerator(CodeGenerator codeGenerator)
+        public InvokableGenerator(ProxyGenerationContext generationContext)
         {
-            _codeGenerator = codeGenerator;
+            _generationContext = generationContext;
         }
 
-        private LibraryTypes LibraryTypes => _codeGenerator.LibraryTypes;
+        private LibraryTypes LibraryTypes => _generationContext.LibraryTypes;
 
         public GeneratedInvokableDescription Generate(InvokableMethodDescription invokableMethodInfo)
         {
@@ -82,7 +82,7 @@ namespace Orleans.CodeGenerator
                 invokableMethodInfo,
                 accessibility,
                 generatedClassName,
-                CodeGenerator.GetGeneratedNamespaceName(invokableMethodInfo.ContainingInterface),
+                GeneratedCodeUtilities.GetGeneratedNamespaceName(invokableMethodInfo.ContainingInterface),
                 fieldDescriptions.OfType<IMemberDescription>().ToList(),
                 serializationHooks,
                 baseClassType,
@@ -124,7 +124,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(SimpleBaseType(baseClassType.ToTypeSyntax(method.TypeParameterSubstitutions)))
                 .AddModifiers(Token(accessibilityKind), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
+                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
                 .AddMembers(fields);
 
             foreach (var alias in compoundTypeAliases)
@@ -819,7 +819,7 @@ namespace Orleans.CodeGenerator
             foreach (var parameter in method.Method.Parameters)
             {
                 var isSerializable = !SymbolEqualityComparer.Default.Equals(LibraryTypes.CancellationToken, parameter.Type);
-                fields.Add(new MethodParameterFieldDescription(method.CodeGenerator, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions, isSerializable));
+                fields.Add(new MethodParameterFieldDescription(LibraryTypes, parameter, $"arg{fieldId}", fieldId, method.TypeParameterSubstitutions, isSerializable));
                 fieldId++;
             }
 
@@ -871,7 +871,7 @@ namespace Orleans.CodeGenerator
         internal class MethodParameterFieldDescription : InvokerFieldDescription, IMemberDescription
         {
             public MethodParameterFieldDescription(
-                CodeGenerator codeGenerator,
+                LibraryTypes libraryTypes,
                 IParameterSymbol parameter,
                 string fieldName,
                 uint fieldId,
@@ -881,7 +881,7 @@ namespace Orleans.CodeGenerator
             {
                 TypeParameterSubstitutions = typeParameterSubstitutions;
                 FieldId = fieldId;
-                CodeGenerator = codeGenerator;
+                LibraryTypes = libraryTypes;
                 Parameter = parameter;
                 if (parameter.Type.TypeKind == TypeKind.Dynamic)
                 {
@@ -898,8 +898,8 @@ namespace Orleans.CodeGenerator
                 IsSerializable = isSerializable;
             }
 
-            public CodeGenerator CodeGenerator { get; }
             public ISymbol Symbol { get; }
+            public LibraryTypes LibraryTypes { get; }
             public Dictionary<ITypeParameterSymbol, string> TypeParameterSubstitutions { get; }
             public int ParameterOrdinal => Parameter.Ordinal;
             public uint FieldId { get; }

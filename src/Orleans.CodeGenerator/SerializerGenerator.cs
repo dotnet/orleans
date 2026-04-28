@@ -22,10 +22,6 @@ namespace Orleans.CodeGenerator
         private const string CodecFieldTypeFieldName = "_codecFieldType";
         private readonly IGeneratorServices _generatorServices;
 
-        public SerializerGenerator(CodeGenerator codeGenerator) : this((IGeneratorServices)codeGenerator)
-        {
-        }
-
         public SerializerGenerator(IGeneratorServices generatorServices)
         {
             _generatorServices = generatorServices;
@@ -74,7 +70,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))
                 .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
+                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
                 .AddMembers(fieldDeclarations);
 
             if (ctor != null)
@@ -121,8 +117,8 @@ namespace Orleans.CodeGenerator
 
         public static string GetGeneratedNamespaceName(ITypeSymbol type) => type.GetNamespaceAndNesting() switch
         {
-            { Length: > 0 } ns => $"{CodeGenerator.CodeGeneratorName}.{ns}",
-            _ => CodeGenerator.CodeGeneratorName
+            { Length: > 0 } ns => $"{GeneratedCodeUtilities.CodeGeneratorName}.{ns}",
+            _ => GeneratedCodeUtilities.CodeGeneratorName
         };
 
         private MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
@@ -414,7 +410,7 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
 
             res = type.IsAbstractType
@@ -591,7 +587,7 @@ namespace Orleans.CodeGenerator
                 .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
 
             if (type.IsAbstractType)
@@ -844,7 +840,7 @@ namespace Orleans.CodeGenerator
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
                 .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -959,7 +955,7 @@ namespace Orleans.CodeGenerator
                 .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -1008,7 +1004,7 @@ namespace Orleans.CodeGenerator
                 .AddParameterListParameters(parameters)
                 .AddTypeParameterListParameters(TypeParameter("TBufferWriter"))
                 .AddConstraintClauses(TypeParameterConstraintClause("TBufferWriter").AddConstraints(TypeConstraint(LibraryTypes.IBufferWriter.ToTypeSyntax(PredefinedType(Token(SyntaxKind.ByteKeyword))))))
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -1041,7 +1037,7 @@ namespace Orleans.CodeGenerator
                 .AddTypeParameterListParameters(TypeParameter("TReaderInput"))
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -1181,7 +1177,7 @@ namespace Orleans.CodeGenerator
             IMemberDescription ISerializableMember.Member => _member;
             public MethodParameterFieldDescription Member => _member;
 
-            private LibraryTypes LibraryTypes => _member.CodeGenerator.LibraryTypes;
+            private LibraryTypes LibraryTypes => _member.LibraryTypes;
 
             public bool IsShallowCopyable => LibraryTypes.IsShallowCopyable(_member.Parameter.Type) || _member.Parameter.HasAttribute(LibraryTypes.ImmutableAttribute);
 

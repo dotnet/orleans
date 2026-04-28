@@ -57,7 +57,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseInterface))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
+                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
                 .AddMembers(members.ToArray());
 
             if (type.IsGenericType)

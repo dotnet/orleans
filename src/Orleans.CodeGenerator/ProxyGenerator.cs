@@ -47,7 +47,7 @@ namespace Orleans.CodeGenerator
                     SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
                     SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
+                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
                 .AddMembers(fieldDeclarations)
                 .AddMembers(ctors)
                 .AddMembers(proxyMethods);

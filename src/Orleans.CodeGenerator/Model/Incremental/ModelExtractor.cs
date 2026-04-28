@@ -23,8 +23,7 @@ namespace Orleans.CodeGenerator
     {
         /// <summary>
         /// Extracts a <see cref="SerializableTypeModel"/> from an <see cref="ISerializableTypeDescription"/>.
-        /// This is a bridge method for Stage 1 — it allows the existing symbol-based descriptions
-        /// to be converted into equatable value models for incremental pipeline caching.
+        /// Converts symbol-based descriptions into equatable value models for incremental pipeline caching.
         /// </summary>
         public static SerializableTypeModel ExtractSerializableTypeModel(
             ISerializableTypeDescription description,
@@ -69,63 +68,6 @@ namespace Orleans.CodeGenerator
                     ? TypeMetadataIdentity.Create(serializableDescription.Type)
                     : TypeMetadataIdentity.Empty);
         }
-
-        /// <summary>
-        /// Extracts a <see cref="SerializableTypeModel"/> from a <see cref="GeneratorAttributeSyntaxContext"/>
-        /// provided by the <c>ForAttributeWithMetadataName</c> incremental pipeline step.
-        /// Returns <c>null</c> if the type cannot be processed.
-        /// </summary>
-        public static SerializableTypeModel ExtractFromAttributeContext(
-            GeneratorAttributeSyntaxContext context,
-            CancellationToken cancellationToken) => ExtractFromAttributeContextWithDiagnostics(context, new CodeGeneratorOptions(), cancellationToken).Model!;
-
-        /// <summary>
-        /// Extracts a <see cref="SerializableTypeModel"/> from a <see cref="GeneratorAttributeSyntaxContext"/>,
-        /// preserving generator diagnostics so the incremental pipeline can surface them without silently dropping the type.
-        /// </summary>
-        public static (SerializableTypeModel Model, Diagnostic Diagnostic) ExtractFromAttributeContextWithDiagnostics(
-            GeneratorAttributeSyntaxContext context,
-            CodeGeneratorOptions options,
-            CancellationToken cancellationToken)
-        {
-            if (context.TargetSymbol is not INamedTypeSymbol typeSymbol)
-            {
-                return (null, null);
-            }
-
-            try
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-
-                var compilation = context.SemanticModel.Compilation;
-                var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
-                cancellationToken.ThrowIfCancellationRequested();
-                var model = TryExtractSerializableTypeModel(typeSymbol, compilation, libraryTypes, options, throwOnFailure: true);
-                return model is null
-                    ? (null, null)
-                    : (model, null);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch (OrleansGeneratorDiagnosticAnalysisException exception)
-            {
-                return (null, exception.Diagnostic);
-            }
-            catch
-            {
-                return (null, null);
-            }
-        }
-
-        /// <summary>
-        /// Extracts reference-assembly metadata from the compilation using the provided code generation options.
-        /// This isolates reference-assembly scanning into a cacheable pipeline step so that
-        /// downstream work can be skipped when references don't change.
-        /// </summary>
-        public static ReferenceAssemblyModel ExtractReferenceAssemblyData(Compilation compilation, CancellationToken cancellationToken)
-            => ExtractReferenceAssemblyData(compilation, new CodeGeneratorOptions(), cancellationToken);
 
         /// <summary>
         /// Extracts reference-assembly metadata from the compilation using the provided code generation options.
@@ -202,7 +144,7 @@ namespace Orleans.CodeGenerator
                     }
 
                     var typeRef = new TypeRef(symbol.ToOpenTypeSyntax().ToString());
-                    if (CodeGenerator.GetId(libraryTypes, symbol) is uint wellKnownTypeId)
+                    if (GeneratedCodeUtilities.GetId(libraryTypes, symbol) is uint wellKnownTypeId)
                     {
                         wellKnownTypeIds.Add(new WellKnownTypeIdModel(typeRef, wellKnownTypeId));
                     }
@@ -835,7 +777,7 @@ namespace Orleans.CodeGenerator
             return ObjectCreationStrategy.GetUninitializedObject;
         }
 
-        private static SerializableTypeModel TryExtractSerializableTypeModel(
+        internal static SerializableTypeModel TryExtractSerializableTypeModel(
             INamedTypeSymbol typeSymbol,
             Compilation compilation,
             LibraryTypes libraryTypes,
@@ -977,7 +919,6 @@ namespace Orleans.CodeGenerator
         /// Extracts a <see cref="ProxyInterfaceModel"/> from a <see cref="GeneratorAttributeSyntaxContext"/>
         /// provided by the <c>ForAttributeWithMetadataName</c> incremental pipeline step for
         /// <c>[GenerateMethodSerializers]</c>-annotated interfaces.
-        /// Returns <c>null</c> if the interface cannot be processed (will be reported by the monolithic path).
         /// </summary>
         public static ProxyInterfaceModel ExtractProxyInterfaceFromAttributeContext(
             GeneratorAttributeSyntaxContext context,
@@ -988,19 +929,7 @@ namespace Orleans.CodeGenerator
                 return null;
             }
 
-            try
-            {
-                return ExtractProxyInterfaceModel(typeSymbol, context.SemanticModel.Compilation, context.Attributes, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                // Errors will be reported through the monolithic code generation path
-                return null;
-            }
+            return ExtractProxyInterfaceModel(typeSymbol, context.SemanticModel.Compilation, context.Attributes, cancellationToken);
         }
 
         public static ProxyInterfaceModel ExtractProxyInterfaceModel(
@@ -1013,19 +942,7 @@ namespace Orleans.CodeGenerator
                 return null;
             }
 
-            try
-            {
-                return ExtractProxyInterfaceModel(typeSymbol, compilation, ImmutableArray<AttributeData>.Empty, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                // Errors will be reported through the monolithic code generation path
-                return null;
-            }
+            return ExtractProxyInterfaceModel(typeSymbol, compilation, ImmutableArray<AttributeData>.Empty, cancellationToken);
         }
 
         public static ProxyInterfaceModel ExtractInheritedProxyInterfaceFromSyntaxContext(
@@ -1052,19 +969,7 @@ namespace Orleans.CodeGenerator
                 return null;
             }
 
-            try
-            {
-                return ExtractProxyInterfaceModel(typeSymbol, compilation, ImmutableArray<AttributeData>.Empty, cancellationToken);
-            }
-            catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-            {
-                throw;
-            }
-            catch
-            {
-                // Errors will be reported through the monolithic code generation path.
-                return null;
-            }
+            return ExtractProxyInterfaceModel(typeSymbol, compilation, ImmutableArray<AttributeData>.Empty, cancellationToken);
         }
 
         private static ProxyInterfaceModel ExtractProxyInterfaceModel(
@@ -1096,7 +1001,7 @@ namespace Orleans.CodeGenerator
             var name = GetProxyInterfaceName(typeSymbol, libraryTypes);
             var typeParameters = ExtractInterfaceTypeParameters(typeSymbol);
             var methods = ExtractInterfaceMethods(typeSymbol, libraryTypes, isExtension, cancellationToken);
-            var generatedNamespace = CodeGenerator.GetGeneratedNamespaceName(typeSymbol);
+            var generatedNamespace = GeneratedCodeUtilities.GetGeneratedNamespaceName(typeSymbol);
 
             return new ProxyInterfaceModel(
                 new TypeRef(typeSymbol.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
@@ -1349,11 +1254,11 @@ namespace Orleans.CodeGenerator
             INamedTypeSymbol containingInterface,
             LibraryTypes libraryTypes)
         {
-            var generatedMethodId = CodeGenerator.CreateHashedMethodId(originalMethod);
+            var generatedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(originalMethod);
 
             // Determine method ID: explicit ID → alias → generated hash
             string methodId;
-            var idValue = CodeGenerator.GetId(libraryTypes, originalMethod);
+            var idValue = GeneratedCodeUtilities.GetId(libraryTypes, originalMethod);
             if (idValue.HasValue)
             {
                 methodId = idValue.Value.ToString(CultureInfo.InvariantCulture);
@@ -1403,7 +1308,7 @@ namespace Orleans.CodeGenerator
                 new TypeRef(containingInterface.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
                 new TypeRef(originalMethod.ContainingType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)),
                 containingInterface.Name,
-                CodeGenerator.GetGeneratedNamespaceName(containingInterface),
+                GeneratedCodeUtilities.GetGeneratedNamespaceName(containingInterface),
                 containingInterface.GetAllTypeParameters().Count(),
                 generatedMethodId,
                 methodId,

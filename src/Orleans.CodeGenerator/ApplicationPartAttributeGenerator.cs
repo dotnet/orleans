@@ -1,16 +1,13 @@
 ﻿using System.Collections.Generic;
-using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
+using Orleans.CodeGenerator.SyntaxGeneration;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.CodeGenerator
 {
     internal static class ApplicationPartAttributeGenerator
     {
-        public static List<AttributeListSyntax> GenerateSyntax(LibraryTypes wellKnownTypes, IEnumerable<string> applicationParts)
-            => GenerateSyntax(wellKnownTypes.ApplicationPartAttribute.ToNameSyntax(), applicationParts);
-
         public static List<AttributeListSyntax> GenerateSyntax(NameSyntax applicationPartAttribute, IEnumerable<string> applicationParts)
         {
             var attributes = new List<AttributeListSyntax>();

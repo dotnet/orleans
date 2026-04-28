@@ -16,11 +16,11 @@ namespace Orleans.CodeGenerator
         private List<ProxyMethodDescription> _methods;
 
         public ProxyInterfaceDescription(
-            CodeGenerator codeGenerator,
+            ProxyGenerationContext generationContext,
             INamedTypeSymbol proxyBaseType,
             INamedTypeSymbol interfaceType)
         {
-            ValidateBaseClass(codeGenerator.LibraryTypes, proxyBaseType);
+            ValidateBaseClass(generationContext.LibraryTypes, proxyBaseType);
 
             var prop = interfaceType.GetAllMembers<IPropertySymbol>().FirstOrDefault();
             if (prop is { })
@@ -28,9 +28,9 @@ namespace Orleans.CodeGenerator
                 throw new OrleansGeneratorDiagnosticAnalysisException(RpcInterfacePropertyDiagnostic.CreateDiagnostic(interfaceType, prop));
             }
 
-            CodeGenerator = codeGenerator;
+            GenerationContext = generationContext;
             InterfaceType = interfaceType;
-            Name = codeGenerator.GetAlias(interfaceType) ?? interfaceType.Name;
+            Name = generationContext.GetAlias(interfaceType) ?? interfaceType.Name;
             ProxyBaseType = proxyBaseType;
 
             // If the name is a user-defined name which specified a generic arity, strip the arity backtick now
@@ -44,8 +44,8 @@ namespace Orleans.CodeGenerator
 
             GeneratedNamespace = InterfaceType.GetNamespaceAndNesting() switch
             {
-                { Length: > 0 } ns => $"{CodeGenerator.CodeGeneratorName}.{ns}",
-                _ => CodeGenerator.CodeGeneratorName
+                { Length: > 0 } ns => $"{GeneratedCodeUtilities.CodeGeneratorName}.{ns}",
+                _ => GeneratedCodeUtilities.CodeGeneratorName
             };
 
             var names = new HashSet<string>(StringComparer.Ordinal);
@@ -71,7 +71,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public CodeGenerator CodeGenerator { get; }
+        public ProxyGenerationContext GenerationContext { get; }
 
         private List<ProxyMethodDescription> GetMethods()
         {
@@ -88,7 +88,7 @@ namespace Orleans.CodeGenerator
                         continue;
                     }
 
-                    var methodDescription = CodeGenerator.GetProxyMethodDescription(InterfaceType, method: method);
+                    var methodDescription = GenerationContext.GetProxyMethodDescription(InterfaceType, method: method);
                     result.Add(methodDescription);
                 }
             }
