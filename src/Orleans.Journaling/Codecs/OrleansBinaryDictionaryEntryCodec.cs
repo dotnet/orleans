@@ -3,12 +3,11 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for <see cref="DurableDictionaryEntry{TKey, TValue}"/> log entries,
-/// preserving the legacy Orleans binary wire format.
+/// Binary codec for durable dictionary log entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryDictionaryEntryCodec<TKey, TValue>(
     ILogDataCodec<TKey> keyCodec,
-    ILogDataCodec<TValue> valueCodec) : ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>>
+    ILogDataCodec<TValue> valueCodec) : IDurableDictionaryCodec<TKey, TValue> where TKey : notnull
 {
     private const byte FormatVersion = 0;
     private const uint SetCommand = 0;
@@ -17,41 +16,44 @@ internal sealed class OrleansBinaryDictionaryEntryCodec<TKey, TValue>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void Write(DurableDictionaryEntry<TKey, TValue> entry, IBufferWriter<byte> output)
+    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, SetCommand);
+        keyCodec.Write(key, output);
+        valueCodec.Write(value, output);
+    }
 
-        switch (entry)
+    /// <inheritdoc/>
+    public void WriteRemove(TKey key, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, RemoveCommand);
+        keyCodec.Write(key, output);
+    }
+
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
+        VarIntHelper.WriteVarUInt32(output, (uint)count);
+        foreach (var (key, value) in items)
         {
-            case DictionarySetEntry<TKey, TValue>(var key, var value):
-                VarIntHelper.WriteVarUInt32(output, SetCommand);
-                keyCodec.Write(key, output);
-                valueCodec.Write(value, output);
-                break;
-            case DictionaryRemoveEntry<TKey, TValue>(var key):
-                VarIntHelper.WriteVarUInt32(output, RemoveCommand);
-                keyCodec.Write(key, output);
-                break;
-            case DictionaryClearEntry<TKey, TValue>:
-                VarIntHelper.WriteVarUInt32(output, ClearCommand);
-                break;
-            case DictionarySnapshotEntry<TKey, TValue>(var items):
-                VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
-                VarIntHelper.WriteVarUInt32(output, (uint)items.Count);
-                foreach (var (key, value) in items)
-                {
-                    keyCodec.Write(key, output);
-                    valueCodec.Write(value, output);
-                }
-
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
+            keyCodec.Write(key, output);
+            valueCodec.Write(value, output);
         }
     }
 
     /// <inheritdoc/>
-    public DurableDictionaryEntry<TKey, TValue> Read(ReadOnlySequence<byte> input)
+    public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer)
     {
         var reader = new SequenceReader<byte>(input);
         ReadVersionByte(ref reader);
@@ -59,47 +61,54 @@ internal sealed class OrleansBinaryDictionaryEntryCodec<TKey, TValue>(
         var command = VarIntHelper.ReadVarUInt32(ref reader);
         var remaining = input.Slice(reader.Consumed);
 
-        return command switch
+        switch (command)
         {
-            SetCommand => ReadSet(remaining),
-            RemoveCommand => ReadRemove(remaining),
-            ClearCommand => new DictionaryClearEntry<TKey, TValue>(),
-            SnapshotCommand => ReadSnapshot(remaining),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+            case SetCommand:
+                ApplySet(remaining, consumer);
+                break;
+            case RemoveCommand:
+                ApplyRemove(remaining, consumer);
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ApplySnapshot(remaining, consumer);
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 
-    private DictionarySetEntry<TKey, TValue> ReadSet(ReadOnlySequence<byte> remaining)
+    private void ApplySet(ReadOnlySequence<byte> remaining, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer)
     {
         var key = keyCodec.Read(remaining, out var consumed);
         remaining = remaining.Slice(consumed);
         var value = valueCodec.Read(remaining, out _);
-        return new DictionarySetEntry<TKey, TValue>(key, value);
+        consumer.ApplySet(key, value);
     }
 
-    private DictionaryRemoveEntry<TKey, TValue> ReadRemove(ReadOnlySequence<byte> remaining)
+    private void ApplyRemove(ReadOnlySequence<byte> remaining, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer)
     {
         var key = keyCodec.Read(remaining, out _);
-        return new DictionaryRemoveEntry<TKey, TValue>(key);
+        consumer.ApplyRemove(key);
     }
 
-    private DictionarySnapshotEntry<TKey, TValue> ReadSnapshot(ReadOnlySequence<byte> remaining)
+    private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer)
     {
         var reader = new SequenceReader<byte>(remaining);
         var count = (int)VarIntHelper.ReadVarUInt32(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
-        var items = new List<KeyValuePair<TKey, TValue>>(count);
+        consumer.ApplySnapshotStart(count);
         for (var i = 0; i < count; i++)
         {
             var key = keyCodec.Read(remaining, out var consumed);
             remaining = remaining.Slice(consumed);
             var value = valueCodec.Read(remaining, out consumed);
             remaining = remaining.Slice(consumed);
-            items.Add(new KeyValuePair<TKey, TValue>(key, value));
+            consumer.ApplySnapshotItem(key, value);
         }
-
-        return new DictionarySnapshotEntry<TKey, TValue>(items);
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)

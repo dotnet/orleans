@@ -11,9 +11,9 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
+internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, IDurableValueLogEntryConsumer<T>
 {
-    private readonly ILogEntryCodec<DurableValueEntry<T>> _entryCodec;
+    private readonly IDurableValueCodec<T> _codec;
     private IStateMachineLogWriter? _storage;
     private T? _value;
     private bool _isDirty;
@@ -21,14 +21,14 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
     public DurableValue([ServiceKey] string key, IStateMachineManager manager, IDurableValueCodecProvider codecProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = codecProvider.GetCodec<T>();
+        _codec = codecProvider.GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableValue(string key, IStateMachineManager manager, ILogEntryCodec<DurableValueEntry<T>> entryCodec)
+    internal DurableValue(string key, IStateMachineManager manager, IDurableValueCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = entryCodec;
+        _codec = codec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -59,13 +59,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        var entry = _entryCodec.Read(logEntry);
-        switch (entry)
-        {
-            case ValueSetEntry<T>(var value):
-                _value = value;
-                break;
-        }
+        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
@@ -85,9 +79,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine
     {
         writer.AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(new ValueSetEntry<T>(self._value!), bufferWriter);
+            self._codec.WriteSet(self._value!, bufferWriter);
         }, this);
     }
+
+    void IDurableValueLogEntryConsumer<T>.ApplySet(T value) => _value = value;
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");

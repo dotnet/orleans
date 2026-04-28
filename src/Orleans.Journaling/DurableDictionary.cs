@@ -12,15 +12,15 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine where K : notnull
+internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine, IDurableDictionaryLogEntryConsumer<K, V> where K : notnull
 {
-    private readonly ILogEntryCodec<DurableDictionaryEntry<K, V>> _entryCodec;
+    private readonly IDurableDictionaryCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    protected DurableDictionary(ILogEntryCodec<DurableDictionaryEntry<K, V>> entryCodec)
+    protected DurableDictionary(IDurableDictionaryCodec<K, V> codec)
     {
-        _entryCodec = entryCodec;
+        _codec = codec;
     }
 
     public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, IDurableDictionaryCodecProvider codecProvider) : this(codecProvider.GetCodec<K, V>())
@@ -29,7 +29,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableDictionary(string key, IStateMachineManager manager, ILogEntryCodec<DurableDictionaryEntry<K, V>> entryCodec) : this(entryCodec)
+    internal DurableDictionary(string key, IStateMachineManager manager, IDurableDictionaryCodec<K, V> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
@@ -62,28 +62,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        var entry = _entryCodec.Read(logEntry);
-        switch (entry)
-        {
-            case DictionarySetEntry<K, V>(var key, var value):
-                ApplySet(key, value);
-                break;
-            case DictionaryRemoveEntry<K, V>(var key):
-                ApplyRemove(key);
-                break;
-            case DictionaryClearEntry<K, V>:
-                ApplyClear();
-                break;
-            case DictionarySnapshotEntry<K, V>(var items):
-                _items.Clear();
-                _items.EnsureCapacity(items.Count);
-                foreach (var kv in items)
-                {
-                    ApplySet(kv.Key, kv.Value);
-                }
-
-                break;
-        }
+        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
@@ -95,8 +74,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     {
         snapshotWriter.AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(
-                new DictionarySnapshotEntry<K, V>(self._items.ToList()), bufferWriter);
+            self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
         }, this);
     }
 
@@ -105,7 +83,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         ApplyClear();
         GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(new DictionaryClearEntry<K, V>(), bufferWriter);
+            self._codec.WriteClear(bufferWriter);
         },
         this);
     }
@@ -128,7 +106,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, key) = state;
-            self._entryCodec.Write(new DictionaryRemoveEntry<K, V>(key), bufferWriter);
+            self._codec.WriteRemove(key, bufferWriter);
         }, (this, key));
     }
 
@@ -139,7 +117,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, key, value) = state;
-            self._entryCodec.Write(new DictionarySetEntry<K, V>(key, value), bufferWriter);
+            self._codec.WriteSet(key, value, bufferWriter);
         },
         (this, key, value));
     }
@@ -154,6 +132,16 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     internal bool ApplyRemove(K key) => _items.Remove(key);
     private void ApplyClear() => _items.Clear();
+    void IDurableDictionaryLogEntryConsumer<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
+    void IDurableDictionaryLogEntryConsumer<K, V>.ApplyRemove(K key) => ApplyRemove(key);
+    void IDurableDictionaryLogEntryConsumer<K, V>.ApplyClear() => ApplyClear();
+    void IDurableDictionaryLogEntryConsumer<K, V>.ApplySnapshotStart(int count)
+    {
+        ApplyClear();
+        _items.EnsureCapacity(count);
+    }
+
+    void IDurableDictionaryLogEntryConsumer<K, V>.ApplySnapshotItem(K key, V value) => ApplySet(key, value);
 
     protected virtual IStateMachineLogWriter GetStorage()
     {

@@ -3,8 +3,7 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for <see cref="DurableTaskCompletionSourceEntry{T}"/> log entries,
-/// preserving the legacy Orleans binary wire format.
+/// Binary codec for durable task completion source log entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 /// <remarks>
 /// Unlike other durable type codecs, the TCS format uses a status byte instead of a
@@ -12,38 +11,42 @@ namespace Orleans.Journaling;
 /// </remarks>
 internal sealed class OrleansBinaryTcsEntryCodec<T>(
     ILogDataCodec<T> codec,
-    ILogDataCodec<Exception> exceptionCodec) : ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>
+    ILogDataCodec<Exception> exceptionCodec) : IDurableTaskCompletionSourceCodec<T>
 {
     private const byte FormatVersion = 0;
 
     /// <inheritdoc/>
-    public void Write(DurableTaskCompletionSourceEntry<T> entry, IBufferWriter<byte> output)
+    public void WritePending(IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
-
-        switch (entry)
-        {
-            case TcsPendingEntry<T>:
-                WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Pending);
-                break;
-            case TcsCompletedEntry<T>(var value):
-                WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Completed);
-                codec.Write(value, output);
-                break;
-            case TcsFaultedEntry<T>(var exception):
-                WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Faulted);
-                exceptionCodec.Write(exception, output);
-                break;
-            case TcsCanceledEntry<T>:
-                WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Canceled);
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
-        }
+        WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Pending);
     }
 
     /// <inheritdoc/>
-    public DurableTaskCompletionSourceEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteCompleted(T value, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Completed);
+        codec.Write(value, output);
+    }
+
+    /// <inheritdoc/>
+    public void WriteFaulted(Exception exception, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Faulted);
+        exceptionCodec.Write(exception, output);
+    }
+
+    /// <inheritdoc/>
+    public void WriteCanceled(IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Canceled);
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(input);
         ReadVersionByte(ref reader);
@@ -56,14 +59,23 @@ internal sealed class OrleansBinaryTcsEntryCodec<T>(
         var remaining = input.Slice(reader.Consumed);
         var status = (DurableTaskCompletionSourceStatus)statusByte;
 
-        return status switch
+        switch (status)
         {
-            DurableTaskCompletionSourceStatus.Pending => new TcsPendingEntry<T>(),
-            DurableTaskCompletionSourceStatus.Completed => new TcsCompletedEntry<T>(codec.Read(remaining, out _)),
-            DurableTaskCompletionSourceStatus.Faulted => new TcsFaultedEntry<T>(exceptionCodec.Read(remaining, out _)),
-            DurableTaskCompletionSourceStatus.Canceled => new TcsCanceledEntry<T>(),
-            _ => throw new NotSupportedException($"Unsupported status: {status}"),
-        };
+            case DurableTaskCompletionSourceStatus.Pending:
+                consumer.ApplyPending();
+                break;
+            case DurableTaskCompletionSourceStatus.Completed:
+                consumer.ApplyCompleted(codec.Read(remaining, out _));
+                break;
+            case DurableTaskCompletionSourceStatus.Faulted:
+                consumer.ApplyFaulted(exceptionCodec.Read(remaining, out _));
+                break;
+            case DurableTaskCompletionSourceStatus.Canceled:
+                consumer.ApplyCanceled();
+                break;
+            default:
+                throw new NotSupportedException($"Unsupported status: {status}");
+        }
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)

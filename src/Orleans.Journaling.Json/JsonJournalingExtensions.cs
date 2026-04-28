@@ -81,44 +81,44 @@ internal sealed class JsonLogEntryCodecProvider(JsonSerializerOptions jsonOption
     private readonly ConcurrentDictionary<Type, object> _codecs = new();
 
     /// <inheritdoc/>
-    public ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>> GetCodec<TKey, TValue>() where TKey : notnull
-        => (ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>>)_codecs.GetOrAdd(
-            typeof(DurableDictionaryEntry<TKey, TValue>),
+    public IDurableDictionaryCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
+        => (IDurableDictionaryCodec<TKey, TValue>)_codecs.GetOrAdd(
+            typeof(IDurableDictionaryCodec<TKey, TValue>),
             _ => new JsonDictionaryEntryCodec<TKey, TValue>(jsonOptions));
 
     /// <inheritdoc/>
-    public ILogEntryCodec<DurableListEntry<T>> GetCodec<T>()
-        => (ILogEntryCodec<DurableListEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableListEntry<T>),
+    public IDurableListCodec<T> GetCodec<T>()
+        => (IDurableListCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableListCodec<T>),
             _ => new JsonListEntryCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableQueueEntry<T>> IDurableQueueCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableQueueEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableQueueEntry<T>),
+    IDurableQueueCodec<T> IDurableQueueCodecProvider.GetCodec<T>()
+        => (IDurableQueueCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableQueueCodec<T>),
             _ => new JsonQueueEntryCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableSetEntry<T>> IDurableSetCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableSetEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableSetEntry<T>),
+    IDurableSetCodec<T> IDurableSetCodecProvider.GetCodec<T>()
+        => (IDurableSetCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableSetCodec<T>),
             _ => new JsonSetEntryCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableValueEntry<T>> IDurableValueCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableValueEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableValueEntry<T>),
+    IDurableValueCodec<T> IDurableValueCodecProvider.GetCodec<T>()
+        => (IDurableValueCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableValueCodec<T>),
             _ => new JsonValueEntryCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableStateEntry<T>> IDurableStateCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableStateEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableStateEntry<T>),
+    IDurableStateCodec<T> IDurableStateCodecProvider.GetCodec<T>()
+        => (IDurableStateCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableStateCodec<T>),
             _ => new JsonStateEntryCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableTaskCompletionSourceEntry<T>),
+    IDurableTaskCompletionSourceCodec<T> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
+        => (IDurableTaskCompletionSourceCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableTaskCompletionSourceCodec<T>),
             _ => new JsonTcsEntryCodec<T>(jsonOptions));
 }

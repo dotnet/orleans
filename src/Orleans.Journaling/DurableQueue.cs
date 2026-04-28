@@ -20,23 +20,23 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, IDurableQueueLogEntryConsumer<T>
 {
-    private readonly ILogEntryCodec<DurableQueueEntry<T>> _entryCodec;
+    private readonly IDurableQueueCodec<T> _codec;
     private readonly Queue<T> _items = new();
     private IStateMachineLogWriter? _storage;
 
     public DurableQueue([ServiceKey] string key, IStateMachineManager manager, IDurableQueueCodecProvider codecProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = codecProvider.GetCodec<T>();
+        _codec = codecProvider.GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableQueue(string key, IStateMachineManager manager, ILogEntryCodec<DurableQueueEntry<T>> entryCodec)
+    internal DurableQueue(string key, IStateMachineManager manager, IDurableQueueCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = entryCodec;
+        _codec = codec;
         manager.RegisterStateMachine(key, this);
     }
 
@@ -50,28 +50,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        var entry = _entryCodec.Read(logEntry);
-        switch (entry)
-        {
-            case QueueEnqueueEntry<T>(var item):
-                ApplyEnqueue(item);
-                break;
-            case QueueDequeueEntry<T>:
-                _ = ApplyDequeue();
-                break;
-            case QueueClearEntry<T>:
-                ApplyClear();
-                break;
-            case QueueSnapshotEntry<T>(var items):
-                ApplyClear();
-                _items.EnsureCapacity(items.Count);
-                foreach (var item in items)
-                {
-                    ApplyEnqueue(item);
-                }
-
-                break;
-        }
+        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
@@ -83,8 +62,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
     {
         snapshotWriter.AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(
-                new QueueSnapshotEntry<T>(self._items.ToList()), bufferWriter);
+            self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
         }, this);
     }
 
@@ -93,7 +71,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
         ApplyClear();
         GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(new QueueClearEntry<T>(), bufferWriter);
+            self._codec.WriteClear(bufferWriter);
         },
         this);
     }
@@ -109,7 +87,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
         GetStorage().AppendEntry(static (state, bufferWriter) =>
         {
             var (self, value) = state;
-            self._entryCodec.Write(new QueueEnqueueEntry<T>(value!), bufferWriter);
+            self._codec.WriteEnqueue(value!, bufferWriter);
         },
         (this, item));
     }
@@ -119,7 +97,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
         var result = ApplyDequeue();
         GetStorage().AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(new QueueDequeueEntry<T>(), bufferWriter);
+            self._codec.WriteDequeue(bufferWriter);
         }, this);
         return result;
     }
@@ -130,7 +108,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
         {
             GetStorage().AppendEntry(static (self, bufferWriter) =>
             {
-                self._entryCodec.Write(new QueueDequeueEntry<T>(), bufferWriter);
+                self._codec.WriteDequeue(bufferWriter);
             }, this);
             return true;
         }
@@ -144,6 +122,16 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine
     protected T ApplyDequeue() => _items.Dequeue();
     protected bool ApplyTryDequeue([MaybeNullWhen(false)] out T value) => _items.TryDequeue(out value);
     protected void ApplyClear() => _items.Clear();
+    void IDurableQueueLogEntryConsumer<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
+    void IDurableQueueLogEntryConsumer<T>.ApplyDequeue() => _ = ApplyDequeue();
+    void IDurableQueueLogEntryConsumer<T>.ApplyClear() => ApplyClear();
+    void IDurableQueueLogEntryConsumer<T>.ApplySnapshotStart(int count)
+    {
+        ApplyClear();
+        _items.EnsureCapacity(count);
+    }
+
+    void IDurableQueueLogEntryConsumer<T>.ApplySnapshotItem(T item) => ApplyEnqueue(item);
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");

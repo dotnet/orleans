@@ -1,142 +1,245 @@
 using System.Buffers;
-using Google.Protobuf;
-using Orleans.Journaling.Protobuf.Messages;
 
 namespace Orleans.Journaling.Protobuf;
 
 /// <summary>
-/// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableValueEntry{T}"/>.
+/// Protocol Buffers codec for durable value log entries.
 /// </summary>
-/// <remarks>
-/// Serialized as a <see cref="ValueEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
-/// </remarks>
 public sealed class ProtobufValueEntryCodec<T>(
-    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableValueEntry<T>>
+    ProtobufValueConverter<T> converter) : IDurableValueCodec<T>
 {
-    /// <inheritdoc/>
-    public void Write(DurableValueEntry<T> entry, IBufferWriter<byte> output)
-    {
-        var proto = entry switch
-        {
-            ValueSetEntry<T>(var value) => new ValueEntry
-            {
-                Set = new ValueSet { Value = converter.ToTypedValue(value) }
-            },
-            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
-        };
+    private const uint CommandField = 1;
+    private const uint ValueField = 2;
+    private const uint SetCommand = 0;
 
-        proto.WriteTo(output);
+    /// <inheritdoc/>
+    public void WriteSet(T value, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
+        ProtobufWire.WriteBytesField(output, ValueField, converter.ToBytes(value));
     }
 
     /// <inheritdoc/>
-    public DurableValueEntry<T> Read(ReadOnlySequence<byte> input)
+    public void Apply(ReadOnlySequence<byte> input, IDurableValueLogEntryConsumer<T> consumer)
     {
-        var proto = ValueEntry.Parser.ParseFrom(input);
+        var reader = new SequenceReader<byte>(input);
+        var command = uint.MaxValue;
+        var hasCommand = false;
+        var hasValue = false;
+        T? value = default;
 
-        return proto.CommandCase switch
+        while (!reader.End)
         {
-            ValueEntry.CommandOneofCase.Set =>
-                new ValueSetEntry<T>(converter.FromTypedValue(proto.Set.Value)),
-            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
-        };
+            var tag = ProtobufWire.ReadTag(ref reader);
+            var field = tag >> 3;
+            switch (field)
+            {
+                case CommandField:
+                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
+                    command = ProtobufWire.ReadUInt32(ref reader);
+                    hasCommand = true;
+                    break;
+                case ValueField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    value = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasValue = true;
+                    break;
+                default:
+                    ProtobufWire.SkipField(ref reader, tag);
+                    break;
+            }
+        }
+
+        ProtobufWire.RequireCommand(hasCommand);
+        switch (command)
+        {
+            case SetCommand:
+                consumer.ApplySet(ProtobufWire.RequireValue(hasValue, value, "value", command));
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 }
 
 /// <summary>
-/// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableStateEntry{T}"/>.
+/// Protocol Buffers codec for durable persistent state log entries.
 /// </summary>
-/// <remarks>
-/// Serialized as a <see cref="StateEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
-/// </remarks>
 public sealed class ProtobufStateEntryCodec<T>(
-    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableStateEntry<T>>
+    ProtobufValueConverter<T> converter) : IDurableStateCodec<T>
 {
-    /// <inheritdoc/>
-    public void Write(DurableStateEntry<T> entry, IBufferWriter<byte> output)
-    {
-        var proto = entry switch
-        {
-            StateSetEntry<T>(var state, var version) => new StateEntry
-            {
-                Set = new StateSet
-                {
-                    State = converter.ToTypedValue(state),
-                    Version = version
-                }
-            },
-            StateClearEntry<T> => new StateEntry { Clear = new StateClear() },
-            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
-        };
+    private const uint CommandField = 1;
+    private const uint StateField = 2;
+    private const uint VersionField = 3;
 
-        proto.WriteTo(output);
+    private const uint SetCommand = 0;
+    private const uint ClearCommand = 1;
+
+    /// <inheritdoc/>
+    public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
+        ProtobufWire.WriteBytesField(output, StateField, converter.ToBytes(state));
+        ProtobufWire.WriteUInt64Field(output, VersionField, version);
     }
 
     /// <inheritdoc/>
-    public DurableStateEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteClear(IBufferWriter<byte> output)
     {
-        var proto = StateEntry.Parser.ParseFrom(input);
+        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+    }
 
-        return proto.CommandCase switch
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableStateLogEntryConsumer<T> consumer)
+    {
+        var reader = new SequenceReader<byte>(input);
+        var command = uint.MaxValue;
+        var version = 0UL;
+        var hasCommand = false;
+        var hasState = false;
+        var hasVersion = false;
+        T? state = default;
+
+        while (!reader.End)
         {
-            StateEntry.CommandOneofCase.Set =>
-                new StateSetEntry<T>(converter.FromTypedValue(proto.Set.State), proto.Set.Version),
-            StateEntry.CommandOneofCase.Clear =>
-                new StateClearEntry<T>(),
-            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
-        };
+            var tag = ProtobufWire.ReadTag(ref reader);
+            var field = tag >> 3;
+            switch (field)
+            {
+                case CommandField:
+                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
+                    command = ProtobufWire.ReadUInt32(ref reader);
+                    hasCommand = true;
+                    break;
+                case StateField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    state = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasState = true;
+                    break;
+                case VersionField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    version = ProtobufWire.ReadUInt64(ref reader);
+                    hasVersion = true;
+                    break;
+                default:
+                    ProtobufWire.SkipField(ref reader, tag);
+                    break;
+            }
+        }
+
+        ProtobufWire.RequireCommand(hasCommand);
+        switch (command)
+        {
+            case SetCommand:
+                ProtobufWire.RequireField(hasVersion, "version", command);
+                consumer.ApplySet(ProtobufWire.RequireValue(hasState, state, "state", command), version);
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 }
 
 /// <summary>
-/// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableTaskCompletionSourceEntry{T}"/>.
+/// Protocol Buffers codec for durable task completion source log entries.
 /// </summary>
-/// <remarks>
-/// Serialized as a <see cref="TcsEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// Exceptions are serialized as their string representation. On deserialization,
-/// a new <see cref="Exception"/> is created with the stored message.
-/// </remarks>
 public sealed class ProtobufTcsEntryCodec<T>(
-    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>
+    ProtobufValueConverter<T> converter) : IDurableTaskCompletionSourceCodec<T>
 {
-    /// <inheritdoc/>
-    public void Write(DurableTaskCompletionSourceEntry<T> entry, IBufferWriter<byte> output)
-    {
-        var proto = entry switch
-        {
-            TcsCompletedEntry<T>(var value) => new TcsEntry
-            {
-                Completed = new TcsCompleted { Value = converter.ToTypedValue(value) }
-            },
-            TcsFaultedEntry<T>(var exception) => new TcsEntry
-            {
-                Faulted = new TcsFaulted { Exception = exception.ToString() }
-            },
-            TcsCanceledEntry<T> => new TcsEntry { Canceled = new TcsCanceled() },
-            TcsPendingEntry<T> => new TcsEntry { Pending = new TcsPending() },
-            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
-        };
+    private const uint CommandField = 1;
+    private const uint ValueField = 2;
+    private const uint MessageField = 3;
 
-        proto.WriteTo(output);
+    private const uint PendingCommand = 0;
+    private const uint CompletedCommand = 1;
+    private const uint FaultedCommand = 2;
+    private const uint CanceledCommand = 3;
+
+    /// <inheritdoc/>
+    public void WritePending(IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, PendingCommand);
     }
 
     /// <inheritdoc/>
-    public DurableTaskCompletionSourceEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteCompleted(T value, IBufferWriter<byte> output)
     {
-        var proto = TcsEntry.Parser.ParseFrom(input);
+        ProtobufWire.WriteUInt32Field(output, CommandField, CompletedCommand);
+        ProtobufWire.WriteBytesField(output, ValueField, converter.ToBytes(value));
+    }
 
-        return proto.CommandCase switch
+    /// <inheritdoc/>
+    public void WriteFaulted(Exception exception, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, FaultedCommand);
+        ProtobufWire.WriteStringField(output, MessageField, exception.Message);
+    }
+
+    /// <inheritdoc/>
+    public void WriteCanceled(IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, CanceledCommand);
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
+    {
+        var reader = new SequenceReader<byte>(input);
+        var command = uint.MaxValue;
+        var hasCommand = false;
+        var hasValue = false;
+        var hasMessage = false;
+        T? value = default;
+        string? message = null;
+
+        while (!reader.End)
         {
-            TcsEntry.CommandOneofCase.Completed =>
-                new TcsCompletedEntry<T>(converter.FromTypedValue(proto.Completed.Value)),
-            TcsEntry.CommandOneofCase.Faulted =>
-                new TcsFaultedEntry<T>(new Exception(proto.Faulted.Exception)),
-            TcsEntry.CommandOneofCase.Canceled =>
-                new TcsCanceledEntry<T>(),
-            TcsEntry.CommandOneofCase.Pending =>
-                new TcsPendingEntry<T>(),
-            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
-        };
+            var tag = ProtobufWire.ReadTag(ref reader);
+            var field = tag >> 3;
+            switch (field)
+            {
+                case CommandField:
+                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
+                    command = ProtobufWire.ReadUInt32(ref reader);
+                    hasCommand = true;
+                    break;
+                case ValueField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    value = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasValue = true;
+                    break;
+                case MessageField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    message = ProtobufWire.ReadString(ref reader);
+                    hasMessage = true;
+                    break;
+                default:
+                    ProtobufWire.SkipField(ref reader, tag);
+                    break;
+            }
+        }
+
+        ProtobufWire.RequireCommand(hasCommand);
+        switch (command)
+        {
+            case PendingCommand:
+                consumer.ApplyPending();
+                break;
+            case CompletedCommand:
+                consumer.ApplyCompleted(ProtobufWire.RequireValue(hasValue, value, "value", command));
+                break;
+            case FaultedCommand:
+                ProtobufWire.RequireField(hasMessage, "message", command);
+                consumer.ApplyFaulted(new Exception(message));
+                break;
+            case CanceledCommand:
+                consumer.ApplyCanceled();
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 }

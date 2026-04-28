@@ -1,208 +1,447 @@
 using System.Buffers;
-using Google.Protobuf;
-using Orleans.Journaling.Protobuf.Messages;
 
 namespace Orleans.Journaling.Protobuf;
 
 /// <summary>
-/// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableListEntry{T}"/>.
+/// Protocol Buffers codec for durable list log entries.
 /// </summary>
-/// <remarks>
-/// Serialized as a <see cref="ListEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
-/// </remarks>
 public sealed class ProtobufListEntryCodec<T>(
-    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableListEntry<T>>
+    ProtobufValueConverter<T> converter) : IDurableListCodec<T>
 {
-    /// <inheritdoc/>
-    public void Write(DurableListEntry<T> entry, IBufferWriter<byte> output)
-    {
-        var proto = entry switch
-        {
-            ListAddEntry<T>(var item) => new ListEntry
-            {
-                Add = new ListAdd { Item = converter.ToTypedValue(item) }
-            },
-            ListSetEntry<T>(var index, var item) => new ListEntry
-            {
-                Set = new ListSet
-                {
-                    Index = (uint)index,
-                    Item = converter.ToTypedValue(item)
-                }
-            },
-            ListInsertEntry<T>(var index, var item) => new ListEntry
-            {
-                Insert = new ListInsert
-                {
-                    Index = (uint)index,
-                    Item = converter.ToTypedValue(item)
-                }
-            },
-            ListRemoveAtEntry<T>(var index) => new ListEntry
-            {
-                RemoveAt = new ListRemoveAt { Index = (uint)index }
-            },
-            ListClearEntry<T> => new ListEntry { Clear = new ListClear() },
-            ListSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
-            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
-        };
+    private const uint CommandField = 1;
+    private const uint IndexField = 2;
+    private const uint ItemField = 3;
+    private const uint CountField = 4;
 
-        proto.WriteTo(output);
+    private const uint AddCommand = 0;
+    private const uint SetCommand = 1;
+    private const uint InsertCommand = 2;
+    private const uint RemoveAtCommand = 3;
+    private const uint ClearCommand = 4;
+    private const uint SnapshotCommand = 5;
+
+    /// <inheritdoc/>
+    public void WriteAdd(T item, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, AddCommand);
+        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
     }
 
     /// <inheritdoc/>
-    public DurableListEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteSet(int index, T item, IBufferWriter<byte> output)
     {
-        var proto = ListEntry.Parser.ParseFrom(input);
-
-        return proto.CommandCase switch
-        {
-            ListEntry.CommandOneofCase.Add =>
-                new ListAddEntry<T>(converter.FromTypedValue(proto.Add.Item)),
-            ListEntry.CommandOneofCase.Set =>
-                new ListSetEntry<T>((int)proto.Set.Index, converter.FromTypedValue(proto.Set.Item)),
-            ListEntry.CommandOneofCase.Insert =>
-                new ListInsertEntry<T>((int)proto.Insert.Index, converter.FromTypedValue(proto.Insert.Item)),
-            ListEntry.CommandOneofCase.RemoveAt =>
-                new ListRemoveAtEntry<T>((int)proto.RemoveAt.Index),
-            ListEntry.CommandOneofCase.Clear =>
-                new ListClearEntry<T>(),
-            ListEntry.CommandOneofCase.Snapshot =>
-                new ListSnapshotEntry<T>(proto.Snapshot.Items.Select(converter.FromTypedValue).ToList()),
-            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
-        };
+        ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
+        ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
+        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
     }
 
-    private ListEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    /// <inheritdoc/>
+    public void WriteInsert(int index, T item, IBufferWriter<byte> output)
     {
-        var snapshot = new ListSnapshot();
+        ProtobufWire.WriteUInt32Field(output, CommandField, InsertCommand);
+        ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
+        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+    }
+
+    /// <inheritdoc/>
+    public void WriteRemoveAt(int index, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, RemoveAtCommand);
+        ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
+    }
+
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
+        ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var item in items)
         {
-            snapshot.Items.Add(converter.ToTypedValue(item));
+            ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer)
+        => ApplyCollection(input, new ListConsumer(consumer), converter);
+
+    private readonly struct ListConsumer(IDurableListLogEntryConsumer<T> consumer) : ICollectionConsumer<T>
+    {
+        public void ApplyAdd(T item) => consumer.ApplyAdd(item);
+        public void ApplySet(int index, T item) => consumer.ApplySet(index, item);
+        public void ApplyInsert(int index, T item) => consumer.ApplyInsert(index, item);
+        public void ApplyRemoveAt(int index) => consumer.ApplyRemoveAt(index);
+        public void ApplyClear() => consumer.ApplyClear();
+        public void ApplySnapshotStart(int count) => consumer.ApplySnapshotStart(count);
+        public void ApplySnapshotItem(T item) => consumer.ApplySnapshotItem(item);
+    }
+
+    internal static void ApplyCollection<TConsumer>(ReadOnlySequence<byte> input, TConsumer consumer, ProtobufValueConverter<T> converter)
+        where TConsumer : struct, ICollectionConsumer<T>
+    {
+        var reader = new SequenceReader<byte>(input);
+        var command = uint.MaxValue;
+        var index = 0;
+        var count = 0;
+        var hasCommand = false;
+        var hasIndex = false;
+        var hasCount = false;
+        var hasItem = false;
+        var snapshotStarted = false;
+        var snapshotItemCount = 0;
+        T? item = default;
+
+        while (!reader.End)
+        {
+            var tag = ProtobufWire.ReadTag(ref reader);
+            var field = tag >> 3;
+            switch (field)
+            {
+                case CommandField:
+                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
+                    command = ProtobufWire.ReadUInt32(ref reader);
+                    hasCommand = true;
+                    break;
+                case IndexField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    index = (int)ProtobufWire.ReadUInt32(ref reader);
+                    hasIndex = true;
+                    break;
+                case CountField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    hasCount = true;
+                    break;
+                case ItemField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    item = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasItem = true;
+                    if (command == SnapshotCommand)
+                    {
+                        if (!snapshotStarted)
+                        {
+                            ProtobufWire.RequireField(hasCount, "count", command);
+                            consumer.ApplySnapshotStart(count);
+                            snapshotStarted = true;
+                        }
+
+                        consumer.ApplySnapshotItem(item);
+                        snapshotItemCount++;
+                        item = default;
+                        hasItem = false;
+                    }
+
+                    break;
+                default:
+                    ProtobufWire.SkipField(ref reader, tag);
+                    break;
+            }
         }
 
-        return new ListEntry { Snapshot = snapshot };
+        ProtobufWire.RequireCommand(hasCommand);
+        switch (command)
+        {
+            case AddCommand:
+                consumer.ApplyAdd(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                break;
+            case SetCommand:
+                ProtobufWire.RequireField(hasIndex, "index", command);
+                consumer.ApplySet(index, ProtobufWire.RequireValue(hasItem, item, "item", command));
+                break;
+            case InsertCommand:
+                ProtobufWire.RequireField(hasIndex, "index", command);
+                consumer.ApplyInsert(index, ProtobufWire.RequireValue(hasItem, item, "item", command));
+                break;
+            case RemoveAtCommand:
+                ProtobufWire.RequireField(hasIndex, "index", command);
+                consumer.ApplyRemoveAt(index);
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ProtobufWire.RequireField(hasCount, "count", command);
+                ProtobufWire.RequireSnapshotCount(count, snapshotItemCount, command);
+                if (!snapshotStarted)
+                {
+                    consumer.ApplySnapshotStart(count);
+                }
+
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 }
 
 /// <summary>
-/// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableQueueEntry{T}"/>.
+/// Protocol Buffers codec for durable queue log entries.
 /// </summary>
-/// <remarks>
-/// Serialized as a <see cref="QueueEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
-/// </remarks>
 public sealed class ProtobufQueueEntryCodec<T>(
-    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableQueueEntry<T>>
+    ProtobufValueConverter<T> converter) : IDurableQueueCodec<T>
 {
-    /// <inheritdoc/>
-    public void Write(DurableQueueEntry<T> entry, IBufferWriter<byte> output)
-    {
-        var proto = entry switch
-        {
-            QueueEnqueueEntry<T>(var item) => new QueueEntry
-            {
-                Enqueue = new QueueEnqueue { Item = converter.ToTypedValue(item) }
-            },
-            QueueDequeueEntry<T> => new QueueEntry { Dequeue = new QueueDequeue() },
-            QueueClearEntry<T> => new QueueEntry { Clear = new QueueClear() },
-            QueueSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
-            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
-        };
+    private const uint CommandField = 1;
+    private const uint ItemField = 2;
+    private const uint CountField = 3;
 
-        proto.WriteTo(output);
+    private const uint EnqueueCommand = 0;
+    private const uint DequeueCommand = 1;
+    private const uint ClearCommand = 2;
+    private const uint SnapshotCommand = 3;
+
+    /// <inheritdoc/>
+    public void WriteEnqueue(T item, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, EnqueueCommand);
+        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
     }
 
     /// <inheritdoc/>
-    public DurableQueueEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteDequeue(IBufferWriter<byte> output)
     {
-        var proto = QueueEntry.Parser.ParseFrom(input);
-
-        return proto.CommandCase switch
-        {
-            QueueEntry.CommandOneofCase.Enqueue =>
-                new QueueEnqueueEntry<T>(converter.FromTypedValue(proto.Enqueue.Item)),
-            QueueEntry.CommandOneofCase.Dequeue =>
-                new QueueDequeueEntry<T>(),
-            QueueEntry.CommandOneofCase.Clear =>
-                new QueueClearEntry<T>(),
-            QueueEntry.CommandOneofCase.Snapshot =>
-                new QueueSnapshotEntry<T>(proto.Snapshot.Items.Select(converter.FromTypedValue).ToList()),
-            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
-        };
+        ProtobufWire.WriteUInt32Field(output, CommandField, DequeueCommand);
     }
 
-    private QueueEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
     {
-        var snapshot = new QueueSnapshot();
+        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
+        ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var item in items)
         {
-            snapshot.Items.Add(converter.ToTypedValue(item));
+            ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableQueueLogEntryConsumer<T> consumer)
+    {
+        var reader = new SequenceReader<byte>(input);
+        var command = uint.MaxValue;
+        var count = 0;
+        var hasCommand = false;
+        var hasCount = false;
+        var hasItem = false;
+        var snapshotStarted = false;
+        var snapshotItemCount = 0;
+        T? item = default;
+
+        while (!reader.End)
+        {
+            var tag = ProtobufWire.ReadTag(ref reader);
+            var field = tag >> 3;
+            switch (field)
+            {
+                case CommandField:
+                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
+                    command = ProtobufWire.ReadUInt32(ref reader);
+                    hasCommand = true;
+                    break;
+                case CountField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    hasCount = true;
+                    break;
+                case ItemField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    item = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasItem = true;
+                    if (command == SnapshotCommand)
+                    {
+                        if (!snapshotStarted)
+                        {
+                            ProtobufWire.RequireField(hasCount, "count", command);
+                            consumer.ApplySnapshotStart(count);
+                            snapshotStarted = true;
+                        }
+
+                        consumer.ApplySnapshotItem(item);
+                        snapshotItemCount++;
+                        item = default;
+                        hasItem = false;
+                    }
+
+                    break;
+                default:
+                    ProtobufWire.SkipField(ref reader, tag);
+                    break;
+            }
         }
 
-        return new QueueEntry { Snapshot = snapshot };
+        ProtobufWire.RequireCommand(hasCommand);
+        switch (command)
+        {
+            case EnqueueCommand:
+                consumer.ApplyEnqueue(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                break;
+            case DequeueCommand:
+                consumer.ApplyDequeue();
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ProtobufWire.RequireField(hasCount, "count", command);
+                ProtobufWire.RequireSnapshotCount(count, snapshotItemCount, command);
+                if (!snapshotStarted)
+                {
+                    consumer.ApplySnapshotStart(count);
+                }
+
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 }
 
 /// <summary>
-/// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableSetEntry{T}"/>.
+/// Protocol Buffers codec for durable set log entries.
 /// </summary>
-/// <remarks>
-/// Serialized as a <see cref="SetEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
-/// </remarks>
 public sealed class ProtobufSetEntryCodec<T>(
-    ProtobufValueConverter<T> converter) : ILogEntryCodec<DurableSetEntry<T>>
+    ProtobufValueConverter<T> converter) : IDurableSetCodec<T>
 {
-    /// <inheritdoc/>
-    public void Write(DurableSetEntry<T> entry, IBufferWriter<byte> output)
-    {
-        var proto = entry switch
-        {
-            SetAddEntry<T>(var item) => new SetEntry
-            {
-                Add = new SetAdd { Item = converter.ToTypedValue(item) }
-            },
-            SetRemoveEntry<T>(var item) => new SetEntry
-            {
-                Remove = new SetRemove { Item = converter.ToTypedValue(item) }
-            },
-            SetClearEntry<T> => new SetEntry { Clear = new SetClear() },
-            SetSnapshotEntry<T>(var items) => CreateSnapshotMessage(items),
-            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
-        };
+    private const uint CommandField = 1;
+    private const uint ItemField = 2;
+    private const uint CountField = 3;
 
-        proto.WriteTo(output);
+    private const uint AddCommand = 0;
+    private const uint RemoveCommand = 1;
+    private const uint ClearCommand = 2;
+    private const uint SnapshotCommand = 3;
+
+    /// <inheritdoc/>
+    public void WriteAdd(T item, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, AddCommand);
+        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
     }
 
     /// <inheritdoc/>
-    public DurableSetEntry<T> Read(ReadOnlySequence<byte> input)
+    public void WriteRemove(T item, IBufferWriter<byte> output)
     {
-        var proto = SetEntry.Parser.ParseFrom(input);
-
-        return proto.CommandCase switch
-        {
-            SetEntry.CommandOneofCase.Add =>
-                new SetAddEntry<T>(converter.FromTypedValue(proto.Add.Item)),
-            SetEntry.CommandOneofCase.Remove =>
-                new SetRemoveEntry<T>(converter.FromTypedValue(proto.Remove.Item)),
-            SetEntry.CommandOneofCase.Clear =>
-                new SetClearEntry<T>(),
-            SetEntry.CommandOneofCase.Snapshot =>
-                new SetSnapshotEntry<T>(proto.Snapshot.Items.Select(converter.FromTypedValue).ToList()),
-            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
-        };
+        ProtobufWire.WriteUInt32Field(output, CommandField, RemoveCommand);
+        ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
     }
 
-    private SetEntry CreateSnapshotMessage(IReadOnlyList<T> items)
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
     {
-        var snapshot = new SetSnapshot();
+        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
+        ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var item in items)
         {
-            snapshot.Items.Add(converter.ToTypedValue(item));
+            ProtobufWire.WriteBytesField(output, ItemField, converter.ToBytes(item));
+        }
+    }
+
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableSetLogEntryConsumer<T> consumer)
+    {
+        var reader = new SequenceReader<byte>(input);
+        var command = uint.MaxValue;
+        var count = 0;
+        var hasCommand = false;
+        var hasCount = false;
+        var hasItem = false;
+        var snapshotStarted = false;
+        var snapshotItemCount = 0;
+        T? item = default;
+
+        while (!reader.End)
+        {
+            var tag = ProtobufWire.ReadTag(ref reader);
+            var field = tag >> 3;
+            switch (field)
+            {
+                case CommandField:
+                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
+                    command = ProtobufWire.ReadUInt32(ref reader);
+                    hasCommand = true;
+                    break;
+                case CountField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    hasCount = true;
+                    break;
+                case ItemField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    item = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasItem = true;
+                    if (command == SnapshotCommand)
+                    {
+                        if (!snapshotStarted)
+                        {
+                            ProtobufWire.RequireField(hasCount, "count", command);
+                            consumer.ApplySnapshotStart(count);
+                            snapshotStarted = true;
+                        }
+
+                        consumer.ApplySnapshotItem(item);
+                        snapshotItemCount++;
+                        item = default;
+                        hasItem = false;
+                    }
+
+                    break;
+                default:
+                    ProtobufWire.SkipField(ref reader, tag);
+                    break;
+            }
         }
 
-        return new SetEntry { Snapshot = snapshot };
+        ProtobufWire.RequireCommand(hasCommand);
+        switch (command)
+        {
+            case AddCommand:
+                consumer.ApplyAdd(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                break;
+            case RemoveCommand:
+                consumer.ApplyRemove(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ProtobufWire.RequireField(hasCount, "count", command);
+                ProtobufWire.RequireSnapshotCount(count, snapshotItemCount, command);
+                if (!snapshotStarted)
+                {
+                    consumer.ApplySnapshotStart(count);
+                }
+
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
+}
+
+internal interface ICollectionConsumer<T>
+{
+    void ApplyAdd(T item);
+    void ApplySet(int index, T item);
+    void ApplyInsert(int index, T item);
+    void ApplyRemoveAt(int index);
+    void ApplyClear();
+    void ApplySnapshotStart(int count);
+    void ApplySnapshotItem(T item);
 }

@@ -6,9 +6,9 @@ using Orleans.Core;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine
+internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine, IDurableStateLogEntryConsumer<T>
 {
-    private readonly ILogEntryCodec<DurableStateEntry<T>> _entryCodec;
+    private readonly IDurableStateCodec<T> _codec;
     private readonly IStateMachineManager _manager;
     private T? _value;
     private ulong _version;
@@ -16,15 +16,15 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     public DurableState([ServiceKey] string key, IStateMachineManager manager, IDurableStateCodecProvider codecProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = codecProvider.GetCodec<T>();
+        _codec = codecProvider.GetCodec<T>();
         manager.RegisterStateMachine(key, this);
         _manager = manager;
     }
 
-    internal DurableState(string key, IStateMachineManager manager, ILogEntryCodec<DurableStateEntry<T>> entryCodec)
+    internal DurableState(string key, IStateMachineManager manager, IDurableStateCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = entryCodec;
+        _codec = codec;
         manager.RegisterStateMachine(key, this);
         _manager = manager;
     }
@@ -49,18 +49,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        var entry = _entryCodec.Read(logEntry);
-        switch (entry)
-        {
-            case StateClearEntry<T>:
-                _value = default;
-                _version = 0;
-                break;
-            case StateSetEntry<T>(var state, var version):
-                _value = state;
-                _version = version;
-                break;
-        }
+        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) => WriteState(logWriter);
@@ -73,8 +62,20 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     {
         writer.AppendEntry(static (self, bufferWriter) =>
         {
-            self._entryCodec.Write(new StateSetEntry<T>(self._value!, self._version), bufferWriter);
+            self._codec.WriteSet(self._value!, self._version, bufferWriter);
         }, this);
+    }
+
+    void IDurableStateLogEntryConsumer<T>.ApplySet(T state, ulong version)
+    {
+        _value = state;
+        _version = version;
+    }
+
+    void IDurableStateLogEntryConsumer<T>.ApplyClear()
+    {
+        _value = default;
+        _version = 0;
     }
 
     Task IStorage.ClearStateAsync() => ((IStorage)this).ClearStateAsync(CancellationToken.None);

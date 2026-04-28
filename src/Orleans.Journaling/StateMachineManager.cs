@@ -61,8 +61,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         IStateMachineStorage storage,
         ILogger<StateMachineManager> logger,
         IOptions<StateMachineManagerOptions> options,
-        ILogEntryCodec<DurableDictionaryEntry<string, ulong>> stateMachineIdsCodec,
-        ILogEntryCodec<DurableDictionaryEntry<string, DateTime>> retirementTrackerCodec,
+        IDurableDictionaryCodec<string, ulong> stateMachineIdsCodec,
+        IDurableDictionaryCodec<string, DateTime> retirementTrackerCodec,
         TimeProvider timeProvider)
     {
         _storage = storage;
@@ -556,7 +556,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
 
     private sealed class StateMachineManagerState(
         StateMachineManager manager,
-        ILogEntryCodec<DurableDictionaryEntry<string, ulong>> entryCodec) : DurableDictionary<string, ulong>(entryCodec)
+        IDurableDictionaryCodec<string, ulong> codec) : DurableDictionary<string, ulong>(codec)
     {
         public const int Id = 0;
 
@@ -572,8 +572,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
     /// </summary>
     /// <remarks>Resurrecting of retired machines is supported.</remarks>
     private sealed class StateMachinesRetirementTracker(
-        StateMachineManager manager, ILogEntryCodec<DurableDictionaryEntry<string, DateTime>> entryCodec)
-            : DurableDictionary<string, DateTime>(entryCodec)
+        StateMachineManager manager, IDurableDictionaryCodec<string, DateTime> codec)
+            : DurableDictionary<string, DateTime>(codec)
     {
         public const int Id = 1;
 

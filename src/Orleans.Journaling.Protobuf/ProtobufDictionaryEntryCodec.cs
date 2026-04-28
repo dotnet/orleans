@@ -1,104 +1,161 @@
 using System.Buffers;
-using Google.Protobuf;
-using Orleans.Journaling.Protobuf.Messages;
 
 namespace Orleans.Journaling.Protobuf;
 
 /// <summary>
-/// Protocol Buffers <see cref="ILogEntryCodec{TEntry}"/> for <see cref="DurableDictionaryEntry{TKey, TValue}"/>.
+/// Protocol Buffers codec for durable dictionary log entries.
 /// </summary>
-/// <remarks>
-/// Serialized as a <see cref="DictionaryEntry"/> protobuf message with a <c>oneof command</c> discriminator.
-/// User keys and values are wrapped in <see cref="TypedValue"/> for native encoding of well-known types.
-/// <example>
-/// <code>
-/// var codec = new ProtobufDictionaryEntryCodec&lt;string, int&gt;(keyConverter, valueConverter);
-/// codec.Write(new DictionarySetEntry&lt;string, int&gt;("key", 42), bufferWriter);
-/// </code>
-/// </example>
-/// </remarks>
 public sealed class ProtobufDictionaryEntryCodec<TKey, TValue>(
     ProtobufValueConverter<TKey> keyConverter,
-    ProtobufValueConverter<TValue> valueConverter) : ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>>
+    ProtobufValueConverter<TValue> valueConverter) : IDurableDictionaryCodec<TKey, TValue> where TKey : notnull
 {
-    /// <inheritdoc/>
-    public void Write(DurableDictionaryEntry<TKey, TValue> entry, IBufferWriter<byte> output)
-    {
-        var proto = entry switch
-        {
-            DictionarySetEntry<TKey, TValue>(var key, var value) => new DictionaryEntry
-            {
-                Set = new DictionarySet
-                {
-                    Key = keyConverter.ToTypedValue(key),
-                    Value = valueConverter.ToTypedValue(value)
-                }
-            },
-            DictionaryRemoveEntry<TKey, TValue>(var key) => new DictionaryEntry
-            {
-                Remove = new DictionaryRemove
-                {
-                    Key = keyConverter.ToTypedValue(key)
-                }
-            },
-            DictionaryClearEntry<TKey, TValue> => new DictionaryEntry
-            {
-                Clear = new DictionaryClear()
-            },
-            DictionarySnapshotEntry<TKey, TValue>(var items) => CreateSnapshotMessage(items),
-            _ => throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}")
-        };
+    private const uint CommandField = 1;
+    private const uint KeyField = 2;
+    private const uint ValueField = 3;
+    private const uint CountField = 4;
 
-        proto.WriteTo(output);
+    private const uint SetCommand = 0;
+    private const uint RemoveCommand = 1;
+    private const uint ClearCommand = 2;
+    private const uint SnapshotCommand = 3;
+
+    /// <inheritdoc/>
+    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
+        ProtobufWire.WriteBytesField(output, KeyField, keyConverter.ToBytes(key));
+        ProtobufWire.WriteBytesField(output, ValueField, valueConverter.ToBytes(value));
     }
 
     /// <inheritdoc/>
-    public DurableDictionaryEntry<TKey, TValue> Read(ReadOnlySequence<byte> input)
+    public void WriteRemove(TKey key, IBufferWriter<byte> output)
     {
-        var proto = DictionaryEntry.Parser.ParseFrom(input);
-
-        return proto.CommandCase switch
-        {
-            DictionaryEntry.CommandOneofCase.Set =>
-                new DictionarySetEntry<TKey, TValue>(
-                    keyConverter.FromTypedValue(proto.Set.Key),
-                    valueConverter.FromTypedValue(proto.Set.Value)),
-            DictionaryEntry.CommandOneofCase.Remove =>
-                new DictionaryRemoveEntry<TKey, TValue>(
-                    keyConverter.FromTypedValue(proto.Remove.Key)),
-            DictionaryEntry.CommandOneofCase.Clear =>
-                new DictionaryClearEntry<TKey, TValue>(),
-            DictionaryEntry.CommandOneofCase.Snapshot =>
-                ReadSnapshot(proto.Snapshot),
-            _ => throw new NotSupportedException($"Command type {proto.CommandCase} is not supported"),
-        };
+        ProtobufWire.WriteUInt32Field(output, CommandField, RemoveCommand);
+        ProtobufWire.WriteBytesField(output, KeyField, keyConverter.ToBytes(key));
     }
 
-    private DictionaryEntry CreateSnapshotMessage(IReadOnlyList<KeyValuePair<TKey, TValue>> items)
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
     {
-        var snapshot = new DictionarySnapshot();
+        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output)
+    {
+        ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
+        ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
         foreach (var (key, value) in items)
         {
-            snapshot.Items.Add(new DictionarySnapshotItem
-            {
-                Key = keyConverter.ToTypedValue(key),
-                Value = valueConverter.ToTypedValue(value)
-            });
+            ProtobufWire.WriteBytesField(output, KeyField, keyConverter.ToBytes(key));
+            ProtobufWire.WriteBytesField(output, ValueField, valueConverter.ToBytes(value));
         }
-
-        return new DictionaryEntry { Snapshot = snapshot };
     }
 
-    private DictionarySnapshotEntry<TKey, TValue> ReadSnapshot(DictionarySnapshot snapshot)
+    /// <inheritdoc/>
+    public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer)
     {
-        var items = new List<KeyValuePair<TKey, TValue>>(snapshot.Items.Count);
-        foreach (var item in snapshot.Items)
+        var reader = new SequenceReader<byte>(input);
+        var command = uint.MaxValue;
+        var count = 0;
+        TKey? key = default;
+        TValue? value = default;
+        var hasCommand = false;
+        var hasCount = false;
+        var hasKey = false;
+        var hasValue = false;
+        var snapshotStarted = false;
+        var snapshotItemCount = 0;
+
+        while (!reader.End)
         {
-            items.Add(new KeyValuePair<TKey, TValue>(
-                keyConverter.FromTypedValue(item.Key),
-                valueConverter.FromTypedValue(item.Value)));
+            var tag = ProtobufWire.ReadTag(ref reader);
+            var field = tag >> 3;
+            switch (field)
+            {
+                case CommandField:
+                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
+                    command = ProtobufWire.ReadUInt32(ref reader);
+                    hasCommand = true;
+                    break;
+                case CountField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    hasCount = true;
+                    break;
+                case KeyField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    if (command == SnapshotCommand && hasKey)
+                    {
+                        ProtobufWire.RequireField(false, "value", command);
+                    }
+
+                    key = keyConverter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasKey = true;
+                    if (command == SnapshotCommand && !snapshotStarted)
+                    {
+                        ProtobufWire.RequireField(hasCount, "count", command);
+                        consumer.ApplySnapshotStart(count);
+                        snapshotStarted = true;
+                    }
+
+                    break;
+                case ValueField:
+                    ProtobufWire.RequireCommand(hasCommand);
+                    value = valueConverter.FromBytes(ProtobufWire.ReadBytes(ref reader));
+                    hasValue = true;
+                    if (command == SnapshotCommand)
+                    {
+                        if (!snapshotStarted)
+                        {
+                            ProtobufWire.RequireField(hasCount, "count", command);
+                            consumer.ApplySnapshotStart(count);
+                            snapshotStarted = true;
+                        }
+
+                        consumer.ApplySnapshotItem(
+                            ProtobufWire.RequireValue(hasKey, key, "key", command),
+                            value);
+                        snapshotItemCount++;
+                        key = default;
+                        value = default;
+                        hasKey = false;
+                        hasValue = false;
+                    }
+
+                    break;
+                default:
+                    ProtobufWire.SkipField(ref reader, tag);
+                    break;
+            }
         }
 
-        return new DictionarySnapshotEntry<TKey, TValue>(items);
+        ProtobufWire.RequireCommand(hasCommand);
+        switch (command)
+        {
+            case SetCommand:
+                consumer.ApplySet(
+                    ProtobufWire.RequireValue(hasKey, key, "key", command),
+                    ProtobufWire.RequireValue(hasValue, value, "value", command));
+                break;
+            case RemoveCommand:
+                consumer.ApplyRemove(ProtobufWire.RequireValue(hasKey, key, "key", command));
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ProtobufWire.RequireField(hasCount, "count", command);
+                ProtobufWire.RequireField(!hasKey, "value", command);
+                ProtobufWire.RequireSnapshotCount(count, snapshotItemCount, command);
+                if (!snapshotStarted)
+                {
+                    consumer.ApplySnapshotStart(count);
+                }
+
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 }

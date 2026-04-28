@@ -7,52 +7,27 @@ using Xunit;
 namespace Orleans.Journaling.Json.Tests;
 
 /// <summary>
-/// Comprehensive round-trip and JSON-format tests for all JSON per-type entry codecs.
+/// Round-trip and JSON-format tests for the direct JSON codecs.
 /// </summary>
 [TestCategory("BVT")]
 public class JsonCodecTests
 {
     private static readonly JsonSerializerOptions Options = new();
 
-    // ── Dictionary ──────────────────────────────────────────
-
     [Fact]
     public void JsonDictionaryCodec_Set_RoundTrips()
     {
         var codec = new JsonDictionaryEntryCodec<string, int>(Options);
-        var entry = new DictionarySetEntry<string, int>("alice", 42);
+        var buffer = new ArrayBufferWriter<byte>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        codec.WriteSet("alice", 42, buffer);
+        var json = GetString(buffer);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
-        Assert.Contains("\"cmd\":\"set\"", json);
-        var set = Assert.IsType<DictionarySetEntry<string, int>>(result);
-        Assert.Equal("alice", set.Key);
-        Assert.Equal(42, set.Value);
-    }
-
-    [Fact]
-    public void JsonDictionaryCodec_Remove_RoundTrips()
-    {
-        var codec = new JsonDictionaryEntryCodec<string, int>(Options);
-        var entry = new DictionaryRemoveEntry<string, int>("bob");
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"remove\"", json);
-        var remove = Assert.IsType<DictionaryRemoveEntry<string, int>>(result);
-        Assert.Equal("bob", remove.Key);
-    }
-
-    [Fact]
-    public void JsonDictionaryCodec_Clear_RoundTrips()
-    {
-        var codec = new JsonDictionaryEntryCodec<string, int>(Options);
-        var entry = new DictionaryClearEntry<string, int>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"clear\"", json);
-        Assert.IsType<DictionaryClearEntry<string, int>>(result);
+        Assert.Equal("""{"cmd":"set","key":"alice","value":42}""", json);
+        Assert.Equal("alice", consumer.LastSetKey);
+        Assert.Equal(42, consumer.LastSetValue);
     }
 
     [Fact]
@@ -63,360 +38,218 @@ public class JsonCodecTests
         {
             new("alpha", 1),
             new("beta", 2),
-            new("gamma", 3),
         };
-        var entry = new DictionarySnapshotEntry<string, int>(items);
+        var buffer = new ArrayBufferWriter<byte>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        codec.WriteSnapshot(items, items.Count, buffer);
+        var json = GetString(buffer);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
-        Assert.Contains("\"cmd\":\"snapshot\"", json);
-        var snapshot = Assert.IsType<DictionarySnapshotEntry<string, int>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-        Assert.Equal("alpha", snapshot.Items[0].Key);
-        Assert.Equal(1, snapshot.Items[0].Value);
-        Assert.Equal("gamma", snapshot.Items[2].Key);
-        Assert.Equal(3, snapshot.Items[2].Value);
+        Assert.Equal("""{"cmd":"snapshot","items":[{"key":"alpha","value":1},{"key":"beta","value":2}]}""", json);
+        Assert.Equal(items, consumer.Items);
     }
 
     [Fact]
-    public void JsonDictionaryCodec_Snapshot_EmptyItems_RoundTrips()
-    {
-        var codec = new JsonDictionaryEntryCodec<string, int>(Options);
-        var entry = new DictionarySnapshotEntry<string, int>([]);
-
-        var (result, _) = RoundTrip(codec, entry);
-
-        var snapshot = Assert.IsType<DictionarySnapshotEntry<string, int>>(result);
-        Assert.Empty(snapshot.Items);
-    }
-
-    [Fact]
-    public void JsonDictionaryCodec_ComplexValueTypes_RoundTrips()
-    {
-        var codec = new JsonDictionaryEntryCodec<int, TestPerson>(Options);
-        var person = new TestPerson("Alice", 30);
-        var entry = new DictionarySetEntry<int, TestPerson>(1, person);
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"set\"", json);
-        Assert.Contains("Alice", json);
-        var set = Assert.IsType<DictionarySetEntry<int, TestPerson>>(result);
-        Assert.Equal(1, set.Key);
-        Assert.Equal("Alice", set.Value.Name);
-        Assert.Equal(30, set.Value.Age);
-    }
-
-    // ── List ────────────────────────────────────────────────
-
-    [Fact]
-    public void JsonListCodec_Add_RoundTrips()
+    public void JsonListCodec_Operations_RoundTrip()
     {
         var codec = new JsonListEntryCodec<string>(Options);
-        var entry = new ListAddEntry<string>("hello");
+        var consumer = new ListConsumer<string>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        Apply(codec, writer => codec.WriteAdd("one", writer), consumer);
+        Apply(codec, writer => codec.WriteSet(0, "updated", writer), consumer);
+        Apply(codec, writer => codec.WriteInsert(1, "two", writer), consumer);
+        Apply(codec, writer => codec.WriteRemoveAt(0, writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
 
-        Assert.Contains("\"cmd\":\"add\"", json);
-        var add = Assert.IsType<ListAddEntry<string>>(result);
-        Assert.Equal("hello", add.Item);
-    }
-
-    [Fact]
-    public void JsonListCodec_Set_RoundTrips()
-    {
-        var codec = new JsonListEntryCodec<int>(Options);
-        var entry = new ListSetEntry<int>(3, 99);
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"set\"", json);
-        var set = Assert.IsType<ListSetEntry<int>>(result);
-        Assert.Equal(3, set.Index);
-        Assert.Equal(99, set.Item);
-    }
-
-    [Fact]
-    public void JsonListCodec_Insert_RoundTrips()
-    {
-        var codec = new JsonListEntryCodec<string>(Options);
-        var entry = new ListInsertEntry<string>(1, "inserted");
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"insert\"", json);
-        var insert = Assert.IsType<ListInsertEntry<string>>(result);
-        Assert.Equal(1, insert.Index);
-        Assert.Equal("inserted", insert.Item);
-    }
-
-    [Fact]
-    public void JsonListCodec_RemoveAt_RoundTrips()
-    {
-        var codec = new JsonListEntryCodec<int>(Options);
-        var entry = new ListRemoveAtEntry<int>(5);
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"removeAt\"", json);
-        var remove = Assert.IsType<ListRemoveAtEntry<int>>(result);
-        Assert.Equal(5, remove.Index);
-    }
-
-    [Fact]
-    public void JsonListCodec_Clear_RoundTrips()
-    {
-        var codec = new JsonListEntryCodec<int>(Options);
-        var entry = new ListClearEntry<int>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"clear\"", json);
-        Assert.IsType<ListClearEntry<int>>(result);
+        Assert.Equal(["add:one", "set:0:updated", "insert:1:two", "remove:0", "clear"], consumer.Commands);
     }
 
     [Fact]
     public void JsonListCodec_Snapshot_RoundTrips()
     {
         var codec = new JsonListEntryCodec<string>(Options);
-        var entry = new ListSnapshotEntry<string>(["one", "two", "three"]);
+        var consumer = new ListConsumer<string>();
+        var buffer = new ArrayBufferWriter<byte>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        codec.WriteSnapshot(["one", "two"], 2, buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
-        Assert.Contains("\"cmd\":\"snapshot\"", json);
-        var snapshot = Assert.IsType<ListSnapshotEntry<string>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-        Assert.Equal("one", snapshot.Items[0]);
-        Assert.Equal("three", snapshot.Items[2]);
+        Assert.Equal(["snapshot:2", "snapshot-item:one", "snapshot-item:two"], consumer.Commands);
     }
 
-    // ── Queue ───────────────────────────────────────────────
-
     [Fact]
-    public void JsonQueueCodec_Enqueue_RoundTrips()
+    public void JsonQueueCodec_Operations_RoundTrip()
     {
         var codec = new JsonQueueEntryCodec<int>(Options);
-        var entry = new QueueEnqueueEntry<int>(42);
+        var consumer = new QueueConsumer<int>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
+        Apply(codec, writer => codec.WriteDequeue(writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot([20, 30], 2, writer), consumer);
 
-        Assert.Contains("\"cmd\":\"enqueue\"", json);
-        var enqueue = Assert.IsType<QueueEnqueueEntry<int>>(result);
-        Assert.Equal(42, enqueue.Item);
+        Assert.Equal(["enqueue:10", "dequeue", "clear", "snapshot:2", "snapshot-item:20", "snapshot-item:30"], consumer.Commands);
     }
 
     [Fact]
-    public void JsonQueueCodec_Dequeue_RoundTrips()
-    {
-        var codec = new JsonQueueEntryCodec<int>(Options);
-        var entry = new QueueDequeueEntry<int>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"dequeue\"", json);
-        Assert.IsType<QueueDequeueEntry<int>>(result);
-    }
-
-    [Fact]
-    public void JsonQueueCodec_Clear_RoundTrips()
-    {
-        var codec = new JsonQueueEntryCodec<string>(Options);
-        var entry = new QueueClearEntry<string>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"clear\"", json);
-        Assert.IsType<QueueClearEntry<string>>(result);
-    }
-
-    [Fact]
-    public void JsonQueueCodec_Snapshot_RoundTrips()
-    {
-        var codec = new JsonQueueEntryCodec<int>(Options);
-        var entry = new QueueSnapshotEntry<int>([10, 20, 30]);
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"snapshot\"", json);
-        var snapshot = Assert.IsType<QueueSnapshotEntry<int>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-        Assert.Equal(10, snapshot.Items[0]);
-    }
-
-    // ── Set ─────────────────────────────────────────────────
-
-    [Fact]
-    public void JsonSetCodec_Add_RoundTrips()
+    public void JsonSetCodec_Operations_RoundTrip()
     {
         var codec = new JsonSetEntryCodec<string>(Options);
-        var entry = new SetAddEntry<string>("item");
+        var consumer = new SetConsumer<string>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
+        Apply(codec, writer => codec.WriteRemove("a", writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(["b", "c"], 2, writer), consumer);
 
-        Assert.Contains("\"cmd\":\"add\"", json);
-        var add = Assert.IsType<SetAddEntry<string>>(result);
-        Assert.Equal("item", add.Item);
+        Assert.Equal(["add:a", "remove:a", "clear", "snapshot:2", "snapshot-item:b", "snapshot-item:c"], consumer.Commands);
     }
-
-    [Fact]
-    public void JsonSetCodec_Remove_RoundTrips()
-    {
-        var codec = new JsonSetEntryCodec<string>(Options);
-        var entry = new SetRemoveEntry<string>("item");
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"remove\"", json);
-        var remove = Assert.IsType<SetRemoveEntry<string>>(result);
-        Assert.Equal("item", remove.Item);
-    }
-
-    [Fact]
-    public void JsonSetCodec_Clear_RoundTrips()
-    {
-        var codec = new JsonSetEntryCodec<int>(Options);
-        var entry = new SetClearEntry<int>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"clear\"", json);
-        Assert.IsType<SetClearEntry<int>>(result);
-    }
-
-    [Fact]
-    public void JsonSetCodec_Snapshot_RoundTrips()
-    {
-        var codec = new JsonSetEntryCodec<string>(Options);
-        var entry = new SetSnapshotEntry<string>(["a", "b", "c"]);
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"snapshot\"", json);
-        var snapshot = Assert.IsType<SetSnapshotEntry<string>>(result);
-        Assert.Equal(3, snapshot.Items.Count);
-    }
-
-    // ── Value ───────────────────────────────────────────────
 
     [Fact]
     public void JsonValueCodec_Set_RoundTrips()
     {
         var codec = new JsonValueEntryCodec<int>(Options);
-        var entry = new ValueSetEntry<int>(42);
+        var consumer = new ValueConsumer<int>();
+        var buffer = new ArrayBufferWriter<byte>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        codec.WriteSet(42, buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
-        Assert.Contains("\"cmd\":\"set\"", json);
-        var set = Assert.IsType<ValueSetEntry<int>>(result);
-        Assert.Equal(42, set.Value);
+        Assert.Equal(42, consumer.Value);
     }
 
     [Fact]
-    public void JsonValueCodec_ComplexType_RoundTrips()
+    public void JsonStateCodec_SetAndClear_RoundTrip()
     {
-        var codec = new JsonValueEntryCodec<TestPerson>(Options);
-        var entry = new ValueSetEntry<TestPerson>(new TestPerson("Bob", 25));
+        var codec = new JsonStateEntryCodec<string>(Options);
+        var consumer = new StateConsumer<string>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        Apply(codec, writer => codec.WriteSet("state", 7, writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
 
-        Assert.Contains("Bob", json);
-        var set = Assert.IsType<ValueSetEntry<TestPerson>>(result);
-        Assert.Equal("Bob", set.Value.Name);
-        Assert.Equal(25, set.Value.Age);
-    }
-
-    // ── State ───────────────────────────────────────────────
-
-    [Fact]
-    public void JsonStateCodec_Set_RoundTrips()
-    {
-        var codec = new JsonStateEntryCodec<TestPerson>(Options);
-        var entry = new StateSetEntry<TestPerson>(new TestPerson("Alice", 30), 5);
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"set\"", json);
-        Assert.Contains("\"Version\":5", json);
-        var set = Assert.IsType<StateSetEntry<TestPerson>>(result);
-        Assert.Equal("Alice", set.State.Name);
-        Assert.Equal(5UL, set.Version);
+        Assert.Equal(["set:state:7", "clear"], consumer.Commands);
     }
 
     [Fact]
-    public void JsonStateCodec_Clear_RoundTrips()
-    {
-        var codec = new JsonStateEntryCodec<int>(Options);
-        var entry = new StateClearEntry<int>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"clear\"", json);
-        Assert.IsType<StateClearEntry<int>>(result);
-    }
-
-    // ── TaskCompletionSource ────────────────────────────────
-
-    [Fact]
-    public void JsonTcsCodec_Completed_RoundTrips()
+    public void JsonTcsCodec_States_RoundTrip()
     {
         var codec = new JsonTcsEntryCodec<int>(Options);
-        var entry = new TcsCompletedEntry<int>(42);
+        var consumer = new TcsConsumer<int>();
 
-        var (result, json) = RoundTrip(codec, entry);
+        Apply(codec, writer => codec.WritePending(writer), consumer);
+        Apply(codec, writer => codec.WriteCompleted(5, writer), consumer);
+        Apply(codec, writer => codec.WriteFaulted(new InvalidOperationException("boom"), writer), consumer);
+        Apply(codec, writer => codec.WriteCanceled(writer), consumer);
 
-        Assert.Contains("\"cmd\":\"completed\"", json);
-        var completed = Assert.IsType<TcsCompletedEntry<int>>(result);
-        Assert.Equal(42, completed.Value);
+        Assert.Equal(["pending", "completed:5", "faulted:boom", "canceled"], consumer.Commands);
     }
 
-    [Fact]
-    public void JsonTcsCodec_Faulted_RoundTrips()
-    {
-        var codec = new JsonTcsEntryCodec<int>(Options);
-        var entry = new TcsFaultedEntry<int>(new InvalidOperationException("test error"));
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"faulted\"", json);
-        Assert.Contains("test error", json);
-        var faulted = Assert.IsType<TcsFaultedEntry<int>>(result);
-        Assert.Contains("test error", faulted.Exception.Message);
-    }
-
-    [Fact]
-    public void JsonTcsCodec_Canceled_RoundTrips()
-    {
-        var codec = new JsonTcsEntryCodec<string>(Options);
-        var entry = new TcsCanceledEntry<string>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"canceled\"", json);
-        Assert.IsType<TcsCanceledEntry<string>>(result);
-    }
-
-    [Fact]
-    public void JsonTcsCodec_Pending_RoundTrips()
-    {
-        var codec = new JsonTcsEntryCodec<string>(Options);
-        var entry = new TcsPendingEntry<string>();
-
-        var (result, json) = RoundTrip(codec, entry);
-
-        Assert.Contains("\"cmd\":\"pending\"", json);
-        Assert.IsType<TcsPendingEntry<string>>(result);
-    }
-
-    // ── Helpers ─────────────────────────────────────────────
-
-    private static (T Result, string Json) RoundTrip<T>(ILogEntryCodec<T> codec, T entry)
+    private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
-        var json = Encoding.UTF8.GetString(buffer.WrittenSpan);
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        return (result, json);
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private sealed record TestPerson(string Name, int Age);
+    private static void Apply<T>(IDurableQueueCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueLogEntryConsumer<T> consumer)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+    }
+
+    private static void Apply<T>(IDurableSetCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetLogEntryConsumer<T> consumer)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+    }
+
+    private static void Apply<T>(IDurableStateCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateLogEntryConsumer<T> consumer)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+    }
+
+    private static void Apply<T>(IDurableTaskCompletionSourceCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        write(buffer);
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+    }
+
+    private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
+
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
+    {
+        public TKey? LastSetKey { get; private set; }
+        public TValue? LastSetValue { get; private set; }
+        public List<KeyValuePair<TKey, TValue>> Items { get; } = [];
+        public void ApplySet(TKey key, TValue value)
+        {
+            LastSetKey = key;
+            LastSetValue = value;
+        }
+
+        public void ApplyRemove(TKey key) { }
+        public void ApplyClear() => Items.Clear();
+        public void ApplySnapshotStart(int count) => Items.Clear();
+        public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
+    }
+
+    private sealed class ListConsumer<T> : IDurableListLogEntryConsumer<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyAdd(T item) => Commands.Add($"add:{item}");
+        public void ApplySet(int index, T item) => Commands.Add($"set:{index}:{item}");
+        public void ApplyInsert(int index, T item) => Commands.Add($"insert:{index}:{item}");
+        public void ApplyRemoveAt(int index) => Commands.Add($"remove:{index}");
+        public void ApplyClear() => Commands.Add("clear");
+        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
+        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+    }
+
+    private sealed class QueueConsumer<T> : IDurableQueueLogEntryConsumer<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
+        public void ApplyDequeue() => Commands.Add("dequeue");
+        public void ApplyClear() => Commands.Add("clear");
+        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
+        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+    }
+
+    private sealed class SetConsumer<T> : IDurableSetLogEntryConsumer<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyAdd(T item) => Commands.Add($"add:{item}");
+        public void ApplyRemove(T item) => Commands.Add($"remove:{item}");
+        public void ApplyClear() => Commands.Add("clear");
+        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
+        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+    }
+
+    private sealed class ValueConsumer<T> : IDurableValueLogEntryConsumer<T>
+    {
+        public T? Value { get; private set; }
+        public void ApplySet(T value) => Value = value;
+    }
+
+    private sealed class StateConsumer<T> : IDurableStateLogEntryConsumer<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplySet(T state, ulong version) => Commands.Add($"set:{state}:{version}");
+        public void ApplyClear() => Commands.Add("clear");
+    }
+
+    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceLogEntryConsumer<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyPending() => Commands.Add("pending");
+        public void ApplyCompleted(T value) => Commands.Add($"completed:{value}");
+        public void ApplyFaulted(Exception exception) => Commands.Add($"faulted:{exception.Message}");
+        public void ApplyCanceled() => Commands.Add("canceled");
+    }
 }

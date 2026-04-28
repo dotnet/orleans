@@ -16,9 +16,9 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine, IDurableTaskCompletionSourceLogEntryConsumer<T>
 {
-    private readonly ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> _entryCodec;
+    private readonly IDurableTaskCompletionSourceCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
 
@@ -36,7 +36,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = codecProvider.GetCodec<T>();
+        _codec = codecProvider.GetCodec<T>();
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterStateMachine(key, this);
@@ -45,12 +45,12 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     internal DurableTaskCompletionSource(
         string key,
         IStateMachineManager manager,
-        ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> entryCodec,
+        IDurableTaskCompletionSourceCodec<T> codec,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _entryCodec = entryCodec;
+        _codec = codec;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterStateMachine(key, this);
@@ -136,24 +136,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        var entry = _entryCodec.Read(logEntry);
-        switch (entry)
-        {
-            case TcsCompletedEntry<T>(var value):
-                _status = DurableTaskCompletionSourceStatus.Completed;
-                _value = value;
-                break;
-            case TcsFaultedEntry<T>(var exception):
-                _status = DurableTaskCompletionSourceStatus.Faulted;
-                _exception = exception;
-                break;
-            case TcsCanceledEntry<T>:
-                _status = DurableTaskCompletionSourceStatus.Canceled;
-                break;
-            case TcsPendingEntry<T>:
-                _status = DurableTaskCompletionSourceStatus.Pending;
-                break;
-        }
+        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
@@ -170,16 +153,38 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     {
         writer.AppendEntry(static (self, bufferWriter) =>
         {
-            DurableTaskCompletionSourceEntry<T> entry = self._status switch
+            switch (self._status)
             {
-                DurableTaskCompletionSourceStatus.Completed => new TcsCompletedEntry<T>(self._value!),
-                DurableTaskCompletionSourceStatus.Faulted => new TcsFaultedEntry<T>(self._exception!),
-                DurableTaskCompletionSourceStatus.Canceled => new TcsCanceledEntry<T>(),
-                _ => new TcsPendingEntry<T>(),
-            };
-            self._entryCodec.Write(entry, bufferWriter);
+                case DurableTaskCompletionSourceStatus.Completed:
+                    self._codec.WriteCompleted(self._value!, bufferWriter);
+                    break;
+                case DurableTaskCompletionSourceStatus.Faulted:
+                    self._codec.WriteFaulted(self._exception!, bufferWriter);
+                    break;
+                case DurableTaskCompletionSourceStatus.Canceled:
+                    self._codec.WriteCanceled(bufferWriter);
+                    break;
+                default:
+                    self._codec.WritePending(bufferWriter);
+                    break;
+            }
         }, this);
     }
+
+    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
+    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyCompleted(T value)
+    {
+        _status = DurableTaskCompletionSourceStatus.Completed;
+        _value = value;
+    }
+
+    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyFaulted(Exception exception)
+    {
+        _status = DurableTaskCompletionSourceStatus.Faulted;
+        _exception = exception;
+    }
+
+    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 }

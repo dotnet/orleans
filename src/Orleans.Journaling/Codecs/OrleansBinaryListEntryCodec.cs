@@ -3,11 +3,10 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for <see cref="DurableListEntry{T}"/> log entries,
-/// preserving the legacy Orleans binary wire format.
+/// Binary codec for durable list log entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryListEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableListEntry<T>>
+    ILogDataCodec<T> codec) : IDurableListCodec<T>
 {
     private const byte FormatVersion = 0;
     private const uint AddCommand = 0;
@@ -18,49 +17,60 @@ internal sealed class OrleansBinaryListEntryCodec<T>(
     private const uint SnapshotCommand = 5;
 
     /// <inheritdoc/>
-    public void Write(DurableListEntry<T> entry, IBufferWriter<byte> output)
+    public void WriteAdd(T item, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, AddCommand);
+        codec.Write(item, output);
+    }
 
-        switch (entry)
+    /// <inheritdoc/>
+    public void WriteSet(int index, T item, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, SetCommand);
+        VarIntHelper.WriteVarUInt32(output, (uint)index);
+        codec.Write(item, output);
+    }
+
+    /// <inheritdoc/>
+    public void WriteInsert(int index, T item, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, InsertCommand);
+        VarIntHelper.WriteVarUInt32(output, (uint)index);
+        codec.Write(item, output);
+    }
+
+    /// <inheritdoc/>
+    public void WriteRemoveAt(int index, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, RemoveCommand);
+        VarIntHelper.WriteVarUInt32(output, (uint)index);
+    }
+
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
+        VarIntHelper.WriteVarUInt32(output, (uint)count);
+        foreach (var item in items)
         {
-            case ListAddEntry<T>(var item):
-                VarIntHelper.WriteVarUInt32(output, AddCommand);
-                codec.Write(item, output);
-                break;
-            case ListSetEntry<T>(var index, var item):
-                VarIntHelper.WriteVarUInt32(output, SetCommand);
-                VarIntHelper.WriteVarUInt32(output, (uint)index);
-                codec.Write(item, output);
-                break;
-            case ListInsertEntry<T>(var index, var item):
-                VarIntHelper.WriteVarUInt32(output, InsertCommand);
-                VarIntHelper.WriteVarUInt32(output, (uint)index);
-                codec.Write(item, output);
-                break;
-            case ListRemoveAtEntry<T>(var index):
-                VarIntHelper.WriteVarUInt32(output, RemoveCommand);
-                VarIntHelper.WriteVarUInt32(output, (uint)index);
-                break;
-            case ListClearEntry<T>:
-                VarIntHelper.WriteVarUInt32(output, ClearCommand);
-                break;
-            case ListSnapshotEntry<T>(var items):
-                VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
-                VarIntHelper.WriteVarUInt32(output, (uint)items.Count);
-                foreach (var item in items)
-                {
-                    codec.Write(item, output);
-                }
-
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
+            codec.Write(item, output);
         }
     }
 
     /// <inheritdoc/>
-    public DurableListEntry<T> Read(ReadOnlySequence<byte> input)
+    public void Apply(ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(input);
         ReadVersionByte(ref reader);
@@ -68,55 +78,59 @@ internal sealed class OrleansBinaryListEntryCodec<T>(
         var command = VarIntHelper.ReadVarUInt32(ref reader);
         var remaining = input.Slice(reader.Consumed);
 
-        return command switch
+        switch (command)
         {
-            AddCommand => ReadAdd(remaining),
-            SetCommand => ReadIndexAndItem(remaining, static (index, item) => new ListSetEntry<T>(index, item)),
-            InsertCommand => ReadIndexAndItem(remaining, static (index, item) => new ListInsertEntry<T>(index, item)),
-            RemoveCommand => ReadRemoveAt(remaining),
-            ClearCommand => new ListClearEntry<T>(),
-            SnapshotCommand => ReadSnapshot(remaining),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+            case AddCommand:
+                consumer.ApplyAdd(codec.Read(remaining, out _));
+                break;
+            case SetCommand:
+                ApplyIndexAndItem(remaining, consumer.ApplySet);
+                break;
+            case InsertCommand:
+                ApplyIndexAndItem(remaining, consumer.ApplyInsert);
+                break;
+            case RemoveCommand:
+                consumer.ApplyRemoveAt(ReadIndex(remaining));
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ApplySnapshot(remaining, consumer);
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 
-    private DurableListEntry<T> ReadAdd(ReadOnlySequence<byte> remaining)
-    {
-        var item = codec.Read(remaining, out _);
-        return new ListAddEntry<T>(item);
-    }
-
-    private DurableListEntry<T> ReadIndexAndItem(ReadOnlySequence<byte> remaining, Func<int, T, DurableListEntry<T>> factory)
+    private void ApplyIndexAndItem(ReadOnlySequence<byte> remaining, Action<int, T> apply)
     {
         var reader = new SequenceReader<byte>(remaining);
         var index = (int)VarIntHelper.ReadVarUInt32(ref reader);
         remaining = remaining.Slice(reader.Consumed);
         var item = codec.Read(remaining, out _);
-        return factory(index, item);
+        apply(index, item);
     }
 
-    private static DurableListEntry<T> ReadRemoveAt(ReadOnlySequence<byte> remaining)
+    private static int ReadIndex(ReadOnlySequence<byte> remaining)
     {
         var reader = new SequenceReader<byte>(remaining);
-        var index = (int)VarIntHelper.ReadVarUInt32(ref reader);
-        return new ListRemoveAtEntry<T>(index);
+        return (int)VarIntHelper.ReadVarUInt32(ref reader);
     }
 
-    private DurableListEntry<T> ReadSnapshot(ReadOnlySequence<byte> remaining)
+    private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableListLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(remaining);
         var count = (int)VarIntHelper.ReadVarUInt32(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
-        var items = new List<T>(count);
+        consumer.ApplySnapshotStart(count);
         for (var i = 0; i < count; i++)
         {
             var item = codec.Read(remaining, out var consumed);
             remaining = remaining.Slice(consumed);
-            items.Add(item);
+            consumer.ApplySnapshotItem(item);
         }
-
-        return new ListSnapshotEntry<T>(items);
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)

@@ -17,10 +17,8 @@ public static class ProtobufJournalingExtensions
     /// <returns>The silo builder for chaining.</returns>
     /// <remarks>
     /// <para>
-    /// Each entry type is serialized as a generated protobuf message. User values are wrapped in
-    /// <see cref="Messages.TypedValue"/> which uses native protobuf encoding for well-known types
-    /// (scalars and <see cref="Google.Protobuf.IMessage"/>) and falls back to
-    /// <see cref="ILogDataCodec{T}"/> for all other types.
+    /// Each entry type is serialized using protobuf wire-format tags. User values use native
+    /// protobuf payload encoding where supported and fall back to <see cref="ILogDataCodec{T}"/>.
     /// </para>
     /// </remarks>
     /// <example>
@@ -66,47 +64,47 @@ internal sealed class ProtobufLogEntryCodecProvider(IServiceProvider serviceProv
     private readonly ConcurrentDictionary<Type, object> _codecs = new();
 
     /// <inheritdoc/>
-    public ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>> GetCodec<TKey, TValue>() where TKey : notnull
-        => (ILogEntryCodec<DurableDictionaryEntry<TKey, TValue>>)_codecs.GetOrAdd(
-            typeof(DurableDictionaryEntry<TKey, TValue>),
+    public IDurableDictionaryCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
+        => (IDurableDictionaryCodec<TKey, TValue>)_codecs.GetOrAdd(
+            typeof(IDurableDictionaryCodec<TKey, TValue>),
             _ => new ProtobufDictionaryEntryCodec<TKey, TValue>(
                 CreateConverter<TKey>(),
                 CreateConverter<TValue>()));
 
     /// <inheritdoc/>
-    public ILogEntryCodec<DurableListEntry<T>> GetCodec<T>()
-        => (ILogEntryCodec<DurableListEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableListEntry<T>),
+    public IDurableListCodec<T> GetCodec<T>()
+        => (IDurableListCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableListCodec<T>),
             _ => new ProtobufListEntryCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableQueueEntry<T>> IDurableQueueCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableQueueEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableQueueEntry<T>),
+    IDurableQueueCodec<T> IDurableQueueCodecProvider.GetCodec<T>()
+        => (IDurableQueueCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableQueueCodec<T>),
             _ => new ProtobufQueueEntryCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableSetEntry<T>> IDurableSetCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableSetEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableSetEntry<T>),
+    IDurableSetCodec<T> IDurableSetCodecProvider.GetCodec<T>()
+        => (IDurableSetCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableSetCodec<T>),
             _ => new ProtobufSetEntryCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableValueEntry<T>> IDurableValueCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableValueEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableValueEntry<T>),
+    IDurableValueCodec<T> IDurableValueCodecProvider.GetCodec<T>()
+        => (IDurableValueCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableValueCodec<T>),
             _ => new ProtobufValueEntryCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableStateEntry<T>> IDurableStateCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableStateEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableStateEntry<T>),
+    IDurableStateCodec<T> IDurableStateCodecProvider.GetCodec<T>()
+        => (IDurableStateCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableStateCodec<T>),
             _ => new ProtobufStateEntryCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    ILogEntryCodec<DurableTaskCompletionSourceEntry<T>> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
-        => (ILogEntryCodec<DurableTaskCompletionSourceEntry<T>>)_codecs.GetOrAdd(
-            typeof(DurableTaskCompletionSourceEntry<T>),
+    IDurableTaskCompletionSourceCodec<T> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
+        => (IDurableTaskCompletionSourceCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableTaskCompletionSourceCodec<T>),
             _ => new ProtobufTcsEntryCodec<T>(CreateConverter<T>()));
 
     private ProtobufValueConverter<T> CreateConverter<[DynamicallyAccessedMembers(DynamicallyAccessedMemberTypes.PublicProperties)] T>()

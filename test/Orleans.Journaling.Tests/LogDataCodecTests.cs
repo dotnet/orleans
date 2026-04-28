@@ -8,7 +8,7 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 /// <summary>
-/// Tests for the ILogDataCodec and binary ILogEntryCodec implementations.
+/// Tests for the ILogDataCodec and binary durable log codec implementations.
 /// </summary>
 [TestCategory("BVT")]
 public class LogDataCodecTests
@@ -73,14 +73,14 @@ public class LogDataCodecTests
         var valueCodec = new OrleansLogDataCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
         var codec = new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec, valueCodec);
 
-        var entry = new DictionarySetEntry<string, int>("key1", 42);
         var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
+        codec.WriteSet("key1", 42, buffer);
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var setResult = Assert.IsType<DictionarySetEntry<string, int>>(result);
-        Assert.Equal("key1", setResult.Key);
-        Assert.Equal(42, setResult.Value);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+
+        Assert.Equal("key1", consumer.LastSetKey);
+        Assert.Equal(42, consumer.LastSetValue);
     }
 
     [Fact]
@@ -95,14 +95,32 @@ public class LogDataCodecTests
             new("alpha", 1),
             new("beta", 2),
         };
-        var entry = new DictionarySnapshotEntry<string, int>(items);
         var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(entry, buffer);
+        codec.WriteSnapshot(items, items.Count, buffer);
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var snapshot = Assert.IsType<DictionarySnapshotEntry<string, int>>(result);
-        Assert.Equal(2, snapshot.Items.Count);
-        Assert.Equal("alpha", snapshot.Items[0].Key);
-        Assert.Equal(2, snapshot.Items[1].Value);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+
+        Assert.Equal(2, consumer.Items.Count);
+        Assert.Equal("alpha", consumer.Items[0].Key);
+        Assert.Equal(2, consumer.Items[1].Value);
+    }
+
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
+    {
+        public TKey? LastSetKey { get; private set; }
+        public TValue? LastSetValue { get; private set; }
+        public List<KeyValuePair<TKey, TValue>> Items { get; } = [];
+
+        public void ApplySet(TKey key, TValue value)
+        {
+            LastSetKey = key;
+            LastSetValue = value;
+        }
+
+        public void ApplyRemove(TKey key) { }
+        public void ApplyClear() => Items.Clear();
+        public void ApplySnapshotStart(int count) => Items.Clear();
+        public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
     }
 }

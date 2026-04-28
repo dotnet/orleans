@@ -3,11 +3,10 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for <see cref="DurableSetEntry{T}"/> log entries,
-/// preserving the legacy Orleans binary wire format.
+/// Binary codec for durable set log entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinarySetEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableSetEntry<T>>
+    ILogDataCodec<T> codec) : IDurableSetCodec<T>
 {
     private const byte FormatVersion = 0;
     private const uint AddCommand = 0;
@@ -16,39 +15,42 @@ internal sealed class OrleansBinarySetEntryCodec<T>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void Write(DurableSetEntry<T> entry, IBufferWriter<byte> output)
+    public void WriteAdd(T item, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, AddCommand);
+        codec.Write(item, output);
+    }
 
-        switch (entry)
+    /// <inheritdoc/>
+    public void WriteRemove(T item, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, RemoveCommand);
+        codec.Write(item, output);
+    }
+
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
+        VarIntHelper.WriteVarUInt32(output, (uint)count);
+        foreach (var item in items)
         {
-            case SetAddEntry<T>(var item):
-                VarIntHelper.WriteVarUInt32(output, AddCommand);
-                codec.Write(item, output);
-                break;
-            case SetRemoveEntry<T>(var item):
-                VarIntHelper.WriteVarUInt32(output, RemoveCommand);
-                codec.Write(item, output);
-                break;
-            case SetClearEntry<T>:
-                VarIntHelper.WriteVarUInt32(output, ClearCommand);
-                break;
-            case SetSnapshotEntry<T>(var items):
-                VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
-                VarIntHelper.WriteVarUInt32(output, (uint)items.Count);
-                foreach (var item in items)
-                {
-                    codec.Write(item, output);
-                }
-
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
+            codec.Write(item, output);
         }
     }
 
     /// <inheritdoc/>
-    public DurableSetEntry<T> Read(ReadOnlySequence<byte> input)
+    public void Apply(ReadOnlySequence<byte> input, IDurableSetLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(input);
         ReadVersionByte(ref reader);
@@ -56,31 +58,38 @@ internal sealed class OrleansBinarySetEntryCodec<T>(
         var command = VarIntHelper.ReadVarUInt32(ref reader);
         var remaining = input.Slice(reader.Consumed);
 
-        return command switch
+        switch (command)
         {
-            AddCommand => new SetAddEntry<T>(codec.Read(remaining, out _)),
-            RemoveCommand => new SetRemoveEntry<T>(codec.Read(remaining, out _)),
-            ClearCommand => new SetClearEntry<T>(),
-            SnapshotCommand => ReadSnapshot(remaining),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+            case AddCommand:
+                consumer.ApplyAdd(codec.Read(remaining, out _));
+                break;
+            case RemoveCommand:
+                consumer.ApplyRemove(codec.Read(remaining, out _));
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ApplySnapshot(remaining, consumer);
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 
-    private DurableSetEntry<T> ReadSnapshot(ReadOnlySequence<byte> remaining)
+    private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableSetLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(remaining);
         var count = (int)VarIntHelper.ReadVarUInt32(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
-        var items = new List<T>(count);
+        consumer.ApplySnapshotStart(count);
         for (var i = 0; i < count; i++)
         {
             var item = codec.Read(remaining, out var consumed);
             remaining = remaining.Slice(consumed);
-            items.Add(item);
+            consumer.ApplySnapshotItem(item);
         }
-
-        return new SetSnapshotEntry<T>(items);
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)

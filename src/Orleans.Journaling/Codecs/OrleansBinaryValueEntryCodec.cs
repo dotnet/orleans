@@ -3,33 +3,24 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for <see cref="DurableValueEntry{T}"/> log entries,
-/// preserving the legacy Orleans binary wire format.
+/// Binary codec for durable value log entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryValueEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableValueEntry<T>>
+    ILogDataCodec<T> codec) : IDurableValueCodec<T>
 {
     private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
 
     /// <inheritdoc/>
-    public void Write(DurableValueEntry<T> entry, IBufferWriter<byte> output)
+    public void WriteSet(T value, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
-
-        switch (entry)
-        {
-            case ValueSetEntry<T>(var value):
-                VarIntHelper.WriteVarUInt32(output, SetValueCommand);
-                codec.Write(value, output);
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
-        }
+        VarIntHelper.WriteVarUInt32(output, SetValueCommand);
+        codec.Write(value, output);
     }
 
     /// <inheritdoc/>
-    public DurableValueEntry<T> Read(ReadOnlySequence<byte> input)
+    public void Apply(ReadOnlySequence<byte> input, IDurableValueLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(input);
         ReadVersionByte(ref reader);
@@ -37,11 +28,14 @@ internal sealed class OrleansBinaryValueEntryCodec<T>(
         var command = VarIntHelper.ReadVarUInt32(ref reader);
         var remaining = input.Slice(reader.Consumed);
 
-        return command switch
+        switch (command)
         {
-            SetValueCommand => new ValueSetEntry<T>(codec.Read(remaining, out _)),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+            case SetValueCommand:
+                consumer.ApplySet(codec.Read(remaining, out _));
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)

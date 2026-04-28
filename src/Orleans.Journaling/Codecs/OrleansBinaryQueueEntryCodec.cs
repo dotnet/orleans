@@ -3,11 +3,10 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for <see cref="DurableQueueEntry{T}"/> log entries,
-/// preserving the legacy Orleans binary wire format.
+/// Binary codec for durable queue log entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryQueueEntryCodec<T>(
-    ILogDataCodec<T> codec) : ILogEntryCodec<DurableQueueEntry<T>>
+    ILogDataCodec<T> codec) : IDurableQueueCodec<T>
 {
     private const byte FormatVersion = 0;
     private const uint EnqueueCommand = 0;
@@ -16,38 +15,41 @@ internal sealed class OrleansBinaryQueueEntryCodec<T>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void Write(DurableQueueEntry<T> entry, IBufferWriter<byte> output)
+    public void WriteEnqueue(T item, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, EnqueueCommand);
+        codec.Write(item, output);
+    }
 
-        switch (entry)
+    /// <inheritdoc/>
+    public void WriteDequeue(IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, DequeueCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteClear(IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, ClearCommand);
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    {
+        WriteVersionByte(output);
+        VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
+        VarIntHelper.WriteVarUInt32(output, (uint)count);
+        foreach (var item in items)
         {
-            case QueueEnqueueEntry<T>(var item):
-                VarIntHelper.WriteVarUInt32(output, EnqueueCommand);
-                codec.Write(item, output);
-                break;
-            case QueueDequeueEntry<T>:
-                VarIntHelper.WriteVarUInt32(output, DequeueCommand);
-                break;
-            case QueueClearEntry<T>:
-                VarIntHelper.WriteVarUInt32(output, ClearCommand);
-                break;
-            case QueueSnapshotEntry<T>(var items):
-                VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
-                VarIntHelper.WriteVarUInt32(output, (uint)items.Count);
-                foreach (var item in items)
-                {
-                    codec.Write(item, output);
-                }
-
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported entry type: {entry.GetType()}");
+            codec.Write(item, output);
         }
     }
 
     /// <inheritdoc/>
-    public DurableQueueEntry<T> Read(ReadOnlySequence<byte> input)
+    public void Apply(ReadOnlySequence<byte> input, IDurableQueueLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(input);
         ReadVersionByte(ref reader);
@@ -55,31 +57,38 @@ internal sealed class OrleansBinaryQueueEntryCodec<T>(
         var command = VarIntHelper.ReadVarUInt32(ref reader);
         var remaining = input.Slice(reader.Consumed);
 
-        return command switch
+        switch (command)
         {
-            EnqueueCommand => new QueueEnqueueEntry<T>(codec.Read(remaining, out _)),
-            DequeueCommand => new QueueDequeueEntry<T>(),
-            ClearCommand => new QueueClearEntry<T>(),
-            SnapshotCommand => ReadSnapshot(remaining),
-            _ => throw new NotSupportedException($"Command type {command} is not supported"),
-        };
+            case EnqueueCommand:
+                consumer.ApplyEnqueue(codec.Read(remaining, out _));
+                break;
+            case DequeueCommand:
+                consumer.ApplyDequeue();
+                break;
+            case ClearCommand:
+                consumer.ApplyClear();
+                break;
+            case SnapshotCommand:
+                ApplySnapshot(remaining, consumer);
+                break;
+            default:
+                throw new NotSupportedException($"Command type {command} is not supported");
+        }
     }
 
-    private DurableQueueEntry<T> ReadSnapshot(ReadOnlySequence<byte> remaining)
+    private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableQueueLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(remaining);
         var count = (int)VarIntHelper.ReadVarUInt32(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
-        var items = new List<T>(count);
+        consumer.ApplySnapshotStart(count);
         for (var i = 0; i < count; i++)
         {
             var item = codec.Read(remaining, out var consumed);
             remaining = remaining.Slice(consumed);
-            items.Add(item);
+            consumer.ApplySnapshotItem(item);
         }
-
-        return new QueueSnapshotEntry<T>(items);
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
