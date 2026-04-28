@@ -260,6 +260,69 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
 
         Assert.Equal("DemoRecord", model.Name);
         Assert.True(model.IncludePrimaryConstructorParameters);
+
+        var members = model.Members.OrderBy(member => member.FieldId).ToArray();
+        Assert.Collection(
+            members,
+            member =>
+            {
+                Assert.Equal((uint)0, member.FieldId);
+                Assert.Equal("Value", member.BackingPropertyName);
+                Assert.True(member.IsPrimaryConstructorParameter);
+            },
+            member =>
+            {
+                Assert.Equal((uint)1, member.FieldId);
+                Assert.Equal("Count", member.BackingPropertyName);
+                Assert.True(member.IsPrimaryConstructorParameter);
+            });
+    }
+
+    [Fact]
+    public async Task ExtractSerializableTypeModel_RecordWithFieldTargetedIds_MarksPrimaryConstructorParameters()
+    {
+        var code = @"
+using Orleans;
+namespace TestProject;
+
+[GenerateSerializer]
+public record DemoRecord([field: Id(0)] string Value);
+";
+        var (model, _) = await ExtractFirstSerializableType(code);
+        var member = Assert.Single(model.Members);
+
+        Assert.Equal((uint)0, member.FieldId);
+        Assert.Equal("Value", member.BackingPropertyName);
+        Assert.True(member.IsPrimaryConstructorParameter);
+    }
+
+    [Fact]
+    public async Task ExtractSerializableTypeModel_RecordWithoutIds_AssignsPrimaryConstructorParameterIds()
+    {
+        var code = @"
+using Orleans;
+namespace TestProject;
+
+[GenerateSerializer]
+public readonly record struct DemoRecord(int Value, string Name);
+";
+        var (model, _) = await ExtractFirstSerializableType(code);
+        var members = model.Members.OrderBy(member => member.FieldId).ToArray();
+
+        Assert.Collection(
+            members,
+            member =>
+            {
+                Assert.Equal((uint)0, member.FieldId);
+                Assert.Equal("Value", member.BackingPropertyName);
+                Assert.True(member.IsPrimaryConstructorParameter);
+            },
+            member =>
+            {
+                Assert.Equal((uint)1, member.FieldId);
+                Assert.Equal("Name", member.BackingPropertyName);
+                Assert.True(member.IsPrimaryConstructorParameter);
+            });
     }
 
     [Fact]

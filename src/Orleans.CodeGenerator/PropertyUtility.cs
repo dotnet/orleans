@@ -25,11 +25,8 @@ namespace Orleans.CodeGenerator
 
         public static IParameterSymbol? GetMatchingPrimaryConstructorParameter(IPropertySymbol property, IEnumerable<IParameterSymbol> constructorParameters)
         {
-            if (!property.IsCompilerGenerated())
-                return null;
-
             return constructorParameters.FirstOrDefault(p =>
-                string.Equals(p.Name, property.Name, StringComparison.Ordinal) &&
+                string.Equals(GetCanonicalName(p.Name), GetCanonicalName(property.Name), StringComparison.Ordinal) &&
                 SymbolEqualityComparer.Default.Equals(p.Type, property.Type));
         }
 
