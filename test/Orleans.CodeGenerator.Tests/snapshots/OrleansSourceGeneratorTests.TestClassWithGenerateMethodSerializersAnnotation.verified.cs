@@ -1,51 +1,14 @@
-﻿#pragma warning disable CS1591, RS0016, RS0041
+#pragma warning disable CS1591, RS0016, RS0041
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
 [assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404));
-            config.Copiers.Add(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
-            config.InterfaceProxies.Add(typeof(OrleansCodeGen.Proxy_IMyGrain));
-            config.Interfaces.Add(typeof(global::IMyGrain));
-            var n1 = config.CompoundTypeAliases.Add("inv");
-            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
-            var n3 = n2.Add(typeof(global::IMyGrain));
-            n3.Add("6D39E404", typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
-        }
-    }
-}
-
 namespace OrleansCodeGen
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Proxy_IMyGrain : global::Orleans.Runtime.GrainReference, global::IMyGrain
-    {
-        public Proxy_IMyGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
-        {
-        }
-
-        global::System.Threading.Tasks.Task<string> global::IMyGrain.SayHello(string arg0)
-        {
-            var request = new OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404();
-            request.arg0 = arg0;
-            return base.InvokeAsync<string>(request).AsTask();
-        }
-    }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::IMyGrain), "6D39E404")]
@@ -93,6 +56,21 @@ namespace OrleansCodeGen
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.SayHello(arg0);
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Proxy_IMyGrain : global::Orleans.Runtime.GrainReference, global::IMyGrain
+    {
+        public Proxy_IMyGrain(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
+        {
+        }
+
+        global::System.Threading.Tasks.Task<string> global::IMyGrain.SayHello(string arg0)
+        {
+            var request = new OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404();
+            request.arg0 = arg0;
+            return base.InvokeAsync<string>(request).AsTask();
+        }
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -171,3 +149,26 @@ namespace OrleansCodeGen
         }
     }
 }
+
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.Codec_Invokable_IMyGrain_GrainReference_6D39E404));
+            config.Copiers.Add(typeof(OrleansCodeGen.Copier_Invokable_IMyGrain_GrainReference_6D39E404));
+            config.InterfaceProxies.Add(typeof(OrleansCodeGen.Proxy_IMyGrain));
+            config.Interfaces.Add(typeof(global::IMyGrain));
+            var n1 = config.CompoundTypeAliases.Add("inv");
+            var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
+            var n3 = n2.Add(typeof(global::IMyGrain));
+            n3.Add("6D39E404", typeof(OrleansCodeGen.Invokable_IMyGrain_GrainReference_6D39E404));
+        }
+    }
+}
+#pragma warning restore CS1591, RS0016, RS0041

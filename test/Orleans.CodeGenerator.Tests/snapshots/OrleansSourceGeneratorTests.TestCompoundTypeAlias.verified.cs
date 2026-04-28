@@ -11,31 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasBaseClass));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasClass));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasBaseClass));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasClass));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasBaseClass));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasClass));
-            config.WellKnownTypeAliases.Add("_custom_type_alias_", typeof(global::TestProject.MyTypeAliasClass));
-            var n1 = config.CompoundTypeAliases.Add("xx_test_xx");
-            var n2 = n1.Add(typeof(global::TestProject.MyTypeAliasClass));
-            var n3 = n2.Add(typeof( int ));
-            n3.Add("1", typeof(global::TestProject.MyCompoundTypeAliasClass));
-        }
-    }
-}
-
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_MyCompoundTypeAliasBaseClass : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.MyCompoundTypeAliasBaseClass>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.MyCompoundTypeAliasBaseClass>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.MyCompoundTypeAliasBaseClass);
@@ -131,12 +106,6 @@ namespace OrleansCodeGen.TestProject
     {
         public global::TestProject.MyCompoundTypeAliasBaseClass Create() => new global::TestProject.MyCompoundTypeAliasBaseClass();
     }
-}
-
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_MyCompoundTypeAliasClass : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.MyCompoundTypeAliasClass>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.MyCompoundTypeAliasClass>
@@ -261,4 +230,24 @@ namespace OrleansCodeGen.TestProject
     {
         public global::TestProject.MyCompoundTypeAliasClass Create() => new global::TestProject.MyCompoundTypeAliasClass();
     }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasBaseClass));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_MyCompoundTypeAliasClass));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasBaseClass));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_MyCompoundTypeAliasClass));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasBaseClass));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_MyCompoundTypeAliasClass));
+            config.WellKnownTypeAliases.Add("_custom_type_alias_", typeof(global::TestProject.MyTypeAliasClass));
+            var n1 = config.CompoundTypeAliases.Add("xx_test_xx");
+            var n2 = n1.Add(typeof(global::TestProject.MyTypeAliasClass));
+            var n3 = n2.Add(typeof( int ));
+            n3.Add("1", typeof(global::TestProject.MyCompoundTypeAliasClass));
+        }
+    }
 }
+#pragma warning restore CS1591, RS0016, RS0041

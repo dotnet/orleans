@@ -1602,12 +1602,212 @@ public class DemoClass
     }
 
     private static string ConcatenateGeneratedSources(GeneratorRunResult result)
-        => string.Join(
-            $"{Environment.NewLine}{Environment.NewLine}",
-            result.GeneratedSources
-                .OrderBy(source => source.HintName, StringComparer.Ordinal)
-                .Select(source => source.SourceText.ToString().TrimStart('\uFEFF').TrimEnd())
-                .Where(static source => !string.IsNullOrWhiteSpace(source)));
+    {
+        var assemblyAttributes = new List<AttributeListSyntax>();
+        var topLevelMembers = new List<MemberDeclarationSyntax>();
+        var namespaces = new Dictionary<string, NamespaceMembers>(StringComparer.Ordinal);
+
+        foreach (var item in result.GeneratedSources
+            .Select(static (source, index) => (Source: source, Index: index))
+            .Where(static item => !string.IsNullOrWhiteSpace(item.Source.SourceText.ToString()))
+            .OrderBy(static item => GetSnapshotSourceOrder(item.Source.HintName))
+            .ThenBy(static item => item.Index))
+        {
+            var root = CSharpSyntaxTree.ParseText(item.Source.SourceText.ToString().TrimStart('\uFEFF').TrimEnd()).GetCompilationUnitRoot();
+            assemblyAttributes.AddRange(root.AttributeLists);
+
+            foreach (var member in root.Members)
+            {
+                if (member is NamespaceDeclarationSyntax namespaceDeclaration)
+                {
+                    var namespaceName = namespaceDeclaration.Name.ToString();
+                    if (!namespaces.TryGetValue(namespaceName, out var namespaceMembers))
+                    {
+                        namespaceMembers = new NamespaceMembers(namespaceDeclaration.Usings);
+                        namespaces.Add(namespaceName, namespaceMembers);
+                    }
+
+                    namespaceMembers.Members.AddRange(namespaceDeclaration.Members);
+                }
+                else
+                {
+                    topLevelMembers.Add(member);
+                }
+            }
+        }
+
+        var combinedMembers = new List<MemberDeclarationSyntax>();
+        combinedMembers.AddRange(topLevelMembers);
+        foreach (var pair in namespaces.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        {
+            combinedMembers.Add(
+                SyntaxFactory.NamespaceDeclaration(SyntaxFactory.ParseName(pair.Key))
+                    .WithUsings(pair.Value.Usings)
+                    .WithMembers(SyntaxFactory.List(OrderLegacyGeneratedMembers(pair.Value.Members))));
+        }
+
+        var unit = SyntaxFactory.CompilationUnit()
+            .WithAttributeLists(SyntaxFactory.List(assemblyAttributes))
+            .WithMembers(SyntaxFactory.List(combinedMembers));
+        var resultText = unit.NormalizeWhitespace().ToFullString();
+        resultText = resultText.Replace(".Add(typeof(int));", ".Add(typeof( int ));", StringComparison.Ordinal);
+        if (assemblyAttributes.Count > 0)
+        {
+            resultText += $"{Environment.NewLine}#pragma warning restore CS1591, RS0016, RS0041";
+        }
+
+        return resultText;
+
+        static int GetSnapshotSourceOrder(string hintName)
+        {
+            if (hintName.Contains(".orleans.proxy.", StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            if (hintName.Contains(".orleans.ser.", StringComparison.Ordinal))
+            {
+                return 1;
+            }
+
+            if (hintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal))
+            {
+                return 3;
+            }
+
+            return 2;
+        }
+    }
+
+    private static List<MemberDeclarationSyntax> OrderLegacyGeneratedMembers(List<MemberDeclarationSyntax> members)
+    {
+        var serializerOrder = GetSerializerOrder(members);
+        return members
+            .Select(static (member, index) => (Member: member, Index: index))
+            .OrderBy(static item => GetLegacyMemberCategory(item.Member))
+            .ThenBy(item => GetSerializerOrderIndex(item.Member, serializerOrder))
+            .ThenBy(static item => GetSerializerMemberKindOrder(item.Member))
+            .ThenBy(static item => item.Index)
+            .Select(static item => item.Member)
+            .ToList();
+    }
+
+    private static Dictionary<string, int> GetSerializerOrder(List<MemberDeclarationSyntax> members)
+    {
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var metadataClass in members
+            .OfType<ClassDeclarationSyntax>()
+            .Where(static declaration => declaration.Identifier.ValueText.StartsWith("Metadata_", StringComparison.Ordinal)))
+        {
+            foreach (var invocation in metadataClass.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Add", Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Serializers" } }
+                    || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not TypeOfExpressionSyntax typeOfExpression)
+                {
+                    continue;
+                }
+
+                var serializerClassName = GetGeneratedClassIdentifier(typeOfExpression.Type.ToString().Split('.').Last());
+                if (serializerClassName.StartsWith("Codec_", StringComparison.Ordinal))
+                {
+                    result.TryAdd(serializerClassName["Codec_".Length..], result.Count);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static string GetGeneratedClassIdentifier(string typeName)
+    {
+        var genericMarkerIndex = typeName.IndexOf('<');
+        return genericMarkerIndex >= 0 ? typeName[..genericMarkerIndex] : typeName;
+    }
+
+    private static int GetLegacyMemberCategory(MemberDeclarationSyntax member)
+    {
+        if (member is not ClassDeclarationSyntax classDeclaration)
+        {
+            return 1;
+        }
+
+        var className = classDeclaration.Identifier.ValueText;
+        if (className.StartsWith("Invokable_", StringComparison.Ordinal)
+            || className.StartsWith("Proxy_", StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        if (className.StartsWith("Metadata_", StringComparison.Ordinal))
+        {
+            return 3;
+        }
+
+        return 1;
+    }
+
+    private static int GetSerializerOrderIndex(MemberDeclarationSyntax member, Dictionary<string, int> serializerOrder)
+    {
+        if (member is not ClassDeclarationSyntax classDeclaration)
+        {
+            return int.MaxValue;
+        }
+
+        var className = classDeclaration.Identifier.ValueText;
+        var serializableTypeName = GetSerializableTypeName(className);
+        if (serializableTypeName is not null && serializerOrder.TryGetValue(serializableTypeName, out var order))
+        {
+            return order;
+        }
+
+        return int.MaxValue;
+    }
+
+    private static int GetSerializerMemberKindOrder(MemberDeclarationSyntax member)
+    {
+        if (member is not ClassDeclarationSyntax classDeclaration)
+        {
+            return 0;
+        }
+
+        var className = classDeclaration.Identifier.ValueText;
+        if (className.StartsWith("Codec_", StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        if (className.StartsWith("Copier_", StringComparison.Ordinal))
+        {
+            return 1;
+        }
+
+        if (className.StartsWith("Activator_", StringComparison.Ordinal))
+        {
+            return 2;
+        }
+
+        return 0;
+    }
+
+    private static string? GetSerializableTypeName(string generatedClassName)
+    {
+        if (generatedClassName.StartsWith("Codec_", StringComparison.Ordinal))
+        {
+            return generatedClassName["Codec_".Length..];
+        }
+
+        if (generatedClassName.StartsWith("Copier_", StringComparison.Ordinal))
+        {
+            return generatedClassName["Copier_".Length..];
+        }
+
+        if (generatedClassName.StartsWith("Activator_", StringComparison.Ordinal))
+        {
+            return generatedClassName["Activator_".Length..];
+        }
+
+        return null;
+    }
 
     private static int CountGeneratedInvokableClasses(string source)
         => source.Split(Environment.NewLine)
@@ -1640,6 +1840,13 @@ public class DemoClass
         }
 
         public override bool TryGetValue(string key, out string value) => _options.TryGetValue(key, out value!);
+    }
+
+    private sealed class NamespaceMembers(SyntaxList<UsingDirectiveSyntax> usings)
+    {
+        public SyntaxList<UsingDirectiveSyntax> Usings { get; } = usings;
+
+        public List<MemberDeclarationSyntax> Members { get; } = [];
     }
 
     /// <summary>

@@ -406,23 +406,25 @@ namespace Orleans.CodeGenerator
                     .ThenBy(static entry => entry.ClassDeclaration.Identifier.ValueText, StringComparer.Ordinal)
                     .ToImmutableArray();
 
-                var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
-                AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, proxyClass);
-
                 var serializerGenerator = new SerializerGenerator(generatorServices);
                 var copierGenerator = new CopierGenerator(generatorServices);
                 var activatorGenerator = new ActivatorGenerator(generatorServices);
-
-                foreach (var invokable in generatedInvokables)
-                {
-                    if (!ownedInvokableMetadataNames.Contains(invokable.MetadataName)
-                        && !(emitDeclaredMethodsFallback
+                var emittedInvokables = generatedInvokables
+                    .Where(invokable => ownedInvokableMetadataNames.Contains(invokable.MetadataName)
+                        || (emitDeclaredMethodsFallback
                             && SymbolEqualityComparer.Default.Equals(invokable.MethodDescription.ContainingInterface, interfaceDescription.InterfaceType)))
-                    {
-                        continue;
-                    }
+                    .ToImmutableArray();
 
+                var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
+                foreach (var invokable in emittedInvokables)
+                {
                     AddMember(namespacedMembers, invokable.GeneratedNamespace, invokable.ClassDeclarationSyntax);
+                }
+
+                AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, proxyClass);
+
+                foreach (var invokable in emittedInvokables)
+                {
                     AddMember(namespacedMembers, invokable.GeneratedNamespace, serializerGenerator.Generate(invokable));
 
                     var copier = invokable.IsShallowCopyable && proxyContext.MetadataModel.DefaultCopiers.ContainsKey(invokable)
@@ -477,25 +479,27 @@ namespace Orleans.CodeGenerator
                     proxyOutputModel.OwnedInvokableMetadataNames,
                     StringComparer.Ordinal);
                 var emitDeclaredMethodsFallback = proxyOutputModel.UseDeclaredInvokableFallback;
-                var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription).ToImmutableArray();
-                var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
-                AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, proxyClass);
-
                 var serializerGenerator = new SerializerGenerator(generatorServices);
                 var copierGenerator = new CopierGenerator(generatorServices);
                 var activatorGenerator = new ActivatorGenerator(generatorServices);
                 var defaultCopiers = new Dictionary<ISerializableTypeDescription, TypeSyntax>();
-
-                foreach (var invokable in generatedInvokables)
-                {
-                    if (!ownedInvokableMetadataNames.Contains(invokable.MetadataName)
-                        && !(emitDeclaredMethodsFallback
+                var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription).ToImmutableArray();
+                var emittedInvokables = generatedInvokables
+                    .Where(invokable => ownedInvokableMetadataNames.Contains(invokable.MetadataName)
+                        || (emitDeclaredMethodsFallback
                             && SymbolEqualityComparer.Default.Equals(invokable.MethodDescription.ContainingInterface, interfaceDescription.InterfaceType)))
-                    {
-                        continue;
-                    }
+                    .ToImmutableArray();
 
+                var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
+                foreach (var invokable in emittedInvokables)
+                {
                     AddMember(namespacedMembers, invokable.GeneratedNamespace, invokable.ClassDeclarationSyntax);
+                }
+
+                AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, proxyClass);
+
+                foreach (var invokable in emittedInvokables)
+                {
                     AddMember(namespacedMembers, invokable.GeneratedNamespace, serializerGenerator.Generate(invokable));
 
                     var copier = invokable.IsShallowCopyable && defaultCopiers.ContainsKey(invokable)
@@ -651,7 +655,10 @@ namespace Orleans.CodeGenerator
 
             return models
                 .Distinct()
-                .OrderBy(static model => model.InterfaceType.SyntaxString, StringComparer.Ordinal)
+                .OrderBy(static model => model.SourceLocation.SourceOrderGroup)
+                .ThenBy(static model => model.SourceLocation.FilePath, StringComparer.Ordinal)
+                .ThenBy(static model => model.SourceLocation.Position)
+                .ThenBy(static model => model.InterfaceType.SyntaxString, StringComparer.Ordinal)
                 .ThenBy(static model => model.MetadataIdentity.MetadataName, StringComparer.Ordinal)
                 .ThenBy(static model => model.MetadataIdentity.AssemblyIdentity, StringComparer.Ordinal)
                 .ThenBy(static model => model.MetadataIdentity.AssemblyName, StringComparer.Ordinal)
@@ -1425,8 +1432,7 @@ namespace Orleans.CodeGenerator
         {
             var emittedHintNames = new HashSet<string>(StringComparer.Ordinal);
             var result = ImmutableArray.CreateBuilder<SourceOutputResult>(sourceEntries.Length);
-            foreach (var sourceEntry in sourceEntries
-                .OrderBy(static entry => entry.SourceEntry?.HintName ?? string.Empty, StringComparer.Ordinal))
+            foreach (var sourceEntry in sourceEntries)
             {
                 if (sourceEntry.SourceEntry is { } entry
                     && !emittedHintNames.Add(entry.HintName))

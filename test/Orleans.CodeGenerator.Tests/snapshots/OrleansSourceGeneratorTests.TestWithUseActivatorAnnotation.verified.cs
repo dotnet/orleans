@@ -19,3 +19,4 @@ namespace OrleansCodeGen.TestProject
         }
     }
 }
+#pragma warning restore CS1591, RS0016, RS0041
