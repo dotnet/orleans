@@ -434,11 +434,6 @@ jobs:
     - name: Test
       run: |
         cosmos_filter='Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress'
-        # The Linux vNext emulator still misses a narrow set of ETag/version concurrency semantics.
-        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_ReadRow_Insert_Read'
-        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRow'
-        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRowInParallel'
-        cosmos_filter+='&FullyQualifiedName!~Tester.Cosmos.Persistence.PersistenceProviderTests_Cosmos.PersistenceProvider_Azure_ChangeWriteFormat'
         for attempt in 1 2; do
           logger_name="test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
           extra_args=()

@@ -21,6 +21,7 @@ namespace Tester.Cosmos.Persistence;
 [TestCategory("Persistence"), TestCategory("Cosmos")]
 public class PersistenceProviderTests_Cosmos
 {
+    private const string CosmosEmulatorWildcardEtagSkipReason = "The Cosmos DB emulator does not support the wildcard ETag condition semantics required by this test.";
     private readonly IProviderRuntime providerRuntime;
     private readonly Dictionary<string, string> providerCfgProps = new Dictionary<string, string>();
     private readonly ITestOutputHelper output;
@@ -128,6 +129,8 @@ public class PersistenceProviderTests_Cosmos
     [InlineData(15 * 32 * 1024 - 256)]
     public async Task PersistenceProvider_Azure_ChangeWriteFormat(int? stringLength)
     {
+        CosmosTestUtils.SkipIfCosmosEmulator(CosmosEmulatorWildcardEtagSkipReason);
+
         var testName = string.Format("{0}({1}={2})",
             nameof(PersistenceProvider_Azure_ChangeWriteFormat),
             nameof(stringLength), stringLength == null ? "default" : stringLength.ToString());
