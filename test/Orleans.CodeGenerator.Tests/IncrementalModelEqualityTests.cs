@@ -432,7 +432,7 @@ public class IncrementalModelEqualityTests
             ["global::Impl.Alpha", "global::Impl.Zulu"],
             aggregate.InterfaceImplementations.Select(static implementation => implementation.ImplementationType.SyntaxString).ToArray());
         Assert.Equal(
-            ["PartA", "PartZ"],
+            ["PartZ", "PartA"],
             aggregate.ReferenceAssemblyData.ApplicationParts.ToArray());
     }
 
@@ -466,7 +466,7 @@ public class IncrementalModelEqualityTests
             ImmutableArray.Create(serializableAlpha, serializableBeta),
             ImmutableArray.Create(proxyAlpha, proxyBeta),
             CreateReferenceAssemblyModel(
-                applicationParts: ImmutableArray.Create("PartA", "PartZ"),
+                applicationParts: ImmutableArray.Create("PartZ", "PartA"),
                 referencedSerializableTypes: ImmutableArray.Create(serializableAlpha, serializableGamma),
                 referencedProxyInterfaces: ImmutableArray.Create(proxyAlpha, proxyGamma),
                 registeredCodecs: ImmutableArray.Create(

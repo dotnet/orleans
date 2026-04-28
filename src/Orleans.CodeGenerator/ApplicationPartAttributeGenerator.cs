@@ -9,6 +9,9 @@ namespace Orleans.CodeGenerator
     internal static class ApplicationPartAttributeGenerator
     {
         public static List<AttributeListSyntax> GenerateSyntax(LibraryTypes wellKnownTypes, IEnumerable<string> applicationParts)
+            => GenerateSyntax(wellKnownTypes.ApplicationPartAttribute.ToNameSyntax(), applicationParts);
+
+        public static List<AttributeListSyntax> GenerateSyntax(NameSyntax applicationPartAttribute, IEnumerable<string> applicationParts)
         {
             var attributes = new List<AttributeListSyntax>();
 
@@ -18,7 +21,7 @@ namespace Orleans.CodeGenerator
                 var attribute = AttributeList(
                     AttributeTargetSpecifier(Token(SyntaxKind.AssemblyKeyword)),
                     SingletonSeparatedList(
-                        Attribute(wellKnownTypes.ApplicationPartAttribute.ToNameSyntax())
+                        Attribute(applicationPartAttribute)
                             .AddArgumentListArguments(AttributeArgument(assemblyName.GetLiteralExpression()))));
                 attributes.Add(attribute);
             }

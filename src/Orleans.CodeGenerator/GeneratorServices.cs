@@ -13,10 +13,15 @@ namespace Orleans.CodeGenerator
     internal sealed class GeneratorServices : IGeneratorServices
     {
         public GeneratorServices(Compilation compilation, CodeGeneratorOptions options)
+            : this(compilation, options, LibraryTypes.FromCompilation(compilation, options))
+        {
+        }
+
+        public GeneratorServices(Compilation compilation, CodeGeneratorOptions options, LibraryTypes libraryTypes)
         {
             Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
             Options = options ?? throw new ArgumentNullException(nameof(options));
-            LibraryTypes = LibraryTypes.FromCompilation(compilation, options);
+            LibraryTypes = libraryTypes ?? throw new ArgumentNullException(nameof(libraryTypes));
         }
 
         public Compilation Compilation { get; }

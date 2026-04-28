@@ -92,7 +92,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
             string generatedNamespace,
             ImmutableArray<TypeParameterModel> typeParameters,
             ProxyBaseModel proxyBase,
-            ImmutableArray<MethodModel> methods)
+            ImmutableArray<MethodModel> methods,
+            SourceLocationModel sourceLocation = default)
         {
             InterfaceType = interfaceType;
             Name = name;
@@ -100,6 +101,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             TypeParameters = ImmutableArrayValueComparer.Normalize(typeParameters);
             ProxyBase = proxyBase;
             Methods = ImmutableArrayValueComparer.Normalize(methods);
+            SourceLocation = sourceLocation;
         }
 
         public TypeRef InterfaceType { get; }
@@ -108,6 +110,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
         public ImmutableArray<TypeParameterModel> TypeParameters { get; }
         public ProxyBaseModel ProxyBase { get; }
         public ImmutableArray<MethodModel> Methods { get; }
+        public SourceLocationModel SourceLocation { get; }
 
         public bool Equals(ProxyInterfaceModel other)
         {
@@ -121,7 +124,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 && string.Equals(GeneratedNamespace, other.GeneratedNamespace, StringComparison.Ordinal)
                 && ImmutableArrayValueComparer.Equals(TypeParameters, other.TypeParameters)
                 && ProxyBase.Equals(other.ProxyBase)
-                && ImmutableArrayValueComparer.Equals(Methods, other.Methods);
+                && ImmutableArrayValueComparer.Equals(Methods, other.Methods)
+                && SourceLocation.Equals(other.SourceLocation);
         }
 
         public override bool Equals(object obj) => obj is ProxyInterfaceModel other && Equals(other);
@@ -136,6 +140,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeParameters);
                 hash = hash * 31 + (ProxyBase?.GetHashCode() ?? 0);
                 hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(Methods);
+                hash = hash * 31 + SourceLocation.GetHashCode();
                 return hash;
             }
         }

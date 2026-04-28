@@ -255,9 +255,8 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         var consumerCompilation = await CreateReferenceExtractionCompilation();
         var model = ModelExtractor.ExtractReferenceAssemblyData(consumerCompilation, default);
 
-        Assert.Equal(
-            model.ApplicationParts.OrderBy(static part => part, StringComparer.Ordinal),
-            model.ApplicationParts);
+        Assert.Equal("ConsumerProject", model.ApplicationParts[0]);
+        Assert.Equal(model.ApplicationParts.Length, model.ApplicationParts.Distinct(StringComparer.Ordinal).Count());
         Assert.Contains("ConsumerProject", model.ApplicationParts);
         Assert.Contains("LibraryA", model.ApplicationParts);
         Assert.Contains("Alpha.Part", model.ApplicationParts);

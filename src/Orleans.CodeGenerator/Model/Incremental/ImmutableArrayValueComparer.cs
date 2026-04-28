@@ -47,4 +47,19 @@ namespace Orleans.CodeGenerator.Model.Incremental
             }
         }
     }
+
+    internal sealed class ImmutableArrayComparer<T> : IEqualityComparer<ImmutableArray<T>>
+    {
+        public static ImmutableArrayComparer<T> Instance { get; } = new();
+
+        private ImmutableArrayComparer()
+        {
+        }
+
+        public bool Equals(ImmutableArray<T> left, ImmutableArray<T> right)
+            => ImmutableArrayValueComparer.Equals(left, right);
+
+        public int GetHashCode(ImmutableArray<T> values)
+            => ImmutableArrayValueComparer.GetHashCode(values);
+    }
 }
