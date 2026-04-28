@@ -100,22 +100,23 @@ internal class FieldIdAssignmentHelper
         {
             if (member is IPropertySymbol prop)
             {
+                var constructorParameter = PropertyUtility.GetMatchingPrimaryConstructorParameter(prop, _constructorParameters);
                 var id = GeneratedCodeUtilities.GetId(_libraryTypes, prop);
 
                 if (id.HasValue)
                 {
-                    _symbols[member] = (id.Value, false);
+                    _symbols[member] = (id.Value, constructorParameter is not null);
                 }
-                else if (PropertyUtility.GetMatchingPrimaryConstructorParameter(prop, _constructorParameters) is { } prm)
+                else if (constructorParameter is not null)
                 {
-                    id = GeneratedCodeUtilities.GetId(_libraryTypes, prop);
+                    id = GeneratedCodeUtilities.GetId(_libraryTypes, constructorParameter);
                     if (id.HasValue)
                     {
                         _symbols[member] = (id.Value, true);
                     }
                     else
                     {
-                        _symbols[member] = ((uint)_constructorParameters.IndexOf(prm), true);
+                        _symbols[member] = ((uint)_constructorParameters.IndexOf(constructorParameter), true);
                     }
                 }
             }
@@ -124,24 +125,23 @@ internal class FieldIdAssignmentHelper
             {
                 var id = GeneratedCodeUtilities.GetId(_libraryTypes, field);
                 var isConstructorParameter = false;
+                IPropertySymbol? property = null;
+                IParameterSymbol? constructorParameter = null;
 
-                if (!id.HasValue)
+                property = PropertyUtility.GetMatchingProperty(field, _memberSymbols);
+                if (property is not null)
                 {
-                    var property = PropertyUtility.GetMatchingProperty(field, _memberSymbols);
-                    if (property is null)
-                    {
-                        continue;
-                    }
+                    constructorParameter = PropertyUtility.GetMatchingPrimaryConstructorParameter(property, _constructorParameters);
+                    isConstructorParameter = constructorParameter is not null;
+                }
 
+                if (!id.HasValue && property is not null)
+                {
                     id = GeneratedCodeUtilities.GetId(_libraryTypes, property);
-                    if (!id.HasValue)
+                    if (!id.HasValue && constructorParameter is not null)
                     {
-                        var constructorParameter = _constructorParameters.FirstOrDefault(x => x.Name.Equals(property.Name, StringComparison.OrdinalIgnoreCase));
-                        if (constructorParameter is not null)
-                        {
-                            id = (uint)_constructorParameters.IndexOf(constructorParameter);
-                            isConstructorParameter = true;
-                        }
+                        id = GeneratedCodeUtilities.GetId(_libraryTypes, constructorParameter)
+                            ?? (uint)_constructorParameters.IndexOf(constructorParameter);
                     }
                 }
 
