@@ -55,7 +55,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     public async Task JsonCodec_WriteAndRecover()
     {
         var storage = CreateJsonStorage();
-        var jsonOptions = new System.Text.Json.JsonSerializerOptions();
+        var jsonOptions = CreateJsonOptions();
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -85,7 +85,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     public async Task JsonCodec_DurableList_WriteAndRecover()
     {
         var storage = CreateJsonStorage();
-        var jsonOptions = new System.Text.Json.JsonSerializerOptions();
+        var jsonOptions = CreateJsonOptions();
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -115,7 +115,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     public async Task JsonCodec_DurableValue_WriteAndRecover()
     {
         var storage = CreateJsonStorage();
-        var jsonOptions = new System.Text.Json.JsonSerializerOptions();
+        var jsonOptions = CreateJsonOptions();
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -136,7 +136,7 @@ public class CodecRecoveryTests : StateMachineTestBase
     internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(IStateMachineStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
         storage ??= CreateJsonStorage();
-        jsonOptions ??= new System.Text.Json.JsonSerializerOptions();
+        jsonOptions ??= CreateJsonOptions();
 
         var stateMachineIdsCodec = new JsonDictionaryEntryCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryEntryCodec<string, DateTime>(jsonOptions);
@@ -147,6 +147,9 @@ public class CodecRecoveryTests : StateMachineTestBase
     }
 
     private static VolatileStateMachineStorage CreateJsonStorage() => new(new JsonLinesLogExtentCodec());
+
+    private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
+        => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {

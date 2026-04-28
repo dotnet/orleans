@@ -9,7 +9,7 @@ namespace Orleans.Journaling.Json;
 public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
     : IDurableListCodec<T>
 {
-    private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
+    private readonly JsonValueSerializer<T> _itemSerializer = new(options);
 
     /// <inheritdoc/>
     public void WriteAdd(T item, IBufferWriter<byte> output)
@@ -18,7 +18,7 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Add);
         writer.WritePropertyName(JsonLogEntryFields.Item);
-        JsonSerializer.Serialize(writer, item, _options);
+        _itemSerializer.Serialize(writer, item);
         writer.WriteEndObject();
     }
 
@@ -30,7 +30,7 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
         writer.WriteNumber(JsonLogEntryFields.Index, index);
         writer.WritePropertyName(JsonLogEntryFields.Item);
-        JsonSerializer.Serialize(writer, item, _options);
+        _itemSerializer.Serialize(writer, item);
         writer.WriteEndObject();
     }
 
@@ -42,7 +42,7 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Insert);
         writer.WriteNumber(JsonLogEntryFields.Index, index);
         writer.WritePropertyName(JsonLogEntryFields.Item);
-        JsonSerializer.Serialize(writer, item, _options);
+        _itemSerializer.Serialize(writer, item);
         writer.WriteEndObject();
     }
 
@@ -75,7 +75,7 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteStartArray();
         foreach (var item in items)
         {
-            JsonSerializer.Serialize(writer, item, _options);
+            _itemSerializer.Serialize(writer, item);
         }
 
         writer.WriteEndArray();
@@ -92,13 +92,13 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
         switch (command)
         {
             case JsonLogEntryCommands.Add:
-                consumer.ApplyAdd(root.GetProperty(JsonLogEntryFields.Item).Deserialize<T>(_options)!);
+                consumer.ApplyAdd(_itemSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Item))!);
                 break;
             case JsonLogEntryCommands.Set:
-                consumer.ApplySet(root.GetProperty(JsonLogEntryFields.Index).GetInt32(), root.GetProperty(JsonLogEntryFields.Item).Deserialize<T>(_options)!);
+                consumer.ApplySet(root.GetProperty(JsonLogEntryFields.Index).GetInt32(), _itemSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Item))!);
                 break;
             case JsonLogEntryCommands.Insert:
-                consumer.ApplyInsert(root.GetProperty(JsonLogEntryFields.Index).GetInt32(), root.GetProperty(JsonLogEntryFields.Item).Deserialize<T>(_options)!);
+                consumer.ApplyInsert(root.GetProperty(JsonLogEntryFields.Index).GetInt32(), _itemSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Item))!);
                 break;
             case JsonLogEntryCommands.RemoveAt:
                 consumer.ApplyRemoveAt(root.GetProperty(JsonLogEntryFields.Index).GetInt32());
@@ -111,7 +111,7 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
                 consumer.ApplySnapshotStart(items.GetArrayLength());
                 foreach (var item in items.EnumerateArray())
                 {
-                    consumer.ApplySnapshotItem(item.Deserialize<T>(_options)!);
+                    consumer.ApplySnapshotItem(_itemSerializer.Deserialize(item)!);
                 }
 
                 break;
@@ -127,7 +127,7 @@ public sealed class JsonListEntryCodec<T>(JsonSerializerOptions? options = null)
 public sealed class JsonQueueEntryCodec<T>(JsonSerializerOptions? options = null)
     : IDurableQueueCodec<T>
 {
-    private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
+    private readonly JsonValueSerializer<T> _itemSerializer = new(options);
 
     /// <inheritdoc/>
     public void WriteEnqueue(T item, IBufferWriter<byte> output)
@@ -136,7 +136,7 @@ public sealed class JsonQueueEntryCodec<T>(JsonSerializerOptions? options = null
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Enqueue);
         writer.WritePropertyName(JsonLogEntryFields.Item);
-        JsonSerializer.Serialize(writer, item, _options);
+        _itemSerializer.Serialize(writer, item);
         writer.WriteEndObject();
     }
 
@@ -168,7 +168,7 @@ public sealed class JsonQueueEntryCodec<T>(JsonSerializerOptions? options = null
         writer.WriteStartArray();
         foreach (var item in items)
         {
-            JsonSerializer.Serialize(writer, item, _options);
+            _itemSerializer.Serialize(writer, item);
         }
 
         writer.WriteEndArray();
@@ -185,7 +185,7 @@ public sealed class JsonQueueEntryCodec<T>(JsonSerializerOptions? options = null
         switch (command)
         {
             case JsonLogEntryCommands.Enqueue:
-                consumer.ApplyEnqueue(root.GetProperty(JsonLogEntryFields.Item).Deserialize<T>(_options)!);
+                consumer.ApplyEnqueue(_itemSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Item))!);
                 break;
             case JsonLogEntryCommands.Dequeue:
                 consumer.ApplyDequeue();
@@ -198,7 +198,7 @@ public sealed class JsonQueueEntryCodec<T>(JsonSerializerOptions? options = null
                 consumer.ApplySnapshotStart(items.GetArrayLength());
                 foreach (var item in items.EnumerateArray())
                 {
-                    consumer.ApplySnapshotItem(item.Deserialize<T>(_options)!);
+                    consumer.ApplySnapshotItem(_itemSerializer.Deserialize(item)!);
                 }
 
                 break;
@@ -214,7 +214,7 @@ public sealed class JsonQueueEntryCodec<T>(JsonSerializerOptions? options = null
 public sealed class JsonSetEntryCodec<T>(JsonSerializerOptions? options = null)
     : IDurableSetCodec<T>
 {
-    private readonly JsonSerializerOptions _options = options ?? JsonSerializerOptions.Default;
+    private readonly JsonValueSerializer<T> _itemSerializer = new(options);
 
     /// <inheritdoc/>
     public void WriteAdd(T item, IBufferWriter<byte> output)
@@ -223,7 +223,7 @@ public sealed class JsonSetEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Add);
         writer.WritePropertyName(JsonLogEntryFields.Item);
-        JsonSerializer.Serialize(writer, item, _options);
+        _itemSerializer.Serialize(writer, item);
         writer.WriteEndObject();
     }
 
@@ -234,7 +234,7 @@ public sealed class JsonSetEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Remove);
         writer.WritePropertyName(JsonLogEntryFields.Item);
-        JsonSerializer.Serialize(writer, item, _options);
+        _itemSerializer.Serialize(writer, item);
         writer.WriteEndObject();
     }
 
@@ -257,7 +257,7 @@ public sealed class JsonSetEntryCodec<T>(JsonSerializerOptions? options = null)
         writer.WriteStartArray();
         foreach (var item in items)
         {
-            JsonSerializer.Serialize(writer, item, _options);
+            _itemSerializer.Serialize(writer, item);
         }
 
         writer.WriteEndArray();
@@ -274,10 +274,10 @@ public sealed class JsonSetEntryCodec<T>(JsonSerializerOptions? options = null)
         switch (command)
         {
             case JsonLogEntryCommands.Add:
-                consumer.ApplyAdd(root.GetProperty(JsonLogEntryFields.Item).Deserialize<T>(_options)!);
+                consumer.ApplyAdd(_itemSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Item))!);
                 break;
             case JsonLogEntryCommands.Remove:
-                consumer.ApplyRemove(root.GetProperty(JsonLogEntryFields.Item).Deserialize<T>(_options)!);
+                consumer.ApplyRemove(_itemSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Item))!);
                 break;
             case JsonLogEntryCommands.Clear:
                 consumer.ApplyClear();
@@ -287,7 +287,7 @@ public sealed class JsonSetEntryCodec<T>(JsonSerializerOptions? options = null)
                 consumer.ApplySnapshotStart(items.GetArrayLength());
                 foreach (var item in items.EnumerateArray())
                 {
-                    consumer.ApplySnapshotItem(item.Deserialize<T>(_options)!);
+                    consumer.ApplySnapshotItem(_itemSerializer.Deserialize(item)!);
                 }
 
                 break;

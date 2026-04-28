@@ -1,0 +1,55 @@
+using Google.Protobuf;
+using Microsoft.Extensions.DependencyInjection;
+
+namespace Orleans.Journaling.Protobuf;
+
+/// <summary>
+/// Options for configuring Protocol Buffers-based serialization for Orleans.Journaling.
+/// </summary>
+/// <remarks>
+/// <para>
+/// String values are encoded natively by default. Google Protocol Buffers message values are encoded
+/// natively only when their generated <see cref="MessageParser{T}"/> is registered explicitly.
+/// Unregistered values fall back to <see cref="ILogDataCodec{T}"/>.
+/// </para>
+/// </remarks>
+public sealed class ProtobufJournalingOptions
+{
+    private readonly List<Action<IServiceCollection>> _configureServices = [];
+
+    /// <summary>
+    /// Registers a generated Protocol Buffers message parser for native value payload encoding.
+    /// </summary>
+    /// <typeparam name="T">The generated Protocol Buffers message type.</typeparam>
+    /// <param name="parser">The generated parser, typically the message type's static <c>Parser</c> property.</param>
+    /// <remarks>
+    /// <para>
+    /// Registering a parser lets journaling encode <typeparamref name="T"/> values directly as protobuf
+    /// message payloads without reflection. If a parser is not registered, values of this type use the
+    /// configured <see cref="ILogDataCodec{T}"/> fallback.
+    /// </para>
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.AddStateMachineStorage().UseProtobufCodec(options =>
+    /// {
+    ///     options.AddMessageParser(MyMessage.Parser);
+    /// });
+    /// </code>
+    /// </example>
+    public void AddMessageParser<T>(MessageParser<T> parser)
+        where T : IMessage<T>
+    {
+        ArgumentNullException.ThrowIfNull(parser);
+
+        _configureServices.Add(services => services.AddSingleton<IProtobufValueCodec<T>>(new ProtobufMessageValueCodec<T>(parser)));
+    }
+
+    internal void Apply(IServiceCollection services)
+    {
+        foreach (var configure in _configureServices)
+        {
+            configure(services);
+        }
+    }
+}

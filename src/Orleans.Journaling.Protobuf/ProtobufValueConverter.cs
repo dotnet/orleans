@@ -1,7 +1,4 @@
 using System.Buffers;
-using System.Reflection;
-using System.Text;
-using Google.Protobuf;
 
 namespace Orleans.Journaling.Protobuf;
 
@@ -11,35 +8,48 @@ namespace Orleans.Journaling.Protobuf;
 public sealed class ProtobufValueConverter<T>
 {
     private readonly ILogDataCodec<T>? _fallbackCodec;
-    private readonly MessageParser? _messageParser;
+    private readonly IProtobufValueCodec<T>? _nativeCodec;
 
     /// <summary>
     /// Initializes a converter that uses the provided <paramref name="fallbackCodec"/> when native protobuf payload encoding is unavailable.
     /// </summary>
     public ProtobufValueConverter(ILogDataCodec<T> fallbackCodec)
     {
+        ArgumentNullException.ThrowIfNull(fallbackCodec);
+
         _fallbackCodec = fallbackCodec;
-        _messageParser = GetMessageParserOrDefault();
+        _nativeCodec = BuiltInNativeCodec;
     }
 
     /// <summary>
-    /// Initializes a converter for types with native protobuf payload encoding.
+    /// Initializes a converter for types with built-in native protobuf payload encoding.
     /// </summary>
     public ProtobufValueConverter()
     {
-        if (!IsNativeType)
+        if (BuiltInNativeCodec is null)
         {
             throw new InvalidOperationException(
                 $"Type '{typeof(T)}' is not natively supported by protobuf. Use the constructor that accepts ILogDataCodec<T>.");
         }
 
-        _messageParser = GetMessageParserOrDefault();
+        _nativeCodec = BuiltInNativeCodec;
+    }
+
+    internal ProtobufValueConverter(IProtobufValueCodec<T> nativeCodec)
+    {
+        ArgumentNullException.ThrowIfNull(nativeCodec);
+
+        _nativeCodec = nativeCodec;
     }
 
     /// <summary>
-    /// Gets whether <typeparamref name="T"/> can be encoded without falling back to <see cref="ILogDataCodec{T}"/>.
+    /// Gets whether <typeparamref name="T"/> has built-in native protobuf payload encoding.
     /// </summary>
-    public static bool IsNativeType { get; } = typeof(T) == typeof(string) || typeof(IMessage).IsAssignableFrom(typeof(T));
+    public static bool IsNativeType => BuiltInNativeCodec is not null;
+
+    private static IProtobufValueCodec<T>? BuiltInNativeCodec { get; } = typeof(T) == typeof(string)
+        ? (IProtobufValueCodec<T>)(object)ProtobufStringValueCodec.Instance
+        : null;
 
     /// <summary>
     /// Serializes <paramref name="value"/> to a length-delimited payload body.
@@ -79,14 +89,9 @@ public sealed class ProtobufValueConverter<T>
 
     private byte[] ToNonNullBytes(T value)
     {
-        if (typeof(T) == typeof(string))
+        if (_nativeCodec is not null)
         {
-            return Encoding.UTF8.GetBytes((string)(object)value!);
-        }
-
-        if (value is IMessage message)
-        {
-            return message.ToByteArray();
+            return _nativeCodec.ToBytes(value);
         }
 
         if (_fallbackCodec is null)
@@ -101,14 +106,9 @@ public sealed class ProtobufValueConverter<T>
 
     private T FromNonNullBytes(ReadOnlySequence<byte> bytes)
     {
-        if (typeof(T) == typeof(string))
+        if (_nativeCodec is not null)
         {
-            return (T)(object)Encoding.UTF8.GetString(bytes.ToArray());
-        }
-
-        if (_messageParser is not null)
-        {
-            return (T)_messageParser.ParseFrom(bytes.ToArray());
+            return _nativeCodec.FromBytes(bytes);
         }
 
         if (_fallbackCodec is null)
@@ -117,18 +117,5 @@ public sealed class ProtobufValueConverter<T>
         }
 
         return _fallbackCodec.Read(bytes, out _);
-    }
-
-    private static MessageParser? GetMessageParserOrDefault()
-    {
-        var type = typeof(T);
-        if (!typeof(IMessage).IsAssignableFrom(type))
-        {
-            return null;
-        }
-
-        var parserProperty = type.GetProperty("Parser", BindingFlags.Public | BindingFlags.Static)
-            ?? throw new InvalidOperationException($"IMessage type '{type}' does not have a static Parser property.");
-        return (MessageParser)parserProperty.GetValue(null)!;
     }
 }

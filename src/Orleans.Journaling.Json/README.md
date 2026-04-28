@@ -15,8 +15,15 @@ dotnet add package Microsoft.Orleans.Journaling.Json
 ## Example - Configuring JSON journaling
 ```csharp
 using System.Text.Json;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
+
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(ulong))]
+internal partial class JournalJsonContext : JsonSerializerContext;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -27,6 +34,7 @@ var builder = Host.CreateApplicationBuilder(args)
             .UseJsonCodec(options =>
             {
                 options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+                options.SerializerOptions.TypeInfoResolverChain.Add(JournalJsonContext.Default);
             });
     });
 
@@ -61,6 +69,8 @@ public sealed class ShoppingCartGrain(
 ```
 
 All durable state machine types use the configured JSON codec automatically. `JsonJournalingOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command and property names are fixed by the storage format, so serializer naming policies only affect user payload values.
+
+For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver` or `SerializerOptions.TypeInfoResolverChain` with source-generated metadata for every journaled key, value, and state type. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
 ## Storage format
 

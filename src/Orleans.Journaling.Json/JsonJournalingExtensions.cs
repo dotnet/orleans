@@ -14,6 +14,12 @@ public sealed class JsonJournalingOptions
     /// <summary>
     /// Gets or sets the <see cref="System.Text.Json.JsonSerializerOptions"/> used for serialization.
     /// </summary>
+    /// <remarks>
+    /// Durable entry codecs resolve <see cref="System.Text.Json.Serialization.Metadata.JsonTypeInfo{T}"/>
+    /// metadata for each journaled payload type from this options instance. Configure
+    /// <see cref="JsonSerializerOptions.TypeInfoResolver"/> or <see cref="JsonSerializerOptions.TypeInfoResolverChain"/>
+    /// with source-generated metadata for journaled value, key, and state types when trimming or using Native AOT.
+    /// </remarks>
     public JsonSerializerOptions SerializerOptions { get; set; } = new JsonSerializerOptions(JsonSerializerDefaults.General);
 }
 
@@ -35,6 +41,7 @@ public static class JsonJournalingExtensions
     /// builder.AddStateMachineStorage().UseJsonCodec(options =>
     /// {
     ///     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+    ///     options.SerializerOptions.TypeInfoResolverChain.Add(MyJournalJsonContext.Default);
     /// });
     /// </code>
     /// </example>
