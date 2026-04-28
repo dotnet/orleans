@@ -157,14 +157,14 @@ public class JsonCodecTests
 
         var encoded = Encoding.UTF8.GetString(codec.Encode(builder));
 
-        Assert.Equal("""{"records":[{"streamId":8,"entry":{"cmd":"set","value":42}},{"streamId":8,"entry":{"cmd":"set","value":43}}]}""" + "\n", encoded);
+        Assert.Equal("""[{"streamId":8,"entry":{"cmd":"set","value":42}},{"streamId":8,"entry":{"cmd":"set","value":43}}]""" + "\n", encoded);
     }
 
     [Fact]
     public void JsonLinesLogExtentCodec_Decode_RoundTripsEntries()
     {
         var codec = new JsonLinesLogExtentCodec();
-        using var extent = Decode(codec, """{"records":[{"streamId":8,"entry":{"cmd":"set","value":42}}]}""" + "\n");
+        using var extent = Decode(codec, """[{"streamId":8,"entry":{"cmd":"set","value":42}}]""" + "\n");
         var entry = Assert.Single(extent.Entries);
         var valueCodec = new JsonValueEntryCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
@@ -177,12 +177,12 @@ public class JsonCodecTests
 
     [Theory]
     [InlineData("\n", "blank lines")]
-    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", "records")]
-    [InlineData("""{"records":null}""" + "\n", "must be a JSON array")]
-    [InlineData("""{"records":[null]}""" + "\n", "each record")]
-    [InlineData("""{"records":[{"entry":{"cmd":"set","value":42}}]}""" + "\n", "streamId")]
-    [InlineData("""{"records":[{"streamId":8}]}""" + "\n", "entry")]
-    [InlineData("""{"records":[{"streamId":8,"entry":null}]}""" + "\n", "must be a JSON object")]
+    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", "must be a JSON array")]
+    [InlineData("null\n", "must be a JSON array")]
+    [InlineData("[null]\n", "each record")]
+    [InlineData("""[{"entry":{"cmd":"set","value":42}}]""" + "\n", "streamId")]
+    [InlineData("""[{"streamId":8}]""" + "\n", "entry")]
+    [InlineData("""[{"streamId":8,"entry":null}]""" + "\n", "must be a JSON object")]
     public void JsonLinesLogExtentCodec_Decode_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
     {
         var codec = new JsonLinesLogExtentCodec();
@@ -196,7 +196,7 @@ public class JsonCodecTests
     public void JsonLinesLogExtentCodec_Decode_Bom_Throws()
     {
         var codec = new JsonLinesLogExtentCodec();
-        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""{"records":[{"streamId":8,"entry":{"cmd":"set","value":42}}]}""" + "\n")).ToArray();
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""[{"streamId":8,"entry":{"cmd":"set","value":42}}]""" + "\n")).ToArray();
 
         var exception = Assert.Throws<InvalidOperationException>(() => Decode(codec, bytes));
 

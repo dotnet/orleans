@@ -11,7 +11,6 @@ internal sealed class JsonLinesLogExtentCodec : IStateMachineLogExtentCodec
     private static readonly JsonWriterOptions WriterOptions = new() { Indented = false };
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
-    private const string RecordsPropertyName = "records";
     private const string StreamIdPropertyName = "streamId";
     private const string EntryPropertyName = "entry";
 
@@ -22,8 +21,6 @@ internal sealed class JsonLinesLogExtentCodec : IStateMachineLogExtentCodec
         var output = new ArrayBufferWriter<byte>();
         using (var writer = new Utf8JsonWriter(output, WriterOptions))
         {
-            writer.WriteStartObject();
-            writer.WritePropertyName(RecordsPropertyName);
             writer.WriteStartArray();
             foreach (var entry in value.Entries)
             {
@@ -39,7 +36,6 @@ internal sealed class JsonLinesLogExtentCodec : IStateMachineLogExtentCodec
             }
 
             writer.WriteEndArray();
-            writer.WriteEndObject();
         }
 
         WriteByte(output, LineFeed);
@@ -90,22 +86,12 @@ internal sealed class JsonLinesLogExtentCodec : IStateMachineLogExtentCodec
     {
         using var document = JsonDocument.Parse(line);
         var root = document.RootElement;
-        if (root.ValueKind is not JsonValueKind.Object)
+        if (root.ValueKind is not JsonValueKind.Array)
         {
-            throw new InvalidOperationException("Malformed JSON Lines log extent: each line must be a JSON object.");
+            throw new InvalidOperationException("Malformed JSON Lines log extent: each line must be a JSON array.");
         }
 
-        if (!root.TryGetProperty(RecordsPropertyName, out var recordsElement))
-        {
-            throw new InvalidOperationException($"Malformed JSON Lines log extent: missing required property '{RecordsPropertyName}'.");
-        }
-
-        if (recordsElement.ValueKind is not JsonValueKind.Array)
-        {
-            throw new InvalidOperationException($"Malformed JSON Lines log extent: property '{RecordsPropertyName}' must be a JSON array.");
-        }
-
-        foreach (var recordElement in recordsElement.EnumerateArray())
+        foreach (var recordElement in root.EnumerateArray())
         {
             if (recordElement.ValueKind is not JsonValueKind.Object)
             {

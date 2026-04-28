@@ -66,7 +66,7 @@ public class CodecRecoveryTests : StateMachineTestBase
         dict.Add("beta", 2);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         var log = Encoding.UTF8.GetString(storage.Segments.Single());
-        Assert.Equal("""{"records":[{"streamId":0,"entry":{"cmd":"set","key":"dict","value":8}},{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}},{"streamId":8,"entry":{"cmd":"set","key":"beta","value":2}}]}""" + "\n", log);
+        Assert.Equal("""[{"streamId":0,"entry":{"cmd":"set","key":"dict","value":8}},{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}},{"streamId":8,"entry":{"cmd":"set","key":"beta","value":2}}]""" + "\n", log);
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
