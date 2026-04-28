@@ -29,7 +29,8 @@ public sealed class ProtobufValueConverter<T>
         if (BuiltInNativeCodec is null)
         {
             throw new InvalidOperationException(
-                $"Type '{typeof(T)}' is not natively supported by protobuf. Use the constructor that accepts ILogDataCodec<T>.");
+                $"Type '{typeof(T).FullName}' is not natively supported by protobuf. "
+                + $"Register an {nameof(ILogDataCodec<T>)} fallback or configure protobuf journaling with a native value codec for this type.");
         }
 
         _nativeCodec = BuiltInNativeCodec;
@@ -47,9 +48,7 @@ public sealed class ProtobufValueConverter<T>
     /// </summary>
     public static bool IsNativeType => BuiltInNativeCodec is not null;
 
-    private static IProtobufValueCodec<T>? BuiltInNativeCodec { get; } = typeof(T) == typeof(string)
-        ? (IProtobufValueCodec<T>)(object)ProtobufStringValueCodec.Instance
-        : null;
+    private static IProtobufValueCodec<T>? BuiltInNativeCodec { get; } = ProtobufBuiltInValueCodecs.Get<T>();
 
     /// <summary>
     /// Serializes <paramref name="value"/> to a length-delimited payload body.

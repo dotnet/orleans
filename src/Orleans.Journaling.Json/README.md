@@ -31,17 +31,25 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             .AddAzureAppendBlobStateMachineStorage()
-            .UseJsonCodec(options =>
-            {
-                options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
-                options.SerializerOptions.TypeInfoResolverChain.Add(JournalJsonContext.Default);
-            });
+            .UseJsonCodec(JournalJsonContext.Default);
     });
 
 await builder.Build().RunAsync();
 ```
 
-If you use a different Journaling storage provider, call `UseJsonCodec()` after registering that provider.
+If you need to customize `JsonSerializerOptions`, add the generated context through `JsonJournalingOptions`:
+
+```csharp
+siloBuilder
+    .AddAzureAppendBlobStateMachineStorage()
+    .UseJsonCodec(options =>
+    {
+        options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
+        options.AddTypeInfoResolver(JournalJsonContext.Default);
+    });
+```
+
+If you use a different Journaling storage provider, call `UseJsonCodec(...)` after registering that provider.
 
 ## Example - Using durable state machines
 ```csharp
@@ -70,7 +78,7 @@ public sealed class ShoppingCartGrain(
 
 All durable state machine types use the configured JSON codec automatically. `JsonJournalingOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command and property names are fixed by the storage format, so serializer naming policies only affect user payload values.
 
-For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver` or `SerializerOptions.TypeInfoResolverChain` with source-generated metadata for every journaled key, value, and state type. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
+For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalingOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonCodec(JournalJsonContext.Default)` overload is the recommended low-friction path. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
 ## Storage format
 

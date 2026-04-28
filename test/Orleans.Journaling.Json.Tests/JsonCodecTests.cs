@@ -1,8 +1,11 @@
 using System.Buffers;
 using System.Text;
 using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling.Json;
 using Orleans.Serialization.Buffers;
+using Orleans.Hosting;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
@@ -29,6 +32,22 @@ public class JsonCodecTests
         Assert.Equal("""{"cmd":"set","key":"alice","value":42}""", json);
         Assert.Equal("alice", consumer.LastSetKey);
         Assert.Equal(42, consumer.LastSetValue);
+    }
+
+    [Fact]
+    public void UseJsonCodec_TypeInfoResolverOverload_RegistersPayloadMetadata()
+    {
+        var builder = new TestSiloBuilder();
+        builder.UseJsonCodec(JsonCodecTestJsonContext.Default);
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var codec = serviceProvider.GetRequiredService<IDurableValueCodecProvider>().GetCodec<JsonCodecTestValue>();
+        var buffer = new ArrayBufferWriter<byte>();
+
+        codec.WriteSet(new("test", 1), buffer);
+        var consumer = new ValueConsumer<JsonCodecTestValue>();
+        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+
+        Assert.Equal(new("test", 1), consumer.Value);
     }
 
     [Fact]
@@ -344,5 +363,12 @@ public class JsonCodecTests
         public void ApplyCompleted(T value) => Commands.Add($"completed:{value}");
         public void ApplyFaulted(Exception exception) => Commands.Add($"faulted:{exception.Message}");
         public void ApplyCanceled() => Commands.Add("canceled");
+    }
+
+    private sealed class TestSiloBuilder : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = new ServiceCollection();
+
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 }
