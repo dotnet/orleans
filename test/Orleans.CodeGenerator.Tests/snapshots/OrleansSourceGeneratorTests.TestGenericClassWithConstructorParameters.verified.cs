@@ -11,25 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_GenericWithCtor<>));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_GenericWithCtor<>));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_UsesGenericWithCtor));
-        }
-    }
-}
-
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_GenericWithCtor<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.GenericWithCtor<T>>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.GenericWithCtor<T>>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.GenericWithCtor<T>);
@@ -155,12 +136,6 @@ namespace OrleansCodeGen.TestProject
             setField0(output, getField0(input));
         }
     }
-}
-
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_UsesGenericWithCtor : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.UsesGenericWithCtor>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.UsesGenericWithCtor>
@@ -271,4 +246,18 @@ namespace OrleansCodeGen.TestProject
     {
         public global::TestProject.UsesGenericWithCtor Create() => new global::TestProject.UsesGenericWithCtor();
     }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_GenericWithCtor<>));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_UsesGenericWithCtor));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_GenericWithCtor<>));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_UsesGenericWithCtor));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_UsesGenericWithCtor));
+        }
+    }
 }
+#pragma warning restore CS1591, RS0016, RS0041

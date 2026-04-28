@@ -11,22 +11,6 @@ namespace OrleansCodeGen.TestProject
     using global::Orleans.Serialization.GeneratedCodeHelpers;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam));
-        }
-    }
-}
-
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Codec_InterfaceCtorParam : global::Orleans.Serialization.Codecs.IFieldCodec<global::TestProject.InterfaceCtorParam>, global::Orleans.Serialization.Serializers.IBaseCodec<global::TestProject.InterfaceCtorParam>
     {
         private readonly global::System.Type _codecFieldType = typeof(global::TestProject.InterfaceCtorParam);
@@ -137,4 +121,15 @@ namespace OrleansCodeGen.TestProject
             setField0(output, _copier0.DeepCopy(getField0(input), context));
         }
     }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_InterfaceCtorParam));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_InterfaceCtorParam));
+        }
+    }
 }
+#pragma warning restore CS1591, RS0016, RS0041
