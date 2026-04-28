@@ -6,7 +6,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.CodeGenerator.Model;
-using Orleans.CodeGenerator.Model.Incremental;
 using Orleans.Serialization;
 using Xunit;
 

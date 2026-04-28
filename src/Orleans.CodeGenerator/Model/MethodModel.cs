@@ -1,49 +1,11 @@
-using System;
 using System.Collections.Immutable;
 
-namespace Orleans.CodeGenerator.Model.Incremental
+namespace Orleans.CodeGenerator.Model
 {
     /// <summary>
     /// Describes a method parameter for invokable/proxy generation.
     /// </summary>
-    internal readonly struct MethodParameterModel : IEquatable<MethodParameterModel>
-    {
-        public MethodParameterModel(string name, TypeRef type, int ordinal, bool isCancellationToken)
-        {
-            Name = name;
-            Type = type;
-            Ordinal = ordinal;
-            IsCancellationToken = isCancellationToken;
-        }
-
-        public string Name { get; }
-        public TypeRef Type { get; }
-        public int Ordinal { get; }
-        public bool IsCancellationToken { get; }
-
-        public bool Equals(MethodParameterModel other) =>
-            string.Equals(Name, other.Name, StringComparison.Ordinal)
-            && Type.Equals(other.Type)
-            && Ordinal == other.Ordinal
-            && IsCancellationToken == other.IsCancellationToken;
-
-        public override bool Equals(object obj) => obj is MethodParameterModel other && Equals(other);
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                var hash = StringComparer.Ordinal.GetHashCode(Name ?? string.Empty);
-                hash = hash * 31 + Type.GetHashCode();
-                hash = hash * 31 + Ordinal;
-                hash = hash * 31 + (IsCancellationToken ? 1 : 0);
-                return hash;
-            }
-        }
-
-        public static bool operator ==(MethodParameterModel left, MethodParameterModel right) => left.Equals(right);
-        public static bool operator !=(MethodParameterModel left, MethodParameterModel right) => !left.Equals(right);
-    }
+    internal readonly record struct MethodParameterModel(string Name, TypeRef Type, int Ordinal, bool IsCancellationToken);
 
     /// <summary>
     /// Describes a method on a proxy interface for invokable generation.
@@ -68,8 +30,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
         {
             Name = name;
             ReturnType = returnType;
-            Parameters = ImmutableArrayValueComparer.Normalize(parameters);
-            TypeParameters = ImmutableArrayValueComparer.Normalize(typeParameters);
+            Parameters = StructuralEquality.Normalize(parameters);
+            TypeParameters = StructuralEquality.Normalize(typeParameters);
             ContainingInterfaceType = containingInterfaceType;
             OriginalContainingInterfaceType = originalContainingInterfaceType;
             ContainingInterfaceName = containingInterfaceName;
@@ -78,7 +40,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             GeneratedMethodId = generatedMethodId;
             MethodId = methodId;
             ResponseTimeoutTicks = responseTimeoutTicks;
-            CustomInitializerMethods = ImmutableArrayValueComparer.Normalize(customInitializerMethods);
+            CustomInitializerMethods = StructuralEquality.Normalize(customInitializerMethods);
             IsCancellable = isCancellable;
         }
 
@@ -107,8 +69,8 @@ namespace Orleans.CodeGenerator.Model.Incremental
 
             return string.Equals(Name, other.Name, StringComparison.Ordinal)
                 && ReturnType.Equals(other.ReturnType)
-                && ImmutableArrayValueComparer.Equals(Parameters, other.Parameters)
-                && ImmutableArrayValueComparer.Equals(TypeParameters, other.TypeParameters)
+                && StructuralEquality.SequenceEqual(Parameters, other.Parameters)
+                && StructuralEquality.SequenceEqual(TypeParameters, other.TypeParameters)
                 && ContainingInterfaceType.Equals(other.ContainingInterfaceType)
                 && OriginalContainingInterfaceType.Equals(other.OriginalContainingInterfaceType)
                 && string.Equals(ContainingInterfaceName, other.ContainingInterfaceName, StringComparison.Ordinal)
@@ -117,7 +79,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 && string.Equals(GeneratedMethodId, other.GeneratedMethodId, StringComparison.Ordinal)
                 && string.Equals(MethodId, other.MethodId, StringComparison.Ordinal)
                 && ResponseTimeoutTicks == other.ResponseTimeoutTicks
-                && ImmutableArrayValueComparer.Equals(CustomInitializerMethods, other.CustomInitializerMethods)
+                && StructuralEquality.SequenceEqual(CustomInitializerMethods, other.CustomInitializerMethods)
                 && IsCancellable == other.IsCancellable;
         }
 
@@ -136,10 +98,10 @@ namespace Orleans.CodeGenerator.Model.Incremental
                 hash = hash * 31 + ContainingInterfaceTypeParameterCount;
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(GeneratedMethodId ?? string.Empty);
                 hash = hash * 31 + StringComparer.Ordinal.GetHashCode(MethodId ?? string.Empty);
-                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(Parameters);
-                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(TypeParameters);
+                hash = hash * 31 + StructuralEquality.GetSequenceHashCode(Parameters);
+                hash = hash * 31 + StructuralEquality.GetSequenceHashCode(TypeParameters);
                 hash = hash * 31 + ResponseTimeoutTicks.GetHashCode();
-                hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(CustomInitializerMethods);
+                hash = hash * 31 + StructuralEquality.GetSequenceHashCode(CustomInitializerMethods);
                 hash = hash * 31 + (IsCancellable ? 1 : 0);
                 return hash;
             }
@@ -149,33 +111,5 @@ namespace Orleans.CodeGenerator.Model.Incremental
     /// <summary>
     /// Describes a custom initializer method associated with an invokable method's attribute.
     /// </summary>
-    internal readonly struct CustomInitializerModel : IEquatable<CustomInitializerModel>
-    {
-        public CustomInitializerModel(string methodName, string argumentValue)
-        {
-            MethodName = methodName;
-            ArgumentValue = argumentValue;
-        }
-
-        public string MethodName { get; }
-        public string ArgumentValue { get; }
-
-        public bool Equals(CustomInitializerModel other) =>
-            string.Equals(MethodName, other.MethodName, StringComparison.Ordinal)
-            && string.Equals(ArgumentValue, other.ArgumentValue, StringComparison.Ordinal);
-
-        public override bool Equals(object obj) => obj is CustomInitializerModel other && Equals(other);
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                return StringComparer.Ordinal.GetHashCode(MethodName ?? string.Empty) * 31
-                    + StringComparer.Ordinal.GetHashCode(ArgumentValue ?? string.Empty);
-            }
-        }
-
-        public static bool operator ==(CustomInitializerModel left, CustomInitializerModel right) => left.Equals(right);
-        public static bool operator !=(CustomInitializerModel left, CustomInitializerModel right) => !left.Equals(right);
-    }
+    internal readonly record struct CustomInitializerModel(string MethodName, string ArgumentValue);
 }

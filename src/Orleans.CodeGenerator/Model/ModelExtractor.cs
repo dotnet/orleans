@@ -9,7 +9,6 @@ using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
-using Orleans.CodeGenerator.Model.Incremental;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 #nullable disable

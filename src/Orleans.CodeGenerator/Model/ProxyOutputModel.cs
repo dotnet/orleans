@@ -1,7 +1,7 @@
 using System;
 using System.Collections.Immutable;
 
-namespace Orleans.CodeGenerator.Model.Incremental
+namespace Orleans.CodeGenerator.Model
 {
     /// <summary>
     /// Describes the proxy output for a single interface, including the invokable metadata names owned by that file.
@@ -14,7 +14,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             bool useDeclaredInvokableFallback)
         {
             ProxyInterface = proxyInterface;
-            OwnedInvokableMetadataNames = ImmutableArrayValueComparer.Normalize(ownedInvokableMetadataNames);
+            OwnedInvokableMetadataNames = StructuralEquality.Normalize(ownedInvokableMetadataNames);
             UseDeclaredInvokableFallback = useDeclaredInvokableFallback;
         }
 
@@ -30,7 +30,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
             }
 
             return ProxyInterface.Equals(other.ProxyInterface)
-                && ImmutableArrayValueComparer.Equals(OwnedInvokableMetadataNames, other.OwnedInvokableMetadataNames)
+                && StructuralEquality.SequenceEqual(OwnedInvokableMetadataNames, other.OwnedInvokableMetadataNames)
                 && UseDeclaredInvokableFallback == other.UseDeclaredInvokableFallback;
         }
 
@@ -40,7 +40,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
         {
             unchecked
             {
-                return ((ProxyInterface.GetHashCode() * 31) + ImmutableArrayValueComparer.GetHashCode(OwnedInvokableMetadataNames)) * 31
+                return ((ProxyInterface.GetHashCode() * 31) + StructuralEquality.GetSequenceHashCode(OwnedInvokableMetadataNames)) * 31
                     + (UseDeclaredInvokableFallback ? 1 : 0);
             }
         }
