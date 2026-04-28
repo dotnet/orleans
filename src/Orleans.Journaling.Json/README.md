@@ -1,9 +1,9 @@
 # Microsoft Orleans Journaling for System.Text.Json
 
 ## Introduction
-Microsoft Orleans Journaling for System.Text.Json provides a `System.Text.Json`-based codec for Orleans.Journaling durable state machines. Use this package to serialize durable dictionary, list, queue, set, value, state, and task completion source log entries directly as JSON.
+Microsoft Orleans Journaling for System.Text.Json provides a JSON Lines-based storage format for Orleans.Journaling durable state machines. Use this package to serialize durable dictionary, list, queue, set, value, state, and task completion source log entries directly as JSON records.
 
-This package configures the log entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the JSON codec providers which durable state machines use to encode and recover their own operations.
+This package configures the physical log extent format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the JSON Lines extent codec and the JSON durable-entry codec providers which durable state machines use to encode and recover their own operations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -62,7 +62,19 @@ public sealed class ShoppingCartGrain(
 
 All durable state machine types use the configured JSON codec automatically. `JsonJournalingOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command and property names are fixed by the storage format, so serializer naming policies only affect user payload values.
 
-The configured journaling codec must match the data already stored for a grain. This package does not automatically migrate existing binary or protobuf journaling data to JSON.
+## Storage format
+
+`UseJsonCodec()` stores log extents as JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON object per line. Each line is one physical log extent and is terminated by `\n`. Recovery accepts both LF and CRLF line endings.
+
+Each extent line contains a `records` array. Each record contains the state machine id and the durable entry payload:
+
+```json
+{"records":[{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}]}
+```
+
+The `entry` object is the durable state machine command. It is nested so storage metadata such as `records` and `streamId` cannot collide with durable command fields such as `cmd`, `key`, `value`, `items`, or `version`. Batching records into extent lines preserves the extent boundaries used by storage writes.
+
+The configured journaling codec must match the data already stored for a grain. This package does not automatically migrate existing binary, protobuf, or older binary-framed JSON journaling data to JSON Lines.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

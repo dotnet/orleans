@@ -11,11 +11,16 @@ namespace Orleans.Journaling.Protobuf;
 public static class ProtobufJournalingExtensions
 {
     /// <summary>
-    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log entry serialization.
+    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log extent and entry serialization.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder for chaining.</returns>
     /// <remarks>
+    /// <para>
+    /// Physical log extents are serialized as a stream of length-delimited protobuf
+    /// <c>LogExtent</c> messages. Each <c>LogExtent</c> contains repeated records with
+    /// the state machine id and the durable entry payload.
+    /// </para>
     /// <para>
     /// Each entry type is serialized using protobuf wire-format tags. User values use native
     /// protobuf payload encoding where supported and fall back to <see cref="ILogDataCodec{T}"/>.
@@ -28,6 +33,7 @@ public static class ProtobufJournalingExtensions
     /// </example>
     public static ISiloBuilder UseProtobufCodec(this ISiloBuilder builder)
     {
+        builder.Services.AddSingleton<IStateMachineLogExtentCodec, ProtobufLogExtentCodec>();
         builder.Services.AddSingleton<ProtobufLogEntryCodecProvider>();
         builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());

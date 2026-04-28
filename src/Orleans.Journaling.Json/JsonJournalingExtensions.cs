@@ -7,7 +7,7 @@ using Orleans.Hosting;
 namespace Orleans.Journaling.Json;
 
 /// <summary>
-/// Options for configuring JSON-based log data serialization.
+/// Options for configuring JSON Lines-based journaling.
 /// </summary>
 public sealed class JsonJournalingOptions
 {
@@ -18,12 +18,12 @@ public sealed class JsonJournalingOptions
 }
 
 /// <summary>
-/// Extension methods for configuring JSON-based serialization for Orleans.Journaling.
+/// Extension methods for configuring JSON Lines-based serialization for Orleans.Journaling.
 /// </summary>
 public static class JsonJournalingExtensions
 {
     /// <summary>
-    /// Configures Orleans.Journaling to use System.Text.Json for log entry serialization.
+    /// Configures Orleans.Journaling to use JSON Lines for physical log extents and System.Text.Json for durable log entries.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">Optional delegate to configure <see cref="JsonJournalingOptions"/>.</param>
@@ -47,7 +47,8 @@ public static class JsonJournalingExtensions
         // JsonSerializerOptions singleton that could collide with other components.
         var jsonOptions = options.SerializerOptions;
 
-        // Replace the default codec providers with the JSON codec provider.
+        // Replace the default extent and entry codec providers with JSON implementations.
+        builder.Services.AddSingleton<IStateMachineLogExtentCodec, JsonLinesLogExtentCodec>();
         builder.Services.AddSingleton<JsonLogEntryCodecProvider>(_ => new JsonLogEntryCodecProvider(jsonOptions));
         builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());

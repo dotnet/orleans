@@ -13,18 +13,18 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
     private static readonly AppendBlobCreateOptions CreateOptions = new() { Conditions = new() { IfNoneMatch = ETag.All } };
     private readonly AppendBlobClient _client;
     private readonly ILogger<AzureAppendBlobLogStorage> _logger;
-    private readonly LogExtentBuilder.ReadOnlyStream _stream;
+    private readonly IStateMachineLogExtentCodec _codec;
     private readonly AppendBlobAppendBlockOptions _appendOptions;
     private bool _exists;
     private int _numBlocks;
 
     public bool IsCompactionRequested => _numBlocks > 10;
 
-    public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger)
+    public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger, IStateMachineLogExtentCodec codec)
     {
         _client = client;
         _logger = logger;
-        _stream = new();
+        _codec = codec;
 
         // For the first request, if we have not performed a read yet, we want to guard against clobbering an existing blob.
         _appendOptions = new AppendBlobAppendBlockOptions() { Conditions = new AppendBlobRequestConditions { IfNoneMatch = ETag.All } };
@@ -40,11 +40,11 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
             _exists = true;
         }
 
-        _stream.SetBuilder(value);
-        var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        LogAppend(_logger, value.Length, _client.BlobContainerName, _client.Name);
+        var encoded = _codec.Encode(value);
+        using var stream = new MemoryStream(encoded, writable: false);
+        var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
+        LogAppend(_logger, encoded.Length, _client.BlobContainerName, _client.Name);
 
-        _stream.Reset();
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.ETag;
         _numBlocks = result.Value.BlobCommittedBlockCount;
@@ -102,7 +102,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
                 if (buffer.Length > 0)
                 {
                     LogRead(_logger, buffer.Length, _client.BlobContainerName, _client.Name);
-                    yield return new LogExtent(buffer.ConsumeSlice(buffer.Length));
+                    yield return _codec.Decode(buffer.ConsumeSlice(buffer.Length));
                 }
 
                 yield break;
@@ -147,11 +147,11 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _appendOptions.Conditions.IfNoneMatch = default;
 
         // Write the state machine snapshot.
-        _stream.SetBuilder(value);
-        var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        LogReplace(_logger, _client.BlobContainerName, _client.Name, value.Length);
+        var encoded = _codec.Encode(value);
+        using var stream = new MemoryStream(encoded, writable: false);
+        var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
+        LogReplace(_logger, _client.BlobContainerName, _client.Name, encoded.Length);
 
-        _stream.Reset();
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.ETag;
         _numBlocks = result.Value.BlobCommittedBlockCount;
