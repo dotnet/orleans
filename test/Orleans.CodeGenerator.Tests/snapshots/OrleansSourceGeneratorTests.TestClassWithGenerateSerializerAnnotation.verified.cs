@@ -1,29 +1,4 @@
-﻿#pragma warning disable CS1591, RS0016, RS0041
-[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
-[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
-[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
-namespace OrleansCodeGen.TestProject
-{
-    using global::Orleans.Serialization.Codecs;
-    using global::Orleans.Serialization.GeneratedCodeHelpers;
-
-    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
-    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
-    {
-        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
-        {
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_MyCustomEnum));
-            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_ClassWithImplicitFieldIds));
-            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_ClassWithImplicitFieldIds));
-            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_ClassWithImplicitFieldIds));
-        }
-    }
-}
-
-namespace OrleansCodeGen.TestProject
+﻿namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
@@ -159,6 +134,31 @@ namespace OrleansCodeGen.TestProject
         public global::TestProject.MyCustomEnum ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field)
         {
             return (global::TestProject.MyCustomEnum)global::Orleans.Serialization.Codecs.Int32Codec.ReadValue(ref reader, field);
+        }
+    }
+}
+
+#pragma warning disable CS1591, RS0016, RS0041
+[assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core")]
+[assembly: global::Orleans.ApplicationPartAttribute("Orleans.Runtime")]
+[assembly: global::Orleans.Serialization.Configuration.TypeManifestProviderAttribute(typeof(OrleansCodeGen.TestProject.Metadata_TestProject))]
+namespace OrleansCodeGen.TestProject
+{
+    using global::Orleans.Serialization.Codecs;
+    using global::Orleans.Serialization.GeneratedCodeHelpers;
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Metadata_TestProject : global::Orleans.Serialization.Configuration.TypeManifestProviderBase
+    {
+        protected override void ConfigureInner(global::Orleans.Serialization.Configuration.TypeManifestOptions config)
+        {
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_MyCustomEnum));
+            config.Serializers.Add(typeof(OrleansCodeGen.TestProject.Codec_ClassWithImplicitFieldIds));
+            config.Copiers.Add(typeof(OrleansCodeGen.TestProject.Copier_ClassWithImplicitFieldIds));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_ClassWithImplicitFieldIds));
         }
     }
 }

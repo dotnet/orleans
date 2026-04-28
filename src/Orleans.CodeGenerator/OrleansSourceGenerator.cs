@@ -183,6 +183,11 @@ namespace Orleans.CodeGenerator
                 EmitSourceOutputResult(productionContext, input);
             });
 
+            context.RegisterSourceOutput(assemblyNameProvider, static (productionContext, assemblyName) =>
+            {
+                productionContext.AddSource($"{assemblyName}.orleans.g.cs", SourceText.From(string.Empty, Encoding.UTF8));
+            });
+
             var metadataOutputs = metadataAggregate
                 .Combine(generatorOptions)
                 .Select(static (input, _) => CreateMetadataSourceOutput(input.Left, input.Right))
@@ -191,11 +196,6 @@ namespace Orleans.CodeGenerator
             context.RegisterSourceOutput(metadataOutputs, static (productionContext, input) =>
             {
                 EmitSourceOutputResult(productionContext, input);
-            });
-
-            context.RegisterSourceOutput(assemblyNameProvider, static (productionContext, assemblyName) =>
-            {
-                productionContext.AddSource($"{assemblyName}.orleans.g.cs", SourceText.From(string.Empty, Encoding.UTF8));
             });
         }
 
@@ -704,7 +704,7 @@ namespace Orleans.CodeGenerator
                 var assemblyName = metadataModel.AssemblyName ?? "assembly";
                 return SourceOutputResult.FromSource(
                     new GeneratedSourceEntry(
-                        $"{assemblyName}.orleans.metadata.g.cs",
+                        CreateMetadataHintName(assemblyName),
                         CreateSourceString(CreateCompilationUnit(namespacedMembers, assemblyAttributes))));
             }
             catch (OrleansGeneratorDiagnosticAnalysisException analysisException)
@@ -1531,6 +1531,10 @@ namespace Orleans.CodeGenerator
 
         private static string CreateProxyHintName(string assemblyName, string interfaceName)
             => $"{assemblyName}.orleans.proxy.{SanitizeHintComponent(interfaceName)}.g.cs";
+
+        // Keep metadata after serializer and proxy sources in generated-source output.
+        private static string CreateMetadataHintName(string assemblyName)
+            => $"{assemblyName}.orleans.typeManifest.g.cs";
 
         private static string SanitizeHintComponent(string value)
         {

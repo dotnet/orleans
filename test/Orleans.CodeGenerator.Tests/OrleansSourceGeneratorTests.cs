@@ -1525,6 +1525,45 @@ public class DemoClass
             ConcatenateGeneratedSources(configuredResult));
     }
 
+    [Fact]
+    public async Task GeneratedSourceHintNames_SortMetadataLast()
+    {
+        var code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public class DemoData
+            {
+                [Id(0)]
+                public string Value { get; set; } = string.Empty;
+            }
+
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                Task<DemoData> Get();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var result = RunSourceGenerator(compilation);
+
+        Assert.Empty(result.Diagnostics);
+
+        var orderedHintNames = result.GeneratedSources
+            .Where(static source => !string.IsNullOrWhiteSpace(source.SourceText.ToString()))
+            .Select(static source => source.HintName)
+            .OrderBy(static hintName => hintName, StringComparer.Ordinal)
+            .ToArray();
+
+        Assert.NotEmpty(orderedHintNames);
+        Assert.Contains(orderedHintNames, static hintName => hintName.Contains(".orleans.ser.", StringComparison.Ordinal));
+        Assert.Contains(orderedHintNames, static hintName => hintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        Assert.EndsWith(".orleans.typeManifest.g.cs", orderedHintNames[^1], StringComparison.Ordinal);
+    }
+
     private static GeneratorRunResult RunSourceGenerator(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
