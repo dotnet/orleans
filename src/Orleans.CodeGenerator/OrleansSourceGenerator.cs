@@ -12,7 +12,6 @@ using Microsoft.CodeAnalysis.Diagnostics;
 using Microsoft.CodeAnalysis.Text;
 using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
-using Orleans.CodeGenerator.Model.Incremental;
 using Orleans.CodeGenerator.SyntaxGeneration;
 
 #pragma warning disable RS1035 // Do not use APIs banned for analyzers
@@ -1741,8 +1740,8 @@ namespace Orleans.CodeGenerator
                 => new(ImmutableArray<ProxyOutputModel>.Empty, ImmutableArray<SourceOutputResult>.Empty, diagnostic);
 
             public bool Equals(ProxyOutputPreparationResult other)
-                => ImmutableArrayValueComparer.Equals(ProxyOutputModels, other.ProxyOutputModels)
-                    && ImmutableArrayValueComparer.Equals(SourceOutputs, other.SourceOutputs)
+                => StructuralEquality.SequenceEqual(ProxyOutputModels, other.ProxyOutputModels)
+                    && StructuralEquality.SequenceEqual(SourceOutputs, other.SourceOutputs)
                     && AreDiagnosticsEqual(Diagnostic, other.Diagnostic);
 
             public override bool Equals(object obj) => obj is ProxyOutputPreparationResult other && Equals(other);
@@ -1751,8 +1750,8 @@ namespace Orleans.CodeGenerator
             {
                 unchecked
                 {
-                    var hash = ImmutableArrayValueComparer.GetHashCode(ProxyOutputModels);
-                    hash = hash * 31 + ImmutableArrayValueComparer.GetHashCode(SourceOutputs);
+                    var hash = StructuralEquality.GetSequenceHashCode(ProxyOutputModels);
+                    hash = hash * 31 + StructuralEquality.GetSequenceHashCode(SourceOutputs);
                     hash = hash * 31 + GetDiagnosticHashCode(Diagnostic);
                     return hash;
                 }

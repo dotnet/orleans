@@ -1,6 +1,4 @@
-using System;
-
-namespace Orleans.CodeGenerator.Model.Incremental
+namespace Orleans.CodeGenerator.Model
 {
     /// <summary>
     /// Describes the kind of a serializable member.
@@ -57,7 +55,7 @@ namespace Orleans.CodeGenerator.Model.Incremental
     /// Describes a serializable field or property member in a <see cref="SerializableTypeModel"/>.
     /// Contains all data needed for serializer, copier, and activator generation without holding <c>ISymbol</c> references.
     /// </summary>
-    internal sealed class MemberModel : IEquatable<MemberModel>
+    internal sealed record class MemberModel
     {
         public MemberModel(
             uint fieldId,
@@ -118,59 +116,5 @@ namespace Orleans.CodeGenerator.Model.Incremental
         public bool ContainingTypeIsValueType { get; }
         public string? BackingPropertyName { get; }
 
-        public bool Equals(MemberModel other)
-        {
-            if (other is null)
-            {
-                return false;
-            }
-
-            return FieldId == other.FieldId
-                && string.Equals(Name, other.Name, StringComparison.Ordinal)
-                && Type.Equals(other.Type)
-                && ContainingType.Equals(other.ContainingType)
-                && string.Equals(AssemblyName, other.AssemblyName, StringComparison.Ordinal)
-                && string.Equals(TypeNameIdentifier, other.TypeNameIdentifier, StringComparison.Ordinal)
-                && IsPrimaryConstructorParameter == other.IsPrimaryConstructorParameter
-                && IsSerializable == other.IsSerializable
-                && IsCopyable == other.IsCopyable
-                && Kind == other.Kind
-                && GetterStrategy == other.GetterStrategy
-                && SetterStrategy == other.SetterStrategy
-                && IsObsolete == other.IsObsolete
-                && HasImmutableAttribute == other.HasImmutableAttribute
-                && IsShallowCopyable == other.IsShallowCopyable
-                && IsValueType == other.IsValueType
-                && ContainingTypeIsValueType == other.ContainingTypeIsValueType
-                && string.Equals(BackingPropertyName, other.BackingPropertyName, StringComparison.Ordinal);
-        }
-
-        public override bool Equals(object obj) => obj is MemberModel other && Equals(other);
-
-        public override int GetHashCode()
-        {
-            unchecked
-            {
-                var hash = (int)FieldId;
-                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(Name ?? string.Empty);
-                hash = hash * 31 + Type.GetHashCode();
-                hash = hash * 31 + ContainingType.GetHashCode();
-                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(AssemblyName ?? string.Empty);
-                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(TypeNameIdentifier ?? string.Empty);
-                hash = hash * 31 + (int)Kind;
-                hash = hash * 31 + (int)GetterStrategy;
-                hash = hash * 31 + (int)SetterStrategy;
-                hash = hash * 31 + (IsPrimaryConstructorParameter ? 1 : 0);
-                hash = hash * 31 + (IsSerializable ? 1 : 0);
-                hash = hash * 31 + (IsCopyable ? 1 : 0);
-                hash = hash * 31 + (IsObsolete ? 1 : 0);
-                hash = hash * 31 + (HasImmutableAttribute ? 1 : 0);
-                hash = hash * 31 + (IsShallowCopyable ? 1 : 0);
-                hash = hash * 31 + (IsValueType ? 1 : 0);
-                hash = hash * 31 + (ContainingTypeIsValueType ? 1 : 0);
-                hash = hash * 31 + StringComparer.Ordinal.GetHashCode(BackingPropertyName ?? string.Empty);
-                return hash;
-            }
-        }
     }
 }
