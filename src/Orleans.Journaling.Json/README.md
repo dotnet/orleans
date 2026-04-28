@@ -64,15 +64,15 @@ All durable state machine types use the configured JSON codec automatically. `Js
 
 ## Storage format
 
-`UseJsonCodec()` stores log extents as JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON object per line. Each line is one physical log extent and is terminated by `\n`. Recovery accepts both LF and CRLF line endings.
+`UseJsonCodec()` stores log extents as JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON array per line. Each line is one physical log extent and is terminated by `\n`. Recovery accepts both LF and CRLF line endings.
 
-Each extent line contains a `records` array. Each record contains the state machine id and the durable entry payload:
+Each extent line is an array of records. Each record contains the state machine id and the durable entry payload:
 
 ```json
-{"records":[{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}]}
+[{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}]
 ```
 
-The `entry` object is the durable state machine command. It is nested so storage metadata such as `records` and `streamId` cannot collide with durable command fields such as `cmd`, `key`, `value`, `items`, or `version`. Batching records into extent lines preserves the extent boundaries used by storage writes.
+The `entry` object is the durable state machine command. It is nested so storage metadata such as `streamId` cannot collide with durable command fields such as `cmd`, `key`, `value`, `items`, or `version`. Batching records into extent lines preserves the extent boundaries used by storage writes.
 
 The configured journaling codec must match the data already stored for a grain. This package does not automatically migrate existing binary, protobuf, or older binary-framed JSON journaling data to JSON Lines.
 
