@@ -13,26 +13,24 @@ internal sealed partial class GrainDirectoryPartition
         ArgumentNullException.ThrowIfNull(address);
         LogRegisterAsync(version, address, currentRegistration);
 
-        // Ensure that the current membership version is new enough.
-        await WaitForRange(address.GrainId, version);
-        if (!IsOwner(CurrentView, address.GrainId))
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version);
+        if (!IsOwner(currentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress>(CurrentView.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress>(currentView.Version);
         }
 
-        DebugAssertOwnership(address.GrainId);
-        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration), version);
+        DebugAssertOwnership(currentView, address.GrainId);
+        return DirectoryResult.FromResult(RegisterCore(address, currentRegistration, currentView.Version), version);
     }
 
     async ValueTask<DirectoryResult<GrainAddress?>> IGrainDirectoryPartition.LookupAsync(MembershipVersion version, GrainId grainId)
     {
         LogLookupAsync(version, grainId);
 
-        // Ensure we can serve the request.
-        await WaitForRange(grainId, version);
-        if (!IsOwner(CurrentView, grainId))
+        var currentView = await WaitForOwnershipViewAsync(grainId, version);
+        if (!IsOwner(currentView, grainId))
         {
-            return DirectoryResult.RefreshRequired<GrainAddress?>(CurrentView.Version);
+            return DirectoryResult.RefreshRequired<GrainAddress?>(currentView.Version);
         }
 
         return DirectoryResult.FromResult(LookupCore(grainId), version);
@@ -43,13 +41,13 @@ internal sealed partial class GrainDirectoryPartition
         ArgumentNullException.ThrowIfNull(address);
         LogDeregisterAsync(version, address);
 
-        await WaitForRange(address.GrainId, version);
-        if (!IsOwner(CurrentView, address.GrainId))
+        var currentView = await WaitForOwnershipViewAsync(address.GrainId, version);
+        if (!IsOwner(currentView, address.GrainId))
         {
-            return DirectoryResult.RefreshRequired<bool>(CurrentView.Version);
+            return DirectoryResult.RefreshRequired<bool>(currentView.Version);
         }
 
-        DebugAssertOwnership(address.GrainId);
+        DebugAssertOwnership(currentView, address.GrainId);
         return DirectoryResult.FromResult(DeregisterCore(address), version);
     }
 
@@ -73,13 +71,29 @@ internal sealed partial class GrainDirectoryPartition
         return null;
     }
 
-    private GrainAddress RegisterCore(GrainAddress newAddress, GrainAddress? existingAddress)
+    private async ValueTask<DirectoryMembershipSnapshot> WaitForOwnershipViewAsync(GrainId grainId, MembershipVersion version)
+    {
+        while (true)
+        {
+            // Requests which arrive with a stale membership version must still wait for any in-flight ownership
+            // transition in the current view before deciding whether this partition can serve them.
+            var currentView = CurrentView;
+            var waitVersion = currentView.Version > version ? currentView.Version : version;
+            await WaitForRange(grainId, waitVersion);
+            if (ReferenceEquals(currentView, CurrentView))
+            {
+                return currentView;
+            }
+        }
+    }
+
+    private GrainAddress RegisterCore(GrainAddress newAddress, GrainAddress? existingAddress, MembershipVersion currentVersion)
     {
         ref var existing = ref CollectionsMarshal.GetValueRefOrAddDefault(_directory, newAddress.GrainId, out _);
 
         if (existing is null || existing.Matches(existingAddress) || IsSiloDead(existing))
         {
-            if (newAddress.MembershipVersion != CurrentView.Version)
+            if (newAddress.MembershipVersion != currentVersion)
             {
                 // Set the membership version to match the view number in which it was registered.
                 newAddress = new()
@@ -87,7 +101,7 @@ internal sealed partial class GrainDirectoryPartition
                     GrainId = newAddress.GrainId,
                     SiloAddress = newAddress.SiloAddress,
                     ActivationId = newAddress.ActivationId,
-                    MembershipVersion = CurrentView.Version
+                    MembershipVersion = currentVersion
                 };
             }
 
