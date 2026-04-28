@@ -286,33 +286,10 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
     }
 
     [Fact]
-    public async Task ExtractFromAttributeContext_CanceledToken_ThrowsOperationCanceledException()
-    {
-        const string code = """
-            using Orleans;
-
-            namespace TestProject;
-
-            [GenerateSerializer]
-            public sealed class DemoData
-            {
-                [Id(0)]
-                public string Value { get; set; } = string.Empty;
-            }
-            """;
-        var compilation = await CreateCompilation(code);
-        var context = CreateSerializableAttributeContext(compilation, "DemoData");
-        using var cancellationTokenSource = new CancellationTokenSource();
-        cancellationTokenSource.Cancel();
-
-        Assert.Throws<OperationCanceledException>(() => ModelExtractor.ExtractFromAttributeContext(context, cancellationTokenSource.Token));
-    }
-
-    [Fact]
     public async Task ExtractReferenceAssemblyData_CollectsCrossAssemblyMetadataAndDeterministicOrdering()
     {
         var consumerCompilation = await CreateReferenceExtractionCompilation();
-        var model = ModelExtractor.ExtractReferenceAssemblyData(consumerCompilation, default);
+        var model = ModelExtractor.ExtractReferenceAssemblyData(consumerCompilation, new CodeGeneratorOptions(), default);
 
         Assert.Equal("ConsumerProject", model.ApplicationParts[0]);
         Assert.Equal(model.ApplicationParts.Length, model.ApplicationParts.Distinct(StringComparer.Ordinal).Count());
@@ -351,8 +328,8 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         var compilationA = await CreateReferenceExtractionCompilation();
         var compilationB = await CreateReferenceExtractionCompilation(reverseReferenceOrder: true);
 
-        var modelA = ModelExtractor.ExtractReferenceAssemblyData(compilationA, default);
-        var modelB = ModelExtractor.ExtractReferenceAssemblyData(compilationB, default);
+        var modelA = ModelExtractor.ExtractReferenceAssemblyData(compilationA, new CodeGeneratorOptions(), default);
+        var modelB = ModelExtractor.ExtractReferenceAssemblyData(compilationB, new CodeGeneratorOptions(), default);
 
         Assert.Equal(modelA, modelB);
         Assert.Equal(modelA.GetHashCode(), modelB.GetHashCode());
@@ -549,7 +526,7 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         var baseInterface = compilation.GetTypeByMetadataName("TestProject.IBaseGrain`1");
         Assert.NotNull(baseInterface);
         var originalMethod = Assert.Single(baseInterface.GetMembers("Echo").OfType<IMethodSymbol>());
-        var expectedMethodId = CodeGenerator.CreateHashedMethodId(originalMethod);
+        var expectedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(originalMethod);
 
         Assert.Equal(expectedMethodId, method.GeneratedMethodId);
     }
@@ -660,8 +637,30 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
 
     private static SerializableTypeModel ExtractFromCompilation(CSharpCompilation compilation)
     {
-        var context = CreateFirstSerializableAttributeContext(compilation);
-        return ModelExtractor.ExtractFromAttributeContext(context, default);
+        var syntaxTree = Assert.Single(compilation.SyntaxTrees);
+        var semanticModel = compilation.GetSemanticModel(syntaxTree);
+        var generateSerializerAttribute = compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+        Assert.NotNull(generateSerializerAttribute);
+
+        foreach (var declaration in syntaxTree.GetRoot().DescendantNodes())
+        {
+            var symbol = declaration switch
+            {
+                TypeDeclarationSyntax typeDeclaration => semanticModel.GetDeclaredSymbol(typeDeclaration),
+                EnumDeclarationSyntax enumDeclaration => semanticModel.GetDeclaredSymbol(enumDeclaration),
+                _ => null,
+            };
+
+            if (symbol is not INamedTypeSymbol typeSymbol
+                || !typeSymbol.GetAttributes().Any(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, generateSerializerAttribute)))
+            {
+                continue;
+            }
+
+            return ExtractSerializableTypeModel(compilation, typeSymbol);
+        }
+
+        throw new InvalidOperationException("No [GenerateSerializer] declaration was found.");
     }
 
     private static SerializableTypeModel ExtractSerializableTypeModel(CSharpCompilation compilation, string metadataName)
@@ -669,9 +668,22 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         var typeSymbol = compilation.GetTypeByMetadataName(metadataName);
         Assert.NotNull(typeSymbol);
 
-        var declaration = Assert.Single(typeSymbol.DeclaringSyntaxReferences).GetSyntax();
-        var context = CreateSerializableAttributeContext(compilation, declaration, typeSymbol);
-        return ModelExtractor.ExtractFromAttributeContext(context, default);
+        return ExtractSerializableTypeModel(compilation, typeSymbol);
+    }
+
+    private static SerializableTypeModel ExtractSerializableTypeModel(CSharpCompilation compilation, INamedTypeSymbol typeSymbol)
+    {
+        var options = new CodeGeneratorOptions();
+        var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
+        var model = ModelExtractor.TryExtractSerializableTypeModel(
+            typeSymbol,
+            compilation,
+            libraryTypes,
+            options,
+            throwOnFailure: true);
+
+        Assert.NotNull(model);
+        return model;
     }
 
     private static FieldIdAssignmentHelper CreateFieldIdAssignmentHelper(
@@ -688,86 +700,6 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
         };
         var libraryTypes = LibraryTypes.FromCompilation(compilation, options);
         return new FieldIdAssignmentHelper(typeSymbol, ImmutableArray<IParameterSymbol>.Empty, generateFieldIds, libraryTypes);
-    }
-
-    private static GeneratorAttributeSyntaxContext CreateSerializableAttributeContext(CSharpCompilation compilation, string typeName)
-    {
-        var syntaxTree = Assert.Single(compilation.SyntaxTrees);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var typeDeclaration = syntaxTree.GetRoot().DescendantNodes()
-            .OfType<TypeDeclarationSyntax>()
-            .Single(declaration => declaration.Identifier.ValueText == typeName);
-        var typeSymbol = semanticModel.GetDeclaredSymbol(typeDeclaration);
-        Assert.NotNull(typeSymbol);
-
-        return CreateSerializableAttributeContext(compilation, typeDeclaration, typeSymbol);
-    }
-
-    private static GeneratorAttributeSyntaxContext CreateSerializableAttributeContext(
-        CSharpCompilation compilation,
-        SyntaxNode declaration,
-        INamedTypeSymbol typeSymbol)
-    {
-        var semanticModel = compilation.GetSemanticModel(declaration.SyntaxTree);
-
-        var generateSerializerAttribute = compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
-        Assert.NotNull(generateSerializerAttribute);
-
-        var attributes = typeSymbol.GetAttributes()
-            .Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, generateSerializerAttribute))
-            .ToImmutableArray();
-        Assert.Single(attributes);
-
-        var constructor = typeof(GeneratorAttributeSyntaxContext).GetConstructor(
-            System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-            binder: null,
-            [typeof(SyntaxNode), typeof(ISymbol), typeof(SemanticModel), typeof(ImmutableArray<AttributeData>)],
-            modifiers: null);
-        Assert.NotNull(constructor);
-
-        return (GeneratorAttributeSyntaxContext)constructor.Invoke([declaration, typeSymbol, semanticModel, attributes]);
-    }
-
-    private static GeneratorAttributeSyntaxContext CreateFirstSerializableAttributeContext(CSharpCompilation compilation)
-    {
-        var syntaxTree = Assert.Single(compilation.SyntaxTrees);
-        var semanticModel = compilation.GetSemanticModel(syntaxTree);
-        var generateSerializerAttribute = compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
-        Assert.NotNull(generateSerializerAttribute);
-
-        foreach (var declaration in syntaxTree.GetRoot().DescendantNodes())
-        {
-            ISymbol? symbol = declaration switch
-            {
-                TypeDeclarationSyntax typeDeclaration => semanticModel.GetDeclaredSymbol(typeDeclaration),
-                EnumDeclarationSyntax enumDeclaration => semanticModel.GetDeclaredSymbol(enumDeclaration),
-                _ => null,
-            };
-
-            if (symbol is null)
-            {
-                continue;
-            }
-
-            var attributes = symbol.GetAttributes()
-                .Where(attribute => SymbolEqualityComparer.Default.Equals(attribute.AttributeClass, generateSerializerAttribute))
-                .ToImmutableArray();
-            if (attributes.Length == 0)
-            {
-                continue;
-            }
-
-            var constructor = typeof(GeneratorAttributeSyntaxContext).GetConstructor(
-                System.Reflection.BindingFlags.Instance | System.Reflection.BindingFlags.NonPublic,
-                binder: null,
-                [typeof(SyntaxNode), typeof(ISymbol), typeof(SemanticModel), typeof(ImmutableArray<AttributeData>)],
-                modifiers: null);
-            Assert.NotNull(constructor);
-
-            return (GeneratorAttributeSyntaxContext)constructor.Invoke([declaration, symbol, semanticModel, attributes]);
-        }
-
-        throw new InvalidOperationException("No [GenerateSerializer] declaration was found.");
     }
 
     private static ProxyInterfaceModel ExtractProxyInterfaceModel(CSharpCompilation compilation, string metadataName)

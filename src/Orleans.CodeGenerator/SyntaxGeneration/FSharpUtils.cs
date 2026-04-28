@@ -246,7 +246,7 @@ namespace Orleans.CodeGenerator
                 List<(IPropertySymbol, uint)> dataMembers = new();
                 foreach (var property in symbol.GetDeclaredInstanceMembers<IPropertySymbol>())
                 {
-                    var id = CodeGenerator.GetId(libraryTypes, property);
+                    var id = GeneratedCodeUtilities.GetId(libraryTypes, property);
                     if (!id.HasValue)
                     {
                         continue;

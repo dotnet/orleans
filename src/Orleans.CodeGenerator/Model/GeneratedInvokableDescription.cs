@@ -67,7 +67,7 @@ namespace Orleans.CodeGenerator
         public bool IsEnumType => false;
         public bool IsGenericType => TypeParameters.Count > 0;
         public List<IMemberDescription> Members { get; }
-        public Compilation Compilation => MethodDescription.CodeGenerator.Compilation;
+        public Compilation Compilation => MethodDescription.GenerationContext.Compilation;
         public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
         public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
         public bool TrackReferences => false;

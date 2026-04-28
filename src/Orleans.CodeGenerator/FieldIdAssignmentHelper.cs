@@ -100,7 +100,7 @@ internal class FieldIdAssignmentHelper
         {
             if (member is IPropertySymbol prop)
             {
-                var id = CodeGenerator.GetId(_libraryTypes, prop);
+                var id = GeneratedCodeUtilities.GetId(_libraryTypes, prop);
 
                 if (id.HasValue)
                 {
@@ -108,7 +108,7 @@ internal class FieldIdAssignmentHelper
                 }
                 else if (PropertyUtility.GetMatchingPrimaryConstructorParameter(prop, _constructorParameters) is { } prm)
                 {
-                    id = CodeGenerator.GetId(_libraryTypes, prop);
+                    id = GeneratedCodeUtilities.GetId(_libraryTypes, prop);
                     if (id.HasValue)
                     {
                         _symbols[member] = (id.Value, true);
@@ -122,7 +122,7 @@ internal class FieldIdAssignmentHelper
 
             if (member is IFieldSymbol field)
             {
-                var id = CodeGenerator.GetId(_libraryTypes, field);
+                var id = GeneratedCodeUtilities.GetId(_libraryTypes, field);
                 var isConstructorParameter = false;
 
                 if (!id.HasValue)
@@ -133,7 +133,7 @@ internal class FieldIdAssignmentHelper
                         continue;
                     }
 
-                    id = CodeGenerator.GetId(_libraryTypes, property);
+                    id = GeneratedCodeUtilities.GetId(_libraryTypes, property);
                     if (!id.HasValue)
                     {
                         var constructorParameter = _constructorParameters.FirstOrDefault(x => x.Name.Equals(property.Name, StringComparison.OrdinalIgnoreCase));

@@ -22,8 +22,8 @@ namespace Orleans.CodeGenerator
         {
             Key = invokableId;
             ContainingInterface = containingType;
-            GeneratedMethodId = CodeGenerator.CreateHashedMethodId(Method);
-            MethodId = CodeGenerator.GetId(Method)?.ToString(CultureInfo.InvariantCulture) ?? CodeGenerator.GetAlias(Method) ?? GeneratedMethodId;
+            GeneratedMethodId = GeneratedCodeUtilities.CreateHashedMethodId(Method);
+            MethodId = GenerationContext.GetId(Method)?.ToString(CultureInfo.InvariantCulture) ?? GenerationContext.GetAlias(Method) ?? GeneratedMethodId;
 
             MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
 
@@ -37,7 +37,7 @@ namespace Orleans.CodeGenerator
             InvokableBaseTypes = invokableBaseTypes;
             foreach (var methodAttr in Method.GetAttributes())
             {
-                if (methodAttr.AttributeClass.GetAttributes(CodeGenerator.LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
+                if (methodAttr.AttributeClass.GetAttributes(GenerationContext.LibraryTypes.InvokableBaseTypeAttribute, out var attrs))
                 {
                     foreach (var attr in attrs)
                     {
@@ -55,7 +55,7 @@ namespace Orleans.CodeGenerator
                     }
                 }
 
-                if (methodAttr.AttributeClass.GetAttributes(CodeGenerator.LibraryTypes.InvokableCustomInitializerAttribute, out attrs))
+                if (methodAttr.AttributeClass.GetAttributes(GenerationContext.LibraryTypes.InvokableCustomInitializerAttribute, out attrs))
                 {
                     foreach (var attr in attrs)
                     {
@@ -91,7 +91,7 @@ namespace Orleans.CodeGenerator
                     }
                 }
 
-                if (SymbolEqualityComparer.Default.Equals(methodAttr.AttributeClass, CodeGenerator.LibraryTypes.ResponseTimeoutAttribute))
+                if (SymbolEqualityComparer.Default.Equals(methodAttr.AttributeClass, GenerationContext.LibraryTypes.ResponseTimeoutAttribute))
                 {
                     ResponseTimeoutTicks = TimeSpan.Parse((string)methodAttr.ConstructorArguments[0].Value).Ticks;
                 }
@@ -150,9 +150,9 @@ namespace Orleans.CodeGenerator
         }
 
         /// <summary>
-        /// Gets the source generator.
+        /// Gets the proxy generation context.
         /// </summary>
-        public CodeGenerator CodeGenerator => ProxyBase.CodeGenerator;
+        public ProxyGenerationContext GenerationContext => ProxyBase.GenerationContext;
 
         /// <summary>
         /// Gets the method identifier.
@@ -211,7 +211,7 @@ namespace Orleans.CodeGenerator
         /// <summary>
         /// Gets a value indicating whether this method is cancellable.
         /// </summary>
-        public bool IsCancellable => Method.Parameters.Any(parameterSymbol => SymbolEqualityComparer.Default.Equals(CodeGenerator.LibraryTypes.CancellationToken, parameterSymbol.Type));
+        public bool IsCancellable => Method.Parameters.Any(parameterSymbol => SymbolEqualityComparer.Default.Equals(GenerationContext.LibraryTypes.CancellationToken, parameterSymbol.Type));
 
         public bool Equals(InvokableMethodDescription other) => Key.Equals(other.Key);
         public override bool Equals(object obj) => obj is InvokableMethodDescription imd && Equals(imd);

@@ -131,8 +131,8 @@ namespace Orleans.CodeGenerator
 
         public string GeneratedNamespace => Namespace switch
         {
-            { Length: > 0 } ns => $"{CodeGenerator.CodeGeneratorName}.{ns}",
-            _ => CodeGenerator.CodeGeneratorName
+            { Length: > 0 } ns => $"{GeneratedCodeUtilities.CodeGeneratorName}.{ns}",
+            _ => GeneratedCodeUtilities.CodeGeneratorName
         };
 
         public string Name => Type.Name;

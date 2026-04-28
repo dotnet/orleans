@@ -18,10 +18,6 @@ namespace Orleans.CodeGenerator
         private const string DeepCopyMethodName = "DeepCopy";
         private readonly IGeneratorServices _generatorServices;
 
-        public CopierGenerator(CodeGenerator codeGenerator) : this((IGeneratorServices)codeGenerator)
-        {
-        }
-
         public CopierGenerator(IGeneratorServices generatorServices)
         {
             _generatorServices = generatorServices;
@@ -78,7 +74,7 @@ namespace Orleans.CodeGenerator
             var classDeclaration = ClassDeclaration(simpleClassName)
                 .AddBaseListTypes(SimpleBaseType(baseType))
                 .AddModifiers(Token(accessibility), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes());
+                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes());
 
             if (!isShallowCopyable)
             {
@@ -490,7 +486,7 @@ skip:;
             return MethodDeclaration(returnType, DeepCopyMethodName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
         }
 
@@ -554,7 +550,7 @@ skip:;
             var method = MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), DeepCopyMethodName)
                 .AddModifiers(Token(SyntaxKind.PublicKeyword))
                 .AddParameterListParameters(parameters)
-                .AddAttributeLists(AttributeList(SingletonSeparatedList(CodeGenerator.GetMethodImplAttributeSyntax())))
+                .AddAttributeLists(AttributeList(SingletonSeparatedList(GeneratedCodeUtilities.GetMethodImplAttributeSyntax())))
                 .AddBodyStatements(body.ToArray());
 
             if (isExceptionType)

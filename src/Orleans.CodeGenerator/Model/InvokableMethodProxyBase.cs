@@ -10,17 +10,17 @@ namespace Orleans.CodeGenerator
     /// </summary>
     internal sealed class InvokableMethodProxyBase : IEquatable<InvokableMethodProxyBase>
     {
-        public InvokableMethodProxyBase(CodeGenerator codeGenerator, InvokableMethodProxyBaseId descriptor, Dictionary<INamedTypeSymbol, INamedTypeSymbol> invokableBaseTypes)
+        public InvokableMethodProxyBase(ProxyGenerationContext generationContext, InvokableMethodProxyBaseId descriptor, Dictionary<INamedTypeSymbol, INamedTypeSymbol> invokableBaseTypes)
         {
-            CodeGenerator = codeGenerator;
+            GenerationContext = generationContext;
             Key = descriptor;
             InvokableBaseTypes = invokableBaseTypes ?? throw new ArgumentNullException(nameof(invokableBaseTypes));
         }
 
         /// <summary>
-        /// Gets the source generator.
+        /// Gets the proxy generation context.
         /// </summary>
-        public CodeGenerator CodeGenerator { get; }
+        public ProxyGenerationContext GenerationContext { get; }
 
         /// <summary>
         /// Gets the proxy base id.

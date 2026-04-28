@@ -380,12 +380,12 @@ namespace Orleans.CodeGenerator
                 AttachDebuggerIfRequested(options);
                 var codeGeneratorOptions = CreateCodeGeneratorOptions(options);
                 var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions);
-                var codeGenerator = new CodeGenerator(compilation, codeGeneratorOptions);
+                var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions);
                 var model = proxyOutputModel.ProxyInterface;
-                PopulateProxyInterfaces(codeGenerator, resolver, ImmutableArray.Create(model), cancellationToken);
+                PopulateProxyInterfaces(proxyContext, resolver, ImmutableArray.Create(model), cancellationToken);
 
                 var assemblyName = compilation.AssemblyName ?? "assembly";
-                var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model, cancellationToken);
+                var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
                 var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
                 var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
                 var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
@@ -393,11 +393,11 @@ namespace Orleans.CodeGenerator
                     proxyOutputModel.OwnedInvokableMetadataNames,
                     StringComparer.Ordinal);
                 var emitDeclaredMethodsFallback = proxyOutputModel.UseDeclaredInvokableFallback;
-                var generatedInvokables = GetGeneratedInvokables(codeGenerator, interfaceDescription).ToImmutableArray();
+                var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription).ToImmutableArray();
                 var generatedInvokableClassNames = new HashSet<string>(
                     generatedInvokables.Select(static invokable => invokable.ClassDeclarationSyntax.Identifier.ValueText),
                     StringComparer.Ordinal);
-                var additionalInvokableClasses = codeGenerator.GetEmittedMembers()
+                var additionalInvokableClasses = proxyContext.GetEmittedMembers()
                     .Where(entry => entry.Member is ClassDeclarationSyntax classDeclaration
                         && !string.Equals(classDeclaration.Identifier.ValueText, proxyClass.Identifier.ValueText, StringComparison.Ordinal)
                         && !generatedInvokableClassNames.Contains(classDeclaration.Identifier.ValueText))
@@ -425,9 +425,9 @@ namespace Orleans.CodeGenerator
                     AddMember(namespacedMembers, invokable.GeneratedNamespace, invokable.ClassDeclarationSyntax);
                     AddMember(namespacedMembers, invokable.GeneratedNamespace, serializerGenerator.Generate(invokable));
 
-                    var copier = invokable.IsShallowCopyable && codeGenerator.MetadataModel.DefaultCopiers.ContainsKey(invokable)
+                    var copier = invokable.IsShallowCopyable && proxyContext.MetadataModel.DefaultCopiers.ContainsKey(invokable)
                         ? null
-                        : copierGenerator.GenerateCopier(invokable, codeGenerator.MetadataModel.DefaultCopiers);
+                        : copierGenerator.GenerateCopier(invokable, proxyContext.MetadataModel.DefaultCopiers);
                     if (copier is not null)
                     {
                         AddMember(namespacedMembers, invokable.GeneratedNamespace, copier);
@@ -458,7 +458,7 @@ namespace Orleans.CodeGenerator
         }
 
         private static SourceOutputResult CreateProxySourceOutput(
-            CodeGenerator codeGenerator,
+            ProxyGenerationContext proxyContext,
             IGeneratorServices generatorServices,
             TypeSymbolResolver resolver,
             string assemblyName,
@@ -469,7 +469,7 @@ namespace Orleans.CodeGenerator
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var model = proxyOutputModel.ProxyInterface;
-                var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model, cancellationToken);
+                var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
                 var proxyGenerator = new ProxyGenerator(generatorServices, new CopierGenerator(generatorServices));
                 var (proxyClass, _) = proxyGenerator.Generate(interfaceDescription);
                 var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
@@ -477,7 +477,7 @@ namespace Orleans.CodeGenerator
                     proxyOutputModel.OwnedInvokableMetadataNames,
                     StringComparer.Ordinal);
                 var emitDeclaredMethodsFallback = proxyOutputModel.UseDeclaredInvokableFallback;
-                var generatedInvokables = GetGeneratedInvokables(codeGenerator, interfaceDescription).ToImmutableArray();
+                var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription).ToImmutableArray();
                 var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
                 AddMember(namespacedMembers, interfaceDescription.GeneratedNamespace, proxyClass);
 
@@ -543,13 +543,13 @@ namespace Orleans.CodeGenerator
                 var codeGeneratorOptions = CreateCodeGeneratorOptions(options);
                 var libraryTypes = LibraryTypes.FromCompilation(compilation, codeGeneratorOptions);
                 var generatorServices = new GeneratorServices(compilation, codeGeneratorOptions, libraryTypes);
-                var codeGenerator = new CodeGenerator(compilation, codeGeneratorOptions, libraryTypes);
+                var proxyContext = new ProxyGenerationContext(compilation, codeGeneratorOptions, libraryTypes);
                 var resolver = new TypeSymbolResolver(compilation);
-                PopulateProxyInterfaces(codeGenerator, resolver, models, cancellationToken);
+                PopulateProxyInterfaces(proxyContext, resolver, models, cancellationToken);
 
                 var proxyOutputModels = CreateProxyOutputModels(
                     compilation,
-                    codeGenerator,
+                    proxyContext,
                     resolver,
                     models,
                     cancellationToken);
@@ -558,7 +558,7 @@ namespace Orleans.CodeGenerator
                     proxyOutputModels,
                     CreateProxySourceOutputs(
                         compilation,
-                        codeGenerator,
+                        proxyContext,
                         generatorServices,
                         resolver,
                         proxyOutputModels,
@@ -577,7 +577,7 @@ namespace Orleans.CodeGenerator
 
         private static ImmutableArray<SourceOutputResult> CreateProxySourceOutputs(
             Compilation compilation,
-            CodeGenerator codeGenerator,
+            ProxyGenerationContext proxyContext,
             IGeneratorServices generatorServices,
             TypeSymbolResolver resolver,
             ImmutableArray<ProxyOutputModel> proxyOutputModels,
@@ -606,7 +606,7 @@ namespace Orleans.CodeGenerator
                 {
                     cancellationToken.ThrowIfCancellationRequested();
                     sourceOutputs.Add(CreateProxySourceOutput(
-                        codeGenerator,
+                        proxyContext,
                         generatorServices,
                         resolver,
                         assemblyName,
@@ -620,7 +620,7 @@ namespace Orleans.CodeGenerator
 
         private static ImmutableArray<ProxyOutputModel> CreateProxyOutputModels(
             Compilation compilation,
-            CodeGenerator codeGenerator,
+            ProxyGenerationContext proxyContext,
             TypeSymbolResolver resolver,
             ImmutableArray<ProxyInterfaceModel> models,
             CancellationToken cancellationToken)
@@ -631,7 +631,7 @@ namespace Orleans.CodeGenerator
             }
 
             var assemblyName = compilation.AssemblyName ?? "assembly";
-            var proxyEntries = codeGenerator.MetadataModel.InvokableInterfaces.Values
+            var proxyEntries = proxyContext.MetadataModel.InvokableInterfaces.Values
                 .Where(desc => SymbolEqualityComparer.Default.Equals(desc.InterfaceType.ContainingAssembly, compilation.Assembly))
                 .OrderBy(static desc => desc.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat), StringComparer.Ordinal)
                 .Select(desc => (HintName: CreateProxyHintName(assemblyName, desc.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat)), Description: desc))
@@ -640,7 +640,7 @@ namespace Orleans.CodeGenerator
             var invokableOwners = new Dictionary<string, string>(StringComparer.Ordinal);
             foreach (var entry in proxyEntries.OrderBy(static entry => entry.HintName, StringComparer.Ordinal))
             {
-                foreach (var invokable in GetGeneratedInvokables(codeGenerator, entry.Description))
+                    foreach (var invokable in GetGeneratedInvokables(proxyContext, entry.Description))
                 {
                     if (!invokableOwners.TryGetValue(invokable.MetadataName, out _))
                     {
@@ -659,9 +659,9 @@ namespace Orleans.CodeGenerator
                 .ThenBy(static model => model.Name, StringComparer.Ordinal)
                 .Select(model =>
                 {
-                    var interfaceDescription = GetProxyInterfaceDescription(codeGenerator, resolver, model, cancellationToken);
+                    var interfaceDescription = GetProxyInterfaceDescription(proxyContext, resolver, model, cancellationToken);
                     var targetHintName = CreateProxyHintName(assemblyName, interfaceDescription.InterfaceType.ToDisplayString(SymbolDisplayFormat.FullyQualifiedFormat));
-                    var generatedInvokables = GetGeneratedInvokables(codeGenerator, interfaceDescription)
+                    var generatedInvokables = GetGeneratedInvokables(proxyContext, interfaceDescription)
                         .ToImmutableArray();
                     var ownedInvokableMetadataNames = generatedInvokables
                         .Select(invokable => invokable.MetadataName)
@@ -693,7 +693,7 @@ namespace Orleans.CodeGenerator
                 AttachDebuggerIfRequested(options);
                 var metadataGenerator = new MetadataGenerator(metadataModel, metadataModel.AssemblyName);
                 var metadataClass = metadataGenerator.GenerateMetadata();
-                var metadataNamespace = $"{CodeGenerator.CodeGeneratorName}.{SyntaxGeneration.Identifier.SanitizeIdentifierName(metadataModel.AssemblyName ?? "Assembly")}";
+                var metadataNamespace = $"{GeneratedCodeUtilities.CodeGeneratorName}.{SyntaxGeneration.Identifier.SanitizeIdentifierName(metadataModel.AssemblyName ?? "Assembly")}";
                 var namespacedMembers = new Dictionary<string, List<MemberDeclarationSyntax>>(StringComparer.Ordinal);
                 AddMember(namespacedMembers, metadataNamespace, metadataClass);
                 var assemblyAttributes = CreateAssemblyAttributes(
@@ -714,7 +714,7 @@ namespace Orleans.CodeGenerator
         }
 
         private static void PopulateProxyInterfaces(
-            CodeGenerator codeGenerator,
+            ProxyGenerationContext proxyContext,
             TypeSymbolResolver resolver,
             ImmutableArray<ProxyInterfaceModel> models,
             CancellationToken cancellationToken)
@@ -752,18 +752,18 @@ namespace Orleans.CodeGenerator
                 .ThenBy(static entry => entry.Model.InterfaceType.SyntaxString, StringComparer.Ordinal))
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                codeGenerator.VisitInterface(entry.Symbol.OriginalDefinition);
+                proxyContext.VisitInterface(entry.Symbol.OriginalDefinition);
             }
         }
 
         private static ProxyInterfaceDescription GetProxyInterfaceDescription(
-            CodeGenerator codeGenerator,
+            ProxyGenerationContext proxyContext,
             TypeSymbolResolver resolver,
             ProxyInterfaceModel model,
             CancellationToken cancellationToken)
         {
             if (!resolver.TryResolveProxyInterface(model, cancellationToken, out var interfaceType)
-                || !codeGenerator.TryGetInvokableInterfaceDescription(interfaceType.OriginalDefinition, out var description))
+                || !proxyContext.TryGetInvokableInterfaceDescription(interfaceType.OriginalDefinition, out var description))
             {
                 throw new InvalidOperationException($"Unable to resolve proxy interface '{model.InterfaceType.SyntaxString}'.");
             }
@@ -1560,15 +1560,15 @@ namespace Orleans.CodeGenerator
         }
 
         private static IEnumerable<GeneratedInvokableDescription> GetGeneratedInvokables(
-            CodeGenerator legacyCodeGenerator,
+            ProxyGenerationContext proxyContext,
             ProxyInterfaceDescription interfaceDescription)
         {
             return interfaceDescription.Methods
                 .Select(static method => method.InvokableKey)
                 .Distinct()
-                .Select(key => legacyCodeGenerator.MetadataModel.GeneratedInvokables.TryGetValue(key, out var generatedInvokable) ? generatedInvokable : null)
+                .Select(key => proxyContext.MetadataModel.GeneratedInvokables.TryGetValue(key, out var generatedInvokable) ? generatedInvokable : null)
                 .Where(generatedInvokable => generatedInvokable is not null
-                    && legacyCodeGenerator.Compilation.GetTypeByMetadataName(generatedInvokable.MetadataName) is null)
+                    && proxyContext.Compilation.GetTypeByMetadataName(generatedInvokable.MetadataName) is null)
                 .OrderBy(static generatedInvokable => generatedInvokable.MetadataName, StringComparer.Ordinal);
         }
 

@@ -1,47 +1,30 @@
 using System;
 using System.Collections.Generic;
-using System.Collections.Immutable;
 using System.Linq;
-using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using Orleans.CodeGenerator.Hashing;
 using Orleans.CodeGenerator.Model;
 using Orleans.CodeGenerator.SyntaxGeneration;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using static Orleans.CodeGenerator.SyntaxGeneration.SymbolExtensions;
 
 #nullable disable
 namespace Orleans.CodeGenerator
 {
-    public class CodeGeneratorOptions
+    internal sealed class ProxyGenerationContext : IGeneratorServices
     {
-        public const string IdAttribute = "Orleans.IdAttribute";
-        public const string AliasAttribute = "Orleans.AliasAttribute";
-        public const string ImmutableAttribute = "Orleans.ImmutableAttribute";
-        public static readonly IReadOnlyList<string> ConstructorAttributes = ["Orleans.OrleansConstructorAttribute", "Microsoft.Extensions.DependencyInjection.ActivatorUtilitiesConstructorAttribute"];
-        public GenerateFieldIds GenerateFieldIds { get; set; }
-        public bool GenerateCompatibilityInvokers { get; set; }
-    }
-
-    public class CodeGenerator : IGeneratorServices
-    {
-        internal const string CodeGeneratorName = "OrleansCodeGen";
         private readonly Dictionary<string, List<MemberDeclarationSyntax>> _namespacedMembers = new();
         private readonly Dictionary<InvokableMethodId, InvokableMethodDescription> _invokableMethodDescriptions = new();
         private readonly HashSet<INamedTypeSymbol> _visitedInterfaces = new(SymbolEqualityComparer.Default);
 
-        public CodeGenerator(Compilation compilation, CodeGeneratorOptions options)
+        internal ProxyGenerationContext(Compilation compilation, CodeGeneratorOptions options)
             : this(compilation, options, LibraryTypes.FromCompilation(compilation, options))
         {
         }
 
-        internal CodeGenerator(Compilation compilation, CodeGeneratorOptions options, LibraryTypes libraryTypes)
+        internal ProxyGenerationContext(Compilation compilation, CodeGeneratorOptions options, LibraryTypes libraryTypes)
         {
-            Compilation = compilation;
-            Options = options;
-            LibraryTypes = libraryTypes;
+            Compilation = compilation ?? throw new ArgumentNullException(nameof(compilation));
+            Options = options ?? throw new ArgumentNullException(nameof(options));
+            LibraryTypes = libraryTypes ?? throw new ArgumentNullException(nameof(libraryTypes));
             MetadataModel = new MetadataModel();
             ProxyGenerator = new ProxyGenerator(this, new CopierGenerator(this));
             InvokableGenerator = new InvokableGenerator(this);
@@ -54,13 +37,8 @@ namespace Orleans.CodeGenerator
         internal MetadataModel MetadataModel { get; }
         internal ProxyGenerator ProxyGenerator { get; }
         internal InvokableGenerator InvokableGenerator { get; }
-        public static string GetGeneratedNamespaceName(ITypeSymbol type) => type.GetNamespaceAndNesting() switch
-        {
-            { Length: > 0 } ns => $"{CodeGeneratorName}.{ns}",
-            _ => CodeGeneratorName
-        };
 
-        public void AddMember(string ns, MemberDeclarationSyntax member)
+        internal void AddMember(string ns, MemberDeclarationSyntax member)
         {
             if (!_namespacedMembers.TryGetValue(ns, out var existing))
             {
@@ -81,90 +59,9 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public uint? GetId(ISymbol memberSymbol) => GetId(LibraryTypes, memberSymbol);
+        internal uint? GetId(ISymbol memberSymbol) => GeneratedCodeUtilities.GetId(LibraryTypes, memberSymbol);
 
-        internal static uint? GetId(LibraryTypes libraryTypes, ISymbol memberSymbol)
-        {
-            return memberSymbol.GetAttribute(libraryTypes.IdAttributeType) is { } attr
-                ? (uint)attr.ConstructorArguments.First().Value
-                : null;
-        }
-
-        internal static string CreateHashedMethodId(IMethodSymbol methodSymbol)
-        {
-            var methodSignature = Format(methodSymbol);
-            var hash = XxHash32.Hash(Encoding.UTF8.GetBytes(methodSignature));
-            return $"{HexConverter.ToString(hash)}";
-
-            static string Format(IMethodSymbol methodInfo)
-            {
-                var result = new StringBuilder();
-                result.Append(methodInfo.ContainingType.ToDisplayName());
-                result.Append('.');
-                result.Append(methodInfo.Name);
-
-                if (methodInfo.IsGenericMethod)
-                {
-                    result.Append('<');
-                    var first = true;
-                    foreach (var typeArgument in methodInfo.TypeArguments)
-                    {
-                        if (!first) result.Append(',');
-                        else first = false;
-                        result.Append(typeArgument.Name);
-                    }
-
-                    result.Append('>');
-                }
-
-                {
-                    result.Append('(');
-                    var parameters = methodInfo.Parameters;
-                    var first = true;
-                    foreach (var parameter in parameters)
-                    {
-                        if (!first)
-                        {
-                            result.Append(',');
-                        }
-
-                        var parameterType = parameter.Type;
-                        switch (parameterType)
-                        {
-                            case ITypeParameterSymbol _:
-                                result.Append(parameterType.Name);
-                                break;
-                            default:
-                                result.Append(parameterType.ToDisplayName());
-                                break;
-                        }
-
-                        first = false;
-                    }
-                }
-
-                result.Append(')');
-                return result.ToString();
-            }
-        }
-        public string GetAlias(ISymbol symbol) => (string)symbol.GetAttribute(LibraryTypes.AliasAttribute)?.ConstructorArguments.First().Value;
-        internal static AttributeListSyntax GetGeneratedCodeAttributes() => GeneratedCodeAttributeSyntax;
-        private static readonly AttributeListSyntax GeneratedCodeAttributeSyntax =
-            AttributeList().AddAttributes(
-                Attribute(ParseName("global::System.CodeDom.Compiler.GeneratedCodeAttribute"))
-                    .AddArgumentListArguments(
-                        AttributeArgument(CodeGeneratorName.GetLiteralExpression()),
-                        AttributeArgument(typeof(CodeGenerator).Assembly.GetName().Version.ToString().GetLiteralExpression())),
-                Attribute(ParseName("global::System.ComponentModel.EditorBrowsableAttribute"))
-                    .AddArgumentListArguments(
-                        AttributeArgument(ParseName("global::System.ComponentModel.EditorBrowsableState").Member("Never"))),
-                        Attribute(ParseName("global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute"))
-            );
-
-        internal static AttributeSyntax GetMethodImplAttributeSyntax() => MethodImplAttributeSyntax;
-        private static readonly AttributeSyntax MethodImplAttributeSyntax =
-            Attribute(ParseName("global::System.Runtime.CompilerServices.MethodImplAttribute"))
-                .AddArgumentListArguments(AttributeArgument(ParseName("global::System.Runtime.CompilerServices.MethodImplOptions").Member("AggressiveInlining")));
+        internal string GetAlias(ISymbol symbol) => GeneratedCodeUtilities.GetAlias(LibraryTypes, symbol);
 
         internal void VisitInterface(INamedTypeSymbol interfaceType)
         {
@@ -183,13 +80,6 @@ namespace Orleans.CodeGenerator
             {
                 _ = GetInvokableInterfaceDescription(proxyBase.ProxyBaseType, interfaceType);
             }
-
-            /*
-            foreach (var baseInterface in interfaceType.AllInterfaces)
-            {
-                VisitInterface(baseInterface);
-            }
-            */
         }
 
         internal bool TryGetInvokableInterfaceDescription(INamedTypeSymbol interfaceType, out ProxyInterfaceDescription result)

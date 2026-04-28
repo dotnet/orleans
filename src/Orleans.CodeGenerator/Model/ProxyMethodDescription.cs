@@ -75,7 +75,7 @@ namespace Orleans.CodeGenerator
             }
         }
 
-        public CodeGenerator CodeGenerator => InvokableMethod.CodeGenerator;
+        public ProxyGenerationContext GenerationContext => InvokableMethod.GenerationContext;
         public InvokableMethodDescription InvokableMethod => _originalInvokable.MethodDescription;
         public ConstructedGeneratedInvokableDescription GeneratedInvokable { get; }
         public ProxyInterfaceDescription ProxyInterface { get; }
@@ -118,7 +118,7 @@ namespace Orleans.CodeGenerator
                 foreach (var member in invokableDescription.Members.OfType<InvokableGenerator.MethodParameterFieldDescription>())
                 {
                     Members.Add(new InvokableGenerator.MethodParameterFieldDescription(
-                        proxyMethod.CodeGenerator,
+                        member.LibraryTypes,
                         proxyMethodParameters[member.ParameterOrdinal],
                         member.FieldName,
                         member.FieldId,
@@ -143,7 +143,7 @@ namespace Orleans.CodeGenerator
             public bool IsEnumType => _invokableDescription.IsEnumType;
             public bool IsGenericType => TypeParameters.Count > 0;
             public List<IMemberDescription> Members { get; }
-            public Compilation Compilation => MethodDescription.CodeGenerator.Compilation;
+            public Compilation Compilation => MethodDescription.GenerationContext.Compilation;
             public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
             public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
             public bool TrackReferences => _invokableDescription.TrackReferences;
