@@ -39,6 +39,7 @@ namespace UnitTests.StreamingTests
 
             var agent = CreateAgent(pubSub, queueId);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
 
             var readTask = testAccessor.ReadFromQueue(queueId, receiver, 1);
 
@@ -78,6 +79,7 @@ namespace UnitTests.StreamingTests
 
             var agent = CreateAgent(pubSub, queueId);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
 
             var readResult = await testAccessor.ReadFromQueue(queueId, receiver, 1);
             Assert.True(readResult, "ReadFromQueue should return true indicating data was read");
@@ -103,6 +105,7 @@ namespace UnitTests.StreamingTests
             var receiver = Substitute.For<IQueueAdapterReceiver>();
             var agent = CreateAgent(pubSub: null, queueId);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
 
             await testAccessor.Shutdown();
 
@@ -119,6 +122,7 @@ namespace UnitTests.StreamingTests
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var agent = CreateAgent(pubSub: null, queueId);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
 
             await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
 
@@ -133,6 +137,7 @@ namespace UnitTests.StreamingTests
             var streamId = new QualifiedStreamId("provider", StreamId.Create("namespace", Guid.NewGuid()));
             var agent = CreateAgent(pubSub, queueId);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
 
             await testAccessor.Shutdown();
             await testAccessor.RegisterStream(streamId, new EventSequenceTokenV2(1), DateTime.UtcNow);
@@ -208,6 +213,7 @@ namespace UnitTests.StreamingTests
             var queueId = QueueId.GetQueueId("queue", 0u, 0u);
             var agent = CreateAgent(pubSub, queueId);
             var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+            await InitializeAgent(agent);
 
             // RegisterStream should complete without throwing even though the subscriber
             // handshake will fault (NullReferenceException from the null RuntimeClient).
@@ -248,6 +254,27 @@ namespace UnitTests.StreamingTests
 
             await shutdownTask;
             await pumpTask;
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Streaming")]
+        public async Task RunQueuePump_ReadsAfterReinitialize()
+        {
+            var queueId = QueueId.GetQueueId("queue", 0u, 0u);
+            var receiver = Substitute.For<IQueueAdapterReceiver>();
+            receiver.GetQueueMessagesAsync(Arg.Any<int>())
+                .Returns(Task.FromResult<IList<IBatchContainer>>(new List<IBatchContainer>()));
+            receiver.Shutdown(Arg.Any<TimeSpan>()).Returns(Task.CompletedTask);
+
+            var agent = CreateAgent(pubSub: null, queueId, receiver);
+            var testAccessor = (PersistentStreamPullingAgent.ITestAccessor)agent;
+
+            await InitializeAgent(agent);
+            await testAccessor.Shutdown();
+            await InitializeAgent(agent);
+
+            await testAccessor.RunQueuePump(queueId, CancellationToken.None);
+
+            await receiver.Received(1).GetQueueMessagesAsync(Arg.Any<int>());
         }
     }
 }

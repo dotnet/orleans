@@ -43,8 +43,7 @@ namespace Orleans.Streams
 
         private Task receiverInitTask;
         private Task _activePumpTask = Task.CompletedTask;
-        private bool _isStopping;
-        private bool IsShutdown => _isStopping;
+        private bool IsShutdown => timer is null;
         private string StatisticUniquePostfix => $"{streamProviderName}.{QueueId}";
 
         internal interface ITestAccessor
@@ -132,7 +131,6 @@ namespace Orleans.Streams
         {
             LogInfoInit(GetType().Name, GrainId, Silo, new(QueueId));
 
-            _isStopping = false;
             _activePumpTask = Task.CompletedTask;
             lastTimeCleanedPubSubCache = _timeProvider.GetUtcNow().UtcDateTime;
 
@@ -192,7 +190,6 @@ namespace Orleans.Streams
             // Stop pulling from queues that are not in my range anymore.
             LogInfoShutdown(GetType().Name, new(QueueId));
 
-            _isStopping = true;
             var asyncTimer = timer;
             timer = null;
             asyncTimer?.Dispose();
@@ -227,7 +224,7 @@ namespace Orleans.Streams
             }
 
             // Drain any in-progress background registration tasks before proceeding.
-            // Setting _isStopping = true above makes IsShutdown = true, which causes registrations
+            // Setting timer = null above makes IsShutdown = true, which causes registrations
             // to stop retrying, so these tasks will complete quickly.
             var inFlightRegistrations = pubSubCache.Values
                 .Select(v => v.RegistrationTask)
