@@ -58,15 +58,21 @@ internal sealed class OrleansBinaryListEntryCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = CollectionCodecHelpers.GetSnapshotCount(items);
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
         VarIntHelper.WriteVarUInt32(output, (uint)count);
+        var written = 0;
         foreach (var item in items)
         {
+            CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
             codec.Write(item, output);
+            written++;
         }
+
+        CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
     }
 
     /// <inheritdoc/>
@@ -106,7 +112,7 @@ internal sealed class OrleansBinaryListEntryCodec<T>(
     private void ApplyIndexAndItem(ReadOnlySequence<byte> remaining, Action<int, T> apply)
     {
         var reader = new SequenceReader<byte>(remaining);
-        var index = (int)VarIntHelper.ReadVarUInt32(ref reader);
+        var index = CollectionCodecHelpers.ReadListIndex(ref reader);
         remaining = remaining.Slice(reader.Consumed);
         var item = codec.Read(remaining, out _);
         apply(index, item);
@@ -115,13 +121,13 @@ internal sealed class OrleansBinaryListEntryCodec<T>(
     private static int ReadIndex(ReadOnlySequence<byte> remaining)
     {
         var reader = new SequenceReader<byte>(remaining);
-        return (int)VarIntHelper.ReadVarUInt32(ref reader);
+        return CollectionCodecHelpers.ReadListIndex(ref reader);
     }
 
     private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableListLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(remaining);
-        var count = (int)VarIntHelper.ReadVarUInt32(ref reader);
+        var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
         consumer.ApplySnapshotStart(count);

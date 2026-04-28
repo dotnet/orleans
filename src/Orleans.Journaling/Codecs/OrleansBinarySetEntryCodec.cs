@@ -38,15 +38,21 @@ internal sealed class OrleansBinarySetEntryCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = CollectionCodecHelpers.GetSnapshotCount(items);
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
         VarIntHelper.WriteVarUInt32(output, (uint)count);
+        var written = 0;
         foreach (var item in items)
         {
+            CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
             codec.Write(item, output);
+            written++;
         }
+
+        CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
     }
 
     /// <inheritdoc/>
@@ -80,7 +86,7 @@ internal sealed class OrleansBinarySetEntryCodec<T>(
     private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableSetLogEntryConsumer<T> consumer)
     {
         var reader = new SequenceReader<byte>(remaining);
-        var count = (int)VarIntHelper.ReadVarUInt32(ref reader);
+        var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
         consumer.ApplySnapshotStart(count);

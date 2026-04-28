@@ -100,7 +100,7 @@ public sealed class DurableListDirectWriteTests
 
         public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer) => throw new NotSupportedException();
     }

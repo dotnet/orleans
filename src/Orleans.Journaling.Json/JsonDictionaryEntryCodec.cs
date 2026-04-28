@@ -52,8 +52,10 @@ public sealed class JsonDictionaryEntryCodec<TKey, TValue>(JsonSerializerOptions
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
+        ArgumentNullException.ThrowIfNull(items);
+
         using var writer = new Utf8JsonWriter(output);
         writer.WriteStartObject();
         writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Snapshot);

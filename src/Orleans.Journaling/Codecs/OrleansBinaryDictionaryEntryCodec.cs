@@ -40,16 +40,22 @@ internal sealed class OrleansBinaryDictionaryEntryCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
+        var count = CollectionCodecHelpers.GetSnapshotCount(items);
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
         VarIntHelper.WriteVarUInt32(output, (uint)count);
+        var written = 0;
         foreach (var (key, value) in items)
         {
+            CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
             keyCodec.Write(key, output);
             valueCodec.Write(value, output);
+            written++;
         }
+
+        CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
     }
 
     /// <inheritdoc/>
@@ -97,7 +103,7 @@ internal sealed class OrleansBinaryDictionaryEntryCodec<TKey, TValue>(
     private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer)
     {
         var reader = new SequenceReader<byte>(remaining);
-        var count = (int)VarIntHelper.ReadVarUInt32(ref reader);
+        var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
         consumer.ApplySnapshotStart(count);

@@ -62,7 +62,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
     {
-        WriteSnapshot(_items, _items.Count, snapshotWriter.BeginEntry());
+        WriteSnapshot(_items, snapshotWriter.BeginEntry());
     }
 
     public void Clear()
@@ -131,11 +131,11 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         return true;
     }
 
-    private void WriteSnapshot(IEnumerable<T> items, int count, LogEntryWriter writer)
+    private void WriteSnapshot(IReadOnlyCollection<T> items, LogEntryWriter writer)
     {
         try
         {
-            _codec.WriteSnapshot(items, count, writer);
+            _codec.WriteSnapshot(items, writer);
             writer.Commit();
         }
         catch
@@ -193,7 +193,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         next.IntersectWith(other);
         if (!_items.SetEquals(next))
         {
-            WriteSnapshot(next, next.Count, GetStorage().BeginEntry());
+            WriteSnapshot(next, GetStorage().BeginEntry());
             _items.Clear();
             _items.UnionWith(next);
         }
@@ -205,7 +205,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         next.SymmetricExceptWith(other);
         if (!_items.SetEquals(next))
         {
-            WriteSnapshot(next, next.Count, GetStorage().BeginEntry());
+            WriteSnapshot(next, GetStorage().BeginEntry());
             _items.Clear();
             _items.UnionWith(next);
         }

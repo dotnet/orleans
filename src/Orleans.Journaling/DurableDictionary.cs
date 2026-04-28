@@ -142,7 +142,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     {
         try
         {
-            _codec.WriteSnapshot(_items, _items.Count, writer);
+            _codec.WriteSnapshot(_items, writer);
             writer.Commit();
         }
         catch

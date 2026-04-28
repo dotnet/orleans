@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Collections;
 using MessagePack;
 using Orleans.Journaling.MessagePack;
 using Orleans.Serialization.Buffers;
@@ -22,7 +23,7 @@ public sealed class MessagePackCodecTests
         Apply(codec, writer => codec.WriteInsert(1, "two", writer), consumer);
         Apply(codec, writer => codec.WriteRemoveAt(0, writer), consumer);
         Apply(codec, writer => codec.WriteClear(writer), consumer);
-        Apply(codec, writer => codec.WriteSnapshot(["three", "four"], 2, writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(new[] { "three", "four" }, writer), consumer);
 
         Assert.Equal(["add:one", "set:0:updated", "insert:1:two", "remove:0", "clear", "snapshot:2", "snapshot-item:three", "snapshot-item:four"], consumer.Commands);
     }
@@ -38,7 +39,7 @@ public sealed class MessagePackCodecTests
         };
         var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSnapshot(items, items.Count, buffer);
+        codec.WriteSnapshot(items, buffer);
         var consumer = new DictionaryConsumer<string, int>();
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
@@ -55,10 +56,10 @@ public sealed class MessagePackCodecTests
 
         Apply(queueCodec, writer => queueCodec.WriteEnqueue(10, writer), queueConsumer);
         Apply(queueCodec, writer => queueCodec.WriteDequeue(writer), queueConsumer);
-        Apply(queueCodec, writer => queueCodec.WriteSnapshot([20, 30], 2, writer), queueConsumer);
+        Apply(queueCodec, writer => queueCodec.WriteSnapshot(new[] { 20, 30 }, writer), queueConsumer);
         Apply(setCodec, writer => setCodec.WriteAdd("a", writer), setConsumer);
         Apply(setCodec, writer => setCodec.WriteRemove("a", writer), setConsumer);
-        Apply(setCodec, writer => setCodec.WriteSnapshot(["b", "c"], 2, writer), setConsumer);
+        Apply(setCodec, writer => setCodec.WriteSnapshot(new[] { "b", "c" }, writer), setConsumer);
 
         Assert.Equal(["enqueue:10", "dequeue", "snapshot:2", "snapshot-item:20", "snapshot-item:30"], queueConsumer.Commands);
         Assert.Equal(["add:a", "remove:a", "snapshot:2", "snapshot-item:b", "snapshot-item:c"], setConsumer.Commands);
@@ -120,6 +121,18 @@ public sealed class MessagePackCodecTests
             () => codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), new ListConsumer<string>()));
 
         Assert.Contains("declared 2 snapshot item(s) but contained 1", exception.Message);
+    }
+
+    [Fact]
+    public void MessagePackListCodec_WriteSnapshot_Rejects_MismatchedCollectionCount()
+    {
+        var codec = new MessagePackListEntryCodec<string>(Options);
+        var items = new MiscountedReadOnlyCollection<string>(1, new[] { "one", "two" });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.WriteSnapshot(items, new ArrayBufferWriter<byte>()));
+
+        Assert.Contains("did not match", exception.Message);
     }
 
     private static LogExtent Decode(IStateMachineLogExtentCodec codec, byte[] bytes)
@@ -233,5 +246,12 @@ public sealed class MessagePackCodecTests
         public void ApplyCompleted(T value) => Commands.Add($"completed:{value}");
         public void ApplyFaulted(Exception exception) => Commands.Add($"faulted:{exception.Message}");
         public void ApplyCanceled() => Commands.Add("canceled");
+    }
+
+    private sealed class MiscountedReadOnlyCollection<T>(int count, IReadOnlyCollection<T> items) : IReadOnlyCollection<T>
+    {
+        public int Count => count;
+        public IEnumerator<T> GetEnumerator() => items.GetEnumerator();
+        IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 }

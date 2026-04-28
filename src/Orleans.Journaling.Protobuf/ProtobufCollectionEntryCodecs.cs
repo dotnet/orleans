@@ -57,14 +57,20 @@ public sealed class ProtobufListEntryCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = ProtobufWire.GetSnapshotCount(items);
         ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
+        var written = 0;
         foreach (var item in items)
         {
+            ProtobufWire.ThrowIfSnapshotItemCountExceeded(count, written);
             converter.WriteField(output, ItemField, item);
+            written++;
         }
+
+        ProtobufWire.RequireSnapshotWriteCount(count, written);
     }
 
     /// <inheritdoc/>
@@ -110,12 +116,12 @@ public sealed class ProtobufListEntryCodec<T>(
                     break;
                 case IndexField:
                     ProtobufWire.RequireCommand(hasCommand);
-                    index = (int)ProtobufWire.ReadUInt32(ref reader);
+                    index = ProtobufWire.ReadNonNegativeInt32(ref reader, "index");
                     hasIndex = true;
                     break;
                 case CountField:
                     ProtobufWire.RequireCommand(hasCommand);
-                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    count = ProtobufWire.ReadNonNegativeInt32(ref reader, "count");
                     hasCount = true;
                     break;
                 case ItemField:
@@ -215,14 +221,20 @@ public sealed class ProtobufQueueEntryCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = ProtobufWire.GetSnapshotCount(items);
         ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
+        var written = 0;
         foreach (var item in items)
         {
+            ProtobufWire.ThrowIfSnapshotItemCountExceeded(count, written);
             converter.WriteField(output, ItemField, item);
+            written++;
         }
+
+        ProtobufWire.RequireSnapshotWriteCount(count, written);
     }
 
     /// <inheritdoc/>
@@ -251,7 +263,7 @@ public sealed class ProtobufQueueEntryCodec<T>(
                     break;
                 case CountField:
                     ProtobufWire.RequireCommand(hasCommand);
-                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    count = ProtobufWire.ReadNonNegativeInt32(ref reader, "count");
                     hasCount = true;
                     break;
                 case ItemField:
@@ -343,14 +355,20 @@ public sealed class ProtobufSetEntryCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<T> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
+        var count = ProtobufWire.GetSnapshotCount(items);
         ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
+        var written = 0;
         foreach (var item in items)
         {
+            ProtobufWire.ThrowIfSnapshotItemCountExceeded(count, written);
             converter.WriteField(output, ItemField, item);
+            written++;
         }
+
+        ProtobufWire.RequireSnapshotWriteCount(count, written);
     }
 
     /// <inheritdoc/>
@@ -379,7 +397,7 @@ public sealed class ProtobufSetEntryCodec<T>(
                     break;
                 case CountField:
                     ProtobufWire.RequireCommand(hasCommand);
-                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    count = ProtobufWire.ReadNonNegativeInt32(ref reader, "count");
                     hasCount = true;
                     break;
                 case ItemField:

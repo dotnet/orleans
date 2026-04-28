@@ -61,7 +61,7 @@ public class JsonCodecTests
         };
         var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSnapshot(items, items.Count, buffer);
+        codec.WriteSnapshot(items, buffer);
         var json = GetString(buffer);
         var consumer = new DictionaryConsumer<string, int>();
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
@@ -92,7 +92,7 @@ public class JsonCodecTests
         var consumer = new ListConsumer<string>();
         var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSnapshot(["one", "two"], 2, buffer);
+        codec.WriteSnapshot(new[] { "one", "two" }, buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
         Assert.Equal(["snapshot:2", "snapshot-item:one", "snapshot-item:two"], consumer.Commands);
@@ -107,7 +107,7 @@ public class JsonCodecTests
         Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
         Apply(codec, writer => codec.WriteDequeue(writer), consumer);
         Apply(codec, writer => codec.WriteClear(writer), consumer);
-        Apply(codec, writer => codec.WriteSnapshot([20, 30], 2, writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(new[] { 20, 30 }, writer), consumer);
 
         Assert.Equal(["enqueue:10", "dequeue", "clear", "snapshot:2", "snapshot-item:20", "snapshot-item:30"], consumer.Commands);
     }
@@ -121,7 +121,7 @@ public class JsonCodecTests
         Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
         Apply(codec, writer => codec.WriteRemove("a", writer), consumer);
         Apply(codec, writer => codec.WriteClear(writer), consumer);
-        Apply(codec, writer => codec.WriteSnapshot(["b", "c"], 2, writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(new[] { "b", "c" }, writer), consumer);
 
         Assert.Equal(["add:a", "remove:a", "clear", "snapshot:2", "snapshot-item:b", "snapshot-item:c"], consumer.Commands);
     }

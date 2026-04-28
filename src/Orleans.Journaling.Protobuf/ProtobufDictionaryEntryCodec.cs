@@ -41,15 +41,21 @@ public sealed class ProtobufDictionaryEntryCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IEnumerable<KeyValuePair<TKey, TValue>> items, int count, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
+        var count = ProtobufWire.GetSnapshotCount(items);
         ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
         ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
+        var written = 0;
         foreach (var (key, value) in items)
         {
+            ProtobufWire.ThrowIfSnapshotItemCountExceeded(count, written);
             keyConverter.WriteField(output, KeyField, key);
             valueConverter.WriteField(output, ValueField, value);
+            written++;
         }
+
+        ProtobufWire.RequireSnapshotWriteCount(count, written);
     }
 
     /// <inheritdoc/>
@@ -80,7 +86,7 @@ public sealed class ProtobufDictionaryEntryCodec<TKey, TValue>(
                     break;
                 case CountField:
                     ProtobufWire.RequireCommand(hasCommand);
-                    count = (int)ProtobufWire.ReadUInt32(ref reader);
+                    count = ProtobufWire.ReadNonNegativeInt32(ref reader, "count");
                     hasCount = true;
                     break;
                 case KeyField:
