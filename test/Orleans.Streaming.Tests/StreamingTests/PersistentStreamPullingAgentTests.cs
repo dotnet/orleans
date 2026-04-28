@@ -238,7 +238,7 @@ namespace UnitTests.StreamingTests
 
             await InitializeAgent(agent);
 
-            var pumpTask = testAccessor.PumpQueue(queueId, CancellationToken.None);
+            var pumpTask = testAccessor.RunQueuePump(queueId, CancellationToken.None);
             await queueReadStarted.Task;
 
             var shutdownTask = testAccessor.Shutdown();

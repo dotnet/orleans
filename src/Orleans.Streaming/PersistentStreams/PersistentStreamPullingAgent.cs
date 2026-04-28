@@ -52,7 +52,7 @@ namespace Orleans.Streams
             Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver receiver, int maxCacheAddCount);
             Task RegisterStream(QualifiedStreamId streamId, StreamSequenceToken firstToken, DateTime now);
             Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> GetPubSubCache();
-            Task PumpQueue(QueueId myQueueId, CancellationToken cancellationToken);
+            Task RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken);
             Task Shutdown();
         }
 
@@ -112,8 +112,8 @@ namespace Orleans.Streams
         Task<IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>> ITestAccessor.GetPubSubCache()
             => this.RunOrQueueTaskResult(() => (IReadOnlyDictionary<QualifiedStreamId, StreamConsumerCollection>)new Dictionary<QualifiedStreamId, StreamConsumerCollection>(pubSubCache));
 
-        Task ITestAccessor.PumpQueue(QueueId myQueueId, CancellationToken cancellationToken)
-            => this.RunOrQueueTask(() => _activePumpTask = PumpQueue(myQueueId, cancellationToken));
+        Task ITestAccessor.RunQueuePump(QueueId myQueueId, CancellationToken cancellationToken)
+            => this.RunOrQueueTask(() => RunQueuePump(myQueueId, cancellationToken));
 
         Task ITestAccessor.Shutdown() => this.RunOrQueueTask(() => Shutdown());
 
@@ -179,7 +179,7 @@ namespace Orleans.Streams
             // Setup a reader for a new receiver.
             // Even if the receiver failed to initialize, treat it as OK and start pumping it. It's receiver responsibility to retry initialization.
             var randomTimerOffset = RandomTimeSpan.Next(this.options.GetQueueMsgsTimerPeriod);
-            timer = RegisterGrainTimer(AsyncTimerCallback, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
+            timer = RegisterGrainTimer(RunQueuePump, QueueId, randomTimerOffset, this.options.GetQueueMsgsTimerPeriod);
 
             StreamInstruments.RegisterPersistentStreamPubSubCacheSizeObserve(() => new Measurement<int>(pubSubCache.Count, new KeyValuePair<string, object>("name", StatisticUniquePostfix)));
 
@@ -401,7 +401,7 @@ namespace Orleans.Streams
                 pubSubCache.Remove(streamId);
         }
 
-        private Task AsyncTimerCallback(QueueId queueId, CancellationToken cancellationToken)
+        private Task RunQueuePump(QueueId queueId, CancellationToken cancellationToken)
         {
             using var _ = new ExecutionContextSuppressor();
             if (IsShutdown)
