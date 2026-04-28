@@ -1138,6 +1138,8 @@ internal sealed partial class ActivationData :
                         DeactivationReason = new(DeactivationReasonCode.ActivationUnresponsive,
                             $"{DeactivationReason.Description}. Activation {this} has been deactivating since {DeactivationStartTime.Value} and is likely stuck");
                     }
+
+                    AbandonStuckDeactivatingActivation();
                 }
 
                 if (!IsStuckDeactivating && !IsStuckProcessingMessage)
@@ -1159,6 +1161,20 @@ internal sealed partial class ActivationData :
                 // Reject all pending messages
                 RejectAllQueuedMessages();
             }
+        }
+
+        void AbandonStuckDeactivatingActivation()
+        {
+            var forwardingAddress = ForwardingAddress;
+            LogWarningAbandoningStuckDeactivatingActivation(_shared.Logger, this, forwardingAddress);
+
+            // The migration target is not proven until deactivation reaches StartMigrationAsync.
+            // If deactivation is stuck before then, re-address messages instead of forwarding to a
+            // target which may not have a valid replacement activation.
+            ForwardingAddress = null;
+            UnregisterMessageTarget();
+            _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
+            GetDeactivationCompletionSource().TrySetResult(true);
         }
 
         bool MayInvokeRequest(Message incoming)
@@ -2588,6 +2604,11 @@ internal sealed partial class ActivationData :
         ActivationDataLogValue grain,
         Message blockingRequest,
         Message message);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Abandoning stuck deactivating activation {Activation}. ForwardingAddress={ForwardingAddress}")]
+    private static partial void LogWarningAbandoningStuckDeactivatingActivation(ILogger logger, ActivationData activation, SiloAddress? forwardingAddress);
 
     private readonly struct ActivationDataLogValue(ActivationData activation, bool includeExtraDetails = false)
     {
