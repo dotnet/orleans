@@ -9,7 +9,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class StateMachineManager : IStateMachineManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class StateMachineManager : IStateMachineManager, IStateMachineLogEntryConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationStateMachineId = 8;
 #if NET9_0_OR_GREATER
@@ -387,22 +387,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
             _stateMachineIds.ResetVolatileState();
         }
 
-        await foreach (var segment in _storage.ReadAsync(cancellationToken).ConfigureAwait(true))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            try
-            {
-                foreach (var entry in segment.Entries)
-                {
-                    var stateMachine = _stateMachinesMap[entry.StreamId.Value];
-                    stateMachine.Apply(entry.Payload);
-                }
-            }
-            finally
-            {
-                segment.Dispose();
-            }
-        }
+        await _storage.ReadAsync(this, cancellationToken).ConfigureAwait(true);
 
         lock (_lock)
         {
@@ -420,6 +405,17 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
                 }
             }
         }
+    }
+
+    void IStateMachineLogEntryConsumer.OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload)
+    {
+        if (!_stateMachinesMap.TryGetValue(streamId.Value, out var stateMachine))
+        {
+            stateMachine = new RetiredStateMachineVessel();
+            _stateMachinesMap[streamId.Value] = stateMachine;
+        }
+
+        stateMachine.Apply(payload);
     }
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
@@ -506,29 +502,44 @@ internal sealed partial class StateMachineManager : IStateMachineManager, ILifec
         _shutdownCancellation.Dispose();
     }
 
-    private sealed class StateMachineLogWriter(StateMachineManager manager, StateMachineId streamId) : IStateMachineLogWriter
+    private sealed class StateMachineLogWriter(StateMachineManager manager, StateMachineId streamId) : IStateMachineLogWriter, ILogEntryWriterCompletion
     {
         private readonly StateMachineManager _manager = manager;
         private readonly StateMachineId _id = streamId;
 
-        public void AppendEntry<TState>(Action<TState, IBufferWriter<byte>> action, TState state)
+        public LogEntryWriter BeginEntry()
         {
-            lock (_manager._lock)
+            EnterLock();
+            try
             {
                 var segment = _manager._currentLogSegment ??= new();
-                var logWriter = segment.CreateLogWriter(_id);
-                logWriter.AppendEntry(action, state);
+                return segment.BeginEntry(_id, this);
+            }
+            catch
+            {
+                ExitLock();
+                throw;
             }
         }
 
-        public void AppendEntries<TState>(Action<TState, StateMachineStorageWriter> action, TState state)
+        void ILogEntryWriterCompletion.CompleteEntryWrite() => ExitLock();
+
+        private void EnterLock()
         {
-            lock (_manager._lock)
-            {
-                var segment = _manager._currentLogSegment ??= new();
-                var logWriter = segment.CreateLogWriter(_id);
-                action(state, logWriter);
-            }
+#if NET9_0_OR_GREATER
+            _manager._lock.Enter();
+#else
+            Monitor.Enter(_manager._lock);
+#endif
+        }
+
+        private void ExitLock()
+        {
+#if NET9_0_OR_GREATER
+            _manager._lock.Exit();
+#else
+            Monitor.Exit(_manager._lock);
+#endif
         }
     }
 

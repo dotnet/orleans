@@ -133,6 +133,103 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
+    /// Overwrites bytes which have already been written to this buffer without changing the writer position.
+    /// </summary>
+    /// <param name="offset">The offset into the unconsumed bytes at which to start writing.</param>
+    /// <param name="value">The bytes to write.</param>
+    public void WriteAt(int offset, ReadOnlySpan<byte> value)
+    {
+        ThrowIfDisposed();
+
+#if NET5_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(value.Length, Length - offset);
+#else
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be greater than or equal to 0.");
+        if (offset > Length) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be less than or equal to the unconsumed length of the buffer.");
+        if (value.Length > Length - offset) throw new ArgumentOutOfRangeException(nameof(value), "Value must fit within the unconsumed length of the buffer.");
+#endif
+
+        if (value.IsEmpty)
+        {
+            return;
+        }
+
+        var page = _readPage;
+        var pageOffset = _readIndex + offset;
+        while (pageOffset >= page.Length)
+        {
+            pageOffset -= page.Length;
+            page = page.Next!;
+            Debug.Assert(page is not null);
+        }
+
+        while (!value.IsEmpty)
+        {
+            var destination = page.AsSpan(pageOffset, page.Length - pageOffset);
+            var copyLength = Math.Min(destination.Length, value.Length);
+            value[..copyLength].CopyTo(destination);
+            value = value[copyLength..];
+
+            if (value.IsEmpty)
+            {
+                return;
+            }
+
+            page = page.Next!;
+            Debug.Assert(page is not null);
+            pageOffset = 0;
+        }
+    }
+
+    /// <summary>
+    /// Truncates this buffer to the specified unconsumed length.
+    /// </summary>
+    /// <param name="length">The new length of the unconsumed bytes.</param>
+    public void Truncate(int length)
+    {
+        ThrowIfDisposed();
+
+#if NET5_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(length, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(length, Length);
+#else
+        if (length < 0) throw new ArgumentOutOfRangeException(nameof(length), "Length must be greater than or equal to 0.");
+        if (length > Length) throw new ArgumentOutOfRangeException(nameof(length), "Length must be less than or equal to the unconsumed length of the buffer.");
+#endif
+
+        if (length == Length)
+        {
+            return;
+        }
+
+        var remaining = _readIndex + length;
+        var page = _readPage;
+        while (remaining > page.Length)
+        {
+            remaining -= page.Length;
+            page = page.Next!;
+            Debug.Assert(page is not null);
+        }
+
+        page.SetLength(remaining, page.Version);
+        var next = page.Next;
+        page.ClearNext(page.Version);
+
+        while (next is not null)
+        {
+            var current = next;
+            next = current.Next;
+            current.SetLength(0, current.Version);
+            current.Unpin(current.Version);
+        }
+
+        _writePage = _tail = page;
+        _totalLength = _readIndex + length;
+    }
+
+    /// <summary>
     /// Resets this instance, returning all memory.
     /// </summary>
     public void Reset()
@@ -662,6 +759,14 @@ public sealed class ArcBufferPage
         Debug.Assert(Length <= Array.Length);
     }
 
+    internal void SetLength(int length, int token)
+    {
+        CheckValidity(token);
+        Debug.Assert(length >= 0);
+        Debug.Assert(length <= Array.Length);
+        Length = length;
+    }
+
     /// <summary>
     /// Sets the next page in the sequence.
     /// </summary>
@@ -674,6 +779,12 @@ public sealed class ArcBufferPage
         Debug.Assert(next is not null, "SetNext called with null next page");
         Debug.Assert(next != this, "SetNext called with self as next page");
         Next = next;
+    }
+
+    internal void ClearNext(int token)
+    {
+        CheckValidity(token);
+        Next = null;
     }
 
     /// <summary>

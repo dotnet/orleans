@@ -13,6 +13,8 @@ public readonly struct StateMachineStorageWriter
         _segment = segment;
     }
 
+    public LogEntryWriter BeginEntry() => _segment.BeginEntry(_id);
+
     public void AppendEntry(byte[] value) => _segment.AppendEntry(_id, value);
     public void AppendEntry(Span<byte> value) => _segment.AppendEntry(_id, value);
     public void AppendEntry(Memory<byte> value) => _segment.AppendEntry(_id, value);
@@ -20,5 +22,4 @@ public readonly struct StateMachineStorageWriter
     public void AppendEntry(ArraySegment<byte> value) => _segment.AppendEntry(_id, value);
     public void AppendEntry(ReadOnlySpan<byte> value) => _segment.AppendEntry(_id, value);
     public void AppendEntry(ReadOnlySequence<byte> value) => _segment.AppendEntry(_id, value);
-    public void AppendEntry<T>(Action<T, IBufferWriter<byte>> valueWriter, T value) => _segment.AppendEntry(_id, valueWriter, value);
 }

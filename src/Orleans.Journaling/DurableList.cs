@@ -46,13 +46,19 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
                 ThrowIndexOutOfRange();
             }
 
-            ApplySet(index, value);
-            GetStorage().AppendEntry(static (state, bufferWriter) =>
+            var writer = GetStorage().BeginEntry();
+            try
             {
-                var (self, index, value) = state;
-                self._codec.WriteSet(index, value!, bufferWriter);
-            },
-            (this, index, value));
+                _codec.WriteSet(index, value, writer);
+                writer.Commit();
+            }
+            catch
+            {
+                writer.Abort();
+                throw;
+            }
+
+            ApplySet(index, value);
         }
     }
 
@@ -78,31 +84,51 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 
     void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
     {
-        snapshotWriter.AppendEntry(static (self, bufferWriter) =>
+        var writer = snapshotWriter.BeginEntry();
+        try
         {
-            self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
-        }, this);
+            _codec.WriteSnapshot(_items, _items.Count, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
     }
 
     public void Add(T item)
     {
-        ApplyAdd(item);
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            var (self, item) = state;
-            self._codec.WriteAdd(item!, bufferWriter);
-        },
-        (this, item));
+            _codec.WriteAdd(item, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyAdd(item);
     }
 
     public void Clear()
     {
-        ApplyClear();
-        GetStorage().AppendEntry(static (self, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            self._codec.WriteClear(bufferWriter);
-        },
-        this);
+            _codec.WriteClear(writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyClear();
     }
 
     public bool Contains(T item) => _items.Contains(item);
@@ -111,13 +137,24 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     public int IndexOf(T item) => _items.IndexOf(item);
     public void Insert(int index, T item)
     {
-        ApplyInsert(index, item);
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        if ((uint)index > (uint)_items.Count)
         {
-            var (self, index, value) = state;
-            self._codec.WriteInsert(index, value!, bufferWriter);
-        },
-        (this, index, item));
+            ThrowIndexOutOfRange();
+        }
+
+        var writer = GetStorage().BeginEntry();
+        try
+        {
+            _codec.WriteInsert(index, item, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyInsert(index, item);
     }
 
     public bool Remove(T item)
@@ -134,13 +171,24 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 
     public void RemoveAt(int index)
     {
-        ApplyRemoveAt(index);
-
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        if ((uint)index >= (uint)_items.Count)
         {
-            var (self, index) = state;
-            self._codec.WriteRemoveAt(index, bufferWriter);
-        }, (this, index));
+            ThrowIndexOutOfRange();
+        }
+
+        var writer = GetStorage().BeginEntry();
+        try
+        {
+            _codec.WriteRemoveAt(index, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyRemoveAt(index);
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();

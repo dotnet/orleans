@@ -27,11 +27,7 @@ internal sealed class JsonLinesLogExtentCodec : IStateMachineLogExtentCodec
                 writer.WriteStartObject();
                 writer.WriteNumber(StreamIdPropertyName, entry.StreamId.Value);
                 writer.WritePropertyName(EntryPropertyName);
-                using (var document = JsonDocument.Parse(entry.Payload))
-                {
-                    document.RootElement.WriteTo(writer);
-                }
-
+                writer.WriteRawValue(entry.Payload, skipInputValidation: false);
                 writer.WriteEndObject();
             }
 

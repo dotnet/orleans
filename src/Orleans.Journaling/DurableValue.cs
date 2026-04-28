@@ -77,10 +77,17 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
 
     private void WriteState(StateMachineStorageWriter writer)
     {
-        writer.AppendEntry(static (self, bufferWriter) =>
+        var entry = writer.BeginEntry();
+        try
         {
-            self._codec.WriteSet(self._value!, bufferWriter);
-        }, this);
+            _codec.WriteSet(_value!, entry);
+            entry.Commit();
+        }
+        catch
+        {
+            entry.Abort();
+            throw;
+        }
     }
 
     void IDurableValueLogEntryConsumer<T>.ApplySet(T value) => _value = value;

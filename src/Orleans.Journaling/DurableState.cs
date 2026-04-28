@@ -60,10 +60,17 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
 
     private void WriteState(StateMachineStorageWriter writer)
     {
-        writer.AppendEntry(static (self, bufferWriter) =>
+        var entry = writer.BeginEntry();
+        try
         {
-            self._codec.WriteSet(self._value!, self._version, bufferWriter);
-        }, this);
+            _codec.WriteSet(_value!, _version, entry);
+            entry.Commit();
+        }
+        catch
+        {
+            entry.Abort();
+            throw;
+        }
     }
 
     void IDurableStateLogEntryConsumer<T>.ApplySet(T state, ulong version)

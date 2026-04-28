@@ -17,9 +17,9 @@ public static class ProtobufJournalingExtensions
     /// <returns>The silo builder for chaining.</returns>
     /// <remarks>
     /// <para>
-    /// Physical log extents are serialized as a stream of length-delimited protobuf
-    /// <c>LogExtent</c> messages. Each <c>LogExtent</c> contains repeated records with
-    /// the state machine id and the durable entry payload.
+    /// Physical log extents use the shared journaling frame:
+    /// <c>fixed32 entryLength + varuint64 stateMachineId + entryPayload</c>.
+    /// The entry payload is encoded with protobuf wire-format tags.
     /// </para>
     /// <para>
     /// Each entry type is serialized using protobuf wire-format tags. Common scalar values

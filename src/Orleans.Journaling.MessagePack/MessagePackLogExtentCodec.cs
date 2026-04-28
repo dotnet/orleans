@@ -1,8 +1,8 @@
 using Orleans.Serialization.Buffers;
 
-namespace Orleans.Journaling.Protobuf;
+namespace Orleans.Journaling.MessagePack;
 
-internal sealed class ProtobufLogExtentCodec : IStateMachineLogExtentCodec
+internal sealed class MessagePackLogExtentCodec : IStateMachineLogExtentCodec
 {
     public byte[] Encode(LogExtentBuilder value)
     {

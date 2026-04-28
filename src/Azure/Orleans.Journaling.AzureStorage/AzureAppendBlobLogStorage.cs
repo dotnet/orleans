@@ -1,7 +1,6 @@
 using Azure;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Blobs.Models;
-using System.Runtime.CompilerServices;
 using Azure.Storage.Sas;
 using Orleans.Serialization.Buffers;
 using Microsoft.Extensions.Logging;
@@ -40,10 +39,9 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
             _exists = true;
         }
 
-        var encoded = _codec.Encode(value);
-        using var stream = new MemoryStream(encoded, writable: false);
+        using var stream = _codec.EncodeToStream(value);
         var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        LogAppend(_logger, encoded.Length, _client.BlobContainerName, _client.Name);
+        LogAppend(_logger, stream.Length, _client.BlobContainerName, _client.Name);
 
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.ETag;
@@ -61,21 +59,19 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _numBlocks = 0;
     }
 
-    public async IAsyncEnumerable<LogExtent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, CancellationToken cancellationToken)
     {
         Response<BlobDownloadStreamingResult> result;
         try
         {
-            // If the blob was not newly created, then download the blob.
             result = await _client.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
             _exists = false;
-            yield break;
+            return;
         }
 
-        // If the blob has a size of zero, check for a snapshot and restore the blob from the snapshot if one exists.
         if (result.Value.Details.ContentLength == 0)
         {
             if (result.Value.Details.Metadata.TryGetValue("snapshot", out var snapshot) && snapshot is { Length: > 0 })
@@ -89,8 +85,6 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _appendOptions.Conditions.IfMatch = result.Value.Details.ETag;
         _exists = true;
 
-        // Read everything into a single log segment. We could change this to read in chunks,
-        // yielding when the stream does not return synchronously, if we wanted to support larger state machines.
         var rawStream = result.Value.Content;
         using var buffer = new ArcBufferWriter();
         while (true)
@@ -102,10 +96,10 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
                 if (buffer.Length > 0)
                 {
                     LogRead(_logger, buffer.Length, _client.BlobContainerName, _client.Name);
-                    yield return _codec.Decode(buffer.ConsumeSlice(buffer.Length));
+                    _codec.Read(buffer.ConsumeSlice(buffer.Length), consumer);
                 }
 
-                yield break;
+                return;
             }
 
             buffer.AdvanceWriter(bytesRead);
@@ -147,10 +141,9 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _appendOptions.Conditions.IfNoneMatch = default;
 
         // Write the state machine snapshot.
-        var encoded = _codec.Encode(value);
-        using var stream = new MemoryStream(encoded, writable: false);
+        using var stream = _codec.EncodeToStream(value);
         var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        LogReplace(_logger, _client.BlobContainerName, _client.Name, encoded.Length);
+        LogReplace(_logger, _client.BlobContainerName, _client.Name, stream.Length);
 
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.ETag;

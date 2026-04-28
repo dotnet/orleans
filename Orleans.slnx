@@ -36,6 +36,7 @@
     <Project Path="src/Orleans.EventSourcing/Orleans.EventSourcing.csproj" />
     <Project Path="src/Orleans.Journaling/Orleans.Journaling.csproj" />
     <Project Path="src/Orleans.Journaling.Json/Orleans.Journaling.Json.csproj" />
+    <Project Path="src/Orleans.Journaling.MessagePack/Orleans.Journaling.MessagePack.csproj" />
     <Project Path="src/Orleans.Journaling.Protobuf/Orleans.Journaling.Protobuf.csproj" />
     <Project Path="src/Orleans.Persistence.Memory/Orleans.Persistence.Memory.csproj" />
     <Project Path="src/Orleans.Reminders/Orleans.Reminders.csproj" />
@@ -120,6 +121,7 @@
     <Project Path="test/Orleans.Connections.Security.Tests/Orleans.Connections.Security.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Tests/Orleans.Journaling.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Json.Tests/Orleans.Journaling.Json.Tests.csproj" />
+    <Project Path="test/Orleans.Journaling.MessagePack.Tests/Orleans.Journaling.MessagePack.Tests.csproj" />
     <Project Path="test/Orleans.Journaling.Protobuf.Tests/Orleans.Journaling.Protobuf.Tests.csproj" />
     <Project Path="test/Orleans.Serialization.FSharp.Tests/Orleans.Serialization.FSharp.Tests.fsproj" />
     <Project Path="test/Orleans.Serialization.UnitTests/Orleans.Serialization.UnitTests.csproj" />

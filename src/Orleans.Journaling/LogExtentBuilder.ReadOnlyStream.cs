@@ -1,10 +1,18 @@
+using System.Buffers;
+using System.Buffers.Binary;
 using System.Diagnostics;
-using System.Numerics;
 
 namespace Orleans.Journaling;
 
 public sealed partial class LogExtentBuilder
 {
+    public Stream AsReadOnlyStream()
+    {
+        var stream = new ReadOnlyStream();
+        stream.SetBuilder(this);
+        return stream;
+    }
+
     public sealed class ReadOnlyStream : Stream
     {
         private LogExtentBuilder? _builder;
@@ -21,7 +29,74 @@ public sealed partial class LogExtentBuilder
 
         public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
 
-        public override int Read(Span<byte> buffer) => throw new NotImplementedException();
+        public override int Read(Span<byte> buffer)
+        {
+            if (_builder is null)
+            {
+                throw new ObjectDisposedException(nameof(ReadOnlyStream));
+            }
+
+            if (buffer.IsEmpty || _position >= _length)
+            {
+                return 0;
+            }
+
+            var output = buffer[..Math.Min(buffer.Length, _length - _position)];
+            var bytesWritten = 0;
+            var position = _position;
+            var rawOffset = 0;
+
+            using var rawBuffer = _builder._buffer.PeekSlice(_builder._buffer.Length);
+            var rawSequence = rawBuffer.AsReadOnlySequence();
+            Span<byte> lengthBytes = stackalloc byte[sizeof(uint)];
+
+            foreach (var entryLength in _builder._entryLengths)
+            {
+                BinaryPrimitives.WriteUInt32LittleEndian(lengthBytes, entryLength);
+                var lengthByteCount = sizeof(uint);
+                var encodedEntryLength = lengthByteCount + (int)entryLength;
+                if (position >= encodedEntryLength)
+                {
+                    position -= encodedEntryLength;
+                    rawOffset += (int)entryLength;
+                    continue;
+                }
+
+                if (position < lengthByteCount)
+                {
+                    var copyLength = Math.Min(output.Length, lengthByteCount - position);
+                    lengthBytes.Slice(position, copyLength).CopyTo(output);
+                    output = output[copyLength..];
+                    bytesWritten += copyLength;
+                    position += copyLength;
+
+                    if (output.IsEmpty || position < lengthByteCount)
+                    {
+                        break;
+                    }
+                }
+
+                var payloadPosition = position - lengthByteCount;
+                if (payloadPosition < entryLength)
+                {
+                    var copyLength = Math.Min(output.Length, (int)entryLength - payloadPosition);
+                    rawSequence.Slice(rawOffset + payloadPosition, copyLength).CopyTo(output);
+                    output = output[copyLength..];
+                    bytesWritten += copyLength;
+
+                    if (output.IsEmpty)
+                    {
+                        break;
+                    }
+                }
+
+                position = 0;
+                rawOffset += (int)entryLength;
+            }
+
+            _position += bytesWritten;
+            return bytesWritten;
+        }
 
         public override long Seek(long offset, SeekOrigin origin)
         {
@@ -67,7 +142,9 @@ public sealed partial class LogExtentBuilder
             return _builder!.CopyToAsync(destination, bufferSize, cancellationToken).AsTask();
         }
 
-        public override void Flush() => throw GetReadOnlyException();
+        public override void Flush()
+        {
+        }
         public override void WriteByte(byte value) => throw GetReadOnlyException();
         public override void SetLength(long value) => throw GetReadOnlyException();
         public override void Write(byte[] buffer, int offset, int count) => throw GetReadOnlyException();
@@ -88,19 +165,21 @@ public sealed partial class LogExtentBuilder
             _length = 0;
         }
 
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                Reset();
+            }
+
+            base.Dispose(disposing);
+        }
+
         private int ComputeLength()
         {
             Debug.Assert(_builder!._entryLengths is not null);
-            var length = _builder!._buffer.Length;
-            foreach (var entry in _builder!._entryLengths)
-            {
-                length += GetVarIntWidth(entry);
-            }
-
-            return length;
+            return checked(_builder!._buffer.Length + (_builder!._entryLengths.Count * sizeof(uint)));
         }
-
-        private static int GetVarIntWidth(uint value) => 1 + (int)((uint)BitOperations.Log2(value) / 7);
 
         private static NotSupportedException GetReadOnlyException() => new("This stream is read-only");
     }

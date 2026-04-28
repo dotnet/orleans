@@ -1,7 +1,7 @@
 using System.Buffers;
 using System.Collections;
-using Orleans.Serialization.Buffers;
 using System.Diagnostics;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -71,9 +71,18 @@ public sealed class LogExtent(ArcBuffer buffer) : IDisposable
                 return false;
             }
 
-            var reader = Reader.Create(_current, null);
-            _length = (int)reader.ReadVarUInt32();
-            _current = _current.Slice(reader.Position);
+            var reader = new SequenceReader<byte>(_current);
+            if (!reader.TryReadLittleEndian(out _length))
+            {
+                throw new InvalidOperationException("Malformed binary log extent: missing entry length.");
+            }
+
+            if (_length < 0 || _length > reader.Remaining)
+            {
+                throw new InvalidOperationException("Malformed binary log extent: entry length exceeds remaining extent bytes.");
+            }
+
+            _current = _current.Slice(sizeof(int));
             return true;
         }
 
@@ -88,7 +97,7 @@ public sealed class LogExtent(ArcBuffer buffer) : IDisposable
 
                 var slice = _current.Slice(0, _length);
                 var reader = Reader.Create(slice, null);
-                var id = reader.ReadVarUInt32();
+                var id = reader.ReadVarUInt64();
                 return new(new(id), slice.Slice(reader.Position));
             }
         }

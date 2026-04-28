@@ -201,7 +201,7 @@ public class ProtobufCodecTests
     }
 
     [Fact]
-    public void ProtobufLogExtentCodec_Encode_WritesDelimitedLogExtent()
+    public void ProtobufLogExtentCodec_Encode_WritesFixed32FramedEntries()
     {
         var codec = new ProtobufLogExtentCodec();
         using var builder = new LogExtentBuilder();
@@ -210,14 +210,14 @@ public class ProtobufCodecTests
 
         var encoded = codec.Encode(builder);
 
-        Assert.Equal([8, 10, 6, 8, 8, 18, 2, 8, 0], encoded);
+        Assert.Equal([3, 0, 0, 0, 17, 8, 0], encoded);
     }
 
     [Fact]
     public void ProtobufLogExtentCodec_Decode_RoundTripsEntries()
     {
         var codec = new ProtobufLogExtentCodec();
-        using var extent = Decode(codec, [8, 10, 6, 8, 8, 18, 2, 8, 0]);
+        using var extent = Decode(codec, [3, 0, 0, 0, 17, 8, 0]);
         var entry = Assert.Single(extent.Entries);
 
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -225,14 +225,15 @@ public class ProtobufCodecTests
     }
 
     [Theory]
-    [InlineData(new byte[] { 4, 10, 2, 18, 0 }, "stream_id")]
-    [InlineData(new byte[] { 4, 10, 2, 8, 8 }, "entry")]
-    [InlineData(new byte[] { 8, 10, 6, 8 }, "insufficient data")]
+    [InlineData(new byte[] { 1, 2 }, "missing entry length")]
+    [InlineData(new byte[] { 10, 0, 0, 0, 1, 2 }, "entry length exceeds")]
+    [InlineData(new byte[] { 0, 0, 0, 0 }, "Insufficient data")]
     public void ProtobufLogExtentCodec_Decode_InvalidExtent_Throws(byte[] bytes, string expectedMessage)
     {
         var codec = new ProtobufLogExtentCodec();
+        using var extent = Decode(codec, bytes);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => Decode(codec, bytes));
+        var exception = Assert.Throws<InvalidOperationException>(() => extent.Entries.ToList());
 
         Assert.Contains(expectedMessage, exception.Message);
     }

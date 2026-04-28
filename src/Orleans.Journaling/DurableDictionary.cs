@@ -41,8 +41,8 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
         set
         {
+            WriteSet(key, value);
             ApplySet(key, value);
-            AppendSet(key, value);
         }
     }
 
@@ -72,54 +72,84 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
     {
-        snapshotWriter.AppendEntry(static (self, bufferWriter) =>
-        {
-            self._codec.WriteSnapshot(self._items, self._items.Count, bufferWriter);
-        }, this);
+        WriteSnapshot(snapshotWriter.BeginEntry());
     }
 
     public void Clear()
     {
-        ApplyClear();
-        GetStorage().AppendEntry(static (self, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            self._codec.WriteClear(bufferWriter);
-        },
-        this);
+            _codec.WriteClear(writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+
+        ApplyClear();
     }
 
     public bool Contains(K key) => _items.ContainsKey(key);
 
     public bool Remove(K key)
     {
-        if (ApplyRemove(key))
+        if (!_items.ContainsKey(key))
         {
-            AppendRemove(key);
-            return true;
+            return false;
         }
 
-        return false;
+        WriteRemove(key);
+        ApplyRemove(key);
+        return true;
     }
 
-    private void AppendRemove(K key)
+    private void WriteRemove(K key)
     {
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            var (self, key) = state;
-            self._codec.WriteRemove(key, bufferWriter);
-        }, (this, key));
+            _codec.WriteRemove(key, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
-    private void AppendSet(K key, V value)
+    private void WriteSet(K key, V value)
     {
-        GetStorage().AppendEntry(static (state, bufferWriter) =>
+        var writer = GetStorage().BeginEntry();
+        try
         {
-            var (self, key, value) = state;
-            self._codec.WriteSet(key, value, bufferWriter);
-        },
-        (this, key, value));
+            _codec.WriteSet(key, value, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
+    }
+
+    private void WriteSnapshot(LogEntryWriter writer)
+    {
+        try
+        {
+            _codec.WriteSnapshot(_items, _items.Count, writer);
+            writer.Commit();
+        }
+        catch
+        {
+            writer.Abort();
+            throw;
+        }
     }
 
     protected virtual void OnSet(K key, V value) { }
@@ -152,9 +182,14 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
     public void Add(K key, V value)
     {
+        if (_items.ContainsKey(key))
+        {
+            ThrowDuplicateKey(key);
+        }
+
+        WriteSet(key, value);
         _items.Add(key, value);
         OnSet(key, value);
-        AppendSet(key, value);
     }
 
     public bool ContainsKey(K key) => _items.ContainsKey(key);
@@ -164,16 +199,20 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     public void CopyTo(KeyValuePair<K, V>[] array, int arrayIndex) => ((ICollection<KeyValuePair<K, V>>)_items).CopyTo(array, arrayIndex);
     public bool Remove(KeyValuePair<K, V> item)
     {
-        if (((ICollection<KeyValuePair<K, V>>)_items).Remove(item))
+        if (!((ICollection<KeyValuePair<K, V>>)_items).Contains(item))
         {
-            AppendRemove(item.Key);
-            return true;
+            return false;
         }
 
-        return false;
+        WriteRemove(item.Key);
+        _ = ((ICollection<KeyValuePair<K, V>>)_items).Remove(item);
+        return true;
     }
 
     public IEnumerator<KeyValuePair<K, V>> GetEnumerator() => ((IEnumerable<KeyValuePair<K, V>>)_items).GetEnumerator();
+
+    [DoesNotReturn]
+    private static void ThrowDuplicateKey(K key) => throw new ArgumentException($"An item with the same key has already been added. Key: {key}", nameof(key));
 }
 
 [DebuggerDisplay("{Value}", Name = "[{Key}]")]

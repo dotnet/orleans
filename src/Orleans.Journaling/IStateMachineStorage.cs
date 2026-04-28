@@ -6,11 +6,12 @@ namespace Orleans.Journaling;
 public interface IStateMachineStorage
 {
     /// <summary>
-    /// Returns an ordered collection of all log segments belonging to this instance.
+    /// Reads all log entries belonging to this instance and pushes them to <paramref name="consumer"/>.
     /// </summary>
+    /// <param name="consumer">The consumer which receives decoded log entries.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
-    /// <returns>An ordered collection of all log segments belonging to this instance.</returns>
-    IAsyncEnumerable<LogExtent> ReadAsync(CancellationToken cancellationToken);
+    /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
+    ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, CancellationToken cancellationToken);
 
     /// <summary>
     /// Replaces the log with the provided value atomically.

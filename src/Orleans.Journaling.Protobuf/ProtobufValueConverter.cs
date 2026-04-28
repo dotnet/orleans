@@ -60,11 +60,60 @@ public sealed class ProtobufValueConverter<T>
             return [0];
         }
 
-        var payload = ToNonNullBytes(value);
-        var result = new byte[payload.Length + 1];
-        result[0] = 1;
-        payload.CopyTo(result.AsSpan(1));
-        return result;
+        if (_nativeCodec is null)
+        {
+            if (_fallbackCodec is null)
+            {
+                throw new InvalidOperationException($"Type '{typeof(T)}' is not natively supported by protobuf and no fallback codec was provided.");
+            }
+
+            var fallbackBuffer = new ArrayBufferWriter<byte>();
+            WriteMarker(fallbackBuffer, 1);
+            _fallbackCodec.Write(value, fallbackBuffer);
+            return fallbackBuffer.WrittenSpan.ToArray();
+        }
+
+        var buffer = new ArrayBufferWriter<byte>(Measure(value));
+        Write(value, buffer);
+        return buffer.WrittenSpan.ToArray();
+    }
+
+    internal int Measure(T value)
+    {
+        if (value is null)
+        {
+            return 1;
+        }
+
+        return checked(1 + MeasureNonNull(value));
+    }
+
+    internal void Write(T value, IBufferWriter<byte> output)
+    {
+        if (value is null)
+        {
+            WriteMarker(output, 0);
+            return;
+        }
+
+        WriteMarker(output, 1);
+        WriteNonNull(value, output);
+    }
+
+    internal void WriteField(IBufferWriter<byte> output, uint fieldNumber, T value)
+    {
+        if (value is not null && _nativeCodec is null)
+        {
+            ProtobufWire.WriteBytesField(output, fieldNumber, ToBytes(value));
+            return;
+        }
+
+        ProtobufWire.WriteBytesField(
+            output,
+            fieldNumber,
+            Measure(value),
+            (Converter: this, Value: value),
+            static (state, writer) => state.Converter.Write(state.Value, writer));
     }
 
     /// <summary>
@@ -86,11 +135,11 @@ public sealed class ProtobufValueConverter<T>
         };
     }
 
-    private byte[] ToNonNullBytes(T value)
+    private int MeasureNonNull(T value)
     {
         if (_nativeCodec is not null)
         {
-            return _nativeCodec.ToBytes(value);
+            return _nativeCodec.Measure(value);
         }
 
         if (_fallbackCodec is null)
@@ -100,7 +149,23 @@ public sealed class ProtobufValueConverter<T>
 
         var buffer = new ArrayBufferWriter<byte>();
         _fallbackCodec.Write(value, buffer);
-        return buffer.WrittenSpan.ToArray();
+        return buffer.WrittenCount;
+    }
+
+    private void WriteNonNull(T value, IBufferWriter<byte> output)
+    {
+        if (_nativeCodec is not null)
+        {
+            _nativeCodec.Write(value, output);
+            return;
+        }
+
+        if (_fallbackCodec is null)
+        {
+            throw new InvalidOperationException($"Type '{typeof(T)}' is not natively supported by protobuf and no fallback codec was provided.");
+        }
+
+        _fallbackCodec.Write(value, output);
     }
 
     private T FromNonNullBytes(ReadOnlySequence<byte> bytes)
@@ -116,5 +181,12 @@ public sealed class ProtobufValueConverter<T>
         }
 
         return _fallbackCodec.Read(bytes, out _);
+    }
+
+    private static void WriteMarker(IBufferWriter<byte> output, byte marker)
+    {
+        var span = output.GetSpan(1);
+        span[0] = marker;
+        output.Advance(1);
     }
 }
