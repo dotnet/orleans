@@ -3,7 +3,7 @@
 ## Introduction
 Microsoft Orleans Journaling for Protocol Buffers provides a Protocol Buffers-based storage format for Orleans.Journaling durable state machines. Use this package to serialize durable dictionary, list, queue, set, value, state, and task completion source log entries directly as protobuf records.
 
-This package configures the physical log extent format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the protobuf extent codec and protobuf durable-entry codec providers which durable state machines use to encode and recover their own operations.
+This package configures the physical log format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the protobuf log format and protobuf durable-entry codec providers which durable state machines use to encode and recover their own operations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -50,11 +50,20 @@ siloBuilder
     });
 ```
 
-Other value types fall back to the configured `ILogDataCodec<T>`. If a protobuf message parser or fallback codec is missing, journaling fails with a configuration error instead of discovering parsers through reflection. This keeps the protobuf codec trimming and Native AOT friendly.
+Other value types can fall back to a configured `ILogDataCodec<T>` compatibility codec. The native protobuf path remains the recommended low-allocation path. If a protobuf message parser or fallback codec is missing, journaling fails with a configuration error instead of discovering parsers through reflection. This keeps the protobuf codec trimming and Native AOT friendly.
 
 ## Storage format
 
-`UseProtobufCodec()` stores physical log extents as a stream of length-delimited `LogExtent` messages. Each extent contains repeated records with the state machine id and the durable entry payload. Durable entry payloads use protobuf wire-format tags with fixed command ids and field numbers.
+`UseProtobufCodec()` stores physical log data as repeated length-delimited `LogEntry` messages with no surrounding extent envelope:
+
+```protobuf
+message LogEntry {
+  uint64 stream_id = 1;
+  bytes payload = 2;
+}
+```
+
+Durable entry payloads use protobuf wire-format tags with fixed command ids and field numbers. Storage write batches append one or more complete length-delimited `LogEntry` messages, and recovery reads entries until the input is exhausted.
 
 The configured journaling codec must match the data already stored for a grain. This package does not automatically migrate existing binary, JSON Lines, or older protobuf journaling data to the current protobuf format.
 

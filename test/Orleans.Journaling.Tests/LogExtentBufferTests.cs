@@ -13,9 +13,9 @@ public sealed class LogExtentBufferTests
     {
         using var buffer = new LogExtentBuffer();
 
-        var writer = buffer.BeginEntry(new StateMachineId(42));
-        writer.Write([1, 2, 3]);
-        writer.Commit();
+        using var entry = buffer.CreateLogWriter(new StateMachineId(42)).BeginEntry();
+        entry.Writer.Write([1, 2, 3]);
+        entry.Commit();
 
         var bytes = ToArray(buffer);
         Assert.Equal(8, bytes.Length);
@@ -29,40 +29,154 @@ public sealed class LogExtentBufferTests
     {
         using var buffer = new LogExtentBuffer();
 
-        var first = buffer.BeginEntry(new StateMachineId(1));
-        first.Write([10]);
-        first.Commit();
-
-        var second = buffer.BeginEntry(new StateMachineId(300));
-        second.Write([20, 21]);
-        second.Commit();
+        AppendEntry(buffer.CreateLogWriter(new StateMachineId(1)), [10]);
+        AppendEntry(buffer.CreateLogWriter(new StateMachineId(300)), [20, 21]);
 
         var reader = new SequenceReader<byte>(buffer.AsReadOnlySequence());
         var firstEntry = ReadEntry(ref reader);
         var secondEntry = ReadEntry(ref reader);
 
+        Assert.Equal(2U, firstEntry.Length);
         Assert.Equal(1UL, firstEntry.StreamId);
         Assert.Equal([10], firstEntry.Payload.ToArray());
+        Assert.Equal(4U, secondEntry.Length);
         Assert.Equal(300UL, secondEntry.StreamId);
         Assert.Equal([20, 21], secondEntry.Payload.ToArray());
         Assert.True(reader.End);
     }
 
     [Fact]
-    public void Abort_TruncatesPendingEntry()
+    public void BinaryFormat_Read_ParsesConcatenatedEntries()
+    {
+        using var buffer = new LogExtentBuffer();
+        AppendEntry(buffer.CreateLogWriter(new StateMachineId(1)), [10]);
+        AppendEntry(buffer.CreateLogWriter(new StateMachineId(300)), [20, 21]);
+        using var data = buffer.GetCommittedBuffer();
+        var consumer = new CollectingConsumer();
+
+        ((IStateMachineLogFormat)BinaryLogExtentCodec.Instance).Read(data, consumer);
+
+        Assert.Collection(
+            consumer.Entries,
+            entry =>
+            {
+                Assert.Equal(1UL, entry.StreamId);
+                Assert.Equal([10], entry.Payload);
+            },
+            entry =>
+            {
+                Assert.Equal(300UL, entry.StreamId);
+                Assert.Equal([20, 21], entry.Payload);
+            });
+    }
+
+    [Fact]
+    public void BinaryFormat_Read_HandlesSegmentedFrames()
+    {
+        using var buffer = new LogExtentBuffer();
+        var payload = Enumerable.Repeat((byte)0xAA, ArcBufferWriter.MinimumPageSize - 7).ToArray();
+        AppendEntry(buffer.CreateLogWriter(new StateMachineId(1)), payload);
+        AppendEntry(buffer.CreateLogWriter(new StateMachineId(300)), [20, 21]);
+        using var data = buffer.GetCommittedBuffer();
+        var consumer = new CollectingConsumer();
+
+        ((IStateMachineLogFormat)BinaryLogExtentCodec.Instance).Read(data, consumer);
+
+        Assert.Collection(
+            consumer.Entries,
+            entry =>
+            {
+                Assert.Equal(1UL, entry.StreamId);
+                Assert.Equal(payload, entry.Payload);
+            },
+            entry =>
+            {
+                Assert.Equal(300UL, entry.StreamId);
+                Assert.Equal([20, 21], entry.Payload);
+            });
+    }
+
+    [Fact]
+    public void DisposeWithoutCommit_TruncatesPendingEntry()
     {
         using var buffer = new LogExtentBuffer();
 
-        var committed = buffer.BeginEntry(new StateMachineId(1));
-        committed.Write([1]);
+        using var committed = buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        committed.Writer.Write([1]);
         committed.Commit();
         var committedBytes = ToArray(buffer);
 
-        var aborted = buffer.BeginEntry(new StateMachineId(2));
-        aborted.Write([2, 3, 4]);
-        aborted.Abort();
+        using (var aborted = buffer.CreateLogWriter(new StateMachineId(2)).BeginEntry())
+        {
+            aborted.Writer.Write([2, 3, 4]);
+        }
 
         Assert.Equal(committedBytes, ToArray(buffer));
+    }
+
+    [Fact]
+    public void GetCommittedBuffer_ThrowsWhenEntryIsActive()
+    {
+        using var buffer = new LogExtentBuffer();
+        var entry = buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        entry.Writer.Write([1]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            using var _ = buffer.GetCommittedBuffer();
+        });
+
+        Assert.Contains("active entry", exception.Message, StringComparison.Ordinal);
+        entry.Dispose();
+        using var committed = buffer.GetCommittedBuffer();
+        Assert.Equal(0, committed.Length);
+    }
+
+    [Fact]
+    public void Commit_ThrowsOnDoubleCommit()
+    {
+        using var buffer = new LogExtentBuffer();
+        using var entry = buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        entry.Writer.Write([1]);
+        entry.Commit();
+        var committedBytes = ToArray(buffer);
+
+        InvalidOperationException? exception = null;
+        try
+        {
+            entry.Commit();
+        }
+        catch (InvalidOperationException ex)
+        {
+            exception = ex;
+        }
+
+        Assert.NotNull(exception);
+        Assert.Contains("already completed", exception.Message, StringComparison.Ordinal);
+        Assert.Equal(committedBytes, ToArray(buffer));
+    }
+
+    [Fact]
+    public void CommitAfterDispose_ThrowsAndKeepsEntryAborted()
+    {
+        using var buffer = new LogExtentBuffer();
+        var entry = buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        entry.Writer.Write([1]);
+        entry.Dispose();
+
+        InvalidOperationException? exception = null;
+        try
+        {
+            entry.Commit();
+        }
+        catch (InvalidOperationException ex)
+        {
+            exception = ex;
+        }
+
+        Assert.NotNull(exception);
+        Assert.Contains("already completed", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(ToArray(buffer));
     }
 
     [Fact]
@@ -70,13 +184,13 @@ public sealed class LogExtentBufferTests
     {
         using var buffer = new LogExtentBuffer();
 
-        var first = buffer.BeginEntry(new StateMachineId(1));
-        first.Write([1]);
+        using var first = buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        first.Writer.Write([1]);
         first.Commit();
         buffer.Reset();
 
-        var second = buffer.BeginEntry(new StateMachineId(2));
-        second.Write([2]);
+        using var second = buffer.CreateLogWriter(new StateMachineId(2)).BeginEntry();
+        second.Writer.Write([2]);
         second.Commit();
 
         var reader = new SequenceReader<byte>(buffer.AsReadOnlySequence());
@@ -88,14 +202,28 @@ public sealed class LogExtentBufferTests
     }
 
     [Fact]
+    public void Reset_ThrowsWhenEntryIsActive()
+    {
+        using var buffer = new LogExtentBuffer();
+        var entry = buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        entry.Writer.Write([1]);
+
+        var exception = Assert.Throws<InvalidOperationException>(buffer.Reset);
+
+        Assert.Contains("active", exception.Message, StringComparison.Ordinal);
+        entry.Dispose();
+        Assert.Empty(ToArray(buffer));
+    }
+
+    [Fact]
     public void Commit_BackpatchesLengthAcrossSegments()
     {
         using var buffer = new LogExtentBuffer();
         buffer.Write(new byte[ArcBufferWriter.MinimumPageSize - 2]);
 
-        var writer = buffer.BeginEntry(new StateMachineId(1));
-        writer.Write([42]);
-        writer.Commit();
+        using var entry = buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        entry.Writer.Write([42]);
+        entry.Commit();
 
         var bytes = ToArray(buffer);
         var offset = ArcBufferWriter.MinimumPageSize - 2;
@@ -109,9 +237,9 @@ public sealed class LogExtentBufferTests
     public void ReadOnlyStream_ReadsCommittedBytes()
     {
         using var buffer = new LogExtentBuffer();
-        var writer = buffer.BeginEntry(new StateMachineId(7));
-        writer.Write([8, 9]);
-        writer.Commit();
+        using var entry = buffer.CreateLogWriter(new StateMachineId(7)).BeginEntry();
+        entry.Writer.Write([8, 9]);
+        entry.Commit();
         var expected = ToArray(buffer);
 
         using var stream = buffer.AsReadOnlyStream();
@@ -155,10 +283,46 @@ public sealed class LogExtentBufferTests
         Assert.True(thrown);
     }
 
+    [Theory]
+    [InlineData(new byte[] { 1, 2, 3 }, "truncated fixed32 entry length prefix")]
+    [InlineData(new byte[] { 0, 0, 0, 0 }, "zero-length entries")]
+    [InlineData(new byte[] { 5, 0, 0, 0, 1, 2 }, "exceeds remaining input bytes")]
+    [InlineData(new byte[] { 1, 0, 0, 0, 0x80 }, "truncated varuint64 state-machine id")]
+    [InlineData(new byte[] { 1, 0, 0, 0, 1 }, "missing operation payload")]
+    [InlineData(
+        new byte[] { 11, 0, 0, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0 },
+        "malformed varuint64 state-machine id")]
+    [InlineData(new byte[] { 255, 255, 255, 255 }, "exceeds remaining input bytes")]
+    public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
+    {
+        using var data = CreateBuffer(bytes);
+        var consumer = new CollectingConsumer();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ((IStateMachineLogFormat)BinaryLogExtentCodec.Instance).Read(data, consumer));
+
+        Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        Assert.Empty(consumer.Entries);
+    }
+
     private static byte[] ToArray(LogExtentBuffer buffer)
     {
         using var slice = buffer.PeekSlice();
         return slice.ToArray();
+    }
+
+    private static void AppendEntry(StateMachineLogWriter writer, ReadOnlySpan<byte> payload)
+    {
+        using var entry = writer.BeginEntry();
+        entry.Writer.Write(payload);
+        entry.Commit();
+    }
+
+    private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> bytes)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        return writer.ConsumeSlice(writer.Length);
     }
 
     private static (uint Length, ulong StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)
@@ -175,5 +339,13 @@ public sealed class LogExtentBufferTests
         reader.Advance(length);
 
         return (length, streamId, payload);
+    }
+
+    private sealed class CollectingConsumer : IStateMachineLogEntryConsumer
+    {
+        public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
+
+        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) =>
+            Entries.Add((streamId.Value, payload.ToArray()));
     }
 }

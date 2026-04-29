@@ -199,13 +199,13 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var stateMachineIdsCodec = new ProtobufDictionaryEntryCodec<string, ulong>(stringConverter, ulongConverter);
         var retirementTrackerCodec = new ProtobufDictionaryEntryCodec<string, DateTime>(stringConverter, dateTimeConverter);
-        var manager = new StateMachineManager(storage, LoggerFactory.CreateLogger<StateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System);
+        var manager = new StateMachineManager(storage, LoggerFactory.CreateLogger<StateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System, new ProtobufLogFormat());
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
 
-    private static VolatileStateMachineStorage CreateProtobufStorage() => new(new ProtobufLogExtentCodec());
+    private static VolatileStateMachineStorage CreateProtobufStorage() => new(StateMachineLogFormatKeys.Protobuf);
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {

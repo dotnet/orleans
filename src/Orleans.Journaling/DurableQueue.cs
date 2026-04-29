@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -26,10 +26,10 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     private readonly Queue<T> _items = new();
     private IStateMachineLogWriter? _storage;
 
-    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, IDurableQueueCodecProvider codecProvider)
+    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codecProvider.GetCodec<T>();
+        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableQueueCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
@@ -53,39 +53,23 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
     {
-        var writer = snapshotWriter.BeginEntry();
-        try
-        {
-            _codec.WriteSnapshot(_items, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = snapshotWriter.BeginEntry();
+        _codec.WriteSnapshot(_items, entry.Writer);
+        entry.Commit();
     }
 
     public void Clear()
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteClear(writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteClear(entry.Writer);
+        entry.Commit();
 
         ApplyClear();
     }
@@ -97,17 +81,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
     public void Enqueue(T item)
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteEnqueue(item, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteEnqueue(item, entry.Writer);
+        entry.Commit();
 
         ApplyEnqueue(item);
     }
@@ -115,17 +91,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     public T Dequeue()
     {
         var result = _items.Peek();
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteDequeue(writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteDequeue(entry.Writer);
+        entry.Commit();
 
         _ = ApplyDequeue();
         return result;
@@ -138,17 +106,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
             return false;
         }
 
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteDequeue(writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteDequeue(entry.Writer);
+        entry.Commit();
 
         _ = ApplyTryDequeue(out _);
         return true;

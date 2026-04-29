@@ -1,4 +1,4 @@
-using System.Buffers.Binary;
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Xunit;
 
@@ -8,57 +8,126 @@ namespace Orleans.Journaling.Tests;
 public sealed class StorageStreamingTests
 {
     [Fact]
-    public async Task VolatileStorage_AppendAndReplaceUseStreamEncoding()
+    public async Task VolatileStorage_AppendAndReplaceStoreRawBuffers()
     {
-        var storage = new VolatileStateMachineStorage(new StreamOnlyBinaryCodec());
-        using var segment = CreateSegment();
-        using var snapshot = CreateSegment();
+        var storage = new VolatileStateMachineStorage("custom-format");
+        var segmentBytes = new byte[] { 1, 2, 3, 4 };
+        var snapshotBytes = new byte[] { 5, 6, 7 };
 
-        await storage.AppendAsync(segment, CancellationToken.None);
-        await storage.ReplaceAsync(snapshot, CancellationToken.None);
+        using (var segmentData = CreateBuffer(segmentBytes))
+        {
+            await storage.AppendAsync(segmentData, CancellationToken.None);
+        }
 
+        using (var snapshotData = CreateBuffer(snapshotBytes))
+        {
+            await storage.ReplaceAsync(snapshotData, CancellationToken.None);
+        }
+
+        Assert.Equal("custom-format", storage.LogFormatKey);
         Assert.Single(storage.Segments);
+        Assert.Equal(snapshotBytes, storage.Segments[0]);
     }
 
     [Fact]
-    public void BinaryCodec_StreamEncodingMatchesArrayEncoding()
+    public async Task VolatileStorage_ReadsRawBuffersWithoutFormatDecoding()
     {
-        using var segment = CreateSegment();
-        var expected = BinaryLogExtentCodec.Instance.Encode(segment);
+        var storage = new VolatileStateMachineStorage("custom-format");
+        var rawBytes = new byte[] { 255, 0, 1 };
+        var consumer = new CapturingLogDataConsumer();
 
-        using var stream = BinaryLogExtentCodec.Instance.EncodeToStream(segment);
-        using var output = new MemoryStream();
-        stream.CopyTo(output);
+        using (var data = CreateBuffer(rawBytes))
+        {
+            await storage.AppendAsync(data, CancellationToken.None);
+        }
 
-        Assert.Equal(expected, output.ToArray());
-        Assert.Equal(4U, BinaryPrimitives.ReadUInt32LittleEndian(expected.AsSpan(0, sizeof(uint))));
+        await storage.ReadAsync(consumer, CancellationToken.None);
+
+        var buffer = Assert.Single(consumer.Buffers);
+        Assert.Equal(rawBytes, buffer);
     }
 
     [Fact]
-    public void BinaryCodec_RejectsTruncatedFixed32Frame()
+    public async Task VolatileStorage_DisposesReadBufferAfterCallbackReturns()
+    {
+        var storage = new VolatileStateMachineStorage();
+        var rawBytes = new byte[] { 1, 2, 3 };
+        var consumer = new RetainingLogDataConsumer();
+
+        using (var data = CreateBuffer(rawBytes))
+        {
+            await storage.AppendAsync(data, CancellationToken.None);
+        }
+
+        await storage.ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Throws<InvalidOperationException>(() => consumer.RetainedBuffer.ToArray());
+    }
+
+    [Fact]
+    public async Task VolatileStorage_ReadConsumerCanRetainPinnedSlice()
+    {
+        var storage = new VolatileStateMachineStorage();
+        var rawBytes = new byte[] { 1, 2, 3 };
+        using var consumer = new PinningLogDataConsumer();
+
+        using (var data = CreateBuffer(rawBytes))
+        {
+            await storage.AppendAsync(data, CancellationToken.None);
+        }
+
+        await storage.ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Equal(rawBytes, consumer.RetainedBuffer.ToArray());
+    }
+
+    [Fact]
+    public void BinaryFormatRead_RejectsTruncatedFixed32Frame()
+    {
+        using var data = CreateBuffer([10, 0, 0, 0, 1, 2]);
+        var consumer = new CapturingLogEntryConsumer();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ((IStateMachineLogFormat)BinaryLogExtentCodec.Instance).Read(data, consumer));
+
+        Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
+        Assert.Empty(consumer.Entries);
+    }
+
+    private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> value)
     {
         using var buffer = new ArcBufferWriter();
-        buffer.Write([10, 0, 0, 0, 1, 2]);
-        using var extent = BinaryLogExtentCodec.Instance.Decode(buffer.ConsumeSlice(buffer.Length));
-
-        Assert.Throws<InvalidOperationException>(() => extent.Entries.ToList());
+        buffer.Write(value);
+        return buffer.ConsumeSlice(buffer.Length);
     }
 
-    private static LogExtentBuilder CreateSegment()
+    private sealed class CapturingLogDataConsumer : IStateMachineLogDataConsumer
     {
-        var segment = new LogExtentBuilder();
-        var writer = segment.BeginEntry(new StateMachineId(1));
-        writer.Write([1, 2, 3]);
-        writer.Commit();
-        return segment;
+        public List<byte[]> Buffers { get; } = [];
+
+        public void OnLogData(ArcBuffer data) => Buffers.Add(data.ToArray());
     }
 
-    private sealed class StreamOnlyBinaryCodec : IStateMachineLogExtentCodec
+    private sealed class CapturingLogEntryConsumer : IStateMachineLogEntryConsumer
     {
-        public byte[] Encode(LogExtentBuilder value) => throw new InvalidOperationException("Storage should use stream encoding.");
+        public List<(StateMachineId StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public Stream EncodeToStream(LogExtentBuilder value) => BinaryLogExtentCodec.Instance.EncodeToStream(value);
+        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
+    }
 
-        public LogExtent Decode(ArcBuffer value) => BinaryLogExtentCodec.Instance.Decode(value);
+    private sealed class RetainingLogDataConsumer : IStateMachineLogDataConsumer
+    {
+        public ArcBuffer RetainedBuffer { get; private set; }
+
+        public void OnLogData(ArcBuffer data) => RetainedBuffer = data;
+    }
+
+    private sealed class PinningLogDataConsumer : IStateMachineLogDataConsumer, IDisposable
+    {
+        public ArcBuffer RetainedBuffer { get; private set; }
+
+        public void OnLogData(ArcBuffer data) => RetainedBuffer = data.Slice(0, data.Length);
+
+        public void Dispose() => RetainedBuffer.Dispose();
     }
 }

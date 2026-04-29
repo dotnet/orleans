@@ -27,6 +27,16 @@ public sealed class AzureAppendBlobStateMachineStorageOptions
     private static readonly Func<GrainId, string> DefaultGetBlobName = static (GrainId grainId) => $"{grainId}.bin";
 
     /// <summary>
+    /// Gets or sets the default state machine log format key.
+    /// </summary>
+    public string LogFormatKey { get; set; } = StateMachineLogFormatKeys.OrleansBinary;
+
+    /// <summary>
+    /// Gets or sets an optional selector for choosing the log format key by grain type.
+    /// </summary>
+    public Func<GrainType, string>? LogFormatKeySelector { get; set; }
+
+    /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
     /// </summary>
     public BlobClientOptions? ClientOptions { get; set; }
@@ -49,6 +59,13 @@ public sealed class AzureAppendBlobStateMachineStorageOptions
     /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
     /// </summary>
     internal Func<CancellationToken, Task<BlobServiceClient>>? CreateClient { get; private set; }
+
+    internal string GetLogFormatKey(GrainType grainType)
+    {
+        var result = LogFormatKeySelector?.Invoke(grainType) ?? LogFormatKey;
+        ArgumentException.ThrowIfNullOrWhiteSpace(result);
+        return result;
+    }
 
     /// <summary>
     /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.

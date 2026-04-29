@@ -1,9 +1,10 @@
+using System.Buffers;
 using Azure;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
-using Orleans.Serialization.Buffers;
 using Microsoft.Extensions.Logging;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -12,24 +13,27 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
     private static readonly AppendBlobCreateOptions CreateOptions = new() { Conditions = new() { IfNoneMatch = ETag.All } };
     private readonly AppendBlobClient _client;
     private readonly ILogger<AzureAppendBlobLogStorage> _logger;
-    private readonly IStateMachineLogExtentCodec _codec;
+    private readonly string _logFormatKey;
     private readonly AppendBlobAppendBlockOptions _appendOptions;
     private bool _exists;
     private int _numBlocks;
 
     public bool IsCompactionRequested => _numBlocks > 10;
 
-    public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger, IStateMachineLogExtentCodec codec)
+    public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger, string logFormatKey)
     {
         _client = client;
         _logger = logger;
-        _codec = codec;
+        ArgumentException.ThrowIfNullOrWhiteSpace(logFormatKey);
+        _logFormatKey = logFormatKey;
 
         // For the first request, if we have not performed a read yet, we want to guard against clobbering an existing blob.
         _appendOptions = new AppendBlobAppendBlockOptions() { Conditions = new AppendBlobRequestConditions { IfNoneMatch = ETag.All } };
     }
 
-    public async ValueTask AppendAsync(LogExtentBuilder value, CancellationToken cancellationToken)
+    public string LogFormatKey => _logFormatKey;
+
+    public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         if (!_exists)
         {
@@ -39,7 +43,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
             _exists = true;
         }
 
-        using var stream = _codec.EncodeToStream(value);
+        using var stream = new BorrowedArcBufferReadOnlyStream(value);
         var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
         LogAppend(_logger, stream.Length, _client.BlobContainerName, _client.Name);
 
@@ -59,7 +63,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _numBlocks = 0;
     }
 
-    public async ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, CancellationToken cancellationToken)
+    public async ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken)
     {
         Response<BlobDownloadStreamingResult> result;
         try
@@ -96,7 +100,8 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
                 if (buffer.Length > 0)
                 {
                     LogRead(_logger, buffer.Length, _client.BlobContainerName, _client.Name);
-                    _codec.Read(buffer.ConsumeSlice(buffer.Length), consumer);
+                    using var data = buffer.ConsumeSlice(buffer.Length);
+                    consumer.OnLogData(data);
                 }
 
                 return;
@@ -125,7 +130,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         return result;
     }
 
-    public async ValueTask ReplaceAsync(LogExtentBuilder value, CancellationToken cancellationToken)
+    public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
     {
         // Create a snapshot of the blob for recovery purposes.
         var blobSnapshot = await _client.CreateSnapshotAsync(conditions: _appendOptions.Conditions, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -141,7 +146,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _appendOptions.Conditions.IfNoneMatch = default;
 
         // Write the state machine snapshot.
-        using var stream = _codec.EncodeToStream(value);
+        using var stream = new BorrowedArcBufferReadOnlyStream(value);
         var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
         LogReplace(_logger, _client.BlobContainerName, _client.Name, stream.Length);
 
@@ -168,4 +173,127 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         Message = "Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
 
+    private sealed class BorrowedArcBufferReadOnlyStream(ArcBuffer buffer) : Stream
+    {
+        private readonly ReadOnlySequence<byte> _sequence = buffer.AsReadOnlySequence();
+        private long _position;
+        private bool _disposed;
+
+        public override bool CanRead => !_disposed;
+
+        public override bool CanSeek => !_disposed;
+
+        public override bool CanWrite => false;
+
+        public override long Length
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _sequence.Length;
+            }
+        }
+
+        public override long Position
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _position;
+            }
+            set
+            {
+                ThrowIfDisposed();
+                if (value < 0 || value > _sequence.Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _position = value;
+            }
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            ThrowIfDisposed();
+            if (buffer.IsEmpty)
+            {
+                return 0;
+            }
+
+            var remaining = _sequence.Length - _position;
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            var count = (int)Math.Min(buffer.Length, remaining);
+            _sequence.Slice(_position, count).CopyTo(buffer);
+            _position += count;
+            return count;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(Read(buffer.Span));
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<int>(cancellationToken);
+            }
+
+            return Task.FromResult(Read(buffer.AsSpan(offset, count)));
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            ThrowIfDisposed();
+            var position = origin switch
+            {
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => _position + offset,
+                SeekOrigin.End => _sequence.Length + offset,
+                _ => throw new ArgumentOutOfRangeException(nameof(origin))
+            };
+
+            Position = position;
+            return _position;
+        }
+
+        public override void SetLength(long value) => throw GetReadOnlyException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw GetReadOnlyException();
+
+        public override void Write(ReadOnlySpan<byte> buffer) => throw GetReadOnlyException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _disposed = true;
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(BorrowedArcBufferReadOnlyStream));
+            }
+        }
+
+        private static NotSupportedException GetReadOnlyException() => new("This stream is read-only.");
+    }
 }

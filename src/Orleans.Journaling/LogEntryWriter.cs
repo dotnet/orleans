@@ -14,6 +14,7 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
     private ILogEntryWriterTarget? _target;
     private ILogEntryWriterCompletion? _completion;
     private int _entryStart;
+    private bool _completed;
 
     internal LogEntryWriter()
     {
@@ -32,6 +33,11 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
     /// Writes the provided bytes to the current log entry.
     /// </summary>
     public void Write(ReadOnlySpan<byte> value) => GetTarget().Write(value);
+
+    /// <summary>
+    /// Writes the provided bytes to the current log entry.
+    /// </summary>
+    public void Write(ReadOnlySequence<byte> value) => GetTarget().Write(value);
 
     /// <summary>
     /// Writes a LEB128-encoded unsigned 32-bit integer to the current log entry.
@@ -53,7 +59,10 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
         _target = target;
         _entryStart = entryStart;
         _completion = completion;
+        _completed = false;
     }
+
+    internal bool IsActive => _target is not null;
 
     internal void Commit()
     {
@@ -79,6 +88,11 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
     {
         if (_target is null)
         {
+            if (_completed)
+            {
+                throw new InvalidOperationException("The log entry has already completed.");
+            }
+
             throw new InvalidOperationException("The log entry writer is not writing an entry.");
         }
 
@@ -91,6 +105,7 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
         _target = null;
         _completion = null;
         _entryStart = 0;
+        _completed = true;
         completion?.CompleteEntryWrite();
     }
 }
@@ -98,6 +113,7 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
 internal interface ILogEntryWriterTarget : IBufferWriter<byte>
 {
     void Write(ReadOnlySpan<byte> value);
+    void Write(ReadOnlySequence<byte> value);
     void CommitEntry(int entryStart);
     void AbortEntry(int entryStart);
 }

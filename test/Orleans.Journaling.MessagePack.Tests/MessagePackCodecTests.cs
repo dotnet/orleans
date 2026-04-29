@@ -1,6 +1,9 @@
 using System.Buffers;
 using System.Collections;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 using MessagePack;
+using Orleans.Hosting;
 using Orleans.Journaling.MessagePack;
 using Orleans.Serialization.Buffers;
 using Xunit;
@@ -11,6 +14,18 @@ namespace Orleans.Journaling.MessagePack.Tests;
 public sealed class MessagePackCodecTests
 {
     private static readonly MessagePackSerializerOptions Options = MessagePackSerializerOptions.Standard;
+
+    [Fact]
+    public void UseMessagePackCodec_RegistersFormatFamilyByKey()
+    {
+        var builder = new TestSiloBuilder();
+
+        builder.UseMessagePackCodec();
+
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        Assert.IsType<MessagePackLogFormat>(serviceProvider.GetRequiredKeyedService<IStateMachineLogFormat>(StateMachineLogFormatKeys.MessagePack));
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackLogEntryCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.MessagePack));
+    }
 
     [Fact]
     public void MessagePackListCodec_Operations_RoundTrip()
@@ -89,23 +104,6 @@ public sealed class MessagePackCodecTests
     }
 
     [Fact]
-    public void MessagePackLogExtentCodec_UsesFixed32FramedEntries()
-    {
-        var codec = new MessagePackLogExtentCodec();
-        using var builder = new LogExtentBuilder();
-        var writer = builder.CreateLogWriter(new(8));
-        writer.AppendEntry((ReadOnlySpan<byte>)[8, 0]);
-
-        var encoded = codec.Encode(builder);
-
-        Assert.Equal([3, 0, 0, 0, 17, 8, 0], encoded);
-        using var extent = Decode(codec, encoded);
-        var entry = Assert.Single(extent.Entries);
-        Assert.Equal((ulong)8, entry.StreamId.Value);
-        Assert.Equal([8, 0], entry.Payload.ToArray());
-    }
-
-    [Fact]
     public void MessagePackCodec_MalformedSnapshotCount_Throws()
     {
         var codec = new MessagePackListEntryCodec<string>(Options);
@@ -135,11 +133,136 @@ public sealed class MessagePackCodecTests
         Assert.Contains("did not match", exception.Message);
     }
 
-    private static LogExtent Decode(IStateMachineLogExtentCodec codec, byte[] bytes)
+    [Fact]
+    public void MessagePackLogFormat_WritesStandaloneEntryArrays()
     {
-        using var buffer = new ArcBufferWriter();
-        buffer.Write(bytes);
-        return codec.Decode(buffer.ConsumeSlice(buffer.Length));
+        var format = new MessagePackLogFormat();
+        using var writer = format.CreateWriter();
+
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
+
+        using var data = writer.GetCommittedBuffer();
+
+        Assert.Equal(
+            [
+                0x92, 0x08, 0xC4, 0x02, 0xAA, 0xBB,
+                0x92, 0xCD, 0x01, 0x2C, 0xC4, 0x01, 0xCC
+            ],
+            data.ToArray());
+    }
+
+    [Fact]
+    public void MessagePackLogFormat_Read_ParsesConcatenatedEntries()
+    {
+        var format = new MessagePackLogFormat();
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
+        using var data = writer.GetCommittedBuffer();
+        var consumer = new CollectingConsumer();
+
+        format.Read(data, consumer);
+
+        Assert.Collection(
+            consumer.Entries,
+            entry =>
+            {
+                Assert.Equal((ulong)8, entry.StreamId);
+                Assert.Equal([0xAA, 0xBB], entry.Payload);
+            },
+            entry =>
+            {
+                Assert.Equal((ulong)300, entry.StreamId);
+                Assert.Equal([0xCC], entry.Payload);
+            });
+    }
+
+    [Fact]
+    public void MessagePackLogFormat_DisposeWithoutCommit_AbortsPendingEntry()
+    {
+        var format = new MessagePackLogFormat();
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+        using var beforeAbort = writer.GetCommittedBuffer();
+        var committedBytes = beforeAbort.ToArray();
+
+        using (var aborted = writer.CreateLogWriter(new StateMachineId(9)).BeginEntry())
+        {
+            aborted.Writer.Write([2, 3, 4]);
+        }
+
+        using var afterAbort = writer.GetCommittedBuffer();
+        Assert.Equal(committedBytes, afterAbort.ToArray());
+    }
+
+    [Fact]
+    public void MessagePackLogFormat_Reset_ReusesWriter()
+    {
+        var format = new MessagePackLogFormat();
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+
+        writer.Reset();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(9)), [2]);
+        using var data = writer.GetCommittedBuffer();
+        var consumer = new CollectingConsumer();
+
+        format.Read(data, consumer);
+
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal((ulong)9, entry.StreamId);
+        Assert.Equal([2], entry.Payload);
+    }
+
+    [Fact]
+    public void MessagePackLogFormat_GetCommittedBuffer_ThrowsWhenEntryIsActive()
+    {
+        var format = new MessagePackLogFormat();
+        using var writer = format.CreateWriter();
+        var entry = writer.CreateLogWriter(new StateMachineId(8)).BeginEntry();
+        entry.Writer.Write([1]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            using var _ = writer.GetCommittedBuffer();
+        });
+
+        Assert.Contains("active entry", exception.Message, StringComparison.Ordinal);
+        entry.Dispose();
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x91, 0x01 }, "expected entry array with 2 item(s)")]
+    [InlineData(new byte[] { 0x92 }, "truncated streamId")]
+    [InlineData(new byte[] { 0x92, 0x01, 0xC4, 0x02, 0xAA }, "payload length 2 exceeds")]
+    [InlineData(new byte[] { 0x92, 0xFF, 0xC4, 0x00 }, "streamId must be an unsigned integer")]
+    [InlineData(new byte[] { 0x92, 0x01, 0xA0 }, "payload must be a binary field")]
+    [InlineData(new byte[] { 0xDC, 0x00 }, "truncated array16 length")]
+    public void MessagePackLogFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
+    {
+        var format = new MessagePackLogFormat();
+        using var data = CreateBuffer(bytes);
+        var consumer = new CollectingConsumer();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => format.Read(data, consumer));
+
+        Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        Assert.Empty(consumer.Entries);
+    }
+
+    private static void AppendEntry(StateMachineLogWriter writer, ReadOnlySpan<byte> payload)
+    {
+        using var entry = writer.BeginEntry();
+        entry.Writer.Write(payload);
+        entry.Commit();
+    }
+
+    private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> bytes)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        return writer.ConsumeSlice(writer.Length);
     }
 
     private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
@@ -182,6 +305,13 @@ public sealed class MessagePackCodecTests
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+    }
+
+    private sealed class TestSiloBuilder : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = new ServiceCollection();
+
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
@@ -246,6 +376,14 @@ public sealed class MessagePackCodecTests
         public void ApplyCompleted(T value) => Commands.Add($"completed:{value}");
         public void ApplyFaulted(Exception exception) => Commands.Add($"faulted:{exception.Message}");
         public void ApplyCanceled() => Commands.Add("canceled");
+    }
+
+    private sealed class CollectingConsumer : IStateMachineLogEntryConsumer
+    {
+        public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
+
+        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) =>
+            Entries.Add((streamId.Value, payload.ToArray()));
     }
 
     private sealed class MiscountedReadOnlyCollection<T>(int count, IReadOnlyCollection<T> items) : IReadOnlyCollection<T>

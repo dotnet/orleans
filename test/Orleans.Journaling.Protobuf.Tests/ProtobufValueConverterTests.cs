@@ -36,7 +36,8 @@ public class ProtobufValueConverterTests
         var builder = new TestSiloBuilder();
         builder.UseProtobufCodec(options => options.AddMessageParser(StringValue.Parser));
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var codec = serviceProvider.GetRequiredService<IDurableValueCodecProvider>().GetCodec<StringValue>();
+        Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredKeyedService<IStateMachineLogFormat>(StateMachineLogFormatKeys.Protobuf));
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf).GetCodec<StringValue>();
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet(new StringValue { Value = "hello" }, buffer);
@@ -55,7 +56,7 @@ public class ProtobufValueConverterTests
         builder.Services.AddSingleton<ILogDataCodec<StringValue>>(fallbackCodec);
         builder.UseProtobufCodec();
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var codec = serviceProvider.GetRequiredService<IDurableValueCodecProvider>().GetCodec<StringValue>();
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf).GetCodec<StringValue>();
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet(new StringValue { Value = "hello" }, buffer);
@@ -74,7 +75,7 @@ public class ProtobufValueConverterTests
         var builder = new TestSiloBuilder();
         builder.UseProtobufCodec();
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var provider = serviceProvider.GetRequiredService<IDurableValueCodecProvider>();
+        var provider = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf);
 
         var exception = Assert.Throws<InvalidOperationException>(() => provider.GetCodec<StringValue>());
 
@@ -87,7 +88,7 @@ public class ProtobufValueConverterTests
         var builder = new TestSiloBuilder();
         builder.UseProtobufCodec();
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var provider = serviceProvider.GetRequiredService<IDurableValueCodecProvider>();
+        var provider = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf);
 
         var exception = Assert.Throws<InvalidOperationException>(() => provider.GetCodec<UnsupportedValue>());
 

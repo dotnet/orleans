@@ -45,7 +45,7 @@ public abstract class StateMachineTestBase
     /// Creates a state machine manager with in-memory storage
     /// </summary>
     internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle)
-        CreateTestSystem(IStateMachineStorage? storage = null, TimeProvider? provider = null)
+        CreateTestSystem(IStateMachineStorage? storage = null, TimeProvider? provider = null, IStateMachineLogFormat? logFormat = null)
     {
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
@@ -56,7 +56,7 @@ public abstract class StateMachineTestBase
         var dateTimeCodec = new OrleansLogDataCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
         var stateMachineIdsCodec = new OrleansBinaryDictionaryEntryCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryEntryCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager = new StateMachineManager(storage, logger, Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, provider);
+        var manager = new StateMachineManager(storage, logger, Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, provider, logFormat);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

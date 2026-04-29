@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -21,10 +21,10 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     private readonly List<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    public DurableList([ServiceKey] string key, IStateMachineManager manager, IDurableListCodecProvider codecProvider)
+    public DurableList([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codecProvider.GetCodec<T>();
+        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableListCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
@@ -46,17 +46,9 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
                 ThrowIndexOutOfRange();
             }
 
-            var writer = GetStorage().BeginEntry();
-            try
-            {
-                _codec.WriteSet(index, value, writer);
-                writer.Commit();
-            }
-            catch
-            {
-                writer.Abort();
-                throw;
-            }
+            using var entry = GetStorage().BeginEntry();
+            _codec.WriteSet(index, value, entry.Writer);
+            entry.Commit();
 
             ApplySet(index, value);
         }
@@ -77,56 +69,32 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
     {
-        var writer = snapshotWriter.BeginEntry();
-        try
-        {
-            _codec.WriteSnapshot(_items, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = snapshotWriter.BeginEntry();
+        _codec.WriteSnapshot(_items, entry.Writer);
+        entry.Commit();
     }
 
     public void Add(T item)
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteAdd(item, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteAdd(item, entry.Writer);
+        entry.Commit();
 
         ApplyAdd(item);
     }
 
     public void Clear()
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteClear(writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteClear(entry.Writer);
+        entry.Commit();
 
         ApplyClear();
     }
@@ -142,17 +110,9 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
             ThrowIndexOutOfRange();
         }
 
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteInsert(index, item, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteInsert(index, item, entry.Writer);
+        entry.Commit();
 
         ApplyInsert(index, item);
     }
@@ -176,17 +136,9 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
             ThrowIndexOutOfRange();
         }
 
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteRemoveAt(index, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteRemoveAt(index, entry.Writer);
+        entry.Commit();
 
         ApplyRemoveAt(index);
     }

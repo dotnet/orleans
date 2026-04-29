@@ -1,5 +1,7 @@
+using System.Buffers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -63,12 +65,255 @@ public class StateMachineManagerTests : StateMachineTestBase
     public async Task StateMachineManager_Recovery_PreservesUnknownStateMachineEntry()
     {
         var storage = new VolatileStateMachineStorage();
-        using var segment = new LogExtentBuilder();
-        segment.AppendEntry(new StateMachineId(99), new byte[] { 1, 2, 3 });
-        await storage.AppendAsync(segment, CancellationToken.None);
+        using var segment = new LogExtentBuffer();
+        using (var entry = segment.CreateLogWriter(new StateMachineId(99)).BeginEntry())
+        {
+            entry.Writer.Write([1, 2, 3]);
+            entry.Commit();
+        }
+
+        using var data = segment.GetCommittedBuffer();
+        await storage.AppendAsync(data, CancellationToken.None);
         var sut = CreateTestSystem(storage: storage);
 
         await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task StateMachineManager_UnknownStateMachineCompaction_PreservesDecodedPayloadThroughFormatWriter()
+    {
+        var physicalBytes = new byte[] { 0xF0, 0x0D, 0x99 };
+        var decodedPayload = new byte[] { 1, 2, 3 };
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        using (var data = CreateBuffer(physicalBytes))
+        {
+            await storage.AppendAsync(data, CancellationToken.None);
+        }
+
+        var format = new DecodedPayloadOnlyLogFormat(new StateMachineId(99), decodedPayload);
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var replacement = Assert.Single(storage.Replaces);
+        Assert.NotEqual(physicalBytes, replacement);
+
+        var entries = ReadBinaryEntries(replacement);
+        var preserved = Assert.Single(entries, entry => entry.StreamId.Value == 99);
+        Assert.Equal(decodedPayload, preserved.Payload);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Contains(99UL, writer.BeganEntryIds);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_RetiredStateMachineCompaction_WritesPreservedPayloadThroughFormatOwnedEntry()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("retired", initial.Manager, CreateDictionaryCodec<string, int>());
+
+        await initial.Lifecycle.OnStart();
+        dictionary.Add("key", 7);
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.IsCompactionRequested = true;
+        var format = new TrackingLogFormat();
+        var compacting = CreateTestSystem(storage: storage, logFormat: format);
+
+        await compacting.Lifecycle.OnStart();
+        await compacting.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Contains(writer.BeganEntryIds, id => id >= 8);
+        Assert.Single(storage.Replaces);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>("retired", recovered.Manager, CreateDictionaryCodec<string, int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(7, recoveredDictionary["key"]);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DirectWrites_UseFormatOwnedCurrentExtentWriter()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Single(storage.Appends);
+        Assert.Empty(storage.Replaces);
+        Assert.Contains(0UL, writer.CreatedLogWriterIds);
+        Assert.Contains(writer.CreatedLogWriterIds, id => id >= 8);
+        Assert.True(writer.GetCommittedBufferCount > 0);
+        Assert.True(writer.ResetCount > 0);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_AppendLogFlush_UsesFormatOwnedWriter()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Single(storage.Appends);
+        Assert.Contains(writer.CreatedLogWriterIds, id => id >= 8);
+        Assert.True(storage.Appends[0].Length > 0);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DefaultAppend_StoresBinaryFixed32Entries()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var append = Assert.Single(storage.Appends);
+        Assert.Empty(storage.Replaces);
+        AssertContainsRuntimeAndApplicationEntries(ReadBinaryEntries(append));
+    }
+
+    [Fact]
+    public async Task StateMachineManager_AppendBufferIsBorrowedUntilStorageCompletes()
+    {
+        var storage = new DelayedBorrowingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.NotNull(storage.AppendBytesAfterYield);
+        Assert.NotEmpty(storage.AppendBytesAfterYield);
+        Assert.Throws<InvalidOperationException>(storage.ReadRetainedAppendBuffer);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_ReplaceBufferIsBorrowedUntilStorageCompletes()
+    {
+        var storage = new DelayedBorrowingStorage { IsCompactionRequested = true };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.NotNull(storage.ReplaceBytesAfterYield);
+        Assert.NotEmpty(storage.ReplaceBytesAfterYield);
+        Assert.Throws<InvalidOperationException>(storage.ReadRetainedReplaceBuffer);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DefaultSnapshot_StoresBinaryFixed32Entries()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var replacement = Assert.Single(storage.Replaces);
+        Assert.Empty(storage.Appends);
+        AssertContainsRuntimeAndApplicationEntries(ReadBinaryEntries(replacement));
+    }
+
+    [Fact]
+    public async Task StateMachineManager_SnapshotFlush_ResetsPendingAppendData()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Empty(storage.Appends);
+        Assert.Single(storage.Replaces);
+        Assert.True(writer.ResetCount >= 2);
+
+        var recovered = CreateTestSystem(storage: storage, logFormat: new TrackingLogFormat());
+        var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(1, recoveredDictionary["key"]);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DirectWriteFailure_AbortsEntryBeforeMutation()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var dictionary = new DurableDictionary<int, int>("dict", sut.Manager, new ThrowingDictionarySetCodec<int, int>());
+
+        await sut.Lifecycle.OnStart();
+        var writer = Assert.Single(format.Writers);
+        var lengthBefore = writer.Length;
+
+        Assert.Throws<InvalidOperationException>(() => dictionary.Add(1, 1));
+
+        Assert.Empty(dictionary);
+        Assert.Equal(lengthBefore, writer.Length);
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_WriteStateAsync_DoesNotObserveActiveEntry()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var stateMachine = new ManualDirectWriteStateMachine();
+        sut.Manager.RegisterStateMachine("manual", stateMachine);
+
+        await sut.Lifecycle.OnStart();
+
+        Task writeTask = Task.CompletedTask;
+        var entry = stateMachine.BeginEntry();
+        try
+        {
+            entry.Writer.Write([1, 2, 3]);
+            writeTask = Task.Run(async () => await sut.Manager.WriteStateAsync(CancellationToken.None));
+            Thread.Sleep(100);
+
+            Assert.False(writeTask.IsCompleted);
+            Assert.Empty(storage.Appends);
+
+            entry.Commit();
+        }
+        finally
+        {
+            entry.Dispose();
+        }
+
+        await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Single(storage.Appends);
     }
 
     /// <summary>
@@ -108,6 +353,84 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal(2, recoveredList.Count);
         Assert.Equal("item1", recoveredList[0]);
         Assert.Equal("item2", recoveredList[1]);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_UsesSelectedLogFormatRead()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", initial.Manager, CreateValueCodec<int>());
+
+        await initial.Lifecycle.OnStart();
+        value.Value = 42;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        var format = new TrackingLogFormat();
+        var recovered = CreateTestSystem(storage: storage, logFormat: format);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(42, recoveredValue.Value);
+        Assert.True(format.ReadCount > 0);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_ReadsConcatenatedLogData()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", initial.Manager, CreateValueCodec<int>());
+
+        await initial.Lifecycle.OnStart();
+        value.Value = 1;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        value.Value = 2;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.ConcatenateReads = true;
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(2, recoveredValue.Value);
+        Assert.Equal(1, storage.ReadCallbackCount);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_RejectsMalformedTrailingData()
+    {
+        byte[] bytes;
+        using (var segment = new LogExtentBuffer())
+        {
+            using (var entry = segment.CreateLogWriter(new StateMachineId(99)).BeginEntry())
+            {
+                entry.Writer.Write([1, 2, 3]);
+                entry.Commit();
+            }
+
+            using var committed = segment.GetCommittedBuffer();
+            bytes = [.. committed.ToArray(), 1, 2, 3];
+        }
+
+        var storage = new RawReadStorage(bytes);
+        var sut = CreateTestSystem(storage: storage);
+
+        InvalidOperationException exception;
+        try
+        {
+            exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            await sut.Lifecycle.OnStop(CancellationToken.None);
+        }
+
+        Assert.Contains("Malformed binary log entry stream", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("truncated fixed32 entry length prefix", exception.Message, StringComparison.Ordinal);
     }
 
     /// <summary>
@@ -406,18 +729,320 @@ public class StateMachineManagerTests : StateMachineTestBase
     {
         public bool StreamingReadCalled { get; private set; }
 
+        public string LogFormatKey => StateMachineLogFormatKeys.OrleansBinary;
+
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken)
         {
             StreamingReadCalled = true;
             return default;
         }
 
-        public ValueTask ReplaceAsync(LogExtentBuilder value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(LogExtentBuilder value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private OrleansBinaryDictionaryEntryCodec<K, V> CreateDictionaryCodec<K, V>() where K : notnull =>
+        new(new OrleansLogDataCodec<K>(CodecProvider.GetCodec<K>(), SessionPool), new OrleansLogDataCodec<V>(CodecProvider.GetCodec<V>(), SessionPool));
+
+    private OrleansBinaryValueEntryCodec<T> CreateValueCodec<T>() =>
+        new(new OrleansLogDataCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
+
+    private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> value)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(value);
+        return writer.ConsumeSlice(writer.Length);
+    }
+
+    private static List<CapturedLogEntry> ReadBinaryEntries(ReadOnlySpan<byte> bytes)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        using var buffer = writer.ConsumeSlice(writer.Length);
+        var consumer = new CapturingLogEntryConsumer();
+        ((IStateMachineLogFormat)BinaryLogExtentCodec.Instance).Read(buffer, consumer);
+
+        return consumer.Entries;
+    }
+
+    private readonly record struct CapturedLogEntry(StateMachineId StreamId, byte[] Payload);
+
+    private static void AssertContainsRuntimeAndApplicationEntries(IReadOnlyCollection<CapturedLogEntry> entries)
+    {
+        Assert.Contains(entries, entry => entry.StreamId.Value == 0 && entry.Payload.Length > 0);
+        Assert.Contains(entries, entry => entry.StreamId.Value >= 8 && entry.Payload.Length > 0);
+    }
+
+    private sealed class CapturingLogEntryConsumer : IStateMachineLogEntryConsumer
+    {
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
+    }
+
+    private sealed class DecodedPayloadOnlyLogFormat : IStateMachineLogFormat
+    {
+        private readonly StateMachineId _streamId;
+        private readonly byte[] _payload;
+        private readonly TrackingLogFormat _writerFormat = new();
+
+        public DecodedPayloadOnlyLogFormat(StateMachineId streamId, byte[] payload)
+        {
+            _streamId = streamId;
+            _payload = payload.ToArray();
+        }
+
+        public List<TrackingLogExtentWriter> Writers => _writerFormat.Writers;
+
+        public IStateMachineLogExtentWriter CreateWriter() => _writerFormat.CreateWriter();
+
+        public void Read(ArcBuffer input, IStateMachineLogEntryConsumer consumer)
+        {
+            var callbackPayload = _payload.ToArray();
+            consumer.OnEntry(_streamId, new ReadOnlySequence<byte>(callbackPayload));
+            Array.Fill(callbackPayload, byte.MaxValue);
+        }
+    }
+
+    private sealed class TrackingLogFormat : IStateMachineLogFormat
+    {
+        public List<TrackingLogExtentWriter> Writers { get; } = [];
+
+        public int ReadCount { get; private set; }
+
+        public IStateMachineLogExtentWriter CreateWriter()
+        {
+            var writer = new TrackingLogExtentWriter();
+            Writers.Add(writer);
+            return writer;
+        }
+
+        public void Read(ArcBuffer input, IStateMachineLogEntryConsumer consumer)
+        {
+            ReadCount++;
+            ((IStateMachineLogFormat)BinaryLogExtentCodec.Instance).Read(input, consumer);
+        }
+    }
+
+    private sealed class TrackingLogExtentWriter : IStateMachineLogExtentWriter
+    {
+        private readonly LogExtentBuffer _inner = new();
+
+        public List<ulong> CreatedLogWriterIds { get; } = [];
+
+        public List<ulong> BeganEntryIds { get; } = [];
+
+        public int GetCommittedBufferCount { get; private set; }
+
+        public int ResetCount { get; private set; }
+
+        public long Length => _inner.Length;
+
+        public StateMachineLogWriter CreateLogWriter(StateMachineId streamId)
+        {
+            CreatedLogWriterIds.Add(streamId.Value);
+            return new(streamId, new TrackingLogWriterTarget(this));
+        }
+
+        public ArcBuffer GetCommittedBuffer()
+        {
+            GetCommittedBufferCount++;
+            return _inner.GetCommittedBuffer();
+        }
+
+        public void Reset()
+        {
+            ResetCount++;
+            _inner.Reset();
+        }
+
+        public void Dispose() => _inner.Dispose();
+
+        private sealed class TrackingLogWriterTarget(TrackingLogExtentWriter owner) : IStateMachineLogWriterTarget
+        {
+            public LogEntryWriter BeginEntry(StateMachineId streamId, ILogEntryWriterCompletion? completion)
+            {
+                owner.BeganEntryIds.Add(streamId.Value);
+                return owner._inner.BeginEntry(streamId, completion);
+            }
+        }
+    }
+
+    private sealed class CapturingStorage : IStateMachineStorage
+    {
+        private readonly List<byte[]> _segments = [];
+
+        public List<byte[]> Appends { get; } = [];
+
+        public List<byte[]> Replaces { get; } = [];
+
+        public bool ConcatenateReads { get; set; }
+
+        public int ReadCallbackCount { get; private set; }
+
+        public string LogFormatKey => StateMachineLogFormatKeys.OrleansBinary;
+
+        public bool IsCompactionRequested { get; set; }
+
+        public ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken)
+        {
+            if (ConcatenateReads)
+            {
+                using var writer = new ArcBufferWriter();
+                foreach (var segment in _segments)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    writer.Write(segment);
+                }
+
+                if (writer.Length > 0)
+                {
+                    using var data = writer.ConsumeSlice(writer.Length);
+                    ReadCallbackCount++;
+                    consumer.OnLogData(data);
+                }
+
+                return default;
+            }
+
+            foreach (var segment in _segments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                using var writer = new ArcBufferWriter();
+                writer.Write(segment);
+                using var data = writer.ConsumeSlice(writer.Length);
+                ReadCallbackCount++;
+                consumer.OnLogData(data);
+            }
+
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytes = value.ToArray();
+            Replaces.Add(bytes);
+            _segments.Clear();
+            _segments.Add(bytes);
+            return default;
+        }
+
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytes = value.ToArray();
+            Appends.Add(bytes);
+            _segments.Add(bytes);
+            return default;
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _segments.Clear();
+            return default;
+        }
+    }
+
+    private sealed class RawReadStorage(byte[] bytes) : IStateMachineStorage
+    {
+        public string LogFormatKey => StateMachineLogFormatKeys.OrleansBinary;
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            using var writer = new ArcBufferWriter();
+            writer.Write(bytes);
+            using var data = writer.ConsumeSlice(writer.Length);
+            consumer.OnLogData(data);
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class DelayedBorrowingStorage : IStateMachineStorage
+    {
+        private ArcBuffer _retainedAppendBuffer;
+        private ArcBuffer _retainedReplaceBuffer;
+
+        public byte[]? AppendBytesAfterYield { get; private set; }
+
+        public byte[]? ReplaceBytesAfterYield { get; private set; }
+
+        public string LogFormatKey => StateMachineLogFormatKeys.OrleansBinary;
+
+        public bool IsCompactionRequested { get; set; }
+
+        public ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken) => default;
+
+        public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        {
+            _retainedReplaceBuffer = value;
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            ReplaceBytesAfterYield = value.ToArray();
+        }
+
+        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        {
+            _retainedAppendBuffer = value;
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            AppendBytesAfterYield = value.ToArray();
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+
+        public byte[] ReadRetainedAppendBuffer() => _retainedAppendBuffer.ToArray();
+
+        public byte[] ReadRetainedReplaceBuffer() => _retainedReplaceBuffer.ToArray();
+    }
+
+    private sealed class ManualDirectWriteStateMachine : IDurableStateMachine
+    {
+        private IStateMachineLogWriter? _writer;
+
+        public StateMachineLogEntry BeginEntry() => (_writer ?? throw new InvalidOperationException("State machine is not initialized.")).BeginEntry();
+
+        public void Reset(IStateMachineLogWriter storage) => _writer = storage;
+
+        public void Apply(ReadOnlySequence<byte> logEntry) { }
+
+        public void AppendEntries(StateMachineLogWriter writer) { }
+
+        public void AppendSnapshot(StateMachineLogWriter writer) { }
+
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryCodec<K, V> where K : notnull
+    {
+        public void WriteSet(K key, V value, IBufferWriter<byte> output)
+        {
+            output.GetSpan(1)[0] = 1;
+            output.Advance(1);
+            throw new InvalidOperationException("Expected test exception.");
+        }
+
+        public void WriteRemove(K key, IBufferWriter<byte> output) => throw new NotSupportedException();
+
+        public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
+
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, IBufferWriter<byte> output) => throw new NotSupportedException();
+
+        public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<K, V> consumer) => throw new NotSupportedException();
     }
 }

@@ -33,8 +33,17 @@ public static class MessagePackJournalingExtensions
         configure?.Invoke(options);
 
         builder.Services.AddSingleton(options);
-        builder.Services.AddSingleton<IStateMachineLogExtentCodec, MessagePackLogExtentCodec>();
+        builder.Services.AddSingleton<MessagePackLogFormat>();
+        builder.Services.AddKeyedSingleton<IStateMachineLogFormat>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogFormat>());
+        builder.Services.AddSingleton<IStateMachineLogFormat>(static sp => sp.GetRequiredService<MessagePackLogFormat>());
         builder.Services.AddSingleton<MessagePackLogEntryCodecProvider>();
+        builder.Services.AddKeyedSingleton<IDurableDictionaryCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());

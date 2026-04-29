@@ -66,7 +66,11 @@ public class CodecRecoveryTests : StateMachineTestBase
         dict.Add("beta", 2);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         var log = Encoding.UTF8.GetString(storage.Segments.Single());
-        Assert.Equal("""[{"streamId":0,"entry":{"cmd":"set","key":"dict","value":8}},{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}},{"streamId":8,"entry":{"cmd":"set","key":"beta","value":2}}]""" + "\n", log);
+        Assert.Equal(
+            """{"streamId":0,"entry":{"cmd":"set","key":"dict","value":8}}""" + "\n" +
+            """{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}""" + "\n" +
+            """{"streamId":8,"entry":{"cmd":"set","key":"beta","value":2}}""" + "\n",
+            log);
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -140,13 +144,13 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var stateMachineIdsCodec = new JsonDictionaryEntryCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryEntryCodec<string, DateTime>(jsonOptions);
-        var manager = new StateMachineManager(storage, LoggerFactory.CreateLogger<StateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System);
+        var manager = new StateMachineManager(storage, LoggerFactory.CreateLogger<StateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System, new JsonLinesLogFormat());
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
 
-    private static VolatileStateMachineStorage CreateJsonStorage() => new(new JsonLinesLogExtentCodec());
+    private static VolatileStateMachineStorage CreateJsonStorage() => new(StateMachineLogFormatKeys.Json);
 
     private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };

@@ -2,8 +2,8 @@ using System.Buffers;
 using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling.Protobuf;
-using Orleans.Serialization.Buffers;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Xunit;
@@ -236,41 +236,122 @@ public class ProtobufCodecTests
     }
 
     [Fact]
-    public void ProtobufLogExtentCodec_Encode_WritesFixed32FramedEntries()
+    public void ProtobufLogFormat_WritesLengthDelimitedEntryMessages()
     {
-        var codec = new ProtobufLogExtentCodec();
-        using var builder = new LogExtentBuilder();
-        var writer = builder.CreateLogWriter(new(8));
-        writer.AppendEntry((ReadOnlySpan<byte>)[8, 0]);
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
 
-        var encoded = codec.Encode(builder);
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
 
-        Assert.Equal([3, 0, 0, 0, 17, 8, 0], encoded);
+        using var data = writer.GetCommittedBuffer();
+
+        Assert.Equal(
+            [
+                0x06, 0x08, 0x08, 0x12, 0x02, 0xAA, 0xBB,
+                0x06, 0x08, 0xAC, 0x02, 0x12, 0x01, 0xCC
+            ],
+            data.ToArray());
     }
 
     [Fact]
-    public void ProtobufLogExtentCodec_Decode_RoundTripsEntries()
+    public void ProtobufLogFormat_Read_ParsesConcatenatedEntries()
     {
-        var codec = new ProtobufLogExtentCodec();
-        using var extent = Decode(codec, [3, 0, 0, 0, 17, 8, 0]);
-        var entry = Assert.Single(extent.Entries);
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
+        using var data = writer.GetCommittedBuffer();
+        var consumer = new CollectingConsumer();
 
-        Assert.Equal((ulong)8, entry.StreamId.Value);
-        Assert.Equal([8, 0], entry.Payload.ToArray());
+        format.Read(data, consumer);
+
+        Assert.Collection(
+            consumer.Entries,
+            entry =>
+            {
+                Assert.Equal((ulong)8, entry.StreamId);
+                Assert.Equal([0xAA, 0xBB], entry.Payload);
+            },
+            entry =>
+            {
+                Assert.Equal((ulong)300, entry.StreamId);
+                Assert.Equal([0xCC], entry.Payload);
+            });
+    }
+
+    [Fact]
+    public void ProtobufLogFormat_DisposeWithoutCommit_AbortsPendingEntry()
+    {
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+        using var beforeAbort = writer.GetCommittedBuffer();
+        var committedBytes = beforeAbort.ToArray();
+
+        using (var aborted = writer.CreateLogWriter(new StateMachineId(9)).BeginEntry())
+        {
+            aborted.Writer.Write([2, 3, 4]);
+        }
+
+        using var afterAbort = writer.GetCommittedBuffer();
+        Assert.Equal(committedBytes, afterAbort.ToArray());
+    }
+
+    [Fact]
+    public void ProtobufLogFormat_Reset_ReusesWriter()
+    {
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+
+        writer.Reset();
+        AppendEntry(writer.CreateLogWriter(new StateMachineId(9)), [2]);
+        using var data = writer.GetCommittedBuffer();
+        var consumer = new CollectingConsumer();
+
+        format.Read(data, consumer);
+
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal((ulong)9, entry.StreamId);
+        Assert.Equal([2], entry.Payload);
+    }
+
+    [Fact]
+    public void ProtobufLogFormat_GetCommittedBuffer_ThrowsWhenEntryIsActive()
+    {
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        var entry = writer.CreateLogWriter(new StateMachineId(8)).BeginEntry();
+        entry.Writer.Write([1]);
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            using var _ = writer.GetCommittedBuffer();
+        });
+
+        Assert.Contains("active entry", exception.Message, StringComparison.Ordinal);
+        entry.Dispose();
     }
 
     [Theory]
-    [InlineData(new byte[] { 1, 2 }, "missing entry length")]
-    [InlineData(new byte[] { 10, 0, 0, 0, 1, 2 }, "entry length exceeds")]
-    [InlineData(new byte[] { 0, 0, 0, 0 }, "Insufficient data")]
-    public void ProtobufLogExtentCodec_Decode_InvalidExtent_Throws(byte[] bytes, string expectedMessage)
+    [InlineData(new byte[] { 0x80 }, "truncated LogEntry length prefix")]
+    [InlineData(new byte[] { 0x02, 0x08 }, "exceeds remaining input bytes")]
+    [InlineData(new byte[] { 0x00 }, "empty LogEntry")]
+    [InlineData(new byte[] { 0x02, 0x08, 0x01 }, "missing required payload")]
+    [InlineData(new byte[] { 0x02, 0x12, 0x00 }, "missing required stream_id")]
+    [InlineData(new byte[] { 0x03, 0x08, 0x80, 0x80 }, "truncated stream_id")]
+    [InlineData(new byte[] { 0x02, 0x10, 0x01 }, "payload must be a bytes field")]
+    public void ProtobufLogFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
-        var codec = new ProtobufLogExtentCodec();
-        using var extent = Decode(codec, bytes);
+        var format = new ProtobufLogFormat();
+        using var data = CreateBuffer(bytes);
+        var consumer = new CollectingConsumer();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => extent.Entries.ToList());
+        var exception = Assert.Throws<InvalidOperationException>(() => format.Read(data, consumer));
 
-        Assert.Contains(expectedMessage, exception.Message);
+        Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        Assert.Empty(consumer.Entries);
     }
 
     private ProtobufValueConverter<T> CreateConverter<T>()
@@ -280,11 +361,18 @@ public class ProtobufCodecTests
 
     private static ReadOnlySequence<byte> Sequence(byte[] bytes) => new(bytes);
 
-    private static LogExtent Decode(IStateMachineLogExtentCodec codec, byte[] bytes)
+    private static void AppendEntry(StateMachineLogWriter writer, ReadOnlySpan<byte> payload)
     {
-        using var buffer = new ArcBufferWriter();
-        buffer.Write(bytes);
-        return codec.Decode(buffer.ConsumeSlice(buffer.Length));
+        using var entry = writer.BeginEntry();
+        entry.Writer.Write(payload);
+        entry.Commit();
+    }
+
+    private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> bytes)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        return writer.ConsumeSlice(writer.Length);
     }
 
     private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
@@ -391,6 +479,14 @@ public class ProtobufCodecTests
         public void ApplyCompleted(T value) => Commands.Add($"completed:{value}");
         public void ApplyFaulted(Exception exception) => Commands.Add($"faulted:{exception.Message}");
         public void ApplyCanceled() => Commands.Add("canceled");
+    }
+
+    private sealed class CollectingConsumer : IStateMachineLogEntryConsumer
+    {
+        public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
+
+        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) =>
+            Entries.Add((streamId.Value, payload.ToArray()));
     }
 
     private sealed class MiscountedReadOnlyCollection<T>(int count, IReadOnlyCollection<T> items) : IReadOnlyCollection<T>

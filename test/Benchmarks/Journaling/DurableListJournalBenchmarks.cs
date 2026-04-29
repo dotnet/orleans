@@ -1,0 +1,200 @@
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Diagnostics.CodeAnalysis;
+using BenchmarkDotNet.Attributes;
+using Orleans.Journaling;
+using Orleans.Serialization.Buffers;
+
+namespace Benchmarks.Journaling;
+
+[BenchmarkCategory("Journaling")]
+[MemoryDiagnoser(displayGenColumns: false)]
+public class DurableListJournalBenchmarks
+{
+    private const int OperationsPerInvocation = 4_096;
+    private static readonly StateMachineId ListStateMachineId = new(8);
+
+    private IDurableListCodec<int> _codec;
+    private IStateMachineLogFormat _logFormat;
+    private DurableList<int> _list;
+    private IDurableStateMachine _stateMachine;
+    private LogExtentBuffer _writeBuffer;
+    private BenchmarkLogWriter _outOfBandWriter;
+    private LogExtentBuffer _encodedLogWriter;
+    private ArcBuffer _encodedLogData;
+    private RecoveryConsumer _recoveryConsumer;
+
+    [GlobalSetup]
+    public void GlobalSetup()
+    {
+        _codec = new OrleansBinaryListEntryCodec<int>(RawInt32LogDataCodec.Instance);
+        _logFormat = BinaryLogExtentCodec.Instance;
+        _writeBuffer = new LogExtentBuffer();
+        _outOfBandWriter = new BenchmarkLogWriter(_writeBuffer, ListStateMachineId);
+        _list = new DurableList<int>("list", new BenchmarkStateMachineManager(_outOfBandWriter), _codec);
+        _stateMachine = _list;
+        _recoveryConsumer = new RecoveryConsumer(ListStateMachineId, _codec, OperationsPerInvocation);
+
+        WarmWritePathCapacity();
+        _encodedLogData = CreateEncodedLogData();
+        ValidateEncodedLogData();
+    }
+
+    [GlobalCleanup]
+    public void GlobalCleanup()
+    {
+        _encodedLogData.Dispose();
+        _encodedLogWriter.Dispose();
+        _writeBuffer.Dispose();
+    }
+
+    [Benchmark(OperationsPerInvoke = OperationsPerInvocation)]
+    public int DurableListAddWritesDirectEntry()
+    {
+        ResetWritePath();
+        for (var i = 0; i < OperationsPerInvocation; i++)
+        {
+            _list.Add(i);
+        }
+
+        return _list.Count;
+    }
+
+    [Benchmark(OperationsPerInvoke = OperationsPerInvocation)]
+    public int RecoverEncodedLogData()
+    {
+        _recoveryConsumer.Reset();
+        _logFormat.Read(_encodedLogData, _recoveryConsumer);
+
+        return _recoveryConsumer.Count;
+    }
+
+    private void WarmWritePathCapacity()
+    {
+        for (var i = 0; i < OperationsPerInvocation; i++)
+        {
+            _list.Add(i);
+        }
+
+        ResetWritePath();
+    }
+
+    private void ResetWritePath()
+    {
+        _writeBuffer.Reset();
+        _stateMachine.Reset(_outOfBandWriter);
+    }
+
+    private ArcBuffer CreateEncodedLogData()
+    {
+        _encodedLogWriter = new LogExtentBuffer();
+        var writer = _encodedLogWriter.CreateLogWriter(ListStateMachineId);
+        for (var i = 0; i < OperationsPerInvocation; i++)
+        {
+            using var entry = writer.BeginEntry();
+            _codec.WriteAdd(i, entry.Writer);
+            entry.Commit();
+        }
+
+        return _encodedLogWriter.GetCommittedBuffer();
+    }
+
+    private void ValidateEncodedLogData()
+    {
+        _logFormat.Read(_encodedLogData, _recoveryConsumer);
+        if (_recoveryConsumer.Count != OperationsPerInvocation)
+        {
+            throw new InvalidOperationException("The encoded journaling benchmark data did not replay all operations.");
+        }
+
+        _recoveryConsumer.Reset();
+    }
+
+    private sealed class RawInt32LogDataCodec : ILogDataCodec<int>
+    {
+        public static RawInt32LogDataCodec Instance { get; } = new();
+
+        public void Write(int value, IBufferWriter<byte> output)
+        {
+            var span = output.GetSpan(sizeof(int));
+            BinaryPrimitives.WriteInt32LittleEndian(span, value);
+            output.Advance(sizeof(int));
+        }
+
+        public int Read(ReadOnlySequence<byte> input, out long bytesConsumed)
+        {
+            var reader = new SequenceReader<byte>(input);
+            Span<byte> bytes = stackalloc byte[sizeof(int)];
+            if (reader.Remaining < sizeof(int) || !reader.TryCopyTo(bytes))
+            {
+                throw new InvalidOperationException("The encoded integer payload is truncated.");
+            }
+
+            reader.Advance(sizeof(int));
+            bytesConsumed = reader.Consumed;
+            return BinaryPrimitives.ReadInt32LittleEndian(bytes);
+        }
+    }
+
+    private sealed class BenchmarkLogWriter(LogExtentBuffer buffer, StateMachineId streamId) : IStateMachineLogWriter
+    {
+        public StateMachineLogEntry BeginEntry() => buffer.CreateLogWriter(streamId).BeginEntry();
+    }
+
+    private sealed class BenchmarkStateMachineManager(IStateMachineLogWriter writer) : IStateMachineManager
+    {
+        public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
+
+        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) => stateMachine.Reset(writer);
+
+        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine stateMachine)
+        {
+            stateMachine = null!;
+            return false;
+        }
+
+        public ValueTask WriteStateAsync(CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class RecoveryConsumer(
+        StateMachineId expectedStreamId,
+        IDurableListCodec<int> codec,
+        int capacity) : IStateMachineLogEntryConsumer, IDurableListLogEntryConsumer<int>
+    {
+        private readonly List<int> _items = new(capacity);
+
+        public int Count => _items.Count;
+
+        public void Reset() => _items.Clear();
+
+        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload)
+        {
+            if (streamId != expectedStreamId)
+            {
+                throw new InvalidOperationException("The encoded journaling benchmark data contained an unexpected stream id.");
+            }
+
+            codec.Apply(payload, this);
+        }
+
+        public void ApplyAdd(int item) => _items.Add(item);
+
+        public void ApplySet(int index, int item) => _items[index] = item;
+
+        public void ApplyInsert(int index, int item) => _items.Insert(index, item);
+
+        public void ApplyRemoveAt(int index) => _items.RemoveAt(index);
+
+        public void ApplyClear() => _items.Clear();
+
+        public void ApplySnapshotStart(int count)
+        {
+            _items.Clear();
+            _items.EnsureCapacity(count);
+        }
+
+        public void ApplySnapshotItem(int item) => _items.Add(item);
+    }
+}

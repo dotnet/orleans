@@ -1,4 +1,4 @@
-﻿using System.Buffers;
+using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -27,10 +27,10 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     private readonly HashSet<T> _items = [];
     private IStateMachineLogWriter? _storage;
 
-    public DurableSet([ServiceKey] string key, IStateMachineManager manager, IDurableSetCodecProvider codecProvider)
+    public DurableSet([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codecProvider.GetCodec<T>();
+        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableSetCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
@@ -55,29 +55,23 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
     {
-        WriteSnapshot(_items, snapshotWriter.BeginEntry());
+        using var entry = snapshotWriter.BeginEntry();
+        _codec.WriteSnapshot(_items, entry.Writer);
+        entry.Commit();
     }
 
     public void Clear()
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteClear(writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteClear(entry.Writer);
+        entry.Commit();
 
         ApplyClear();
     }
@@ -92,17 +86,9 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
             return false;
         }
 
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteAdd(item, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteAdd(item, entry.Writer);
+        entry.Commit();
 
         _ = ApplyAdd(item);
         return true;
@@ -115,34 +101,19 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
             return false;
         }
 
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteRemove(item, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteRemove(item, entry.Writer);
+        entry.Commit();
 
         _ = ApplyRemove(item);
         return true;
     }
 
-    private void WriteSnapshot(IReadOnlyCollection<T> items, LogEntryWriter writer)
+    private void WriteSnapshot(IReadOnlyCollection<T> items)
     {
-        try
-        {
-            _codec.WriteSnapshot(items, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteSnapshot(items, entry.Writer);
+        entry.Commit();
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
@@ -193,7 +164,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         next.IntersectWith(other);
         if (!_items.SetEquals(next))
         {
-            WriteSnapshot(next, GetStorage().BeginEntry());
+            WriteSnapshot(next);
             _items.Clear();
             _items.UnionWith(next);
         }
@@ -205,7 +176,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         next.SymmetricExceptWith(other);
         if (!_items.SetEquals(next))
         {
-            WriteSnapshot(next, GetStorage().BeginEntry());
+            WriteSnapshot(next);
             _items.Clear();
             _items.UnionWith(next);
         }

@@ -3,7 +3,7 @@
 ## Introduction
 Microsoft Orleans Journaling for System.Text.Json provides a JSON Lines-based storage format for Orleans.Journaling durable state machines. Use this package to serialize durable dictionary, list, queue, set, value, state, and task completion source log entries directly as JSON records.
 
-This package configures the physical log extent format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the JSON Lines extent codec and the JSON durable-entry codec providers which durable state machines use to encode and recover their own operations.
+This package configures the physical log format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the JSON Lines log format and the JSON durable-entry codec providers which durable state machines use to encode and recover their own operations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -82,15 +82,15 @@ For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `Se
 
 ## Storage format
 
-`UseJsonCodec()` stores log extents as JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON array per line. Each line is one physical log extent and is terminated by `\n`. Recovery accepts both LF and CRLF line endings.
+`UseJsonCodec()` stores log entries as true JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON object per log entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings.
 
-Each extent line is an array of records. Each record contains the state machine id and the durable entry payload:
+Each record contains the state machine id and the durable entry payload:
 
 ```json
-[{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}]
+{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}
 ```
 
-The `entry` object is the durable state machine command. It is nested so storage metadata such as `streamId` cannot collide with durable command fields such as `cmd`, `key`, `value`, `items`, or `version`. Batching records into extent lines preserves the extent boundaries used by storage writes.
+The `entry` object is the durable state machine command. It is nested so storage metadata such as `streamId` cannot collide with durable command fields such as `cmd`, `key`, `value`, `items`, or `version`. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
 The configured journaling codec must match the data already stored for a grain. This package does not automatically migrate existing binary, protobuf, or older binary-framed JSON journaling data to JSON Lines.
 

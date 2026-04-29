@@ -208,8 +208,8 @@ namespace Orleans.Journaling
 
     public partial interface IDurableStateMachine
     {
-        void AppendEntries(StateMachineStorageWriter writer);
-        void AppendSnapshot(StateMachineStorageWriter writer);
+        void AppendEntries(StateMachineLogWriter writer);
+        void AppendSnapshot(StateMachineLogWriter writer);
         void Apply(System.Buffers.ReadOnlySequence<byte> entry);
         IDurableStateMachine DeepCopy();
         void OnRecoveryCompleted();
@@ -277,22 +277,34 @@ namespace Orleans.Journaling
         void Write(T value, System.Buffers.IBufferWriter<byte> output);
     }
 
+    public partial interface IStateMachineLogDataConsumer
+    {
+        void OnLogData(Serialization.Buffers.ArcBuffer data);
+    }
+
     public partial interface IStateMachineLogEntryConsumer
     {
         void OnEntry(StateMachineId streamId, System.Buffers.ReadOnlySequence<byte> payload);
     }
 
-    public partial interface IStateMachineLogExtentCodec
+    public partial interface IStateMachineLogExtentWriter : System.IDisposable
     {
-        LogExtent Decode(Serialization.Buffers.ArcBuffer value);
-        byte[] Encode(LogExtentBuilder value);
-        System.IO.Stream EncodeToStream(LogExtentBuilder value);
-        void Read(Serialization.Buffers.ArcBuffer value, IStateMachineLogEntryConsumer consumer);
+        long Length { get; }
+
+        StateMachineLogWriter CreateLogWriter(StateMachineId streamId);
+        Serialization.Buffers.ArcBuffer GetCommittedBuffer();
+        void Reset();
+    }
+
+    public partial interface IStateMachineLogFormat
+    {
+        IStateMachineLogExtentWriter CreateWriter();
+        void Read(Serialization.Buffers.ArcBuffer input, IStateMachineLogEntryConsumer consumer);
     }
 
     public partial interface IStateMachineLogWriter
     {
-        LogEntryWriter BeginEntry();
+        StateMachineLogEntry BeginEntry();
     }
 
     public partial interface IStateMachineManager
@@ -308,10 +320,12 @@ namespace Orleans.Journaling
     {
         bool IsCompactionRequested { get; }
 
-        System.Threading.Tasks.ValueTask AppendAsync(LogExtentBuilder value, System.Threading.CancellationToken cancellationToken);
+        string LogFormatKey { get; }
+
+        System.Threading.Tasks.ValueTask AppendAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask ReplaceAsync(LogExtentBuilder value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReplaceAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface IStateMachineStorageProvider
@@ -350,134 +364,13 @@ namespace Orleans.Journaling
 
         public System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
 
+        public void Write(System.Buffers.ReadOnlySequence<byte> value) { }
+
         public void Write(System.ReadOnlySpan<byte> value) { }
 
         public void WriteVarUInt32(uint value) { }
 
         public void WriteVarUInt64(ulong value) { }
-    }
-
-    public sealed partial class LogExtent : System.IDisposable
-    {
-        public LogExtent() { }
-
-        public LogExtent(Serialization.Buffers.ArcBuffer buffer) { }
-
-        public LogExtent(System.Collections.Generic.IReadOnlyList<Entry> entries) { }
-
-        public bool IsEmpty { get { throw null; } }
-
-        public void Dispose() { }
-
-        public readonly partial struct Entry : System.IEquatable<Entry>
-        {
-            private readonly int _dummyPrimitive;
-            public Entry(StateMachineId StreamId, System.Buffers.ReadOnlySequence<byte> Payload) { }
-
-            public System.Buffers.ReadOnlySequence<byte> Payload { get { throw null; } init { } }
-
-            public StateMachineId StreamId { get { throw null; } init { } }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public readonly void Deconstruct(out StateMachineId StreamId, out System.Buffers.ReadOnlySequence<byte> Payload) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public readonly bool Equals(Entry other) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public override readonly bool Equals(object obj) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public override readonly int GetHashCode() { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public static bool operator ==(Entry left, Entry right) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public static bool operator !=(Entry left, Entry right) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public override readonly string ToString() { throw null; }
-        }
-    }
-
-    public sealed partial class LogExtentBuilder : System.IDisposable, System.Buffers.IBufferWriter<byte>
-    {
-        public LogExtentBuilder() { }
-
-        public LogExtentBuilder(Serialization.Buffers.ArcBufferWriter buffer) { }
-
-        public System.Collections.Generic.IEnumerable<LogExtent.Entry> Entries { get { throw null; } }
-
-        public bool IsEmpty { get { throw null; } }
-
-        public long Length { get { throw null; } }
-
-        public System.IO.Stream AsReadOnlyStream() { throw null; }
-
-        public void CopyTo(System.IO.Stream destination, int bufferSize) { }
-
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.ValueTask CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public StateMachineStorageWriter CreateLogWriter(StateMachineId id) { throw null; }
-
-        public void Dispose() { }
-
-        public void Reset() { }
-
-        void System.Buffers.IBufferWriter<byte>.Advance(int count) { }
-
-        System.Memory<byte> System.Buffers.IBufferWriter<byte>.GetMemory(int sizeHint) { throw null; }
-
-        System.Span<byte> System.Buffers.IBufferWriter<byte>.GetSpan(int sizeHint) { throw null; }
-
-        public byte[] ToArray() { throw null; }
-
-        public sealed partial class ReadOnlyStream : System.IO.Stream
-        {
-            public override bool CanRead { get { throw null; } }
-
-            public override bool CanSeek { get { throw null; } }
-
-            public override bool CanWrite { get { throw null; } }
-
-            public override long Length { get { throw null; } }
-
-            public override long Position { get { throw null; } set { } }
-
-            public override void CopyTo(System.IO.Stream destination, int bufferSize) { }
-
-            public override System.Threading.Tasks.Task CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-            protected override void Dispose(bool disposing) { }
-
-            public override void Flush() { }
-
-            public override int Read(byte[] buffer, int offset, int count) { throw null; }
-
-            public override int Read(System.Span<byte> buffer) { throw null; }
-
-            public override System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-            public override System.Threading.Tasks.ValueTask<int> ReadAsync(System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-            public void Reset() { }
-
-            public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
-
-            public void SetBuilder(LogExtentBuilder builder) { }
-
-            public override void SetLength(long value) { }
-
-            public override void Write(byte[] buffer, int offset, int count) { }
-
-            public override void Write(System.ReadOnlySpan<byte> buffer) { }
-
-            public override System.Threading.Tasks.ValueTask WriteAsync(System.ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-            public override void WriteByte(byte value) { }
-        }
     }
 
     public readonly partial struct StateMachineId : System.IEquatable<StateMachineId>
@@ -509,56 +402,89 @@ namespace Orleans.Journaling
         public override readonly string ToString() { throw null; }
     }
 
+    public ref partial struct StateMachineLogEntry
+    {
+        private object _dummy;
+        private int _dummyPrimitive;
+        public LogEntryWriter Writer { get { throw null; } }
+
+        public void Commit() { }
+
+        public void Dispose() { }
+    }
+
+    public abstract partial class StateMachineLogExtentWriterBase : IStateMachineLogExtentWriter, System.IDisposable
+    {
+        protected StateMachineId ActiveStreamId { get { throw null; } }
+
+        protected bool IsEntryActive { get { throw null; } }
+
+        public abstract long Length { get; }
+
+        protected abstract void AbortEntry(StateMachineId streamId, int entryStart);
+        protected abstract void AdvancePayload(int count);
+        protected abstract void CommitEntry(StateMachineId streamId, int entryStart);
+        public StateMachineLogWriter CreateLogWriter(StateMachineId streamId) { throw null; }
+
+        public abstract void Dispose();
+        public abstract Serialization.Buffers.ArcBuffer GetCommittedBuffer();
+        protected abstract int GetEntryStart(StateMachineId streamId);
+        protected abstract System.Memory<byte> GetPayloadMemory(int sizeHint);
+        protected abstract System.Span<byte> GetPayloadSpan(int sizeHint);
+        protected virtual void OnBeginEntry(StateMachineId streamId) { }
+
+        public abstract void Reset();
+        protected abstract void WritePayload(System.Buffers.ReadOnlySequence<byte> value);
+        protected abstract void WritePayload(System.ReadOnlySpan<byte> value);
+    }
+
+    public static partial class StateMachineLogFormatKeys
+    {
+        public const string Json = "json";
+        public const string MessagePack = "messagepack";
+        public const string OrleansBinary = "orleans-binary";
+        public const string Protobuf = "protobuf";
+    }
+
+    public readonly partial struct StateMachineLogWriter
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public readonly StateMachineLogEntry BeginEntry() { throw null; }
+    }
+
     public sealed partial class StateMachineManagerOptions
     {
         public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
         public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
     }
 
-    public readonly partial struct StateMachineStorageWriter
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public readonly void AppendEntry(System.ArraySegment<byte> value) { }
-
-        public readonly void AppendEntry(System.Buffers.ReadOnlySequence<byte> value) { }
-
-        public readonly void AppendEntry(byte[] value) { }
-
-        public readonly void AppendEntry(System.Memory<byte> value) { }
-
-        public readonly void AppendEntry(System.ReadOnlyMemory<byte> value) { }
-
-        public readonly void AppendEntry(System.ReadOnlySpan<byte> value) { }
-
-        public readonly void AppendEntry(System.Span<byte> value) { }
-
-        public readonly LogEntryWriter BeginEntry() { throw null; }
-    }
-
     public sealed partial class VolatileStateMachineStorage : IStateMachineStorage
     {
         public VolatileStateMachineStorage() { }
 
-        public VolatileStateMachineStorage(IStateMachineLogExtentCodec codec) { }
+        public VolatileStateMachineStorage(string logFormatKey) { }
 
         public bool IsCompactionRequested { get { throw null; } }
 
-        public System.Threading.Tasks.ValueTask AppendAsync(LogExtentBuilder segment, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public string LogFormatKey { get { throw null; } }
+
+        public System.Threading.Tasks.ValueTask AppendAsync(Serialization.Buffers.ArcBuffer segment, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        [System.Diagnostics.DebuggerStepThrough]
-        public System.Threading.Tasks.ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public System.Threading.Tasks.ValueTask ReplaceAsync(LogExtentBuilder snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask ReplaceAsync(Serialization.Buffers.ArcBuffer snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public sealed partial class VolatileStateMachineStorageProvider : IStateMachineStorageProvider
     {
         public VolatileStateMachineStorageProvider() { }
 
-        public VolatileStateMachineStorageProvider(IStateMachineLogExtentCodec codec) { }
+        public VolatileStateMachineStorageProvider(string logFormatKey, System.Func<Runtime.GrainType, string>? logFormatKeySelector) { }
+
+        public VolatileStateMachineStorageProvider(string logFormatKey) { }
 
         public IStateMachineStorage Create(Runtime.IGrainContext grainContext) { throw null; }
     }
