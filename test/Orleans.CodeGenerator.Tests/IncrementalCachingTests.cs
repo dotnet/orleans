@@ -1,5 +1,7 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.Diagnostics;
+using Orleans.CodeGenerator.Diagnostics;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -509,6 +511,238 @@ public class IncrementalCachingTests
         AssertSourcesUnchanged(result1, result2, static hint => hint.Contains(".orleans.ser.", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task ChangedReferenceAssembly_InvalidatesReferenceAssemblyPipelineAndDropsStaleOutputs()
+    {
+        const string libraryV1Code = """
+            using Orleans;
+
+            namespace LibraryProject;
+
+            public sealed class Marker
+            {
+            }
+
+            [GenerateSerializer]
+            public sealed class ReferencedDto
+            {
+                [Id(0)]
+                public string LegacyValue { get; set; } = string.Empty;
+            }
+            """;
+
+        const string libraryV2Code = """
+            using Orleans;
+
+            namespace LibraryProject;
+
+            public sealed class Marker
+            {
+            }
+
+            [GenerateSerializer]
+            public sealed class ReferencedDto
+            {
+                [Id(0)]
+                public string CurrentValue { get; set; } = string.Empty;
+
+                [Id(1)]
+                public int Version { get; set; }
+            }
+            """;
+
+        const string consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryProject.Marker))]
+            """;
+
+        var consumerV1 = await CreateConsumerCompilationWithLibrary(libraryV1Code, consumerCode);
+        var consumerV2 = await CreateConsumerCompilationWithLibrary(libraryV2Code, consumerCode);
+        var (result1, result2) = await RunTwice(consumerV1, consumerV2);
+
+        Assert.Empty(result1.Diagnostics);
+        Assert.Empty(result2.Diagnostics);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName);
+        AssertTrackedStepModifiedOrNew(result2, OrleansSerializationSourceGenerator.ReferencedSerializerOutputsTrackingName);
+
+        var firstGeneratedSource = ConcatenateGeneratedSources(result1);
+        var secondGeneratedSource = ConcatenateGeneratedSources(result2);
+        Assert.Contains("LegacyValue", firstGeneratedSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("CurrentValue", firstGeneratedSource, StringComparison.Ordinal);
+        Assert.DoesNotContain("LegacyValue", secondGeneratedSource, StringComparison.Ordinal);
+        Assert.Contains("CurrentValue", secondGeneratedSource, StringComparison.Ordinal);
+        Assert.Contains("Version", secondGeneratedSource, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task SameDriverSameCompilation_ProducesIdenticalDiagnosticsAndSources()
+    {
+        const string code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public sealed class StableDto
+            {
+                [Id(0)]
+                public string Name { get; set; } = string.Empty;
+            }
+
+            public interface IStableGrain : IGrainWithIntegerKey
+            {
+                Task<StableDto> Get();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var (result1, result2) = await RunTwice(compilation, compilation);
+
+        AssertNoDuplicateHintNames(result1);
+        AssertNoDuplicateHintNames(result2);
+        AssertDiagnosticsIdentical(result1.Diagnostics, result2.Diagnostics);
+        AssertGeneratedSourcesIdentical(result1, result2);
+        AssertAllOutputsCachedOrUnchanged(result2);
+    }
+
+    [Fact]
+    public async Task UnrelatedAnalyzerConfigOption_DoesNotInvalidateGeneratedModels()
+    {
+        const string code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public sealed class StableDto
+            {
+                [Id(0)]
+                public string Name { get; set; } = string.Empty;
+            }
+
+            public interface IStableGrain : IGrainWithIntegerKey
+            {
+                Task<StableDto> Get();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var (result1, result2) = await RunTwice(
+            compilation,
+            compilation,
+            new Dictionary<string, string>
+            {
+                ["build_property.unrelated_option"] = "before",
+            },
+            new Dictionary<string, string>
+            {
+                ["build_property.unrelated_option"] = "after",
+            });
+
+        Assert.Empty(result1.Diagnostics);
+        Assert.Empty(result2.Diagnostics);
+        AssertGeneratedSourcesIdentical(result1, result2);
+        AssertTrackedStepsCachedOrUnchanged(
+            result2,
+            OrleansSerializationSourceGenerator.SerializableTypeResultsTrackingName,
+            OrleansSerializationSourceGenerator.CollectedSerializableTypesTrackingName,
+            OrleansSerializationSourceGenerator.SerializerOutputsTrackingName,
+            OrleansSerializationSourceGenerator.InheritedProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.CollectedProxyInterfacesTrackingName,
+            OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName,
+            OrleansSerializationSourceGenerator.ProxyOutputsTrackingName,
+            OrleansSerializationSourceGenerator.ReferenceAssemblyDataTrackingName,
+            OrleansSerializationSourceGenerator.MetadataAggregateTrackingName,
+            OrleansSerializationSourceGenerator.MetadataOutputsTrackingName);
+    }
+
+    [Fact]
+    public async Task GenerateFieldIdsOption_ChangesSerializerDiagnosticsWithoutChangingProxyOutputs()
+    {
+        const string code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public sealed class OptionDto
+            {
+                public string Name { get; set; } = string.Empty;
+                public int Age { get; set; }
+            }
+
+            public interface IOptionGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var (baselineResult, configuredResult) = await RunTwice(
+            compilation,
+            compilation,
+            firstGlobalOptions: null,
+            secondGlobalOptions: new Dictionary<string, string>
+            {
+                ["build_property.orleans_generatefieldids"] = "PublicProperties",
+            });
+
+        Assert.Contains(baselineResult.Diagnostics, diagnostic => diagnostic.Id == DiagnosticRuleId.CanNotGenerateImplicitFieldIds);
+        Assert.Empty(configuredResult.Diagnostics);
+        Assert.Contains(configuredResult.GeneratedSources, static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal));
+        AssertSourcesUnchanged(baselineResult, configuredResult, static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        AssertTrackedStepModifiedOrNew(configuredResult, OrleansSerializationSourceGenerator.SerializableTypeResultsTrackingName);
+        AssertTrackedStepModifiedOrNew(configuredResult, OrleansSerializationSourceGenerator.SerializerOutputsTrackingName);
+    }
+
+    [Fact]
+    public async Task CompatibilityInvokersOption_ChangesProxyOutputsWithoutChangingSerializerOutputs()
+    {
+        const string code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public sealed class StableDto
+            {
+                [Id(0)]
+                public string Name { get; set; } = string.Empty;
+            }
+
+            public interface IBaseOptionGrain : IGrainWithIntegerKey
+            {
+                Task<StableDto> Get();
+            }
+
+            public interface IDerivedOptionGrain : IBaseOptionGrain
+            {
+            }
+            """;
+
+        var compilation = await CreateCompilation(code);
+        var (baselineResult, configuredResult) = await RunTwice(
+            compilation,
+            compilation,
+            firstGlobalOptions: null,
+            secondGlobalOptions: new Dictionary<string, string>
+            {
+                ["build_property.orleansgeneratecompatibilityinvokers"] = "true",
+            });
+
+        Assert.Empty(baselineResult.Diagnostics);
+        Assert.Empty(configuredResult.Diagnostics);
+        AssertSourcesUnchanged(baselineResult, configuredResult, static hint => hint.Contains(".orleans.ser.", StringComparison.Ordinal));
+        AssertSourcesChanged(baselineResult, configuredResult, static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        AssertTrackedStepModifiedOrNew(configuredResult, OrleansSerializationSourceGenerator.PreparedProxyOutputsTrackingName);
+        AssertTrackedStepModifiedOrNew(configuredResult, OrleansSerializationSourceGenerator.ProxyOutputsTrackingName);
+    }
+
     #region Helpers
 
     private static CSharpCompilation ReplaceSource(CSharpCompilation compilation, string newSource)
@@ -519,19 +753,27 @@ public class IncrementalCachingTests
 
     private static async Task<(GeneratorRunResult First, GeneratorRunResult Second)> RunTwice(
         CSharpCompilation firstCompilation,
-        CSharpCompilation secondCompilation)
+        CSharpCompilation secondCompilation,
+        IReadOnlyDictionary<string, string>? firstGlobalOptions = null,
+        IReadOnlyDictionary<string, string>? secondGlobalOptions = null)
     {
         var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
+        var hasOptions = firstGlobalOptions is not null || secondGlobalOptions is not null;
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
+            optionsProvider: hasOptions ? new TestAnalyzerConfigOptionsProvider(firstGlobalOptions) : null,
             driverOptions: new GeneratorDriverOptions(
                 disabledOutputs: default,
                 trackIncrementalGeneratorSteps: true));
 
         driver = driver.RunGenerators(firstCompilation);
         var result1 = driver.GetRunResult();
-        Assert.Empty(result1.Diagnostics);
         Assert.NotEmpty(result1.Results[0].GeneratedSources);
+
+        if (hasOptions)
+        {
+            driver = driver.WithUpdatedAnalyzerConfigOptions(new TestAnalyzerConfigOptionsProvider(secondGlobalOptions));
+        }
 
         driver = driver.RunGenerators(secondCompilation);
         var result2 = driver.GetRunResult();
@@ -596,6 +838,19 @@ public class IncrementalCachingTests
         }
     }
 
+    private static void AssertTrackedStepModifiedOrNew(GeneratorRunResult result, string stepName)
+    {
+        var trackedSteps = result.TrackedSteps;
+        Assert.NotEmpty(trackedSteps);
+        Assert.True(trackedSteps.TryGetValue(stepName, out var steps), $"Missing tracked step '{stepName}'.");
+
+        var reasons = steps
+            .SelectMany(static step => step.Outputs)
+            .Select(static output => output.Reason)
+            .ToArray();
+        Assert.Contains(reasons, static reason => reason is IncrementalStepRunReason.Modified or IncrementalStepRunReason.New);
+    }
+
     private static void AssertGeneratedSourcesIdentical(GeneratorRunResult result1, GeneratorRunResult result2)
     {
         Assert.Equal(result1.GeneratedSources.Length, result2.GeneratedSources.Length);
@@ -608,6 +863,35 @@ public class IncrementalCachingTests
             Assert.Equal(sources1[i].HintName, sources2[i].HintName);
             Assert.Equal(sources1[i].SourceText.ToString(), sources2[i].SourceText.ToString());
         }
+    }
+
+    private static void AssertDiagnosticsIdentical(IEnumerable<Diagnostic> diagnostics, IEnumerable<Diagnostic> otherDiagnostics)
+        => Assert.Equal(
+            diagnostics.Select(GetDiagnosticShape).OrderBy(static value => value, StringComparer.Ordinal),
+            otherDiagnostics.Select(GetDiagnosticShape).OrderBy(static value => value, StringComparer.Ordinal));
+
+    private static string GetDiagnosticShape(Diagnostic diagnostic)
+    {
+        var lineSpan = diagnostic.Location.GetLineSpan();
+        return string.Join(
+            "|",
+            diagnostic.Id,
+            diagnostic.Severity.ToString(),
+            diagnostic.GetMessage(),
+            lineSpan.Path ?? string.Empty,
+            lineSpan.StartLinePosition.Line.ToString(),
+            lineSpan.StartLinePosition.Character.ToString());
+    }
+
+    private static void AssertNoDuplicateHintNames(GeneratorRunResult result)
+    {
+        var duplicateHintNames = result.GeneratedSources
+            .GroupBy(static source => source.HintName, StringComparer.Ordinal)
+            .Where(static group => group.Count() > 1)
+            .Select(static group => group.Key)
+            .ToArray();
+
+        Assert.True(duplicateHintNames.Length == 0, $"Duplicate generated source hint names: {string.Join(", ", duplicateHintNames)}");
     }
 
     private static void AssertSourcesChanged(
@@ -639,8 +923,59 @@ public class IncrementalCachingTests
     private static Dictionary<string, string> GetGeneratedSourceMap(GeneratorRunResult result)
         => result.GeneratedSources.ToDictionary(source => source.HintName, source => source.SourceText.ToString(), StringComparer.Ordinal);
 
+    private static string ConcatenateGeneratedSources(GeneratorRunResult result)
+        => string.Join(
+            Environment.NewLine,
+            result.GeneratedSources
+                .OrderBy(static source => source.HintName, StringComparer.Ordinal)
+                .Select(static source => source.SourceText.ToString()));
+
+    private static async Task<CSharpCompilation> CreateConsumerCompilationWithLibrary(
+        string libraryCode,
+        string consumerCode)
+    {
+        var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
+        Assert.Empty(libraryCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var consumerCompilation = await TestCompilationHelper.CreateCompilation(
+            consumerCode,
+            "ConsumerProject",
+            libraryCompilation.ToMetadataReference());
+        Assert.Empty(consumerCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        return consumerCompilation;
+    }
+
     private static Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
         => TestCompilationHelper.CreateCompilation(sourceCode, assemblyName);
+
+    private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
+    {
+        private static readonly AnalyzerConfigOptions EmptyOptions = new TestAnalyzerConfigOptions(new Dictionary<string, string>());
+        private readonly AnalyzerConfigOptions _globalOptions;
+
+        public TestAnalyzerConfigOptionsProvider(IReadOnlyDictionary<string, string>? globalOptions)
+        {
+            _globalOptions = new TestAnalyzerConfigOptions(globalOptions ?? new Dictionary<string, string>());
+        }
+
+        public override AnalyzerConfigOptions GlobalOptions => _globalOptions;
+
+        public override AnalyzerConfigOptions GetOptions(SyntaxTree tree) => EmptyOptions;
+
+        public override AnalyzerConfigOptions GetOptions(AdditionalText textFile) => EmptyOptions;
+    }
+
+    private sealed class TestAnalyzerConfigOptions : AnalyzerConfigOptions
+    {
+        private readonly IReadOnlyDictionary<string, string> _options;
+
+        public TestAnalyzerConfigOptions(IReadOnlyDictionary<string, string> options)
+        {
+            _options = options;
+        }
+
+        public override bool TryGetValue(string key, out string value) => _options.TryGetValue(key, out value!);
+    }
 
     #endregion
 }

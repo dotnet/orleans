@@ -1614,6 +1614,50 @@ public class DemoClass
         Assert.DoesNotContain(registeredActivatorNames, static name => name.Contains("INormalGrain", StringComparison.Ordinal));
     }
 
+    [Fact]
+    public async Task RecordPrimaryConstructorFieldIds_AreNotDuplicatedOrDropped()
+    {
+        var code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public sealed record PrimaryCtorRecord(
+                [property: Id(0)] string Value,
+                [field: Id(1)] int Count)
+            {
+                [Id(2)]
+                public string Extra { get; init; } = string.Empty;
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [generator],
+            driverOptions: new GeneratorDriverOptions(default));
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var generatorDiagnostics);
+        var result = driver.GetRunResult().Results.Single();
+
+        Assert.Empty(generatorDiagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var serializerSource = Assert.Single(
+            result.GeneratedSources,
+            static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal)
+                && source.SourceText.ToString().Contains("Codec_PrimaryCtorRecord", StringComparison.Ordinal));
+        var serializerText = serializerSource.SourceText.ToString();
+
+        Assert.Equal(1, CountOccurrences(serializerText, "instance.Value"));
+        Assert.Equal(1, CountOccurrences(serializerText, "instance.Count"));
+        Assert.Equal(1, CountOccurrences(serializerText, "instance.Extra"));
+        Assert.Equal(1, CountOccurrences(serializerText, "if (id == 0U)"));
+        Assert.Equal(1, CountOccurrences(serializerText, "if (id == 1U)"));
+        Assert.Equal(1, CountOccurrences(serializerText, "if (id == 2U)"));
+    }
+
     private static GeneratorRunResult RunSourceGenerator(
         CSharpCompilation compilation,
         IReadOnlyDictionary<string, string>? globalOptions = null)
@@ -1863,6 +1907,19 @@ public class DemoClass
     private static int CountGeneratedInvokableClasses(string source)
         => source.Split(Environment.NewLine)
             .Count(line => line.Contains("public sealed class Invokable_", StringComparison.Ordinal));
+
+    private static int CountOccurrences(string value, string substring)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(substring, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += substring.Length;
+        }
+
+        return count;
+    }
 
     private static string[] GetGeneratedClassNames(GeneratorRunResult result, string hintNameFragment, string classNamePrefix)
         => result.GeneratedSources

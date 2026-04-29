@@ -1,5 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 
 namespace Orleans.CodeGenerator.Tests;
 
@@ -103,6 +104,87 @@ public class IncrementalOrderingStabilityTests
         AssertGeneratedSourcesIdentical(result, updatedResult);
     }
 
+    [Fact]
+    public async Task ReorderedInterfaceInheritanceGraph_ProducesIdenticalProxyAndMetadata()
+    {
+        const string featureInterfaces = """
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface IFirstOrderingFeature
+            {
+                Task First();
+            }
+
+            public interface ISecondOrderingFeature
+            {
+                Task Second();
+            }
+            """;
+
+        const string derivedInterface = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface ICompositeOrderingGrain : IGrainWithIntegerKey, IFirstOrderingFeature, ISecondOrderingFeature
+            {
+                Task Own();
+            }
+            """;
+
+        const string reorderedDerivedInterface = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface ICompositeOrderingGrain : IGrainWithIntegerKey, IFirstOrderingFeature, ISecondOrderingFeature
+            {
+                Task Own();
+            }
+            """;
+
+        var compilation = await CreateCompilation(
+            "OrderingProject",
+            featureInterfaces,
+            derivedInterface);
+        var reorderedCompilation = await CreateCompilation(
+            "OrderingProject",
+            reorderedDerivedInterface,
+            featureInterfaces);
+
+        var result = RunGenerator(compilation);
+        var reorderedResult = RunGenerator(reorderedCompilation);
+
+        AssertGeneratedSourcesIdentical(result, reorderedResult);
+        Assert.Contains(GetGeneratedSourceMap(result).Keys, static hint => hint.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        Assert.Contains(GetGeneratedSourceMap(result).Keys, static hint => hint.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task ReorderedMetadataInputsWithAliasesCodecsAndApplicationParts_ProducesIdenticalMetadata()
+    {
+        var compilation = await CreateMetadataStabilityCompilation(reverseReferenceOrder: false);
+        var reorderedCompilation = await CreateMetadataStabilityCompilation(reverseReferenceOrder: true);
+
+        var result = RunGenerator(compilation);
+        var reorderedResult = RunGenerator(reorderedCompilation);
+
+        var metadataSource = GetMetadataSource(result);
+        var reorderedMetadataSource = GetMetadataSource(reorderedResult);
+        Assert.Equal(metadataSource, reorderedMetadataSource);
+        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.Add(\"A.Alias\""));
+        Assert.Equal(1, CountOccurrences(metadataSource, "WellKnownTypeAliases.Add(\"B.Alias\""));
+        Assert.Equal(1, CountOccurrences(metadataSource, "Serializers.Add(typeof(global::LibraryB.SerializerType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "Copiers.Add(typeof(global::LibraryB.CopierType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "Activators.Add(typeof(global::LibraryB.ActivatorType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "Converters.Add(typeof(global::LibraryB.ConverterType))"));
+        Assert.Equal(1, CountOccurrences(metadataSource, "InterfaceImplementations.Add(typeof(global::LibraryB.GeneratedInterfaceImplementation))"));
+    }
+
     private static async Task<CSharpCompilation> CreateCompilation(string assemblyName, params string[] sources)
     {
         Assert.NotEmpty(sources);
@@ -114,6 +196,102 @@ public class IncrementalOrderingStabilityTests
         }
 
         return compilation.AddSyntaxTrees(sources.Skip(1).Select(ParseSource));
+    }
+
+    private static async Task<CSharpCompilation> CreateMetadataStabilityCompilation(bool reverseReferenceOrder)
+    {
+        const string libraryBCode = """
+            using Orleans;
+            using Orleans.Runtime;
+            using System.Threading.Tasks;
+
+            namespace LibraryB;
+
+            [Id(200)]
+            [Alias("B.Alias")]
+            [CompoundTypeAlias("B", typeof(LibraryB.BetaType))]
+            public sealed class BetaType
+            {
+            }
+
+            [RegisterSerializer]
+            public sealed class SerializerType
+            {
+            }
+
+            [RegisterCopier]
+            public sealed class CopierType
+            {
+            }
+
+            [RegisterActivator]
+            public sealed class ActivatorType
+            {
+            }
+
+            [RegisterConverter]
+            public sealed class ConverterType
+            {
+            }
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface IGeneratedInterface
+            {
+                Task Ping();
+            }
+
+            public sealed class GeneratedInterfaceImplementation : IGeneratedInterface
+            {
+                public Task Ping() => Task.CompletedTask;
+            }
+            """;
+
+        const string libraryACode = """
+            using Orleans;
+            using LibraryB;
+
+            [assembly: ApplicationPart("Zeta.Part")]
+            [assembly: ApplicationPart("Alpha.Part")]
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryB.BetaType))]
+
+            namespace LibraryA;
+
+            [Id(100)]
+            [Alias("A.Alias")]
+            public sealed class AlphaType
+            {
+            }
+            """;
+
+        const string consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryA.AlphaType))]
+
+            namespace ConsumerProject;
+
+            public sealed class ConsumerMarker
+            {
+            }
+            """;
+
+        var libraryBCompilation = await TestCompilationHelper.CreateCompilation(libraryBCode, "LibraryB");
+        Assert.Empty(libraryBCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var libraryACompilation = await TestCompilationHelper.CreateCompilation(
+            libraryACode,
+            "LibraryA",
+            libraryBCompilation.ToMetadataReference());
+        Assert.Empty(libraryACompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var libraryAReference = libraryACompilation.ToMetadataReference();
+        var libraryBReference = libraryBCompilation.ToMetadataReference();
+        var consumerCompilation = reverseReferenceOrder
+            ? await TestCompilationHelper.CreateCompilation(consumerCode, "ConsumerProject", libraryBReference, libraryAReference)
+            : await TestCompilationHelper.CreateCompilation(consumerCode, "ConsumerProject", libraryAReference, libraryBReference);
+
+        Assert.Empty(consumerCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        return consumerCompilation;
     }
 
     private static SyntaxTree ParseSource(string source)
@@ -211,4 +389,23 @@ public class IncrementalOrderingStabilityTests
         => new(
             result.GeneratedSources.ToDictionary(source => source.HintName, source => source.SourceText.ToString(), StringComparer.Ordinal),
             StringComparer.Ordinal);
+
+    private static string GetMetadataSource(GeneratorRunResult result)
+    {
+        var source = Assert.Single(result.GeneratedSources, static source => source.HintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal));
+        return CSharpSyntaxTree.ParseText(source.SourceText.ToString().TrimStart('\uFEFF')).GetCompilationUnitRoot().NormalizeWhitespace().ToFullString();
+    }
+
+    private static int CountOccurrences(string value, string substring)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(substring, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += substring.Length;
+        }
+
+        return count;
+    }
 }

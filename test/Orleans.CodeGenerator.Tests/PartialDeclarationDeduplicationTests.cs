@@ -76,6 +76,60 @@ public class PartialDeclarationDeduplicationTests
     }
 
     [Fact]
+    public async Task ReorderedPartialDeclarationsWithInvalidMember_ProducesOneStableDiagnostic()
+    {
+        const string invalidPart = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public partial class InvalidPartialDto
+            {
+                [Id(0)]
+                public string Name => "computed";
+            }
+            """;
+
+        const string validPart = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public partial class InvalidPartialDto
+            {
+                [Id(1)]
+                public int Value { get; set; }
+            }
+            """;
+
+        var compilation = await CreateCompilation(
+            "PartialOrderingProject",
+            ("InvalidPart.cs", invalidPart),
+            ("ValidPart.cs", validPart));
+        var reorderedCompilation = await CreateCompilation(
+            "PartialOrderingProject",
+            ("ValidPart.cs", validPart),
+            ("InvalidPart.cs", invalidPart));
+
+        var result = RunSourceGenerator(compilation);
+        var reorderedResult = RunSourceGenerator(reorderedCompilation);
+
+        var diagnostics = result.Diagnostics
+            .Where(static diagnostic => diagnostic.Id == DiagnosticRuleId.InaccessibleSetter)
+            .ToArray();
+        var reorderedDiagnostics = reorderedResult.Diagnostics
+            .Where(static diagnostic => diagnostic.Id == DiagnosticRuleId.InaccessibleSetter)
+            .ToArray();
+
+        Assert.Single(diagnostics);
+        Assert.Single(reorderedDiagnostics);
+        AssertDiagnosticsIdentical(diagnostics, reorderedDiagnostics);
+        AssertGeneratedSourcesIdentical(result, reorderedResult);
+    }
+
+    [Fact]
     public async Task DirectAndInheritedGenerateMethodSerializersDiscoveryProducesOneProxyAndMetadataSet()
     {
         const string code = """
@@ -178,4 +232,59 @@ public class PartialDeclarationDeduplicationTests
 
     private static Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
         => TestCompilationHelper.CreateCompilation(sourceCode, assemblyName);
+
+    private static async Task<CSharpCompilation> CreateCompilation(
+        string assemblyName,
+        params (string Path, string Source)[] sources)
+    {
+        Assert.NotEmpty(sources);
+
+        var compilation = await TestCompilationHelper.CreateCompilation(sources[0].Source, assemblyName);
+        var firstTree = CSharpSyntaxTree.ParseText(sources[0].Source, path: sources[0].Path);
+        compilation = compilation.ReplaceSyntaxTree(compilation.SyntaxTrees.Single(), firstTree);
+
+        if (sources.Length == 1)
+        {
+            return compilation;
+        }
+
+        return compilation.AddSyntaxTrees(sources.Skip(1).Select(static source => CSharpSyntaxTree.ParseText(source.Source, path: source.Path)));
+    }
+
+    private static void AssertDiagnosticsIdentical(IEnumerable<Diagnostic> diagnostics, IEnumerable<Diagnostic> otherDiagnostics)
+        => Assert.Equal(
+            diagnostics.Select(GetDiagnosticShape).OrderBy(static value => value, StringComparer.Ordinal),
+            otherDiagnostics.Select(GetDiagnosticShape).OrderBy(static value => value, StringComparer.Ordinal));
+
+    private static string GetDiagnosticShape(Diagnostic diagnostic)
+    {
+        var lineSpan = diagnostic.Location.GetLineSpan();
+        return string.Join(
+            "|",
+            diagnostic.Id,
+            diagnostic.Severity.ToString(),
+            diagnostic.GetMessage(),
+            lineSpan.Path ?? string.Empty,
+            lineSpan.StartLinePosition.Line.ToString(),
+            lineSpan.StartLinePosition.Character.ToString());
+    }
+
+    private static void AssertGeneratedSourcesIdentical(GeneratorRunResult result, GeneratorRunResult other)
+    {
+        var sources = GetGeneratedSourceMap(result);
+        var otherSources = GetGeneratedSourceMap(other);
+
+        Assert.Equal(sources.Count, otherSources.Count);
+
+        foreach (var (hintName, sourceText) in sources)
+        {
+            Assert.True(otherSources.TryGetValue(hintName, out var otherSourceText), $"Missing generated source '{hintName}'.");
+            Assert.Equal(sourceText, otherSourceText);
+        }
+    }
+
+    private static SortedDictionary<string, string> GetGeneratedSourceMap(GeneratorRunResult result)
+        => new(
+            result.GeneratedSources.ToDictionary(source => source.HintName, source => source.SourceText.ToString(), StringComparer.Ordinal),
+            StringComparer.Ordinal);
 }
