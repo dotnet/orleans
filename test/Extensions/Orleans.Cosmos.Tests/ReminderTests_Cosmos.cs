@@ -308,22 +308,53 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         IReminderTestGrain2 g1 = GrainFactory.GetGrain<IReminderTestGrain2>(Guid.NewGuid());
         IReminderTestCopyGrain g2 = GrainFactory.GetGrain<IReminderTestCopyGrain>(Guid.NewGuid());
         TimeSpan period = await g1.GetReminderPeriod(DR); // using same period
+        using var cts = new CancellationTokenSource(ENDWAIT);
 
-        await g1.StartReminder(DR);
-        await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), 2);
-        await g2.StartReminder(DR);
-        long last1 = await WaitForReminderCounterAsync(g1, DR, () => g1.GetCounter(DR), 4);
-        Assert.Equal(4, last1);
-        long last2 = await WaitForReminderCounterAsync(g2, DR, () => g2.GetCounter(DR), 2);
-        Assert.Equal(2, last2); // CopyGrain fault
+        var reminder1 = await g1.StartReminder(DR);
+        Assert.Equal(DR, reminder1.ReminderName);
+        await observer.WaitForActiveReminderCountAsync(g1, 1, cts.Token, DR);
+        await AdvanceReminderTimeAndWaitForTickAsync(g1, DR, period, cts.Token);
 
-        await StopReminderAndWaitForQuiescenceAsync(g1, DR, g1.StopReminder);
-        await AdvanceReminderTimeAsync(period.Multiply(2));
-        await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder);
-        long curr1 = await g1.GetCounter(DR);
-        Assert.Equal(last1, curr1);
-        long curr2 = await g2.GetCounter(DR);
-        Assert.Equal(4, curr2); // CopyGrain fault
+        var reminder2 = await g2.StartReminder(DR);
+        Assert.Equal(DR, reminder2.ReminderName);
+        await observer.WaitForActiveReminderCountAsync(g2, 1, cts.Token, DR);
+
+        await AdvanceReminderTimeAsync(TimeSpan.Zero, cts.Token);
+        var g1TickTask = observer.WaitForAdditionalTickCountAsync(g1, 1, cts.Token, DR);
+        var g2TickTask = observer.WaitForAdditionalTickCountAsync(g2, 1, cts.Token, DR);
+        await AdvanceReminderTimeAsync(period, cts.Token);
+        await Task.WhenAll(g1TickTask, g2TickTask);
+
+        await StopReminderAndWaitForInactiveAsync(g1, DR, g1.StopReminder, cts.Token);
+        Assert.Null(await g1.GetReminderObject(DR));
+        Assert.Equal(1, observer.GetActiveReminderCount(g2.GetGrainId(), DR));
+
+        var stopped1TickCount = observer.GetTickCount(g1.GetGrainId(), DR);
+        await AdvanceReminderTimeAndWaitForTickAsync(g2, DR, period, cts.Token);
+        Assert.Equal(stopped1TickCount, observer.GetTickCount(g1.GetGrainId(), DR));
+
+        await StopReminderAndWaitForInactiveAsync(g2, DR, g2.StopReminder, cts.Token);
+        var stopped2TickCount = observer.GetTickCount(g2.GetGrainId(), DR);
+        await AdvanceReminderTimeAsync(period, cts.Token);
+        Assert.Equal(stopped2TickCount, observer.GetTickCount(g2.GetGrainId(), DR));
+    }
+
+    private async Task AdvanceReminderTimeAndWaitForTickAsync(IAddressable grain, string reminderName, TimeSpan amount, CancellationToken cancellationToken)
+    {
+        await AdvanceReminderTimeAsync(TimeSpan.Zero, cancellationToken);
+        var tickTask = observer.WaitForAdditionalTickCountAsync(grain, 1, cancellationToken, reminderName);
+        await AdvanceReminderTimeAsync(amount, cancellationToken);
+        await tickTask;
+    }
+
+    private async Task StopReminderAndWaitForInactiveAsync(IAddressable grain, string reminderName, Func<string, Task> stopReminder, CancellationToken cancellationToken)
+    {
+        var unregisteredTask = observer.WaitForReminderUnregisteredAsync(grain, reminderName, cancellationToken);
+        var inactiveTask = observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellationToken);
+
+        await stopReminder(reminderName);
+        await unregisteredTask;
+        await inactiveTask;
     }
 
     [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
