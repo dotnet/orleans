@@ -90,14 +90,19 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;
         _logger = logger;
-        var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(DirectoryMembershipSnapshot.PartitionsPerSilo);
-        for (var i = 0; i < DirectoryMembershipSnapshot.PartitionsPerSilo; i++)
+        var partitionsPerSilo = membershipService.PartitionsPerSilo;
+        var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
+        for (var i = 0; i < partitionsPerSilo; i++)
         {
             partitions.Add(new GrainDirectoryPartition(i, this, grainFactory, shared));
         }
 
         _partitions = partitions.ToImmutable();
         shared.ActivationDirectory.RecordNewTarget(this);
+
+        // Register IRemoteGrainDirectory system targets so that silos running LocalGrainDirectory
+        // can forward directory requests to this silo during a rolling upgrade.
+        DistributedRemoteGrainDirectory.Create(this, shared);
     }
 
     public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
