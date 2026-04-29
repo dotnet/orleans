@@ -1051,9 +1051,8 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
                 var removedCount = TrimExpiredItems();
                 ConcurrentLruCacheDiagnostics.EmitExpiredItemsRemoved(this, removedCount);
             }
-            catch (Exception exception)
+            catch
             {
-                Trace.TraceError($"{nameof(ConcurrentLruCache<K, V>)} background expiration loop failed: {exception}");
             }
         }
     }

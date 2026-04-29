@@ -37,6 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal SiloAddress MyAddress { get; }
 
         internal IGrainDirectoryCache DirectoryCache { get; }
+        private readonly bool disposeDirectoryCache;
         internal LocalGrainDirectoryPartition DirectoryPartition { get; }
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
@@ -62,7 +63,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
 
-            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
+            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeDirectoryCache);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
@@ -116,9 +117,9 @@ namespace Orleans.Runtime.GrainDirectory
             //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
 
-            if (DirectoryCache is LruGrainDirectoryCache lruCache)
+            if (this.disposeDirectoryCache)
             {
-                await lruCache.DisposeAsync();
+                await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(DirectoryCache);
             }
 
             DirectoryPartition.Clear();

@@ -18,6 +18,7 @@ namespace Orleans.Runtime.GrainDirectory
     {
         private readonly GrainDirectoryResolver grainDirectoryResolver;
         private readonly IGrainDirectoryCache cache;
+        private readonly bool disposeCache;
 
         private readonly CancellationTokenSource shutdownToken = new CancellationTokenSource();
         private readonly IClusterMembershipService clusterMembershipService;
@@ -39,7 +40,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             this.grainDirectoryResolver = grainDirectoryResolver;
             this.clusterMembershipService = clusterMembershipService;
-            this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
+            this.cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeCache);
         }
 
         public async ValueTask<GrainAddress> Lookup(GrainId grainId)
@@ -149,9 +150,9 @@ namespace Orleans.Runtime.GrainDirectory
                     await listenToClusterChangeTask.WaitAsync(ct).SuppressThrowing();
                 }
 
-                if (this.cache is LruGrainDirectoryCache lruCache)
+                if (this.disposeCache)
                 {
-                    await lruCache.DisposeAsync();
+                    await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(this.cache);
                 }
             };
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);

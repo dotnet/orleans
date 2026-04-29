@@ -19,36 +19,62 @@ namespace Orleans.Runtime.GrainDirectory
         /// <param name="options">The options.</param>
         /// <returns>The newly created <see cref="IGrainDirectoryCache"/> instance.</returns>
         public static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+            => CreateGrainDirectoryCache(services, options, out _);
+
+        internal static IGrainDirectoryCache CreateGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache)
         {
             if (options.CacheSize <= 0)
+            {
+                disposeCache = true;
                 return new NullGrainDirectoryCache();
+            }
 
             switch (options.CachingStrategy)
             {
                 case GrainDirectoryOptions.CachingStrategyType.None:
+                    disposeCache = true;
                     return new NullGrainDirectoryCache();
                 case GrainDirectoryOptions.CachingStrategyType.LRU:
 #pragma warning disable CS0618 // Type or member is obsolete
                 case GrainDirectoryOptions.CachingStrategyType.Adaptive:
 #pragma warning restore CS0618 // Type or member is obsolete
+                    disposeCache = true;
                     return CreateLruGrainDirectoryCache(services, options);
                 case GrainDirectoryOptions.CachingStrategyType.Custom:
                 default:
+                    disposeCache = false;
                     return services.GetRequiredService<IGrainDirectoryCache>();
             }
         }
 
         internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+            => CreateCustomGrainDirectoryCache(services, options, out _);
+
+        internal static IGrainDirectoryCache CreateCustomGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options, out bool disposeCache)
         {
             var grainDirectoryCache = services.GetService<IGrainDirectoryCache>();
-            if (grainDirectoryCache != null)
+            if (grainDirectoryCache is not null)
             {
+                disposeCache = false;
                 return grainDirectoryCache;
             }
-            else
+
+            disposeCache = true;
+            return CreateLruGrainDirectoryCache(services, options);
+        }
+
+        internal static ValueTask DisposeGrainDirectoryCacheAsync(IGrainDirectoryCache cache)
+        {
+            switch (cache)
             {
-                return CreateLruGrainDirectoryCache(services, options);
+                case IAsyncDisposable asyncDisposable:
+                    return asyncDisposable.DisposeAsync();
+                case IDisposable disposable:
+                    disposable.Dispose();
+                    break;
             }
+
+            return default;
         }
 
         private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
