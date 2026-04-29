@@ -105,10 +105,16 @@ internal class FieldIdAssignmentHelper
 
                 if (id.HasValue)
                 {
-                    _symbols[member] = (id.Value, constructorParameter is not null);
+                    _symbols[member] = (id.Value, false);
                 }
                 else if (constructorParameter is not null)
                 {
+                    var matchingField = PropertyUtility.GetMatchingField(prop, _memberSymbols);
+                    if (matchingField is not null && GeneratedCodeUtilities.GetId(_libraryTypes, matchingField).HasValue)
+                    {
+                        continue;
+                    }
+
                     id = GeneratedCodeUtilities.GetId(_libraryTypes, constructorParameter);
                     if (id.HasValue)
                     {
@@ -132,7 +138,6 @@ internal class FieldIdAssignmentHelper
                 if (property is not null)
                 {
                     constructorParameter = PropertyUtility.GetMatchingPrimaryConstructorParameter(property, _constructorParameters);
-                    isConstructorParameter = constructorParameter is not null;
                 }
 
                 if (!id.HasValue && property is not null)
@@ -142,6 +147,7 @@ internal class FieldIdAssignmentHelper
                     {
                         id = GeneratedCodeUtilities.GetId(_libraryTypes, constructorParameter)
                             ?? (uint)_constructorParameters.IndexOf(constructorParameter);
+                        isConstructorParameter = true;
                     }
                 }
 

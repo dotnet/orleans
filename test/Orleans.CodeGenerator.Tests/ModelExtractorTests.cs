@@ -247,7 +247,7 @@ public sealed class DemoData
     }
 
     [Fact]
-    public async Task ExtractSerializableTypeModel_Record_IncludesPrimaryConstructorParameters()
+    public async Task ExtractSerializableTypeModel_RecordWithPropertyTargetedIds_PreservesExistingMemberSection()
     {
         var code = @"
 using Orleans;
@@ -268,18 +268,18 @@ public record DemoRecord([property: Id(0)] string Value, [property: Id(1)] int C
             {
                 Assert.Equal((uint)0, member.FieldId);
                 Assert.Equal("Value", member.BackingPropertyName);
-                Assert.True(member.IsPrimaryConstructorParameter);
+                Assert.False(member.IsPrimaryConstructorParameter);
             },
             member =>
             {
                 Assert.Equal((uint)1, member.FieldId);
                 Assert.Equal("Count", member.BackingPropertyName);
-                Assert.True(member.IsPrimaryConstructorParameter);
+                Assert.False(member.IsPrimaryConstructorParameter);
             });
     }
 
     [Fact]
-    public async Task ExtractSerializableTypeModel_RecordWithFieldTargetedIds_MarksPrimaryConstructorParameters()
+    public async Task ExtractSerializableTypeModel_RecordWithFieldTargetedIds_PreservesExistingMemberSection()
     {
         var code = @"
 using Orleans;
@@ -293,7 +293,7 @@ public record DemoRecord([field: Id(0)] string Value);
 
         Assert.Equal((uint)0, member.FieldId);
         Assert.Equal("Value", member.BackingPropertyName);
-        Assert.True(member.IsPrimaryConstructorParameter);
+        Assert.False(member.IsPrimaryConstructorParameter);
     }
 
     [Fact]
