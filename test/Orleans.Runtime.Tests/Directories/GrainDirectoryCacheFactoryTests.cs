@@ -18,13 +18,11 @@ public class GrainDirectoryCacheFactoryTests
         var services = new ServiceCollection()
             .AddSingleton<TimeProvider>(timeProvider)
             .BuildServiceProvider();
-#pragma warning disable CS0618 // Type or member is obsolete
         var options = new GrainDirectoryOptions
         {
             CacheSize = 10,
             MaximumCacheTTL = TimeSpan.FromMinutes(1)
         };
-#pragma warning restore CS0618 // Type or member is obsolete
         var cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(services, options);
         var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
         using var listener = new ConcurrentLruCacheExpirationCleanupListener(cache);
