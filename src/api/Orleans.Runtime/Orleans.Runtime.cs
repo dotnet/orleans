@@ -189,7 +189,6 @@ namespace Orleans.Configuration
 
         public System.TimeSpan LazyDeregistrationDelay { get { throw null; } set { } }
 
-        [System.Obsolete("MaximumCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan MaximumCacheTTL { get { throw null; } set { } }
 
         public enum CachingStrategyType

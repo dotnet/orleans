@@ -37,6 +37,7 @@ namespace Orleans.Runtime.GrainDirectory
         internal SiloAddress MyAddress { get; }
 
         internal IGrainDirectoryCache DirectoryCache { get; }
+        private readonly bool disposeDirectoryCache;
         internal LocalGrainDirectoryPartition DirectoryPartition { get; }
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
@@ -62,7 +63,7 @@ namespace Orleans.Runtime.GrainDirectory
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
 
-            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value);
+            DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeDirectoryCache);
 
             var primarySiloEndPoint = developmentClusterMembershipOptions.Value.PrimarySiloEndpoint;
             if (primarySiloEndPoint != null)
@@ -106,7 +107,7 @@ namespace Orleans.Runtime.GrainDirectory
         // The alternative would be to allow the silo to process requests after it has handed off its partition, in which case those changes
         // would receive successful responses but would not be reflected in the eventual state of the directory.
         // It's easy to change this, if we think the trade-off is better the other way.
-        public Task StopAsync()
+        public async Task StopAsync()
         {
             // This will cause remote write requests to be forwarded to the silo that will become the new owner.
             // Requests might bounce back and forth for a while as membership stabilizes, but they will either be served by the
@@ -116,9 +117,13 @@ namespace Orleans.Runtime.GrainDirectory
             //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
 
+            if (this.disposeDirectoryCache)
+            {
+                await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(DirectoryCache);
+            }
+
             DirectoryPartition.Clear();
             DirectoryCache.Clear();
-            return Task.CompletedTask;
         }
 
         private void AddServer(SiloAddress silo)

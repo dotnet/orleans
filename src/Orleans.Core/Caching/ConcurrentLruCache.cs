@@ -7,6 +7,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Threading;
+using System.Threading.Tasks;
 using Orleans.Caching.Internal;
 
 namespace Orleans.Caching;
@@ -18,8 +19,8 @@ namespace Orleans.Caching;
 /// On cache miss, a new item is added. Tail items in each segment are dequeued, examined, and are either enqueued
 /// or discarded.
 /// The TU-Q scheme of hot, warm and cold is similar to that used in MemCached (https://memcached.org/blog/modern-lru/)
-/// and OpenBSD (https://flak.tedunangst.com/post/2Q-buffer-cache-algorithm), but does not use a background thread
-/// to maintain the internal queues.
+/// and OpenBSD (https://flak.tedunangst.com/post/2Q-buffer-cache-algorithm). Capacity maintenance does not use a
+/// background thread, while optional TTL cleanup uses a timer to periodically remove expired items.
 /// </summary>
 /// <remarks>
 /// This implementation is derived from BitFaster.Caching (https://github.com/bitfaster/BitFaster.Caching), removing
@@ -35,26 +36,25 @@ namespace Orleans.Caching;
 ///   <item><description>When cold is full, cold tail is moved to warm head or removed from dictionary on depending on WasAccessed.</description></item>
 ///</list>
 /// </remarks>
-/// <remarks>
-/// Initializes a new instance of the ConcurrentLruCore class with the specified concurrencyLevel, capacity, equality comparer, item policy and telemetry policy.
-/// </remarks>
-/// <param name="capacity">The capacity.</param>
-/// <param name="comparer">The equality comparer.</param>
-internal class ConcurrentLruCache<K, V>(
-    int capacity,
-    IEqualityComparer<K>? comparer) : IEnumerable<KeyValuePair<K, V>>, ICacheMetrics, ConcurrentLruCache<K, V>.ITestAccessor
+internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICacheMetrics, IAsyncDisposable, ConcurrentLruCache<K, V>.ITestAccessor
     where K : notnull
 {
-    private readonly ConcurrentDictionary<K, LruItem> _dictionary = new(concurrencyLevel: -1, capacity: capacity, comparer: comparer);
+    private readonly ConcurrentDictionary<K, LruItem> _dictionary;
     private readonly ConcurrentQueue<LruItem> _hotQueue = new();
     private readonly ConcurrentQueue<LruItem> _warmQueue = new();
     private readonly ConcurrentQueue<LruItem> _coldQueue = new();
-    private readonly CapacityPartition _capacity = new(capacity);
+    private readonly CapacityPartition _capacity;
     private readonly TelemetryPolicy _telemetryPolicy = new();
+    private readonly bool _expiresAfterAccess;
+    private readonly TimeSpan _timeToLive;
+    private readonly TimeProvider _timeProvider;
+    private readonly PeriodicTimer? _expirationTimer;
+    private readonly Task? _expirationLoopTask;
 
     // maintain count outside ConcurrentQueue, since ConcurrentQueue.Count holds a global lock
     private PaddedQueueCount _counter;
     private bool _isWarm;
+    private int _disposed;
 
     /// <summary>
     /// Initializes a new instance of the ConcurrentLruCore class with the specified capacity.
@@ -62,6 +62,43 @@ internal class ConcurrentLruCache<K, V>(
     /// <param name="capacity">The capacity.</param>
     public ConcurrentLruCache(int capacity) : this(capacity, comparer: null)
     {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the ConcurrentLruCore class with the specified capacity and expire-after-access time to live.
+    /// </summary>
+    /// <param name="capacity">The capacity.</param>
+    /// <param name="timeToLive">The time after which inactive items expire.</param>
+    /// <param name="timeProvider">The time provider.</param>
+    public ConcurrentLruCache(int capacity, TimeSpan timeToLive, TimeProvider? timeProvider = null)
+        : this(capacity, comparer: null, timeToLive: timeToLive, timeProvider: timeProvider)
+    {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the ConcurrentLruCore class with the specified concurrencyLevel, capacity, equality comparer, item policy and telemetry policy.
+    /// </summary>
+    /// <param name="capacity">The capacity.</param>
+    /// <param name="comparer">The equality comparer.</param>
+    /// <param name="timeToLive">The time after which inactive items expire.</param>
+    /// <param name="timeProvider">The time provider.</param>
+    public ConcurrentLruCache(
+        int capacity,
+        IEqualityComparer<K>? comparer,
+        TimeSpan? timeToLive = null,
+        TimeProvider? timeProvider = null)
+    {
+        _capacity = new CapacityPartition(capacity);
+        _dictionary = new ConcurrentDictionary<K, LruItem>(concurrencyLevel: -1, capacity: capacity, comparer: comparer);
+        _expiresAfterAccess = timeToLive.HasValue;
+        _timeToLive = ValidateTimeToLive(timeToLive);
+        _timeProvider = timeProvider ?? TimeProvider.System;
+
+        if (_expiresAfterAccess)
+        {
+            _expirationTimer = new PeriodicTimer(_timeToLive, _timeProvider);
+            _expirationLoopTask = RunExpirationLoop();
+        }
     }
 
     // No lock count: https://arbel.net/2013/02/03/best-practices-for-using-concurrentdictionary/
@@ -127,7 +164,7 @@ internal class ConcurrentLruCache<K, V>(
         if (_dictionary.TryGetValue(key, out var item))
         {
             value = item.Value;
-            item.MarkAccessed();
+            Touch(item);
             _telemetryPolicy.IncrementHit();
             return true;
         }
@@ -139,7 +176,7 @@ internal class ConcurrentLruCache<K, V>(
 
     public bool TryAdd(K key, V value)
     {
-        var newItem = new LruItem(key, value);
+        var newItem = CreateItem(key, value);
 
         if (_dictionary.TryAdd(key, newItem))
         {
@@ -315,6 +352,7 @@ internal class ConcurrentLruCache<K, V>(
                     var oldValue = existing.Value;
 
                     existing.Value = value;
+                    UpdateTimestamp(existing);
 
                     _telemetryPolicy.IncrementUpdated();
                     DisposeValue(oldValue);
@@ -340,7 +378,7 @@ internal class ConcurrentLruCache<K, V>(
             }
 
             // then try add
-            var newItem = new LruItem(key, value);
+            var newItem = CreateItem(key, value);
 
             if (_dictionary.TryAdd(key, newItem))
             {
@@ -356,14 +394,10 @@ internal class ConcurrentLruCache<K, V>(
     ///<inheritdoc/>
     public void Clear()
     {
-        // don't overlap Clear/Trim/TrimExpired
-        lock (_dictionary)
-        {
-            // evaluate queue count, remove everything including items removed from the dictionary but
-            // not the queues. This also avoids the expensive o(n) no lock count, or locking the dictionary.
-            var queueCount = HotCount + WarmCount + ColdCount;
-            TrimLiveItems(queueCount, ItemRemovedReason.Cleared);
-        }
+        // evaluate queue count, remove everything including items removed from the dictionary but
+        // not the queues. This also avoids the expensive o(n) no lock count, or locking the dictionary.
+        var queueCount = HotCount + WarmCount + ColdCount;
+        TrimLiveItems(queueCount, ItemRemovedReason.Cleared);
     }
 
     /// <summary>
@@ -385,11 +419,57 @@ internal class ConcurrentLruCache<K, V>(
         // clamp itemCount to number of items actually in the cache
         itemCount = Math.Min(itemCount, HotCount + WarmCount + ColdCount);
 
-        // don't overlap Clear/Trim/TrimExpired
-        lock (_dictionary)
+        TrimLiveItems(itemCount, ItemRemovedReason.Trimmed);
+    }
+
+    private int TrimExpiredItems()
+    {
+        if (!_expiresAfterAccess)
         {
-            TrimLiveItems(itemCount, ItemRemovedReason.Trimmed);
+            return 0;
         }
+
+        var timestamp = _timeProvider.GetTimestamp();
+
+        int RemoveExpiredItems(ConcurrentQueue<LruItem> queue, ref int queueCounter)
+        {
+            var itemsRemoved = 0;
+            var localCount = Volatile.Read(ref queueCounter);
+
+            for (var i = 0; i < localCount; i++)
+            {
+                if (queue.TryDequeue(out var item))
+                {
+                    if (item.WasRemoved)
+                    {
+                        Interlocked.Decrement(ref queueCounter);
+                    }
+                    else if (IsExpired(item, timestamp))
+                    {
+                        Interlocked.Decrement(ref queueCounter);
+                        Move(item, ItemDestination.Remove, ItemRemovedReason.Trimmed);
+                        itemsRemoved++;
+                    }
+                    else
+                    {
+                        queue.Enqueue(item);
+                    }
+                }
+            }
+
+            return itemsRemoved;
+        }
+
+        var coldRemoved = RemoveExpiredItems(_coldQueue, ref _counter.Cold);
+        var warmRemoved = RemoveExpiredItems(_warmQueue, ref _counter.Warm);
+        var hotRemoved = RemoveExpiredItems(_hotQueue, ref _counter.Hot);
+
+        if (warmRemoved > 0)
+        {
+            Volatile.Write(ref _isWarm, false);
+        }
+
+        return coldRemoved + warmRemoved + hotRemoved;
     }
 
     private void TrimLiveItems(int itemCount, ItemRemovedReason reason)
@@ -773,12 +853,13 @@ internal class ConcurrentLruCache<K, V>(
     /// <param name="value">The value.</param>
     // NOTE: Internal for testing
     [DebuggerDisplay("[{Key}] = {Value}")]
-    internal sealed class LruItem(K key, V value)
+    internal sealed class LruItem(K key, V value, long timestamp = 0)
     {
         private V _data = value;
 
         // only used when V is a non-atomic value type to prevent torn reads
         private int _sequence;
+        private long _timestamp = timestamp;
 
         /// <summary>
         /// Gets the key.
@@ -825,6 +906,14 @@ internal class ConcurrentLruCache<K, V>(
         /// Gets or sets a value indicating whether the item was removed.
         /// </summary>
         public bool WasRemoved { get; set; }
+
+        public long Timestamp
+        {
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            get => Volatile.Read(ref _timestamp);
+            [MethodImpl(MethodImplOptions.AggressiveInlining)]
+            set => Volatile.Write(ref _timestamp, value);
+        }
 
         /// <summary>
         /// Marks the item as accessed, if it was not already accessed.
@@ -949,5 +1038,77 @@ internal class ConcurrentLruCache<K, V>(
         {
             d.Dispose();
         }
+    }
+
+    private async Task RunExpirationLoop()
+    {
+        Debug.Assert(_expirationTimer is not null);
+
+        while (await _expirationTimer.WaitForNextTickAsync().ConfigureAwait(false))
+        {
+            try
+            {
+                var removedCount = TrimExpiredItems();
+                ConcurrentLruCacheDiagnostics.EmitExpiredItemsRemoved(this, removedCount);
+            }
+            catch
+            {
+            }
+        }
+    }
+
+    private LruItem CreateItem(K key, V value) =>
+        new(key, value, _expiresAfterAccess ? _timeProvider.GetTimestamp() : 0);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void Touch(LruItem item)
+    {
+        if (_expiresAfterAccess)
+        {
+            item.Timestamp = _timeProvider.GetTimestamp();
+        }
+
+        item.MarkAccessed();
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private void UpdateTimestamp(LruItem item)
+    {
+        if (_expiresAfterAccess)
+        {
+            item.Timestamp = _timeProvider.GetTimestamp();
+        }
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private bool IsExpired(LruItem item, long timestamp) =>
+        _expiresAfterAccess && _timeProvider.GetElapsedTime(item.Timestamp, timestamp) > _timeToLive;
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        _expirationTimer?.Dispose();
+
+        if (_expirationLoopTask is not null)
+        {
+            await _expirationLoopTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+        }
+    }
+
+    private static TimeSpan ValidateTimeToLive(TimeSpan? timeToLive)
+    {
+        if (!timeToLive.HasValue)
+        {
+            return default;
+        }
+
+        var value = timeToLive.GetValueOrDefault();
+        ArgumentOutOfRangeException.ThrowIfLessThanOrEqual(value, TimeSpan.Zero, nameof(timeToLive));
+
+        return value;
     }
 }
