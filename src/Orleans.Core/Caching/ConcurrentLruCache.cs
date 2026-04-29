@@ -1096,14 +1096,7 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
 
         if (_expirationLoopTask is not null)
         {
-            try
-            {
-                await _expirationLoopTask.ConfigureAwait(false);
-            }
-            catch (Exception exception)
-            {
-                Trace.TraceError($"{nameof(ConcurrentLruCache<K, V>)} background expiration loop failed during disposal: {exception}");
-            }
+            await _expirationLoopTask.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
         }
     }
 
