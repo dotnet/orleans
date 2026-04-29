@@ -13,10 +13,10 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     private T? _value;
     private ulong _version;
 
-    public DurableState([ServiceKey] string key, IStateMachineManager manager, IDurableStateCodecProvider codecProvider)
+    public DurableState([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codecProvider.GetCodec<T>();
+        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableStateCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
         _manager = manager;
     }
@@ -52,25 +52,17 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) => WriteState(logWriter);
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter) => WriteState(logWriter);
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) => WriteState(snapshotWriter);
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(StateMachineStorageWriter writer)
+    private void WriteState(StateMachineLogWriter writer)
     {
-        var entry = writer.BeginEntry();
-        try
-        {
-            _codec.WriteSet(_value!, _version, entry);
-            entry.Commit();
-        }
-        catch
-        {
-            entry.Abort();
-            throw;
-        }
+        using var entry = writer.BeginEntry();
+        _codec.WriteSet(_value!, _version, entry.Writer);
+        entry.Commit();
     }
 
     void IDurableStateLogEntryConsumer<T>.ApplySet(T state, ulong version)

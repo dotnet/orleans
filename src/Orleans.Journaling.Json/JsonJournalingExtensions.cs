@@ -82,8 +82,17 @@ public static class JsonJournalingExtensions
         var jsonOptions = options.SerializerOptions;
 
         // Replace the default extent and entry codec providers with JSON implementations.
-        builder.Services.AddSingleton<IStateMachineLogExtentCodec, JsonLinesLogExtentCodec>();
+        builder.Services.AddSingleton<JsonLinesLogFormat>();
+        builder.Services.AddKeyedSingleton<IStateMachineLogFormat>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLinesLogFormat>());
+        builder.Services.AddSingleton<IStateMachineLogFormat>(static sp => sp.GetRequiredService<JsonLinesLogFormat>());
         builder.Services.AddSingleton<JsonLogEntryCodecProvider>(_ => new JsonLogEntryCodecProvider(jsonOptions));
+        builder.Services.AddKeyedSingleton<IDurableDictionaryCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());

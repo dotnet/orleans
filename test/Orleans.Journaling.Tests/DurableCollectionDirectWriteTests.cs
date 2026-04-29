@@ -149,11 +149,11 @@ public sealed class DurableCollectionDirectWriteTests
 
     private sealed class TestLogWriter : IStateMachineLogWriter
     {
-        private readonly LogExtentBuilder _buffer = new();
+        private readonly LogExtentBuffer _buffer = new();
 
         public long Length => _buffer.Length;
 
-        public LogEntryWriter BeginEntry() => _buffer.BeginEntry(new StateMachineId(1));
+        public StateMachineLogEntry BeginEntry() => _buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
     }
 
     private sealed class DirectQueueCodec<T> : TestQueueCodec<T>

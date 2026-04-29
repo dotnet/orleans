@@ -4,7 +4,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal sealed class LogExtentBuffer : IDisposable, ILogEntryWriterTarget
+internal sealed class LogExtentBuffer : IDisposable, ILogEntryWriterTarget, IStateMachineLogExtentWriter, IStateMachineLogWriterTarget
 {
     private const int LengthPrefixSize = sizeof(uint);
     private readonly ArcBufferWriter _buffer = new();
@@ -12,7 +12,11 @@ internal sealed class LogExtentBuffer : IDisposable, ILogEntryWriterTarget
 
     public int Length => _buffer.Length;
 
+    long IStateMachineLogExtentWriter.Length => _buffer.Length;
+
     public bool IsEmpty => _buffer.Length == 0;
+
+    public StateMachineLogWriter CreateLogWriter(StateMachineId streamId) => new(streamId, this);
 
     public void Advance(int count) => _buffer.AdvanceWriter(count);
 
@@ -31,13 +35,18 @@ internal sealed class LogExtentBuffer : IDisposable, ILogEntryWriterTarget
         _buffer.WriteAt(offset, bytes);
     }
 
-    public LogEntryWriter BeginEntry(StateMachineId streamId)
+    public LogEntryWriter BeginEntry(StateMachineId streamId, ILogEntryWriterCompletion? completion = null)
     {
+        if (_entryWriter.IsActive)
+        {
+            throw new InvalidOperationException("The log extent already has an active entry.");
+        }
+
         var entryStart = Length;
         Span<byte> lengthPrefix = stackalloc byte[LengthPrefixSize];
         Write(lengthPrefix);
         VarIntHelper.WriteVarUInt64(this, streamId.Value);
-        _entryWriter.Initialize(this, entryStart);
+        _entryWriter.Initialize(this, entryStart, completion);
         return _entryWriter;
     }
 
@@ -53,6 +62,16 @@ internal sealed class LogExtentBuffer : IDisposable, ILogEntryWriterTarget
 
     public ArcBuffer PeekSlice() => _buffer.PeekSlice(_buffer.Length);
 
+    public ArcBuffer GetCommittedBuffer()
+    {
+        if (_entryWriter.IsActive)
+        {
+            throw new InvalidOperationException("The log extent has an active entry.");
+        }
+
+        return _buffer.PeekSlice(_buffer.Length);
+    }
+
     public ReadOnlySequence<byte> AsReadOnlySequence()
     {
         using var buffer = PeekSlice();
@@ -61,9 +80,19 @@ internal sealed class LogExtentBuffer : IDisposable, ILogEntryWriterTarget
 
     public Stream AsReadOnlyStream() => new ReadOnlyStream(PeekSlice());
 
-    public void Reset() => _buffer.Reset();
+    public void Reset()
+    {
+        if (_entryWriter.IsActive)
+        {
+            throw new InvalidOperationException("The log extent cannot be reset while an entry is active.");
+        }
+
+        _buffer.Reset();
+    }
 
     public void Dispose() => _buffer.Dispose();
+
+    LogEntryWriter IStateMachineLogWriterTarget.BeginEntry(StateMachineId streamId, ILogEntryWriterCompletion? completion) => BeginEntry(streamId, completion);
 
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream
     {

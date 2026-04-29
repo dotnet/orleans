@@ -18,10 +18,10 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     private T? _value;
     private bool _isDirty;
 
-    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IDurableValueCodecProvider codecProvider)
+    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codecProvider.GetCodec<T>();
+        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableValueCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
@@ -62,7 +62,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
     {
         if (_isDirty)
         {
@@ -71,23 +71,15 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) => WriteState(snapshotWriter);
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(StateMachineStorageWriter writer)
+    private void WriteState(StateMachineLogWriter writer)
     {
-        var entry = writer.BeginEntry();
-        try
-        {
-            _codec.WriteSet(_value!, entry);
-            entry.Commit();
-        }
-        catch
-        {
-            entry.Abort();
-            throw;
-        }
+        using var entry = writer.BeginEntry();
+        _codec.WriteSet(_value!, entry.Writer);
+        entry.Commit();
     }
 
     void IDurableValueLogEntryConsumer<T>.ApplySet(T value) => _value = value;

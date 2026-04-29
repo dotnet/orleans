@@ -23,6 +23,12 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
                 options.ContainerName = containerName;
             }
 
+            var logFormatKey = configurationSection[nameof(AzureAppendBlobStateMachineStorageOptions.LogFormatKey)];
+            if (!string.IsNullOrWhiteSpace(logFormatKey))
+            {
+                options.LogFormatKey = logFormatKey;
+            }
+
             var serviceKey = configurationSection["ServiceKey"];
             if (!string.IsNullOrEmpty(serviceKey))
             {

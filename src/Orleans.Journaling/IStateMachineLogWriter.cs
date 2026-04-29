@@ -8,7 +8,7 @@ public interface IStateMachineLogWriter
     /// <summary>
     /// Begins writing an entry to the log for the state machine which holds this instance.
     /// </summary>
-    /// <returns>A writer for the pending log entry. The caller must commit or abort it before returning.</returns>
-    LogEntryWriter BeginEntry();
+    /// <returns>A lexical scope for the pending log entry. Dispose the returned value to abort the entry if <see cref="StateMachineLogEntry.Commit"/> is not called.</returns>
+    StateMachineLogEntry BeginEntry();
 
 }

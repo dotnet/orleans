@@ -11,15 +11,15 @@ namespace Orleans.Journaling.Protobuf;
 public static class ProtobufJournalingExtensions
 {
     /// <summary>
-    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log extent and entry serialization.
+    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log entry serialization.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder for chaining.</returns>
     /// <remarks>
     /// <para>
-    /// Physical log extents use the shared journaling frame:
-    /// <c>fixed32 entryLength + varuint64 stateMachineId + entryPayload</c>.
-    /// The entry payload is encoded with protobuf wire-format tags.
+    /// Physical log data is a stream of length-delimited <c>LogEntry</c> messages:
+    /// <c>message LogEntry { uint64 stream_id = 1; bytes payload = 2; }</c>.
+    /// The durable entry payload is encoded with protobuf wire-format tags.
     /// </para>
     /// <para>
     /// Each entry type is serialized using protobuf wire-format tags. Common scalar values
@@ -38,7 +38,7 @@ public static class ProtobufJournalingExtensions
         => UseProtobufCodecCore(builder, configure: null);
 
     /// <summary>
-    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log extent and entry serialization.
+    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log entry serialization.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">A delegate used to configure protobuf journaling options.</param>
@@ -75,8 +75,17 @@ public static class ProtobufJournalingExtensions
             options.Apply(builder.Services);
         }
 
-        builder.Services.AddSingleton<IStateMachineLogExtentCodec, ProtobufLogExtentCodec>();
+        builder.Services.AddSingleton<ProtobufLogFormat>();
+        builder.Services.AddKeyedSingleton<IStateMachineLogFormat>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogFormat>());
+        builder.Services.AddSingleton<IStateMachineLogFormat>(static sp => sp.GetRequiredService<ProtobufLogFormat>());
         builder.Services.AddSingleton<ProtobufLogEntryCodecProvider>();
+        builder.Services.AddKeyedSingleton<IDurableDictionaryCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
         builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());

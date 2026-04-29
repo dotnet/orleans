@@ -1,3 +1,5 @@
+using Orleans.Serialization.Buffers;
+
 namespace Orleans.Journaling;
 
 /// <summary>
@@ -6,28 +8,33 @@ namespace Orleans.Journaling;
 public interface IStateMachineStorage
 {
     /// <summary>
-    /// Reads all log entries belonging to this instance and pushes them to <paramref name="consumer"/>.
+    /// Gets the configured physical log format key for this storage instance.
     /// </summary>
-    /// <param name="consumer">The consumer which receives decoded log entries.</param>
+    string LogFormatKey { get; }
+
+    /// <summary>
+    /// Reads all log data belonging to this instance and pushes it to <paramref name="consumer"/>.
+    /// </summary>
+    /// <param name="consumer">The consumer which receives raw log data.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask ReadAsync(IStateMachineLogEntryConsumer consumer, CancellationToken cancellationToken);
+    ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken);
 
     /// <summary>
     /// Replaces the log with the provided value atomically.
     /// </summary>
-    /// <param name="value">The value to write.</param>
+    /// <param name="value">The encoded log bytes to write. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask ReplaceAsync(LogExtentBuilder value, CancellationToken cancellationToken);
+    ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken);
 
     /// <summary>
     /// Appends the provided segment to the log atomically.
     /// </summary>
-    /// <param name="value">The segment to append.</param>
+    /// <param name="value">The encoded log bytes to append. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask AppendAsync(LogExtentBuilder value, CancellationToken cancellationToken);
+    ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken);
 
     /// <summary>
     /// Deletes the state machine's log atomically.

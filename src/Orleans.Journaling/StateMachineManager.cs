@@ -5,11 +5,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class StateMachineManager : IStateMachineManager, IStateMachineLogEntryConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class StateMachineManager : IStateMachineManager, IStateMachineLogDataConsumer, IStateMachineLogEntryConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationStateMachineId = 8;
 #if NET9_0_OR_GREATER
@@ -20,6 +21,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
     private readonly Dictionary<string, IDurableStateMachine> _stateMachines = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, IDurableStateMachine> _stateMachinesMap = [];
     private readonly IStateMachineStorage _storage;
+    private readonly IStateMachineLogFormat _logFormat;
     private readonly ILogger<StateMachineManager> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -32,16 +34,19 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
     private ManagerState _state;
     private Task? _pendingWrite;
     private ulong _nextStateMachineId = MinApplicationStateMachineId;
-    private LogExtentBuilder? _currentLogSegment;
+    private IStateMachineLogExtentWriter? _currentLogExtentWriter;
 
     public StateMachineManager(
         IStateMachineStorage storage,
         ILogger<StateMachineManager> logger,
         IOptions<StateMachineManagerOptions> options,
-        IDurableDictionaryCodecProvider dictionaryCodecProvider,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IServiceProvider serviceProvider)
     {
         _storage = storage;
+        var logFormatKey = StateMachineLogFormatServices.GetValidatedLogFormatKey(storage);
+        _logFormat = StateMachineLogFormatServices.GetRequiredKeyedService<IStateMachineLogFormat>(serviceProvider, logFormatKey);
+        var dictionaryCodecProvider = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableDictionaryCodecProvider>(serviceProvider, logFormatKey);
         _logger = logger;
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
@@ -63,9 +68,12 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
         IOptions<StateMachineManagerOptions> options,
         IDurableDictionaryCodec<string, ulong> stateMachineIdsCodec,
         IDurableDictionaryCodec<string, DateTime> retirementTrackerCodec,
-        TimeProvider timeProvider)
+        TimeProvider timeProvider,
+        IStateMachineLogFormat? logFormat = null)
     {
         _storage = storage;
+        StateMachineLogFormatServices.GetValidatedLogFormatKey(storage);
+        _logFormat = logFormat ?? BinaryLogExtentCodec.Instance;
         _logger = logger;
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
@@ -92,7 +100,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
                     // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
-                    stateMachine.Reset(new StateMachineLogWriter(this, new(_stateMachineIds[name])));      
+                    stateMachine.Reset(new ManagerStateMachineLogWriter(this, new(_stateMachineIds[name])));
                     foreach (var entry in vessel.BufferedData)
                     {
                         stateMachine.Apply(new ReadOnlySequence<byte>(entry));
@@ -184,7 +192,8 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
                             // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current log length.
                             //       If the current log length is greater than the snapshot size, then take a snapshot instead of appending more log entries.
                             var isSnapshot = workItem.Type is WorkItemType.WriteSnapshot;
-                            LogExtentBuilder? logSegment;
+                            IStateMachineLogExtentWriter? logExtentWriter;
+                            ArcBuffer committedBuffer = default;
 
                             lock (_lock)
                             {
@@ -192,7 +201,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
                                 {
                                     // If there are pending writes, reset them since they will be captured by the snapshot instead.
                                     // If we did not do this, the log would begin with some writes which would be followed by a snapshot which also included those writes.
-                                    _currentLogSegment?.Reset();
+                                    _currentLogExtentWriter?.Reset();
 
                                     if (_retirementTracker.Count > 0)
                                     {
@@ -200,12 +209,12 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
                                     }
                                 }
 
-                                _currentLogSegment ??= new();
+                                var currentLogExtentWriter = GetOrCreateCurrentLogExtentWriter();
 
                                 // The map of state machine ids is itself stored as a durable state machine with the id 0.
                                 // This must be stored first, since it includes the identities of all other state machines, which are needed when replaying the log.
                                 // If we removed retired machines, this snapshot will persist that change.
-                                AppendUpdatesOrSnapshotStateMachine(_currentLogSegment, isSnapshot, 0, _stateMachineIds);
+                                AppendUpdatesOrSnapshotStateMachine(currentLogExtentWriter, isSnapshot, 0, _stateMachineIds);
 
                                 foreach (var (id, stateMachine) in _stateMachinesMap)
                                 {
@@ -214,34 +223,60 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
                                         continue;
                                     }
 
-                                    AppendUpdatesOrSnapshotStateMachine(_currentLogSegment, isSnapshot, id, stateMachine);
+                                    AppendUpdatesOrSnapshotStateMachine(currentLogExtentWriter, isSnapshot, id, stateMachine);
                                 }
 
-                                if (_currentLogSegment.IsEmpty)
+                                committedBuffer = currentLogExtentWriter.GetCommittedBuffer();
+                                if (committedBuffer.Length == 0)
                                 {
-                                    logSegment = null;
+                                    committedBuffer.Dispose();
+                                    logExtentWriter = null;
                                 }
                                 else
                                 {
-                                    logSegment = _currentLogSegment;
-                                    _currentLogSegment = null;
+                                    logExtentWriter = currentLogExtentWriter;
+                                    _currentLogExtentWriter = null;
                                 }
                             }
 
-                            if (logSegment is not null)
+                            if (logExtentWriter is not null)
                             {
-                                if (isSnapshot)
+                                var writeSucceeded = false;
+                                try
                                 {
-                                    await _storage.ReplaceAsync(logSegment, cancellationToken).ConfigureAwait(true);
+                                    if (isSnapshot)
+                                    {
+                                        await _storage.ReplaceAsync(committedBuffer, cancellationToken).ConfigureAwait(true);
+                                    }
+                                    else
+                                    {
+                                        await _storage.AppendAsync(committedBuffer, cancellationToken).ConfigureAwait(true);
+                                    }
+
+                                    writeSucceeded = true;
                                 }
-                                else
+                                finally
                                 {
-                                    await _storage.AppendAsync(logSegment, cancellationToken).ConfigureAwait(true);
+                                    committedBuffer.Dispose();
+                                    if (!writeSucceeded)
+                                    {
+                                        logExtentWriter.Dispose();
+                                    }
                                 }
 
                                 // Notify all state machines that the operation completed.
                                 lock (_lock)
                                 {
+                                    if (_currentLogExtentWriter is null)
+                                    {
+                                        logExtentWriter.Reset();
+                                        _currentLogExtentWriter = logExtentWriter;
+                                    }
+                                    else
+                                    {
+                                        logExtentWriter.Dispose();
+                                    }
+
                                     foreach (var stateMachine in _stateMachines.Values)
                                     {
                                         stateMachine.OnWriteCompleted();
@@ -315,7 +350,19 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
                     return;
                 }
 
+                FaultQueuedWorkItems(exception);
                 LogErrorProcessingWorkItems(_logger, exception);
+            }
+        }
+    }
+
+    private void FaultQueuedWorkItems(Exception exception)
+    {
+        lock (_lock)
+        {
+            while (_workQueue.TryDequeue(out var workItem))
+            {
+                workItem.CompletionSource?.TrySetException(exception);
             }
         }
     }
@@ -336,7 +383,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
                     LogRemovingRetiredStateMachine(_logger, name);
 
                     // Since we are permanently removing this state machine, we will clean it up by reseting it.
-                    stateMachine.Reset(new StateMachineLogWriter(this, new(id)));
+                    stateMachine.Reset(new ManagerStateMachineLogWriter(this, new(id)));
 
                     _stateMachinesMap.Remove(id);
                     // We remove these from memory only, since the snapshot will persist these changes.
@@ -353,9 +400,11 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
         }
     }
 
-    private static void AppendUpdatesOrSnapshotStateMachine(LogExtentBuilder logSegment, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
+    private IStateMachineLogExtentWriter GetOrCreateCurrentLogExtentWriter() => _currentLogExtentWriter ??= _logFormat.CreateWriter();
+
+    private static void AppendUpdatesOrSnapshotStateMachine(IStateMachineLogExtentWriter logExtentWriter, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
     {
-        var writer = logSegment.CreateLogWriter(new(id));
+        var writer = logExtentWriter.CreateLogWriter(new(id));
         if (isSnapshot)
         {
             stateMachine.AppendSnapshot(writer);
@@ -384,6 +433,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
     {
         lock (_lock)
         {
+            _currentLogExtentWriter?.Reset();
             _stateMachineIds.ResetVolatileState();
         }
 
@@ -411,12 +461,14 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
     {
         if (!_stateMachinesMap.TryGetValue(streamId.Value, out var stateMachine))
         {
-            stateMachine = new RetiredStateMachineVessel();
+            stateMachine = new RetiredStateMachineVessel(streamId);
             _stateMachinesMap[streamId.Value] = stateMachine;
         }
 
         stateMachine.Apply(payload);
     }
+
+    void IStateMachineLogDataConsumer.OnLogData(ArcBuffer data) => _logFormat.Read(data, this);
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
     {
@@ -468,11 +520,11 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
             if (_stateMachines.TryGetValue(name, out var stateMachine))
             {
                 _stateMachinesMap[id] = stateMachine;
-                stateMachine.Reset(new StateMachineLogWriter(this, new(id)));
+                stateMachine.Reset(new ManagerStateMachineLogWriter(this, new(id)));
             }
             else
             {
-                var vessel = new RetiredStateMachineVessel();
+                var vessel = new RetiredStateMachineVessel(new(id));
 
                 // We must not make the vessel self-register with the manager, since it will
                 // result in a late-registration after the manager is 'ready'. Instead we add it inline here.
@@ -500,20 +552,20 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
     void IDisposable.Dispose()
     {
         _shutdownCancellation.Dispose();
+        _currentLogExtentWriter?.Dispose();
     }
 
-    private sealed class StateMachineLogWriter(StateMachineManager manager, StateMachineId streamId) : IStateMachineLogWriter, ILogEntryWriterCompletion
+    private sealed class ManagerStateMachineLogWriter(StateMachineManager manager, StateMachineId streamId) : IStateMachineLogWriter, ILogEntryWriterCompletion
     {
         private readonly StateMachineManager _manager = manager;
         private readonly StateMachineId _id = streamId;
 
-        public LogEntryWriter BeginEntry()
+        public StateMachineLogEntry BeginEntry()
         {
             EnterLock();
             try
             {
-                var segment = _manager._currentLogSegment ??= new();
-                return segment.BeginEntry(_id, this);
+                return _manager.GetOrCreateCurrentLogExtentWriter().CreateLogWriter(_id).BeginEntry(this);
             }
             catch
             {
@@ -573,7 +625,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
 
         private readonly StateMachineManager _manager = manager;
 
-        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(new StateMachineLogWriter(_manager, new(Id)));
+        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(new ManagerStateMachineLogWriter(_manager, new(Id)));
 
         protected override void OnSet(string key, ulong value) => _manager.OnSetStateMachineId(key, value);
     }
@@ -588,7 +640,7 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
     {
         public const int Id = 1;
 
-        private readonly StateMachineLogWriter _logWriter = new(manager, new(Id));
+        private readonly ManagerStateMachineLogWriter _logWriter = new(manager, new(Id));
 
         protected override IStateMachineLogWriter GetStorage() => _logWriter;
     }
@@ -597,24 +649,31 @@ internal sealed partial class StateMachineManager : IStateMachineManager, IState
     /// Used to keep retired machines into a purgatory state until time-based purging or if a comeback occurs.
     /// This keeps buffering entries and dumps them back into the log upon compaction.
     /// </summary>
-    [DebuggerDisplay(nameof(RetiredStateMachineVessel))]
-    private sealed class RetiredStateMachineVessel : IDurableStateMachine
+    [DebuggerDisplay("RetiredStateMachineVessel Id = {StreamId.Value}")]
+    private sealed class RetiredStateMachineVessel(StateMachineId streamId) : IDurableStateMachine
     {
         private readonly List<byte[]> _bufferedData = [];
 
+        public StateMachineId StreamId { get; } = streamId;
+
         public ReadOnlyCollection<byte[]> BufferedData => _bufferedData.AsReadOnly();
 
-        void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
+        void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
         {
             foreach (var data in _bufferedData)
             {
-                snapshotWriter.AppendEntry(data);
+                snapshotWriter.AppendPreservedDecodedPayload(data);
             }
         }
 
         void IDurableStateMachine.Reset(IStateMachineLogWriter storage) => _bufferedData.Clear();
-        void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) => _bufferedData.Add(logEntry.ToArray());
-        void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) { }
+        void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
+        {
+            // Recovery buffers are callback-scoped, so copy the decoded durable payload.
+            _bufferedData.Add(logEntry.ToArray());
+        }
+
+        void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter) { }
         IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
     }
 

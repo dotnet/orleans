@@ -36,13 +36,13 @@ public interface IDurableStateMachine
     /// Writes pending state changes to the log.
     /// </summary>
     /// <param name="writer">The log writer.</param>
-    void AppendEntries(StateMachineStorageWriter writer);
+    void AppendEntries(StateMachineLogWriter writer);
 
     /// <summary>
     /// Writes a snapshot of the state machine to the provided writer.
     /// </summary>
     /// <param name="writer">The log writer.</param>
-    void AppendSnapshot(StateMachineStorageWriter writer);
+    void AppendSnapshot(StateMachineLogWriter writer);
 
     /// <summary>
     /// Notifies the state machine that all prior log entries and snapshots which it has written have been written to stable storage.

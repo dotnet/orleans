@@ -25,9 +25,9 @@ internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) { }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) { }
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter) { }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) { }
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) { }
 
     public IDurableStateMachine DeepCopy() => this;
 }

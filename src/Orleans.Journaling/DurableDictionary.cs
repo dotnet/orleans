@@ -23,7 +23,8 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         _codec = codec;
     }
 
-    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, IDurableDictionaryCodecProvider codecProvider) : this(codecProvider.GetCodec<K, V>())
+    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
+        : this(StateMachineLogFormatServices.GetRequiredKeyedService<IDurableDictionaryCodecProvider>(serviceProvider, storage).GetCodec<K, V>())
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
@@ -65,29 +66,23 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
     {
-        WriteSnapshot(snapshotWriter.BeginEntry());
+        using var entry = snapshotWriter.BeginEntry();
+        _codec.WriteSnapshot(_items, entry.Writer);
+        entry.Commit();
     }
 
     public void Clear()
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteClear(writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteClear(entry.Writer);
+        entry.Commit();
 
         ApplyClear();
     }
@@ -108,48 +103,18 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     private void WriteRemove(K key)
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteRemove(key, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteRemove(key, entry.Writer);
+        entry.Commit();
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
     private void WriteSet(K key, V value)
     {
-        var writer = GetStorage().BeginEntry();
-        try
-        {
-            _codec.WriteSet(key, value, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
-    }
-
-    private void WriteSnapshot(LogEntryWriter writer)
-    {
-        try
-        {
-            _codec.WriteSnapshot(_items, writer);
-            writer.Commit();
-        }
-        catch
-        {
-            writer.Abort();
-            throw;
-        }
+        using var entry = GetStorage().BeginEntry();
+        _codec.WriteSet(key, value, entry.Writer);
+        entry.Commit();
     }
 
     protected virtual void OnSet(K key, V value) { }

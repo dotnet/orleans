@@ -31,12 +31,13 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         IStateMachineManager manager,
-        IDurableTaskCompletionSourceCodecProvider codecProvider,
+        IStateMachineStorage storage,
+        IServiceProvider serviceProvider,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = codecProvider.GetCodec<T>();
+        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceCodecProvider>(serviceProvider, storage).GetCodec<T>();
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterStateMachine(key, this);
@@ -139,7 +140,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter)
+    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -147,36 +148,28 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) => WriteState(snapshotWriter);
 
-    private void WriteState(StateMachineStorageWriter writer)
+    private void WriteState(StateMachineLogWriter writer)
     {
-        var entry = writer.BeginEntry();
-        try
+        using var entry = writer.BeginEntry();
+        switch (_status)
         {
-            switch (_status)
-            {
-                case DurableTaskCompletionSourceStatus.Completed:
-                    _codec.WriteCompleted(_value!, entry);
-                    break;
-                case DurableTaskCompletionSourceStatus.Faulted:
-                    _codec.WriteFaulted(_exception!, entry);
-                    break;
-                case DurableTaskCompletionSourceStatus.Canceled:
-                    _codec.WriteCanceled(entry);
-                    break;
-                default:
-                    _codec.WritePending(entry);
-                    break;
-            }
+            case DurableTaskCompletionSourceStatus.Completed:
+                _codec.WriteCompleted(_value!, entry.Writer);
+                break;
+            case DurableTaskCompletionSourceStatus.Faulted:
+                _codec.WriteFaulted(_exception!, entry.Writer);
+                break;
+            case DurableTaskCompletionSourceStatus.Canceled:
+                _codec.WriteCanceled(entry.Writer);
+                break;
+            default:
+                _codec.WritePending(entry.Writer);
+                break;
+        }
 
-            entry.Commit();
-        }
-        catch
-        {
-            entry.Abort();
-            throw;
-        }
+        entry.Commit();
     }
 
     void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;

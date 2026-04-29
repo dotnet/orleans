@@ -24,6 +24,10 @@ namespace Orleans.Journaling
 
         public int InitStage { get { throw null; } set { } }
 
+        public string LogFormatKey { get { throw null; } set { } }
+
+        public System.Func<Runtime.GrainType, string>? LogFormatKeySelector { get { throw null; } set { } }
+
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 
         public void ConfigureBlobServiceClient(string connectionString) { }
