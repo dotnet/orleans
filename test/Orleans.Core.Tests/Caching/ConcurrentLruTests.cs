@@ -767,6 +767,29 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     }
 
     [Fact]
+    public async Task WhenItemAgeEqualsTimeToLivePeriodicCleanupKeepsItemUntilLaterTick()
+    {
+        var timeProvider = new FakeTimeProvider();
+        await using var lru = CreateExpiringLru(timeProvider);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
+
+        lru.AddOrUpdate(1, "1");
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+
+        var firstCleanup = await listener.WaitForCleanupAsync();
+        firstCleanup.Should().Be(0);
+        lru.Count.Should().Be(1);
+        lru.Keys.Should().BeEquivalentTo([1]);
+
+        timeProvider.Advance(TimeSpan.FromMinutes(1));
+
+        var secondCleanup = await listener.WaitForCleanupAsync();
+        secondCleanup.Should().Be(1);
+        lru.TryGet(1, out _).Should().BeFalse();
+        lru.Count.Should().Be(0);
+    }
+
+    [Fact]
     public async Task WhenItemIsReadTimeToLiveIsExtended()
     {
         var timeProvider = new FakeTimeProvider();
@@ -859,11 +882,41 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
 
             var cleanup = await listener.WaitForCleanupAsync();
             cleanup.Should().Be(0);
+
+            Func<Task> dispose = async () => await lru.DisposeAsync();
+            await dispose.Should().NotThrowAsync();
         }
         finally
         {
             await lru.DisposeAsync();
         }
+    }
+
+    [Fact]
+    public async Task WhenOtherCacheExpiresCleanupListenerWithShortTimeoutDoesNotCompleteForNonTargetCache()
+    {
+        var targetTimeProvider = new FakeTimeProvider();
+        var otherTimeProvider = new FakeTimeProvider();
+        await using var targetLru = CreateExpiringLru(targetTimeProvider);
+        await using var otherLru = CreateExpiringLru(otherTimeProvider);
+        using var targetListener = new ConcurrentLruCacheExpirationCleanupListener(targetLru);
+        using var otherListener = new ConcurrentLruCacheExpirationCleanupListener(otherLru);
+
+        targetLru.AddOrUpdate(1, "target");
+        otherLru.AddOrUpdate(1, "other");
+        otherTimeProvider.Advance(TimeSpan.FromMinutes(2));
+
+        var otherCleanup = await otherListener.WaitForCleanupAsync();
+        otherCleanup.Should().Be(1);
+
+        Func<Task> waitForTargetCleanup = () => targetListener.WaitForCleanupAsync(TimeSpan.FromMilliseconds(10));
+        await waitForTargetCleanup.Should().ThrowAsync<TimeoutException>();
+
+        using var targetListenerAfterNegativeAssertion = new ConcurrentLruCacheExpirationCleanupListener(targetLru);
+        targetTimeProvider.Advance(TimeSpan.FromMinutes(2));
+
+        var targetCleanup = await targetListenerAfterNegativeAssertion.WaitForCleanupAsync();
+        targetCleanup.Should().Be(1);
     }
 
     [Fact]

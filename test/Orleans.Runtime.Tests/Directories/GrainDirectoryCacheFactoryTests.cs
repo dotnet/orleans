@@ -65,6 +65,146 @@ public class GrainDirectoryCacheFactoryTests
         Assert.Same(expected, actual);
     }
 
+    [Fact]
+    public async Task CreateGrainDirectoryCache_LruReturnsOwnedCache()
+    {
+        var services = new ServiceCollection().BuildServiceProvider();
+        var options = new GrainDirectoryOptions
+        {
+            CachingStrategy = GrainDirectoryOptions.CachingStrategyType.LRU,
+            CacheSize = 10
+        };
+
+        var cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(services, options, out var disposeCache);
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+
+        try
+        {
+            Assert.True(disposeCache);
+            Assert.IsAssignableFrom<IGrainDirectoryCache>(cache);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public void CreateGrainDirectoryCache_NoneReturnsOwnedCache()
+    {
+        var services = new ServiceCollection().BuildServiceProvider();
+        var options = new GrainDirectoryOptions
+        {
+            CachingStrategy = GrainDirectoryOptions.CachingStrategyType.None,
+            CacheSize = 10
+        };
+
+        var cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(services, options, out var disposeCache);
+
+        Assert.True(disposeCache);
+        Assert.IsAssignableFrom<IGrainDirectoryCache>(cache);
+    }
+
+    [Fact]
+    public void CreateGrainDirectoryCache_NonPositiveCacheSizeReturnsOwnedCache()
+    {
+        var services = new ServiceCollection().BuildServiceProvider();
+        var options = new GrainDirectoryOptions
+        {
+            CachingStrategy = GrainDirectoryOptions.CachingStrategyType.LRU,
+            CacheSize = 0
+        };
+
+        var cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(services, options, out var disposeCache);
+
+        Assert.True(disposeCache);
+        Assert.IsAssignableFrom<IGrainDirectoryCache>(cache);
+    }
+
+    [Fact]
+    public void CreateGrainDirectoryCache_CustomReturnsUnownedRegisteredCache()
+    {
+        var expected = new TestGrainDirectoryCache();
+        var services = new ServiceCollection()
+            .AddSingleton<IGrainDirectoryCache>(expected)
+            .BuildServiceProvider();
+        var options = new GrainDirectoryOptions
+        {
+            CachingStrategy = GrainDirectoryOptions.CachingStrategyType.Custom
+        };
+
+        var actual = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(services, options, out var disposeCache);
+
+        Assert.False(disposeCache);
+        Assert.Same(expected, actual);
+    }
+
+    [Fact]
+    public void CreateCustomGrainDirectoryCache_ReturnsUnownedRegisteredCache()
+    {
+        var expected = new TestGrainDirectoryCache();
+        var services = new ServiceCollection()
+            .AddSingleton<IGrainDirectoryCache>(expected)
+            .BuildServiceProvider();
+        var options = new GrainDirectoryOptions();
+
+        var actual = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(services, options, out var disposeCache);
+
+        Assert.False(disposeCache);
+        Assert.Same(expected, actual);
+    }
+
+    [Fact]
+    public async Task CreateCustomGrainDirectoryCache_FallbackReturnsOwnedLruCache()
+    {
+        var services = new ServiceCollection().BuildServiceProvider();
+        var options = new GrainDirectoryOptions
+        {
+            CacheSize = 10
+        };
+
+        var cache = GrainDirectoryCacheFactory.CreateCustomGrainDirectoryCache(services, options, out var disposeCache);
+        var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
+
+        try
+        {
+            Assert.True(disposeCache);
+            Assert.IsAssignableFrom<IGrainDirectoryCache>(cache);
+        }
+        finally
+        {
+            await disposableCache.DisposeAsync();
+        }
+    }
+
+    [Fact]
+    public async Task DisposeGrainDirectoryCacheAsync_AsyncDisposableCacheCallsDisposeAsync()
+    {
+        var cache = new AsyncDisposableGrainDirectoryCache();
+
+        await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(cache);
+
+        Assert.True(cache.DisposeAsyncCalled);
+    }
+
+    [Fact]
+    public async Task DisposeGrainDirectoryCacheAsync_DisposableOnlyCacheCallsDispose()
+    {
+        var cache = new DisposableGrainDirectoryCache();
+
+        await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(cache);
+
+        Assert.True(cache.DisposeCalled);
+    }
+
+    [Fact]
+    public async Task DisposeGrainDirectoryCacheAsync_NonDisposableCacheCompletes()
+    {
+        var cache = new TestGrainDirectoryCache();
+
+        await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(cache);
+    }
+
     private static GrainAddress CreateGrainAddress() => new()
     {
         ActivationId = ActivationId.NewId(),
@@ -73,7 +213,7 @@ public class GrainDirectoryCacheFactoryTests
         MembershipVersion = new MembershipVersion(1)
     };
 
-    private sealed class TestGrainDirectoryCache : IGrainDirectoryCache
+    private class TestGrainDirectoryCache : IGrainDirectoryCache
     {
         public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues => [];
 
@@ -95,5 +235,23 @@ public class GrainDirectoryCacheFactoryTests
         public bool Remove(GrainId key) => false;
 
         public bool Remove(GrainAddress key) => false;
+    }
+
+    private sealed class AsyncDisposableGrainDirectoryCache : TestGrainDirectoryCache, IAsyncDisposable
+    {
+        public bool DisposeAsyncCalled { get; private set; }
+
+        public ValueTask DisposeAsync()
+        {
+            DisposeAsyncCalled = true;
+            return default;
+        }
+    }
+
+    private sealed class DisposableGrainDirectoryCache : TestGrainDirectoryCache, IDisposable
+    {
+        public bool DisposeCalled { get; private set; }
+
+        public void Dispose() => DisposeCalled = true;
     }
 }
