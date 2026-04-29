@@ -31,35 +31,35 @@ internal static class ModelExtractor
         var creationStrategy = DetermineCreationStrategy(description);
 
         return new SerializableTypeModel(
-            accessibility: description.Accessibility,
-            typeSyntax: new TypeRef(description.TypeSyntax.ToString()),
-            hasComplexBaseType: description.HasComplexBaseType,
-            includePrimaryConstructorParameters: description.IncludePrimaryConstructorParameters,
-            baseTypeSyntax: description.HasComplexBaseType ? new TypeRef(description.BaseTypeSyntax.ToString()) : TypeRef.Empty,
-            ns: description.Namespace ?? string.Empty,
-            generatedNamespace: description.GeneratedNamespace ?? string.Empty,
-            name: description.Name ?? string.Empty,
-            isValueType: description.IsValueType,
-            isSealedType: description.IsSealedType,
-            isAbstractType: description.IsAbstractType,
-            isEnumType: description.IsEnumType,
-            isGenericType: description.IsGenericType,
-            typeParameters: typeParameters,
-            members: members,
-            useActivator: description.UseActivator,
-            isEmptyConstructable: description.IsEmptyConstructable,
-            hasActivatorConstructor: description.HasActivatorConstructor,
-            trackReferences: description.TrackReferences,
-            omitDefaultMemberValues: description.OmitDefaultMemberValues,
-            serializationHooks: serializationHooks,
-            isShallowCopyable: description.IsShallowCopyable,
-            isUnsealedImmutable: description.IsUnsealedImmutable,
-            isImmutable: description.IsImmutable,
-            isExceptionType: description.IsExceptionType,
-            activatorConstructorParameters: activatorCtorParams,
-            creationStrategy: creationStrategy,
-            sourceLocation: sourceLocation,
-            metadataIdentity: description is SerializableTypeDescription serializableDescription
+            Accessibility: description.Accessibility,
+            TypeSyntax: new TypeRef(description.TypeSyntax.ToString()),
+            HasComplexBaseType: description.HasComplexBaseType,
+            IncludePrimaryConstructorParameters: description.IncludePrimaryConstructorParameters,
+            BaseTypeSyntax: description.HasComplexBaseType ? new TypeRef(description.BaseTypeSyntax.ToString()) : TypeRef.Empty,
+            Namespace: description.Namespace ?? string.Empty,
+            GeneratedNamespace: description.GeneratedNamespace ?? string.Empty,
+            Name: description.Name ?? string.Empty,
+            IsValueType: description.IsValueType,
+            IsSealedType: description.IsSealedType,
+            IsAbstractType: description.IsAbstractType,
+            IsEnumType: description.IsEnumType,
+            IsGenericType: description.IsGenericType,
+            TypeParameters: typeParameters,
+            Members: members,
+            UseActivator: description.UseActivator,
+            IsEmptyConstructable: description.IsEmptyConstructable,
+            HasActivatorConstructor: description.HasActivatorConstructor,
+            TrackReferences: description.TrackReferences,
+            OmitDefaultMemberValues: description.OmitDefaultMemberValues,
+            SerializationHooks: serializationHooks,
+            IsShallowCopyable: description.IsShallowCopyable,
+            IsUnsealedImmutable: description.IsUnsealedImmutable,
+            IsImmutable: description.IsImmutable,
+            IsExceptionType: description.IsExceptionType,
+            ActivatorConstructorParameters: activatorCtorParams,
+            CreationStrategy: creationStrategy,
+            SourceLocation: sourceLocation,
+            MetadataIdentity: description is SerializableTypeDescription serializableDescription
                 ? TypeMetadataIdentity.Create(serializableDescription.Type)
                 : TypeMetadataIdentity.Empty);
     }
@@ -242,15 +242,15 @@ internal static class ModelExtractor
         diagnostics = diagnosticBuilder.ToImmutable();
 
         return new ReferenceAssemblyModel(
-            assemblyName: compilation.AssemblyName ?? string.Empty,
-            applicationParts: orderedApplicationParts,
-            wellKnownTypeIds: sortedWellKnownTypeIds,
-            typeAliases: sortedTypeAliases,
-            compoundTypeAliases: sortedCompoundTypeAliases,
-            referencedSerializableTypes: sortedReferencedSerializableTypes,
-            referencedProxyInterfaces: sortedReferencedProxyInterfaces,
-            registeredCodecs: sortedRegisteredCodecs,
-            interfaceImplementations: sortedInterfaceImplementations);
+            AssemblyName: compilation.AssemblyName ?? string.Empty,
+            ApplicationParts: orderedApplicationParts,
+            WellKnownTypeIds: sortedWellKnownTypeIds,
+            TypeAliases: sortedTypeAliases,
+            CompoundTypeAliases: sortedCompoundTypeAliases,
+            ReferencedSerializableTypes: sortedReferencedSerializableTypes,
+            ReferencedProxyInterfaces: sortedReferencedProxyInterfaces,
+            RegisteredCodecs: sortedRegisteredCodecs,
+            InterfaceImplementations: sortedInterfaceImplementations);
 
         void AddApplicationPart(string applicationPart)
         {
@@ -381,7 +381,7 @@ internal static class ModelExtractor
             serializableTypes,
             proxyInterfaces.IsDefaultOrEmpty
                 ? []
-                : proxyInterfaces.Select(static proxy => new ProxyOutputModel(proxy, [], useDeclaredInvokableFallback: false)).ToImmutableArray(),
+                : proxyInterfaces.Select(static proxy => new ProxyOutputModel(proxy, EquatableArray<string>.Empty, useDeclaredInvokableFallback: false)).ToImmutableArray(),
             refData);
 
     public static MetadataAggregateModel CreateMetadataAggregate(
@@ -403,17 +403,17 @@ internal static class ModelExtractor
         var defaultCopiers = GetDefaultCopiers(normalizedSerializableTypes);
 
         return new MetadataAggregateModel(
-            assemblyName: assemblyName,
-            serializableTypes: normalizedSerializableTypes,
-            proxyInterfaces: normalizedProxyInterfaces,
-            registeredCodecs: normalizedReferenceData.RegisteredCodecs,
-            referenceAssemblyData: normalizedReferenceData,
-            activatableTypes: activatableTypes,
-            generatedProxyTypes: generatedProxyTypes,
-            invokableInterfaces: invokableInterfaces,
-            generatedInvokableActivatorMetadataNames: generatedInvokableActivatorMetadataNames,
-            interfaceImplementations: normalizedReferenceData.InterfaceImplementations,
-            defaultCopiers: defaultCopiers);
+            AssemblyName: assemblyName,
+            SerializableTypes: normalizedSerializableTypes,
+            ProxyInterfaces: normalizedProxyInterfaces,
+            RegisteredCodecs: normalizedReferenceData.RegisteredCodecs,
+            ReferenceAssemblyData: normalizedReferenceData,
+            ActivatableTypes: activatableTypes,
+            GeneratedProxyTypes: generatedProxyTypes,
+            InvokableInterfaces: invokableInterfaces,
+            GeneratedInvokableActivatorMetadataNames: generatedInvokableActivatorMetadataNames,
+            InterfaceImplementations: normalizedReferenceData.InterfaceImplementations,
+            DefaultCopiers: defaultCopiers);
     }
 
     private static ReferenceAssemblyModel NormalizeReferenceAssemblyData(ReferenceAssemblyModel referenceData)
@@ -456,15 +456,15 @@ internal static class ModelExtractor
             .ToImmutableArray();
 
         return new ReferenceAssemblyModel(
-            assemblyName: referenceData.AssemblyName ?? string.Empty,
-            applicationParts: applicationParts,
-            wellKnownTypeIds: wellKnownTypeIds,
-            typeAliases: typeAliases,
-            compoundTypeAliases: compoundTypeAliases,
-            referencedSerializableTypes: referencedSerializableTypes,
-            referencedProxyInterfaces: referencedProxyInterfaces,
-            registeredCodecs: registeredCodecs,
-            interfaceImplementations: interfaceImplementations);
+            AssemblyName: referenceData.AssemblyName ?? string.Empty,
+            ApplicationParts: applicationParts,
+            WellKnownTypeIds: wellKnownTypeIds,
+            TypeAliases: typeAliases,
+            CompoundTypeAliases: compoundTypeAliases,
+            ReferencedSerializableTypes: referencedSerializableTypes,
+            ReferencedProxyInterfaces: referencedProxyInterfaces,
+            RegisteredCodecs: registeredCodecs,
+            InterfaceImplementations: interfaceImplementations);
     }
 
     internal static ImmutableArray<SerializableTypeModel> MergeSerializableTypes(
@@ -1181,8 +1181,8 @@ internal static class ModelExtractor
             typeParameters,
             proxyBase,
             methods,
-            sourceLocation: GetSourceLocation(typeSymbol),
-            metadataIdentity: TypeMetadataIdentity.Create(typeSymbol));
+            SourceLocation: GetSourceLocation(typeSymbol),
+            MetadataIdentity: TypeMetadataIdentity.Create(typeSymbol));
     }
 
     private static string GetProxyInterfaceName(INamedTypeSymbol typeSymbol, LibraryTypes libraryTypes)
