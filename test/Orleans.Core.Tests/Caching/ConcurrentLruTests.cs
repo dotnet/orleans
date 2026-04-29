@@ -5,6 +5,7 @@ using Xunit;
 using Xunit.Abstractions;
 using Orleans.Caching;
 using Orleans.Caching.Internal;
+using TestExtensions;
 
 namespace NonSilo.Tests.Caching;
 
@@ -752,13 +753,13 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     {
         var timeProvider = new FakeTimeProvider();
         await using var lru = CreateExpiringLru(timeProvider);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
 
         lru.AddOrUpdate(1, "1");
         timeProvider.Advance(TimeSpan.FromMinutes(2));
 
         var cleanup = await listener.WaitForCleanupAsync();
-        cleanup.RemovedCount.Should().Be(1);
+        cleanup.Should().Be(1);
         lru.TryGet(1, out var value).Should().BeFalse();
         value.Should().BeNull();
         lru.Count.Should().Be(0);
@@ -770,7 +771,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     {
         var timeProvider = new FakeTimeProvider();
         await using var lru = CreateExpiringLru(timeProvider);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
 
         lru.AddOrUpdate(1, "1");
         timeProvider.Advance(TimeSpan.FromSeconds(45));
@@ -781,14 +782,14 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         timeProvider.Advance(TimeSpan.FromSeconds(45));
 
         var firstCleanup = await listener.WaitForCleanupAsync();
-        firstCleanup.RemovedCount.Should().Be(0);
+        firstCleanup.Should().Be(0);
         lru.TryGet(1, out value).Should().BeTrue();
         value.Should().Be("1");
 
         timeProvider.Advance(TimeSpan.FromSeconds(61));
 
         var secondCleanup = await listener.WaitForCleanupAsync();
-        secondCleanup.RemovedCount.Should().Be(1);
+        secondCleanup.Should().Be(1);
         lru.TryGet(1, out _).Should().BeFalse();
     }
 
@@ -797,7 +798,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     {
         var timeProvider = new FakeTimeProvider();
         await using var lru = CreateExpiringLru(timeProvider);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
 
         lru.AddOrUpdate(1, "1");
         timeProvider.Advance(TimeSpan.FromSeconds(45));
@@ -806,7 +807,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         timeProvider.Advance(TimeSpan.FromSeconds(45));
 
         var firstCleanup = await listener.WaitForCleanupAsync();
-        firstCleanup.RemovedCount.Should().Be(0);
+        firstCleanup.Should().Be(0);
 
         lru.TryGet(1, out var value).Should().BeTrue();
         value.Should().Be("2");
@@ -821,7 +822,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
             comparer: EqualityComparer<int>.Default,
             timeToLive: TimeSpan.FromMinutes(1),
             timeProvider: timeProvider);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
         var items = Enumerable.Range(1, 2).Select(_ => new DisposableItem()).ToArray();
 
         lru.AddOrUpdate(1, items[0]);
@@ -830,9 +831,39 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
 
         var cleanup = await listener.WaitForCleanupAsync();
 
-        cleanup.RemovedCount.Should().Be(2);
+        cleanup.Should().Be(2);
         items.All(item => item.IsDisposed).Should().BeTrue();
         lru.Count.Should().Be(0);
+    }
+
+    [Fact]
+    public async Task WhenExpiredItemDisposalThrowsExpirationLoopContinues()
+    {
+        var timeProvider = new FakeTimeProvider();
+        var lru = new ConcurrentLruCache<int, ThrowingDisposableItem>(
+            capacity: 6,
+            comparer: EqualityComparer<int>.Default,
+            timeToLive: TimeSpan.FromMinutes(1),
+            timeProvider: timeProvider);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
+        var item = new ThrowingDisposableItem();
+
+        try
+        {
+            lru.AddOrUpdate(1, item);
+            timeProvider.Advance(TimeSpan.FromMinutes(2));
+
+            await item.Disposed.WaitAsync(TimeSpan.FromSeconds(10));
+
+            timeProvider.Advance(TimeSpan.FromMinutes(1));
+
+            var cleanup = await listener.WaitForCleanupAsync();
+            cleanup.Should().Be(0);
+        }
+        finally
+        {
+            await lru.DisposeAsync();
+        }
     }
 
     [Fact]
@@ -840,7 +871,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     {
         var timeProvider = new FakeTimeProvider();
         await using var lru = CreateExpiringLru(timeProvider, capacity: 9);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
 
         lru.AddOrUpdate(1, "1");
         lru.AddOrUpdate(2, "2");
@@ -864,7 +895,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         timeProvider.Advance(TimeSpan.FromMinutes(2));
 
         var cleanup = await listener.WaitForCleanupAsync();
-        cleanup.RemovedCount.Should().Be(9);
+        cleanup.Should().Be(9);
         lru.Count.Should().Be(0);
         lru.HotCount.Should().Be(0);
         lru.WarmCount.Should().Be(0);
@@ -876,7 +907,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     {
         var timeProvider = new FakeTimeProvider();
         await using var lru = CreateExpiringLru(timeProvider, capacity: 9);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
 
         lru.AddOrUpdate(1, "1");
         lru.AddOrUpdate(2, "2");
@@ -895,7 +926,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         timeProvider.Advance(TimeSpan.FromSeconds(2));
 
         var cleanup = await listener.WaitForCleanupAsync();
-        cleanup.RemovedCount.Should().Be(3);
+        cleanup.Should().Be(3);
         lru.Count.Should().Be(3);
         lru.Keys.Should().BeEquivalentTo([1, 2, 3]);
 
@@ -908,7 +939,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     {
         var timeProvider = new FakeTimeProvider();
         await using var lru = CreateExpiringLru(timeProvider, capacity: 9);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
         var testAccessor = GetTestAccessor(lru);
 
         lru.AddOrUpdate(1, "1");
@@ -931,7 +962,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         timeProvider.Advance(TimeSpan.FromMinutes(2));
 
         var cleanup = await listener.WaitForCleanupAsync();
-        cleanup.RemovedCount.Should().Be(9);
+        cleanup.Should().Be(9);
         testAccessor.IsWarm.Should().BeFalse();
 
         for (var i = 0; i < lru.Capacity; i++)
@@ -950,7 +981,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     {
         var timeProvider = new FakeTimeProvider();
         await using var lru = CreateExpiringLru(timeProvider, capacity: 9);
-        using var listener = new ExpirationCleanupListener(lru);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
         var testAccessor = GetTestAccessor(lru);
 
         for (var i = 0; i < lru.Capacity; i++)
@@ -976,7 +1007,7 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         timeProvider.Advance(TimeSpan.FromMinutes(1));
 
         var cleanup = await listener.WaitForCleanupAsync();
-        cleanup.RemovedCount.Should().Be(0);
+        cleanup.Should().Be(0);
         lru.Count.Should().Be(6);
         lru.HotCount.Should().Be(hotCount - 1);
         lru.WarmCount.Should().Be(warmCount - 1);
@@ -1469,65 +1500,6 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
 #endif
     }
 
-    private sealed class ExpirationCleanupListener : IObserver<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved>, IDisposable
-    {
-        private readonly object _targetCache;
-        private readonly IDisposable _subscription;
-        private readonly Queue<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved> _events = [];
-        private readonly Queue<TaskCompletionSource<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved>> _waiters = [];
-
-        public ExpirationCleanupListener(object targetCache)
-        {
-            _targetCache = targetCache;
-            _subscription = ConcurrentLruCacheDiagnostics.ExpiredItemsRemovedEvents.Subscribe(this);
-        }
-
-        public Task<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved> WaitForCleanupAsync()
-        {
-            lock (_events)
-            {
-                if (_events.TryDequeue(out var evt))
-                {
-                    return Task.FromResult(evt);
-                }
-
-                var waiter = new TaskCompletionSource<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _waiters.Enqueue(waiter);
-                return waiter.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            }
-        }
-
-        public void OnCompleted()
-        {
-        }
-
-        public void OnError(Exception error)
-        {
-        }
-
-        public void OnNext(ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved value)
-        {
-            if (!ReferenceEquals(value.Cache, _targetCache))
-            {
-                return;
-            }
-
-            TaskCompletionSource<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved> waiter;
-            lock (_events)
-            {
-                if (!_waiters.TryDequeue(out waiter))
-                {
-                    _events.Enqueue(value);
-                    return;
-                }
-            }
-
-            waiter.SetResult(value);
-        }
-
-        public void Dispose() => _subscription.Dispose();
-    }
-
     private class ValueFactory
     {
         public int TimesCalled;
@@ -1564,6 +1536,19 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
         public void Dispose()
         {
             IsDisposed = true;
+        }
+    }
+
+    private sealed class ThrowingDisposableItem : IDisposable
+    {
+        private readonly TaskCompletionSource _disposed = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public Task Disposed => _disposed.Task;
+
+        public void Dispose()
+        {
+            _disposed.TrySetResult();
+            throw new InvalidOperationException("Dispose failed");
         }
     }
 

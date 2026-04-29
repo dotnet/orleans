@@ -1,9 +1,9 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Time.Testing;
-using Orleans.Caching;
 using Orleans.Configuration;
 using Orleans.Runtime;
 using Orleans.Runtime.GrainDirectory;
+using TestExtensions;
 using Xunit;
 
 namespace Tester.Directories;
@@ -27,7 +27,7 @@ public class GrainDirectoryCacheFactoryTests
 #pragma warning restore CS0618 // Type or member is obsolete
         var cache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(services, options);
         var disposableCache = Assert.IsAssignableFrom<IAsyncDisposable>(cache);
-        using var listener = new ExpirationCleanupListener(cache);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(cache);
         var address = CreateGrainAddress();
 
         try
@@ -40,7 +40,7 @@ public class GrainDirectoryCacheFactoryTests
             timeProvider.Advance(TimeSpan.FromMinutes(2));
             var cleanup = await listener.WaitForCleanupAsync();
 
-            Assert.Equal(1, cleanup.RemovedCount);
+            Assert.Equal(1, cleanup);
             Assert.False(cache.LookUp(address.GrainId, out _, out _));
             Assert.Empty(cache.KeyValues);
         }
@@ -74,65 +74,6 @@ public class GrainDirectoryCacheFactoryTests
         SiloAddress = SiloAddress.FromParsableString("127.0.0.1:11111@1"),
         MembershipVersion = new MembershipVersion(1)
     };
-
-    private sealed class ExpirationCleanupListener : IObserver<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved>, IDisposable
-    {
-        private readonly object _targetCache;
-        private readonly IDisposable _subscription;
-        private readonly Queue<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved> _events = [];
-        private readonly Queue<TaskCompletionSource<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved>> _waiters = [];
-
-        public ExpirationCleanupListener(object targetCache)
-        {
-            _targetCache = targetCache;
-            _subscription = ConcurrentLruCacheDiagnostics.ExpiredItemsRemovedEvents.Subscribe(this);
-        }
-
-        public Task<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved> WaitForCleanupAsync()
-        {
-            lock (_events)
-            {
-                if (_events.TryDequeue(out var evt))
-                {
-                    return Task.FromResult(evt);
-                }
-
-                var waiter = new TaskCompletionSource<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved>(TaskCreationOptions.RunContinuationsAsynchronously);
-                _waiters.Enqueue(waiter);
-                return waiter.Task.WaitAsync(TimeSpan.FromSeconds(10));
-            }
-        }
-
-        public void OnCompleted()
-        {
-        }
-
-        public void OnError(Exception error)
-        {
-        }
-
-        public void OnNext(ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved value)
-        {
-            if (!ReferenceEquals(value.Cache, _targetCache))
-            {
-                return;
-            }
-
-            TaskCompletionSource<ConcurrentLruCacheDiagnostics.ExpiredItemsRemoved> waiter;
-            lock (_events)
-            {
-                if (!_waiters.TryDequeue(out waiter))
-                {
-                    _events.Enqueue(value);
-                    return;
-                }
-            }
-
-            waiter.SetResult(value);
-        }
-
-        public void Dispose() => _subscription.Dispose();
-    }
 
     private sealed class TestGrainDirectoryCache : IGrainDirectoryCache
     {

@@ -1046,8 +1046,15 @@ internal class ConcurrentLruCache<K, V> : IEnumerable<KeyValuePair<K, V>>, ICach
 
         while (await _expirationTimer.WaitForNextTickAsync().ConfigureAwait(false))
         {
-            var removedCount = TrimExpiredItems();
-            ConcurrentLruCacheDiagnostics.EmitExpiredItemsRemoved(this, removedCount);
+            try
+            {
+                var removedCount = TrimExpiredItems();
+                ConcurrentLruCacheDiagnostics.EmitExpiredItemsRemoved(this, removedCount);
+            }
+            catch (Exception exception)
+            {
+                Trace.TraceError($"{nameof(ConcurrentLruCache<K, V>)} background expiration loop failed: {exception}");
+            }
         }
     }
 
