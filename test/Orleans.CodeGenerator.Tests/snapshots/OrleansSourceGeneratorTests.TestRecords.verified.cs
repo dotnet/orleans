@@ -18,8 +18,8 @@ namespace OrleansCodeGen.TestProject
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, scoped ref global::TestProject.DemoDataRecordStruct instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.Value);
             writer.WriteEndBase();
+            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.Value);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -27,28 +27,28 @@ namespace OrleansCodeGen.TestProject
         {
             uint id = 0U;
             global::Orleans.Serialization.WireProtocol.Field header = default;
-            while (true)
             {
                 reader.ReadFieldHeader(ref header);
-                if (header.IsEndBaseOrEndObject)
-                    break;
-                id += header.FieldIdDelta;
-                if (id == 0U)
-                {
-                    instance.Value = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
-                    reader.ReadFieldHeader(ref header);
-                }
-
                 reader.ConsumeEndBaseOrEndObject(ref header);
-                break;
             }
 
             id = 0U;
             if (header.IsEndBaseFields)
-            {
-                reader.ReadFieldHeader(ref header);
-                reader.ConsumeEndBaseOrEndObject(ref header);
-            }
+                while (true)
+                {
+                    reader.ReadFieldHeader(ref header);
+                    if (header.IsEndBaseOrEndObject)
+                        break;
+                    id += header.FieldIdDelta;
+                    if (id == 0U)
+                    {
+                        instance.Value = global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header);
+                        reader.ReadFieldHeader(ref header);
+                    }
+
+                    reader.ConsumeEndBaseOrEndObject(ref header);
+                    break;
+                }
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -87,8 +87,8 @@ namespace OrleansCodeGen.TestProject
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.DemoDataRecordClass instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.Value);
             writer.WriteEndBase();
+            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.Value);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -96,28 +96,28 @@ namespace OrleansCodeGen.TestProject
         {
             uint id = 0U;
             global::Orleans.Serialization.WireProtocol.Field header = default;
-            while (true)
             {
                 reader.ReadFieldHeader(ref header);
-                if (header.IsEndBaseOrEndObject)
-                    break;
-                id += header.FieldIdDelta;
-                if (id == 0U)
-                {
-                    setField0(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
-                    reader.ReadFieldHeader(ref header);
-                }
-
                 reader.ConsumeEndBaseOrEndObject(ref header);
-                break;
             }
 
             id = 0U;
             if (header.IsEndBaseFields)
-            {
-                reader.ReadFieldHeader(ref header);
-                reader.ConsumeEndBaseOrEndObject(ref header);
-            }
+                while (true)
+                {
+                    reader.ReadFieldHeader(ref header);
+                    if (header.IsEndBaseOrEndObject)
+                        break;
+                    id += header.FieldIdDelta;
+                    if (id == 0U)
+                    {
+                        setField0(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
+                        reader.ReadFieldHeader(ref header);
+                    }
+
+                    reader.ConsumeEndBaseOrEndObject(ref header);
+                    break;
+                }
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -200,8 +200,8 @@ namespace OrleansCodeGen.TestProject
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::TestProject.DemoDataRecord instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
         {
-            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.Value);
             writer.WriteEndBase();
+            global::Orleans.Serialization.Codecs.StringCodec.WriteField(ref writer, 0U, instance.Value);
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
@@ -209,28 +209,28 @@ namespace OrleansCodeGen.TestProject
         {
             uint id = 0U;
             global::Orleans.Serialization.WireProtocol.Field header = default;
-            while (true)
             {
                 reader.ReadFieldHeader(ref header);
-                if (header.IsEndBaseOrEndObject)
-                    break;
-                id += header.FieldIdDelta;
-                if (id == 0U)
-                {
-                    setField0(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
-                    reader.ReadFieldHeader(ref header);
-                }
-
                 reader.ConsumeEndBaseOrEndObject(ref header);
-                break;
             }
 
             id = 0U;
             if (header.IsEndBaseFields)
-            {
-                reader.ReadFieldHeader(ref header);
-                reader.ConsumeEndBaseOrEndObject(ref header);
-            }
+                while (true)
+                {
+                    reader.ReadFieldHeader(ref header);
+                    if (header.IsEndBaseOrEndObject)
+                        break;
+                    id += header.FieldIdDelta;
+                    if (id == 0U)
+                    {
+                        setField0(instance, global::Orleans.Serialization.Codecs.StringCodec.ReadValue(ref reader, header));
+                        reader.ReadFieldHeader(ref header);
+                    }
+
+                    reader.ConsumeEndBaseOrEndObject(ref header);
+                    break;
+                }
         }
 
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
