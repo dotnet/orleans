@@ -12,25 +12,25 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine, IDurableDictionaryLogEntryConsumer<K, V> where K : notnull
+internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine, IDurableDictionaryOperationHandler<K, V> where K : notnull
 {
-    private readonly IDurableDictionaryCodec<K, V> _codec;
+    private readonly IDurableDictionaryOperationCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
-    private IStateMachineLogWriter? _storage;
+    private ILogWriter? _storage;
 
-    protected DurableDictionary(IDurableDictionaryCodec<K, V> codec)
+    protected DurableDictionary(IDurableDictionaryOperationCodec<K, V> codec)
     {
         _codec = codec;
     }
 
-    public DurableDictionary([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
-        : this(StateMachineLogFormatServices.GetRequiredKeyedService<IDurableDictionaryCodecProvider>(serviceProvider, storage).GetCodec<K, V>())
+    public DurableDictionary([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
+        : this(LogFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, storage).GetCodec<K, V>())
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableDictionary(string key, IStateMachineManager manager, IDurableDictionaryCodec<K, V> codec) : this(codec)
+    internal DurableDictionary(string key, ILogManager manager, IDurableDictionaryOperationCodec<K, V> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
@@ -55,7 +55,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage)
+    void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -66,12 +66,12 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
         using var entry = snapshotWriter.BeginEntry();
         _codec.WriteSnapshot(_items, entry.Writer);
@@ -127,18 +127,18 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     internal bool ApplyRemove(K key) => _items.Remove(key);
     private void ApplyClear() => _items.Clear();
-    void IDurableDictionaryLogEntryConsumer<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
-    void IDurableDictionaryLogEntryConsumer<K, V>.ApplyRemove(K key) => ApplyRemove(key);
-    void IDurableDictionaryLogEntryConsumer<K, V>.ApplyClear() => ApplyClear();
-    void IDurableDictionaryLogEntryConsumer<K, V>.ApplySnapshotStart(int count)
+    void IDurableDictionaryOperationHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
+    void IDurableDictionaryOperationHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
+    void IDurableDictionaryOperationHandler<K, V>.ApplyClear() => ApplyClear();
+    void IDurableDictionaryOperationHandler<K, V>.ApplySnapshotStart(int count)
     {
         ApplyClear();
         _items.EnsureCapacity(count);
     }
 
-    void IDurableDictionaryLogEntryConsumer<K, V>.ApplySnapshotItem(K key, V value) => ApplySet(key, value);
+    void IDurableDictionaryOperationHandler<K, V>.ApplySnapshotItem(K key, V value) => ApplySet(key, value);
 
-    protected virtual IStateMachineLogWriter GetStorage()
+    protected virtual ILogWriter GetStorage()
     {
         Debug.Assert(_storage is not null);
         return _storage;

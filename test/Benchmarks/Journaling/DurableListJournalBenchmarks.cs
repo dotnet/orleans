@@ -12,28 +12,28 @@ namespace Benchmarks.Journaling;
 public class DurableListJournalBenchmarks
 {
     private const int OperationsPerInvocation = 4_096;
-    private static readonly StateMachineId ListStateMachineId = new(8);
+    private static readonly LogStreamId ListLogStreamId = new(8);
 
-    private IDurableListCodec<int> _codec;
-    private IStateMachineLogFormat _logFormat;
+    private IDurableListOperationCodec<int> _codec;
+    private ILogFormat _logFormat;
     private DurableList<int> _list;
     private IDurableStateMachine _stateMachine;
-    private LogExtentBuffer _writeBuffer;
+    private LogSegmentBuffer _writeBuffer;
     private BenchmarkLogWriter _outOfBandWriter;
-    private LogExtentBuffer _encodedLogWriter;
+    private LogSegmentBuffer _encodedLogWriter;
     private ArcBuffer _encodedLogData;
     private RecoveryConsumer _recoveryConsumer;
 
     [GlobalSetup]
     public void GlobalSetup()
     {
-        _codec = new OrleansBinaryListEntryCodec<int>(RawInt32LogDataCodec.Instance);
-        _logFormat = BinaryLogExtentCodec.Instance;
-        _writeBuffer = new LogExtentBuffer();
-        _outOfBandWriter = new BenchmarkLogWriter(_writeBuffer, ListStateMachineId);
-        _list = new DurableList<int>("list", new BenchmarkStateMachineManager(_outOfBandWriter), _codec);
+        _codec = new OrleansBinaryListOperationCodec<int>(RawInt32LogValueCodec.Instance);
+        _logFormat = OrleansBinaryLogFormat.Instance;
+        _writeBuffer = new LogSegmentBuffer();
+        _outOfBandWriter = new BenchmarkLogWriter(_writeBuffer, ListLogStreamId);
+        _list = new DurableList<int>("list", new BenchmarkLogManager(_outOfBandWriter), _codec);
         _stateMachine = _list;
-        _recoveryConsumer = new RecoveryConsumer(ListStateMachineId, _codec, OperationsPerInvocation);
+        _recoveryConsumer = new RecoveryConsumer(ListLogStreamId, _codec, OperationsPerInvocation);
 
         WarmWritePathCapacity();
         _encodedLogData = CreateEncodedLogData();
@@ -64,7 +64,7 @@ public class DurableListJournalBenchmarks
     public int RecoverEncodedLogData()
     {
         _recoveryConsumer.Reset();
-        _logFormat.Read(_encodedLogData, _recoveryConsumer);
+        _logFormat.Read(_encodedLogData, _recoveryConsumer, isCompleted: true);
 
         return _recoveryConsumer.Count;
     }
@@ -87,8 +87,8 @@ public class DurableListJournalBenchmarks
 
     private ArcBuffer CreateEncodedLogData()
     {
-        _encodedLogWriter = new LogExtentBuffer();
-        var writer = _encodedLogWriter.CreateLogWriter(ListStateMachineId);
+        _encodedLogWriter = new LogSegmentBuffer();
+        var writer = _encodedLogWriter.CreateLogWriter(ListLogStreamId);
         for (var i = 0; i < OperationsPerInvocation; i++)
         {
             using var entry = writer.BeginEntry();
@@ -101,7 +101,7 @@ public class DurableListJournalBenchmarks
 
     private void ValidateEncodedLogData()
     {
-        _logFormat.Read(_encodedLogData, _recoveryConsumer);
+        _logFormat.Read(_encodedLogData, _recoveryConsumer, isCompleted: true);
         if (_recoveryConsumer.Count != OperationsPerInvocation)
         {
             throw new InvalidOperationException("The encoded journaling benchmark data did not replay all operations.");
@@ -110,9 +110,9 @@ public class DurableListJournalBenchmarks
         _recoveryConsumer.Reset();
     }
 
-    private sealed class RawInt32LogDataCodec : ILogDataCodec<int>
+    private sealed class RawInt32LogValueCodec : ILogValueCodec<int>
     {
-        public static RawInt32LogDataCodec Instance { get; } = new();
+        public static RawInt32LogValueCodec Instance { get; } = new();
 
         public void Write(int value, IBufferWriter<byte> output)
         {
@@ -136,12 +136,12 @@ public class DurableListJournalBenchmarks
         }
     }
 
-    private sealed class BenchmarkLogWriter(LogExtentBuffer buffer, StateMachineId streamId) : IStateMachineLogWriter
+    private sealed class BenchmarkLogWriter(LogSegmentBuffer buffer, LogStreamId streamId) : ILogWriter
     {
-        public StateMachineLogEntry BeginEntry() => buffer.CreateLogWriter(streamId).BeginEntry();
+        public LogEntry BeginEntry() => buffer.CreateLogWriter(streamId).BeginEntry();
     }
 
-    private sealed class BenchmarkStateMachineManager(IStateMachineLogWriter writer) : IStateMachineManager
+    private sealed class BenchmarkLogManager(ILogWriter writer) : ILogManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
@@ -159,9 +159,9 @@ public class DurableListJournalBenchmarks
     }
 
     private sealed class RecoveryConsumer(
-        StateMachineId expectedStreamId,
-        IDurableListCodec<int> codec,
-        int capacity) : IStateMachineLogEntryConsumer, IDurableListLogEntryConsumer<int>
+        LogStreamId expectedStreamId,
+        IDurableListOperationCodec<int> codec,
+        int capacity) : ILogEntrySink, IDurableListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -169,7 +169,7 @@ public class DurableListJournalBenchmarks
 
         public void Reset() => _items.Clear();
 
-        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload)
+        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload)
         {
             if (streamId != expectedStreamId)
             {

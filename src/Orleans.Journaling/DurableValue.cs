@@ -11,21 +11,21 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, IDurableValueLogEntryConsumer<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, IDurableValueOperationHandler<T>
 {
-    private readonly IDurableValueCodec<T> _codec;
-    private IStateMachineLogWriter? _storage;
+    private readonly IDurableValueOperationCodec<T> _codec;
+    private ILogWriter? _storage;
     private T? _value;
     private bool _isDirty;
 
-    public DurableValue([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
+    public DurableValue([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableValueCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableValue(string key, IStateMachineManager manager, IDurableValueCodec<T> codec)
+    internal DurableValue(string key, ILogManager manager, IDurableValueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -51,7 +51,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage)
+    void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _value = default;
         _storage = storage;
@@ -62,7 +62,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
     {
         if (_isDirty)
         {
@@ -71,23 +71,23 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter) => WriteState(snapshotWriter);
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(StateMachineLogWriter writer)
+    private void WriteState(LogWriter writer)
     {
         using var entry = writer.BeginEntry();
         _codec.WriteSet(_value!, entry.Writer);
         entry.Commit();
     }
 
-    void IDurableValueLogEntryConsumer<T>.ApplySet(T value) => _value = value;
+    void IDurableValueOperationHandler<T>.ApplySet(T value) => _value = value;
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
 
-    private IStateMachineLogWriter GetStorage()
+    private ILogWriter GetStorage()
     {
         Debug.Assert(_storage is not null);
         return _storage;

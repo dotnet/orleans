@@ -4,25 +4,32 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.MessagePack;
 
-internal sealed class MessagePackLogFormat : IStateMachineLogFormat
+internal sealed class MessagePackLogFormat : ILogFormat
 {
-    public IStateMachineLogExtentWriter CreateWriter()
-        => new MessagePackLogExtentWriter();
+    public ILogSegmentWriter CreateWriter()
+        => new MessagePackLogSegmentWriter();
 
-    public void Read(ArcBuffer input, IStateMachineLogEntryConsumer consumer)
+    public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
         var reader = new SequenceReader<byte>(input.AsReadOnlySequence());
+        int? minimumBufferLength = null;
         while (!reader.End)
         {
             var offset = reader.Consumed;
-            MessagePackLogEntryReader.ReadEntry(ref reader, offset, out var streamId, out var payload);
+            if (!MessagePackLogEntryReader.TryReadEntry(ref reader, offset, isCompleted, out var streamId, out var payload, out minimumBufferLength))
+            {
+                break;
+            }
+
             consumer.OnEntry(streamId, payload);
         }
+
+        return new(checked((int)reader.Consumed), reader.End ? null : minimumBufferLength);
     }
 
-    private sealed class MessagePackLogExtentWriter : StateMachineLogExtentWriterBase
+    private sealed class MessagePackLogSegmentWriter : LogSegmentWriterBase
     {
         private readonly ArcBufferWriter _buffer = new();
         private readonly ArcBufferWriter _payload = new();
@@ -33,7 +40,7 @@ internal sealed class MessagePackLogFormat : IStateMachineLogFormat
         {
             if (IsEntryActive)
             {
-                throw new InvalidOperationException("The MessagePack log extent has an active entry.");
+                throw new InvalidOperationException("The MessagePack log segment has an active entry.");
             }
 
             return _buffer.PeekSlice(_buffer.Length);
@@ -43,7 +50,7 @@ internal sealed class MessagePackLogFormat : IStateMachineLogFormat
         {
             if (IsEntryActive)
             {
-                throw new InvalidOperationException("The MessagePack log extent cannot be reset while an entry is active.");
+                throw new InvalidOperationException("The MessagePack log segment cannot be reset while an entry is active.");
             }
 
             _payload.Reset();
@@ -56,9 +63,9 @@ internal sealed class MessagePackLogFormat : IStateMachineLogFormat
             _buffer.Dispose();
         }
 
-        protected override void OnBeginEntry(StateMachineId streamId) => _payload.Reset();
+        protected override void OnBeginEntry(LogStreamId streamId) => _payload.Reset();
 
-        protected override int GetEntryStart(StateMachineId streamId) => _buffer.Length;
+        protected override int GetEntryStart(LogStreamId streamId) => _buffer.Length;
 
         protected override void AdvancePayload(int count) => _payload.AdvanceWriter(count);
 
@@ -70,7 +77,7 @@ internal sealed class MessagePackLogFormat : IStateMachineLogFormat
 
         protected override void WritePayload(ReadOnlySequence<byte> value) => _payload.Write(value);
 
-        protected override void CommitEntry(StateMachineId streamId, int entryStart)
+        protected override void CommitEntry(LogStreamId streamId, int entryStart)
         {
             WriteByte(_buffer, 0x92);
             WriteUInt64(_buffer, streamId.Value);
@@ -85,7 +92,7 @@ internal sealed class MessagePackLogFormat : IStateMachineLogFormat
             _payload.Reset();
         }
 
-        protected override void AbortEntry(StateMachineId streamId, int entryStart) => _payload.Reset();
+        protected override void AbortEntry(LogStreamId streamId, int entryStart) => _payload.Reset();
 
         private int GetCurrentFrameLength()
             => checked(1 + GetUInt64Size(ActiveStreamId.Value) + GetBinHeaderSize(_payload.Length) + _payload.Length);
@@ -93,134 +100,326 @@ internal sealed class MessagePackLogFormat : IStateMachineLogFormat
 
     private static class MessagePackLogEntryReader
     {
-        public static void ReadEntry(
+        public static bool TryReadEntry(
             ref SequenceReader<byte> reader,
             long offset,
-            out StateMachineId streamId,
-            out ReadOnlySequence<byte> payload)
+            bool isCompleted,
+            out LogStreamId streamId,
+            out ReadOnlySequence<byte> payload,
+            out int? minimumBufferLength)
         {
-            var itemCount = ReadArrayHeader(ref reader, offset);
+            var start = reader;
+            streamId = default;
+            payload = default;
+            minimumBufferLength = null;
+
+            if (!TryReadArrayHeader(ref reader, offset, isCompleted, out var itemCount, out minimumBufferLength))
+            {
+                reader = start;
+                return false;
+            }
+
             if (itemCount != 2)
             {
                 throw new InvalidOperationException(
                     $"Malformed MessagePack log entry stream at byte offset {offset}: expected entry array with 2 item(s), found {itemCount}.");
             }
 
-            streamId = new(ReadUInt64(ref reader, offset, "streamId"));
-            payload = ReadBin(ref reader, offset);
+            if (!TryReadUInt64(ref reader, offset, isCompleted, "streamId", out var id, out minimumBufferLength)
+                || !TryReadBin(ref reader, offset, isCompleted, out payload, out minimumBufferLength))
+            {
+                reader = start;
+                return false;
+            }
+
+            streamId = new(id);
+            return true;
         }
 
-        private static uint ReadArrayHeader(ref SequenceReader<byte> reader, long offset)
+        private static bool TryReadArrayHeader(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            out uint result,
+            out int? minimumBufferLength)
         {
-            var code = ReadByte(ref reader, offset, "array header");
+            result = 0;
+            if (!TryReadByte(ref reader, offset, isCompleted, "array header", out var code, out minimumBufferLength))
+            {
+                return false;
+            }
+
             if ((code & 0xF0) == 0x90)
             {
-                return (uint)(code & 0x0F);
+                result = (uint)(code & 0x0F);
+                return true;
             }
 
-            return code switch
+            switch (code)
             {
-                0xDC => ReadUInt16BigEndian(ref reader, offset, "array16 length"),
-                0xDD => ReadUInt32BigEndian(ref reader, offset, "array32 length"),
-                _ => throw new InvalidOperationException(
-                    $"Malformed MessagePack log entry stream at byte offset {offset}: expected entry array.")
-            };
+                case 0xDC:
+                    if (!TryReadUInt16BigEndian(ref reader, offset, isCompleted, "array16 length", out var array16Length, out minimumBufferLength))
+                    {
+                        return false;
+                    }
+
+                    result = array16Length;
+                    return true;
+                case 0xDD:
+                    return TryReadUInt32BigEndian(ref reader, offset, isCompleted, "array32 length", out result, out minimumBufferLength);
+                default:
+                    throw new InvalidOperationException(
+                        $"Malformed MessagePack log entry stream at byte offset {offset}: expected entry array.");
+            }
         }
 
-        private static ulong ReadUInt64(ref SequenceReader<byte> reader, long offset, string fieldName)
+        private static bool TryReadUInt64(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            string fieldName,
+            out ulong result,
+            out int? minimumBufferLength)
         {
-            var code = ReadByte(ref reader, offset, fieldName);
+            result = 0;
+            if (!TryReadByte(ref reader, offset, isCompleted, fieldName, out var code, out minimumBufferLength))
+            {
+                return false;
+            }
+
             if (code <= 0x7F)
             {
-                return code;
+                result = code;
+                return true;
             }
 
-            return code switch
+            switch (code)
             {
-                0xCC => ReadByte(ref reader, offset, fieldName),
-                0xCD => ReadUInt16BigEndian(ref reader, offset, fieldName),
-                0xCE => ReadUInt32BigEndian(ref reader, offset, fieldName),
-                0xCF => ReadUInt64BigEndian(ref reader, offset, fieldName),
-                _ => throw new InvalidOperationException(
-                    $"Malformed MessagePack log entry stream at byte offset {offset}: streamId must be an unsigned integer.")
-            };
+                case 0xCC:
+                    if (!TryReadByte(ref reader, offset, isCompleted, fieldName, out var byteValue, out minimumBufferLength))
+                    {
+                        return false;
+                    }
+
+                    result = byteValue;
+                    return true;
+                case 0xCD:
+                    if (!TryReadUInt16BigEndian(ref reader, offset, isCompleted, fieldName, out var ushortValue, out minimumBufferLength))
+                    {
+                        return false;
+                    }
+
+                    result = ushortValue;
+                    return true;
+                case 0xCE:
+                    if (!TryReadUInt32BigEndian(ref reader, offset, isCompleted, fieldName, out var uintValue, out minimumBufferLength))
+                    {
+                        return false;
+                    }
+
+                    result = uintValue;
+                    return true;
+                case 0xCF:
+                    return TryReadUInt64BigEndian(ref reader, offset, isCompleted, fieldName, out result, out minimumBufferLength);
+                default:
+                    throw new InvalidOperationException(
+                        $"Malformed MessagePack log entry stream at byte offset {offset}: streamId must be an unsigned integer.");
+            }
         }
 
-        private static ReadOnlySequence<byte> ReadBin(ref SequenceReader<byte> reader, long offset)
+        private static bool TryReadBin(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            out ReadOnlySequence<byte> result,
+            out int? minimumBufferLength)
         {
-            var code = ReadByte(ref reader, offset, "payload header");
-            var length = code switch
+            result = default;
+            if (!TryReadByte(ref reader, offset, isCompleted, "payload header", out var code, out minimumBufferLength))
             {
-                0xC4 => ReadByte(ref reader, offset, "bin8 length"),
-                0xC5 => ReadUInt16BigEndian(ref reader, offset, "bin16 length"),
-                0xC6 => ReadUInt32BigEndian(ref reader, offset, "bin32 length"),
-                _ => throw new InvalidOperationException(
-                    $"Malformed MessagePack log entry stream at byte offset {offset}: payload must be a binary field.")
-            };
+                return false;
+            }
 
-            EnsureRemaining(ref reader, length, offset, "payload");
-            var result = reader.Sequence.Slice(reader.Position, length);
+            uint length;
+            switch (code)
+            {
+                case 0xC4:
+                    if (!TryReadByte(ref reader, offset, isCompleted, "bin8 length", out var bin8Length, out minimumBufferLength))
+                    {
+                        return false;
+                    }
+
+                    length = bin8Length;
+                    break;
+                case 0xC5:
+                    if (!TryReadUInt16BigEndian(ref reader, offset, isCompleted, "bin16 length", out var bin16Length, out minimumBufferLength))
+                    {
+                        return false;
+                    }
+
+                    length = bin16Length;
+                    break;
+                case 0xC6:
+                    if (!TryReadUInt32BigEndian(ref reader, offset, isCompleted, "bin32 length", out length, out minimumBufferLength))
+                    {
+                        return false;
+                    }
+
+                    break;
+                default:
+                    throw new InvalidOperationException(
+                        $"Malformed MessagePack log entry stream at byte offset {offset}: payload must be a binary field.");
+            }
+
+            if (!TryEnsureRemaining(ref reader, length, offset, isCompleted, "payload", out minimumBufferLength))
+            {
+                return false;
+            }
+
+            result = reader.Sequence.Slice(reader.Position, length);
             reader.Advance(length);
-            return result;
+            return true;
         }
 
-        private static byte ReadByte(ref SequenceReader<byte> reader, long offset, string fieldName)
+        private static bool TryReadByte(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            string fieldName,
+            out byte result,
+            out int? minimumBufferLength)
         {
+            minimumBufferLength = null;
             if (!reader.TryRead(out var value))
             {
+                result = 0;
+                if (!isCompleted)
+                {
+                    minimumBufferLength = GetMinimumBufferLength(reader, offset, 1);
+                    return false;
+                }
+
                 throw new InvalidOperationException(
                     $"Malformed MessagePack log entry stream at byte offset {offset}: truncated {fieldName}.");
             }
 
-            return value;
+            result = value;
+            return true;
         }
 
-        private static ushort ReadUInt16BigEndian(ref SequenceReader<byte> reader, long offset, string fieldName)
+        private static bool TryReadUInt16BigEndian(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            string fieldName,
+            out ushort result,
+            out int? minimumBufferLength)
         {
+            result = 0;
+            minimumBufferLength = null;
             Span<byte> bytes = stackalloc byte[sizeof(ushort)];
             if (!reader.TryCopyTo(bytes))
             {
+                if (!isCompleted)
+                {
+                    minimumBufferLength = GetMinimumBufferLength(reader, offset, bytes.Length);
+                    return false;
+                }
+
                 throw new InvalidOperationException(
                     $"Malformed MessagePack log entry stream at byte offset {offset}: truncated {fieldName}.");
             }
 
             reader.Advance(bytes.Length);
-            return BinaryPrimitives.ReadUInt16BigEndian(bytes);
+            result = BinaryPrimitives.ReadUInt16BigEndian(bytes);
+            return true;
         }
 
-        private static uint ReadUInt32BigEndian(ref SequenceReader<byte> reader, long offset, string fieldName)
+        private static bool TryReadUInt32BigEndian(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            string fieldName,
+            out uint result,
+            out int? minimumBufferLength)
         {
+            result = 0;
+            minimumBufferLength = null;
             Span<byte> bytes = stackalloc byte[sizeof(uint)];
             if (!reader.TryCopyTo(bytes))
             {
+                if (!isCompleted)
+                {
+                    minimumBufferLength = GetMinimumBufferLength(reader, offset, bytes.Length);
+                    return false;
+                }
+
                 throw new InvalidOperationException(
                     $"Malformed MessagePack log entry stream at byte offset {offset}: truncated {fieldName}.");
             }
 
             reader.Advance(bytes.Length);
-            return BinaryPrimitives.ReadUInt32BigEndian(bytes);
+            result = BinaryPrimitives.ReadUInt32BigEndian(bytes);
+            return true;
         }
 
-        private static ulong ReadUInt64BigEndian(ref SequenceReader<byte> reader, long offset, string fieldName)
+        private static bool TryReadUInt64BigEndian(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            string fieldName,
+            out ulong result,
+            out int? minimumBufferLength)
         {
+            result = 0;
+            minimumBufferLength = null;
             Span<byte> bytes = stackalloc byte[sizeof(ulong)];
             if (!reader.TryCopyTo(bytes))
             {
+                if (!isCompleted)
+                {
+                    minimumBufferLength = GetMinimumBufferLength(reader, offset, bytes.Length);
+                    return false;
+                }
+
                 throw new InvalidOperationException(
                     $"Malformed MessagePack log entry stream at byte offset {offset}: truncated {fieldName}.");
             }
 
             reader.Advance(bytes.Length);
-            return BinaryPrimitives.ReadUInt64BigEndian(bytes);
+            result = BinaryPrimitives.ReadUInt64BigEndian(bytes);
+            return true;
         }
 
-        private static void EnsureRemaining(ref SequenceReader<byte> reader, uint length, long offset, string fieldName)
+        private static bool TryEnsureRemaining(
+            ref SequenceReader<byte> reader,
+            uint length,
+            long offset,
+            bool isCompleted,
+            string fieldName,
+            out int? minimumBufferLength)
         {
+            minimumBufferLength = null;
             if (length > (ulong)reader.Remaining)
             {
+                if (!isCompleted)
+                {
+                    minimumBufferLength = length <= int.MaxValue ? GetMinimumBufferLength(reader, offset, checked((int)length)) : null;
+                    return false;
+                }
+
                 throw new InvalidOperationException(
                     $"Malformed MessagePack log entry stream at byte offset {offset}: {fieldName} length {length} exceeds remaining input bytes {reader.Remaining}.");
             }
+
+            return true;
+        }
+
+        private static int? GetMinimumBufferLength(SequenceReader<byte> reader, long entryOffset, int requiredBytes)
+        {
+            var consumedInEntry = reader.Consumed - entryOffset;
+            var result = consumedInEntry + requiredBytes;
+            return result > int.MaxValue ? null : checked((int)result);
         }
     }
 

@@ -34,71 +34,71 @@ public static class MessagePackJournalingExtensions
 
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton<MessagePackLogFormat>();
-        builder.Services.AddKeyedSingleton<IStateMachineLogFormat>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogFormat>());
-        builder.Services.AddSingleton<IStateMachineLogFormat>(static sp => sp.GetRequiredService<MessagePackLogFormat>());
-        builder.Services.AddSingleton<MessagePackLogEntryCodecProvider>();
-        builder.Services.AddKeyedSingleton<IDurableDictionaryCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableListCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableQueueCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableSetCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableValueCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableStateCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceCodecProvider>(StateMachineLogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableSetCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableValueCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableStateCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableTaskCompletionSourceCodecProvider>(static sp => sp.GetRequiredService<MessagePackLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogFormat>());
+        builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<MessagePackLogFormat>());
+        builder.Services.AddSingleton<MessagePackOperationCodecProvider>();
+        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableSetOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableValueOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableStateOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
 
         return builder;
     }
 }
 
-internal sealed class MessagePackLogEntryCodecProvider(MessagePackJournalingOptions options) :
-    IDurableDictionaryCodecProvider,
-    IDurableListCodecProvider,
-    IDurableQueueCodecProvider,
-    IDurableSetCodecProvider,
-    IDurableValueCodecProvider,
-    IDurableStateCodecProvider,
-    IDurableTaskCompletionSourceCodecProvider
+internal sealed class MessagePackOperationCodecProvider(MessagePackJournalingOptions options) :
+    IDurableDictionaryOperationCodecProvider,
+    IDurableListOperationCodecProvider,
+    IDurableQueueOperationCodecProvider,
+    IDurableSetOperationCodecProvider,
+    IDurableValueOperationCodecProvider,
+    IDurableStateOperationCodecProvider,
+    IDurableTaskCompletionSourceOperationCodecProvider
 {
     private readonly ConcurrentDictionary<Type, object> _codecs = new();
 
-    public IDurableDictionaryCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
-        => (IDurableDictionaryCodec<TKey, TValue>)_codecs.GetOrAdd(
-            typeof(IDurableDictionaryCodec<TKey, TValue>),
-            _ => new MessagePackDictionaryEntryCodec<TKey, TValue>(options.SerializerOptions));
+    public IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
+        => (IDurableDictionaryOperationCodec<TKey, TValue>)_codecs.GetOrAdd(
+            typeof(IDurableDictionaryOperationCodec<TKey, TValue>),
+            _ => new MessagePackDictionaryOperationCodec<TKey, TValue>(options.SerializerOptions));
 
-    public IDurableListCodec<T> GetCodec<T>()
-        => (IDurableListCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableListCodec<T>),
-            _ => new MessagePackListEntryCodec<T>(options.SerializerOptions));
+    public IDurableListOperationCodec<T> GetCodec<T>()
+        => (IDurableListOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableListOperationCodec<T>),
+            _ => new MessagePackListOperationCodec<T>(options.SerializerOptions));
 
-    IDurableQueueCodec<T> IDurableQueueCodecProvider.GetCodec<T>()
-        => (IDurableQueueCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableQueueCodec<T>),
-            _ => new MessagePackQueueEntryCodec<T>(options.SerializerOptions));
+    IDurableQueueOperationCodec<T> IDurableQueueOperationCodecProvider.GetCodec<T>()
+        => (IDurableQueueOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableQueueOperationCodec<T>),
+            _ => new MessagePackQueueOperationCodec<T>(options.SerializerOptions));
 
-    IDurableSetCodec<T> IDurableSetCodecProvider.GetCodec<T>()
-        => (IDurableSetCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableSetCodec<T>),
-            _ => new MessagePackSetEntryCodec<T>(options.SerializerOptions));
+    IDurableSetOperationCodec<T> IDurableSetOperationCodecProvider.GetCodec<T>()
+        => (IDurableSetOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableSetOperationCodec<T>),
+            _ => new MessagePackSetOperationCodec<T>(options.SerializerOptions));
 
-    IDurableValueCodec<T> IDurableValueCodecProvider.GetCodec<T>()
-        => (IDurableValueCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableValueCodec<T>),
-            _ => new MessagePackValueEntryCodec<T>(options.SerializerOptions));
+    IDurableValueOperationCodec<T> IDurableValueOperationCodecProvider.GetCodec<T>()
+        => (IDurableValueOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableValueOperationCodec<T>),
+            _ => new MessagePackValueOperationCodec<T>(options.SerializerOptions));
 
-    IDurableStateCodec<T> IDurableStateCodecProvider.GetCodec<T>()
-        => (IDurableStateCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableStateCodec<T>),
-            _ => new MessagePackStateEntryCodec<T>(options.SerializerOptions));
+    IDurableStateOperationCodec<T> IDurableStateOperationCodecProvider.GetCodec<T>()
+        => (IDurableStateOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableStateOperationCodec<T>),
+            _ => new MessagePackStateOperationCodec<T>(options.SerializerOptions));
 
-    IDurableTaskCompletionSourceCodec<T> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
-        => (IDurableTaskCompletionSourceCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableTaskCompletionSourceCodec<T>),
-            _ => new MessagePackTcsEntryCodec<T>(options.SerializerOptions));
+    IDurableTaskCompletionSourceOperationCodec<T> IDurableTaskCompletionSourceOperationCodecProvider.GetCodec<T>()
+        => (IDurableTaskCompletionSourceOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableTaskCompletionSourceOperationCodec<T>),
+            _ => new MessagePackTcsOperationCodec<T>(options.SerializerOptions));
 }

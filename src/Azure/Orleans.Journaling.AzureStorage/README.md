@@ -26,7 +26,7 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Storage as a journaling provider
-            .AddAzureAppendBlobStateMachineStorage(optionsBuilder =>
+            .AddAzureAppendBlobLogStorage(optionsBuilder =>
             {
                 optionsBuilder.Configure((options, serviceProvider) => options.BlobServiceClient = serviceProvider.GetRequiredService<BlobServiceClient>());
             });

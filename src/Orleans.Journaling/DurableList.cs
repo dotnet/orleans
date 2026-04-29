@@ -15,20 +15,20 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, IDurableListLogEntryConsumer<T>
+internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, IDurableListOperationHandler<T>
 {
-    private readonly IDurableListCodec<T> _codec;
+    private readonly IDurableListOperationCodec<T> _codec;
     private readonly List<T> _items = [];
-    private IStateMachineLogWriter? _storage;
+    private ILogWriter? _storage;
 
-    public DurableList([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
+    public DurableList([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableListCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableListOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableList(string key, IStateMachineManager manager, IDurableListCodec<T> codec)
+    internal DurableList(string key, ILogManager manager, IDurableListOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -58,7 +58,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 
     bool ICollection<T>.IsReadOnly => false;
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage)
+    void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -69,12 +69,12 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
         using var entry = snapshotWriter.BeginEntry();
         _codec.WriteSnapshot(_items, entry.Writer);
@@ -150,23 +150,23 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     protected void ApplyInsert(int index, T item) => _items.Insert(index, item);
     protected void ApplyRemoveAt(int index) => _items.RemoveAt(index);
     protected void ApplyClear() => _items.Clear();
-    void IDurableListLogEntryConsumer<T>.ApplyAdd(T item) => ApplyAdd(item);
-    void IDurableListLogEntryConsumer<T>.ApplySet(int index, T item) => ApplySet(index, item);
-    void IDurableListLogEntryConsumer<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
-    void IDurableListLogEntryConsumer<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
-    void IDurableListLogEntryConsumer<T>.ApplyClear() => ApplyClear();
-    void IDurableListLogEntryConsumer<T>.ApplySnapshotStart(int count)
+    void IDurableListOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
+    void IDurableListOperationHandler<T>.ApplySet(int index, T item) => ApplySet(index, item);
+    void IDurableListOperationHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
+    void IDurableListOperationHandler<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
+    void IDurableListOperationHandler<T>.ApplyClear() => ApplyClear();
+    void IDurableListOperationHandler<T>.ApplySnapshotStart(int count)
     {
         ApplyClear();
         _items.EnsureCapacity(count);
     }
 
-    void IDurableListLogEntryConsumer<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
+    void IDurableListOperationHandler<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
 
-    private IStateMachineLogWriter GetStorage()
+    private ILogWriter GetStorage()
     {
         Debug.Assert(_storage is not null);
         return _storage;

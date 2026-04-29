@@ -82,7 +82,7 @@ _Avoid_: User-reserved id
 - A **Log Entry Writer** is reused across entries and must not be retained by codecs after the write call returns.
 - A pending **Log Entry** should not escape the lexical scope which began it.
 - Durable operation codecs synchronously encode one operation and must not store **Log Entry Writers**.
-- The lexical entry scope type is `StateMachineLogEntry`.
+- The lexical entry scope type is `LogEntry`.
 - A pending **Log Entry** can complete only once. `Commit` finalizes it; `Dispose` aborts it only if it was not committed; double completion is invalid.
 - `LogEntryWriter` is payload-only. Entry lifecycle operations belong to the lexical scope, not to durable operation codecs.
 - Aborting a pending **Log Entry** truncates the caller-owned **Log Extent Writer** to its pre-entry state; aborted data must never affect stored data or later writes.
@@ -105,7 +105,7 @@ _Avoid_: User-reserved id
 - "record" was used for the framed item inside an extent, but this context uses **Log Entry** for that concept.
 - "segment" appears in older comments and tests, but this context uses **Log Extent** for the physical batch.
 - JSONL is a readable/debug/interchange format with best-effort allocation reduction, not the strict zero-allocation path. JSONL lines are **Log Entries**, not **Log Extents**.
-- `ILogDataCodec<T>` was the earlier value serialization term, but this context uses **Value Codec** for the replacement API.
+- `ILogValueCodec<T>` was the earlier value serialization term, but this context uses **Value Codec** for the replacement API.
 - Universal value codecs were considered, but **Value Codecs** are format-specific to avoid mixing JSON, protobuf, MessagePack, and Orleans binary responsibilities.
 - A public **Log Format** is intentionally narrower than a public codec-family abstraction.
 - Storage is intentionally format-agnostic: it may expose a **Log Format** key, but it should not inject, own, or call a **Log Format** implementation.

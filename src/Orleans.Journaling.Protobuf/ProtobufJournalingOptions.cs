@@ -11,7 +11,7 @@ namespace Orleans.Journaling.Protobuf;
 /// Common scalar values (<see cref="string"/>, byte arrays, numeric primitives, and <see cref="bool"/>)
 /// are encoded natively by default. Google Protocol Buffers message values are encoded natively only
 /// when their generated <see cref="MessageParser{T}"/> is registered explicitly. Other unregistered
-/// values fall back to <see cref="ILogDataCodec{T}"/>.
+/// values fall back to <see cref="ILogValueCodec{T}"/>.
 /// </para>
 /// </remarks>
 public sealed class ProtobufJournalingOptions
@@ -28,12 +28,12 @@ public sealed class ProtobufJournalingOptions
     /// <para>
     /// Registering a parser lets journaling encode <typeparamref name="T"/> values directly as protobuf
     /// message payloads without reflection. If a parser is not registered, values of this type use the
-    /// configured <see cref="ILogDataCodec{T}"/> fallback.
+    /// configured <see cref="ILogValueCodec{T}"/> fallback.
     /// </para>
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddStateMachineStorage().UseProtobufCodec(options =>
+    /// builder.AddLogStorage().UseProtobufCodec(options =>
     /// {
     ///     options.AddMessageParser(MyMessage.Parser);
     /// });

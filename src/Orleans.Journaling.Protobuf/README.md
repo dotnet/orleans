@@ -23,7 +23,7 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobStateMachineStorage()
+            .AddAzureAppendBlobLogStorage()
             .UseProtobufCodec(options =>
             {
                 options.AddMessageParser(StringValue.Parser);
@@ -43,14 +43,14 @@ Generated protobuf message types are encoded natively only when their generated 
 
 ```csharp
 siloBuilder
-    .AddAzureAppendBlobStateMachineStorage()
+    .AddAzureAppendBlobLogStorage()
     .UseProtobufCodec(options =>
     {
         options.AddMessageParser(MyJournaledMessage.Parser);
     });
 ```
 
-Other value types can fall back to a configured `ILogDataCodec<T>` compatibility codec. The native protobuf path remains the recommended low-allocation path. If a protobuf message parser or fallback codec is missing, journaling fails with a configuration error instead of discovering parsers through reflection. This keeps the protobuf codec trimming and Native AOT friendly.
+Other value types can fall back to a configured `ILogValueCodec<T>` compatibility codec. The native protobuf path remains the recommended low-allocation path. If a protobuf message parser or fallback codec is missing, journaling fails with a configuration error instead of discovering parsers through reflection. This keeps the protobuf codec trimming and Native AOT friendly.
 
 ## Storage format
 

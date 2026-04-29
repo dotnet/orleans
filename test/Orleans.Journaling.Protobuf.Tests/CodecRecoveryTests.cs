@@ -10,7 +10,7 @@ namespace Orleans.Journaling.Protobuf.Tests;
 /// Tests that verify same-format recovery for Protobuf journaling and the Orleans binary compatibility baseline.
 /// </summary>
 [TestCategory("BVT")]
-public class CodecRecoveryTests : StateMachineTestBase
+public class CodecRecoveryTests : JournalingTestBase
 {
     /// <summary>
     /// Writes data with the Orleans binary codec, then reads it back.
@@ -22,9 +22,9 @@ public class CodecRecoveryTests : StateMachineTestBase
         var storage = CreateStorage();
 
         var sut = CreateTestSystem(storage);
-        var keyCodec = new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec = new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec, valueCodec));
+        var keyCodec = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var valueCodec = new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -33,9 +33,9 @@ public class CodecRecoveryTests : StateMachineTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         var sut2 = CreateTestSystem(storage);
-        var keyCodec2 = new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec2 = new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec2, valueCodec2));
+        var keyCodec2 = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var valueCodec2 = new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec2, valueCodec2));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, dict2.Count);
@@ -54,7 +54,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var dict = new DurableDictionary<string, int>("dict", sut.Manager,
-            new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>()));
+            new ProtobufDictionaryOperationCodec<string, int>(CreateConverter<string>(), CreateConverter<int>()));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -65,7 +65,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut2 = CreateTestSystemWithProtobufCodec(storage);
         var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager,
-            new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>()));
+            new ProtobufDictionaryOperationCodec<string, int>(CreateConverter<string>(), CreateConverter<int>()));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(2, dict2.Count);
@@ -83,7 +83,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var list = new DurableList<string>("list", sut.Manager,
-            new ProtobufListEntryCodec<string>(CreateConverter<string>()));
+            new ProtobufListOperationCodec<string>(CreateConverter<string>()));
         await sut.Lifecycle.OnStart();
 
         list.Add("one");
@@ -93,7 +93,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut2 = CreateTestSystemWithProtobufCodec(storage);
         var list2 = new DurableList<string>("list", sut2.Manager,
-            new ProtobufListEntryCodec<string>(CreateConverter<string>()));
+            new ProtobufListOperationCodec<string>(CreateConverter<string>()));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, list2.Count);
@@ -112,7 +112,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var value = new DurableValue<int>("val", sut.Manager,
-            new ProtobufValueEntryCodec<int>(CreateConverter<int>()));
+            new ProtobufValueOperationCodec<int>(CreateConverter<int>()));
         await sut.Lifecycle.OnStart();
 
         value.Value = 42;
@@ -120,7 +120,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut2 = CreateTestSystemWithProtobufCodec(storage);
         var value2 = new DurableValue<int>("val", sut2.Manager,
-            new ProtobufValueEntryCodec<int>(CreateConverter<int>()));
+            new ProtobufValueOperationCodec<int>(CreateConverter<int>()));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(42, value2.Value);
@@ -136,7 +136,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var set = new DurableSet<string>("set", sut.Manager,
-            new ProtobufSetEntryCodec<string>(CreateConverter<string>()));
+            new ProtobufSetOperationCodec<string>(CreateConverter<string>()));
         await sut.Lifecycle.OnStart();
 
         set.Add("a");
@@ -146,7 +146,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut2 = CreateTestSystemWithProtobufCodec(storage);
         var set2 = new DurableSet<string>("set", sut2.Manager,
-            new ProtobufSetEntryCodec<string>(CreateConverter<string>()));
+            new ProtobufSetOperationCodec<string>(CreateConverter<string>()));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, set2.Count);
@@ -165,7 +165,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut = CreateTestSystemWithProtobufCodec(storage);
         var queue = new DurableQueue<string>("queue", sut.Manager,
-            new ProtobufQueueEntryCodec<string>(CreateConverter<string>()));
+            new ProtobufQueueOperationCodec<string>(CreateConverter<string>()));
         await sut.Lifecycle.OnStart();
 
         queue.Enqueue("first");
@@ -175,7 +175,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         var sut2 = CreateTestSystemWithProtobufCodec(storage);
         var queue2 = new DurableQueue<string>("queue", sut2.Manager,
-            new ProtobufQueueEntryCodec<string>(CreateConverter<string>()));
+            new ProtobufQueueOperationCodec<string>(CreateConverter<string>()));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, queue2.Count);
@@ -187,9 +187,9 @@ public class CodecRecoveryTests : StateMachineTestBase
     private ProtobufValueConverter<T> CreateConverter<T>()
         => ProtobufValueConverter<T>.IsNativeType
             ? new ProtobufValueConverter<T>()
-            : new ProtobufValueConverter<T>(new OrleansLogDataCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
+            : new ProtobufValueConverter<T>(new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
 
-    internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithProtobufCodec(IStateMachineStorage? storage = null)
+    internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithProtobufCodec(ILogStorage? storage = null)
     {
         storage ??= CreateProtobufStorage();
 
@@ -197,15 +197,15 @@ public class CodecRecoveryTests : StateMachineTestBase
         var ulongConverter = CreateConverter<ulong>();
         var dateTimeConverter = CreateConverter<DateTime>();
 
-        var stateMachineIdsCodec = new ProtobufDictionaryEntryCodec<string, ulong>(stringConverter, ulongConverter);
-        var retirementTrackerCodec = new ProtobufDictionaryEntryCodec<string, DateTime>(stringConverter, dateTimeConverter);
-        var manager = new StateMachineManager(storage, LoggerFactory.CreateLogger<StateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System, new ProtobufLogFormat());
+        var logStreamIdsCodec = new ProtobufDictionaryOperationCodec<string, ulong>(stringConverter, ulongConverter);
+        var retirementTrackerCodec = new ProtobufDictionaryOperationCodec<string, DateTime>(stringConverter, dateTimeConverter);
+        var manager = new LogManager(storage, LoggerFactory.CreateLogger<LogManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new ProtobufLogFormat());
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
 
-    private static VolatileStateMachineStorage CreateProtobufStorage() => new(StateMachineLogFormatKeys.Protobuf);
+    private static VolatileLogStorage CreateProtobufStorage() => new(LogFormatKeys.Protobuf);
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {

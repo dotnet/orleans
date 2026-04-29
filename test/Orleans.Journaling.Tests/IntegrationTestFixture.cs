@@ -16,11 +16,11 @@ public class IntegrationTestFixture : IAsyncLifetime
     public IntegrationTestFixture()
     {
         var builder = new InProcessTestClusterBuilder();
-        var storageProvider = new VolatileStateMachineStorageProvider();
+        var storageProvider = new VolatileLogStorageProvider();
         builder.ConfigureSilo((options, siloBuilder) =>
         {
-            siloBuilder.AddStateMachineStorage();
-            siloBuilder.Services.AddSingleton<IStateMachineStorageProvider>(storageProvider);
+            siloBuilder.AddLogStorage();
+            siloBuilder.Services.AddSingleton<ILogStorageProvider>(storageProvider);
         });
         ConfigureTestCluster(builder);
         Cluster = builder.Build();

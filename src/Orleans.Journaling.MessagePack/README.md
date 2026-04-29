@@ -26,7 +26,7 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobStateMachineStorage()
+            .AddAzureAppendBlobLogStorage()
             .UseMessagePackCodec(options =>
             {
                 options.SerializerOptions = MessagePackSerializerOptions.Standard;

@@ -23,14 +23,14 @@ public sealed class MessagePackCodecTests
         builder.UseMessagePackCodec();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<MessagePackLogFormat>(serviceProvider.GetRequiredKeyedService<IStateMachineLogFormat>(StateMachineLogFormatKeys.MessagePack));
-        Assert.Same(serviceProvider.GetRequiredService<MessagePackLogEntryCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.MessagePack));
+        Assert.IsType<MessagePackLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(LogFormatKeys.MessagePack));
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.MessagePack));
     }
 
     [Fact]
     public void MessagePackListCodec_Operations_RoundTrip()
     {
-        var codec = new MessagePackListEntryCodec<string>(Options);
+        var codec = new MessagePackListOperationCodec<string>(Options);
         var consumer = new ListConsumer<string>();
 
         Apply(codec, writer => codec.WriteAdd("one", writer), consumer);
@@ -46,7 +46,7 @@ public sealed class MessagePackCodecTests
     [Fact]
     public void MessagePackDictionaryCodec_Snapshot_RoundTrips()
     {
-        var codec = new MessagePackDictionaryEntryCodec<string, int>(Options);
+        var codec = new MessagePackDictionaryOperationCodec<string, int>(Options);
         var items = new List<KeyValuePair<string, int>>
         {
             new("alpha", 1),
@@ -64,9 +64,9 @@ public sealed class MessagePackCodecTests
     [Fact]
     public void MessagePackQueueAndSetCodecs_RoundTrip()
     {
-        var queueCodec = new MessagePackQueueEntryCodec<int>(Options);
+        var queueCodec = new MessagePackQueueOperationCodec<int>(Options);
         var queueConsumer = new QueueConsumer<int>();
-        var setCodec = new MessagePackSetEntryCodec<string>(Options);
+        var setCodec = new MessagePackSetOperationCodec<string>(Options);
         var setConsumer = new SetConsumer<string>();
 
         Apply(queueCodec, writer => queueCodec.WriteEnqueue(10, writer), queueConsumer);
@@ -83,11 +83,11 @@ public sealed class MessagePackCodecTests
     [Fact]
     public void MessagePackValueStateAndTcsCodecs_RoundTrip()
     {
-        var valueCodec = new MessagePackValueEntryCodec<int>(Options);
+        var valueCodec = new MessagePackValueOperationCodec<int>(Options);
         var valueConsumer = new ValueConsumer<int>();
-        var stateCodec = new MessagePackStateEntryCodec<string>(Options);
+        var stateCodec = new MessagePackStateOperationCodec<string>(Options);
         var stateConsumer = new StateConsumer<string>();
-        var tcsCodec = new MessagePackTcsEntryCodec<int>(Options);
+        var tcsCodec = new MessagePackTcsOperationCodec<int>(Options);
         var tcsConsumer = new TcsConsumer<int>();
 
         Apply(valueCodec, writer => valueCodec.WriteSet(42, writer), valueConsumer);
@@ -106,7 +106,7 @@ public sealed class MessagePackCodecTests
     [Fact]
     public void MessagePackCodec_MalformedSnapshotCount_Throws()
     {
-        var codec = new MessagePackListEntryCodec<string>(Options);
+        var codec = new MessagePackListOperationCodec<string>(Options);
         var buffer = new ArrayBufferWriter<byte>();
         var writer = new MessagePackWriter(buffer);
         writer.WriteArrayHeader(3);
@@ -124,7 +124,7 @@ public sealed class MessagePackCodecTests
     [Fact]
     public void MessagePackListCodec_WriteSnapshot_Rejects_MismatchedCollectionCount()
     {
-        var codec = new MessagePackListEntryCodec<string>(Options);
+        var codec = new MessagePackListOperationCodec<string>(Options);
         var items = new MiscountedReadOnlyCollection<string>(1, new[] { "one", "two" });
 
         var exception = Assert.Throws<InvalidOperationException>(
@@ -139,8 +139,8 @@ public sealed class MessagePackCodecTests
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
 
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
 
         using var data = writer.GetCommittedBuffer();
 
@@ -157,12 +157,12 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
         using var data = writer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
-        format.Read(data, consumer);
+        format.Read(data, consumer, isCompleted: true);
 
         Assert.Collection(
             consumer.Entries,
@@ -179,15 +179,41 @@ public sealed class MessagePackCodecTests
     }
 
     [Fact]
+    public void MessagePackLogFormat_Read_WaitsForPartialTrailingEntryWhenInputIsNotCompleted()
+    {
+        var format = new MessagePackLogFormat();
+        using var firstWriter = format.CreateWriter();
+        AppendEntry(firstWriter.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        using var firstData = firstWriter.GetCommittedBuffer();
+        var firstBytes = firstData.ToArray();
+
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
+        using var fullData = writer.GetCommittedBuffer();
+        var partialBytes = fullData.ToArray()[..^1];
+        using var data = CreateBuffer(partialBytes);
+        var consumer = new CollectingConsumer();
+
+        var result = format.Read(data, consumer, isCompleted: false);
+
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal((ulong)8, entry.StreamId);
+        Assert.Equal([0xAA, 0xBB], entry.Payload);
+        Assert.Equal(firstBytes.Length, result.BytesConsumed);
+        Assert.Equal(7, result.MinimumBufferLength);
+    }
+
+    [Fact]
     public void MessagePackLogFormat_DisposeWithoutCommit_AbortsPendingEntry()
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [1]);
         using var beforeAbort = writer.GetCommittedBuffer();
         var committedBytes = beforeAbort.ToArray();
 
-        using (var aborted = writer.CreateLogWriter(new StateMachineId(9)).BeginEntry())
+        using (var aborted = writer.CreateLogWriter(new LogStreamId(9)).BeginEntry())
         {
             aborted.Writer.Write([2, 3, 4]);
         }
@@ -201,14 +227,14 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [1]);
 
         writer.Reset();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(9)), [2]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(9)), [2]);
         using var data = writer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
-        format.Read(data, consumer);
+        format.Read(data, consumer, isCompleted: true);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)9, entry.StreamId);
@@ -220,7 +246,7 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        var entry = writer.CreateLogWriter(new StateMachineId(8)).BeginEntry();
+        var entry = writer.CreateLogWriter(new LogStreamId(8)).BeginEntry();
         entry.Writer.Write([1]);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -245,13 +271,13 @@ public sealed class MessagePackCodecTests
         using var data = CreateBuffer(bytes);
         var consumer = new CollectingConsumer();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => format.Read(data, consumer));
+        var exception = Assert.Throws<InvalidOperationException>(() => format.Read(data, consumer, isCompleted: true));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
     }
 
-    private static void AppendEntry(StateMachineLogWriter writer, ReadOnlySpan<byte> payload)
+    private static void AppendEntry(LogWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
@@ -265,42 +291,42 @@ public sealed class MessagePackCodecTests
         return writer.ConsumeSlice(writer.Length);
     }
 
-    private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableSetCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableValueCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableValueLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableValueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableValueOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableStateCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
@@ -314,7 +340,7 @@ public sealed class MessagePackCodecTests
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
-    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull
     {
         public List<KeyValuePair<TKey, TValue>> Items { get; } = [];
         public void ApplySet(TKey key, TValue value) => Items.Add(new(key, value));
@@ -324,7 +350,7 @@ public sealed class MessagePackCodecTests
         public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
     }
 
-    private sealed class ListConsumer<T> : IDurableListLogEntryConsumer<T>
+    private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -336,7 +362,7 @@ public sealed class MessagePackCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class QueueConsumer<T> : IDurableQueueLogEntryConsumer<T>
+    private sealed class QueueConsumer<T> : IDurableQueueOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
@@ -346,7 +372,7 @@ public sealed class MessagePackCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class SetConsumer<T> : IDurableSetLogEntryConsumer<T>
+    private sealed class SetConsumer<T> : IDurableSetOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -356,20 +382,20 @@ public sealed class MessagePackCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class ValueConsumer<T> : IDurableValueLogEntryConsumer<T>
+    private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>
     {
         public T? Value { get; private set; }
         public void ApplySet(T value) => Value = value;
     }
 
-    private sealed class StateConsumer<T> : IDurableStateLogEntryConsumer<T>
+    private sealed class StateConsumer<T> : IDurableStateOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplySet(T state, ulong version) => Commands.Add($"set:{state}:{version}");
         public void ApplyClear() => Commands.Add("clear");
     }
 
-    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceLogEntryConsumer<T>
+    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyPending() => Commands.Add("pending");
@@ -378,11 +404,11 @@ public sealed class MessagePackCodecTests
         public void ApplyCanceled() => Commands.Add("canceled");
     }
 
-    private sealed class CollectingConsumer : IStateMachineLogEntryConsumer
+    private sealed class CollectingConsumer : ILogEntrySink
     {
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) =>
+        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) =>
             Entries.Add((streamId.Value, payload.ToArray()));
     }
 

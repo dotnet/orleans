@@ -21,7 +21,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonDictionaryCodec_Set_RoundTrips()
     {
-        var codec = new JsonDictionaryEntryCodec<string, int>(Options);
+        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet("alice", 42, buffer);
@@ -40,8 +40,8 @@ public class JsonCodecTests
         var builder = new TestSiloBuilder();
         builder.UseJsonCodec(JsonCodecTestJsonContext.Default);
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<IStateMachineLogFormat>(StateMachineLogFormatKeys.Json));
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Json).GetCodec<JsonCodecTestValue>();
+        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(LogFormatKeys.Json));
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.Json).GetCodec<JsonCodecTestValue>();
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet(new("test", 1), buffer);
@@ -54,7 +54,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonDictionaryCodec_Snapshot_RoundTrips()
     {
-        var codec = new JsonDictionaryEntryCodec<string, int>(Options);
+        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
         var items = new List<KeyValuePair<string, int>>
         {
             new("alpha", 1),
@@ -74,7 +74,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonListCodec_Operations_RoundTrip()
     {
-        var codec = new JsonListEntryCodec<string>(Options);
+        var codec = new JsonListOperationCodec<string>(Options);
         var consumer = new ListConsumer<string>();
 
         Apply(codec, writer => codec.WriteAdd("one", writer), consumer);
@@ -89,7 +89,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonListCodec_Snapshot_RoundTrips()
     {
-        var codec = new JsonListEntryCodec<string>(Options);
+        var codec = new JsonListOperationCodec<string>(Options);
         var consumer = new ListConsumer<string>();
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -102,7 +102,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonQueueCodec_Operations_RoundTrip()
     {
-        var codec = new JsonQueueEntryCodec<int>(Options);
+        var codec = new JsonQueueOperationCodec<int>(Options);
         var consumer = new QueueConsumer<int>();
 
         Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
@@ -116,7 +116,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonSetCodec_Operations_RoundTrip()
     {
-        var codec = new JsonSetEntryCodec<string>(Options);
+        var codec = new JsonSetOperationCodec<string>(Options);
         var consumer = new SetConsumer<string>();
 
         Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
@@ -130,7 +130,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonValueCodec_Set_RoundTrips()
     {
-        var codec = new JsonValueEntryCodec<int>(Options);
+        var codec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -143,7 +143,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonValueCodec_CustomValue_UsesConfiguredTypeInfo()
     {
-        var codec = new JsonValueEntryCodec<JsonCodecTestValue>(CreateOptions());
+        var codec = new JsonValueOperationCodec<JsonCodecTestValue>(CreateOptions());
         var consumer = new ValueConsumer<JsonCodecTestValue>();
         var buffer = new ArrayBufferWriter<byte>();
         var value = new JsonCodecTestValue("alpha", 3);
@@ -158,7 +158,7 @@ public class JsonCodecTests
     public void JsonValueCodec_MissingMetadata_ThrowsHelpfulException()
     {
         var exception = Assert.Throws<InvalidOperationException>(
-            () => new JsonValueEntryCodec<JsonCodecTestValue>(new JsonSerializerOptions()));
+            () => new JsonValueOperationCodec<JsonCodecTestValue>(new JsonSerializerOptions()));
 
         Assert.Contains(nameof(JsonCodecTestValue), exception.Message);
         Assert.Contains("source-generated JsonSerializerContext", exception.Message);
@@ -167,7 +167,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonStateCodec_SetAndClear_RoundTrip()
     {
-        var codec = new JsonStateEntryCodec<string>(Options);
+        var codec = new JsonStateOperationCodec<string>(Options);
         var consumer = new StateConsumer<string>();
 
         Apply(codec, writer => codec.WriteSet("state", 7, writer), consumer);
@@ -179,7 +179,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonTcsCodec_States_RoundTrip()
     {
-        var codec = new JsonTcsEntryCodec<int>(Options);
+        var codec = new JsonTcsOperationCodec<int>(Options);
         var consumer = new TcsConsumer<int>();
 
         Apply(codec, writer => codec.WritePending(writer), consumer);
@@ -212,7 +212,7 @@ public class JsonCodecTests
         using var writer = format.CreateWriter();
 
         AppendValueSet(writer, 8, 42);
-        using (var aborted = writer.CreateLogWriter(new StateMachineId(9)).BeginEntry())
+        using (var aborted = writer.CreateLogWriter(new LogStreamId(9)).BeginEntry())
         {
             aborted.Writer.Write("""{"cmd":"set","value":100"""u8);
         }
@@ -242,9 +242,9 @@ public class JsonCodecTests
     public void JsonLinesLogFormat_DoesNotDependOnRemovedBuilderTypes()
     {
         Assert.Null(typeof(JsonLinesLogFormat).Assembly.GetType("Orleans.Journaling.Json.JsonLinesLogExtentCodec"));
-        Assert.Null(typeof(IStateMachineLogFormat).Assembly.GetType("Orleans.Journaling.LogExtentBuilder"));
-        Assert.Null(typeof(IStateMachineLogFormat).Assembly.GetType("Orleans.Journaling.IStateMachineLogExtentCodec"));
-        Assert.Null(typeof(IStateMachineLogFormat).Assembly.GetType("Orleans.Journaling.StateMachineStorageWriter"));
+        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.LogExtentBuilder"));
+        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.IStateMachineLogExtentCodec"));
+        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.StateMachineStorageWriter"));
     }
 
     [Fact]
@@ -253,7 +253,7 @@ public class JsonCodecTests
         var format = new JsonLinesLogFormat();
         var entries = Read(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n");
         var entry = Assert.Single(entries);
-        var valueCodec = new JsonValueEntryCodec<int>(Options);
+        var valueCodec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
 
         valueCodec.Apply(new ReadOnlySequence<byte>(entry.Payload), consumer);
@@ -294,7 +294,7 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_MalformedTrailingLine_Throws()
+    public void JsonLinesLogFormat_Read_FinalLineWithoutNewline_Throws()
     {
         var format = new JsonLinesLogFormat();
         var jsonLines =
@@ -303,7 +303,24 @@ public class JsonCodecTests
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
 
-        Assert.Contains("invalid JSON", exception.Message);
+        Assert.Contains("must end with a newline", exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_PartialLineWaitsForNewlineWhenInputIsNotCompleted()
+    {
+        var format = new JsonLinesLogFormat();
+        var bytes = Encoding.UTF8.GetBytes("""{"streamId":8,"entry":{"cmd":"set","value":42}}""");
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        using var data = buffer.ConsumeSlice(buffer.Length);
+        var consumer = new RecordingLogEntrySink();
+
+        var result = format.Read(data, consumer, isCompleted: false);
+
+        Assert.Equal(0, result.BytesConsumed);
+        Assert.Equal(bytes.Length + 1, result.MinimumBufferLength);
+        Assert.Empty(consumer.Entries);
     }
 
     [Fact]
@@ -317,35 +334,35 @@ public class JsonCodecTests
         Assert.Equal("""{"cmd":"set","value":42}""", Encoding.UTF8.GetString(entry.Payload));
     }
 
-    private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableSetCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableStateCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
@@ -354,16 +371,16 @@ public class JsonCodecTests
 
     private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
 
-    private static string GetString(IStateMachineLogExtentWriter writer)
+    private static string GetString(ILogSegmentWriter writer)
     {
         using var buffer = writer.GetCommittedBuffer();
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private static void AppendValueSet(IStateMachineLogExtentWriter writer, ulong streamId, int value)
+    private static void AppendValueSet(ILogSegmentWriter writer, ulong streamId, int value)
     {
-        var codec = new JsonValueEntryCodec<int>(Options);
-        using var entry = writer.CreateLogWriter(new StateMachineId(streamId)).BeginEntry();
+        var codec = new JsonValueOperationCodec<int>(Options);
+        using var entry = writer.CreateLogWriter(new LogStreamId(streamId)).BeginEntry();
         codec.WriteSet(value, entry.Writer);
         entry.Commit();
     }
@@ -377,21 +394,21 @@ public class JsonCodecTests
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
         using var data = buffer.ConsumeSlice(buffer.Length);
-        var consumer = new RecordingLogEntryConsumer();
-        format.Read(data, consumer);
+        var consumer = new RecordingLogEntrySink();
+        format.Read(data, consumer, isCompleted: true);
         return consumer.Entries;
     }
 
-    private sealed record RecordedLogEntry(StateMachineId StreamId, byte[] Payload);
+    private sealed record RecordedLogEntry(LogStreamId StreamId, byte[] Payload);
 
-    private sealed class RecordingLogEntryConsumer : IStateMachineLogEntryConsumer
+    private sealed class RecordingLogEntrySink : ILogEntrySink
     {
         public List<RecordedLogEntry> Entries { get; } = [];
 
-        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
+        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
     }
 
-    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull
     {
         public TKey? LastSetKey { get; private set; }
         public TValue? LastSetValue { get; private set; }
@@ -408,7 +425,7 @@ public class JsonCodecTests
         public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
     }
 
-    private sealed class ListConsumer<T> : IDurableListLogEntryConsumer<T>
+    private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -420,7 +437,7 @@ public class JsonCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class QueueConsumer<T> : IDurableQueueLogEntryConsumer<T>
+    private sealed class QueueConsumer<T> : IDurableQueueOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
@@ -430,7 +447,7 @@ public class JsonCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class SetConsumer<T> : IDurableSetLogEntryConsumer<T>
+    private sealed class SetConsumer<T> : IDurableSetOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -440,20 +457,20 @@ public class JsonCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class ValueConsumer<T> : IDurableValueLogEntryConsumer<T>
+    private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>
     {
         public T? Value { get; private set; }
         public void ApplySet(T value) => Value = value;
     }
 
-    private sealed class StateConsumer<T> : IDurableStateLogEntryConsumer<T>
+    private sealed class StateConsumer<T> : IDurableStateOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplySet(T state, ulong version) => Commands.Add($"set:{state}:{version}");
         public void ApplyClear() => Commands.Add("clear");
     }
 
-    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceLogEntryConsumer<T>
+    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyPending() => Commands.Add("pending");

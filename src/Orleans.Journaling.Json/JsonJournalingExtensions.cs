@@ -33,7 +33,7 @@ public sealed class JsonJournalingOptions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddStateMachineStorage().UseJsonCodec(options =>
+    /// builder.AddLogStorage().UseJsonCodec(options =>
     /// {
     ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
     /// });
@@ -54,18 +54,18 @@ public sealed class JsonJournalingOptions
 public static class JsonJournalingExtensions
 {
     /// <summary>
-    /// Configures Orleans.Journaling to use JSON Lines for physical log extents and System.Text.Json for durable log entries.
+    /// Configures Orleans.Journaling to use JSON Lines for physical log segments and System.Text.Json for durable log entries.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">Optional delegate to configure <see cref="JsonJournalingOptions"/>.</param>
     /// <returns>The silo builder for chaining.</returns>
     /// <example>
     /// <code>
-    /// builder.AddStateMachineStorage().UseJsonCodec();
+    /// builder.AddLogStorage().UseJsonCodec();
     ///
-    /// builder.AddStateMachineStorage().UseJsonCodec(MyJournalJsonContext.Default);
+    /// builder.AddLogStorage().UseJsonCodec(MyJournalJsonContext.Default);
     ///
-    /// builder.AddStateMachineStorage().UseJsonCodec(options =>
+    /// builder.AddLogStorage().UseJsonCodec(options =>
     /// {
     ///     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
@@ -81,25 +81,25 @@ public static class JsonJournalingExtensions
         // JsonSerializerOptions singleton that could collide with other components.
         var jsonOptions = options.SerializerOptions;
 
-        // Replace the default extent and entry codec providers with JSON implementations.
+        // Replace the default segment and operation codec providers with JSON implementations.
         builder.Services.AddSingleton<JsonLinesLogFormat>();
-        builder.Services.AddKeyedSingleton<IStateMachineLogFormat>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLinesLogFormat>());
-        builder.Services.AddSingleton<IStateMachineLogFormat>(static sp => sp.GetRequiredService<JsonLinesLogFormat>());
-        builder.Services.AddSingleton<JsonLogEntryCodecProvider>(_ => new JsonLogEntryCodecProvider(jsonOptions));
-        builder.Services.AddKeyedSingleton<IDurableDictionaryCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableListCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableQueueCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableSetCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableStateCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceCodecProvider>(StateMachineLogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableSetCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableValueCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableStateCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableTaskCompletionSourceCodecProvider>(static sp => sp.GetRequiredService<JsonLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLinesLogFormat>());
+        builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<JsonLinesLogFormat>());
+        builder.Services.AddSingleton<JsonOperationCodecProvider>(_ => new JsonOperationCodecProvider(jsonOptions));
+        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableSetOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableValueOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableStateOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
 
         return builder;
     }
@@ -116,7 +116,7 @@ public static class JsonJournalingExtensions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddStateMachineStorage().UseJsonCodec(MyJournalJsonContext.Default);
+    /// builder.AddLogStorage().UseJsonCodec(MyJournalJsonContext.Default);
     /// </code>
     /// </example>
     public static ISiloBuilder UseJsonCodec(this ISiloBuilder builder, IJsonTypeInfoResolver typeInfoResolver)
@@ -135,56 +135,56 @@ public static class JsonJournalingExtensions
 /// the shared <see cref="JsonSerializerOptions"/> — no reflection required. Codec instances
 /// are cached per closed generic combination so they behave as singletons.
 /// </remarks>
-internal sealed class JsonLogEntryCodecProvider(JsonSerializerOptions jsonOptions) :
-    IDurableDictionaryCodecProvider,
-    IDurableListCodecProvider,
-    IDurableQueueCodecProvider,
-    IDurableSetCodecProvider,
-    IDurableValueCodecProvider,
-    IDurableStateCodecProvider,
-    IDurableTaskCompletionSourceCodecProvider
+internal sealed class JsonOperationCodecProvider(JsonSerializerOptions jsonOptions) :
+    IDurableDictionaryOperationCodecProvider,
+    IDurableListOperationCodecProvider,
+    IDurableQueueOperationCodecProvider,
+    IDurableSetOperationCodecProvider,
+    IDurableValueOperationCodecProvider,
+    IDurableStateOperationCodecProvider,
+    IDurableTaskCompletionSourceOperationCodecProvider
 {
     private readonly ConcurrentDictionary<Type, object> _codecs = new();
 
     /// <inheritdoc/>
-    public IDurableDictionaryCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
-        => (IDurableDictionaryCodec<TKey, TValue>)_codecs.GetOrAdd(
-            typeof(IDurableDictionaryCodec<TKey, TValue>),
-            _ => new JsonDictionaryEntryCodec<TKey, TValue>(jsonOptions));
+    public IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
+        => (IDurableDictionaryOperationCodec<TKey, TValue>)_codecs.GetOrAdd(
+            typeof(IDurableDictionaryOperationCodec<TKey, TValue>),
+            _ => new JsonDictionaryOperationCodec<TKey, TValue>(jsonOptions));
 
     /// <inheritdoc/>
-    public IDurableListCodec<T> GetCodec<T>()
-        => (IDurableListCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableListCodec<T>),
-            _ => new JsonListEntryCodec<T>(jsonOptions));
+    public IDurableListOperationCodec<T> GetCodec<T>()
+        => (IDurableListOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableListOperationCodec<T>),
+            _ => new JsonListOperationCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    IDurableQueueCodec<T> IDurableQueueCodecProvider.GetCodec<T>()
-        => (IDurableQueueCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableQueueCodec<T>),
-            _ => new JsonQueueEntryCodec<T>(jsonOptions));
+    IDurableQueueOperationCodec<T> IDurableQueueOperationCodecProvider.GetCodec<T>()
+        => (IDurableQueueOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableQueueOperationCodec<T>),
+            _ => new JsonQueueOperationCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    IDurableSetCodec<T> IDurableSetCodecProvider.GetCodec<T>()
-        => (IDurableSetCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableSetCodec<T>),
-            _ => new JsonSetEntryCodec<T>(jsonOptions));
+    IDurableSetOperationCodec<T> IDurableSetOperationCodecProvider.GetCodec<T>()
+        => (IDurableSetOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableSetOperationCodec<T>),
+            _ => new JsonSetOperationCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    IDurableValueCodec<T> IDurableValueCodecProvider.GetCodec<T>()
-        => (IDurableValueCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableValueCodec<T>),
-            _ => new JsonValueEntryCodec<T>(jsonOptions));
+    IDurableValueOperationCodec<T> IDurableValueOperationCodecProvider.GetCodec<T>()
+        => (IDurableValueOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableValueOperationCodec<T>),
+            _ => new JsonValueOperationCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    IDurableStateCodec<T> IDurableStateCodecProvider.GetCodec<T>()
-        => (IDurableStateCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableStateCodec<T>),
-            _ => new JsonStateEntryCodec<T>(jsonOptions));
+    IDurableStateOperationCodec<T> IDurableStateOperationCodecProvider.GetCodec<T>()
+        => (IDurableStateOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableStateOperationCodec<T>),
+            _ => new JsonStateOperationCodec<T>(jsonOptions));
 
     /// <inheritdoc/>
-    IDurableTaskCompletionSourceCodec<T> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
-        => (IDurableTaskCompletionSourceCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableTaskCompletionSourceCodec<T>),
-            _ => new JsonTcsEntryCodec<T>(jsonOptions));
+    IDurableTaskCompletionSourceOperationCodec<T> IDurableTaskCompletionSourceOperationCodecProvider.GetCodec<T>()
+        => (IDurableTaskCompletionSourceOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableTaskCompletionSourceOperationCodec<T>),
+            _ => new JsonTcsOperationCodec<T>(jsonOptions));
 }

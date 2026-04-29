@@ -15,19 +15,19 @@ public interface IDurableNothing
 /// </summary>
 internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 {
-    public DurableNothing([ServiceKey] string key, IStateMachineManager manager)
+    public DurableNothing([ServiceKey] string key, ILogManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
     }
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage) { }
+    void IDurableStateMachine.Reset(ILogWriter storage) { }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) { }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter) { }
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter) { }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) { }
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter) { }
 
     public IDurableStateMachine DeepCopy() => this;
 }

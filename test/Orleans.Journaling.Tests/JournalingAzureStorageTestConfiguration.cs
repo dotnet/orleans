@@ -17,7 +17,7 @@ internal static class JournalingAzureStorageTestConfiguration
         }
     }
 
-    public static AzureAppendBlobStateMachineStorageOptions ConfigureTestDefaults(this AzureAppendBlobStateMachineStorageOptions options)
+    public static AzureAppendBlobLogStorageOptions ConfigureTestDefaults(this AzureAppendBlobLogStorageOptions options)
     {
         if (TestDefaultConfiguration.UseAadAuthentication)
         {

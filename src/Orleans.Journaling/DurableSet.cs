@@ -21,20 +21,20 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDurableSetLogEntryConsumer<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDurableSetOperationHandler<T>
 {
-    private readonly IDurableSetCodec<T> _codec;
+    private readonly IDurableSetOperationCodec<T> _codec;
     private readonly HashSet<T> _items = [];
-    private IStateMachineLogWriter? _storage;
+    private ILogWriter? _storage;
 
-    public DurableSet([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
+    public DurableSet([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableSetCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableSet(string key, IStateMachineManager manager, IDurableSetCodec<T> codec)
+    internal DurableSet(string key, ILogManager manager, IDurableSetOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -44,7 +44,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     public int Count => _items.Count;
     public bool IsReadOnly => false;
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage)
+    void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -55,12 +55,12 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
         using var entry = snapshotWriter.BeginEntry();
         _codec.WriteSnapshot(_items, entry.Writer);
@@ -121,21 +121,21 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     protected bool ApplyAdd(T item) => _items.Add(item);
     protected bool ApplyRemove(T item) => _items.Remove(item);
     protected void ApplyClear() => _items.Clear();
-    void IDurableSetLogEntryConsumer<T>.ApplyAdd(T item) => ApplyAdd(item);
-    void IDurableSetLogEntryConsumer<T>.ApplyRemove(T item) => ApplyRemove(item);
-    void IDurableSetLogEntryConsumer<T>.ApplyClear() => ApplyClear();
-    void IDurableSetLogEntryConsumer<T>.ApplySnapshotStart(int count)
+    void IDurableSetOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
+    void IDurableSetOperationHandler<T>.ApplyRemove(T item) => ApplyRemove(item);
+    void IDurableSetOperationHandler<T>.ApplyClear() => ApplyClear();
+    void IDurableSetOperationHandler<T>.ApplySnapshotStart(int count)
     {
         ApplyClear();
         _items.EnsureCapacity(count);
     }
 
-    void IDurableSetLogEntryConsumer<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
+    void IDurableSetOperationHandler<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
 
-    private IStateMachineLogWriter GetStorage()
+    private ILogWriter GetStorage()
     {
         Debug.Assert(_storage is not null);
         return _storage;

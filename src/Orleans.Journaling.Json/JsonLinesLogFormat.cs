@@ -5,7 +5,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Json;
 
-internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
+internal sealed class JsonLinesLogFormat : ILogFormat
 {
     private static readonly byte[] Bom = [0xEF, 0xBB, 0xBF];
     private static ReadOnlySpan<byte> EntryPrefixStart => "{\"streamId\":"u8;
@@ -18,20 +18,20 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
     private const string StreamIdPropertyName = "streamId";
     private const string EntryPropertyName = "entry";
 
-    public IStateMachineLogExtentWriter CreateWriter() => new JsonLinesLogExtentWriter();
+    public ILogSegmentWriter CreateWriter() => new JsonLinesLogSegmentWriter();
 
-    public void Read(ArcBuffer input, IStateMachineLogEntryConsumer consumer)
+    public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
-        ReadEntries(input.AsReadOnlySequence(), consumer);
+        return ReadEntries(input.AsReadOnlySequence(), consumer, isCompleted);
     }
 
-    private static void ReadEntries(ReadOnlySequence<byte> input, IStateMachineLogEntryConsumer consumer)
+    private static LogFormatReadResult ReadEntries(ReadOnlySequence<byte> input, ILogEntrySink consumer, bool isCompleted)
     {
         if (StartsWithBom(input))
         {
-            throw new InvalidOperationException("Malformed JSON Lines log extent: UTF-8 byte order marks are not supported.");
+            throw new InvalidOperationException("Malformed JSON Lines log segment: UTF-8 byte order marks are not supported.");
         }
 
         var remaining = input;
@@ -41,8 +41,12 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
             var reader = new SequenceReader<byte>(remaining);
             if (!reader.TryReadTo(out ReadOnlySequence<byte> line, LineFeed, advancePastDelimiter: true))
             {
-                line = remaining;
-                reader.Advance(remaining.Length);
+                if (!isCompleted)
+                {
+                    return new(checked((int)offset), remaining.Length > int.MaxValue - 1 ? null : checked((int)remaining.Length + 1));
+                }
+
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: log entries must end with a newline.");
             }
 
             var consumed = reader.Consumed;
@@ -53,7 +57,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
 
             if (IsBlankLine(line))
             {
-                throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: blank lines are not valid log entries.");
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: blank lines are not valid log entries.");
             }
 
             ReadLine(line, offset, consumer);
@@ -61,9 +65,11 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
             remaining = remaining.Slice(consumed);
             offset += consumed;
         }
+
+        return new(checked((int)offset));
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateMachineLogEntryConsumer consumer)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, ILogEntrySink consumer)
     {
         var reader = new Utf8JsonReader(line);
         var hasStreamId = false;
@@ -76,12 +82,12 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
         {
             if (!reader.Read())
             {
-                throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: blank lines are not valid log entries.");
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: blank lines are not valid log entries.");
             }
 
             if (reader.TokenType is not JsonTokenType.StartObject)
             {
-                throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: each line must be a JSON object.");
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must be a JSON object.");
             }
 
             while (reader.Read())
@@ -93,24 +99,24 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
 
                 if (reader.TokenType is not JsonTokenType.PropertyName)
                 {
-                    throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: expected a property name.");
+                    throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: expected a property name.");
                 }
 
                 if (reader.ValueTextEquals(StreamIdPropertyNameUtf8))
                 {
                     if (hasStreamId)
                     {
-                        throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: duplicate property '{StreamIdPropertyName}'.");
+                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: duplicate property '{StreamIdPropertyName}'.");
                     }
 
                     if (!reader.Read())
                     {
-                        throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: missing value for property '{StreamIdPropertyName}'.");
+                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing value for property '{StreamIdPropertyName}'.");
                     }
 
                     if (reader.TokenType is not JsonTokenType.Number || !reader.TryGetUInt64(out streamId))
                     {
-                        throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: property '{StreamIdPropertyName}' must be an unsigned integer.");
+                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property '{StreamIdPropertyName}' must be an unsigned integer.");
                     }
 
                     hasStreamId = true;
@@ -119,17 +125,17 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
                 {
                     if (hasEntry)
                     {
-                        throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: duplicate property '{EntryPropertyName}'.");
+                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: duplicate property '{EntryPropertyName}'.");
                     }
 
                     if (!reader.Read())
                     {
-                        throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: missing value for property '{EntryPropertyName}'.");
+                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing value for property '{EntryPropertyName}'.");
                     }
 
                     if (reader.TokenType is not JsonTokenType.StartObject)
                     {
-                        throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: property '{EntryPropertyName}' must be a JSON object.");
+                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property '{EntryPropertyName}' must be a JSON object.");
                     }
 
                     entryStart = reader.TokenStartIndex;
@@ -140,33 +146,33 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
                 else
                 {
                     var propertyName = reader.GetString();
-                    throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: unexpected property '{propertyName}'.");
+                    throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: unexpected property '{propertyName}'.");
                 }
             }
 
             if (reader.TokenType is not JsonTokenType.EndObject)
             {
-                throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: each line must contain one complete JSON object.");
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must contain one complete JSON object.");
             }
 
             if (!hasStreamId)
             {
-                throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: missing required property '{StreamIdPropertyName}'.");
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing required property '{StreamIdPropertyName}'.");
             }
 
             if (!hasEntry)
             {
-                throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: missing required property '{EntryPropertyName}'.");
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing required property '{EntryPropertyName}'.");
             }
 
             if (reader.Read())
             {
-                throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: trailing JSON content after the log entry object.");
+                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: trailing JSON content after the log entry object.");
             }
         }
         catch (JsonException exception)
         {
-            throw new InvalidOperationException($"Malformed JSON Lines log extent at byte offset {offset}: invalid JSON log entry.", exception);
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: invalid JSON log entry.", exception);
         }
 
         consumer.OnEntry(new(streamId), line.Slice(entryStart, entryLength));
@@ -209,7 +215,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
         return true;
     }
 
-    private sealed class JsonLinesLogExtentWriter : StateMachineLogExtentWriterBase
+    private sealed class JsonLinesLogSegmentWriter : LogSegmentWriterBase
     {
         private readonly ArcBufferWriter _buffer = new();
         private int _activePayloadStart;
@@ -220,7 +226,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
         {
             if (IsEntryActive)
             {
-                throw new InvalidOperationException("The JSON Lines log extent has an active entry.");
+                throw new InvalidOperationException("The JSON Lines log segment has an active entry.");
             }
 
             return _buffer.PeekSlice(_buffer.Length);
@@ -230,7 +236,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
         {
             if (IsEntryActive)
             {
-                throw new InvalidOperationException("The JSON Lines log extent cannot be reset while an entry is active.");
+                throw new InvalidOperationException("The JSON Lines log segment cannot be reset while an entry is active.");
             }
 
             _activePayloadStart = 0;
@@ -239,7 +245,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
 
         public override void Dispose() => _buffer.Dispose();
 
-        protected override int GetEntryStart(StateMachineId streamId)
+        protected override int GetEntryStart(LogStreamId streamId)
         {
             var entryStart = _buffer.Length;
             _buffer.Write(EntryPrefixStart);
@@ -247,7 +253,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
             Span<byte> streamIdBytes = stackalloc byte[20];
             if (!Utf8Formatter.TryFormat(streamId.Value, streamIdBytes, out var bytesWritten))
             {
-                throw new InvalidOperationException("The JSON Lines log extent could not format the state-machine id.");
+                throw new InvalidOperationException("The JSON Lines log segment could not format the state-machine id.");
             }
 
             _buffer.Write(streamIdBytes[..bytesWritten]);
@@ -266,7 +272,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
 
         protected override void WritePayload(ReadOnlySequence<byte> value) => _buffer.Write(value);
 
-        protected override void CommitEntry(StateMachineId streamId, int entryStart)
+        protected override void CommitEntry(LogStreamId streamId, int entryStart)
         {
             if (_buffer.Length == _activePayloadStart)
             {
@@ -277,7 +283,7 @@ internal sealed class JsonLinesLogFormat : IStateMachineLogFormat
             _activePayloadStart = 0;
         }
 
-        protected override void AbortEntry(StateMachineId streamId, int entryStart)
+        protected override void AbortEntry(LogStreamId streamId, int entryStart)
         {
             _activePayloadStart = 0;
             _buffer.Truncate(entryStart);

@@ -8,11 +8,11 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling.Json
 {
-    public sealed partial class JsonDictionaryEntryCodec<TKey, TValue> : IDurableDictionaryCodec<TKey, TValue>
+    public sealed partial class JsonDictionaryOperationCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue>
     {
-        public JsonDictionaryEntryCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonDictionaryOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -37,11 +37,11 @@ namespace Orleans.Journaling.Json
         public JsonJournalingOptions AddTypeInfoResolver(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
     }
 
-    public sealed partial class JsonListEntryCodec<T> : IDurableListCodec<T>
+    public sealed partial class JsonListOperationCodec<T> : IDurableListOperationCodec<T>
     {
-        public JsonListEntryCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonListOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
 
@@ -56,11 +56,11 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class JsonQueueEntryCodec<T> : IDurableQueueCodec<T>
+    public sealed partial class JsonQueueOperationCodec<T> : IDurableQueueOperationCodec<T>
     {
-        public JsonQueueEntryCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonQueueOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -71,11 +71,11 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class JsonSetEntryCodec<T> : IDurableSetCodec<T>
+    public sealed partial class JsonSetOperationCodec<T> : IDurableSetOperationCodec<T>
     {
-        public JsonSetEntryCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonSetOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
 
@@ -86,22 +86,22 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class JsonStateEntryCodec<T> : IDurableStateCodec<T>
+    public sealed partial class JsonStateOperationCodec<T> : IDurableStateOperationCodec<T>
     {
-        public JsonStateEntryCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonStateOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
         public void WriteSet(T state, ulong version, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class JsonTcsEntryCodec<T> : IDurableTaskCompletionSourceCodec<T>
+    public sealed partial class JsonTcsOperationCodec<T> : IDurableTaskCompletionSourceOperationCodec<T>
     {
-        public JsonTcsEntryCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonTcsOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer) { }
 
         public void WriteCanceled(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -112,11 +112,11 @@ namespace Orleans.Journaling.Json
         public void WritePending(System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class JsonValueEntryCodec<T> : IDurableValueCodec<T>
+    public sealed partial class JsonValueOperationCodec<T> : IDurableValueOperationCodec<T>
     {
-        public JsonValueEntryCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonValueOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) { }
 
         public void WriteSet(T value, System.Buffers.IBufferWriter<byte> output) { }
     }

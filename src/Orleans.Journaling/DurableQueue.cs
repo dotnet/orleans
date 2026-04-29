@@ -20,20 +20,20 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, IDurableQueueLogEntryConsumer<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, IDurableQueueOperationHandler<T>
 {
-    private readonly IDurableQueueCodec<T> _codec;
+    private readonly IDurableQueueOperationCodec<T> _codec;
     private readonly Queue<T> _items = new();
-    private IStateMachineLogWriter? _storage;
+    private ILogWriter? _storage;
 
-    public DurableQueue([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
+    public DurableQueue([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableQueueCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableQueue(string key, IStateMachineManager manager, IDurableQueueCodec<T> codec)
+    internal DurableQueue(string key, ILogManager manager, IDurableQueueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -42,7 +42,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     public int Count => _items.Count;
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage)
+    void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -53,12 +53,12 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
         using var entry = snapshotWriter.BeginEntry();
         _codec.WriteSnapshot(_items, entry.Writer);
@@ -120,21 +120,21 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     protected T ApplyDequeue() => _items.Dequeue();
     protected bool ApplyTryDequeue([MaybeNullWhen(false)] out T value) => _items.TryDequeue(out value);
     protected void ApplyClear() => _items.Clear();
-    void IDurableQueueLogEntryConsumer<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
-    void IDurableQueueLogEntryConsumer<T>.ApplyDequeue() => _ = ApplyDequeue();
-    void IDurableQueueLogEntryConsumer<T>.ApplyClear() => ApplyClear();
-    void IDurableQueueLogEntryConsumer<T>.ApplySnapshotStart(int count)
+    void IDurableQueueOperationHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
+    void IDurableQueueOperationHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
+    void IDurableQueueOperationHandler<T>.ApplyClear() => ApplyClear();
+    void IDurableQueueOperationHandler<T>.ApplySnapshotStart(int count)
     {
         ApplyClear();
         _items.EnsureCapacity(count);
     }
 
-    void IDurableQueueLogEntryConsumer<T>.ApplySnapshotItem(T item) => ApplyEnqueue(item);
+    void IDurableQueueOperationHandler<T>.ApplySnapshotItem(T item) => ApplyEnqueue(item);
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
 
-    private IStateMachineLogWriter GetStorage()
+    private ILogWriter GetStorage()
     {
         Debug.Assert(_storage is not null);
         return _storage;
