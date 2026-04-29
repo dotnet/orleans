@@ -1,4 +1,3 @@
-using System;
 using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
@@ -13,5 +12,5 @@ public static class UnhandledCodeGenerationExceptionDiagnostic
 
     internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true, description: Description);
 
-    internal static Diagnostic CreateDiagnostic(Exception exception) => Diagnostic.Create(Rule, location: null, messageArgs: new[] { exception.ToString(), exception.StackTrace });
+    internal static Diagnostic CreateDiagnostic(Exception exception) => Diagnostic.Create(Rule, location: null, messageArgs: [exception.ToString(), exception.StackTrace]);
 }

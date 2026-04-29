@@ -1,179 +1,171 @@
 using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis;
-using System;
-using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Collections.Immutable;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using Microsoft.CodeAnalysis.CSharp;
 
-#nullable disable
-namespace Orleans.CodeGenerator
+namespace Orleans.CodeGenerator;
+
+/// <summary>
+/// Describes an invokable method on a proxy interface.
+/// </summary>
+[DebuggerDisplay("{Method} (from {ProxyInterface})")]
+internal class ProxyMethodDescription : IEquatable<ProxyMethodDescription>
 {
-    /// <summary>
-    /// Describes an invokable method on a proxy interface.
-    /// </summary>
-    [DebuggerDisplay("{Method} (from {ProxyInterface})")]
-    internal class ProxyMethodDescription : IEquatable<ProxyMethodDescription>
+    private readonly GeneratedInvokableDescription _originalInvokable;
+    public static ProxyMethodDescription Create(
+        ProxyInterfaceDescription proxyInterface,
+        GeneratedInvokableDescription generatedInvokable,
+        IMethodSymbol method)
+        => new(proxyInterface, generatedInvokable, method);
+
+    private ProxyMethodDescription(ProxyInterfaceDescription proxyInterface, GeneratedInvokableDescription generatedInvokable, IMethodSymbol method)
     {
-        private readonly GeneratedInvokableDescription _originalInvokable;
-        public static ProxyMethodDescription Create(
-            ProxyInterfaceDescription proxyInterface,
-            GeneratedInvokableDescription generatedInvokable,
-            IMethodSymbol method)
-            => new(proxyInterface, generatedInvokable, method);
+        _originalInvokable = generatedInvokable;
+        Method = method;
+        ProxyInterface = proxyInterface;
 
-        private ProxyMethodDescription(ProxyInterfaceDescription proxyInterface, GeneratedInvokableDescription generatedInvokable, IMethodSymbol method)
+        TypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
+        MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
+
+        TypeParametersWithArguments = [.. Method.ContainingType.GetAllTypeParameters().Zip(method.ContainingType.GetAllTypeArguments(), (a, b) => (a, b))];
+        var names = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var (typeParameter, typeArgument) in TypeParametersWithArguments)
         {
-            _originalInvokable = generatedInvokable;
-            Method = method;
-            ProxyInterface = proxyInterface;
+            var tpName = GetTypeParameterName(names, typeParameter);
+            TypeParameters.Add((tpName, typeParameter));
+        }
 
-            TypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
-            MethodTypeParameters = new List<(string Name, ITypeParameterSymbol Parameter)>();
+        foreach (var typeParameter in Method.TypeParameters)
+        {
+            var tpName = GetTypeParameterName(names, typeParameter);
+            TypeParameters.Add((tpName, typeParameter));
+            MethodTypeParameters.Add((tpName, typeParameter));
+        }
 
-            TypeParametersWithArguments = Method.ContainingType.GetAllTypeParameters().Zip(method.ContainingType.GetAllTypeArguments(), (a, b) => (a, b)).ToImmutableArray();
-            var names = new HashSet<string>(StringComparer.Ordinal);
-            foreach (var (typeParameter, typeArgument) in TypeParametersWithArguments)
+        TypeParameterSubstitutions = new(SymbolEqualityComparer.Default);
+        foreach (var (name, parameter) in TypeParameters)
+        {
+            TypeParameterSubstitutions[parameter] = name;
+        }
+
+        foreach (var (parameter, arg) in TypeParametersWithArguments)
+        {
+            TypeParameterSubstitutions[parameter] = arg.ToDisplayName();
+        }
+
+        GeneratedInvokable = new ConstructedGeneratedInvokableDescription(generatedInvokable, this);
+        static string GetTypeParameterName(HashSet<string> names, ITypeParameterSymbol typeParameter)
+        {
+            var count = 0;
+            var result = typeParameter.Name;
+            while (names.Contains(result))
             {
-                var tpName = GetTypeParameterName(names, typeParameter);
-                TypeParameters.Add((tpName, typeParameter));
+                result = $"{typeParameter.Name}_{++count}";
             }
 
-            foreach (var typeParameter in Method.TypeParameters)
-            {
-                var tpName = GetTypeParameterName(names, typeParameter);
-                TypeParameters.Add((tpName, typeParameter));
-                MethodTypeParameters.Add((tpName, typeParameter));
-            }
+            names.Add(result);
+            return result.EscapeIdentifier();
+        }
+    }
 
-            TypeParameterSubstitutions = new(SymbolEqualityComparer.Default);
-            foreach (var (name, parameter) in TypeParameters)
-            {
-                TypeParameterSubstitutions[parameter] = name;
-            }
+    public ProxyGenerationContext GenerationContext => InvokableMethod.GenerationContext;
+    public InvokableMethodDescription InvokableMethod => _originalInvokable.MethodDescription;
+    public ConstructedGeneratedInvokableDescription GeneratedInvokable { get; }
+    public ProxyInterfaceDescription ProxyInterface { get; }
 
-            foreach (var (parameter, arg) in TypeParametersWithArguments)
-            {
-                TypeParameterSubstitutions[parameter] = arg.ToDisplayName();
-            }
+    public IMethodSymbol Method { get; }
+    public InvokableMethodId InvokableId { get; }
+    public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
+    public List<(string Name, ITypeParameterSymbol Parameter)> MethodTypeParameters { get; }
+    public ImmutableArray<(ITypeParameterSymbol Parameter, ITypeSymbol Argument)> TypeParametersWithArguments { get; }
+    public Dictionary<ITypeParameterSymbol, string> TypeParameterSubstitutions { get; }
 
-            GeneratedInvokable = new ConstructedGeneratedInvokableDescription(generatedInvokable, this);
-            static string GetTypeParameterName(HashSet<string> names, ITypeParameterSymbol typeParameter)
-            {
-                var count = 0;
-                var result = typeParameter.Name;
-                while (names.Contains(result))
-                {
-                    result = $"{typeParameter.Name}_{++count}";
-                }
+    /// <summary>
+    /// Mapping of method return types to invokable base type. The code generator will create a derived type with the method arguments as fields.
+    /// </summary>
+    public IReadOnlyDictionary<INamedTypeSymbol, INamedTypeSymbol> InvokableBaseTypes => InvokableMethod.InvokableBaseTypes;
+    public InvokableMethodId InvokableKey => InvokableMethod.Key;
+    public List<(string, TypedConstant)> CustomInitializerMethods => InvokableMethod.CustomInitializerMethods;
+    public string GeneratedMethodId => InvokableMethod.GeneratedMethodId;
+    public string MethodId => InvokableMethod.MethodId;
+    public bool HasAlias => InvokableMethod.HasAlias;
+    public long? ResponseTimeoutTicks => InvokableMethod.ResponseTimeoutTicks;
 
-                names.Add(result);
-                return result.EscapeIdentifier();
+    public override int GetHashCode() => ProxyInterface.GetHashCode() * 17 ^ InvokableMethod.GetHashCode();
+    public bool Equals(ProxyMethodDescription other) => other is not null && InvokableMethod.Key.Equals(other.InvokableKey) && ProxyInterface.Equals(other.ProxyInterface);
+    public override bool Equals(object other) => other is ProxyMethodDescription imd && Equals(imd);
+
+    internal sealed class ConstructedGeneratedInvokableDescription : ISerializableTypeDescription
+    {
+        private readonly GeneratedInvokableDescription _invokableDescription;
+        private readonly ProxyMethodDescription _proxyMethod;
+
+        public ConstructedGeneratedInvokableDescription(GeneratedInvokableDescription invokableDescription, ProxyMethodDescription proxyMethod)
+        {
+            _invokableDescription = invokableDescription;
+            _proxyMethod = proxyMethod;
+            Members = new List<IMemberDescription>(invokableDescription.Members.Count);
+            var proxyMethodParameters = proxyMethod.Method.Parameters;
+            foreach (var member in invokableDescription.Members.OfType<InvokableGenerator.MethodParameterFieldDescription>())
+            {
+                Members.Add(new InvokableGenerator.MethodParameterFieldDescription(
+                    member.LibraryTypes,
+                    proxyMethodParameters[member.ParameterOrdinal],
+                    member.FieldName,
+                    member.FieldId,
+                    proxyMethod.TypeParameterSubstitutions,
+                    member.IsSerializable));
             }
         }
 
-        public ProxyGenerationContext GenerationContext => InvokableMethod.GenerationContext;
-        public InvokableMethodDescription InvokableMethod => _originalInvokable.MethodDescription;
-        public ConstructedGeneratedInvokableDescription GeneratedInvokable { get; }
-        public ProxyInterfaceDescription ProxyInterface { get; }
+        public Accessibility Accessibility => _invokableDescription.Accessibility;
+        public TypeSyntax TypeSyntax => field ??= CreateTypeSyntax();
+        public TypeSyntax OpenTypeSyntax => _invokableDescription.OpenTypeSyntax;
+        public bool HasComplexBaseType => BaseType is { SpecialType: not SpecialType.System_Object };
+        public bool IncludePrimaryConstructorParameters => false;
+        public INamedTypeSymbol BaseType => _invokableDescription.BaseType;
+        public TypeSyntax BaseTypeSyntax => field ??= BaseType.ToTypeSyntax(_proxyMethod.TypeParameterSubstitutions);
+        public string Namespace => GeneratedNamespace;
+        public string GeneratedNamespace => _invokableDescription.GeneratedNamespace;
+        public string Name => _invokableDescription.Name;
+        public bool IsValueType => _invokableDescription.IsValueType;
+        public bool IsSealedType => _invokableDescription.IsSealedType;
+        public bool IsAbstractType => _invokableDescription.IsAbstractType;
+        public bool IsEnumType => _invokableDescription.IsEnumType;
+        public bool IsGenericType => TypeParameters.Count > 0;
+        public List<IMemberDescription> Members { get; }
+        public Compilation Compilation => MethodDescription.GenerationContext.Compilation;
+        public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
+        public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
+        public bool TrackReferences => _invokableDescription.TrackReferences;
+        public bool OmitDefaultMemberValues => _invokableDescription.OmitDefaultMemberValues;
+        public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters => _proxyMethod.TypeParameters;
+        public List<INamedTypeSymbol> SerializationHooks => _invokableDescription.SerializationHooks;
+        public bool IsShallowCopyable => _invokableDescription.IsShallowCopyable;
+        public bool IsUnsealedImmutable => _invokableDescription.IsUnsealedImmutable;
+        public bool IsImmutable => _invokableDescription.IsImmutable;
+        public bool IsExceptionType => _invokableDescription.IsExceptionType;
+        public List<TypeSyntax> ActivatorConstructorParameters => _invokableDescription.ActivatorConstructorParameters;
+        public bool HasActivatorConstructor => UseActivator;
+        public string? ReturnValueInitializerMethod => _invokableDescription.ReturnValueInitializerMethod;
 
-        public IMethodSymbol Method { get; }
-        public InvokableMethodId InvokableId { get; }
-        public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters { get; }
-        public List<(string Name, ITypeParameterSymbol Parameter)> MethodTypeParameters { get; }
-        public ImmutableArray<(ITypeParameterSymbol Parameter, ITypeSymbol Argument)> TypeParametersWithArguments { get; }
-        public Dictionary<ITypeParameterSymbol, string> TypeParameterSubstitutions { get; }
+        public InvokableMethodDescription MethodDescription => _invokableDescription.MethodDescription;
 
-        /// <summary>
-        /// Mapping of method return types to invokable base type. The code generator will create a derived type with the method arguments as fields.
-        /// </summary>
-        public IReadOnlyDictionary<INamedTypeSymbol, INamedTypeSymbol> InvokableBaseTypes => InvokableMethod.InvokableBaseTypes;
-        public InvokableMethodId InvokableKey => InvokableMethod.Key;
-        public List<(string, TypedConstant)> CustomInitializerMethods => InvokableMethod.CustomInitializerMethods;
-        public string GeneratedMethodId => InvokableMethod.GeneratedMethodId;
-        public string MethodId => InvokableMethod.MethodId;
-        public bool HasAlias => InvokableMethod.HasAlias;
-        public long? ResponseTimeoutTicks => InvokableMethod.ResponseTimeoutTicks;
+        public ExpressionSyntax GetObjectCreationExpression() => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);
 
-        public override int GetHashCode() => ProxyInterface.GetHashCode() * 17 ^ InvokableMethod.GetHashCode();
-        public bool Equals(ProxyMethodDescription other) => other is not null && InvokableMethod.Key.Equals(other.InvokableKey) && ProxyInterface.Equals(other.ProxyInterface);
-        public override bool Equals(object other) => other is ProxyMethodDescription imd && Equals(imd);
-
-        internal sealed class ConstructedGeneratedInvokableDescription : ISerializableTypeDescription
+        private TypeSyntax CreateTypeSyntax()
         {
-            private TypeSyntax _typeSyntax;
-            private TypeSyntax _baseTypeSyntax;
-            private readonly GeneratedInvokableDescription _invokableDescription;
-            private readonly ProxyMethodDescription _proxyMethod;
-
-            public ConstructedGeneratedInvokableDescription(GeneratedInvokableDescription invokableDescription, ProxyMethodDescription proxyMethod)
+            var simpleName = InvokableGenerator.GetSimpleClassName(MethodDescription);
+            var subs = _proxyMethod.TypeParameterSubstitutions;
+            return (TypeParameters, Namespace) switch
             {
-                _invokableDescription = invokableDescription;
-                _proxyMethod = proxyMethod;
-                Members = new List<IMemberDescription>(invokableDescription.Members.Count);
-                var proxyMethodParameters = proxyMethod.Method.Parameters;
-                foreach (var member in invokableDescription.Members.OfType<InvokableGenerator.MethodParameterFieldDescription>())
-                {
-                    Members.Add(new InvokableGenerator.MethodParameterFieldDescription(
-                        member.LibraryTypes,
-                        proxyMethodParameters[member.ParameterOrdinal],
-                        member.FieldName,
-                        member.FieldId,
-                        proxyMethod.TypeParameterSubstitutions,
-                        member.IsSerializable));
-                }
-            }
-
-            public Accessibility Accessibility => _invokableDescription.Accessibility;
-            public TypeSyntax TypeSyntax => _typeSyntax ??= CreateTypeSyntax();
-            public TypeSyntax OpenTypeSyntax => _invokableDescription.OpenTypeSyntax;
-            public bool HasComplexBaseType => BaseType is { SpecialType: not SpecialType.System_Object };
-            public bool IncludePrimaryConstructorParameters => false;
-            public INamedTypeSymbol BaseType => _invokableDescription.BaseType;
-            public TypeSyntax BaseTypeSyntax => _baseTypeSyntax ??= BaseType.ToTypeSyntax(_proxyMethod.TypeParameterSubstitutions);
-            public string Namespace => GeneratedNamespace;
-            public string GeneratedNamespace => _invokableDescription.GeneratedNamespace;
-            public string Name => _invokableDescription.Name;
-            public bool IsValueType => _invokableDescription.IsValueType;
-            public bool IsSealedType => _invokableDescription.IsSealedType;
-            public bool IsAbstractType => _invokableDescription.IsAbstractType;
-            public bool IsEnumType => _invokableDescription.IsEnumType;
-            public bool IsGenericType => TypeParameters.Count > 0;
-            public List<IMemberDescription> Members { get; }
-            public Compilation Compilation => MethodDescription.GenerationContext.Compilation;
-            public bool IsEmptyConstructable => ActivatorConstructorParameters is not { Count: > 0 };
-            public bool UseActivator => ActivatorConstructorParameters is { Count: > 0 };
-            public bool TrackReferences => _invokableDescription.TrackReferences;
-            public bool OmitDefaultMemberValues => _invokableDescription.OmitDefaultMemberValues;
-            public List<(string Name, ITypeParameterSymbol Parameter)> TypeParameters => _proxyMethod.TypeParameters;
-            public List<INamedTypeSymbol> SerializationHooks => _invokableDescription.SerializationHooks;
-            public bool IsShallowCopyable => _invokableDescription.IsShallowCopyable;
-            public bool IsUnsealedImmutable => _invokableDescription.IsUnsealedImmutable;
-            public bool IsImmutable => _invokableDescription.IsImmutable;
-            public bool IsExceptionType => _invokableDescription.IsExceptionType;
-            public List<TypeSyntax> ActivatorConstructorParameters => _invokableDescription.ActivatorConstructorParameters;
-            public bool HasActivatorConstructor => UseActivator;
-            public string ReturnValueInitializerMethod => _invokableDescription.ReturnValueInitializerMethod;
-
-            public InvokableMethodDescription MethodDescription => _invokableDescription.MethodDescription;
-
-            public ExpressionSyntax GetObjectCreationExpression() => ObjectCreationExpression(TypeSyntax, ArgumentList(), null);
-
-            private TypeSyntax CreateTypeSyntax()
-            {
-                var simpleName = InvokableGenerator.GetSimpleClassName(MethodDescription);
-                var subs = _proxyMethod.TypeParameterSubstitutions;
-                return (TypeParameters, Namespace) switch
-                {
-                    ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(subs[p.Parameter])))))),
-                    ({ Count: > 0 }, _) => GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(subs[p.Parameter]))))),
-                    (_, { Length: > 0 }) => QualifiedName(ParseName(Namespace), IdentifierName(simpleName)),
-                    _ => IdentifierName(simpleName),
-                };
-            }
+                ({ Count: > 0 }, { Length: > 0 }) => QualifiedName(ParseName(Namespace), GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(subs[p.Parameter])))))),
+                ({ Count: > 0 }, _) => GenericName(Identifier(simpleName), TypeArgumentList(SeparatedList<TypeSyntax>(TypeParameters.Select(p => IdentifierName(subs[p.Parameter]))))),
+                (_, { Length: > 0 }) => QualifiedName(ParseName(Namespace), IdentifierName(simpleName)),
+                _ => IdentifierName(simpleName),
+            };
         }
     }
 }

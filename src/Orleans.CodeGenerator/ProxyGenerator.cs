@@ -1,6 +1,3 @@
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
@@ -11,423 +8,350 @@ using static Orleans.CodeGenerator.CopierGenerator;
 using static Orleans.CodeGenerator.InvokableGenerator;
 using static Orleans.CodeGenerator.SerializerGenerator;
 
-#nullable disable
-namespace Orleans.CodeGenerator
+namespace Orleans.CodeGenerator;
+
+/// <summary>
+/// Generates RPC stub objects called invokers.
+/// </summary>
+internal class ProxyGenerator(IGeneratorServices generatorServices, CopierGenerator copierGenerator)
 {
-    /// <summary>
-    /// Generates RPC stub objects called invokers.
-    /// </summary>
-    internal class ProxyGenerator
+    private const string CopyContextPoolMemberName = "CopyContextPool";
+    private const string CodecProviderMemberName = "CodecProvider";
+    private readonly IGeneratorServices _generatorServices = generatorServices;
+    private readonly CopierGenerator _copierGenerator = copierGenerator;
+
+    private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
+
+    public (ClassDeclarationSyntax, GeneratedProxyDescription) Generate(ProxyInterfaceDescription interfaceDescription)
     {
-        private const string CopyContextPoolMemberName = "CopyContextPool";
-        private const string CodecProviderMemberName = "CodecProvider";
-        private readonly IGeneratorServices _generatorServices;
-        private readonly CopierGenerator _copierGenerator;
+        var generatedClassName = GetSimpleClassName(interfaceDescription);
 
-        public ProxyGenerator(IGeneratorServices generatorServices, CopierGenerator copierGenerator)
+        var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
+        var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
+        var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
+
+        var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+
+        var classDeclaration = ClassDeclaration(generatedClassName)
+            .AddBaseListTypes(
+                SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
+                SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
+            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
+            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
+            .AddMembers(fieldDeclarations)
+            .AddMembers(ctors)
+            .AddMembers(proxyMethods);
+
+        var typeParameters = interfaceDescription.TypeParameters;
+        if (typeParameters.Count > 0)
         {
-            _generatorServices = generatorServices;
-            _copierGenerator = copierGenerator;
+            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, typeParameters);
         }
 
-        private LibraryTypes LibraryTypes => _generatorServices.LibraryTypes;
+        return (classDeclaration, new GeneratedProxyDescription(interfaceDescription, generatedClassName));
+    }
 
-        public (ClassDeclarationSyntax, GeneratedProxyDescription) Generate(ProxyInterfaceDescription interfaceDescription)
+    public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
+        => GetSimpleClassName(interfaceDescription.Name);
+
+    public static string GetSimpleClassName(string name)
+        => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
+
+    private List<GeneratedFieldDescription> GetFieldDescriptions(
+        ProxyInterfaceDescription interfaceDescription)
+    {
+        var fields = new List<GeneratedFieldDescription>();
+
+        // Add a copier field for any method parameter which does not have a static codec.
+        var paramCopiers = interfaceDescription.Methods
+            .Where(method => method.MethodTypeParameters.Count == 0)
+            .SelectMany(method => method.GeneratedInvokable.Members);
+        _copierGenerator.GetCopierFieldDescriptions(paramCopiers, fields);
+        return fields;
+    }
+
+    private static MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
+    {
+        return [.. fieldDescriptions.Select(GetFieldDeclaration)];
+
+        static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
         {
-            var generatedClassName = GetSimpleClassName(interfaceDescription);
+            return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+        }
+    }
 
-            var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
-            var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-            var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
+    private MemberDeclarationSyntax[] CreateProxyMethods(
+        List<GeneratedFieldDescription> fieldDescriptions,
+        ProxyInterfaceDescription interfaceDescription)
+    {
+        var res = new List<MemberDeclarationSyntax>();
+        foreach (var methodDescription in interfaceDescription.Methods)
+        {
+            res.Add(CreateProxyMethod(methodDescription));
+        }
+        return [.. res];
 
-            var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+        MethodDeclarationSyntax CreateProxyMethod(ProxyMethodDescription methodDescription)
+        {
+            var (isAsync, body) = CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription);
+            var method = methodDescription.Method;
+            var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
+                .AddParameterListParameters([.. method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions))])
+                .WithBody(body);
 
-            var classDeclaration = ClassDeclaration(generatedClassName)
-                .AddBaseListTypes(
-                    SimpleBaseType(interfaceDescription.ProxyBaseType.ToTypeSyntax()),
-                    SimpleBaseType(interfaceDescription.InterfaceType.ToTypeSyntax()))
-                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-                .AddMembers(fieldDeclarations)
-                .AddMembers(ctors)
-                .AddMembers(proxyMethods);
-
-            var typeParameters = interfaceDescription.TypeParameters;
-            if (typeParameters.Count > 0)
+            if (isAsync)
             {
-                classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, typeParameters);
+                declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.AsyncKeyword)));
             }
 
-            return (classDeclaration, new GeneratedProxyDescription(interfaceDescription, generatedClassName));
-        }
+            var explicitInterfaceSpecifier = ExplicitInterfaceSpecifier(methodDescription.Method.ContainingType.ToNameSyntax());
+            declaration = declaration.WithExplicitInterfaceSpecifier(explicitInterfaceSpecifier);
 
-        public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
-            => GetSimpleClassName(interfaceDescription.Name);
-
-        public static string GetSimpleClassName(string name)
-            => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(name)}";
-        
-        private List<GeneratedFieldDescription> GetFieldDescriptions(
-            ProxyInterfaceDescription interfaceDescription)
-        {
-            var fields = new List<GeneratedFieldDescription>();
-
-            // Add a copier field for any method parameter which does not have a static codec.
-            var paramCopiers = interfaceDescription.Methods
-                .Where(method => method.MethodTypeParameters.Count == 0)
-                .SelectMany(method => method.GeneratedInvokable.Members);
-            _copierGenerator.GetCopierFieldDescriptions(paramCopiers, fields);
-            return fields;
-        }
-
-        private MemberDeclarationSyntax[] GetFieldDeclarations(List<GeneratedFieldDescription> fieldDescriptions)
-        {
-            return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
-
-            static MemberDeclarationSyntax GetFieldDeclaration(GeneratedFieldDescription description)
+            if (methodDescription.MethodTypeParameters.Count > 0)
             {
-                return FieldDeclaration(VariableDeclaration(description.FieldType, SingletonSeparatedList(VariableDeclarator(description.FieldName))))
-                    .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                declaration = declaration.WithTypeParameterList(
+                    TypeParameterList(SeparatedList(methodDescription.MethodTypeParameters.Select(tp => TypeParameter(tp.Name)))));
             }
+
+            return declaration;
         }
+    }
 
-        private MemberDeclarationSyntax[] CreateProxyMethods(
-            List<GeneratedFieldDescription> fieldDescriptions,
-            ProxyInterfaceDescription interfaceDescription)
+    private (bool IsAsync, BlockSyntax body) CreateAsyncProxyMethodBody(
+        List<GeneratedFieldDescription> fieldDescriptions,
+        ProxyMethodDescription methodDescription)
+    {
+        var statements = new List<StatementSyntax>();
+        var requestVar = IdentifierName("request");
+        var methodSymbol = methodDescription.Method;
+        var invokable = methodDescription.GeneratedInvokable;
+        ExpressionSyntax createRequestExpr = (!invokable.IsEmptyConstructable || invokable.UseActivator) switch
         {
-            var res = new List<MemberDeclarationSyntax>();
-            foreach (var methodDescription in interfaceDescription.Methods)
-            {
-                res.Add(CreateProxyMethod(methodDescription));
-            }
-            return res.ToArray();
+            true => InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
+            .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())),
+            _ => ObjectCreationExpression(invokable.TypeSyntax).WithArgumentList(ArgumentList())
+        };
 
-            MethodDeclarationSyntax CreateProxyMethod(ProxyMethodDescription methodDescription)
-            {
-                var (isAsync, body) = CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription);
-                var method = methodDescription.Method;
-                var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
-                    .AddParameterListParameters(method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions)).ToArray())
-                    .WithBody(body);
+        statements.Add(
+            LocalDeclarationStatement(
+                VariableDeclaration(
+                    ParseTypeName("var"),
+                    SingletonSeparatedList(
+                        VariableDeclarator(
+                                Identifier("request"))
+                            .WithInitializer(
+                                EqualsValueClause(createRequestExpr))))));
 
-                if (isAsync)
-                {
-                    declaration = declaration.WithModifiers(TokenList(Token(SyntaxKind.AsyncKeyword)));
-                }
+        var codecs = fieldDescriptions.OfType<ICopierDescription>()
+                .Concat(_generatorServices.LibraryTypes.StaticCopiers)
+                .ToList();
 
-                var explicitInterfaceSpecifier = ExplicitInterfaceSpecifier(methodDescription.Method.ContainingType.ToNameSyntax());
-                declaration = declaration.WithExplicitInterfaceSpecifier(explicitInterfaceSpecifier);
-
-                if (methodDescription.MethodTypeParameters.Count > 0)
-                {
-                    declaration = declaration.WithTypeParameterList(
-                        TypeParameterList(SeparatedList(methodDescription.MethodTypeParameters.Select(tp => TypeParameter(tp.Name)))));
-                }
-
-                return declaration;
-            }
-        }
-
-        private (bool IsAsync, BlockSyntax body) CreateAsyncProxyMethodBody(
-            List<GeneratedFieldDescription> fieldDescriptions,
-            ProxyMethodDescription methodDescription)
+        // Set request object fields from method parameters.
+        var parameterIndex = 0;
+        var parameters = invokable.Members.OfType<MethodParameterFieldDescription>().Select(member => new SerializableMethodMember(member));
+        ExpressionSyntax copyContextPool = BaseExpression().Member(CopyContextPoolMemberName);
+        ExpressionSyntax copyContextVariable = IdentifierName("copyContext");
+        var hasCopyContext = false;
+        foreach (var parameter in parameters)
         {
-            var statements = new List<StatementSyntax>();
-            var requestVar = IdentifierName("request");
-            var methodSymbol = methodDescription.Method;
-            var invokable = methodDescription.GeneratedInvokable;
-            ExpressionSyntax createRequestExpr = (!invokable.IsEmptyConstructable || invokable.UseActivator) switch
+            // Only create a copy context as needed.
+            if (!hasCopyContext && !parameter.IsShallowCopyable)
             {
-                true => InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
-                .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())),
-                _ => ObjectCreationExpression(invokable.TypeSyntax).WithArgumentList(ArgumentList())
-            };
+                // C#: using var copyContext = base.CopyContext.GetContext();
+                statements.Add(
+                        LocalDeclarationStatement(
+                            VariableDeclaration(
+                                ParseTypeName("var"),
+                                SingletonSeparatedList(
+                                    VariableDeclarator(Identifier("copyContext")).WithInitializer(
+                                        EqualsValueClause(InvocationExpression(
+                                                copyContextPool.Member("GetContext"),
+                                                ArgumentList())))))).WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
+                hasCopyContext = true;
+            }
+
+            var valueExpression = _copierGenerator.GenerateMemberCopy(
+                fieldDescriptions,
+                IdentifierName($"arg{parameterIndex}"),
+                copyContextVariable,
+                codecs,
+                parameter);
 
             statements.Add(
-                LocalDeclarationStatement(
-                    VariableDeclaration(
-                        ParseTypeName("var"),
-                        SingletonSeparatedList(
-                            VariableDeclarator(
-                                    Identifier("request"))
-                                .WithInitializer(
-                                    EqualsValueClause(createRequestExpr))))));
+                ExpressionStatement(
+                    AssignmentExpression(
+                        SyntaxKind.SimpleAssignmentExpression,
+                        requestVar.Member($"arg{parameterIndex}"),
+                        valueExpression)));
 
-            var codecs = fieldDescriptions.OfType<ICopierDescription>()
-                    .Concat(_generatorServices.LibraryTypes.StaticCopiers)
-                    .ToList();
-
-            // Set request object fields from method parameters.
-            var parameterIndex = 0;
-            var parameters = invokable.Members.OfType<MethodParameterFieldDescription>().Select(member => new SerializableMethodMember(member));
-            ExpressionSyntax copyContextPool = BaseExpression().Member(CopyContextPoolMemberName);
-            ExpressionSyntax copyContextVariable = IdentifierName("copyContext");
-            var hasCopyContext = false;
-            foreach (var parameter in parameters)
-            {
-                // Only create a copy context as needed.
-                if (!hasCopyContext && !parameter.IsShallowCopyable)
-                {
-                    // C#: using var copyContext = base.CopyContext.GetContext();
-                    statements.Add(
-                            LocalDeclarationStatement(
-                                VariableDeclaration(
-                                    ParseTypeName("var"),
-                                    SingletonSeparatedList(
-                                        VariableDeclarator(Identifier("copyContext")).WithInitializer(
-                                            EqualsValueClause(InvocationExpression(
-                                                    copyContextPool.Member("GetContext"),
-                                                    ArgumentList())))))).WithUsingKeyword(Token(SyntaxKind.UsingKeyword)));
-                    hasCopyContext = true;
-                }
-
-                var valueExpression = _copierGenerator.GenerateMemberCopy(
-                    fieldDescriptions,
-                    IdentifierName($"arg{parameterIndex}"),
-                    copyContextVariable,
-                    codecs,
-                    parameter);
-
-                statements.Add(
-                    ExpressionStatement(
-                        AssignmentExpression(
-                            SyntaxKind.SimpleAssignmentExpression,
-                            requestVar.Member($"arg{parameterIndex}"),
-                            valueExpression)));
-
-                parameterIndex++;
-            }
-
-            string invokeMethodName = default;
-            foreach (var attr in methodDescription.Method.GetAttributes())
-            {
-                if (attr.AttributeClass.GetAttributes(LibraryTypes.InvokeMethodNameAttribute, out var attrs))
-                {
-                    foreach (var methodAttr in attrs)
-                    {
-                        invokeMethodName = (string)methodAttr.ConstructorArguments.First().Value;
-                    }
-                }
-            }
-
-            var methodReturnType = methodDescription.Method.ReturnType;
-            if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
-            {
-                var diagnostic = InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(methodDescription.InvokableMethod);
-                throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
-            }
-
-            ExpressionSyntax baseInvokeExpression;
-            var isVoid = methodReturnType.SpecialType is SpecialType.System_Void;
-            if (namedMethodReturnType.TypeArguments.Length == 1)
-            {
-                // Task<T> / ValueTask<T>
-                var resultType = namedMethodReturnType.TypeArguments[0];
-                baseInvokeExpression = BaseExpression().Member(
-                    invokeMethodName ?? "InvokeAsync",
-                    resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions));
-            }
-            else if (isVoid)
-            {
-                // void
-                baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "Invoke");
-            }
-            else
-            {
-                // Task / ValueTask
-                baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "InvokeAsync");
-            }
-
-            // C#: base.InvokeAsync<TReturn>(request);
-            var invocationExpression =
-                         InvocationExpression(
-                             baseInvokeExpression,
-                             ArgumentList(SeparatedList(new[] { Argument(requestVar) })));
-
-            var rt = namedMethodReturnType.ConstructedFrom;
-            bool isAsync;
-            if (SymbolEqualityComparer.Default.Equals(rt, LibraryTypes.Task_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, LibraryTypes.Task))
-            {
-                // C#: return <invocation>.AsTask()
-                statements.Add(ReturnStatement(InvocationExpression(invocationExpression.Member("AsTask"), ArgumentList())));
-                isAsync = false;
-            }
-            else if (SymbolEqualityComparer.Default.Equals(rt, LibraryTypes.ValueTask_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, LibraryTypes.ValueTask))
-            {
-                // ValueTask<T> / ValueTask
-                // C#: return <invocation>
-                statements.Add(ReturnStatement(invocationExpression));
-                isAsync = false;
-            }
-            else if (invokable.ReturnValueInitializerMethod is { } returnValueInitializerMethod)
-            {
-                // C#: return request.<returnValueInitializerMethod>(this);
-                statements.Add(ReturnStatement(InvocationExpression(requestVar.Member(returnValueInitializerMethod), ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
-                isAsync = false;
-            }
-            else if (isVoid)
-            {
-                // C#: <invocation>
-                statements.Add(ExpressionStatement(invocationExpression));
-                isAsync = false;
-            }
-            else if (rt.Arity == 0)
-            {
-                // C#: await <invocation>
-                statements.Add(ExpressionStatement(AwaitExpression(invocationExpression)));
-                isAsync = true;
-            }
-            else
-            {
-                // C#: return await <invocation>
-                statements.Add(ReturnStatement(AwaitExpression(invocationExpression)));
-                isAsync = true;
-            }
-
-            return (isAsync, Block(statements));
+            parameterIndex++;
         }
 
-        private MemberDeclarationSyntax[] GenerateConstructors(
-            string simpleClassName,
-            List<GeneratedFieldDescription> fieldDescriptions,
-            INamedTypeSymbol baseType)
+        string? invokeMethodName = default;
+        foreach (var attr in methodDescription.Method.GetAttributes())
         {
-            if (baseType is null)
+            if (attr.AttributeClass is { } attributeClass && attributeClass.GetAttributes(LibraryTypes.InvokeMethodNameAttribute, out var attrs))
             {
-                return Array.Empty<MemberDeclarationSyntax>();
-            }
-
-            var bodyStatements = GetBodyStatements();
-            var res = new List<MemberDeclarationSyntax>();
-            foreach (var member in baseType.GetMembers())
-            {
-                if (member is not IMethodSymbol method)
+                foreach (var methodAttr in attrs)
                 {
-                    continue;
-                }
-
-                if (method.MethodKind != MethodKind.Constructor)
-                {
-                    continue;
-                }
-
-                if (method.DeclaredAccessibility == Accessibility.Private)
-                {
-                    continue;
-                }
-
-                res.Add(CreateConstructor(method));
-            }
-            return res.ToArray();
-
-            ConstructorDeclarationSyntax CreateConstructor(IMethodSymbol baseConstructor)
-            {
-                return ConstructorDeclaration(simpleClassName)
-                    .AddParameterListParameters(baseConstructor.Parameters.Select((p, i) => GetParameterSyntax(i, p, typeParameterSubstitutions: null)).ToArray())
-                    .WithModifiers(TokenList(GetModifiers(baseConstructor)))
-                    .WithInitializer(
-                        ConstructorInitializer(
-                            SyntaxKind.BaseConstructorInitializer,
-                            ArgumentList(
-                                SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
-                    .WithBody(Block(bodyStatements));
-            }
-
-            static SyntaxToken[] GetModifiers(IMethodSymbol method)
-            {
-                switch (method.DeclaredAccessibility)
-                {
-                    case Accessibility.Public:
-                    case Accessibility.Protected:
-                        return new[] { Token(SyntaxKind.PublicKeyword) };
-                    case Accessibility.Internal:
-                    case Accessibility.ProtectedOrInternal:
-                    case Accessibility.ProtectedAndInternal:
-                        return new[] { Token(SyntaxKind.InternalKeyword) };
-                    default:
-                        return Array.Empty<SyntaxToken>();
-                }
-            }
-
-            static ArgumentSyntax GetBaseInitializerArgument(IParameterSymbol parameter, int index)
-            {
-                var name = $"arg{index}";
-                var result = Argument(IdentifierName(name));
-                switch (parameter.RefKind)
-                {
-                    case RefKind.None:
-                        break;
-                    case RefKind.Ref:
-                        result = result.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
-                        break;
-                    case RefKind.Out:
-                        result = result.WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword));
-                        break;
-                    default:
-                        break;
-                }
-
-                return result;
-            }
-
-            List<StatementSyntax> GetBodyStatements()
-            {
-                var res = new List<StatementSyntax>();
-                foreach (var field in fieldDescriptions)
-                {
-                    switch (field)
-                    {
-                        case GeneratedFieldDescription _ when field.IsInjected:
-                            res.Add(ExpressionStatement(
-                                AssignmentExpression(
-                                    SyntaxKind.SimpleAssignmentExpression,
-                                    ThisExpression().Member(field.FieldName.ToIdentifierName()),
-                                    Unwrapped(field.FieldName.ToIdentifierName()))));
-                            break;
-                        case CopierFieldDescription codec:
-                            {
-                                res.Add(ExpressionStatement(
-                                    AssignmentExpression(
-                                        SyntaxKind.SimpleAssignmentExpression,
-                                        field.FieldName.ToIdentifierName(),
-                                        GetService(field.FieldType))));
-                            }
-                            break;
-                    }
-                }
-                return res;
-
-                static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
-                {
-                    return InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
-                        ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
-                }
-
-                static ExpressionSyntax GetService(TypeSyntax type)
-                {
-                    return InvocationExpression(
-                        MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
-                        ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName)) })));
+                    invokeMethodName = (string?)methodAttr.ConstructorArguments.First().Value;
                 }
             }
         }
 
-        private ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string> typeParameterSubstitutions)
+        var methodReturnType = methodDescription.Method.ReturnType;
+        if (methodReturnType is not INamedTypeSymbol namedMethodReturnType)
         {
-            var result = Parameter(Identifier($"arg{index}")).WithType(parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
+            var diagnostic = InvalidRpcMethodReturnTypeDiagnostic.CreateDiagnostic(methodDescription.InvokableMethod);
+            throw new OrleansGeneratorDiagnosticAnalysisException(diagnostic);
+        }
+
+        ExpressionSyntax baseInvokeExpression;
+        var isVoid = methodReturnType.SpecialType is SpecialType.System_Void;
+        if (namedMethodReturnType.TypeArguments.Length == 1)
+        {
+            // Task<T> / ValueTask<T>
+            var resultType = namedMethodReturnType.TypeArguments[0];
+            baseInvokeExpression = BaseExpression().Member(
+                invokeMethodName ?? "InvokeAsync",
+                resultType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions));
+        }
+        else if (isVoid)
+        {
+            // void
+            baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "Invoke");
+        }
+        else
+        {
+            // Task / ValueTask
+            baseInvokeExpression = BaseExpression().Member(invokeMethodName ?? "InvokeAsync");
+        }
+
+        // C#: base.InvokeAsync<TReturn>(request);
+        var invocationExpression =
+                     InvocationExpression(
+                         baseInvokeExpression,
+                         ArgumentList(SeparatedList([Argument(requestVar)])));
+
+        var rt = namedMethodReturnType.ConstructedFrom;
+        bool isAsync;
+        if (SymbolEqualityComparer.Default.Equals(rt, LibraryTypes.Task_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, LibraryTypes.Task))
+        {
+            // C#: return <invocation>.AsTask()
+            statements.Add(ReturnStatement(InvocationExpression(invocationExpression.Member("AsTask"), ArgumentList())));
+            isAsync = false;
+        }
+        else if (SymbolEqualityComparer.Default.Equals(rt, LibraryTypes.ValueTask_1) || SymbolEqualityComparer.Default.Equals(methodReturnType, LibraryTypes.ValueTask))
+        {
+            // ValueTask<T> / ValueTask
+            // C#: return <invocation>
+            statements.Add(ReturnStatement(invocationExpression));
+            isAsync = false;
+        }
+        else if (invokable.ReturnValueInitializerMethod is { } returnValueInitializerMethod)
+        {
+            // C#: return request.<returnValueInitializerMethod>(this);
+            statements.Add(ReturnStatement(InvocationExpression(requestVar.Member(returnValueInitializerMethod), ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
+            isAsync = false;
+        }
+        else if (isVoid)
+        {
+            // C#: <invocation>
+            statements.Add(ExpressionStatement(invocationExpression));
+            isAsync = false;
+        }
+        else if (rt.Arity == 0)
+        {
+            // C#: await <invocation>
+            statements.Add(ExpressionStatement(AwaitExpression(invocationExpression)));
+            isAsync = true;
+        }
+        else
+        {
+            // C#: return await <invocation>
+            statements.Add(ReturnStatement(AwaitExpression(invocationExpression)));
+            isAsync = true;
+        }
+
+        return (isAsync, Block(statements));
+    }
+
+    private MemberDeclarationSyntax[] GenerateConstructors(
+        string simpleClassName,
+        List<GeneratedFieldDescription> fieldDescriptions,
+        INamedTypeSymbol baseType)
+    {
+        if (baseType is null)
+        {
+            return [];
+        }
+
+        var bodyStatements = GetBodyStatements();
+        var res = new List<MemberDeclarationSyntax>();
+        foreach (var member in baseType.GetMembers())
+        {
+            if (member is not IMethodSymbol method)
+            {
+                continue;
+            }
+
+            if (method.MethodKind != MethodKind.Constructor)
+            {
+                continue;
+            }
+
+            if (method.DeclaredAccessibility == Accessibility.Private)
+            {
+                continue;
+            }
+
+            res.Add(CreateConstructor(method));
+        }
+        return [.. res];
+
+        ConstructorDeclarationSyntax CreateConstructor(IMethodSymbol baseConstructor)
+        {
+            return ConstructorDeclaration(simpleClassName)
+                .AddParameterListParameters([.. baseConstructor.Parameters.Select((p, i) => GetParameterSyntax(i, p, typeParameterSubstitutions: null))])
+                .WithModifiers(TokenList(GetModifiers(baseConstructor)))
+                .WithInitializer(
+                    ConstructorInitializer(
+                        SyntaxKind.BaseConstructorInitializer,
+                        ArgumentList(
+                            SeparatedList(baseConstructor.Parameters.Select(GetBaseInitializerArgument)))))
+                .WithBody(Block(bodyStatements));
+        }
+
+        static SyntaxToken[] GetModifiers(IMethodSymbol method)
+        {
+            switch (method.DeclaredAccessibility)
+            {
+                case Accessibility.Public:
+                case Accessibility.Protected:
+                    return [Token(SyntaxKind.PublicKeyword)];
+                case Accessibility.Internal:
+                case Accessibility.ProtectedOrInternal:
+                case Accessibility.ProtectedAndInternal:
+                    return [Token(SyntaxKind.InternalKeyword)];
+                default:
+                    return [];
+            }
+        }
+
+        static ArgumentSyntax GetBaseInitializerArgument(IParameterSymbol parameter, int index)
+        {
+            var name = $"arg{index}";
+            var result = Argument(IdentifierName(name));
             switch (parameter.RefKind)
             {
                 case RefKind.None:
                     break;
                 case RefKind.Ref:
-                    result = result.WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
+                    result = result.WithRefOrOutKeyword(Token(SyntaxKind.RefKeyword));
                     break;
                 case RefKind.Out:
-                    result = result.WithModifiers(TokenList(Token(SyntaxKind.OutKeyword)));
-                    break;
-                case RefKind.In:
-                    result = result.WithModifiers(TokenList(Token(SyntaxKind.InKeyword)));
+                    result = result.WithRefOrOutKeyword(Token(SyntaxKind.OutKeyword));
                     break;
                 default:
                     break;
@@ -435,5 +359,70 @@ namespace Orleans.CodeGenerator
 
             return result;
         }
+
+        List<StatementSyntax> GetBodyStatements()
+        {
+            var res = new List<StatementSyntax>();
+            foreach (var field in fieldDescriptions)
+            {
+                switch (field)
+                {
+                    case GeneratedFieldDescription _ when field.IsInjected:
+                        res.Add(ExpressionStatement(
+                            AssignmentExpression(
+                                SyntaxKind.SimpleAssignmentExpression,
+                                ThisExpression().Member(field.FieldName.ToIdentifierName()),
+                                Unwrapped(field.FieldName.ToIdentifierName()))));
+                        break;
+                    case CopierFieldDescription codec:
+                        {
+                            res.Add(ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    field.FieldName.ToIdentifierName(),
+                                    GetService(field.FieldType))));
+                        }
+                        break;
+                }
+            }
+            return res;
+
+            static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
+            {
+                return InvocationExpression(
+                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
+                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
+            }
+
+            static ExpressionSyntax GetService(TypeSyntax type)
+            {
+                return InvocationExpression(
+                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), GenericName(Identifier("GetService"), TypeArgumentList(SingletonSeparatedList(type)))),
+                    ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(IdentifierName(CodecProviderMemberName))])));
+            }
+        }
+    }
+
+    private static ParameterSyntax GetParameterSyntax(int index, IParameterSymbol parameter, Dictionary<ITypeParameterSymbol, string>? typeParameterSubstitutions)
+    {
+        var result = Parameter(Identifier($"arg{index}")).WithType(parameter.Type.ToTypeSyntax(typeParameterSubstitutions));
+        switch (parameter.RefKind)
+        {
+            case RefKind.None:
+                break;
+            case RefKind.Ref:
+                result = result.WithModifiers(TokenList(Token(SyntaxKind.RefKeyword)));
+                break;
+            case RefKind.Out:
+                result = result.WithModifiers(TokenList(Token(SyntaxKind.OutKeyword)));
+                break;
+            case RefKind.In:
+                result = result.WithModifiers(TokenList(Token(SyntaxKind.InKeyword)));
+                break;
+            default:
+                break;
+        }
+
+        return result;
     }
 }

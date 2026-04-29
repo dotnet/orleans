@@ -2,7 +2,6 @@ using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
-#nullable disable
 public static class GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly_Diagnostic
 {
     public const string DiagnosticId = DiagnosticRuleId.GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembly;
@@ -12,5 +11,5 @@ public static class GenerateCodeForDeclaringAssemblyAttribute_NoDeclaringAssembl
 
     private static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(DiagnosticId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true);
 
-    internal static Diagnostic CreateDiagnostic(AttributeData attribute, ITypeSymbol type) => Diagnostic.Create(Rule, attribute.ApplicationSyntaxReference.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span), type.ToDisplayString(), attribute.ToString());
+    internal static Diagnostic CreateDiagnostic(AttributeData attribute, ITypeSymbol type) => Diagnostic.Create(Rule, attribute.ApplicationSyntaxReference!.SyntaxTree.GetLocation(attribute.ApplicationSyntaxReference.Span), type.ToDisplayString(), attribute.ToString());
 }
