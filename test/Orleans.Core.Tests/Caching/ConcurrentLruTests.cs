@@ -935,6 +935,25 @@ public class ConcurrentLruTests(ITestOutputHelper testOutputHelper)
     }
 
     [Fact]
+    public async Task WhenItemIsInsertedBeforePeriodicCleanupRunsItIsNotRemoved()
+    {
+        var timeProvider = new FakeTimeProvider();
+        timeProvider.Advance(TimeSpan.FromHours(1));
+        await using var lru = CreateExpiringLru(timeProvider);
+        using var listener = new ConcurrentLruCacheExpirationCleanupListener(lru);
+
+        timeProvider.Advance(TimeSpan.FromSeconds(50));
+        lru.AddOrUpdate(1, "1");
+        timeProvider.Advance(TimeSpan.FromSeconds(10));
+
+        var cleanup = await listener.WaitForCleanupAsync();
+        cleanup.Should().Be(0);
+        lru.TryGet(1, out var value).Should().BeTrue();
+        value.Should().Be("1");
+        lru.Count.Should().Be(1);
+    }
+
+    [Fact]
     public async Task WhenExpiredItemsAreCleanedUpCacheIsMarkedCold()
     {
         var timeProvider = new FakeTimeProvider();
