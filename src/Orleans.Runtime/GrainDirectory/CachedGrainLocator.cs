@@ -148,6 +148,11 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     await listenToClusterChangeTask.WaitAsync(ct).SuppressThrowing();
                 }
+
+                if (this.cache is LruGrainDirectoryCache lruCache)
+                {
+                    await lruCache.DisposeAsync();
+                }
             };
             lifecycle.Subscribe(nameof(CachedGrainLocator), ServiceLifecycleStage.RuntimeGrainServices, OnStart, OnStop);
         }

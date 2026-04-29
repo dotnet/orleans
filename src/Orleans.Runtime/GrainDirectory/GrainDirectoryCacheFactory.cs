@@ -31,7 +31,7 @@ namespace Orleans.Runtime.GrainDirectory
 #pragma warning disable CS0618 // Type or member is obsolete
                 case GrainDirectoryOptions.CachingStrategyType.Adaptive:
 #pragma warning restore CS0618 // Type or member is obsolete
-                    return new LruGrainDirectoryCache(options.CacheSize);
+                    return CreateLruGrainDirectoryCache(services, options);
                 case GrainDirectoryOptions.CachingStrategyType.Custom:
                 default:
                     return services.GetRequiredService<IGrainDirectoryCache>();
@@ -47,8 +47,16 @@ namespace Orleans.Runtime.GrainDirectory
             }
             else
             {
-                return new LruGrainDirectoryCache(options.CacheSize);
+                return CreateLruGrainDirectoryCache(services, options);
             }
+        }
+
+        private static IGrainDirectoryCache CreateLruGrainDirectoryCache(IServiceProvider services, GrainDirectoryOptions options)
+        {
+            var timeProvider = services?.GetService<TimeProvider>() ?? TimeProvider.System;
+#pragma warning disable CS0618 // Type or member is obsolete
+            return new LruGrainDirectoryCache(options.CacheSize, options.MaximumCacheTTL, timeProvider);
+#pragma warning restore CS0618 // Type or member is obsolete
         }
     }
 
