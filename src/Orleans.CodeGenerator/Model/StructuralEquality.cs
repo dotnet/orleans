@@ -1,13 +1,11 @@
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 
 namespace Orleans.CodeGenerator.Model;
 
 internal static class StructuralEquality
 {
     public static ImmutableArray<T> Normalize<T>(ImmutableArray<T> values)
-        => values.IsDefault ? ImmutableArray<T>.Empty : values;
+        => values.IsDefault ? [] : values;
 
     public static bool SequenceEqual<T>(ImmutableArray<T> left, ImmutableArray<T> right)
         => Normalize(left).SequenceEqual(Normalize(right));

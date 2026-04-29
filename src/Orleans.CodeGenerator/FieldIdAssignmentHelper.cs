@@ -1,8 +1,5 @@
-using System;
 using System.Buffers.Binary;
-using System.Collections.Generic;
 using System.Collections.Immutable;
-using System.Linq;
 using System.Runtime.InteropServices;
 using System.Text;
 using Microsoft.CodeAnalysis;
@@ -31,7 +28,7 @@ internal class FieldIdAssignmentHelper
         _constructorParameters = constructorParameters;
         _implicitMemberSelectionStrategy = implicitMemberSelectionStrategy;
         _libraryTypes = libraryTypes;
-        _memberSymbols = GetMembers(typeSymbol).ToArray();
+        _memberSymbols = [.. GetMembers(typeSymbol)];
 
         var isValidForSerialization = _implicitMemberSelectionStrategy != GenerateFieldIds.None && !HasMemberWithIdAnnotation()
             ? GenerateImplicitFieldIds()

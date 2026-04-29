@@ -2,144 +2,137 @@ using Orleans.CodeGenerator.SyntaxGeneration;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
-using System.Collections.Generic;
 
-namespace Orleans.CodeGenerator
+namespace Orleans.CodeGenerator;
+
+internal class ActivatorGenerator(IGeneratorServices generatorServices)
 {
-    internal class ActivatorGenerator
+    private readonly IGeneratorServices _generatorServices = generatorServices;
+
+    private struct ConstructorArgument
     {
-        private readonly IGeneratorServices _generatorServices;
+        public TypeSyntax Type { get; set; }
+        public string FieldName { get; set; }
+        public string ParameterName { get; set; }
+    }
 
-        private struct ConstructorArgument
+    public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
+    {
+        var simpleClassName = GetSimpleClassName(type);
+
+        var baseInterface = _generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
+
+        var orderedFields = new List<ConstructorArgument>();
+        var index = 0;
+        if (type.ActivatorConstructorParameters is { Count: > 0 } parameters)
         {
-            public TypeSyntax Type { get; set; }
-            public string FieldName { get; set; }
-            public string ParameterName { get; set; }
-        }
-
-        public ActivatorGenerator(IGeneratorServices generatorServices)
-        {
-            _generatorServices = generatorServices;
-        }
-
-        public ClassDeclarationSyntax GenerateActivator(ISerializableTypeDescription type)
-        {
-            var simpleClassName = GetSimpleClassName(type);
-
-            var baseInterface = _generatorServices.LibraryTypes.IActivator_1.ToTypeSyntax(type.TypeSyntax);
-
-            var orderedFields = new List<ConstructorArgument>();
-            var index = 0;
-            if (type.ActivatorConstructorParameters is { Count: > 0 } parameters)
+            foreach (var arg in parameters)
             {
-                foreach (var arg in parameters)
-                {
-                    orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}" });
-                    index++;
-                }
+                orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}" });
+                index++;
             }
+        }
 
-            var members = new List<MemberDeclarationSyntax>();
+        var members = new List<MemberDeclarationSyntax>();
+        foreach (var field in orderedFields)
+        {
+            members.Add(
+                FieldDeclaration(VariableDeclaration(field.Type, SingletonSeparatedList(VariableDeclarator(field.FieldName))))
+                .AddModifiers(
+                    Token(SyntaxKind.PrivateKeyword),
+                    Token(SyntaxKind.ReadOnlyKeyword)));
+        }
+
+        if (orderedFields.Count > 0)
+            members.Add(GenerateConstructor(simpleClassName, orderedFields));
+
+        members.Add(GenerateCreateMethod(type, orderedFields));
+
+        var classDeclaration = ClassDeclaration(simpleClassName)
+            .AddBaseListTypes(SimpleBaseType(baseInterface))
+            .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
+            .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
+            .AddMembers([.. members]);
+
+        if (type.IsGenericType)
+        {
+            classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, type.TypeParameters);
+        }
+
+        return classDeclaration;
+    }
+
+    public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
+
+    public static string GetSimpleClassName(string name) => $"Activator_{name}";
+
+    /// <summary>
+    /// Determines whether an activator should be generated for the specified type.
+    /// </summary>
+    internal static bool ShouldGenerateActivator(ISerializableTypeDescription type)
+    {
+        return !type.IsAbstractType
+            && !type.IsEnumType
+            && (!type.IsValueType
+                && type.IsEmptyConstructable
+                && !type.UseActivator
+                && type is not GeneratedInvokableDescription
+                || type.HasActivatorConstructor);
+    }
+
+    private static ConstructorDeclarationSyntax GenerateConstructor(
+        string simpleClassName,
+        List<ConstructorArgument> orderedFields)
+    {
+        var parameters = new List<ParameterSyntax>();
+        var body = new List<StatementSyntax>();
+        foreach (var field in orderedFields)
+        {
+            parameters.Add(Parameter(field.ParameterName.ToIdentifier()).WithType(field.Type));
+
+            body.Add(ExpressionStatement(
+                        AssignmentExpression(
+                            SyntaxKind.SimpleAssignmentExpression,
+                            field.FieldName.ToIdentifierName(),
+                            Unwrapped(field.ParameterName.ToIdentifierName()))));
+        }
+
+        var constructorDeclaration = ConstructorDeclaration(simpleClassName)
+            .AddModifiers(Token(SyntaxKind.PublicKeyword))
+            .AddParameterListParameters([.. parameters])
+            .AddBodyStatements([.. body]);
+
+        return constructorDeclaration;
+
+        static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
+        {
+            return InvocationExpression(
+                MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
+                ArgumentList(SeparatedList([Argument(ThisExpression()), Argument(expr)])));
+        }
+    }
+
+    private static MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
+    {
+        ExpressionSyntax createObject;
+        if (type.ActivatorConstructorParameters is { Count: > 0 })
+        {
+            var argList = new List<ArgumentSyntax>();
             foreach (var field in orderedFields)
             {
-                members.Add(
-                    FieldDeclaration(VariableDeclaration(field.Type, SingletonSeparatedList(VariableDeclarator(field.FieldName))))
-                    .AddModifiers(
-                        Token(SyntaxKind.PrivateKeyword),
-                        Token(SyntaxKind.ReadOnlyKeyword)));
+                argList.Add(Argument(field.FieldName.ToIdentifierName()));
             }
 
-            if (orderedFields.Count > 0)
-                members.Add(GenerateConstructor(simpleClassName, orderedFields));
-
-            members.Add(GenerateCreateMethod(type, orderedFields));
-
-            var classDeclaration = ClassDeclaration(simpleClassName)
-                .AddBaseListTypes(SimpleBaseType(baseInterface))
-                .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
-                .AddAttributeLists(GeneratedCodeUtilities.GetGeneratedCodeAttributes())
-                .AddMembers(members.ToArray());
-
-            if (type.IsGenericType)
-            {
-                classDeclaration = SyntaxFactoryUtility.AddGenericTypeParameters(classDeclaration, type.TypeParameters);
-            }
-
-            return classDeclaration;
+            createObject = ObjectCreationExpression(type.TypeSyntax).WithArgumentList(ArgumentList(SeparatedList(argList)));
         }
-
-        public static string GetSimpleClassName(ISerializableTypeDescription serializableType) => GetSimpleClassName(serializableType.Name);
-
-        public static string GetSimpleClassName(string name) => $"Activator_{name}";
-
-        /// <summary>
-        /// Determines whether an activator should be generated for the specified type.
-        /// </summary>
-        internal static bool ShouldGenerateActivator(ISerializableTypeDescription type)
+        else
         {
-            return !type.IsAbstractType
-                && !type.IsEnumType
-                && (!type.IsValueType
-                    && type.IsEmptyConstructable
-                    && !type.UseActivator
-                    && type is not GeneratedInvokableDescription
-                    || type.HasActivatorConstructor);
+            createObject = type.GetObjectCreationExpression();
         }
 
-        private ConstructorDeclarationSyntax GenerateConstructor(
-            string simpleClassName,
-            List<ConstructorArgument> orderedFields)
-        {
-            var parameters = new List<ParameterSyntax>();
-            var body = new List<StatementSyntax>();
-            foreach (var field in orderedFields)
-            {
-                parameters.Add(Parameter(field.ParameterName.ToIdentifier()).WithType(field.Type));
-
-                body.Add(ExpressionStatement(
-                            AssignmentExpression(
-                                SyntaxKind.SimpleAssignmentExpression,
-                                field.FieldName.ToIdentifierName(),
-                                Unwrapped(field.ParameterName.ToIdentifierName()))));
-            }
-
-            var constructorDeclaration = ConstructorDeclaration(simpleClassName)
-                .AddModifiers(Token(SyntaxKind.PublicKeyword))
-                .AddParameterListParameters(parameters.ToArray())
-                .AddBodyStatements(body.ToArray());
-
-            return constructorDeclaration;
-
-            static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
-            {
-                return InvocationExpression(
-                    MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, IdentifierName("OrleansGeneratedCodeHelper"), IdentifierName("UnwrapService")),
-                    ArgumentList(SeparatedList(new[] { Argument(ThisExpression()), Argument(expr) })));
-            }
-        }
-
-        private MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
-        {
-            ExpressionSyntax createObject;
-            if (type.ActivatorConstructorParameters is { Count: > 0 })
-            {
-                var argList = new List<ArgumentSyntax>();
-                foreach (var field in orderedFields)
-                {
-                    argList.Add(Argument(field.FieldName.ToIdentifierName()));
-                }
-
-                createObject = ObjectCreationExpression(type.TypeSyntax).WithArgumentList(ArgumentList(SeparatedList(argList)));
-            }
-            else
-            {
-                createObject = type.GetObjectCreationExpression();
-            }
-
-            return MethodDeclaration(type.TypeSyntax, "Create")
-                .WithExpressionBody(ArrowExpressionClause(createObject))
-                .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
-                .AddModifiers(Token(SyntaxKind.PublicKeyword));
-        }
+        return MethodDeclaration(type.TypeSyntax, "Create")
+            .WithExpressionBody(ArrowExpressionClause(createObject))
+            .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+            .AddModifiers(Token(SyntaxKind.PublicKeyword));
     }
 }
