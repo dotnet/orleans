@@ -15,13 +15,27 @@ namespace Orleans.Runtime.GrainDirectory;
 internal sealed class DirectoryMembershipSnapshot
 {
     internal const int PartitionsPerSilo = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+
+    /// <summary>
+    /// The default hash function for directory ring boundaries, matching the <see cref="LocalGrainDirectory"/> partitioning scheme.
+    /// </summary>
+    internal static readonly Func<SiloAddress, int, uint[]> DefaultGetRingBoundaries = static (silo, count) =>
+    {
+        if (count == 1)
+        {
+            return [unchecked((uint)silo.GetConsistentHashCode())];
+        }
+
+        return silo.GetUniformHashCodes(count);
+    };
+
     private readonly ImmutableArray<(uint Start, int MemberIndex, int PartitionIndex)> _ringBoundaries;
     private readonly RingRangeCollection[] _rangesByMember;
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
     public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory)
-        : this(snapshot, grainFactory, PartitionsPerSilo, static (silo, count) => silo.GetUniformHashCodes(count))
+        : this(snapshot, grainFactory, PartitionsPerSilo, DefaultGetRingBoundaries)
     {
     }
 
@@ -134,7 +148,7 @@ internal sealed class DirectoryMembershipSnapshot
     }
 
     public static DirectoryMembershipSnapshot Default { get; } = new DirectoryMembershipSnapshot(
-        new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue), null!);
+        new ClusterMembershipSnapshot(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue), null!, partitionCount: 1, DefaultGetRingBoundaries);
 
     public MembershipVersion Version => ClusterMembershipSnapshot.Version;
 
