@@ -8,7 +8,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
+internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
 {
     private static readonly AppendBlobCreateOptions CreateOptions = new() { Conditions = new() { IfNoneMatch = ETag.All } };
     private readonly AppendBlobClient _client;
@@ -63,7 +63,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _numBlocks = 0;
     }
 
-    public async ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken)
+    public async ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken)
     {
         Response<BlobDownloadStreamingResult> result;
         try
@@ -89,25 +89,23 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _appendOptions.Conditions.IfMatch = result.Value.Details.ETag;
         _exists = true;
 
-        var rawStream = result.Value.Content;
-        using var buffer = new ArcBufferWriter();
+        await using var rawStream = result.Value.Content;
+        long totalBytesRead = 0;
         while (true)
         {
+            using var buffer = new ArcBufferWriter();
             var mem = buffer.GetMemory();
-            var bytesRead = await rawStream.ReadAsync(mem, cancellationToken);
+            var bytesRead = await rawStream.ReadAsync(mem, cancellationToken).ConfigureAwait(false);
             if (bytesRead == 0)
             {
-                if (buffer.Length > 0)
-                {
-                    LogRead(_logger, buffer.Length, _client.BlobContainerName, _client.Name);
-                    using var data = buffer.ConsumeSlice(buffer.Length);
-                    consumer.OnLogData(data);
-                }
-
+                LogRead(_logger, totalBytesRead, _client.BlobContainerName, _client.Name);
                 return;
             }
 
             buffer.AdvanceWriter(bytesRead);
+            totalBytesRead += bytesRead;
+            using var data = buffer.ConsumeSlice(buffer.Length);
+            consumer.OnLogData(data);
         }
     }
 

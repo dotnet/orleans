@@ -24,14 +24,14 @@ public static class ProtobufJournalingExtensions
     /// <para>
     /// Each entry type is serialized using protobuf wire-format tags. Common scalar values
     /// (<see cref="string"/>, byte arrays, numeric primitives, and <see cref="bool"/>)
-    /// use native protobuf payload encoding. Other user values fall back to <see cref="ILogDataCodec{T}"/>
+    /// use native protobuf payload encoding. Other user values fall back to <see cref="ILogValueCodec{T}"/>
     /// unless native protobuf message encoding is configured using
     /// <see cref="ProtobufJournalingOptions.AddMessageParser{T}(Google.Protobuf.MessageParser{T})"/>.
     /// </para>
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddStateMachineStorage().UseProtobufCodec();
+    /// builder.AddLogStorage().UseProtobufCodec();
     /// </code>
     /// </example>
     public static ISiloBuilder UseProtobufCodec(this ISiloBuilder builder)
@@ -46,11 +46,11 @@ public static class ProtobufJournalingExtensions
     /// <remarks>
     /// Use <see cref="ProtobufJournalingOptions.AddMessageParser{T}(Google.Protobuf.MessageParser{T})"/>
     /// to register generated protobuf message parsers for native, reflection-free message value encoding.
-    /// Unregistered message values fall back to <see cref="ILogDataCodec{T}"/>.
+    /// Unregistered message values fall back to <see cref="ILogValueCodec{T}"/>.
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddStateMachineStorage().UseProtobufCodec(options =>
+    /// builder.AddLogStorage().UseProtobufCodec(options =>
     /// {
     ///     options.AddMessageParser(MyMessage.Parser);
     /// });
@@ -76,23 +76,23 @@ public static class ProtobufJournalingExtensions
         }
 
         builder.Services.AddSingleton<ProtobufLogFormat>();
-        builder.Services.AddKeyedSingleton<IStateMachineLogFormat>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogFormat>());
-        builder.Services.AddSingleton<IStateMachineLogFormat>(static sp => sp.GetRequiredService<ProtobufLogFormat>());
-        builder.Services.AddSingleton<ProtobufLogEntryCodecProvider>();
-        builder.Services.AddKeyedSingleton<IDurableDictionaryCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableListCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableQueueCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableSetCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableStateCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceCodecProvider>(StateMachineLogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableDictionaryCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableListCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableQueueCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableSetCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableValueCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableStateCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
-        builder.Services.AddSingleton<IDurableTaskCompletionSourceCodecProvider>(static sp => sp.GetRequiredService<ProtobufLogEntryCodecProvider>());
+        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogFormat>());
+        builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<ProtobufLogFormat>());
+        builder.Services.AddSingleton<ProtobufOperationCodecProvider>();
+        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableSetOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableValueOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableStateOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
 
         return builder;
     }
@@ -106,64 +106,64 @@ public static class ProtobufJournalingExtensions
 /// Each <c>GetCodec</c> method constructs the appropriate protobuf codec using <c>new</c>.
 /// For each type argument, a <see cref="ProtobufValueConverter{T}"/> is created that uses native
 /// protobuf encoding for built-in and explicitly registered types and falls back to
-/// <see cref="ILogDataCodec{T}"/> only when needed. No reflection (<c>MakeGenericType</c>,
+/// <see cref="ILogValueCodec{T}"/> only when needed. No reflection (<c>MakeGenericType</c>,
 /// <c>GetGenericTypeDefinition</c>, parser property lookup, etc.) is used.
 /// </para>
 /// </remarks>
-internal sealed class ProtobufLogEntryCodecProvider(IServiceProvider serviceProvider) :
-    IDurableDictionaryCodecProvider,
-    IDurableListCodecProvider,
-    IDurableQueueCodecProvider,
-    IDurableSetCodecProvider,
-    IDurableValueCodecProvider,
-    IDurableStateCodecProvider,
-    IDurableTaskCompletionSourceCodecProvider
+internal sealed class ProtobufOperationCodecProvider(IServiceProvider serviceProvider) :
+    IDurableDictionaryOperationCodecProvider,
+    IDurableListOperationCodecProvider,
+    IDurableQueueOperationCodecProvider,
+    IDurableSetOperationCodecProvider,
+    IDurableValueOperationCodecProvider,
+    IDurableStateOperationCodecProvider,
+    IDurableTaskCompletionSourceOperationCodecProvider
 {
     private readonly ConcurrentDictionary<Type, object> _codecs = new();
 
     /// <inheritdoc/>
-    public IDurableDictionaryCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
-        => (IDurableDictionaryCodec<TKey, TValue>)_codecs.GetOrAdd(
-            typeof(IDurableDictionaryCodec<TKey, TValue>),
-            _ => new ProtobufDictionaryEntryCodec<TKey, TValue>(
+    public IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
+        => (IDurableDictionaryOperationCodec<TKey, TValue>)_codecs.GetOrAdd(
+            typeof(IDurableDictionaryOperationCodec<TKey, TValue>),
+            _ => new ProtobufDictionaryOperationCodec<TKey, TValue>(
                 CreateConverter<TKey>(),
                 CreateConverter<TValue>()));
 
     /// <inheritdoc/>
-    public IDurableListCodec<T> GetCodec<T>()
-        => (IDurableListCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableListCodec<T>),
-            _ => new ProtobufListEntryCodec<T>(CreateConverter<T>()));
+    public IDurableListOperationCodec<T> GetCodec<T>()
+        => (IDurableListOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableListOperationCodec<T>),
+            _ => new ProtobufListOperationCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    IDurableQueueCodec<T> IDurableQueueCodecProvider.GetCodec<T>()
-        => (IDurableQueueCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableQueueCodec<T>),
-            _ => new ProtobufQueueEntryCodec<T>(CreateConverter<T>()));
+    IDurableQueueOperationCodec<T> IDurableQueueOperationCodecProvider.GetCodec<T>()
+        => (IDurableQueueOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableQueueOperationCodec<T>),
+            _ => new ProtobufQueueOperationCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    IDurableSetCodec<T> IDurableSetCodecProvider.GetCodec<T>()
-        => (IDurableSetCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableSetCodec<T>),
-            _ => new ProtobufSetEntryCodec<T>(CreateConverter<T>()));
+    IDurableSetOperationCodec<T> IDurableSetOperationCodecProvider.GetCodec<T>()
+        => (IDurableSetOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableSetOperationCodec<T>),
+            _ => new ProtobufSetOperationCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    IDurableValueCodec<T> IDurableValueCodecProvider.GetCodec<T>()
-        => (IDurableValueCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableValueCodec<T>),
-            _ => new ProtobufValueEntryCodec<T>(CreateConverter<T>()));
+    IDurableValueOperationCodec<T> IDurableValueOperationCodecProvider.GetCodec<T>()
+        => (IDurableValueOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableValueOperationCodec<T>),
+            _ => new ProtobufValueOperationCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    IDurableStateCodec<T> IDurableStateCodecProvider.GetCodec<T>()
-        => (IDurableStateCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableStateCodec<T>),
-            _ => new ProtobufStateEntryCodec<T>(CreateConverter<T>()));
+    IDurableStateOperationCodec<T> IDurableStateOperationCodecProvider.GetCodec<T>()
+        => (IDurableStateOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableStateOperationCodec<T>),
+            _ => new ProtobufStateOperationCodec<T>(CreateConverter<T>()));
 
     /// <inheritdoc/>
-    IDurableTaskCompletionSourceCodec<T> IDurableTaskCompletionSourceCodecProvider.GetCodec<T>()
-        => (IDurableTaskCompletionSourceCodec<T>)_codecs.GetOrAdd(
-            typeof(IDurableTaskCompletionSourceCodec<T>),
-            _ => new ProtobufTcsEntryCodec<T>(CreateConverter<T>()));
+    IDurableTaskCompletionSourceOperationCodec<T> IDurableTaskCompletionSourceOperationCodecProvider.GetCodec<T>()
+        => (IDurableTaskCompletionSourceOperationCodec<T>)_codecs.GetOrAdd(
+            typeof(IDurableTaskCompletionSourceOperationCodec<T>),
+            _ => new ProtobufTcsOperationCodec<T>(CreateConverter<T>()));
 
     private ProtobufValueConverter<T> CreateConverter<T>()
     {
@@ -178,7 +178,7 @@ internal sealed class ProtobufLogEntryCodecProvider(IServiceProvider serviceProv
             return new ProtobufValueConverter<T>();
         }
 
-        var codec = serviceProvider.GetService<ILogDataCodec<T>>();
+        var codec = serviceProvider.GetService<ILogValueCodec<T>>();
         if (codec is not null)
         {
             return new ProtobufValueConverter<T>(codec);
@@ -195,11 +195,11 @@ internal sealed class ProtobufLogEntryCodecProvider(IServiceProvider serviceProv
             return new InvalidOperationException(
                 $"Protocol Buffers journaling does not have a native parser or fallback codec for message type '{typeName}'. "
                 + $"Register the generated parser with UseProtobufCodec(options => options.AddMessageParser({typeof(T).Name}.Parser)) "
-                + $"or register {nameof(ILogDataCodec<T>)}.");
+                + $"or register {nameof(ILogValueCodec<T>)}.");
         }
 
         return new InvalidOperationException(
-            $"Protocol Buffers journaling does not have a native value codec for type '{typeName}' and no {nameof(ILogDataCodec<T>)} fallback was registered. "
-            + $"Use a supported native protobuf value type or register {nameof(ILogDataCodec<T>)}.");
+            $"Protocol Buffers journaling does not have a native value codec for type '{typeName}' and no {nameof(ILogValueCodec<T>)} fallback was registered. "
+            + $"Use a supported native protobuf value type or register {nameof(ILogValueCodec<T>)}.");
     }
 }

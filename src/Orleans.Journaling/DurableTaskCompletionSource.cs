@@ -16,28 +16,28 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine, IDurableTaskCompletionSourceLogEntryConsumer<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine, IDurableTaskCompletionSourceOperationHandler<T>
 {
-    private readonly IDurableTaskCompletionSourceCodec<T> _codec;
+    private readonly IDurableTaskCompletionSourceOperationCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
 
     private TaskCompletionSource<T> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private IStateMachineLogWriter? _storage;
+    private ILogWriter? _storage;
     private DurableTaskCompletionSourceStatus _status;
     private T? _value;
     private Exception? _exception;
 
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
-        IStateMachineManager manager,
-        IStateMachineStorage storage,
+        ILogManager manager,
+        ILogStorage storage,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterStateMachine(key, this);
@@ -45,8 +45,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     internal DurableTaskCompletionSource(
         string key,
-        IStateMachineManager manager,
-        IDurableTaskCompletionSourceCodec<T> codec,
+        ILogManager manager,
+        IDurableTaskCompletionSourceOperationCodec<T> codec,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
@@ -124,7 +124,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage)
+    void IDurableStateMachine.Reset(ILogWriter storage)
     {
         // Reset the task completion source if necessary.
         if (_completion.Task.IsCompleted)
@@ -140,7 +140,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -148,9 +148,9 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter) => WriteState(snapshotWriter);
 
-    private void WriteState(StateMachineLogWriter writer)
+    private void WriteState(LogWriter writer)
     {
         using var entry = writer.BeginEntry();
         switch (_status)
@@ -172,20 +172,20 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         entry.Commit();
     }
 
-    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
-    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyCompleted(T value)
+    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
+    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyCompleted(T value)
     {
         _status = DurableTaskCompletionSourceStatus.Completed;
         _value = value;
     }
 
-    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyFaulted(Exception exception)
+    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyFaulted(Exception exception)
     {
         _status = DurableTaskCompletionSourceStatus.Faulted;
         _exception = exception;
     }
 
-    void IDurableTaskCompletionSourceLogEntryConsumer<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
+    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 }

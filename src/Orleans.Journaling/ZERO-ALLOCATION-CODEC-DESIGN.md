@@ -2,9 +2,9 @@
 
 ## Summary
 
-Orleans Journaling writes durable mutations directly into a format-owned log extent writer. The selected storage exposes a `LogFormatKey`, the manager resolves the matching keyed `IStateMachineLogFormat`, and the format creates the `IStateMachineLogExtentWriter` which owns physical entry framing from the first byte written.
+Orleans Journaling writes durable mutations directly into a format-owned log extent writer. The selected storage exposes a `LogFormatKey`, the manager resolves the matching keyed `ILogFormat`, and the format creates the `ILogSegmentWriter` which owns physical entry framing from the first byte written.
 
-Durable state machines do not build a generic payload and ask storage to wrap it later. They write one durable operation payload through `StateMachineLogEntry.Writer`, call `StateMachineLogEntry.Commit()`, and only then mutate in-memory state. Disposing an uncommitted `StateMachineLogEntry` aborts the entry and truncates the active extent writer to the entry start.
+Durable state machines do not build a generic payload and ask storage to wrap it later. They write one durable operation payload through `LogEntry.Writer`, call `LogEntry.Commit()`, and only then mutate in-memory state. Disposing an uncommitted `LogEntry` aborts the entry and truncates the active extent writer to the entry start.
 
 Storage is intentionally format-agnostic. It persists and returns raw `ArcBuffer` data, exposes the configured `LogFormatKey`, and must not retain a borrowed buffer after append or replace completes.
 
@@ -30,22 +30,22 @@ Storage is intentionally format-agnostic. It persists and returns raw `ArcBuffer
 ### Log format
 
 ```csharp
-public interface IStateMachineLogFormat
+public interface ILogFormat
 {
-    IStateMachineLogExtentWriter CreateWriter();
-    void Read(ArcBuffer input, IStateMachineLogEntryConsumer consumer);
+    ILogSegmentWriter CreateWriter();
+    void Read(ArcBuffer input, ILogEntrySink consumer);
 }
 ```
 
-A log format owns physical framing. It creates writers for new extents and reads raw persisted bytes back into `(StateMachineId, payload)` entries. It does not apply durable operations itself.
+A log format owns physical framing. It creates writers for new extents and reads raw persisted bytes back into `(LogStreamId, payload)` entries. It does not apply durable operations itself.
 
 ### Extent writer
 
 ```csharp
-public interface IStateMachineLogExtentWriter : IDisposable
+public interface ILogSegmentWriter : IDisposable
 {
     long Length { get; }
-    StateMachineLogWriter CreateLogWriter(StateMachineId streamId);
+    LogWriter CreateLogWriter(LogStreamId streamId);
     ArcBuffer GetCommittedBuffer();
     void Reset();
 }
@@ -53,22 +53,22 @@ public interface IStateMachineLogExtentWriter : IDisposable
 
 The manager owns the extent writer. `Length` is the raw current buffer length and can include an active uncommitted entry. Storage-safe code must call `GetCommittedBuffer()`, which returns only committed bytes and throws if an entry is active. The returned `ArcBuffer` is borrowed by the storage call; the caller disposes it after the append or replace operation returns.
 
-Formats can implement the interface directly or derive from `StateMachineLogExtentWriterBase` when they need the shared lexical-entry machinery.
+Formats can implement the interface directly or derive from `LogSegmentWriterBase` when they need the shared lexical-entry machinery.
 
 ### State-machine writers and entry scope
 
 ```csharp
-public interface IStateMachineLogWriter
+public interface ILogWriter
 {
-    StateMachineLogEntry BeginEntry();
+    LogEntry BeginEntry();
 }
 
-public readonly struct StateMachineLogWriter
+public readonly struct LogWriter
 {
-    public StateMachineLogEntry BeginEntry();
+    public LogEntry BeginEntry();
 }
 
-public ref struct StateMachineLogEntry
+public ref struct LogEntry
 {
     public LogEntryWriter Writer { get; }
     public void Commit();
@@ -76,11 +76,11 @@ public ref struct StateMachineLogEntry
 }
 ```
 
-`IStateMachineLogWriter` is the out-of-band writer exposed to a durable state machine instance. `StateMachineLogWriter` is the batch/snapshot writer passed to `IDurableStateMachine.AppendEntries` and `AppendSnapshot`.
+`ILogWriter` is the out-of-band writer exposed to a durable state machine instance. `LogWriter` is the batch/snapshot writer passed to `IDurableStateMachine.AppendEntries` and `AppendSnapshot`.
 
-`StateMachineLogEntry` is the lexical lifetime boundary. `Commit()` finalizes one pending entry. `Dispose()` aborts only if commit did not happen. Completing an entry twice is invalid. Normal code should not call public append-entry convenience APIs; durable operation codecs write only through the payload writer.
+`LogEntry` is the lexical lifetime boundary. `Commit()` finalizes one pending entry. `Dispose()` aborts only if commit did not happen. Completing an entry twice is invalid. Normal code should not call public append-entry convenience APIs; durable operation codecs write only through the payload writer.
 
-The former `StateMachineStorageWriter` API is removed. Use `StateMachineLogWriter`.
+The former `StateMachineStorageWriter` API is removed. Use `LogWriter`.
 
 ### Payload writer
 
@@ -97,15 +97,15 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
 }
 ```
 
-`LogEntryWriter` is payload-only. It has no public `Commit` or `Abort`; lifecycle belongs to `StateMachineLogEntry`. Codecs must not retain the writer or memory obtained from it after the write call returns.
+`LogEntryWriter` is payload-only. It has no public `Commit` or `Abort`; lifecycle belongs to `LogEntry`. Codecs must not retain the writer or memory obtained from it after the write call returns.
 
 ### Storage
 
 ```csharp
-public interface IStateMachineStorage
+public interface ILogStorage
 {
     string LogFormatKey { get; }
-    ValueTask ReadAsync(IStateMachineLogDataConsumer consumer, CancellationToken cancellationToken);
+    ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken);
     ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken);
     ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken);
     ValueTask DeleteAsync(CancellationToken cancellationToken);
@@ -113,9 +113,9 @@ public interface IStateMachineStorage
 }
 ```
 
-`AppendAsync` and `ReplaceAsync` accept encoded log bytes, not a format-specific writer or decoded entries. `ReadAsync` pushes raw persisted data to `IStateMachineLogDataConsumer`; the manager then invokes the selected `IStateMachineLogFormat.Read(...)` method.
+`AppendAsync` and `ReplaceAsync` accept encoded log bytes, not a format-specific writer or decoded entries. `ReadAsync` pushes raw persisted data to `ILogDataSink`; the manager then invokes the selected `ILogFormat.Read(...)` method.
 
-Storage options use a default `LogFormatKey` and may expose a `Func<GrainType, string>` selector. The selector is grain-type scoped, not grain-id scoped. The built-in keys are defined by `StateMachineLogFormatKeys`: `orleans-binary`, `json`, `protobuf`, and `messagepack`.
+Storage options use a default `LogFormatKey` and may expose a `Func<GrainType, string>` selector. The selector is grain-type scoped, not grain-id scoped. The built-in keys are defined by `LogFormatKeys`: `orleans-binary`, `json`, `protobuf`, and `messagepack`.
 
 The key is configuration, not persisted metadata. Switching a grain to a different key over existing data is a migration problem and should fail recovery clearly.
 
@@ -136,10 +136,10 @@ public void Add(T item)
 
 If `_codec.WriteAdd` throws, disposing `entry` aborts the pending physical frame and the in-memory collection remains unchanged. Operations which return existing data, such as dequeue, should read and validate the result before writing the entry, then mutate after commit.
 
-Snapshots use the same scoped writer API through `StateMachineLogWriter`:
+Snapshots use the same scoped writer API through `LogWriter`:
 
 ```csharp
-void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter writer)
+void IDurableStateMachine.AppendSnapshot(LogWriter writer)
 {
     using var entry = writer.BeginEntry();
     _codec.WriteSnapshot(_items, entry.Writer);
@@ -152,12 +152,12 @@ void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter writer)
 Storage pushes raw data blocks to the manager. The manager passes each block to the active log format, and the format parses physical framing:
 
 ```csharp
-void IStateMachineLogDataConsumer.OnLogData(ArcBuffer data)
+void ILogDataSink.OnLogData(ArcBuffer data)
 {
     _logFormat.Read(data, this);
 }
 
-void IStateMachineLogEntryConsumer.OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload)
+void ILogEntrySink.OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload)
 {
     if (_stateMachinesMap.TryGetValue(streamId.Value, out var stateMachine))
     {
@@ -194,7 +194,7 @@ JSON uses true JSON Lines. Each log entry is one UTF-8 JSON object line terminat
 {"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}
 ```
 
-A storage batch can contain multiple JSON Lines records, but there is no surrounding extent object and no final container-close step. The JSON log writer owns the `streamId` property, `entry` property framing, object close, and newline. JSON durable operation codecs write only the JSON value for the `entry` property, typically using `Utf8JsonWriter` over `StateMachineLogEntry.Writer`.
+A storage batch can contain multiple JSON Lines records, but there is no surrounding extent object and no final container-close step. The JSON log writer owns the `streamId` property, `entry` property framing, object close, and newline. JSON durable operation codecs write only the JSON value for the `entry` property, typically using `Utf8JsonWriter` over `LogEntry.Writer`.
 
 Recovery reads one line at a time, validates that each line is a complete object with `streamId` and `entry`, and passes the raw `entry` value bytes to the durable operation codec. UTF-8 byte order marks and blank lines are malformed journal data.
 
@@ -225,7 +225,7 @@ entry := [streamId, payload]
 
 Retired or temporarily unknown state machines are a rare recovery path and are outside the steady-state allocation contract. Preservation stores the state-machine id plus the decoded durable operation payload bytes produced by the active log format. It does not preserve exact physical extent bytes, whitespace, field order, or storage block boundaries.
 
-Write-back uses an explicit internal helper, `StateMachineLogWriter.AppendPreservedDecodedPayload(...)`, which opens a normal `StateMachineLogEntry`, copies the preserved payload into `entry.Writer`, and commits. This keeps retired-entry preservation on the same format-owned writer path as normal writes while preventing raw physical-byte append APIs from becoming a public durable state machine surface.
+Write-back uses an explicit internal helper, `LogWriter.AppendPreservedDecodedPayload(...)`, which opens a normal `LogEntry`, copies the preserved payload into `entry.Writer`, and commits. This keeps retired-entry preservation on the same format-owned writer path as normal writes while preventing raw physical-byte append APIs from becoming a public durable state machine surface.
 
 ## Retired APIs
 
@@ -245,7 +245,7 @@ Do not rely on exact allocation-count assertions for correctness. Validate the s
 
 `test\Benchmarks\Journaling\DurableListJournalBenchmarks.cs` covers the allocation-sensitive representative paths without making correctness depend on exact allocation counts:
 
-1. `DurableListAddWritesDirectEntry` warms collection capacity, uses a direct integer value codec, and repeatedly calls `DurableList<int>.Add`. The benchmark exercises `StateMachineLogEntry`/`LogEntryWriter`/format-owned extent writing instead of allocating command objects or completing a generic builder for post-hoc extent framing.
-2. `RecoverEncodedLogData` replays pre-encoded binary log data through `IStateMachineLogFormat.Read` into a durable list consumer. The benchmark validates the raw `ArcBuffer` read path and push-based entry dispatch rather than materializing a `LogExtent` or `LogExtent.Entry` collection.
+1. `DurableListAddWritesDirectEntry` warms collection capacity, uses a direct integer value codec, and repeatedly calls `DurableList<int>.Add`. The benchmark exercises `LogEntry`/`LogEntryWriter`/format-owned extent writing instead of allocating command objects or completing a generic builder for post-hoc extent framing.
+2. `RecoverEncodedLogData` replays pre-encoded binary log data through `ILogFormat.Read` into a durable list consumer. The benchmark validates the raw `ArcBuffer` read path and push-based entry dispatch rather than materializing a `LogExtent` or `LogExtent.Entry` collection.
 
 The benchmark uses BenchmarkDotNet's memory diagnoser as review evidence. It intentionally avoids pass/fail byte thresholds because allocation counts vary by runtime, architecture, JIT tiering, and BenchmarkDotNet job configuration.

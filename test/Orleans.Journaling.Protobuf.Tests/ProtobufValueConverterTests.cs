@@ -36,8 +36,8 @@ public class ProtobufValueConverterTests
         var builder = new TestSiloBuilder();
         builder.UseProtobufCodec(options => options.AddMessageParser(StringValue.Parser));
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredKeyedService<IStateMachineLogFormat>(StateMachineLogFormatKeys.Protobuf));
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf).GetCodec<StringValue>();
+        Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(LogFormatKeys.Protobuf));
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.Protobuf).GetCodec<StringValue>();
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet(new StringValue { Value = "hello" }, buffer);
@@ -53,10 +53,10 @@ public class ProtobufValueConverterTests
     {
         var builder = new TestSiloBuilder();
         var fallbackCodec = new StringValueFallbackCodec();
-        builder.Services.AddSingleton<ILogDataCodec<StringValue>>(fallbackCodec);
+        builder.Services.AddSingleton<ILogValueCodec<StringValue>>(fallbackCodec);
         builder.UseProtobufCodec();
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf).GetCodec<StringValue>();
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.Protobuf).GetCodec<StringValue>();
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet(new StringValue { Value = "hello" }, buffer);
@@ -75,7 +75,7 @@ public class ProtobufValueConverterTests
         var builder = new TestSiloBuilder();
         builder.UseProtobufCodec();
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var provider = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf);
+        var provider = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.Protobuf);
 
         var exception = Assert.Throws<InvalidOperationException>(() => provider.GetCodec<StringValue>());
 
@@ -88,11 +88,11 @@ public class ProtobufValueConverterTests
         var builder = new TestSiloBuilder();
         builder.UseProtobufCodec();
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var provider = serviceProvider.GetRequiredKeyedService<IDurableValueCodecProvider>(StateMachineLogFormatKeys.Protobuf);
+        var provider = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.Protobuf);
 
         var exception = Assert.Throws<InvalidOperationException>(() => provider.GetCodec<UnsupportedValue>());
 
-        Assert.Contains("ILogDataCodec", exception.Message);
+        Assert.Contains("ILogValueCodec", exception.Message);
         Assert.Contains(typeof(UnsupportedValue).FullName!, exception.Message);
     }
 
@@ -104,7 +104,7 @@ public class ProtobufValueConverterTests
         Assert.Equal(value, converter.FromBytes(new ReadOnlySequence<byte>(converter.ToBytes(value))));
     }
 
-    private sealed class StringValueFallbackCodec : ILogDataCodec<StringValue>
+    private sealed class StringValueFallbackCodec : ILogValueCodec<StringValue>
     {
         public int WriteCount { get; private set; }
 
@@ -134,7 +134,7 @@ public class ProtobufValueConverterTests
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
-    private sealed class ValueConsumer<T> : IDurableValueLogEntryConsumer<T>
+    private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>
     {
         public T? Value { get; private set; }
 

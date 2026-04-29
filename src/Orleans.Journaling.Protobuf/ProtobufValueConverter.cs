@@ -7,13 +7,13 @@ namespace Orleans.Journaling.Protobuf;
 /// </summary>
 public sealed class ProtobufValueConverter<T>
 {
-    private readonly ILogDataCodec<T>? _fallbackCodec;
+    private readonly ILogValueCodec<T>? _fallbackCodec;
     private readonly IProtobufValueCodec<T>? _nativeCodec;
 
     /// <summary>
     /// Initializes a converter that uses the provided <paramref name="fallbackCodec"/> when native protobuf payload encoding is unavailable.
     /// </summary>
-    public ProtobufValueConverter(ILogDataCodec<T> fallbackCodec)
+    public ProtobufValueConverter(ILogValueCodec<T> fallbackCodec)
     {
         ArgumentNullException.ThrowIfNull(fallbackCodec);
 
@@ -30,7 +30,7 @@ public sealed class ProtobufValueConverter<T>
         {
             throw new InvalidOperationException(
                 $"Type '{typeof(T).FullName}' is not natively supported by protobuf. "
-                + $"Register an {nameof(ILogDataCodec<T>)} fallback or configure protobuf journaling with a native value codec for this type.");
+                + $"Register an {nameof(ILogValueCodec<T>)} fallback or configure protobuf journaling with a native value codec for this type.");
         }
 
         _nativeCodec = BuiltInNativeCodec;

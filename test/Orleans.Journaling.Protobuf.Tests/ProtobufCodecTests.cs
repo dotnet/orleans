@@ -23,7 +23,7 @@ public class ProtobufCodecTests
     {
         var services = new ServiceCollection();
         services.AddSerializer();
-        services.AddSingleton(typeof(ILogDataCodec<>), typeof(OrleansLogDataCodec<>));
+        services.AddSingleton(typeof(ILogValueCodec<>), typeof(OrleansLogValueCodec<>));
         var serviceProvider = services.BuildServiceProvider();
         _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
         _codecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
@@ -32,7 +32,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufDictionaryCodec_Set_RoundTrips()
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
+        var codec = new ProtobufDictionaryOperationCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet("key", 42, buffer);
@@ -46,7 +46,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufDictionaryCodec_Snapshot_RoundTrips()
     {
-        var codec = new ProtobufDictionaryEntryCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
+        var codec = new ProtobufDictionaryOperationCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
         var items = new List<KeyValuePair<string, int>>
         {
             new("alpha", 1),
@@ -64,7 +64,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_Operations_RoundTrip()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
+        var codec = new ProtobufListOperationCodec<string>(CreateConverter<string>());
         var consumer = new ListConsumer<string>();
 
         Apply(codec, writer => codec.WriteAdd("one", writer), consumer);
@@ -80,7 +80,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufQueueCodec_Operations_RoundTrip()
     {
-        var codec = new ProtobufQueueEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufQueueOperationCodec<int>(CreateConverter<int>());
         var consumer = new QueueConsumer<int>();
 
         Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
@@ -94,7 +94,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufSetCodec_Operations_RoundTrip()
     {
-        var codec = new ProtobufSetEntryCodec<string>(CreateConverter<string>());
+        var codec = new ProtobufSetOperationCodec<string>(CreateConverter<string>());
         var consumer = new SetConsumer<string>();
 
         Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
@@ -108,7 +108,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_Rejects_Overflowed_SnapshotCount()
     {
-        var codec = new ProtobufListEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufListOperationCodec<int>(CreateConverter<int>());
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(Sequence([8, 5, 32, 128, 128, 128, 128, 8]), new ListConsumer<int>()));
@@ -119,7 +119,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_Rejects_Overflowed_Index()
     {
-        var codec = new ProtobufListEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufListOperationCodec<int>(CreateConverter<int>());
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(Sequence([8, 3, 16, 128, 128, 128, 128, 8]), new ListConsumer<int>()));
@@ -130,7 +130,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_WriteSnapshot_Rejects_MismatchedCollectionCount()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
+        var codec = new ProtobufListOperationCodec<string>(CreateConverter<string>());
         var items = new MiscountedReadOnlyCollection<string>(1, new[] { "one", "two" });
 
         var exception = Assert.Throws<InvalidOperationException>(
@@ -142,7 +142,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufValueCodec_Set_RoundTrips()
     {
-        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufValueOperationCodec<int>(CreateConverter<int>());
         var consumer = new ValueConsumer<int>();
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -155,7 +155,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufValueCodec_NullString_RoundTrips()
     {
-        var codec = new ProtobufValueEntryCodec<string>(CreateConverter<string>());
+        var codec = new ProtobufValueOperationCodec<string>(CreateConverter<string>());
         var consumer = new ValueConsumer<string>();
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -168,7 +168,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufStateCodec_SetAndClear_RoundTrip()
     {
-        var codec = new ProtobufStateEntryCodec<string>(CreateConverter<string>());
+        var codec = new ProtobufStateOperationCodec<string>(CreateConverter<string>());
         var consumer = new StateConsumer<string>();
 
         Apply(codec, writer => codec.WriteSet("state", 7, writer), consumer);
@@ -180,7 +180,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufTcsCodec_States_RoundTrip()
     {
-        var codec = new ProtobufTcsEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufTcsOperationCodec<int>(CreateConverter<int>());
         var consumer = new TcsConsumer<int>();
 
         Apply(codec, writer => codec.WritePending(writer), consumer);
@@ -194,7 +194,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufValueCodec_MissingValueField_Throws()
     {
-        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufValueOperationCodec<int>(CreateConverter<int>());
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(Sequence([8, 0]), new ValueConsumer<int>()));
@@ -205,7 +205,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufValueCodec_InvalidPayloadMarker_Throws()
     {
-        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufValueOperationCodec<int>(CreateConverter<int>());
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(Sequence([8, 0, 18, 1, 2]), new ValueConsumer<int>()));
@@ -216,7 +216,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufValueCodec_TruncatedLengthDelimitedField_Throws()
     {
-        var codec = new ProtobufValueEntryCodec<int>(CreateConverter<int>());
+        var codec = new ProtobufValueOperationCodec<int>(CreateConverter<int>());
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(Sequence([8, 0, 18, 2, 1]), new ValueConsumer<int>()));
@@ -227,7 +227,7 @@ public class ProtobufCodecTests
     [Fact]
     public void ProtobufListCodec_SnapshotCountMismatch_Throws()
     {
-        var codec = new ProtobufListEntryCodec<string>(CreateConverter<string>());
+        var codec = new ProtobufListOperationCodec<string>(CreateConverter<string>());
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(Sequence([8, 5, 32, 2, 26, 2, 1, 97]), new ListConsumer<string>()));
@@ -241,8 +241,8 @@ public class ProtobufCodecTests
         var format = new ProtobufLogFormat();
         using var writer = format.CreateWriter();
 
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
 
         using var data = writer.GetCommittedBuffer();
 
@@ -259,12 +259,12 @@ public class ProtobufCodecTests
     {
         var format = new ProtobufLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [0xAA, 0xBB]);
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(300)), [0xCC]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
         using var data = writer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
-        format.Read(data, consumer);
+        format.Read(data, consumer, isCompleted: true);
 
         Assert.Collection(
             consumer.Entries,
@@ -281,15 +281,41 @@ public class ProtobufCodecTests
     }
 
     [Fact]
+    public void ProtobufLogFormat_Read_WaitsForPartialTrailingEntryWhenInputIsNotCompleted()
+    {
+        var format = new ProtobufLogFormat();
+        using var firstWriter = format.CreateWriter();
+        AppendEntry(firstWriter.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        using var firstData = firstWriter.GetCommittedBuffer();
+        var firstBytes = firstData.ToArray();
+
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
+        using var fullData = writer.GetCommittedBuffer();
+        var partialBytes = fullData.ToArray()[..^1];
+        using var data = CreateBuffer(partialBytes);
+        var consumer = new CollectingConsumer();
+
+        var result = format.Read(data, consumer, isCompleted: false);
+
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal((ulong)8, entry.StreamId);
+        Assert.Equal([0xAA, 0xBB], entry.Payload);
+        Assert.Equal(firstBytes.Length, result.BytesConsumed);
+        Assert.Equal(7, result.MinimumBufferLength);
+    }
+
+    [Fact]
     public void ProtobufLogFormat_DisposeWithoutCommit_AbortsPendingEntry()
     {
         var format = new ProtobufLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [1]);
         using var beforeAbort = writer.GetCommittedBuffer();
         var committedBytes = beforeAbort.ToArray();
 
-        using (var aborted = writer.CreateLogWriter(new StateMachineId(9)).BeginEntry())
+        using (var aborted = writer.CreateLogWriter(new LogStreamId(9)).BeginEntry())
         {
             aborted.Writer.Write([2, 3, 4]);
         }
@@ -303,14 +329,14 @@ public class ProtobufCodecTests
     {
         var format = new ProtobufLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(8)), [1]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [1]);
 
         writer.Reset();
-        AppendEntry(writer.CreateLogWriter(new StateMachineId(9)), [2]);
+        AppendEntry(writer.CreateLogWriter(new LogStreamId(9)), [2]);
         using var data = writer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
-        format.Read(data, consumer);
+        format.Read(data, consumer, isCompleted: true);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)9, entry.StreamId);
@@ -322,7 +348,7 @@ public class ProtobufCodecTests
     {
         var format = new ProtobufLogFormat();
         using var writer = format.CreateWriter();
-        var entry = writer.CreateLogWriter(new StateMachineId(8)).BeginEntry();
+        var entry = writer.CreateLogWriter(new LogStreamId(8)).BeginEntry();
         entry.Writer.Write([1]);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -348,7 +374,7 @@ public class ProtobufCodecTests
         using var data = CreateBuffer(bytes);
         var consumer = new CollectingConsumer();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => format.Read(data, consumer));
+        var exception = Assert.Throws<InvalidOperationException>(() => format.Read(data, consumer, isCompleted: true));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -357,11 +383,11 @@ public class ProtobufCodecTests
     private ProtobufValueConverter<T> CreateConverter<T>()
         => ProtobufValueConverter<T>.IsNativeType
             ? new ProtobufValueConverter<T>()
-            : new ProtobufValueConverter<T>(new OrleansLogDataCodec<T>(_codecProvider.GetCodec<T>(), _sessionPool));
+            : new ProtobufValueConverter<T>(new OrleansLogValueCodec<T>(_codecProvider.GetCodec<T>(), _sessionPool));
 
     private static ReadOnlySequence<byte> Sequence(byte[] bytes) => new(bytes);
 
-    private static void AppendEntry(StateMachineLogWriter writer, ReadOnlySpan<byte> payload)
+    private static void AppendEntry(LogWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
@@ -375,42 +401,42 @@ public class ProtobufCodecTests
         return writer.ConsumeSlice(writer.Length);
     }
 
-    private static void Apply<T>(IDurableListCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableSetCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableStateCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer)
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
         write(buffer);
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
     }
 
-    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryLogEntryConsumer<TKey, TValue> where TKey : notnull
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull
     {
         public TKey? LastSetKey { get; private set; }
         public TValue? LastSetValue { get; private set; }
@@ -427,7 +453,7 @@ public class ProtobufCodecTests
         public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
     }
 
-    private sealed class ListConsumer<T> : IDurableListLogEntryConsumer<T>
+    private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -439,7 +465,7 @@ public class ProtobufCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class QueueConsumer<T> : IDurableQueueLogEntryConsumer<T>
+    private sealed class QueueConsumer<T> : IDurableQueueOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
@@ -449,7 +475,7 @@ public class ProtobufCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class SetConsumer<T> : IDurableSetLogEntryConsumer<T>
+    private sealed class SetConsumer<T> : IDurableSetOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -459,20 +485,20 @@ public class ProtobufCodecTests
         public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
     }
 
-    private sealed class ValueConsumer<T> : IDurableValueLogEntryConsumer<T>
+    private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>
     {
         public T? Value { get; private set; }
         public void ApplySet(T value) => Value = value;
     }
 
-    private sealed class StateConsumer<T> : IDurableStateLogEntryConsumer<T>
+    private sealed class StateConsumer<T> : IDurableStateOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplySet(T state, ulong version) => Commands.Add($"set:{state}:{version}");
         public void ApplyClear() => Commands.Add("clear");
     }
 
-    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceLogEntryConsumer<T>
+    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyPending() => Commands.Add("pending");
@@ -481,11 +507,11 @@ public class ProtobufCodecTests
         public void ApplyCanceled() => Commands.Add("canceled");
     }
 
-    private sealed class CollectingConsumer : IStateMachineLogEntryConsumer
+    private sealed class CollectingConsumer : ILogEntrySink
     {
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public void OnEntry(StateMachineId streamId, ReadOnlySequence<byte> payload) =>
+        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) =>
             Entries.Add((streamId.Value, payload.ToArray()));
     }
 

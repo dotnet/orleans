@@ -3,24 +3,29 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Protobuf;
 
-internal sealed class ProtobufLogFormat : IStateMachineLogFormat
+internal sealed class ProtobufLogFormat : ILogFormat
 {
     private const uint StreamIdFieldNumber = 1;
     private const uint PayloadFieldNumber = 2;
 
-    public IStateMachineLogExtentWriter CreateWriter()
-        => new ProtobufLogExtentWriter();
+    public ILogSegmentWriter CreateWriter()
+        => new ProtobufLogSegmentWriter();
 
-    public void Read(ArcBuffer input, IStateMachineLogEntryConsumer consumer)
+    public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
         var remaining = input.AsReadOnlySequence();
         var offset = 0L;
+        int? minimumBufferLength = null;
         while (!remaining.IsEmpty)
         {
             var reader = new SequenceReader<byte>(remaining);
-            var messageLength = ProtobufLogEntryReader.ReadLengthPrefix(ref reader, offset);
+            if (!ProtobufLogEntryReader.TryReadLengthPrefix(ref reader, offset, isCompleted, out var messageLength, out minimumBufferLength))
+            {
+                break;
+            }
+
             var prefixLength = reader.Consumed;
             if (messageLength == 0)
             {
@@ -30,6 +35,12 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
 
             if (messageLength > (ulong)reader.Remaining)
             {
+                if (!isCompleted)
+                {
+                    minimumBufferLength = messageLength <= int.MaxValue - prefixLength ? checked((int)(prefixLength + messageLength)) : null;
+                    break;
+                }
+
                 throw new InvalidOperationException(
                     $"Malformed protobuf log entry stream at byte offset {offset}: LogEntry length {messageLength} exceeds remaining input bytes {reader.Remaining}.");
             }
@@ -42,9 +53,11 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
             remaining = remaining.Slice(frameLength);
             offset += frameLength;
         }
+
+        return new(checked((int)offset), remaining.IsEmpty ? null : minimumBufferLength);
     }
 
-    private sealed class ProtobufLogExtentWriter : StateMachineLogExtentWriterBase
+    private sealed class ProtobufLogSegmentWriter : LogSegmentWriterBase
     {
         private readonly ArcBufferWriter _buffer = new();
         private readonly ArcBufferWriter _payload = new();
@@ -55,7 +68,7 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
         {
             if (IsEntryActive)
             {
-                throw new InvalidOperationException("The protobuf log extent has an active entry.");
+                throw new InvalidOperationException("The protobuf log segment has an active entry.");
             }
 
             return _buffer.PeekSlice(_buffer.Length);
@@ -65,7 +78,7 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
         {
             if (IsEntryActive)
             {
-                throw new InvalidOperationException("The protobuf log extent cannot be reset while an entry is active.");
+                throw new InvalidOperationException("The protobuf log segment cannot be reset while an entry is active.");
             }
 
             _payload.Reset();
@@ -78,9 +91,9 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
             _buffer.Dispose();
         }
 
-        protected override void OnBeginEntry(StateMachineId streamId) => _payload.Reset();
+        protected override void OnBeginEntry(LogStreamId streamId) => _payload.Reset();
 
-        protected override int GetEntryStart(StateMachineId streamId) => _buffer.Length;
+        protected override int GetEntryStart(LogStreamId streamId) => _buffer.Length;
 
         protected override void AdvancePayload(int count) => _payload.AdvanceWriter(count);
 
@@ -92,7 +105,7 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
 
         protected override void WritePayload(ReadOnlySequence<byte> value) => _payload.Write(value);
 
-        protected override void CommitEntry(StateMachineId streamId, int entryStart)
+        protected override void CommitEntry(LogStreamId streamId, int entryStart)
         {
             var payloadLength = _payload.Length;
             var messageLength = GetMessageBodyLength(streamId.Value, payloadLength);
@@ -110,7 +123,7 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
             _payload.Reset();
         }
 
-        protected override void AbortEntry(StateMachineId streamId, int entryStart) => _payload.Reset();
+        protected override void AbortEntry(LogStreamId streamId, int entryStart) => _payload.Reset();
 
         private int GetCurrentFrameLength()
         {
@@ -129,13 +142,18 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
 
     private static class ProtobufLogEntryReader
     {
-        public static uint ReadLengthPrefix(ref SequenceReader<byte> reader, long offset)
-            => ReadVarUInt32(ref reader, offset, "LogEntry length prefix");
+        public static bool TryReadLengthPrefix(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            out uint length,
+            out int? minimumBufferLength)
+            => TryReadVarUInt32(ref reader, offset, isCompleted, "LogEntry length prefix", out length, out minimumBufferLength);
 
         public static void ReadMessage(
             ReadOnlySequence<byte> message,
             long offset,
-            out StateMachineId streamId,
+            out LogStreamId streamId,
             out ReadOnlySequence<byte> payload)
         {
             var reader = new SequenceReader<byte>(message);
@@ -266,6 +284,47 @@ internal sealed class ProtobufLogFormat : IStateMachineLogFormat
                 if ((value & 0x80) == 0)
                 {
                     return result;
+                }
+            }
+
+            throw new InvalidOperationException(
+                $"Malformed protobuf log entry stream at byte offset {offset}: malformed {fieldName}.");
+        }
+
+        private static bool TryReadVarUInt32(
+            ref SequenceReader<byte> reader,
+            long offset,
+            bool isCompleted,
+            string fieldName,
+            out uint result,
+            out int? minimumBufferLength)
+        {
+            result = 0;
+            minimumBufferLength = null;
+            for (var index = 0; index < 5; index++)
+            {
+                if (!reader.TryRead(out var value))
+                {
+                    if (!isCompleted)
+                    {
+                        minimumBufferLength = checked((int)reader.Consumed + 1);
+                        return false;
+                    }
+
+                    throw new InvalidOperationException(
+                        $"Malformed protobuf log entry stream at byte offset {offset}: truncated {fieldName}.");
+                }
+
+                if (index == 4 && (value & 0xF0) != 0)
+                {
+                    throw new InvalidOperationException(
+                        $"Malformed protobuf log entry stream at byte offset {offset}: malformed {fieldName}.");
+                }
+
+                result |= (uint)(value & 0x7F) << (index * 7);
+                if ((value & 0x80) == 0)
+                {
+                    return true;
                 }
             }
 

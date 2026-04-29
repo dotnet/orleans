@@ -30,7 +30,7 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobStateMachineStorage()
+            .AddAzureAppendBlobLogStorage()
             .UseJsonCodec(JournalJsonContext.Default);
     });
 
@@ -41,7 +41,7 @@ If you need to customize `JsonSerializerOptions`, add the generated context thro
 
 ```csharp
 siloBuilder
-    .AddAzureAppendBlobStateMachineStorage()
+    .AddAzureAppendBlobLogStorage()
     .UseJsonCodec(options =>
     {
         options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;

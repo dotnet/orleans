@@ -8,11 +8,11 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling.MessagePack
 {
-    public sealed partial class MessagePackDictionaryEntryCodec<TKey, TValue> : IDurableDictionaryCodec<TKey, TValue>
+    public sealed partial class MessagePackDictionaryOperationCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue>
     {
-        public MessagePackDictionaryEntryCodec(global::MessagePack.MessagePackSerializerOptions options) { }
+        public MessagePackDictionaryOperationCodec(global::MessagePack.MessagePackSerializerOptions options) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -35,11 +35,11 @@ namespace Orleans.Journaling.MessagePack
         public global::MessagePack.MessagePackSerializerOptions SerializerOptions { get { throw null; } set { } }
     }
 
-    public sealed partial class MessagePackListEntryCodec<T> : IDurableListCodec<T>
+    public sealed partial class MessagePackListOperationCodec<T> : IDurableListOperationCodec<T>
     {
-        public MessagePackListEntryCodec(global::MessagePack.MessagePackSerializerOptions options) { }
+        public MessagePackListOperationCodec(global::MessagePack.MessagePackSerializerOptions options) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
 
@@ -54,11 +54,11 @@ namespace Orleans.Journaling.MessagePack
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class MessagePackQueueEntryCodec<T> : IDurableQueueCodec<T>
+    public sealed partial class MessagePackQueueOperationCodec<T> : IDurableQueueOperationCodec<T>
     {
-        public MessagePackQueueEntryCodec(global::MessagePack.MessagePackSerializerOptions options) { }
+        public MessagePackQueueOperationCodec(global::MessagePack.MessagePackSerializerOptions options) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -69,11 +69,11 @@ namespace Orleans.Journaling.MessagePack
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class MessagePackSetEntryCodec<T> : IDurableSetCodec<T>
+    public sealed partial class MessagePackSetOperationCodec<T> : IDurableSetOperationCodec<T>
     {
-        public MessagePackSetEntryCodec(global::MessagePack.MessagePackSerializerOptions options) { }
+        public MessagePackSetOperationCodec(global::MessagePack.MessagePackSerializerOptions options) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
 
@@ -84,22 +84,22 @@ namespace Orleans.Journaling.MessagePack
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class MessagePackStateEntryCodec<T> : IDurableStateCodec<T>
+    public sealed partial class MessagePackStateOperationCodec<T> : IDurableStateOperationCodec<T>
     {
-        public MessagePackStateEntryCodec(global::MessagePack.MessagePackSerializerOptions options) { }
+        public MessagePackStateOperationCodec(global::MessagePack.MessagePackSerializerOptions options) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
         public void WriteSet(T state, ulong version, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class MessagePackTcsEntryCodec<T> : IDurableTaskCompletionSourceCodec<T>
+    public sealed partial class MessagePackTcsOperationCodec<T> : IDurableTaskCompletionSourceOperationCodec<T>
     {
-        public MessagePackTcsEntryCodec(global::MessagePack.MessagePackSerializerOptions options) { }
+        public MessagePackTcsOperationCodec(global::MessagePack.MessagePackSerializerOptions options) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer) { }
 
         public void WriteCanceled(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -110,11 +110,11 @@ namespace Orleans.Journaling.MessagePack
         public void WritePending(System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class MessagePackValueEntryCodec<T> : IDurableValueCodec<T>
+    public sealed partial class MessagePackValueOperationCodec<T> : IDurableValueOperationCodec<T>
     {
-        public MessagePackValueEntryCodec(global::MessagePack.MessagePackSerializerOptions options) { }
+        public MessagePackValueOperationCodec(global::MessagePack.MessagePackSerializerOptions options) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) { }
 
         public void WriteSet(T value, System.Buffers.IBufferWriter<byte> output) { }
     }

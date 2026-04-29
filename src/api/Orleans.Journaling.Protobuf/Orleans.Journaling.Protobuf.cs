@@ -8,11 +8,11 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling.Protobuf
 {
-    public sealed partial class ProtobufDictionaryEntryCodec<TKey, TValue> : IDurableDictionaryCodec<TKey, TValue>
+    public sealed partial class ProtobufDictionaryOperationCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue>
     {
-        public ProtobufDictionaryEntryCodec(ProtobufValueConverter<TKey> keyConverter, ProtobufValueConverter<TValue> valueConverter) { }
+        public ProtobufDictionaryOperationCodec(ProtobufValueConverter<TKey> keyConverter, ProtobufValueConverter<TValue> valueConverter) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryLogEntryConsumer<TKey, TValue> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -36,11 +36,11 @@ namespace Orleans.Journaling.Protobuf
             where T : Google.Protobuf.IMessage<T> { throw null; }
     }
 
-    public sealed partial class ProtobufListEntryCodec<T> : IDurableListCodec<T>
+    public sealed partial class ProtobufListOperationCodec<T> : IDurableListOperationCodec<T>
     {
-        public ProtobufListEntryCodec(ProtobufValueConverter<T> converter) { }
+        public ProtobufListOperationCodec(ProtobufValueConverter<T> converter) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
 
@@ -55,11 +55,11 @@ namespace Orleans.Journaling.Protobuf
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class ProtobufQueueEntryCodec<T> : IDurableQueueCodec<T>
+    public sealed partial class ProtobufQueueOperationCodec<T> : IDurableQueueOperationCodec<T>
     {
-        public ProtobufQueueEntryCodec(ProtobufValueConverter<T> converter) { }
+        public ProtobufQueueOperationCodec(ProtobufValueConverter<T> converter) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -70,11 +70,11 @@ namespace Orleans.Journaling.Protobuf
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class ProtobufSetEntryCodec<T> : IDurableSetCodec<T>
+    public sealed partial class ProtobufSetOperationCodec<T> : IDurableSetOperationCodec<T>
     {
-        public ProtobufSetEntryCodec(ProtobufValueConverter<T> converter) { }
+        public ProtobufSetOperationCodec(ProtobufValueConverter<T> converter) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
 
@@ -85,22 +85,22 @@ namespace Orleans.Journaling.Protobuf
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class ProtobufStateEntryCodec<T> : IDurableStateCodec<T>
+    public sealed partial class ProtobufStateOperationCodec<T> : IDurableStateOperationCodec<T>
     {
-        public ProtobufStateEntryCodec(ProtobufValueConverter<T> converter) { }
+        public ProtobufStateOperationCodec(ProtobufValueConverter<T> converter) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
 
         public void WriteSet(T state, ulong version, System.Buffers.IBufferWriter<byte> output) { }
     }
 
-    public sealed partial class ProtobufTcsEntryCodec<T> : IDurableTaskCompletionSourceCodec<T>
+    public sealed partial class ProtobufTcsOperationCodec<T> : IDurableTaskCompletionSourceOperationCodec<T>
     {
-        public ProtobufTcsEntryCodec(ProtobufValueConverter<T> converter) { }
+        public ProtobufTcsOperationCodec(ProtobufValueConverter<T> converter) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer) { }
 
         public void WriteCanceled(System.Buffers.IBufferWriter<byte> output) { }
 
@@ -115,7 +115,7 @@ namespace Orleans.Journaling.Protobuf
     {
         public ProtobufValueConverter() { }
 
-        public ProtobufValueConverter(ILogDataCodec<T> fallbackCodec) { }
+        public ProtobufValueConverter(ILogValueCodec<T> fallbackCodec) { }
 
         public static bool IsNativeType { get { throw null; } }
 
@@ -124,11 +124,11 @@ namespace Orleans.Journaling.Protobuf
         public byte[] ToBytes(T value) { throw null; }
     }
 
-    public sealed partial class ProtobufValueEntryCodec<T> : IDurableValueCodec<T>
+    public sealed partial class ProtobufValueOperationCodec<T> : IDurableValueOperationCodec<T>
     {
-        public ProtobufValueEntryCodec(ProtobufValueConverter<T> converter) { }
+        public ProtobufValueOperationCodec(ProtobufValueConverter<T> converter) { }
 
-        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueLogEntryConsumer<T> consumer) { }
+        public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) { }
 
         public void WriteSet(T value, System.Buffers.IBufferWriter<byte> output) { }
     }

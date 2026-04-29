@@ -8,17 +8,17 @@ using Xunit;
 namespace Orleans.Journaling.MessagePack.Tests;
 
 [TestCategory("BVT")]
-public sealed class CodecRecoveryTests : StateMachineTestBase
+public sealed class CodecRecoveryTests : JournalingTestBase
 {
     private static readonly MessagePackSerializerOptions SerializerOptions = MessagePackSerializerOptions.Standard;
 
     [Fact]
     public async Task MessagePackCodec_Dictionary_WriteAndRecover()
     {
-        var storage = new VolatileStateMachineStorage(StateMachineLogFormatKeys.MessagePack);
+        var storage = new VolatileLogStorage(LogFormatKeys.MessagePack);
 
         var sut = CreateTestSystemWithMessagePackCodec(storage);
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new MessagePackDictionaryEntryCodec<string, int>(SerializerOptions));
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new MessagePackDictionaryOperationCodec<string, int>(SerializerOptions));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -26,7 +26,7 @@ public sealed class CodecRecoveryTests : StateMachineTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         var sut2 = CreateTestSystemWithMessagePackCodec(storage);
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new MessagePackDictionaryEntryCodec<string, int>(SerializerOptions));
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new MessagePackDictionaryOperationCodec<string, int>(SerializerOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(2, dict2.Count);
@@ -34,15 +34,15 @@ public sealed class CodecRecoveryTests : StateMachineTestBase
         Assert.Equal(2, dict2["beta"]);
     }
 
-    private (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithMessagePackCodec(IStateMachineStorage storage)
+    private (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithMessagePackCodec(ILogStorage storage)
     {
-        var stateMachineIdsCodec = new MessagePackDictionaryEntryCodec<string, ulong>(SerializerOptions);
-        var retirementTrackerCodec = new MessagePackDictionaryEntryCodec<string, DateTime>(SerializerOptions);
-        var manager = new StateMachineManager(
+        var logStreamIdsCodec = new MessagePackDictionaryOperationCodec<string, ulong>(SerializerOptions);
+        var retirementTrackerCodec = new MessagePackDictionaryOperationCodec<string, DateTime>(SerializerOptions);
+        var manager = new LogManager(
             storage,
-            LoggerFactory.CreateLogger<StateMachineManager>(),
+            LoggerFactory.CreateLogger<LogManager>(),
             Microsoft.Extensions.Options.Options.Create(ManagerOptions),
-            stateMachineIdsCodec,
+            logStreamIdsCodec,
             retirementTrackerCodec,
             TimeProvider.System,
             new MessagePackLogFormat());

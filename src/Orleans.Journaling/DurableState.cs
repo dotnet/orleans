@@ -6,22 +6,22 @@ using Orleans.Core;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine, IDurableStateLogEntryConsumer<T>
+internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine, IDurableStateOperationHandler<T>
 {
-    private readonly IDurableStateCodec<T> _codec;
-    private readonly IStateMachineManager _manager;
+    private readonly IDurableStateOperationCodec<T> _codec;
+    private readonly ILogManager _manager;
     private T? _value;
     private ulong _version;
 
-    public DurableState([ServiceKey] string key, IStateMachineManager manager, IStateMachineStorage storage, IServiceProvider serviceProvider)
+    public DurableState([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = StateMachineLogFormatServices.GetRequiredKeyedService<IDurableStateCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
         _manager = manager;
     }
 
-    internal DurableState(string key, IStateMachineManager manager, IDurableStateCodec<T> codec)
+    internal DurableState(string key, ILogManager manager, IDurableStateOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -45,33 +45,33 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         OnPersisted?.Invoke();
     }
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage) => _value = default;
+    void IDurableStateMachine.Reset(ILogWriter storage) => _value = default;
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineLogWriter logWriter) => WriteState(logWriter);
+    void IDurableStateMachine.AppendEntries(LogWriter logWriter) => WriteState(logWriter);
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineLogWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter) => WriteState(snapshotWriter);
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(StateMachineLogWriter writer)
+    private void WriteState(LogWriter writer)
     {
         using var entry = writer.BeginEntry();
         _codec.WriteSet(_value!, _version, entry.Writer);
         entry.Commit();
     }
 
-    void IDurableStateLogEntryConsumer<T>.ApplySet(T state, ulong version)
+    void IDurableStateOperationHandler<T>.ApplySet(T state, ulong version)
     {
         _value = state;
         _version = version;
     }
 
-    void IDurableStateLogEntryConsumer<T>.ApplyClear()
+    void IDurableStateOperationHandler<T>.ApplyClear()
     {
         _value = default;
         _version = 0;

@@ -12,7 +12,7 @@ namespace Orleans.Journaling.Tests;
 /// collections of unique identifiers, tags, or other distinct values in Orleans grains.
 /// </summary>
 [TestCategory("BVT")]
-public class DurableSetTests : StateMachineTestBase
+public class DurableSetTests : JournalingTestBase
 {
     /// <summary>
     /// Tests basic set operations: Add, Remove, and uniqueness constraint.
@@ -25,7 +25,7 @@ public class DurableSetTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var set = new DurableSet<string>("testSet", manager, new OrleansBinarySetEntryCodec<string>(new OrleansLogDataCodec<string>(codec, SessionPool)));
+        var set = new DurableSet<string>("testSet", manager, new OrleansBinarySetOperationCodec<string>(new OrleansLogValueCodec<string>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Act - Add items
@@ -66,7 +66,7 @@ public class DurableSetTests : StateMachineTestBase
         // First manager and set
         var sut = CreateTestSystem();
         var codec = CodecProvider.GetCodec<string>();
-        var set1 = new DurableSet<string>("testSet", sut.Manager, new OrleansBinarySetEntryCodec<string>(new OrleansLogDataCodec<string>(codec, SessionPool)));
+        var set1 = new DurableSet<string>("testSet", sut.Manager, new OrleansBinarySetOperationCodec<string>(new OrleansLogValueCodec<string>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Act - Add items and persist
@@ -77,7 +77,7 @@ public class DurableSetTests : StateMachineTestBase
 
         // Create a new manager with the same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var set2 = new DurableSet<string>("testSet", sut2.Manager, new OrleansBinarySetEntryCodec<string>(new OrleansLogDataCodec<string>(codec, SessionPool)));
+        var set2 = new DurableSet<string>("testSet", sut2.Manager, new OrleansBinarySetOperationCodec<string>(new OrleansLogValueCodec<string>(codec, SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - Set should be recovered
@@ -97,7 +97,7 @@ public class DurableSetTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
-        var set = new DurableSet<TestPerson>("personSet", manager, new OrleansBinarySetEntryCodec<TestPerson>(new OrleansLogDataCodec<TestPerson>(codec, SessionPool)));
+        var set = new DurableSet<TestPerson>("personSet", manager, new OrleansBinarySetOperationCodec<TestPerson>(new OrleansLogValueCodec<TestPerson>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Act
@@ -127,7 +127,7 @@ public class DurableSetTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var set = new DurableSet<string>("clearSet", manager, new OrleansBinarySetEntryCodec<string>(new OrleansLogDataCodec<string>(codec, SessionPool)));
+        var set = new DurableSet<string>("clearSet", manager, new OrleansBinarySetOperationCodec<string>(new OrleansLogValueCodec<string>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Add items
@@ -156,7 +156,7 @@ public class DurableSetTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var set = new DurableSet<string>("enumSet", manager, new OrleansBinarySetEntryCodec<string>(new OrleansLogDataCodec<string>(codec, SessionPool)));
+        var set = new DurableSet<string>("enumSet", manager, new OrleansBinarySetOperationCodec<string>(new OrleansLogValueCodec<string>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Add items
@@ -188,7 +188,7 @@ public class DurableSetTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
-        var set = new DurableSet<int>("largeSet", manager, new OrleansBinarySetEntryCodec<int>(new OrleansLogDataCodec<int>(codec, SessionPool)));
+        var set = new DurableSet<int>("largeSet", manager, new OrleansBinarySetOperationCodec<int>(new OrleansLogValueCodec<int>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Act - Add many items
@@ -211,7 +211,7 @@ public class DurableSetTests : StateMachineTestBase
 
         // Create a new manager with the same storage to test recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var set2 = new DurableSet<int>("largeSet", sut2.Manager, new OrleansBinarySetEntryCodec<int>(new OrleansLogDataCodec<int>(codec, SessionPool)));
+        var set2 = new DurableSet<int>("largeSet", sut2.Manager, new OrleansBinarySetOperationCodec<int>(new OrleansLogValueCodec<int>(codec, SessionPool)));
         await sut2.Lifecycle.OnStart();
         
         // Assert - Large set is correctly recovered
@@ -234,8 +234,8 @@ public class DurableSetTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
-        var set1 = new DurableSet<int>("set1", manager, new OrleansBinarySetEntryCodec<int>(new OrleansLogDataCodec<int>(codec, SessionPool)));
-        var set2 = new DurableSet<int>("set2", manager, new OrleansBinarySetEntryCodec<int>(new OrleansLogDataCodec<int>(codec, SessionPool)));
+        var set1 = new DurableSet<int>("set1", manager, new OrleansBinarySetOperationCodec<int>(new OrleansLogValueCodec<int>(codec, SessionPool)));
+        var set2 = new DurableSet<int>("set2", manager, new OrleansBinarySetOperationCodec<int>(new OrleansLogValueCodec<int>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Populate set1 with even numbers from 0 to 10
@@ -284,7 +284,7 @@ public class DurableSetTests : StateMachineTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
-        var set = new DurableSet<int>("exceptSet", manager, new OrleansBinarySetEntryCodec<int>(new OrleansLogDataCodec<int>(codec, SessionPool)));
+        var set = new DurableSet<int>("exceptSet", manager, new OrleansBinarySetOperationCodec<int>(new OrleansLogValueCodec<int>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
         
         // Add numbers from 0 to 9

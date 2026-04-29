@@ -11,7 +11,7 @@ namespace Orleans.Journaling.Json.Tests;
 /// Tests that verify same-format recovery for JSON journaling and the Orleans binary compatibility baseline.
 /// </summary>
 [TestCategory("BVT")]
-public class CodecRecoveryTests : StateMachineTestBase
+public class CodecRecoveryTests : JournalingTestBase
 {
     /// <summary>
     /// Writes data with the Orleans binary codec, then reads it back.
@@ -24,9 +24,9 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Write phase
         var sut = CreateTestSystem(storage);
-        var keyCodec = new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec = new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec, valueCodec));
+        var keyCodec = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var valueCodec = new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -36,9 +36,9 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Recovery phase — new manager, same storage
         var sut2 = CreateTestSystem(storage);
-        var keyCodec2 = new OrleansLogDataCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec2 = new OrleansLogDataCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryEntryCodec<string, int>(keyCodec2, valueCodec2));
+        var keyCodec2 = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var valueCodec2 = new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec2, valueCodec2));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, dict2.Count);
@@ -59,7 +59,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new JsonDictionaryEntryCodec<string, int>(jsonOptions));
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new JsonDictionaryOperationCodec<string, int>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -74,7 +74,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new JsonDictionaryEntryCodec<string, int>(jsonOptions));
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new JsonDictionaryOperationCodec<string, int>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(2, dict2.Count);
@@ -93,7 +93,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var list = new DurableList<string>("list", sut.Manager, new JsonListEntryCodec<string>(jsonOptions));
+        var list = new DurableList<string>("list", sut.Manager, new JsonListOperationCodec<string>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         list.Add("one");
@@ -103,7 +103,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var list2 = new DurableList<string>("list", sut2.Manager, new JsonListEntryCodec<string>(jsonOptions));
+        var list2 = new DurableList<string>("list", sut2.Manager, new JsonListOperationCodec<string>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, list2.Count);
@@ -123,7 +123,7 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var value = new DurableValue<int>("val", sut.Manager, new JsonValueEntryCodec<int>(jsonOptions));
+        var value = new DurableValue<int>("val", sut.Manager, new JsonValueOperationCodec<int>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         value.Value = 42;
@@ -131,26 +131,26 @@ public class CodecRecoveryTests : StateMachineTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var value2 = new DurableValue<int>("val", sut2.Manager, new JsonValueEntryCodec<int>(jsonOptions));
+        var value2 = new DurableValue<int>("val", sut2.Manager, new JsonValueOperationCodec<int>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(42, value2.Value);
     }
 
-    internal (IStateMachineManager Manager, IStateMachineStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(IStateMachineStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
+    internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(ILogStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
         storage ??= CreateJsonStorage();
         jsonOptions ??= CreateJsonOptions();
 
-        var stateMachineIdsCodec = new JsonDictionaryEntryCodec<string, ulong>(jsonOptions);
-        var retirementTrackerCodec = new JsonDictionaryEntryCodec<string, DateTime>(jsonOptions);
-        var manager = new StateMachineManager(storage, LoggerFactory.CreateLogger<StateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), stateMachineIdsCodec, retirementTrackerCodec, TimeProvider.System, new JsonLinesLogFormat());
+        var logStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
+        var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
+        var manager = new LogManager(storage, LoggerFactory.CreateLogger<LogManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new JsonLinesLogFormat());
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
 
-    private static VolatileStateMachineStorage CreateJsonStorage() => new(StateMachineLogFormatKeys.Json);
+    private static VolatileLogStorage CreateJsonStorage() => new(LogFormatKeys.Json);
 
     private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };

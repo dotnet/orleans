@@ -11,7 +11,7 @@ public sealed class DurableListDirectWriteTests
     public void Add_DoesNotMutateWhenEncodingFails()
     {
         var writer = new TestLogWriter();
-        var list = new DurableList<int>("list", new TestStateMachineManager(writer), new ThrowingAddCodec<int>());
+        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingAddCodec<int>());
 
         var thrown = false;
         try
@@ -32,7 +32,7 @@ public sealed class DurableListDirectWriteTests
     public void Add_UsesDirectEntryWriter()
     {
         var writer = new TestLogWriter();
-        var list = new DurableList<int>("list", new TestStateMachineManager(writer), new DirectAddCodec<int>());
+        var list = new DurableList<int>("list", new TestLogManager(writer), new DirectAddCodec<int>());
 
         list.Add(1);
 
@@ -41,7 +41,7 @@ public sealed class DurableListDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestStateMachineManager(IStateMachineLogWriter writer) : IStateMachineManager
+    private sealed class TestLogManager(ILogWriter writer) : ILogManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
@@ -58,13 +58,13 @@ public sealed class DurableListDirectWriteTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class TestLogWriter : IStateMachineLogWriter
+    private sealed class TestLogWriter : ILogWriter
     {
-        private readonly LogExtentBuffer _buffer = new();
+        private readonly LogSegmentBuffer _buffer = new();
 
         public long Length => _buffer.Length;
 
-        public StateMachineLogEntry BeginEntry() => _buffer.CreateLogWriter(new StateMachineId(1)).BeginEntry();
+        public LogEntry BeginEntry() => _buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
     }
 
     private sealed class ThrowingAddCodec<T> : TestListCodec<T>
@@ -88,7 +88,7 @@ public sealed class DurableListDirectWriteTests
         }
     }
 
-    private abstract class TestListCodec<T> : IDurableListCodec<T>
+    private abstract class TestListCodec<T> : IDurableListOperationCodec<T>
     {
         public abstract void WriteAdd(T item, IBufferWriter<byte> output);
 
@@ -102,6 +102,6 @@ public sealed class DurableListDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableListLogEntryConsumer<T> consumer) => throw new NotSupportedException();
+        public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 }
