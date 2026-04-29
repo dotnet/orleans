@@ -1984,7 +1984,16 @@ public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
     }
 
     private static ReferenceAssemblyModel CreateEmptyReferenceAssemblyModel(string assemblyName)
-        => new(assemblyName, [], [], [], [], [], [], [], []);
+        => new(
+            assemblyName,
+            EquatableArray<string>.Empty,
+            EquatableArray<WellKnownTypeIdModel>.Empty,
+            EquatableArray<TypeAliasModel>.Empty,
+            EquatableArray<CompoundTypeAliasModel>.Empty,
+            EquatableArray<SerializableTypeModel>.Empty,
+            EquatableArray<ProxyInterfaceModel>.Empty,
+            EquatableArray<RegisteredCodecModel>.Empty,
+            EquatableArray<InterfaceImplementationModel>.Empty);
 
     private readonly struct SourceOutputResult(GeneratedSourceEntry? sourceEntry, Diagnostic? diagnostic) : IEquatable<SourceOutputResult>
     {
