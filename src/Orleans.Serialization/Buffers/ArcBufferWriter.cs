@@ -41,9 +41,6 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     // The total length of the buffer.
     private int _totalLength;
 
-    // The total number of bytes consumed from this buffer.
-    private long _consumed;
-
     // Indicates whether the writer has been disposed.
     private bool _disposed;
 
@@ -242,7 +239,6 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
         UnpinAll();
         _totalLength = _readIndex = 0;
-        _consumed = 0;
         _readPage = _writePage = _tail = ArcBufferPagePool.Shared.Rent();
         Debug.Assert(_readPage.ReferenceCount == 0);
         _readPage.Pin(_readPage.Version);
@@ -255,7 +251,6 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
         UnpinAll();
         _totalLength = _readIndex = 0;
-        _consumed = 0;
         _readPage = _writePage = _tail = null!;
         _disposed = true;
     }
@@ -347,18 +342,6 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
             }
 
             return _readPage.AsSpan(_readIndex, _readPage.Length - _readIndex);
-        }
-    }
-
-    /// <summary>
-    /// Gets the total number of bytes which have been consumed from this buffer.
-    /// </summary>
-    internal long Consumed
-    {
-        get
-        {
-            ThrowIfDisposed();
-            return _consumed;
         }
     }
 
@@ -595,8 +578,6 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         if (count < 0) throw new ArgumentOutOfRangeException(nameof(count), "Count must be greater than or equal to 0.");
         if (count > Length) throw new ArgumentOutOfRangeException(nameof(count), "Count must be less than or equal to the unconsumed length of the buffer.");
 #endif
-
-        _consumed += count;
 
         _readIndex += count;
 
@@ -1000,8 +981,6 @@ public sealed class ArcBufferPage
 /// <param name="writer">The writer.</param>
 public readonly struct ArcBufferReader(ArcBufferWriter writer)
 {
-    private readonly long _consumedOffset = writer.Consumed;
-
     /// <summary>
     /// Gets the number of unconsumed bytes.
     /// </summary>
@@ -1018,15 +997,6 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         get => writer.Length == 0;
-    }
-
-    /// <summary>
-    /// Gets the total number of bytes which have been consumed by this reader.
-    /// </summary>
-    public long Consumed
-    {
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => writer.Consumed - _consumedOffset;
     }
 
     /// <summary>
@@ -1304,13 +1274,14 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <returns>The number of bytes advanced.</returns>
     public long AdvancePast(byte value)
     {
-        var start = writer.Consumed;
+        var result = 0L;
         while (writer.TryPeek(0, out var current) && current == value)
         {
             writer.AdvanceReader(1);
+            result++;
         }
 
-        return writer.Consumed - start;
+        return result;
     }
 
     /// <summary>
@@ -1320,13 +1291,14 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <returns>The number of bytes advanced.</returns>
     public long AdvancePastAny(ReadOnlySpan<byte> values)
     {
-        var start = writer.Consumed;
+        var result = 0L;
         while (writer.TryPeek(0, out var current) && values.IndexOf(current) >= 0)
         {
             writer.AdvanceReader(1);
+            result++;
         }
 
-        return writer.Consumed - start;
+        return result;
     }
 
     /// <summary>
@@ -1335,13 +1307,14 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <returns>The number of bytes advanced.</returns>
     public long AdvancePastAny(byte value0, byte value1)
     {
-        var start = writer.Consumed;
+        var result = 0L;
         while (writer.TryPeek(0, out var current) && (current == value0 || current == value1))
         {
             writer.AdvanceReader(1);
+            result++;
         }
 
-        return writer.Consumed - start;
+        return result;
     }
 
     /// <summary>
@@ -1350,13 +1323,14 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <returns>The number of bytes advanced.</returns>
     public long AdvancePastAny(byte value0, byte value1, byte value2)
     {
-        var start = writer.Consumed;
+        var result = 0L;
         while (writer.TryPeek(0, out var current) && (current == value0 || current == value1 || current == value2))
         {
             writer.AdvanceReader(1);
+            result++;
         }
 
-        return writer.Consumed - start;
+        return result;
     }
 
     /// <summary>
@@ -1365,13 +1339,14 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <returns>The number of bytes advanced.</returns>
     public long AdvancePastAny(byte value0, byte value1, byte value2, byte value3)
     {
-        var start = writer.Consumed;
+        var result = 0L;
         while (writer.TryPeek(0, out var current) && (current == value0 || current == value1 || current == value2 || current == value3))
         {
             writer.AdvanceReader(1);
+            result++;
         }
 
-        return writer.Consumed - start;
+        return result;
     }
 
     /// <summary>

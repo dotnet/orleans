@@ -755,8 +755,6 @@ namespace Orleans.Serialization.Buffers
         private readonly int _dummyPrimitive;
         public ArcBufferReader(ArcBufferWriter writer) { }
 
-        public long Consumed { get { throw null; } }
-
         public bool End { get { throw null; } }
 
         public int Length { get { throw null; } }
