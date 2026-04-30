@@ -14,32 +14,68 @@ internal sealed class OrleansBinaryLogFormat : ILogFormat
 
     ILogSegmentWriter ILogFormat.CreateWriter() => new LogSegmentBuffer();
 
-    LogFormatReadResult ILogFormat.Read(ArcBuffer input, ILogEntrySink sink, bool isCompleted) => OrleansBinaryLogReader.Read(input, sink, isCompleted);
+    bool ILogFormat.TryRead(ArcBufferReader input, ILogEntrySink sink, bool isCompleted) => OrleansBinaryLogReader.TryRead(input, sink, isCompleted);
 }
 
 internal static class OrleansBinaryLogReader
 {
-    public static LogFormatReadResult Read(ArcBuffer input, ILogEntrySink sink, bool isCompleted)
+    public static bool TryRead(ArcBufferReader input, ILogEntrySink sink, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(sink);
 
-        var remaining = input.AsReadOnlySequence();
-        var offset = 0L;
-        int? minimumBufferLength = null;
-        while (OrleansBinaryLogEntryFrameReader.TryReadEntry(ref remaining, offset, isCompleted, out var streamId, out var payload, out var frameLength, out minimumBufferLength))
+        if (input.Length == 0)
         {
-            sink.OnEntry(streamId, payload);
-            remaining = remaining.Slice(frameLength);
-            offset += frameLength;
+            return false;
         }
 
-        return new(checked((int)offset), remaining.IsEmpty ? null : OrleansBinaryLogEntryFrameReader.GetMinimumBufferLength(remaining, minimumBufferLength));
+        if (input.Length < OrleansBinaryLogEntryFrameReader.LengthPrefixSize)
+        {
+            if (!isCompleted)
+            {
+                return false;
+            }
+
+            throw new InvalidOperationException(
+                "Malformed binary log entry stream at byte offset 0: truncated fixed32 entry length prefix.");
+        }
+
+        Span<byte> lengthBytes = stackalloc byte[OrleansBinaryLogEntryFrameReader.LengthPrefixSize];
+        var lengthPrefix = input.Peek(lengthBytes);
+        var bodyLength = BinaryPrimitives.ReadUInt32LittleEndian(lengthPrefix[..OrleansBinaryLogEntryFrameReader.LengthPrefixSize]);
+        var frameLength = checked(OrleansBinaryLogEntryFrameReader.LengthPrefixSize + (long)bodyLength);
+        if (input.Length < frameLength)
+        {
+            if (!isCompleted)
+            {
+                return false;
+            }
+
+            throw new InvalidOperationException(
+                $"Malformed binary log entry stream at byte offset 0: entry length {bodyLength} exceeds remaining input bytes {input.Length - OrleansBinaryLogEntryFrameReader.LengthPrefixSize}.");
+        }
+
+        if (frameLength > int.MaxValue)
+        {
+            throw new InvalidOperationException(
+                "Malformed binary log entry stream at byte offset 0: entry length exceeds maximum supported frame size.");
+        }
+
+        using var frame = input.PeekSlice((int)frameLength);
+        var remaining = frame.AsReadOnlySequence();
+        if (!OrleansBinaryLogEntryFrameReader.TryReadEntry(ref remaining, offset: 0, isCompleted: true, out var streamId, out var payload, out _, out _))
+        {
+            throw new InvalidOperationException("The binary log format failed to read a complete frame.");
+        }
+
+        input.Skip((int)frameLength);
+        sink.OnEntry(streamId, payload);
+        return true;
     }
 }
 
 internal static class OrleansBinaryLogEntryFrameReader
 {
-    private const int LengthPrefixSize = sizeof(uint);
+    public const int LengthPrefixSize = sizeof(uint);
     private const int MaxVarUInt64Bytes = 10;
 
     public static bool TryReadEntry(
@@ -115,9 +151,6 @@ internal static class OrleansBinaryLogEntryFrameReader
         frameLength = checked(LengthPrefixSize + (long)bodyLength);
         return true;
     }
-
-    public static int? GetMinimumBufferLength(ReadOnlySequence<byte> remaining, int? minimumBufferLength)
-        => minimumBufferLength ?? (remaining.Length > int.MaxValue ? null : checked((int)remaining.Length + 1));
 
     private static ulong ReadLogStreamId(ref SequenceReader<byte> reader, long offset)
     {

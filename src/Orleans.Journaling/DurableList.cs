@@ -21,10 +21,10 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     private readonly List<T> _items = [];
     private ILogWriter? _storage;
 
-    public DurableList([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
+    public DurableList([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableListOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableListOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 

@@ -18,10 +18,10 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     private T? _value;
     private bool _isDirty;
 
-    public DurableValue([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
+    public DurableValue([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 

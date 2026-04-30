@@ -18,44 +18,11 @@ public interface ILogFormat
     ILogSegmentWriter CreateWriter();
 
     /// <summary>
-    /// Reads complete log entries from the beginning of <paramref name="input"/> and pushes decoded entries to <paramref name="sink"/>.
+    /// Attempts to read one complete log entry from <paramref name="input"/> and push the decoded entry to <paramref name="sink"/>.
     /// </summary>
-    /// <param name="input">The buffered persisted log data. The caller retains ownership and disposes it after this call returns.</param>
+    /// <param name="input">The buffered persisted log data.</param>
     /// <param name="sink">The sink which receives decoded log entries.</param>
     /// <param name="isCompleted">A value indicating whether no more persisted bytes will be supplied after <paramref name="input"/>.</param>
-    /// <returns>The read result indicating how many bytes were consumed and, if incomplete data remains, when to retry.</returns>
-    LogFormatReadResult Read(ArcBuffer input, ILogEntrySink sink, bool isCompleted);
-}
-
-/// <summary>
-/// The result of reading log entries from buffered persisted data.
-/// </summary>
-public readonly struct LogFormatReadResult
-{
-    /// <summary>
-    /// Initializes a new instance of the <see cref="LogFormatReadResult"/> struct.
-    /// </summary>
-    /// <param name="bytesConsumed">The number of bytes consumed from the beginning of the input buffer.</param>
-    /// <param name="minimumBufferLength">The minimum length of the retained buffer before retrying, if known.</param>
-    public LogFormatReadResult(int bytesConsumed, int? minimumBufferLength = null)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(bytesConsumed);
-        if (minimumBufferLength is < 0)
-        {
-            throw new ArgumentOutOfRangeException(nameof(minimumBufferLength));
-        }
-
-        BytesConsumed = bytesConsumed;
-        MinimumBufferLength = minimumBufferLength;
-    }
-
-    /// <summary>
-    /// Gets the number of bytes consumed from the beginning of the input buffer.
-    /// </summary>
-    public int BytesConsumed { get; }
-
-    /// <summary>
-    /// Gets the minimum length of the retained buffer before retrying, if known.
-    /// </summary>
-    public int? MinimumBufferLength { get; }
+    /// <returns><see langword="true"/> if a complete entry was consumed; otherwise, <see langword="false"/>.</returns>
+    bool TryRead(ArcBufferReader input, ILogEntrySink sink, bool isCompleted);
 }

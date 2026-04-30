@@ -20,53 +20,52 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
     public ILogSegmentWriter CreateWriter() => new JsonLinesLogSegmentWriter();
 
-    public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
-        return ReadEntries(input.AsReadOnlySequence(), consumer, isCompleted);
-    }
+        if (input.Length == 0)
+        {
+            return false;
+        }
 
-    private static LogFormatReadResult ReadEntries(ReadOnlySequence<byte> input, ILogEntrySink consumer, bool isCompleted)
-    {
-        if (StartsWithBom(input))
+        using var buffered = input.PeekSlice(input.Length);
+        var sequence = buffered.AsReadOnlySequence();
+        if (StartsWithBom(sequence))
         {
             throw new InvalidOperationException("Malformed JSON Lines log segment: UTF-8 byte order marks are not supported.");
         }
 
-        var remaining = input;
-        var offset = 0L;
-        while (!remaining.IsEmpty)
+        var reader = new SequenceReader<byte>(sequence);
+        if (!reader.TryReadTo(out ReadOnlySequence<byte> line, LineFeed, advancePastDelimiter: true))
         {
-            var reader = new SequenceReader<byte>(remaining);
-            if (!reader.TryReadTo(out ReadOnlySequence<byte> line, LineFeed, advancePastDelimiter: true))
+            if (!isCompleted)
             {
-                if (!isCompleted)
-                {
-                    return new(checked((int)offset), remaining.Length > int.MaxValue - 1 ? null : checked((int)remaining.Length + 1));
-                }
-
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: log entries must end with a newline.");
+                return false;
             }
 
-            var consumed = reader.Consumed;
-            if (!line.IsEmpty && EndsWith(line, CarriageReturn))
-            {
-                line = line.Slice(0, line.Length - 1);
-            }
-
-            if (IsBlankLine(line))
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: blank lines are not valid log entries.");
-            }
-
-            ReadLine(line, offset, consumer);
-
-            remaining = remaining.Slice(consumed);
-            offset += consumed;
+            throw new InvalidOperationException("Malformed JSON Lines log segment at byte offset 0: log entries must end with a newline.");
         }
 
-        return new(checked((int)offset));
+        var consumed = reader.Consumed;
+        if (line.Length > int.MaxValue || consumed > int.MaxValue)
+        {
+            throw new InvalidOperationException("Malformed JSON Lines log segment: log entry exceeds maximum supported frame size.");
+        }
+
+        input.Skip(checked((int)consumed));
+        if (!line.IsEmpty && EndsWith(line, CarriageReturn))
+        {
+            line = line.Slice(0, line.Length - 1);
+        }
+
+        if (IsBlankLine(line))
+        {
+            throw new InvalidOperationException("Malformed JSON Lines log segment at byte offset 0: blank lines are not valid log entries.");
+        }
+
+        ReadLine(line, offset: 0, consumer);
+        return true;
     }
 
     private static void ReadLine(ReadOnlySequence<byte> line, long offset, ILogEntrySink consumer)

@@ -22,6 +22,7 @@ public class DurableListJournalBenchmarks
     private BenchmarkLogWriter _outOfBandWriter;
     private LogSegmentBuffer _encodedLogWriter;
     private ArcBuffer _encodedLogData;
+    private ArcBufferWriter _recoveryBuffer;
     private RecoveryConsumer _recoveryConsumer;
 
     [GlobalSetup]
@@ -37,6 +38,7 @@ public class DurableListJournalBenchmarks
 
         WarmWritePathCapacity();
         _encodedLogData = CreateEncodedLogData();
+        _recoveryBuffer = new ArcBufferWriter();
         ValidateEncodedLogData();
     }
 
@@ -44,6 +46,7 @@ public class DurableListJournalBenchmarks
     public void GlobalCleanup()
     {
         _encodedLogData.Dispose();
+        _recoveryBuffer.Dispose();
         _encodedLogWriter.Dispose();
         _writeBuffer.Dispose();
     }
@@ -64,7 +67,7 @@ public class DurableListJournalBenchmarks
     public int RecoverEncodedLogData()
     {
         _recoveryConsumer.Reset();
-        _logFormat.Read(_encodedLogData, _recoveryConsumer, isCompleted: true);
+        ReplayEncodedLogData();
 
         return _recoveryConsumer.Count;
     }
@@ -101,13 +104,23 @@ public class DurableListJournalBenchmarks
 
     private void ValidateEncodedLogData()
     {
-        _logFormat.Read(_encodedLogData, _recoveryConsumer, isCompleted: true);
+        ReplayEncodedLogData();
         if (_recoveryConsumer.Count != OperationsPerInvocation)
         {
             throw new InvalidOperationException("The encoded journaling benchmark data did not replay all operations.");
         }
 
         _recoveryConsumer.Reset();
+    }
+
+    private void ReplayEncodedLogData()
+    {
+        _recoveryBuffer.Reset();
+        _recoveryBuffer.Write(_encodedLogData.AsReadOnlySequence());
+        var reader = new ArcBufferReader(_recoveryBuffer);
+        while (_logFormat.TryRead(reader, _recoveryConsumer, isCompleted: true))
+        {
+        }
     }
 
     private sealed class RawInt32LogValueCodec : ILogValueCodec<int>

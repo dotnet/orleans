@@ -313,13 +313,13 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes("""{"streamId":8,"entry":{"cmd":"set","value":42}}""");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        using var data = buffer.ConsumeSlice(buffer.Length);
+        var reader = new ArcBufferReader(buffer);
         var consumer = new RecordingLogEntrySink();
 
-        var result = format.Read(data, consumer, isCompleted: false);
+        var result = format.TryRead(reader, consumer, isCompleted: false);
 
-        Assert.Equal(0, result.BytesConsumed);
-        Assert.Equal(bytes.Length + 1, result.MinimumBufferLength);
+        Assert.False(result);
+        Assert.Equal(bytes.Length, reader.Length);
         Assert.Empty(consumer.Entries);
     }
 
@@ -393,9 +393,12 @@ public class JsonCodecTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        using var data = buffer.ConsumeSlice(buffer.Length);
+        var reader = new ArcBufferReader(buffer);
         var consumer = new RecordingLogEntrySink();
-        format.Read(data, consumer, isCompleted: true);
+        while (format.TryRead(reader, consumer, isCompleted: true))
+        {
+        }
+
         return consumer.Entries;
     }
 

@@ -13,10 +13,10 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     private T? _value;
     private ulong _version;
 
-    public DurableState([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
+    public DurableState([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
         _manager = manager;
     }

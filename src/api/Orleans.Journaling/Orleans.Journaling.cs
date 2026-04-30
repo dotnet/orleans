@@ -277,11 +277,6 @@ namespace Orleans.Journaling
         void Write(T value, System.Buffers.IBufferWriter<byte> output);
     }
 
-    public partial interface ILogDataSink
-    {
-        void OnLogData(Serialization.Buffers.ArcBuffer data);
-    }
-
     public partial interface ILogEntrySink
     {
         void OnEntry(LogStreamId streamId, System.Buffers.ReadOnlySequence<byte> payload);
@@ -299,17 +294,12 @@ namespace Orleans.Journaling
     public partial interface ILogFormat
     {
         ILogSegmentWriter CreateWriter();
-        LogFormatReadResult Read(Serialization.Buffers.ArcBuffer input, ILogEntrySink sink, bool isCompleted);
+        bool TryRead(Serialization.Buffers.ArcBufferReader input, ILogEntrySink sink, bool isCompleted);
     }
 
-    public readonly partial struct LogFormatReadResult
+    public partial interface ILogFormatKeyProvider
     {
-        private readonly int _dummyPrimitive;
-        public LogFormatReadResult(int bytesConsumed, int? minimumBufferLength = null) { }
-
-        public int BytesConsumed { get { throw null; } }
-
-        public int? MinimumBufferLength { get { throw null; } }
+        string GetLogFormatKey(Runtime.IGrainContext grainContext);
     }
 
     public partial interface ILogWriter
@@ -330,12 +320,10 @@ namespace Orleans.Journaling
     {
         bool IsCompactionRequested { get; }
 
-        string LogFormatKey { get; }
-
-        System.Threading.Tasks.ValueTask AppendAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask ReadAsync(ILogDataSink consumer, System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask ReplaceAsync(Serialization.Buffers.ArcBuffer value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReadAsync(Serialization.Buffers.ArcBufferWriter buffer, System.Action<Serialization.Buffers.ArcBufferReader> consume, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
     }
 
     public partial interface ILogStorageProvider
@@ -473,22 +461,18 @@ namespace Orleans.Journaling
     {
         public VolatileLogStorage() { }
 
-        public VolatileLogStorage(string logFormatKey) { }
-
         public bool IsCompactionRequested { get { throw null; } }
 
-        public string LogFormatKey { get { throw null; } }
-
-        public System.Threading.Tasks.ValueTask AppendAsync(Serialization.Buffers.ArcBuffer segment, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> segment, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public System.Threading.Tasks.ValueTask ReadAsync(ILogDataSink consumer, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask ReadAsync(Serialization.Buffers.ArcBufferWriter buffer, System.Action<Serialization.Buffers.ArcBufferReader> consume, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public System.Threading.Tasks.ValueTask ReplaceAsync(Serialization.Buffers.ArcBuffer snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class VolatileLogStorageProvider : ILogStorageProvider
+    public sealed partial class VolatileLogStorageProvider : ILogStorageProvider, ILogFormatKeyProvider
     {
         public VolatileLogStorageProvider() { }
 
@@ -497,6 +481,7 @@ namespace Orleans.Journaling
         public VolatileLogStorageProvider(string logFormatKey) { }
 
         public ILogStorage Create(Runtime.IGrainContext grainContext) { throw null; }
+        public string GetLogFormatKey(Runtime.IGrainContext grainContext) { throw null; }
     }
 }
 

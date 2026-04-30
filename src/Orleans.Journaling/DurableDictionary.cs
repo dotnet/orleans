@@ -23,8 +23,8 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         _codec = codec;
     }
 
-    public DurableDictionary([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
-        : this(LogFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, storage).GetCodec<K, V>())
+    public DurableDictionary([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
+        : this(LogFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<K, V>())
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
