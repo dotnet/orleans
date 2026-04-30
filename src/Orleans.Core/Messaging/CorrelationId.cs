@@ -16,7 +16,7 @@ namespace Orleans.Runtime
 
         public static CorrelationId GetNext() => new(System.Threading.Interlocked.Increment(ref lastUsed));
 
-        public override int GetHashCode() => id.GetHashCode();
+        public override int GetHashCode() => HashCode.Combine(id);
 
         public override bool Equals(object? obj) => obj is CorrelationId correlationId && Equals(correlationId);
 
