@@ -270,11 +270,13 @@ namespace Orleans
             var oneWay = (options & InvokeMethodOptions.OneWay) != 0;
             message.SendingGrain = CurrentActivationAddress.GrainId;
             message.TargetGrain = targetGrainId;
+            IMessageReceiverCache targetCache = target;
 
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 // If the silo isn't be supplied, it will be filled in by the sender to be the gateway silo
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
+                targetCache = null;
             }
             else if (_grainMappingCache.TryGetValue(targetGrainId, out var cachedSilo))
             {
@@ -300,7 +302,7 @@ namespace Orleans
             }
 
             LogSendingMessage(logger, message);
-            MessageCenter.SendMessage(message, receiverCache: target);
+            MessageCenter.SendMessage(message, receiverCache: targetCache);
         }
 
         public void ReceiveResponse(Message response)

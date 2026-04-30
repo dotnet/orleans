@@ -156,11 +156,13 @@ namespace Orleans.Runtime
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
             SharedCallbackData sharedData;
+            IMessageReceiverCache targetCache = target;
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
                 message.IsSystemMessage = true;
                 sharedData = this.systemSharedCallbackData;
+                targetCache = null;
             }
             else
             {
@@ -189,13 +191,13 @@ namespace Orleans.Runtime
 
             this.messagingTrace.OnSendRequest(message);
 
-            if (target.MessageReceiver is IMessageReceiver receiver)
+            if (targetCache?.MessageReceiver is IMessageReceiver receiver)
             {
-                receiver.ReceiveMessage(message, target);
+                receiver.ReceiveMessage(message, targetCache);
             }
             else
             {
-                this.MessageCenter.AddressAndSendMessage(message, targetCache: target);
+                this.MessageCenter.AddressAndSendMessage(message, targetCache);
             }
         }
 
