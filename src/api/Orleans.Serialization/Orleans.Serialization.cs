@@ -755,17 +755,79 @@ namespace Orleans.Serialization.Buffers
         private readonly int _dummyPrimitive;
         public ArcBufferReader(ArcBufferWriter writer) { }
 
+        public long Consumed { get { throw null; } }
+
+        public bool End { get { throw null; } }
+
         public int Length { get { throw null; } }
+
+        public long Remaining { get { throw null; } }
+
+        public System.ReadOnlySpan<byte> UnreadSpan { get { throw null; } }
+
+        public readonly void Advance(int count) { }
+
+        public readonly void Advance(long count) { }
+
+        public readonly long AdvancePast(byte value) { throw null; }
+
+        public readonly long AdvancePastAny(byte value0, byte value1) { throw null; }
+
+        public readonly long AdvancePastAny(byte value0, byte value1, byte value2) { throw null; }
+
+        public readonly long AdvancePastAny(byte value0, byte value1, byte value2, byte value3) { throw null; }
+
+        public readonly long AdvancePastAny(System.ReadOnlySpan<byte> values) { throw null; }
+
+        public readonly void AdvanceToEnd() { }
 
         public readonly void Consume(System.Span<byte> output) { }
 
         public readonly ArcBuffer ConsumeSlice(int count) { throw null; }
+
+        public readonly bool IsNext(byte next, bool advancePast = false) { throw null; }
+
+        public readonly bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
 
         public readonly System.ReadOnlySpan<byte> Peek(scoped in System.Span<byte> destination) { throw null; }
 
         public readonly ArcBuffer PeekSlice(int count) { throw null; }
 
         public readonly void Skip(int count) { }
+
+        public readonly bool TryAdvanceTo(byte delimiter, bool advancePastDelimiter = true) { throw null; }
+
+        public readonly bool TryAdvanceToAny(System.ReadOnlySpan<byte> delimiters, bool advancePastDelimiter = true) { throw null; }
+
+        public readonly bool TryCopyTo(System.Span<byte> destination) { throw null; }
+
+        public readonly bool TryPeek(out byte value) { throw null; }
+
+        public readonly bool TryPeek(long offset, out byte value) { throw null; }
+
+        public readonly bool TryRead(out byte value) { throw null; }
+
+        public readonly bool TryReadBigEndian(out short value) { throw null; }
+
+        public readonly bool TryReadBigEndian(out int value) { throw null; }
+
+        public readonly bool TryReadBigEndian(out long value) { throw null; }
+
+        public readonly bool TryReadExact(int count, out ArcBuffer slice) { throw null; }
+
+        public readonly bool TryReadLittleEndian(out short value) { throw null; }
+
+        public readonly bool TryReadLittleEndian(out int value) { throw null; }
+
+        public readonly bool TryReadLittleEndian(out long value) { throw null; }
+
+        public readonly bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true) { throw null; }
+
+        public readonly bool TryReadTo(out ArcBuffer slice, byte delimiter, byte delimiterEscape, bool advancePastDelimiter = true) { throw null; }
+
+        public readonly bool TryReadTo(out ArcBuffer slice, System.ReadOnlySpan<byte> delimiter, bool advancePastDelimiter = true) { throw null; }
+
+        public readonly bool TryReadToAny(out ArcBuffer slice, System.ReadOnlySpan<byte> delimiters, bool advancePastDelimiter = true) { throw null; }
     }
 
     [Immutable]
