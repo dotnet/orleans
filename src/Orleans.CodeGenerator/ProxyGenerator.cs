@@ -21,6 +21,7 @@ namespace Orleans.CodeGenerator
     {
         private const string CopyContextPoolMemberName = "CopyContextPool";
         private const string CodecProviderMemberName = "CodecProvider";
+        private const string SharedMemberName = "Shared";
         private readonly CodeGenerator _codeGenerator;
 
         public ProxyGenerator(CodeGenerator codeGenerator)
@@ -36,9 +37,24 @@ namespace Orleans.CodeGenerator
 
             var fieldDescriptions = GetFieldDescriptions(interfaceDescription);
             var fieldDeclarations = GetFieldDeclarations(fieldDescriptions);
-            var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription);
 
-            var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType);
+            // Build activator index mapping for non-generic methods that use activators
+            var activatorIndexMap = new Dictionary<ProxyMethodDescription, int>();
+            var activatorIndex = 0;
+            foreach (var method in interfaceDescription.Methods)
+            {
+                if (method.MethodTypeParameters.Count == 0 && method.GeneratedInvokable.UseActivator)
+                {
+                    activatorIndexMap[method] = activatorIndex++;
+                }
+            }
+
+            var proxyMethods = CreateProxyMethods(fieldDescriptions, interfaceDescription, activatorIndexMap);
+            var activatorMembers = interfaceDescription.ProxyBaseType is not null && ProxyBaseHasActivatorMethods(interfaceDescription.ProxyBaseType)
+                ? Array.Empty<MemberDeclarationSyntax>()
+                : GetActivatorMembers(activatorIndexMap.Count);
+
+            var ctors = GenerateConstructors(generatedClassName, fieldDescriptions, interfaceDescription.ProxyBaseType, interfaceDescription, activatorIndexMap);
 
             var classDeclaration = ClassDeclaration(generatedClassName)
                 .AddBaseListTypes(
@@ -47,6 +63,7 @@ namespace Orleans.CodeGenerator
                 .AddModifiers(Token(SyntaxKind.InternalKeyword), Token(SyntaxKind.SealedKeyword))
                 .AddAttributeLists(CodeGenerator.GetGeneratedCodeAttributes())
                 .AddMembers(fieldDeclarations)
+                .AddMembers(activatorMembers)
                 .AddMembers(ctors)
                 .AddMembers(proxyMethods);
 
@@ -61,7 +78,7 @@ namespace Orleans.CodeGenerator
 
         public static string GetSimpleClassName(ProxyInterfaceDescription interfaceDescription)
             => $"Proxy_{SyntaxGeneration.Identifier.SanitizeIdentifierName(interfaceDescription.Name)}";
-        
+
         private List<GeneratedFieldDescription> GetFieldDescriptions(
             ProxyInterfaceDescription interfaceDescription)
         {
@@ -86,9 +103,56 @@ namespace Orleans.CodeGenerator
             }
         }
 
+        private static bool ProxyBaseHasActivatorMethods(INamedTypeSymbol baseType)
+        {
+            return HasMethod(baseType, "EnsureActivator") && HasMethod(baseType, "GetActivator");
+
+            static bool HasMethod(INamedTypeSymbol type, string name)
+            {
+                for (var current = type; current is not null; current = current.BaseType)
+                {
+                    if (current.GetMembers(name).OfType<IMethodSymbol>().Any(method =>
+                        method.DeclaredAccessibility != Accessibility.Private && method.Arity == 1 && method.Parameters.Length == 1))
+                    {
+                        return true;
+                    }
+                }
+
+                return false;
+            }
+        }
+
+        private static MemberDeclarationSyntax[] GetActivatorMembers(int activatorCount)
+        {
+            if (activatorCount == 0)
+            {
+                return Array.Empty<MemberDeclarationSyntax>();
+            }
+
+            return new[]
+            {
+                ParseMemberDeclaration($"private readonly object[] _activators = new object[{activatorCount}];"),
+                ParseMemberDeclaration(
+                    """
+                    private void EnsureActivator<TInvokable>(int index)
+                    {
+                        _activators[index] ??= CodecProvider.GetActivator<TInvokable>();
+                    }
+                    """),
+                ParseMemberDeclaration(
+                    """
+                    private global::Orleans.Serialization.Activators.IActivator<TInvokable> GetActivator<TInvokable>(int index)
+                    {
+                        return (global::Orleans.Serialization.Activators.IActivator<TInvokable>)_activators[index];
+                    }
+                    """)
+            };
+        }
+
         private MemberDeclarationSyntax[] CreateProxyMethods(
             List<GeneratedFieldDescription> fieldDescriptions,
-            ProxyInterfaceDescription interfaceDescription)
+            ProxyInterfaceDescription interfaceDescription,
+            Dictionary<ProxyMethodDescription, int> activatorIndexMap)
         {
             var res = new List<MemberDeclarationSyntax>();
             foreach (var methodDescription in interfaceDescription.Methods)
@@ -99,7 +163,7 @@ namespace Orleans.CodeGenerator
 
             MethodDeclarationSyntax CreateProxyMethod(ProxyMethodDescription methodDescription)
             {
-                var (isAsync, body) = CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription);
+                var (isAsync, body) = CreateAsyncProxyMethodBody(fieldDescriptions, methodDescription, activatorIndexMap);
                 var method = methodDescription.Method;
                 var declaration = MethodDeclaration(method.ReturnType.ToTypeSyntax(methodDescription.TypeParameterSubstitutions), method.Name.EscapeIdentifier())
                     .AddParameterListParameters(method.Parameters.Select((p, i) => GetParameterSyntax(i, p, methodDescription.TypeParameterSubstitutions)).ToArray())
@@ -125,18 +189,42 @@ namespace Orleans.CodeGenerator
 
         private (bool IsAsync, BlockSyntax body) CreateAsyncProxyMethodBody(
             List<GeneratedFieldDescription> fieldDescriptions,
-            ProxyMethodDescription methodDescription)
+            ProxyMethodDescription methodDescription,
+            Dictionary<ProxyMethodDescription, int> activatorIndexMap)
         {
             var statements = new List<StatementSyntax>();
             var requestVar = IdentifierName("request");
             var methodSymbol = methodDescription.Method;
             var invokable = methodDescription.GeneratedInvokable;
-            ExpressionSyntax createRequestExpr = (!invokable.IsEmptyConstructable || invokable.UseActivator) switch
+
+            ExpressionSyntax createRequestExpr;
+            if (activatorIndexMap.TryGetValue(methodDescription, out var activatorIdx))
             {
-                true => InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
-                .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>())),
-                _ => ObjectCreationExpression(invokable.TypeSyntax).WithArgumentList(ArgumentList())
-            };
+                // Non-generic method with activator: use GetActivator<T>(index).Create()
+                // C#: GetActivator<InvokableType>(index).Create()
+                createRequestExpr = InvocationExpression(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        InvocationExpression(
+                            GenericName(
+                                Identifier("GetActivator"),
+                                TypeArgumentList(SingletonSeparatedList(invokable.TypeSyntax))),
+                            ArgumentList(SingletonSeparatedList(Argument(
+                                LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(activatorIdx)))))),
+                        IdentifierName("Create")),
+                    ArgumentList());
+            }
+            else if (!invokable.IsEmptyConstructable || invokable.UseActivator)
+            {
+                // Generic method or other case that needs GetInvokable
+                createRequestExpr = InvocationExpression(ThisExpression().Member("GetInvokable", invokable.TypeSyntax))
+                    .WithArgumentList(ArgumentList(SeparatedList<ArgumentSyntax>()));
+            }
+            else
+            {
+                // Simple case: direct construction
+                createRequestExpr = ObjectCreationExpression(invokable.TypeSyntax).WithArgumentList(ArgumentList());
+            }
 
             statements.Add(
                 LocalDeclarationStatement(
@@ -285,7 +373,9 @@ namespace Orleans.CodeGenerator
         private MemberDeclarationSyntax[] GenerateConstructors(
             string simpleClassName,
             List<GeneratedFieldDescription> fieldDescriptions,
-            INamedTypeSymbol baseType)
+            INamedTypeSymbol baseType,
+            ProxyInterfaceDescription interfaceDescription,
+            Dictionary<ProxyMethodDescription, int> activatorIndexMap)
         {
             if (baseType is null)
             {
@@ -390,6 +480,30 @@ namespace Orleans.CodeGenerator
                             break;
                     }
                 }
+
+                // Generate activator initialization if needed
+                if (activatorIndexMap.Count > 0)
+                {
+                    // Call EnsureActivator<T>(index) for each method that needs pooling
+                    // C#: EnsureActivator<Invokable_T0>(0);
+                    // C#: EnsureActivator<Invokable_T1>(1);
+                    // ...
+                    foreach (var kvp in activatorIndexMap.OrderBy(x => x.Value))
+                    {
+                        var method = kvp.Key;
+                        var index = kvp.Value;
+                        var invokable = method.GeneratedInvokable;
+
+                        res.Add(ExpressionStatement(
+                            InvocationExpression(
+                                GenericName(
+                                    Identifier("EnsureActivator"),
+                                    TypeArgumentList(SingletonSeparatedList(invokable.TypeSyntax))),
+                                ArgumentList(SingletonSeparatedList(Argument(
+                                    LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal(index))))))));
+                    }
+                }
+
                 return res;
 
                 static ExpressionSyntax Unwrapped(ExpressionSyntax expr)
