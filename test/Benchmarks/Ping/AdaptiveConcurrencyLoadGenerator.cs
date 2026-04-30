@@ -16,10 +16,12 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
     private readonly int _requestsPerBlock;
     private readonly TimeSpan _warmupDuration;
     private readonly TimeSpan _measurementInterval;
+    private readonly TimeSpan _sampleInterval;
     private readonly int _minConcurrency;
     private readonly int _maxConcurrency;
     private readonly int _initialConcurrency;
     private readonly int _maxStableRounds;
+    private readonly double _minimumRelativeImprovement;
 
     private Channel<WorkBlock> _completedBlocks;
     private volatile int _currentConcurrency;
@@ -27,13 +29,18 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
 
     // Hill climbing state
     private double _bestThroughput;
-    private double _lastThroughput;
+    private Measurement _bestMeasurement;
+    private Measurement _lastMeasurement;
     private int _bestConcurrency;
     private int _stepSize;
     private int _direction; // 1 = increasing, -1 = decreasing
     private int _stableCount;
     private int _roundsSinceBestChanged;
     private const int StableThreshold = 3; // Number of consecutive non-improvements before changing direction
+    private const int DefaultInitialStepSize = 50;
+    private const int MinimumSampleCount = 4;
+    private const double DefaultMinimumRelativeImprovement = 0.005;
+    private const double StatisticalConfidence = 0.95;
 
     public int CurrentConcurrency => _currentConcurrency;
     public int BestConcurrency => _bestConcurrency;
@@ -43,26 +50,65 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
     public AdaptiveConcurrencyLoadGenerator(
         Func<TState, ValueTask> issueRequest,
         Func<int, TState> getStateForWorker,
-        int requestsPerBlock = 500,
+        int requestsPerBlock = 100,
         TimeSpan? warmupDuration = null,
         TimeSpan? measurementInterval = null,
         int minConcurrency = 1,
         int maxConcurrency = 2000,
         int initialConcurrency = 100,
-        int maxStableRounds = 0)
+        int maxStableRounds = 0,
+        int initialStepSize = DefaultInitialStepSize,
+        TimeSpan? sampleInterval = null,
+        double minimumRelativeImprovement = DefaultMinimumRelativeImprovement)
     {
+        var resolvedWarmupDuration = warmupDuration ?? TimeSpan.FromSeconds(5);
+        var resolvedMeasurementInterval = measurementInterval ?? TimeSpan.FromSeconds(2);
+        var resolvedSampleInterval = sampleInterval ?? TimeSpan.FromMilliseconds(250);
+
+        if (resolvedWarmupDuration <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(warmupDuration), "Warmup duration must be positive.");
+        }
+
+        if (resolvedMeasurementInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(measurementInterval), "Measurement interval must be positive.");
+        }
+
+        if (resolvedSampleInterval <= TimeSpan.Zero)
+        {
+            throw new ArgumentOutOfRangeException(nameof(sampleInterval), "Sample interval must be positive.");
+        }
+
+        if (double.IsNaN(minimumRelativeImprovement) || minimumRelativeImprovement < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(minimumRelativeImprovement), "Minimum relative improvement must be non-negative.");
+        }
+
+        if (requestsPerBlock <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(requestsPerBlock), "Requests per block must be positive.");
+        }
+
+        if (initialStepSize <= 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(initialStepSize), "Initial step size must be positive.");
+        }
+
         _issueRequest = issueRequest;
         _getStateForWorker = getStateForWorker;
         _requestsPerBlock = requestsPerBlock;
-        _warmupDuration = warmupDuration ?? TimeSpan.FromSeconds(5);
-        _measurementInterval = measurementInterval ?? TimeSpan.FromSeconds(5);
+        _warmupDuration = resolvedWarmupDuration;
+        _measurementInterval = resolvedMeasurementInterval;
+        _sampleInterval = resolvedSampleInterval;
         _minConcurrency = minConcurrency;
         _maxConcurrency = maxConcurrency;
         _initialConcurrency = initialConcurrency;
         _currentConcurrency = initialConcurrency;
-        _stepSize = Math.Max(1, initialConcurrency / 10);
+        _stepSize = initialStepSize;
         _direction = 1;
         _maxStableRounds = maxStableRounds; // 0 = run forever
+        _minimumRelativeImprovement = minimumRelativeImprovement;
     }
 
     public async Task RunForeverAsync(CancellationToken cancellationToken = default)
@@ -70,10 +116,11 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         _cts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken);
 
         Console.WriteLine($"Starting adaptive load generator with initial concurrency: {_initialConcurrency}");
-        Console.WriteLine($"Warmup duration: {_warmupDuration.TotalSeconds}s, Measurement interval: {_measurementInterval.TotalSeconds}s");
-        Console.WriteLine($"Concurrency range: [{_minConcurrency}, {_maxConcurrency}]");
+        Console.WriteLine($"Warmup duration: {_warmupDuration.TotalSeconds}s, Measurement interval: {_measurementInterval.TotalSeconds}s, Sample interval: {GetEffectiveSampleInterval(_measurementInterval).TotalMilliseconds:N0}ms");
+        Console.WriteLine($"Concurrency range: [{_minConcurrency}, {_maxConcurrency}], Initial step size: {_stepSize}");
+        Console.WriteLine($"New best requires >{_minimumRelativeImprovement:P1} improvement at {StatisticalConfidence:P0} confidence.");
         if (_maxStableRounds > 0)
-            Console.WriteLine($"Will terminate after {_maxStableRounds} rounds with no improvement to best");
+            Console.WriteLine($"Will terminate after {_maxStableRounds} rounds with no statistically significant improvement to best");
         Console.WriteLine();
 
         // Warmup phase
@@ -83,33 +130,35 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
 
         Console.WriteLine();
         Console.WriteLine("=== TUNING PHASE ===");
-        Console.WriteLine($"{"Time",-12} {"Concurrency",12} {"Throughput",14} {"Best",14} {"BestConc",10} {"Action",-20}");
-        Console.WriteLine(new string('-', 82));
+        Console.WriteLine($"{"Time",-12} {"Concurrency",12} {"Samples",7} {"Throughput",14} {"Best",14} {"BestConc",10} {"Action",-28}");
+        Console.WriteLine(new string('-', 99));
 
         var startTime = DateTime.UtcNow;
 
         while (!_cts.Token.IsCancellationRequested)
         {
-            var throughput = await RunPhaseAsync(_measurementInterval, isWarmup: false);
+            var measuredConcurrency = _currentConcurrency;
+            var measurement = await RunPhaseAsync(_measurementInterval, isWarmup: false);
+            var throughput = measurement.Throughput;
             var elapsed = DateTime.UtcNow - startTime;
 
-            var action = ApplyHillClimbing(throughput);
+            var action = ApplyHillClimbing(measurement);
 
             var elapsedStr = elapsed.ToString(@"hh\:mm\:ss\.f");
-            Console.WriteLine($"{elapsedStr,-12} {_currentConcurrency,12} {throughput,14:N0}/s {_bestThroughput,14:N0}/s {_bestConcurrency,10} {action,-20}");
+            Console.WriteLine($"{elapsedStr,-12} {measuredConcurrency,12} {measurement.SampleCount,7} {throughput,14:N0}/s {_bestThroughput,14:N0}/s {_bestConcurrency,10} {action,-28}");
 
             // Check for convergence
             if (_maxStableRounds > 0 && _roundsSinceBestChanged >= _maxStableRounds)
             {
                 Converged = true;
                 Console.WriteLine();
-                Console.WriteLine($"Converged after {_roundsSinceBestChanged} rounds with no improvement.");
+                Console.WriteLine($"Converged after {_roundsSinceBestChanged} rounds with no statistically significant improvement.");
                 break;
             }
         }
     }
 
-    private async Task<double> RunPhaseAsync(TimeSpan duration, bool isWarmup)
+    private async Task<Measurement> RunPhaseAsync(TimeSpan duration, bool isWarmup)
     {
         _completedBlocks = Channel.CreateUnbounded<WorkBlock>(
             new UnboundedChannelOptions
@@ -134,7 +183,7 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
 
         var aggregator = Task.Run(() => AggregateBlocksAsync(duration, isWarmup, workerCts));
 
-        var throughput = await aggregator;
+        var measurement = await aggregator;
 
         // Signal workers to stop
         await workerCts.CancelAsync();
@@ -154,20 +203,55 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
             // Expected
         }
 
-        return throughput;
+        return measurement;
     }
 
-    private async Task<double> AggregateBlocksAsync(TimeSpan duration, bool isWarmup, CancellationTokenSource workerCts)
+    private async Task<Measurement> AggregateBlocksAsync(TimeSpan duration, bool isWarmup, CancellationTokenSource workerCts)
     {
         var reader = _completedBlocks.Reader;
         var startTime = Stopwatch.GetTimestamp();
         var endTime = startTime + (long)(duration.TotalSeconds * StopwatchTickPerSecond);
+        var sampleInterval = GetEffectiveSampleInterval(duration);
+        var sampleTicks = Math.Max(1, (long)(sampleInterval.TotalSeconds * StopwatchTickPerSecond));
+        var plannedSampleCount = Math.Max(1, (int)Math.Ceiling((endTime - startTime) / (double)sampleTicks));
+        var completionsBySample = new List<long>(plannedSampleCount);
+        for (var i = 0; i < plannedSampleCount; i++)
+        {
+            completionsBySample.Add(0);
+        }
 
         long totalCompleted = 0;
-        long totalSuccesses = 0;
         long totalFailures = 0;
         long minStartTime = long.MaxValue;
         long maxEndTime = long.MinValue;
+
+        void RecordBlock(WorkBlock block)
+        {
+            totalCompleted += block.Completed;
+            totalFailures += block.Failures;
+            if (block.StartTimestamp < minStartTime) minStartTime = block.StartTimestamp;
+            if (block.EndTimestamp > maxEndTime) maxEndTime = block.EndTimestamp;
+
+            var sampleIndex = GetSampleIndex(block.EndTimestamp);
+            completionsBySample[sampleIndex] += block.Completed;
+        }
+
+        int GetSampleIndex(long timestamp)
+        {
+            if (timestamp <= startTime)
+            {
+                return 0;
+            }
+
+            var elapsedTicks = timestamp - startTime;
+            var sampleIndex = (int)((elapsedTicks - 1) / sampleTicks);
+            while (sampleIndex >= completionsBySample.Count)
+            {
+                completionsBySample.Add(0);
+            }
+
+            return sampleIndex;
+        }
 
         while (Stopwatch.GetTimestamp() < endTime && !_cts.Token.IsCancellationRequested)
         {
@@ -180,11 +264,7 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
 
                 while (reader.TryRead(out var block))
                 {
-                    totalCompleted += block.Completed;
-                    totalSuccesses += block.Successes;
-                    totalFailures += block.Failures;
-                    if (block.StartTimestamp < minStartTime) minStartTime = block.StartTimestamp;
-                    if (block.EndTimestamp > maxEndTime) maxEndTime = block.EndTimestamp;
+                    RecordBlock(block);
                 }
             }
             catch (TimeoutException)
@@ -203,20 +283,16 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         // Drain remaining blocks
         while (reader.TryRead(out var block))
         {
-            totalCompleted += block.Completed;
-            totalSuccesses += block.Successes;
-            totalFailures += block.Failures;
-            if (block.StartTimestamp < minStartTime) minStartTime = block.StartTimestamp;
-            if (block.EndTimestamp > maxEndTime) maxEndTime = block.EndTimestamp;
+            RecordBlock(block);
         }
 
-        if (totalCompleted == 0 || maxEndTime <= minStartTime)
-        {
-            return 0;
-        }
-
-        var totalSeconds = (maxEndTime - minStartTime) / StopwatchTickPerSecond;
-        var throughput = totalCompleted / totalSeconds;
+        var totalSeconds = totalCompleted == 0 || maxEndTime <= minStartTime
+            ? duration.TotalSeconds
+            : (maxEndTime - minStartTime) / StopwatchTickPerSecond;
+        var throughput = totalSeconds > 0 ? totalCompleted / totalSeconds : 0;
+        var sampleEndTime = maxEndTime > endTime ? maxEndTime : endTime;
+        var samples = CreateThroughputSamples(completionsBySample, startTime, sampleEndTime, sampleTicks);
+        var measurement = new Measurement(throughput, samples);
 
         if (isWarmup)
         {
@@ -224,19 +300,20 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
             Console.WriteLine($"  Warmup: {throughput:N0}/s, {totalCompleted:N0} requests in {totalSeconds:F1}s{failureInfo}");
         }
 
-        return throughput;
+        return measurement;
     }
 
-    private string ApplyHillClimbing(double currentThroughput)
+    private string ApplyHillClimbing(Measurement measurement)
     {
+        var currentThroughput = measurement.Throughput;
         string action;
-        bool isNewBest = currentThroughput > _bestThroughput;
+        bool isNewBest = !_bestMeasurement.HasValue || IsStatisticallySignificantImprovement(measurement, _bestMeasurement);
 
-        // Always track the actual best
         if (isNewBest)
         {
             _bestThroughput = currentThroughput;
             _bestConcurrency = _currentConcurrency;
+            _bestMeasurement = measurement;
             _roundsSinceBestChanged = 0;
         }
         else
@@ -245,8 +322,8 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
         }
 
         // Determine if this is a meaningful improvement (resets stable count)
-        // or just noise within measurement variance
-        bool meaningfulImprovement = currentThroughput > _lastThroughput * 1.005; // 0.5% threshold
+        // or just noise within measurement variance.
+        bool meaningfulImprovement = isNewBest || !_lastMeasurement.HasValue || IsStatisticallySignificantImprovement(measurement, _lastMeasurement);
 
         if (meaningfulImprovement)
         {
@@ -320,8 +397,142 @@ public sealed class AdaptiveConcurrencyLoadGenerator<TState>
             }
         }
 
-        _lastThroughput = currentThroughput;
+        _lastMeasurement = measurement;
         return action;
+    }
+
+    private TimeSpan GetEffectiveSampleInterval(TimeSpan duration) => _sampleInterval <= duration ? _sampleInterval : duration;
+
+    private static double[] CreateThroughputSamples(IReadOnlyList<long> completionsBySample, long startTime, long endTime, long sampleTicks)
+    {
+        var samples = new double[completionsBySample.Count];
+        for (var i = 0; i < samples.Length; i++)
+        {
+            var sampleStart = startTime + (i * sampleTicks);
+            var sampleEnd = Math.Min(endTime, sampleStart + sampleTicks);
+            var sampleSeconds = Math.Max((sampleEnd - sampleStart) / StopwatchTickPerSecond, double.Epsilon);
+            samples[i] = completionsBySample[i] / sampleSeconds;
+        }
+
+        return samples;
+    }
+
+    private bool IsStatisticallySignificantImprovement(Measurement candidate, Measurement baseline)
+    {
+        if (!baseline.HasValue)
+        {
+            return true;
+        }
+
+        if (candidate.SampleMean <= baseline.SampleMean * (1 + _minimumRelativeImprovement))
+        {
+            return false;
+        }
+
+        if (candidate.SampleCount < MinimumSampleCount || baseline.SampleCount < MinimumSampleCount)
+        {
+            return candidate.Throughput > baseline.Throughput * (1 + _minimumRelativeImprovement);
+        }
+
+        var candidateVarianceContribution = candidate.SampleVariance / candidate.SampleCount;
+        var baselineVarianceContribution = baseline.SampleVariance / baseline.SampleCount;
+        var standardError = Math.Sqrt(candidateVarianceContribution + baselineVarianceContribution);
+        if (standardError <= double.Epsilon)
+        {
+            return true;
+        }
+
+        var degreesOfFreedom = CalculateWelchDegreesOfFreedom(
+            candidateVarianceContribution,
+            candidate.SampleCount,
+            baselineVarianceContribution,
+            baseline.SampleCount);
+        var requiredDifference = GetTwoSidedTCriticalValue95(degreesOfFreedom) * standardError;
+        return candidate.SampleMean - baseline.SampleMean > requiredDifference;
+    }
+
+    private static double CalculateWelchDegreesOfFreedom(double firstVarianceContribution, int firstSampleCount, double secondVarianceContribution, int secondSampleCount)
+    {
+        var numerator = Math.Pow(firstVarianceContribution + secondVarianceContribution, 2);
+        var denominator =
+            (Math.Pow(firstVarianceContribution, 2) / (firstSampleCount - 1)) +
+            (Math.Pow(secondVarianceContribution, 2) / (secondSampleCount - 1));
+
+        return denominator <= double.Epsilon ? double.PositiveInfinity : numerator / denominator;
+    }
+
+    private static double GetTwoSidedTCriticalValue95(double degreesOfFreedom)
+    {
+        if (double.IsPositiveInfinity(degreesOfFreedom))
+        {
+            return 1.960;
+        }
+
+        var df = Math.Max(1, (int)Math.Floor(degreesOfFreedom));
+        return df switch
+        {
+            1 => 12.706,
+            2 => 4.303,
+            3 => 3.182,
+            4 => 2.776,
+            5 => 2.571,
+            6 => 2.447,
+            7 => 2.365,
+            8 => 2.306,
+            9 => 2.262,
+            10 => 2.228,
+            11 => 2.201,
+            12 => 2.179,
+            13 => 2.160,
+            14 => 2.145,
+            15 => 2.131,
+            16 => 2.120,
+            17 => 2.110,
+            18 => 2.101,
+            19 => 2.093,
+            20 => 2.086,
+            <= 25 => 2.060,
+            <= 30 => 2.042,
+            <= 40 => 2.021,
+            <= 60 => 2.000,
+            <= 120 => 1.980,
+            _ => 1.960
+        };
+    }
+
+    private readonly struct Measurement
+    {
+        public Measurement(double throughput, double[] samples)
+        {
+            Throughput = throughput;
+            SampleCount = samples.Length;
+            SampleMean = SampleCount == 0 ? throughput : samples.Average();
+            SampleVariance = CalculateSampleVariance(samples, SampleMean);
+            HasValue = true;
+        }
+
+        public bool HasValue { get; }
+        public double Throughput { get; }
+        public int SampleCount { get; }
+        public double SampleMean { get; }
+        public double SampleVariance { get; }
+
+        private static double CalculateSampleVariance(double[] samples, double mean)
+        {
+            if (samples.Length < 2)
+            {
+                return 0;
+            }
+
+            var sumOfSquares = 0d;
+            foreach (var sample in samples)
+            {
+                var delta = sample - mean;
+                sumOfSquares += delta * delta;
+            }
+
+            return sumOfSquares / (samples.Length - 1);
+        }
     }
 
     private async Task RunWorkerAsync(TState state, int workerId, CancellationToken cancellationToken)
