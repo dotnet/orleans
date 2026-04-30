@@ -156,31 +156,36 @@ namespace Orleans.Serialization.Invocation
         public void SetResult(TResult result) => _core.SetResult(result);
 
         /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Complete(Response value)
         {
-            if (value is Response<TResult> typed)
-            {
-                Complete(typed);
-            }
-            else if (value.Exception is { } exception)
+            // Fast path: check exception first since it's a simple null check
+            if (value.Exception is { } exception)
             {
                 SetException(exception);
+                return;
+            }
+
+            // Check for typed response (common for void returns)
+            if (value is Response<TResult> typed)
+            {
+                SetResult(typed.TypedResult);
+                return;
+            }
+
+            // Handle untyped successful response
+            var result = value.Result;
+            if (result is null)
+            {
+                SetResult(default);
+            }
+            else if (result is TResult typedResult)
+            {
+                SetResult(typedResult);
             }
             else
             {
-                var result = value.Result;
-                if (result is null)
-                {
-                    SetResult(default);
-                }
-                else if (result is TResult typedResult)
-                {
-                    SetResult(typedResult);
-                }
-                else
-                {
-                    SetInvalidCastException(result);
-                }
+                SetInvalidCastException(result);
             }
         }
 

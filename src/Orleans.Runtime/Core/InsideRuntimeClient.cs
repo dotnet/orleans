@@ -3,6 +3,7 @@ using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
+using System.Runtime.CompilerServices;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -395,7 +396,15 @@ namespace Orleans.Runtime
         public void ReceiveResponse(Message message)
         {
             OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
-            if (message.Result is Message.ResponseTypes.Rejection)
+
+            var result = message.Result;
+            if (result != Message.ResponseTypes.Rejection && result != Message.ResponseTypes.Status)
+            {
+                ProcessResponseCallback(message);
+                return;
+            }
+
+            if (result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))
                 {
@@ -429,46 +438,19 @@ namespace Orleans.Runtime
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
                         break;
                 }
+
+                ProcessResponseCallback(message);
             }
-            else if (message.Result == Message.ResponseTypes.Status)
+            else
             {
-                var status = (StatusResponse)message.BodyObject;
-                callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
-                var request = callback?.Message;
-                if (request is not null)
-                {
-                    callback.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
-                    {
-                        LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
-                    }
-                }
-                else
-                {
-                    if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
-                    {
-                        // Cancel the call since the caller has abandoned it.
-                        // Note that the target and sender arguments are swapped because this is a response to the original request.
-                        _cancellationManager.SignalCancellation(
-                            message.SendingSilo,
-                            targetGrainId: message.SendingGrain,
-                            sendingGrainId: message.TargetGrain,
-                            messageId: message.Id);
-                    }
-
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
-                    {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
-                    }
-                }
-
-                return;
+                ProcessStatusResponse(message);
             }
+        }
 
-            CallbackData callbackData;
-            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
-            if (found)
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private void ProcessResponseCallback(Message message)
+        {
+            if (callbacks.TryRemove((message.TargetGrain, message.Id), out var callbackData))
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
@@ -477,6 +459,45 @@ namespace Orleans.Runtime
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
+            }
+        }
+
+        private void ProcessStatusResponse(Message message)
+        {
+            var status = (StatusResponse)message.BodyObject;
+            callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
+            var request = callback?.Message;
+            if (request is not null)
+            {
+                callback.OnStatusUpdate(status);
+                if (status.Diagnostics is { Count: > 0 })
+                {
+                    LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
+                }
+
+                return;
+            }
+
+            HandleUnknownStatusUpdate(message, status);
+        }
+
+        private void HandleUnknownStatusUpdate(Message message, StatusResponse status)
+        {
+            if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
+            {
+                // Cancel the call since the caller has abandoned it.
+                // Note that the target and sender arguments are swapped because this is a response to the original request.
+                _cancellationManager.SignalCancellation(
+                    message.SendingSilo,
+                    targetGrainId: message.SendingGrain,
+                    sendingGrainId: message.TargetGrain,
+                    messageId: message.Id);
+            }
+
+            if (status.Diagnostics is { Count: > 0 } && logger.IsEnabled(LogLevel.Debug))
+            {
+                var diagnosticsString = string.Join("\n", status.Diagnostics);
+                LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
             }
         }
 
