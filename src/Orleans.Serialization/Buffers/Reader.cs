@@ -505,13 +505,13 @@ namespace Orleans.Serialization.Buffers
 
         /// <summary>
         /// Creates a new reader beginning at the specified position.
-        /// </summary>        
+        /// </summary>
         /// <param name="position">
         /// The position in the input stream to fork from.
-        /// </param>        
+        /// </param>
         /// <param name="forked">
         /// The forked reader instance.
-        /// </param>        
+        /// </param>
         public void ForkFrom(long position, out Reader<TInput> forked)
         {
             if (IsReadOnlySequenceInput)

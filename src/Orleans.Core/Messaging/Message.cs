@@ -3,6 +3,8 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Orleans.Runtime.Messaging;
+using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
 {
@@ -10,14 +12,92 @@ namespace Orleans.Runtime
     internal sealed class Message : ISpanFormattable
     {
         public const int LENGTH_HEADER_SIZE = 8;
-        public const int LENGTH_META_HEADER = 4;
 
         [NonSerialized]
         private short _retryCount;
 
         public CoarseStopwatch _timeToExpiry;
 
-        public object? BodyObject { get; set; }
+        internal object? _bodyObject;
+
+        public object? BodyObject
+        {
+            get
+            {
+                if (_bodyObject is MessageReadRequest readRequest)
+                {
+                    DeserializeRequestBody(readRequest);
+                }
+
+                return _bodyObject;
+            }
+
+            set
+            {
+                (_bodyObject as MessageReadRequest)?.Reset();
+                _bodyObject = value;
+            }
+        }
+
+        private object? GetBodyObjectSafe()
+        {
+            if (_bodyObject is MessageReadRequest readRequest)
+            {
+                var messageSerializer = readRequest.Shared.GetMessageSerializer();
+                try
+                {
+                    messageSerializer.ReadBodyObject(this, readRequest);
+                }
+                catch
+                {
+                }
+                finally
+                {
+                    readRequest.Shared.Return(messageSerializer);
+                    if (!Equals(_bodyObject, readRequest))
+                    {
+                        readRequest.Reset();
+                    }
+                }
+            }
+
+            return _bodyObject;
+        }
+
+        private void DeserializeRequestBody(MessageReadRequest readRequest)
+        {
+            var messageSerializer = readRequest.Shared.GetMessageSerializer();
+            try
+            {
+                messageSerializer.ReadBodyObject(this, readRequest);
+            }
+            catch (Exception exception) when (Direction == Directions.Response)
+            {
+                _bodyObject = Response.FromException(exception);
+            }
+            finally
+            {
+                readRequest.Shared.Return(messageSerializer);
+                readRequest.Reset();
+            }
+        }
+
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        internal void SetMessageReadRequest(MessageReadRequest request)
+        {
+            if (_bodyObject is MessageReadRequest current && !ReferenceEquals(current, request))
+            {
+                current.Reset();
+            }
+
+            _bodyObject = request;
+        }
+
+        public void Dispose()
+        {
+            (_bodyObject as MessageReadRequest)?.Reset();
+            _bodyObject = null;
+        }
 
         public PackedHeaders _headers;
         public CorrelationId _id;
@@ -222,6 +302,11 @@ namespace Orleans.Runtime
             }
         }
 
+        internal void SetTimeToLive(Message other)
+        {
+            _timeToExpiry = other._timeToExpiry;
+        }
+
         internal long GetTimeToLiveMilliseconds() => -_timeToExpiry.ElapsedMilliseconds;
 
         internal void SetTimeToLiveMilliseconds(long milliseconds)
@@ -315,11 +400,12 @@ namespace Orleans.Runtime
             if (IsReadOnly && !Append(ref dst, "ReadOnly ")) goto grow;
             if (IsAlwaysInterleave && !Append(ref dst, "IsAlwaysInterleave ")) goto grow;
 
+            var bodyObject = GetBodyObjectSafe();
             if (Direction == Directions.Response)
             {
                 switch (Result)
                 {
-                    case ResponseTypes.Rejection when BodyObject is RejectionResponse rejection:
+                    case ResponseTypes.Rejection when bodyObject is RejectionResponse rejection:
                         if (!dst.TryWrite($"{rejection.RejectionType} Rejection (info: {rejection.RejectionInfo}) ", out len)) goto grow;
                         dst = dst[len..];
                         break;
@@ -337,7 +423,7 @@ namespace Orleans.Runtime
             if (!dst.TryWrite($"{Direction} [{SendingSilo} {SendingGrain}]->[{TargetSilo} {TargetGrain}]", out len)) goto grow;
             dst = dst[len..];
 
-            if (BodyObject is { } request)
+            if (bodyObject is { } request)
             {
                 if (!dst.TryWrite($" {request}", out len)) goto grow;
                 dst = dst[len..];
@@ -386,10 +472,10 @@ grow:
             HasTimeToLive = 1 << 8,
 
             // Message cannot be forwarded to another activation.
-            IsLocalOnly = 1 << 9, 
+            IsLocalOnly = 1 << 9,
 
             // Message must not trigger grain activation or extend an activation's lifetime.
-            SuppressKeepAlive = 1 << 10,  
+            SuppressKeepAlive = 1 << 10,
 
             // The most significant bit is reserved, possibly for use to indicate more data follows.
             Reserved = 1 << 15,

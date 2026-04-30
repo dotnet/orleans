@@ -5,7 +5,6 @@ using Benchmarks.Serialization.Models;
 using Benchmarks.Serialization.Utilities;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
-using Orleans.Networking.Shared;
 using Orleans.Runtime.Messaging;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
@@ -80,8 +79,7 @@ public class ComplexTypeBenchmarks
         _readBytesLength = _serializedPayload.Length;
 
         _pipe = new Pipe(new PipeOptions(readerScheduler: PipeScheduler.Inline, writerScheduler: PipeScheduler.Inline, pauseWriterThreshold: 0));
-        var memoryPool = new SharedMemoryPool();
-        _messageSerializer = new(_sessionPool, memoryPool, new SiloMessagingOptions());
+        _messageSerializer = new(_sessionPool, new SiloMessagingOptions());
     }
 
     [Fact]

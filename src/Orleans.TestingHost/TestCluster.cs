@@ -16,21 +16,26 @@ using Microsoft.Extensions.Configuration.Memory;
 using Orleans.Configuration;
 using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Hosting;
-using Orleans.TestingHost.InMemoryTransport;
+using Orleans.Runtime.Messaging;
+using Orleans.Connections.Transport;
 using Orleans.TestingHost.UnixSocketTransport;
 using System.Net;
 using Orleans.Statistics;
+using Orleans.TestingHost.InMemoryTransport;
+using Orleans.Messaging;
+using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 
 #nullable disable
 namespace Orleans.TestingHost
 {
     /// <summary>
-    /// A host class for local testing with Orleans using in-process silos. 
+    /// A host class for local testing with Orleans using in-process silos.
     /// Runs a Primary and optionally secondary silos in separate app domains, and client in the main app domain.
     /// Additional silos can also be started in-process on demand if required for particular test cases.
     /// </summary>
     /// <remarks>
-    /// Make sure that your test project references your test grains and test grain interfaces 
+    /// Make sure that your test project references your test grains and test grain interfaces
     /// projects, and has CopyLocal=True set on those references [which should be the default].
     /// </remarks>
     public class TestCluster : IDisposable, IAsyncDisposable
@@ -87,7 +92,7 @@ namespace Orleans.TestingHost
         /// <summary>
         /// Options used to configure the test cluster.
         /// </summary>
-        /// <remarks>This is the options you configured your test cluster with, or the default one. 
+        /// <remarks>This is the options you configured your test cluster with, or the default one.
         /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
         /// </remarks>
         public TestClusterOptions Options => this.options;
@@ -131,7 +136,7 @@ namespace Orleans.TestingHost
         /// The port allocator.
         /// </summary>
         public ITestClusterPortAllocator PortAllocator { get; }
-        
+
         /// <summary>
         /// Configures the test cluster plus client in-process.
         /// </summary>
@@ -392,7 +397,7 @@ namespace Orleans.TestingHost
                 Primary, additional.Count, Runtime.Utils.EnumerableToString(additional));
 
             if (Primary?.IsActive == true) yield return Primary;
-            
+
 
             if (additional.Count > 0)
             foreach (var s in additional)
@@ -537,7 +542,7 @@ namespace Orleans.TestingHost
                 if (client is not null)
                 {
                     await client.StopAsync().ConfigureAwait(false);
-                }                
+                }
             }
             catch (Exception exc)
             {
@@ -741,13 +746,21 @@ namespace Orleans.TestingHost
                         switch (transport)
                         {
                             case ConnectionTransportType.TcpSocket:
+                                // TCP is used by default
                                 break;
                             case ConnectionTransportType.InMemory:
-                                clientBuilder.UseInMemoryConnectionTransport(_transportHub);
-                                break;
+                                {
+                                    clientBuilder.UseInMemoryTransport(_transportHub);
+                                    break;
+                                }
                             case ConnectionTransportType.UnixSocket:
-                                clientBuilder.UseUnixSocketConnection();
-                                break;
+                                {
+                                    clientBuilder.Services.RemoveAll<MessageTransportConnector>();
+                                    clientBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new UnixDomainSocketMessageTransportConnector(
+                                        sp.GetRequiredService<IOptions<UnixSocketConnectionOptions>>(),
+                                        sp.GetRequiredService<ILoggerFactory>()));
+                                    break;
+                                }
                             default:
                                 throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                         }
@@ -803,11 +816,37 @@ namespace Orleans.TestingHost
                         case ConnectionTransportType.TcpSocket:
                             break;
                         case ConnectionTransportType.InMemory:
-                            siloBuilder.UseInMemoryConnectionTransport(_transportHub);
-                            break;
+                            {
+                                siloBuilder.UseInMemoryTransport(_transportHub);
+                               break;
+                            }
                         case ConnectionTransportType.UnixSocket:
-                            siloBuilder.UseUnixSocketConnection();
-                            break;
+                            {
+                                siloBuilder.Services.RemoveAll<MessageTransportConnector>();
+                                siloBuilder.Services.RemoveAll<MessageTransportListener>();
+                                siloBuilder.Services.AddSingleton<MessageTransportConnector>(sp => new UnixDomainSocketMessageTransportConnector(
+                                    sp.GetRequiredService<IOptions<UnixSocketConnectionOptions>>(),
+                                    sp.GetRequiredService<ILoggerFactory>()));
+                                siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new UnixDomainSocketMessageTransportListener(
+                                    "gateway",
+                                    sp.GetRequiredService<IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions>>(),
+                                    sp.GetRequiredService<ILoggerFactory>()));
+                                siloBuilder.Services.AddOptions<UnixDomainSocketMessageTransportListenerOptions>("gateway").Configure<IOptions<EndpointOptions>, IOptions<UnixSocketConnectionOptions>>(
+                                    (listenerOptions, endPointOptions, connectionOptions) =>
+                                {
+                                    listenerOptions.Path = connectionOptions.Value.ConvertEndpointToPath(endPointOptions.Value.GetListeningProxyEndpoint());
+                                });
+                                siloBuilder.Services.AddSingleton<MessageTransportListener>(sp => new UnixDomainSocketMessageTransportListener(
+                                    "silo",
+                                    sp.GetRequiredService<IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions>>(),
+                                    sp.GetRequiredService<ILoggerFactory>()));
+                                siloBuilder.Services.AddOptions<UnixDomainSocketMessageTransportListenerOptions>("silo").Configure<IOptions<EndpointOptions>, IOptions<UnixSocketConnectionOptions>>(
+                                    (listenerOptions, endPointOptions, connectionOptions) =>
+                                {
+                                    listenerOptions.Path = connectionOptions.Value.ConvertEndpointToPath(endPointOptions.Value.GetListeningSiloEndpoint());
+                                });
+                                break;
+                            }
                         default:
                             throw new ArgumentException($"Unsupported {nameof(ConnectionTransportType)}: {transport}");
                     }

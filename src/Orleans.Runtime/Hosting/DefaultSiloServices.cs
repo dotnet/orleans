@@ -2,7 +2,6 @@ using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Reflection;
-using Microsoft.AspNetCore.Connections;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -11,10 +10,12 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
 using Orleans.Configuration.Validators;
+using Orleans.Connections;
+using Orleans.Connections.Transport;
+using Orleans.Connections.Transport.Sockets;
 using Orleans.Core;
 using Orleans.GrainReferences;
 using Orleans.Metadata;
-using Orleans.Networking.Shared;
 using Orleans.Placement.Repartitioning;
 using Orleans.Providers;
 using Orleans.Runtime;
@@ -253,7 +254,7 @@ namespace Orleans.Hosting
             services.AddKeyedSingleton<CompatibilityStrategy, AllVersionsCompatible>(nameof(AllVersionsCompatible));
             services.AddKeyedSingleton<CompatibilityStrategy, BackwardCompatible>(nameof(BackwardCompatible));
             services.AddKeyedSingleton<CompatibilityStrategy, StrictVersionCompatible>(nameof(StrictVersionCompatible));
-            // Compatability directors
+
             services.AddKeyedSingleton<ICompatibilityDirector, BackwardCompatilityDirector>(typeof(BackwardCompatible));
             services.AddKeyedSingleton<ICompatibilityDirector, AllVersionsCompatibilityDirector>(typeof(AllVersionsCompatible));
             services.AddKeyedSingleton<ICompatibilityDirector, StrictVersionCompatibilityDirector>(typeof(StrictVersionCompatible));
@@ -384,22 +385,13 @@ namespace Orleans.Hosting
                 (sp, _) => sp.GetRequiredService<IAsyncEnumerableGrainExtension>());
 
             // Networking
+            services.AddSingleton<MessageHandlerShared>();
             services.TryAddSingleton<IMessageStatisticsSink, NoOpMessageStatisticsSink>();
             services.TryAddSingleton<ConnectionCommon>();
             services.TryAddSingleton<ConnectionManager>();
             services.TryAddSingleton<ConnectionPreambleHelper>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, ConnectionManagerLifecycleAdapter<ISiloLifecycle>>();
             services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionMaintainer>();
-
-            services.AddKeyedSingleton<IConnectionFactory>(
-                SiloConnectionFactory.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionFactory>(sp));
-            services.AddKeyedSingleton<IConnectionListenerFactory>(
-                SiloConnectionListener.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
-            services.AddKeyedSingleton<IConnectionListenerFactory>(
-                GatewayConnectionListener.ServicesKey,
-                (sp, key) => ActivatorUtilities.CreateInstance<SocketConnectionListenerFactory>(sp));
 
             services.AddSerializer();
             services.AddSingleton<ITypeNameFilter, AllowOrleansTypes>();
@@ -410,22 +402,46 @@ namespace Orleans.Hosting
             services.AddSingleton<IPostConfigureOptions<OrleansJsonSerializerOptions>, ConfigureOrleansJsonSerializerOptions>();
             services.AddSingleton<OrleansJsonSerializer>();
 
-            services.TryAddTransient(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
+            services.TryAddTransient<MessageSerializer>(sp => ActivatorUtilities.CreateInstance<MessageSerializer>(
                 sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value));
+
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
+            services.AddSingleton<ConnectionTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
             services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
-
-            // Use Orleans server.
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
-            services.AddSingleton<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
-            services.AddSingleton<SocketSchedulers>();
-            services.AddSingleton<SharedMemoryPool>();
 
             // Activation migration
             services.AddSingleton<ActivationMigrationManager>();
             services.AddFromExisting<IActivationMigrationManager, ActivationMigrationManager>();
+
+            // Use Orleans server.
+            services.AddSingleton<MessageTransportConnector, TcpMessageTransportConnector>();
+            services.AddSingleton<MessageTransportListener>(sp => new TcpMessageTransportListener(
+                "gateway",
+                sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportOptions>>(),
+                sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportListenerOptions>>(),
+                sp.GetRequiredService<ILoggerFactory>()));
+            services.AddOptions<TcpMessageTransportListenerOptions>("gateway").Configure<IOptions<EndpointOptions>>((listenerOptions, endpointOptions) =>
+            {
+                listenerOptions.Endpoint = endpointOptions.Value.GetListeningProxyEndpoint();
+            });
+
+            services.AddSingleton<MessageTransportListener>(sp => new TcpMessageTransportListener(
+                "silo",
+                sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportOptions>>(),
+                sp.GetRequiredService<IOptionsMonitor<TcpMessageTransportListenerOptions>>(),
+                sp.GetRequiredService<ILoggerFactory>()));
+            services.AddOptions<TcpMessageTransportListenerOptions>("silo").Configure<IOptions<EndpointOptions>>((listenerOptions, endpointOptions) =>
+            {
+                listenerOptions.Endpoint = endpointOptions.Value.GetListeningSiloEndpoint();
+            });
+
+            services.AddSingleton<SiloConnectionListener>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, SiloConnectionListener>();
+            services.AddSingleton<GatewayConnectionListener>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, GatewayConnectionListener>();
+
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, ActivationMigrationManager>();
             services.AddSingleton<GrainMigratabilityChecker>();
 

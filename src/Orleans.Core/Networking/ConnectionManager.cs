@@ -324,7 +324,7 @@ namespace Orleans.Runtime.Messaging
             {
                 using (this.BeginConnectionScope(connection))
                 {
-                    await connection.Run();
+                    await connection.RunAsync();
                 }
             }
             catch (Exception exception)

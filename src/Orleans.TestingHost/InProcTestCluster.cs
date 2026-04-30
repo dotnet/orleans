@@ -26,12 +26,13 @@ using Orleans.Hosting;
 using Orleans.Runtime.TestHooks;
 using Orleans.Configuration.Internal;
 using Orleans.TestingHost.Logging;
+using Microsoft.Extensions.Logging;
 
 #nullable disable
 namespace Orleans.TestingHost;
 
 /// <summary>
-/// A host class for local testing with Orleans using in-process silos. 
+/// A host class for local testing with Orleans using in-process silos.
 /// </summary>
 public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
 {
@@ -60,7 +61,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
     /// <summary>
     /// Options used to configure the test cluster.
     /// </summary>
-    /// <remarks>This is the options you configured your test cluster with, or the default one. 
+    /// <remarks>This is the options you configured your test cluster with, or the default one.
     /// If the cluster is being configured via ClusterConfiguration, then this object may not reflect the true settings.
     /// </remarks>
     public InProcessTestClusterOptions Options { get; }
@@ -661,7 +662,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                 clientBuilder.Services.AddSingleton<IGatewayListProvider>(_membershipTable);
             }
 
-            clientBuilder.UseInMemoryConnectionTransport(_transportHub);
+            clientBuilder.UseInMemoryTransport(_transportHub);
         });
 
         TryConfigureFileLogging(Options, hostBuilder.Services, "TestClusterClient");
@@ -706,7 +707,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
             if (Debugger.IsAttached)
             {
                 // Test is running inside debugger - Make timeout ~= infinite
-                services.Configure<SiloMessagingOptions>(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000));
+                services.Configure((Action<SiloMessagingOptions>)(op => op.ResponseTimeout = TimeSpan.FromMilliseconds(1000000)));
             }
 
             foreach (var hostDelegate in Options.SiloHostConfigurationDelegates)
@@ -743,7 +744,7 @@ public sealed class InProcessTestCluster : IDisposable, IAsyncDisposable
                     siloBuilder.AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (_, _) => _grainDirectory);
                 }
 
-                siloBuilder.UseInMemoryConnectionTransport(_transportHub);
+                siloBuilder.UseInMemoryTransport(_transportHub);
 
                 services.AddSingleton<TestHooksEnvironmentStatisticsProvider>();
                 services.AddSingleton<TestHooksSystemTarget>();
