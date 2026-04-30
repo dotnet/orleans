@@ -135,6 +135,7 @@
   </Folder>
   <Folder Name="/test/Benchmarks/">
     <Project Path="test/Benchmarks.AdoNet/Benchmarks.AdoNet.csproj" />
+    <Project Path="test/Benchmarks.Scenarios/Benchmarks.Scenarios.csproj" />
     <Project Path="test/Benchmarks/Benchmarks.csproj" />
     <Project Path="test/Grains/BenchmarkGrainInterfaces/BenchmarkGrainInterfaces.csproj" />
     <Project Path="test/Grains/BenchmarkGrains/BenchmarkGrains.csproj" />
