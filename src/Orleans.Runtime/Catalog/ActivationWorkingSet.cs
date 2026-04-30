@@ -216,7 +216,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents an activation from the perspective of <see cref="IActivationWorkingSet"/>.
     /// </summary>
-    public interface IActivationWorkingSetMember
+    public interface IActivationWorkingSetMember : IGrainContext
     {
         /// <summary>
         /// Returns <see langword="true"/> if the member is eligible for removal, <see langword="false"/> otherwise.
