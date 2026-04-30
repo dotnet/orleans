@@ -184,6 +184,13 @@ namespace Orleans.Runtime.Messaging
 
                     MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
+                    if (msg.Direction == Message.Directions.Request && msg.BodyObjectIsShared && msg.BodyObject is { } body)
+                    {
+                        msg.BodyObject = this.messageFactory.CopyBodyObject(body);
+                        msg.DisposeBodyObject = msg.BodyObject is IInvokable;
+                        msg.BodyObjectIsShared = false;
+                    }
+
                     this.ReceiveMessage(msg);
                 }
                 else

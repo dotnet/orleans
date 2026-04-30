@@ -15,6 +15,19 @@ namespace Orleans.Runtime
         [NonSerialized]
         private short _retryCount;
 
+        /// <summary>
+        /// When true, the <see cref="BodyObject"/> will be disposed when this message is reset (returned to the pool).
+        /// This is used for pooling invokable request objects.
+        /// </summary>
+        [NonSerialized]
+        internal bool DisposeBodyObject;
+
+        /// <summary>
+        /// Indicates that <see cref="BodyObject"/> is shared with the local sender.
+        /// </summary>
+        [NonSerialized]
+        internal bool BodyObjectIsShared;
+
         public CoarseStopwatch _timeToExpiry;
 
         public object? BodyObject { get; set; }
@@ -371,6 +384,43 @@ grow:
 
         internal bool IsPing() => _requestContextData?.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var value) == true && value is bool isPing && isPing;
 
+        /// <summary>
+        /// Disposes the message body if it is marked as disposable by the message owner.
+        /// </summary>
+        internal void DisposeBody()
+        {
+            if (DisposeBodyObject)
+            {
+                (BodyObject as IDisposable)?.Dispose();
+                DisposeBodyObject = false;
+                BodyObjectIsShared = false;
+                BodyObject = null;
+            }
+        }
+
+        /// <summary>
+        /// Resets the message to its default state for reuse.
+        /// </summary>
+        internal void Reset()
+        {
+            _retryCount = 0;
+            _timeToExpiry = default;
+            DisposeBody();
+            BodyObject = null;
+            BodyObjectIsShared = false;
+            _headers = default;
+            _id = default;
+            _requestContextData = null;
+            _targetSilo = null;
+            _targetGrain = default;
+            _sendingSilo = null;
+            _sendingGrain = default;
+            _interfaceVersion = 0;
+            _interfaceType = default;
+            _cacheInvalidationHeader = null;
+        }
+
+
         [Flags]
         internal enum MessageFlags : ushort
         {
@@ -386,10 +436,10 @@ grow:
             HasTimeToLive = 1 << 8,
 
             // Message cannot be forwarded to another activation.
-            IsLocalOnly = 1 << 9, 
+            IsLocalOnly = 1 << 9,
 
             // Message must not trigger grain activation or extend an activation's lifetime.
-            SuppressKeepAlive = 1 << 10,  
+            SuppressKeepAlive = 1 << 10,
 
             // The most significant bit is reserved, possibly for use to indicate more data follows.
             Reserved = 1 << 15,

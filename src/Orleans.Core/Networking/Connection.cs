@@ -382,6 +382,16 @@ namespace Orleans.Runtime.Messaging
                         break;
                     }
 
+                    // Dispose one-way request bodies after they've been sent.
+                    // Request-response bodies are disposed when the invocation completes.
+                    foreach (var msg in inflight)
+                    {
+                        if (msg.Direction == Message.Directions.OneWay)
+                        {
+                            msg.DisposeBody();
+                        }
+                    }
+
                     inflight.Clear();
                 }
             }

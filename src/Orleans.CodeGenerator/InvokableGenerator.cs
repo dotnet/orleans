@@ -33,8 +33,12 @@ namespace Orleans.CodeGenerator
 
             var baseClassType = GetBaseClassType(invokableMethodInfo);
             var fieldDescriptions = GetFieldDescriptions(invokableMethodInfo);
-            var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions);
-            var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType);
+
+            // Create the invokable type syntax for use in field declarations and constructor
+            var invokableTypeSyntax = CreateInvokableTypeSyntax(generatedClassName, invokableMethodInfo);
+
+            var fields = GetFieldDeclarations(invokableMethodInfo, fieldDescriptions, invokableTypeSyntax);
+            var (ctor, ctorArgs) = GenerateConstructor(generatedClassName, invokableMethodInfo, baseClassType, fieldDescriptions, invokableTypeSyntax);
             var accessibility = GetAccessibility(method);
             var compoundTypeAliases = GetCompoundTypeAliasAttributeArguments(invokableMethodInfo, invokableMethodInfo.Key);
 
@@ -588,6 +592,8 @@ namespace Orleans.CodeGenerator
             INamedTypeSymbol baseClassType)
         {
             var body = new List<StatementSyntax>();
+            PoolFieldDescription poolField = null;
+
             foreach (var field in fields)
             {
                 if (field is CancellationTokenSourceFieldDescription ctsField)
@@ -600,6 +606,11 @@ namespace Orleans.CodeGenerator
                                 ctsField.FieldName.ToIdentifierName(),
                                 InvocationExpression(
                                     MemberBindingExpression(IdentifierName("Dispose"))))));
+                }
+
+                if (field is PoolFieldDescription pf)
+                {
+                    poolField = pf;
                 }
 
                 if (field.IsInstanceField)
@@ -619,6 +630,19 @@ namespace Orleans.CodeGenerator
                 && baseClassType.GetAllMembers<IMethodSymbol>("Dispose").FirstOrDefault(m => !m.IsAbstract && m.DeclaredAccessibility != Accessibility.Private) is { })
             {
                 body.Add(ExpressionStatement(InvocationExpression(BaseExpression().Member("Dispose")).WithArgumentList(ArgumentList())));
+            }
+
+            // C# _pool.Return(this); - return to pool at the very end
+            if (poolField != null)
+            {
+                body.Add(
+                    ExpressionStatement(
+                        InvocationExpression(
+                            MemberAccessExpression(
+                                SyntaxKind.SimpleMemberAccessExpression,
+                                IdentifierName(poolField.FieldName),
+                                IdentifierName("Return")),
+                            ArgumentList(SingletonSeparatedList(Argument(ThisExpression()))))));
             }
 
             return MethodDeclaration(PredefinedType(Token(SyntaxKind.VoidKeyword)), "Dispose")
@@ -698,9 +722,28 @@ namespace Orleans.CodeGenerator
             return $"Invokable_{method.ContainingInterface.Name}_{proxyKey}_{method.GeneratedMethodId}{typeArgs}";
         }
 
+        private static TypeSyntax CreateInvokableTypeSyntax(string generatedClassName, InvokableMethodDescription method)
+        {
+            if (method.AllTypeParameters.Count > 0)
+            {
+                // Generic invokable: ClassName<TArg0, TArg1, ...>
+                var typeArguments = method.AllTypeParameters.Select(p =>
+                    (TypeSyntax)IdentifierName(method.TypeParameterSubstitutions[p.Parameter]));
+                return GenericName(
+                    Identifier(generatedClassName),
+                    TypeArgumentList(SeparatedList(typeArguments)));
+            }
+            else
+            {
+                // Non-generic invokable: ClassName
+                return IdentifierName(generatedClassName);
+            }
+        }
+
         private MemberDeclarationSyntax[] GetFieldDeclarations(
             InvokableMethodDescription method,
-            List<InvokerFieldDescription> fieldDescriptions)
+            List<InvokerFieldDescription> fieldDescriptions,
+            TypeSyntax invokableTypeSyntax)
         {
             return fieldDescriptions.Select(GetFieldDeclaration).ToArray();
 
@@ -727,6 +770,18 @@ namespace Orleans.CodeGenerator
                                         Argument(parameterTypes),
                                     }))))))))
                         .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.StaticKeyword), Token(SyntaxKind.ReadOnlyKeyword));
+                }
+                else if (description is PoolFieldDescription)
+                {
+                    // Pool field: InvokablePool<ThisInvokableType>
+                    var poolType = GenericName(
+                        Identifier("InvokablePool"),
+                        TypeArgumentList(SingletonSeparatedList(invokableTypeSyntax)));
+                    field = FieldDeclaration(
+                        VariableDeclaration(
+                            poolType,
+                            SingletonSeparatedList(VariableDeclarator(description.FieldName))))
+                        .AddModifiers(Token(SyntaxKind.PrivateKeyword), Token(SyntaxKind.ReadOnlyKeyword));
                 }
                 else
                 {
@@ -758,7 +813,9 @@ namespace Orleans.CodeGenerator
         private (ConstructorDeclarationSyntax Constructor, List<TypeSyntax> ConstructorArguments) GenerateConstructor(
             string simpleClassName,
             InvokableMethodDescription method,
-            INamedTypeSymbol baseClassType)
+            INamedTypeSymbol baseClassType,
+            List<InvokerFieldDescription> fieldDescriptions,
+            TypeSyntax invokableTypeSyntax)
         {
             var parameters = new List<ParameterSyntax>();
 
@@ -766,6 +823,23 @@ namespace Orleans.CodeGenerator
 
             List<TypeSyntax> constructorArgumentTypes = new();
             List<ArgumentSyntax> baseConstructorArguments = new();
+
+            // For non-generic methods, add pool parameter first
+            var poolField = fieldDescriptions.OfType<PoolFieldDescription>().FirstOrDefault();
+            if (poolField != null)
+            {
+                var poolType = GenericName(
+                    Identifier("InvokablePool"),
+                    TypeArgumentList(SingletonSeparatedList(invokableTypeSyntax)));
+                constructorArgumentTypes.Add(poolType);
+                parameters.Add(Parameter(Identifier("pool")).WithType(poolType));
+                body.Add(ExpressionStatement(
+                    AssignmentExpression(
+                        SyntaxKind.SimpleAssignmentExpression,
+                        IdentifierName(poolField.FieldName),
+                        IdentifierName("pool"))));
+            }
+
             foreach (var constructor in baseClassType.GetAllMembers<IMethodSymbol>())
             {
                 if (constructor.MethodKind != MethodKind.Constructor || constructor.DeclaredAccessibility == Accessibility.Private || constructor.IsImplicitlyDeclared)
@@ -829,6 +903,12 @@ namespace Orleans.CodeGenerator
             if (method.IsCancellable)
             {
                 fields.Add(new CancellationTokenSourceFieldDescription(LibraryTypes));
+            }
+
+            // Add pool field for non-generic methods (generic methods can't use pooling)
+            if (method.MethodTypeParameters.Count == 0)
+            {
+                fields.Add(new PoolFieldDescription(LibraryTypes));
             }
 
             return fields;
@@ -939,6 +1019,14 @@ namespace Orleans.CodeGenerator
 
             public override bool IsSerializable => false;
             public override bool IsInstanceField => false;
+        }
+
+        internal sealed class PoolFieldDescription : InvokerFieldDescription
+        {
+            public PoolFieldDescription(LibraryTypes libraryTypes) : base(libraryTypes.InvokablePool_1, "_pool") { }
+
+            public override bool IsSerializable => false;
+            public override bool IsInstanceField => false; // Assigned via constructor, not reset on dispose
         }
     }
 }

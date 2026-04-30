@@ -65,6 +65,9 @@ namespace Orleans.Serialization
                 services.TryAddSingleton(typeof(IDeepCopier<>), typeof(CopierHolder<>));
                 services.TryAddSingleton(typeof(IBaseCopier<>), typeof(BaseCopierHolder<>));
 
+                // Invokable pooling
+                services.TryAddSingleton(typeof(Invocation.InvokablePool<>));
+
                 // Type filtering
                 services.AddSingleton<ITypeNameFilter, DefaultTypeFilter>();
 

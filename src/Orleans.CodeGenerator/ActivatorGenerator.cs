@@ -3,6 +3,7 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 using System.Collections.Generic;
+using System.Linq;
 
 namespace Orleans.CodeGenerator
 {
@@ -15,6 +16,7 @@ namespace Orleans.CodeGenerator
             public TypeSyntax Type { get; set; }
             public string FieldName { get; set; }
             public string ParameterName { get; set; }
+            public bool IsPool { get; set; }
         }
 
         public ActivatorGenerator(CodeGenerator codeGenerator)
@@ -34,7 +36,9 @@ namespace Orleans.CodeGenerator
             {
                 foreach (var arg in parameters)
                 {
-                    orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}" });
+                    // Detect if this is an InvokablePool<T> parameter
+                    var isPool = arg is GenericNameSyntax gns && gns.Identifier.Text == "InvokablePool";
+                    orderedFields.Add(new ConstructorArgument { Type = arg, FieldName = $"_arg{index}", ParameterName = $"arg{index}", IsPool = isPool });
                     index++;
                 }
             }
@@ -80,11 +84,23 @@ namespace Orleans.CodeGenerator
             {
                 parameters.Add(Parameter(field.ParameterName.ToIdentifier()).WithType(field.Type));
 
-                body.Add(ExpressionStatement(
-                            AssignmentExpression(
-                                SyntaxKind.SimpleAssignmentExpression,
-                                field.FieldName.ToIdentifierName(),
-                                Unwrapped(field.ParameterName.ToIdentifierName()))));
+                // Pool fields are not wrapped services, assign directly
+                if (field.IsPool)
+                {
+                    body.Add(ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    field.FieldName.ToIdentifierName(),
+                                    field.ParameterName.ToIdentifierName())));
+                }
+                else
+                {
+                    body.Add(ExpressionStatement(
+                                AssignmentExpression(
+                                    SyntaxKind.SimpleAssignmentExpression,
+                                    field.FieldName.ToIdentifierName(),
+                                    Unwrapped(field.ParameterName.ToIdentifierName()))));
+                }
             }
 
             var constructorDeclaration = ConstructorDeclaration(simpleClassName)
@@ -104,6 +120,45 @@ namespace Orleans.CodeGenerator
 
         private MemberDeclarationSyntax GenerateCreateMethod(ISerializableTypeDescription type, List<ConstructorArgument> orderedFields)
         {
+            // Check if this is a poolable invokable (has InvokablePool<T> as first constructor argument)
+            var poolField = orderedFields.FirstOrDefault(f => f.IsPool);
+
+            if (poolField.IsPool)
+            {
+                // Generate: _pool.TryGet(out var item) ? item : new T(_pool, ...otherArgs)
+                var argList = new List<ArgumentSyntax>();
+                foreach (var field in orderedFields)
+                {
+                    argList.Add(Argument(field.FieldName.ToIdentifierName()));
+                }
+
+                var newExpression = ObjectCreationExpression(type.TypeSyntax)
+                    .WithArgumentList(ArgumentList(SeparatedList(argList)));
+
+                // _pool.TryGet(out var item)
+                var tryGetCall = InvocationExpression(
+                    MemberAccessExpression(
+                        SyntaxKind.SimpleMemberAccessExpression,
+                        poolField.FieldName.ToIdentifierName(),
+                        IdentifierName("TryGet")),
+                    ArgumentList(SingletonSeparatedList(
+                        Argument(DeclarationExpression(
+                            IdentifierName("var"),
+                            SingleVariableDesignation(Identifier("item"))))
+                        .WithRefKindKeyword(Token(SyntaxKind.OutKeyword)))));
+
+                // Conditional: tryGet ? item : new T(...)
+                var conditionalExpression = ConditionalExpression(
+                    tryGetCall,
+                    IdentifierName("item"),
+                    newExpression);
+
+                return MethodDeclaration(type.TypeSyntax, "Create")
+                    .WithExpressionBody(ArrowExpressionClause(conditionalExpression))
+                    .WithSemicolonToken(Token(SyntaxKind.SemicolonToken))
+                    .AddModifiers(Token(SyntaxKind.PublicKeyword));
+            }
+
             ExpressionSyntax createObject;
             if (type.ActivatorConstructorParameters is { Count: > 0 })
             {
