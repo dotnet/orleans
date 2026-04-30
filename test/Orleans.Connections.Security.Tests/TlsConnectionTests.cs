@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
+using Orleans.Connections.Transport.Security;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -7,17 +8,17 @@ namespace Orleans.Connections.Security.Tests
 {
     /// <summary>
     /// Tests for TLS (Transport Layer Security) support in Orleans connections.
-    /// 
+    ///
     /// Orleans supports TLS encryption for:
     /// - Client-to-silo connections (gateway connections)
     /// - Silo-to-silo connections (membership protocol)
-    /// 
+    ///
     /// Key features tested:
     /// - Certificate creation and encoding/decoding
     /// - Mutual TLS authentication (mTLS) with client certificates
     /// - Different certificate validation modes
     /// - End-to-end encrypted communication
-    /// 
+    ///
     /// TLS is essential for:
     /// - Securing Orleans deployments in untrusted networks
     /// - Meeting compliance requirements (HIPAA, PCI-DSS, etc.)
@@ -48,7 +49,7 @@ namespace Orleans.Connections.Security.Tests
             var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);
         }
-        
+
         /// <summary>
         /// Configures TLS for Orleans clients in the test cluster.
         /// Sets up:
@@ -134,7 +135,7 @@ namespace Orleans.Connections.Security.Tests
         /// Tests different combinations of:
         /// - Certificate OIDs (null, server-only, or both client and server authentication)
         /// - Certificate modes (NoCertificate, AllowCertificate, RequireCertificate)
-        /// 
+        ///
         /// Verifies that:
         /// - TLS connections are established successfully
         /// - Grain calls work over encrypted connections
@@ -161,7 +162,7 @@ namespace Orleans.Connections.Security.Tests
                 // Create a self-signed certificate with specified OIDs
                 var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
                     CertificateSubjectName, oids);
-                
+
                 // Pass certificate through configuration (simulates real deployment)
                 var encodedCertificate = TestCertificateHelper.ConvertToBase64(certificate);
                 builder.Properties[CertificateConfigKey] = encodedCertificate;
