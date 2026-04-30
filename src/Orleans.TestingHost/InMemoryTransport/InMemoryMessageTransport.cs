@@ -1,6 +1,5 @@
 #nullable enable
 using System;
-using System.Buffers;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -206,9 +205,8 @@ internal class InMemoryMessageTransport : MessageTransportBase
         bool isGracefulTermination = false;
         Exception? error = null;
         ReadRequest? request = null;
-        ReadOnlySequence<byte> readBuffer = default;
         using ArcBufferWriter bufferWriter = new();
-        bool hasRead = false;
+        var reader = new ArcBufferReader(bufferWriter);
         try
         {
             // Loop until termination.
@@ -220,13 +218,12 @@ internal class InMemoryMessageTransport : MessageTransportBase
                     // Process the request to completion.
                     while (true)
                     {
-                        if (hasRead)
+                        if (request.OnRead(reader))
                         {
-                            _pipeReader.AdvanceTo(readBuffer.Start, readBuffer.End);
+                            break;
                         }
 
                         var readResult = await _pipeReader.ReadAsync(_connectionClosingCts.Token);
-                        hasRead = true;
 
                         if (readResult.IsCanceled || readResult.IsCompleted)
                         {
@@ -234,12 +231,7 @@ internal class InMemoryMessageTransport : MessageTransportBase
                         }
 
                         bufferWriter.Write(readResult.Buffer);
-                        readBuffer = readResult.Buffer.Slice(readResult.Buffer.Length);
-
-                        if (request.OnRead(new ArcBufferReader(bufferWriter)))
-                        {
-                            break;
-                        }
+                        _pipeReader.AdvanceTo(readResult.Buffer.End);
                     }
                 }
 

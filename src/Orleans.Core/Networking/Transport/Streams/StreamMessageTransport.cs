@@ -220,6 +220,7 @@ public abstract class StreamMessageTransport : MessageTransportBase
         ReadRequest? operation = default;
         bool isGracefulTermination = false;
         using ArcBufferWriter bufferWriter = new();
+        var reader = new ArcBufferReader(bufferWriter);
         try
         {
             while (!_connectionClosingCts.IsCancellationRequested)
@@ -228,17 +229,18 @@ public abstract class StreamMessageTransport : MessageTransportBase
                 {
                     while (true)
                     {
+                        if (operation.OnRead(reader))
+                        {
+                            break;
+                        }
+
                         var bytesRead = await Stream.ReadAsync(bufferWriter.GetMemory(), _connectionClosingCts.Token);
-                        bufferWriter.AdvanceReader(bytesRead);
                         if (bytesRead == 0)
                         {
                             goto gracefulTermination;
                         }
 
-                        if (operation.OnRead(new ArcBufferReader(bufferWriter)))
-                        {
-                            break;
-                        }
+                        bufferWriter.AdvanceWriter(bytesRead);
                     }
                 }
 
