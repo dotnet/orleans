@@ -19,7 +19,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 {
     private readonly IDurableListOperationCodec<T> _codec;
     private readonly List<T> _items = [];
-    private ILogWriter? _storage;
+    private LogWriter _storage;
 
     public DurableList([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
     {
@@ -46,10 +46,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
                 ThrowIndexOutOfRange();
             }
 
-            using var entry = GetStorage().BeginEntry();
-            _codec.WriteSet(index, value, entry.Writer);
-            entry.Commit();
-
+            _codec.WriteSet(index, value, GetStorage());
             ApplySet(index, value);
         }
     }
@@ -60,7 +57,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(ILogWriter storage)
+    void IDurableStateMachine.Reset(LogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -78,26 +75,18 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 
     void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
-        using var entry = snapshotWriter.BeginEntry();
-        _codec.WriteSnapshot(_items, entry.Writer);
-        entry.Commit();
+        _codec.WriteSnapshot(_items, snapshotWriter);
     }
 
     public void Add(T item)
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteAdd(item, entry.Writer);
-        entry.Commit();
-
+        _codec.WriteAdd(item, GetStorage());
         ApplyAdd(item);
     }
 
     public void Clear()
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteClear(entry.Writer);
-        entry.Commit();
-
+        _codec.WriteClear(GetStorage());
         ApplyClear();
     }
 
@@ -112,10 +101,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
             ThrowIndexOutOfRange();
         }
 
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteInsert(index, item, entry.Writer);
-        entry.Commit();
-
+        _codec.WriteInsert(index, item, GetStorage());
         ApplyInsert(index, item);
     }
 
@@ -138,10 +124,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
             ThrowIndexOutOfRange();
         }
 
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteRemoveAt(index, entry.Writer);
-        entry.Commit();
-
+        _codec.WriteRemoveAt(index, GetStorage());
         ApplyRemoveAt(index);
     }
 
@@ -168,9 +151,9 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
 
-    private ILogWriter GetStorage()
+    private LogWriter GetStorage()
     {
-        Debug.Assert(_storage is not null);
+        Debug.Assert(_storage.IsInitialized);
         return _storage;
     }
 

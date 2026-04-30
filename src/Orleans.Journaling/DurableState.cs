@@ -47,7 +47,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         OnPersisted?.Invoke();
     }
 
-    void IDurableStateMachine.Reset(ILogWriter storage) => _value = default;
+    void IDurableStateMachine.Reset(LogWriter storage) => _value = default;
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
@@ -62,9 +62,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
 
     private void WriteState(LogWriter writer)
     {
-        using var entry = writer.BeginEntry();
-        _codec.WriteSet(_value!, _version, entry.Writer);
-        entry.Commit();
+        _codec.WriteSet(_value!, _version, writer);
     }
 
     void IDurableStateOperationHandler<T>.ApplySet(T state, ulong version)

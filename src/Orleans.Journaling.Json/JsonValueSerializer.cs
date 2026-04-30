@@ -15,6 +15,8 @@ internal sealed class JsonValueSerializer<T>
 
     public void Serialize(Utf8JsonWriter writer, T value) => JsonSerializer.Serialize(writer, value, _typeInfo);
 
+    public JsonElement SerializeToElement(T value) => JsonSerializer.SerializeToElement(value, _typeInfo);
+
     public T? Deserialize(JsonElement element) => element.Deserialize(_typeInfo);
 
     private static JsonTypeInfo<T> GetTypeInfo(JsonSerializerOptions options)

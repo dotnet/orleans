@@ -107,6 +107,14 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
     }
 
     /// <summary>
+    /// Attempts to append a format-owned entry without first converting it to payload bytes.
+    /// </summary>
+    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="entry">The format-owned entry.</param>
+    /// <returns><see langword="true"/> if <paramref name="entry"/> was appended; otherwise, <see langword="false"/>.</returns>
+    protected virtual bool OnTryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) => false;
+
+    /// <summary>
     /// Commits the active entry.
     /// </summary>
     /// <param name="streamId">The durable state machine id.</param>
@@ -144,6 +152,17 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
         }
 
         OnAppendFormattedEntry(streamId, entry);
+    }
+
+    private bool TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (_entryWriter.IsActive)
+        {
+            throw new InvalidOperationException("The log segment already has an active entry.");
+        }
+
+        return OnTryAppendFormattedEntry(streamId, entry);
     }
 
     private void CommitActiveEntry(int entryStart)
@@ -201,5 +220,8 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
 
         void ILogWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
             owner.AppendFormattedEntry(streamId, entry);
+
+        bool ILogWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
+            owner.TryAppendFormattedEntry(streamId, entry);
     }
 }

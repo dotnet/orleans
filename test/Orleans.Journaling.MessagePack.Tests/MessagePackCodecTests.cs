@@ -434,7 +434,7 @@ public sealed class MessagePackCodecTests
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add((_streamId.Value, payload.ToArray()));
 
-        public void Reset(ILogWriter storage) { }
+        public void Reset(LogWriter storage) { }
         public void AppendEntries(LogWriter writer) { }
         public void AppendSnapshot(LogWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();

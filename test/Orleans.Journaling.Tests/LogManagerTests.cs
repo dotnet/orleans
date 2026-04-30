@@ -816,7 +816,7 @@ public class LogManagerTests : JournalingTestBase
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        public void Reset(ILogWriter storage) { }
+        public void Reset(LogWriter storage) { }
         public void AppendEntries(LogWriter writer) { }
         public void AppendSnapshot(LogWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
@@ -935,6 +935,12 @@ public class LogManagerTests : JournalingTestBase
                 using var logEntry = new LogEntry(owner._inner.BeginEntry(streamId));
                 logEntry.Writer.Write(entry.Payload.Span);
                 logEntry.Commit();
+            }
+
+            public bool TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+            {
+                AppendFormattedEntry(streamId, entry);
+                return true;
             }
         }
     }
@@ -1085,13 +1091,13 @@ public class LogManagerTests : JournalingTestBase
 
     private sealed class ManualDirectWriteStateMachine : IDurableStateMachine
     {
-        private ILogWriter? _writer;
+        private LogWriter _writer;
 
-        public LogEntry BeginEntry() => (_writer ?? throw new InvalidOperationException("State machine is not initialized.")).BeginEntry();
+        public LogEntry BeginEntry() => _writer.BeginEntry();
 
         public object OperationCodec => this;
 
-        public void Reset(ILogWriter storage) => _writer = storage;
+        public void Reset(LogWriter storage) => _writer = storage;
 
         public void Apply(ReadOnlySequence<byte> logEntry) { }
 

@@ -369,8 +369,8 @@ public class ProtobufCodecTests
     [InlineData(new byte[] { 0x00 }, "empty LogEntry")]
     [InlineData(new byte[] { 0x02, 0x08, 0x01 }, "missing required payload")]
     [InlineData(new byte[] { 0x02, 0x12, 0x00 }, "missing required stream_id")]
-    [InlineData(new byte[] { 0x03, 0x08, 0x80, 0x80 }, "truncated stream_id")]
-    [InlineData(new byte[] { 0x02, 0x10, 0x01 }, "payload must be a bytes field")]
+    [InlineData(new byte[] { 0x03, 0x08, 0x80, 0x80 }, "invalid wire format")]
+    [InlineData(new byte[] { 0x02, 0x10, 0x01 }, "missing required stream_id")]
     public void ProtobufLogFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
         var format = new ProtobufLogFormat();
@@ -537,7 +537,7 @@ public class ProtobufCodecTests
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add((_streamId.Value, payload.ToArray()));
 
-        public void Reset(ILogWriter storage) { }
+        public void Reset(LogWriter storage) { }
         public void AppendEntries(LogWriter writer) { }
         public void AppendSnapshot(LogWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();

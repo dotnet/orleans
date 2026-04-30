@@ -97,7 +97,7 @@ public interface IDurableStateMachine
 {
     object OperationCodec { get; }
 
-    void Reset(ILogWriter storage);
+    void Reset(LogWriter storage);
     void Apply(ReadOnlySequence<byte> entry);
     void OnRecoveryCompleted() { }
     void AppendEntries(LogWriter writer);

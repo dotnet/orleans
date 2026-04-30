@@ -1,0 +1,52 @@
+syntax = "proto3";
+
+package orleans.journaling.protobuf;
+option csharp_namespace = "Orleans.Journaling.Protobuf";
+
+message ProtobufLogEntry {
+  repeated uint64 stream_id = 1 [packed = false];
+  repeated bytes payload = 2;
+}
+
+message ProtobufDictionaryOperation {
+  repeated uint32 command = 1 [packed = false];
+  repeated bytes key = 2;
+  repeated bytes value = 3;
+  repeated uint32 count = 4 [packed = false];
+}
+
+message ProtobufCollectionOperation {
+  repeated uint32 command = 1 [packed = false];
+  repeated uint32 index = 2 [packed = false];
+  repeated bytes item = 3;
+  repeated uint32 count = 4 [packed = false];
+}
+
+message ProtobufQueueOperation {
+  repeated uint32 command = 1 [packed = false];
+  repeated bytes item = 2;
+  repeated uint32 count = 3 [packed = false];
+}
+
+message ProtobufSetOperation {
+  repeated uint32 command = 1 [packed = false];
+  repeated bytes item = 2;
+  repeated uint32 count = 3 [packed = false];
+}
+
+message ProtobufValueOperation {
+  repeated uint32 command = 1 [packed = false];
+  repeated bytes value = 2;
+}
+
+message ProtobufStateOperation {
+  repeated uint32 command = 1 [packed = false];
+  repeated bytes state = 2;
+  repeated uint64 version = 3 [packed = false];
+}
+
+message ProtobufTaskCompletionSourceOperation {
+  repeated uint32 command = 1 [packed = false];
+  repeated bytes value = 2;
+  repeated string message = 3;
+}

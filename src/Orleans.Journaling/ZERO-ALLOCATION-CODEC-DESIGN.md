@@ -58,11 +58,6 @@ Formats can implement the interface directly or derive from `LogSegmentWriterBas
 ### State-machine writers and entry scope
 
 ```csharp
-public interface ILogWriter
-{
-    LogEntry BeginEntry();
-}
-
 public readonly struct LogWriter
 {
     public LogEntry BeginEntry();
@@ -76,11 +71,11 @@ public ref struct LogEntry
 }
 ```
 
-`ILogWriter` is the out-of-band writer exposed to a durable state machine instance. `LogWriter` is the batch/snapshot writer passed to `IDurableStateMachine.AppendEntries` and `AppendSnapshot`.
+`LogWriter` is the out-of-band writer exposed to a durable state machine instance via `IDurableStateMachine.Reset`, and the batch/snapshot writer passed to `IDurableStateMachine.AppendEntries` and `AppendSnapshot`.
 
 `LogEntry` is the lexical lifetime boundary. `Commit()` finalizes one pending entry. `Dispose()` aborts only if commit did not happen. Completing an entry twice is invalid. Normal code should not call public append-entry convenience APIs; durable operation codecs write only through the payload writer.
 
-The former `StateMachineStorageWriter` API is removed. Use `LogWriter`.
+The former separate state-machine writer APIs are removed. Use `LogWriter`.
 
 ### Payload writer
 

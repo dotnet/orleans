@@ -111,15 +111,24 @@ internal sealed class MessagePackLogFormat : ILogFormat
 
         protected override void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
         {
-            if (entry is not MessagePackFormattedLogEntry messagePackEntry)
+            if (!OnTryAppendFormattedEntry(streamId, entry))
             {
                 throw new InvalidOperationException(
                     $"The MessagePack log writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+            }
+        }
+
+        protected override bool OnTryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+        {
+            if (entry is not MessagePackFormattedLogEntry messagePackEntry)
+            {
+                return false;
             }
 
             using var logEntry = CreateLogWriter(streamId).BeginEntry();
             logEntry.Writer.Write(messagePackEntry.Payload.Span);
             logEntry.Commit();
+            return true;
         }
 
         private int GetCurrentFrameLength()

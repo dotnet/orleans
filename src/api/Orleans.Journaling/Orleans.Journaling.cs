@@ -61,9 +61,13 @@ namespace Orleans.Journaling
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer);
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
+        void WriteClear(LogWriter writer);
         void WriteRemove(TKey key, System.Buffers.IBufferWriter<byte> output);
+        void WriteRemove(TKey key, LogWriter writer);
         void WriteSet(TKey key, TValue value, System.Buffers.IBufferWriter<byte> output);
+        void WriteSet(TKey key, TValue value, LogWriter writer);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, LogWriter writer);
     }
 
     public partial interface IDurableDictionaryOperationHandler<TKey, TValue>
@@ -88,11 +92,17 @@ namespace Orleans.Journaling
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer);
         void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output);
+        void WriteAdd(T item, LogWriter writer);
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
+        void WriteClear(LogWriter writer);
         void WriteInsert(int index, T item, System.Buffers.IBufferWriter<byte> output);
+        void WriteInsert(int index, T item, LogWriter writer);
         void WriteRemoveAt(int index, System.Buffers.IBufferWriter<byte> output);
+        void WriteRemoveAt(int index, LogWriter writer);
         void WriteSet(int index, T item, System.Buffers.IBufferWriter<byte> output);
+        void WriteSet(int index, T item, LogWriter writer);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogWriter writer);
     }
 
     public partial interface IDurableListOperationHandler<T>
@@ -125,9 +135,13 @@ namespace Orleans.Journaling
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer);
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
+        void WriteClear(LogWriter writer);
         void WriteDequeue(System.Buffers.IBufferWriter<byte> output);
+        void WriteDequeue(LogWriter writer);
         void WriteEnqueue(T item, System.Buffers.IBufferWriter<byte> output);
+        void WriteEnqueue(T item, LogWriter writer);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogWriter writer);
     }
 
     public partial interface IDurableQueueOperationHandler<T>
@@ -160,9 +174,13 @@ namespace Orleans.Journaling
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer);
         void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output);
+        void WriteAdd(T item, LogWriter writer);
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
+        void WriteClear(LogWriter writer);
         void WriteRemove(T item, System.Buffers.IBufferWriter<byte> output);
+        void WriteRemove(T item, LogWriter writer);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogWriter writer);
     }
 
     public partial interface IDurableSetOperationHandler<T>
@@ -197,7 +215,9 @@ namespace Orleans.Journaling
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer);
         void WriteClear(System.Buffers.IBufferWriter<byte> output);
+        void WriteClear(LogWriter writer);
         void WriteSet(T state, ulong version, System.Buffers.IBufferWriter<byte> output);
+        void WriteSet(T state, ulong version, LogWriter writer);
     }
 
     public partial interface IDurableStateOperationHandler<T>
@@ -216,7 +236,7 @@ namespace Orleans.Journaling
         IDurableStateMachine DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
-        void Reset(ILogWriter storage);
+        void Reset(LogWriter storage);
     }
 
     public partial interface IDurableTaskCompletionSourceOperationCodecProvider
@@ -228,9 +248,13 @@ namespace Orleans.Journaling
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer);
         void WriteCanceled(System.Buffers.IBufferWriter<byte> output);
+        void WriteCanceled(LogWriter writer);
         void WriteCompleted(T value, System.Buffers.IBufferWriter<byte> output);
+        void WriteCompleted(T value, LogWriter writer);
         void WriteFaulted(System.Exception exception, System.Buffers.IBufferWriter<byte> output);
+        void WriteFaulted(System.Exception exception, LogWriter writer);
         void WritePending(System.Buffers.IBufferWriter<byte> output);
+        void WritePending(LogWriter writer);
     }
 
     public partial interface IDurableTaskCompletionSourceOperationHandler<T>
@@ -261,6 +285,7 @@ namespace Orleans.Journaling
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer);
         void WriteSet(T value, System.Buffers.IBufferWriter<byte> output);
+        void WriteSet(T value, LogWriter writer);
     }
 
     public partial interface IDurableValueOperationHandler<T>
@@ -309,11 +334,6 @@ namespace Orleans.Journaling
     public partial interface ILogFormatKeyProvider
     {
         string GetLogFormatKey(Runtime.IGrainContext grainContext);
-    }
-
-    public partial interface ILogWriter
-    {
-        LogEntry BeginEntry();
     }
 
     public partial interface ILogStreamStateMachineResolver
@@ -445,6 +465,7 @@ namespace Orleans.Journaling
         protected abstract System.Span<byte> GetPayloadSpan(int sizeHint);
         protected virtual void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) { }
         protected virtual void OnBeginEntry(LogStreamId streamId) { }
+        protected virtual bool OnTryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) { throw null; }
 
         public abstract void Reset();
         protected abstract void WritePayload(System.Buffers.ReadOnlySequence<byte> value);
@@ -464,6 +485,7 @@ namespace Orleans.Journaling
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
         public readonly LogEntry BeginEntry() { throw null; }
+        public readonly bool TryAppendFormattedEntry(IFormattedLogEntry entry) { throw null; }
     }
 
     public sealed partial class LogManagerOptions

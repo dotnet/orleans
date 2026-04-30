@@ -24,7 +24,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 {
     private readonly IDurableQueueOperationCodec<T> _codec;
     private readonly Queue<T> _items = new();
-    private ILogWriter? _storage;
+    private LogWriter _storage;
 
     public DurableQueue([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
     {
@@ -44,7 +44,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(ILogWriter storage)
+    void IDurableStateMachine.Reset(LogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -62,17 +62,12 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
-        using var entry = snapshotWriter.BeginEntry();
-        _codec.WriteSnapshot(_items, entry.Writer);
-        entry.Commit();
+        _codec.WriteSnapshot(_items, snapshotWriter);
     }
 
     public void Clear()
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteClear(entry.Writer);
-        entry.Commit();
-
+        _codec.WriteClear(GetStorage());
         ApplyClear();
     }
 
@@ -83,20 +78,14 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
     public void Enqueue(T item)
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteEnqueue(item, entry.Writer);
-        entry.Commit();
-
+        _codec.WriteEnqueue(item, GetStorage());
         ApplyEnqueue(item);
     }
 
     public T Dequeue()
     {
         var result = _items.Peek();
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteDequeue(entry.Writer);
-        entry.Commit();
-
+        _codec.WriteDequeue(GetStorage());
         _ = ApplyDequeue();
         return result;
     }
@@ -108,10 +97,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
             return false;
         }
 
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteDequeue(entry.Writer);
-        entry.Commit();
-
+        _codec.WriteDequeue(GetStorage());
         _ = ApplyTryDequeue(out _);
         return true;
     }
@@ -133,12 +119,9 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     void IDurableQueueOperationHandler<T>.ApplySnapshotItem(T item) => ApplyEnqueue(item);
 
-    [DoesNotReturn]
-    private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
-
-    private ILogWriter GetStorage()
+    private LogWriter GetStorage()
     {
-        Debug.Assert(_storage is not null);
+        Debug.Assert(_storage.IsInitialized);
         return _storage;
     }
 

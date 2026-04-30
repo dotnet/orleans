@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using System.Text;
 using Xunit;
 
@@ -137,6 +140,54 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(42, value2.Value);
     }
 
+    [Fact]
+    public async Task JsonCodec_DurableQueueSetStateAndTcs_WriteAndRecover()
+    {
+        var storage = CreateJsonStorage();
+        var jsonOptions = CreateJsonOptions();
+
+        var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
+        var queue = new DurableQueue<string>("queue", sut.Manager, new JsonQueueOperationCodec<string>(jsonOptions));
+        var set = new DurableSet<string>("set", sut.Manager, new JsonSetOperationCodec<string>(jsonOptions));
+        var state = new DurableState<string>("state", sut.Manager, new JsonStateOperationCodec<string>(jsonOptions));
+        var tcs = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut.Manager,
+            new JsonTcsOperationCodec<int>(jsonOptions),
+            Copier<int>(),
+            Copier<Exception>());
+        await sut.Lifecycle.OnStart();
+
+        queue.Enqueue("first");
+        queue.Enqueue("second");
+        set.Add("a");
+        set.Add("b");
+        ((IStorage<string>)state).State = "state-value";
+        Assert.True(tcs.TrySetResult(17));
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
+        var queue2 = new DurableQueue<string>("queue", sut2.Manager, new JsonQueueOperationCodec<string>(jsonOptions));
+        var set2 = new DurableSet<string>("set", sut2.Manager, new JsonSetOperationCodec<string>(jsonOptions));
+        var state2 = new DurableState<string>("state", sut2.Manager, new JsonStateOperationCodec<string>(jsonOptions));
+        var tcs2 = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut2.Manager,
+            new JsonTcsOperationCodec<int>(jsonOptions),
+            Copier<int>(),
+            Copier<Exception>());
+        await sut2.Lifecycle.OnStart();
+
+        Assert.Equal(2, queue2.Count);
+        Assert.Equal("first", queue2.Dequeue());
+        Assert.Equal("second", queue2.Dequeue());
+        Assert.True(set2.SetEquals(["a", "b"]));
+        Assert.Equal("state-value", ((IStorage<string>)state2).State);
+        Assert.Equal(DurableTaskCompletionSourceStatus.Completed, tcs2.State.Status);
+        Assert.Equal(17, tcs2.State.Value);
+        Assert.Equal(17, await tcs2.Task);
+    }
+
     internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(ILogStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
         storage ??= CreateJsonStorage();
@@ -154,6 +205,8 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
+
+    private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {

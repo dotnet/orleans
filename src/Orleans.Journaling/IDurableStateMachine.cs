@@ -19,7 +19,7 @@ public interface IDurableStateMachine
     /// If the state machine has any volatile state, it must be cleared by this method.
     /// This method can be called at any point in the state machine's lifetime, including during recovery.
     /// </remarks>
-    void Reset(ILogWriter storage);
+    void Reset(LogWriter storage);
 
     /// <summary>
     /// Called during recovery to apply the provided log entry or snapshot.

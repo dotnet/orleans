@@ -1,8 +1,11 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
 using MessagePack;
+using Orleans.Core;
 using Orleans.Journaling.MessagePack;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.MessagePack.Tests;
@@ -34,6 +37,77 @@ public sealed class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(2, dict2["beta"]);
     }
 
+    [Fact]
+    public async Task MessagePackCodec_ListQueueSetAndValue_WriteAndRecover()
+    {
+        var storage = new VolatileLogStorage();
+
+        var sut = CreateTestSystemWithMessagePackCodec(storage);
+        var list = new DurableList<string>("list", sut.Manager, new MessagePackListOperationCodec<string>(SerializerOptions));
+        var queue = new DurableQueue<string>("queue", sut.Manager, new MessagePackQueueOperationCodec<string>(SerializerOptions));
+        var set = new DurableSet<string>("set", sut.Manager, new MessagePackSetOperationCodec<string>(SerializerOptions));
+        var value = new DurableValue<int>("value", sut.Manager, new MessagePackValueOperationCodec<int>(SerializerOptions));
+        await sut.Lifecycle.OnStart();
+
+        list.Add("one");
+        list.Add("two");
+        queue.Enqueue("first");
+        queue.Enqueue("second");
+        set.Add("a");
+        set.Add("b");
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var sut2 = CreateTestSystemWithMessagePackCodec(storage);
+        var list2 = new DurableList<string>("list", sut2.Manager, new MessagePackListOperationCodec<string>(SerializerOptions));
+        var queue2 = new DurableQueue<string>("queue", sut2.Manager, new MessagePackQueueOperationCodec<string>(SerializerOptions));
+        var set2 = new DurableSet<string>("set", sut2.Manager, new MessagePackSetOperationCodec<string>(SerializerOptions));
+        var value2 = new DurableValue<int>("value", sut2.Manager, new MessagePackValueOperationCodec<int>(SerializerOptions));
+        await sut2.Lifecycle.OnStart();
+
+        Assert.Equal(["one", "two"], list2);
+        Assert.Equal(2, queue2.Count);
+        Assert.Equal("first", queue2.Dequeue());
+        Assert.Equal("second", queue2.Dequeue());
+        Assert.True(set2.SetEquals(["a", "b"]));
+        Assert.Equal(42, value2.Value);
+    }
+
+    [Fact]
+    public async Task MessagePackCodec_StateAndTcs_WriteAndRecover()
+    {
+        var storage = new VolatileLogStorage();
+
+        var sut = CreateTestSystemWithMessagePackCodec(storage);
+        var state = new DurableState<string>("state", sut.Manager, new MessagePackStateOperationCodec<string>(SerializerOptions));
+        var tcs = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut.Manager,
+            new MessagePackTcsOperationCodec<int>(SerializerOptions),
+            Copier<int>(),
+            Copier<Exception>());
+        await sut.Lifecycle.OnStart();
+
+        ((IStorage<string>)state).State = "state-value";
+        Assert.True(tcs.TrySetResult(17));
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var sut2 = CreateTestSystemWithMessagePackCodec(storage);
+        var state2 = new DurableState<string>("state", sut2.Manager, new MessagePackStateOperationCodec<string>(SerializerOptions));
+        var tcs2 = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut2.Manager,
+            new MessagePackTcsOperationCodec<int>(SerializerOptions),
+            Copier<int>(),
+            Copier<Exception>());
+        await sut2.Lifecycle.OnStart();
+
+        Assert.Equal("state-value", ((IStorage<string>)state2).State);
+        Assert.Equal(DurableTaskCompletionSourceStatus.Completed, tcs2.State.Status);
+        Assert.Equal(17, tcs2.State.Value);
+        Assert.Equal(17, await tcs2.Task);
+    }
+
     private (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithMessagePackCodec(ILogStorage storage)
     {
         var logStreamIdsCodec = new MessagePackDictionaryOperationCodec<string, ulong>(SerializerOptions);
@@ -50,6 +124,8 @@ public sealed class CodecRecoveryTests : JournalingTestBase
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
+
+    private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {

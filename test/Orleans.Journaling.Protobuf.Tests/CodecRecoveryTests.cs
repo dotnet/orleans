@@ -1,7 +1,10 @@
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Core;
 using Orleans.Journaling.Protobuf;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
+using Orleans.Serialization;
 using Xunit;
 
 namespace Orleans.Journaling.Protobuf.Tests;
@@ -184,10 +187,47 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal("third", queue2.Dequeue());
     }
 
+    [Fact]
+    public async Task ProtobufCodec_StateAndTcs_WriteAndRecover()
+    {
+        var storage = CreateProtobufStorage();
+
+        var sut = CreateTestSystemWithProtobufCodec(storage);
+        var state = new DurableState<string>("state", sut.Manager, new ProtobufStateOperationCodec<string>(CreateConverter<string>()));
+        var tcs = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut.Manager,
+            new ProtobufTcsOperationCodec<int>(CreateConverter<int>()),
+            Copier<int>(),
+            Copier<Exception>());
+        await sut.Lifecycle.OnStart();
+
+        ((IStorage<string>)state).State = "state-value";
+        Assert.True(tcs.TrySetResult(17));
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var sut2 = CreateTestSystemWithProtobufCodec(storage);
+        var state2 = new DurableState<string>("state", sut2.Manager, new ProtobufStateOperationCodec<string>(CreateConverter<string>()));
+        var tcs2 = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut2.Manager,
+            new ProtobufTcsOperationCodec<int>(CreateConverter<int>()),
+            Copier<int>(),
+            Copier<Exception>());
+        await sut2.Lifecycle.OnStart();
+
+        Assert.Equal("state-value", ((IStorage<string>)state2).State);
+        Assert.Equal(DurableTaskCompletionSourceStatus.Completed, tcs2.State.Status);
+        Assert.Equal(17, tcs2.State.Value);
+        Assert.Equal(17, await tcs2.Task);
+    }
+
     private ProtobufValueConverter<T> CreateConverter<T>()
         => ProtobufValueConverter<T>.IsNativeType
             ? new ProtobufValueConverter<T>()
             : new ProtobufValueConverter<T>(new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
+
+    private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
     internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithProtobufCodec(ILogStorage? storage = null)
     {
