@@ -87,14 +87,30 @@ public interface IDurableDictionaryOperationCodec<TKey, TValue> where TKey : not
     /// <summary>Writes a set command.</summary>
     void WriteSet(TKey key, TValue value, IBufferWriter<byte> output);
 
+    /// <summary>Writes a set command.</summary>
+    void WriteSet(TKey key, TValue value, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSet(key, value, output));
+
     /// <summary>Writes a remove command.</summary>
     void WriteRemove(TKey key, IBufferWriter<byte> output);
+
+    /// <summary>Writes a remove command.</summary>
+    void WriteRemove(TKey key, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteRemove(key, output));
 
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
+    /// <summary>Writes a clear command.</summary>
+    void WriteClear(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClear);
+
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
     void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output);
+
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSnapshot(items, output));
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer);
@@ -108,20 +124,44 @@ public interface IDurableListOperationCodec<T>
     /// <summary>Writes an add command.</summary>
     void WriteAdd(T item, IBufferWriter<byte> output);
 
+    /// <summary>Writes an add command.</summary>
+    void WriteAdd(T item, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteAdd(item, output));
+
     /// <summary>Writes a set command.</summary>
     void WriteSet(int index, T item, IBufferWriter<byte> output);
+
+    /// <summary>Writes a set command.</summary>
+    void WriteSet(int index, T item, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSet(index, item, output));
 
     /// <summary>Writes an insert command.</summary>
     void WriteInsert(int index, T item, IBufferWriter<byte> output);
 
+    /// <summary>Writes an insert command.</summary>
+    void WriteInsert(int index, T item, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteInsert(index, item, output));
+
     /// <summary>Writes a remove-at command.</summary>
     void WriteRemoveAt(int index, IBufferWriter<byte> output);
+
+    /// <summary>Writes a remove-at command.</summary>
+    void WriteRemoveAt(int index, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteRemoveAt(index, output));
 
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
+    /// <summary>Writes a clear command.</summary>
+    void WriteClear(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClear);
+
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
     void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output);
+
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<T> items, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSnapshot(items, output));
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer);
@@ -135,14 +175,30 @@ public interface IDurableQueueOperationCodec<T>
     /// <summary>Writes an enqueue command.</summary>
     void WriteEnqueue(T item, IBufferWriter<byte> output);
 
+    /// <summary>Writes an enqueue command.</summary>
+    void WriteEnqueue(T item, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteEnqueue(item, output));
+
     /// <summary>Writes a dequeue command.</summary>
     void WriteDequeue(IBufferWriter<byte> output);
+
+    /// <summary>Writes a dequeue command.</summary>
+    void WriteDequeue(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteDequeue);
 
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
+    /// <summary>Writes a clear command.</summary>
+    void WriteClear(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClear);
+
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
     void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output);
+
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<T> items, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSnapshot(items, output));
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer);
@@ -156,14 +212,30 @@ public interface IDurableSetOperationCodec<T>
     /// <summary>Writes an add command.</summary>
     void WriteAdd(T item, IBufferWriter<byte> output);
 
+    /// <summary>Writes an add command.</summary>
+    void WriteAdd(T item, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteAdd(item, output));
+
     /// <summary>Writes a remove command.</summary>
     void WriteRemove(T item, IBufferWriter<byte> output);
+
+    /// <summary>Writes a remove command.</summary>
+    void WriteRemove(T item, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteRemove(item, output));
 
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
 
+    /// <summary>Writes a clear command.</summary>
+    void WriteClear(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClear);
+
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
     void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output);
+
+    /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
+    void WriteSnapshot(IReadOnlyCollection<T> items, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSnapshot(items, output));
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer);
@@ -177,6 +249,10 @@ public interface IDurableValueOperationCodec<T>
     /// <summary>Writes a set command.</summary>
     void WriteSet(T value, IBufferWriter<byte> output);
 
+    /// <summary>Writes a set command.</summary>
+    void WriteSet(T value, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSet(value, output));
+
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer);
 }
@@ -189,8 +265,16 @@ public interface IDurableStateOperationCodec<T>
     /// <summary>Writes a set command.</summary>
     void WriteSet(T state, ulong version, IBufferWriter<byte> output);
 
+    /// <summary>Writes a set command.</summary>
+    void WriteSet(T state, ulong version, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSet(state, version, output));
+
     /// <summary>Writes a clear command.</summary>
     void WriteClear(IBufferWriter<byte> output);
+
+    /// <summary>Writes a clear command.</summary>
+    void WriteClear(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClear);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer);
@@ -204,14 +288,30 @@ public interface IDurableTaskCompletionSourceOperationCodec<T>
     /// <summary>Writes a pending command.</summary>
     void WritePending(IBufferWriter<byte> output);
 
+    /// <summary>Writes a pending command.</summary>
+    void WritePending(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WritePending);
+
     /// <summary>Writes a completed command.</summary>
     void WriteCompleted(T value, IBufferWriter<byte> output);
+
+    /// <summary>Writes a completed command.</summary>
+    void WriteCompleted(T value, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteCompleted(value, output));
 
     /// <summary>Writes a faulted command.</summary>
     void WriteFaulted(Exception exception, IBufferWriter<byte> output);
 
+    /// <summary>Writes a faulted command.</summary>
+    void WriteFaulted(Exception exception, LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteFaulted(exception, output));
+
     /// <summary>Writes a canceled command.</summary>
     void WriteCanceled(IBufferWriter<byte> output);
+
+    /// <summary>Writes a canceled command.</summary>
+    void WriteCanceled(LogWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteCanceled);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer);
@@ -344,4 +444,14 @@ public interface IDurableTaskCompletionSourceOperationHandler<T>
 
     /// <summary>Applies a canceled command.</summary>
     void ApplyCanceled();
+}
+
+internal static class DurableOperationCodecWriter
+{
+    public static void Write(LogWriter writer, Action<LogEntryWriter> write)
+    {
+        using var entry = writer.BeginEntry();
+        write(entry.Writer);
+        entry.Commit();
+    }
 }

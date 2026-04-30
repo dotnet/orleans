@@ -1,4 +1,5 @@
 using System.Buffers;
+using Google.Protobuf;
 
 namespace Orleans.Journaling.Protobuf;
 
@@ -8,11 +9,6 @@ namespace Orleans.Journaling.Protobuf;
 public sealed class ProtobufListOperationCodec<T>(
     ProtobufValueConverter<T> converter) : IDurableListOperationCodec<T>
 {
-    private const uint CommandField = 1;
-    private const uint IndexField = 2;
-    private const uint ItemField = 3;
-    private const uint CountField = 4;
-
     private const uint AddCommand = 0;
     private const uint SetCommand = 1;
     private const uint InsertCommand = 2;
@@ -23,54 +19,66 @@ public sealed class ProtobufListOperationCodec<T>(
     /// <inheritdoc/>
     public void WriteAdd(T item, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, AddCommand);
-        converter.WriteField(output, ItemField, item);
+        var operation = new ProtobufCollectionOperation();
+        operation.Command.Add(AddCommand);
+        operation.Item.Add(converter.ToByteString(item));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteSet(int index, T item, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
-        ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
-        converter.WriteField(output, ItemField, item);
+        var operation = new ProtobufCollectionOperation();
+        operation.Command.Add(SetCommand);
+        operation.Index.Add((uint)index);
+        operation.Item.Add(converter.ToByteString(item));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteInsert(int index, T item, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, InsertCommand);
-        ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
-        converter.WriteField(output, ItemField, item);
+        var operation = new ProtobufCollectionOperation();
+        operation.Command.Add(InsertCommand);
+        operation.Index.Add((uint)index);
+        operation.Item.Add(converter.ToByteString(item));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteRemoveAt(int index, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, RemoveAtCommand);
-        ProtobufWire.WriteUInt32Field(output, IndexField, (uint)index);
+        var operation = new ProtobufCollectionOperation();
+        operation.Command.Add(RemoveAtCommand);
+        operation.Index.Add((uint)index);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteClear(IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+        var operation = new ProtobufCollectionOperation();
+        operation.Command.Add(ClearCommand);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
-        var count = ProtobufWire.GetSnapshotCount(items);
-        ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
-        ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
+        var count = ProtobufGeneratedCodecHelpers.GetSnapshotCount(items);
+        var operation = new ProtobufCollectionOperation();
+        operation.Command.Add(SnapshotCommand);
+        operation.Count.Add((uint)count);
         var written = 0;
         foreach (var item in items)
         {
-            ProtobufWire.ThrowIfSnapshotItemCountExceeded(count, written);
-            converter.WriteField(output, ItemField, item);
+            ProtobufGeneratedCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+            operation.Item.Add(converter.ToByteString(item));
             written++;
         }
 
-        ProtobufWire.RequireSnapshotWriteCount(count, written);
+        ProtobufGeneratedCodecHelpers.RequireSnapshotWriteCount(count, written);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
@@ -91,92 +99,36 @@ public sealed class ProtobufListOperationCodec<T>(
     internal static void ApplyCollection<TConsumer>(ReadOnlySequence<byte> input, TConsumer consumer, ProtobufValueConverter<T> converter)
         where TConsumer : struct, ICollectionConsumer<T>
     {
-        var reader = new SequenceReader<byte>(input);
-        var command = uint.MaxValue;
-        var index = 0;
-        var count = 0;
-        var hasCommand = false;
-        var hasIndex = false;
-        var hasCount = false;
-        var hasItem = false;
-        var snapshotStarted = false;
-        var snapshotItemCount = 0;
-        T? item = default;
-
-        while (!reader.End)
-        {
-            var tag = ProtobufWire.ReadTag(ref reader);
-            var field = tag >> 3;
-            switch (field)
-            {
-                case CommandField:
-                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
-                    command = ProtobufWire.ReadUInt32(ref reader);
-                    hasCommand = true;
-                    break;
-                case IndexField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    index = ProtobufWire.ReadNonNegativeInt32(ref reader, "index");
-                    hasIndex = true;
-                    break;
-                case CountField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    count = ProtobufWire.ReadNonNegativeInt32(ref reader, "count");
-                    hasCount = true;
-                    break;
-                case ItemField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    item = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
-                    hasItem = true;
-                    if (command == SnapshotCommand)
-                    {
-                        if (!snapshotStarted)
-                        {
-                            ProtobufWire.RequireField(hasCount, "count", command);
-                            consumer.ApplySnapshotStart(count);
-                            snapshotStarted = true;
-                        }
-
-                        consumer.ApplySnapshotItem(item);
-                        snapshotItemCount++;
-                        item = default;
-                        hasItem = false;
-                    }
-
-                    break;
-                default:
-                    ProtobufWire.SkipField(ref reader, tag);
-                    break;
-            }
-        }
-
-        ProtobufWire.RequireCommand(hasCommand);
+        var operation = ProtobufGeneratedCodecHelpers.Parse(input, ProtobufCollectionOperation.Parser, "collection operation");
+        var command = ProtobufGeneratedCodecHelpers.RequireCommand(operation.Command);
         switch (command)
         {
             case AddCommand:
-                consumer.ApplyAdd(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                consumer.ApplyAdd(converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Item, "item", command)));
                 break;
             case SetCommand:
-                ProtobufWire.RequireField(hasIndex, "index", command);
-                consumer.ApplySet(index, ProtobufWire.RequireValue(hasItem, item, "item", command));
+                consumer.ApplySet(
+                    ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Index, "index", command),
+                    converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Item, "item", command)));
                 break;
             case InsertCommand:
-                ProtobufWire.RequireField(hasIndex, "index", command);
-                consumer.ApplyInsert(index, ProtobufWire.RequireValue(hasItem, item, "item", command));
+                consumer.ApplyInsert(
+                    ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Index, "index", command),
+                    converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Item, "item", command)));
                 break;
             case RemoveAtCommand:
-                ProtobufWire.RequireField(hasIndex, "index", command);
-                consumer.ApplyRemoveAt(index);
+                consumer.ApplyRemoveAt(ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Index, "index", command));
                 break;
             case ClearCommand:
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                ProtobufWire.RequireField(hasCount, "count", command);
-                ProtobufWire.RequireSnapshotCount(count, snapshotItemCount, command);
-                if (!snapshotStarted)
+                var count = ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Count, "count", command);
+                ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Item.Count, command);
+                consumer.ApplySnapshotStart(count);
+                for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotStart(count);
+                    consumer.ApplySnapshotItem(converter.FromByteString(operation.Item[i]));
                 }
 
                 break;
@@ -192,10 +144,6 @@ public sealed class ProtobufListOperationCodec<T>(
 public sealed class ProtobufQueueOperationCodec<T>(
     ProtobufValueConverter<T> converter) : IDurableQueueOperationCodec<T>
 {
-    private const uint CommandField = 1;
-    private const uint ItemField = 2;
-    private const uint CountField = 3;
-
     private const uint EnqueueCommand = 0;
     private const uint DequeueCommand = 1;
     private const uint ClearCommand = 2;
@@ -204,99 +152,56 @@ public sealed class ProtobufQueueOperationCodec<T>(
     /// <inheritdoc/>
     public void WriteEnqueue(T item, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, EnqueueCommand);
-        converter.WriteField(output, ItemField, item);
+        var operation = new ProtobufQueueOperation();
+        operation.Command.Add(EnqueueCommand);
+        operation.Item.Add(converter.ToByteString(item));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteDequeue(IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, DequeueCommand);
+        var operation = new ProtobufQueueOperation();
+        operation.Command.Add(DequeueCommand);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteClear(IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+        var operation = new ProtobufQueueOperation();
+        operation.Command.Add(ClearCommand);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
-        var count = ProtobufWire.GetSnapshotCount(items);
-        ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
-        ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
+        var count = ProtobufGeneratedCodecHelpers.GetSnapshotCount(items);
+        var operation = new ProtobufQueueOperation();
+        operation.Command.Add(SnapshotCommand);
+        operation.Count.Add((uint)count);
         var written = 0;
         foreach (var item in items)
         {
-            ProtobufWire.ThrowIfSnapshotItemCountExceeded(count, written);
-            converter.WriteField(output, ItemField, item);
+            ProtobufGeneratedCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+            operation.Item.Add(converter.ToByteString(item));
             written++;
         }
 
-        ProtobufWire.RequireSnapshotWriteCount(count, written);
+        ProtobufGeneratedCodecHelpers.RequireSnapshotWriteCount(count, written);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        var command = uint.MaxValue;
-        var count = 0;
-        var hasCommand = false;
-        var hasCount = false;
-        var hasItem = false;
-        var snapshotStarted = false;
-        var snapshotItemCount = 0;
-        T? item = default;
-
-        while (!reader.End)
-        {
-            var tag = ProtobufWire.ReadTag(ref reader);
-            var field = tag >> 3;
-            switch (field)
-            {
-                case CommandField:
-                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
-                    command = ProtobufWire.ReadUInt32(ref reader);
-                    hasCommand = true;
-                    break;
-                case CountField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    count = ProtobufWire.ReadNonNegativeInt32(ref reader, "count");
-                    hasCount = true;
-                    break;
-                case ItemField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    item = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
-                    hasItem = true;
-                    if (command == SnapshotCommand)
-                    {
-                        if (!snapshotStarted)
-                        {
-                            ProtobufWire.RequireField(hasCount, "count", command);
-                            consumer.ApplySnapshotStart(count);
-                            snapshotStarted = true;
-                        }
-
-                        consumer.ApplySnapshotItem(item);
-                        snapshotItemCount++;
-                        item = default;
-                        hasItem = false;
-                    }
-
-                    break;
-                default:
-                    ProtobufWire.SkipField(ref reader, tag);
-                    break;
-            }
-        }
-
-        ProtobufWire.RequireCommand(hasCommand);
+        var operation = ProtobufGeneratedCodecHelpers.Parse(input, ProtobufQueueOperation.Parser, "queue operation");
+        var command = ProtobufGeneratedCodecHelpers.RequireCommand(operation.Command);
         switch (command)
         {
             case EnqueueCommand:
-                consumer.ApplyEnqueue(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                consumer.ApplyEnqueue(converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Item, "item", command)));
                 break;
             case DequeueCommand:
                 consumer.ApplyDequeue();
@@ -305,11 +210,12 @@ public sealed class ProtobufQueueOperationCodec<T>(
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                ProtobufWire.RequireField(hasCount, "count", command);
-                ProtobufWire.RequireSnapshotCount(count, snapshotItemCount, command);
-                if (!snapshotStarted)
+                var count = ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Count, "count", command);
+                ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Item.Count, command);
+                consumer.ApplySnapshotStart(count);
+                for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotStart(count);
+                    consumer.ApplySnapshotItem(converter.FromByteString(operation.Item[i]));
                 }
 
                 break;
@@ -325,10 +231,6 @@ public sealed class ProtobufQueueOperationCodec<T>(
 public sealed class ProtobufSetOperationCodec<T>(
     ProtobufValueConverter<T> converter) : IDurableSetOperationCodec<T>
 {
-    private const uint CommandField = 1;
-    private const uint ItemField = 2;
-    private const uint CountField = 3;
-
     private const uint AddCommand = 0;
     private const uint RemoveCommand = 1;
     private const uint ClearCommand = 2;
@@ -337,113 +239,71 @@ public sealed class ProtobufSetOperationCodec<T>(
     /// <inheritdoc/>
     public void WriteAdd(T item, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, AddCommand);
-        converter.WriteField(output, ItemField, item);
+        var operation = new ProtobufSetOperation();
+        operation.Command.Add(AddCommand);
+        operation.Item.Add(converter.ToByteString(item));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteRemove(T item, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, RemoveCommand);
-        converter.WriteField(output, ItemField, item);
+        var operation = new ProtobufSetOperation();
+        operation.Command.Add(RemoveCommand);
+        operation.Item.Add(converter.ToByteString(item));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteClear(IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+        var operation = new ProtobufSetOperation();
+        operation.Command.Add(ClearCommand);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
-        var count = ProtobufWire.GetSnapshotCount(items);
-        ProtobufWire.WriteUInt32Field(output, CommandField, SnapshotCommand);
-        ProtobufWire.WriteUInt32Field(output, CountField, (uint)count);
+        var count = ProtobufGeneratedCodecHelpers.GetSnapshotCount(items);
+        var operation = new ProtobufSetOperation();
+        operation.Command.Add(SnapshotCommand);
+        operation.Count.Add((uint)count);
         var written = 0;
         foreach (var item in items)
         {
-            ProtobufWire.ThrowIfSnapshotItemCountExceeded(count, written);
-            converter.WriteField(output, ItemField, item);
+            ProtobufGeneratedCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+            operation.Item.Add(converter.ToByteString(item));
             written++;
         }
 
-        ProtobufWire.RequireSnapshotWriteCount(count, written);
+        ProtobufGeneratedCodecHelpers.RequireSnapshotWriteCount(count, written);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        var command = uint.MaxValue;
-        var count = 0;
-        var hasCommand = false;
-        var hasCount = false;
-        var hasItem = false;
-        var snapshotStarted = false;
-        var snapshotItemCount = 0;
-        T? item = default;
-
-        while (!reader.End)
-        {
-            var tag = ProtobufWire.ReadTag(ref reader);
-            var field = tag >> 3;
-            switch (field)
-            {
-                case CommandField:
-                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
-                    command = ProtobufWire.ReadUInt32(ref reader);
-                    hasCommand = true;
-                    break;
-                case CountField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    count = ProtobufWire.ReadNonNegativeInt32(ref reader, "count");
-                    hasCount = true;
-                    break;
-                case ItemField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    item = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
-                    hasItem = true;
-                    if (command == SnapshotCommand)
-                    {
-                        if (!snapshotStarted)
-                        {
-                            ProtobufWire.RequireField(hasCount, "count", command);
-                            consumer.ApplySnapshotStart(count);
-                            snapshotStarted = true;
-                        }
-
-                        consumer.ApplySnapshotItem(item);
-                        snapshotItemCount++;
-                        item = default;
-                        hasItem = false;
-                    }
-
-                    break;
-                default:
-                    ProtobufWire.SkipField(ref reader, tag);
-                    break;
-            }
-        }
-
-        ProtobufWire.RequireCommand(hasCommand);
+        var operation = ProtobufGeneratedCodecHelpers.Parse(input, ProtobufSetOperation.Parser, "set operation");
+        var command = ProtobufGeneratedCodecHelpers.RequireCommand(operation.Command);
         switch (command)
         {
             case AddCommand:
-                consumer.ApplyAdd(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                consumer.ApplyAdd(converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Item, "item", command)));
                 break;
             case RemoveCommand:
-                consumer.ApplyRemove(ProtobufWire.RequireValue(hasItem, item, "item", command));
+                consumer.ApplyRemove(converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Item, "item", command)));
                 break;
             case ClearCommand:
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                ProtobufWire.RequireField(hasCount, "count", command);
-                ProtobufWire.RequireSnapshotCount(count, snapshotItemCount, command);
-                if (!snapshotStarted)
+                var count = ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Count, "count", command);
+                ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Item.Count, command);
+                consumer.ApplySnapshotStart(count);
+                for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotStart(count);
+                    consumer.ApplySnapshotItem(converter.FromByteString(operation.Item[i]));
                 }
 
                 break;

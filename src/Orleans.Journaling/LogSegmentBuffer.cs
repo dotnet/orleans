@@ -108,6 +108,20 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
         logEntry.Commit();
     }
 
+    bool ILogWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (entry is not OrleansBinaryFormattedLogEntry binaryEntry)
+        {
+            return false;
+        }
+
+        using var logEntry = new LogEntry(BeginEntry(streamId));
+        logEntry.Writer.Write(binaryEntry.Payload.Span);
+        logEntry.Commit();
+        return true;
+    }
+
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream
     {
         private ArcBuffer _buffer = buffer;

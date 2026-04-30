@@ -25,7 +25,7 @@ internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 
     object IDurableStateMachine.OperationCodec => NoOpCodec;
 
-    void IDurableStateMachine.Reset(ILogWriter storage) { }
+    void IDurableStateMachine.Reset(LogWriter storage) { }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) { }
 

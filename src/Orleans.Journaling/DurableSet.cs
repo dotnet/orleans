@@ -25,7 +25,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 {
     private readonly IDurableSetOperationCodec<T> _codec;
     private readonly HashSet<T> _items = [];
-    private ILogWriter? _storage;
+    private LogWriter _storage;
 
     public DurableSet([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
     {
@@ -46,7 +46,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(ILogWriter storage)
+    void IDurableStateMachine.Reset(LogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -64,17 +64,12 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
-        using var entry = snapshotWriter.BeginEntry();
-        _codec.WriteSnapshot(_items, entry.Writer);
-        entry.Commit();
+        _codec.WriteSnapshot(_items, snapshotWriter);
     }
 
     public void Clear()
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteClear(entry.Writer);
-        entry.Commit();
-
+        _codec.WriteClear(GetStorage());
         ApplyClear();
     }
 
@@ -88,10 +83,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
             return false;
         }
 
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteAdd(item, entry.Writer);
-        entry.Commit();
-
+        _codec.WriteAdd(item, GetStorage());
         _ = ApplyAdd(item);
         return true;
     }
@@ -103,19 +95,14 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
             return false;
         }
 
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteRemove(item, entry.Writer);
-        entry.Commit();
-
+        _codec.WriteRemove(item, GetStorage());
         _ = ApplyRemove(item);
         return true;
     }
 
     private void WriteSnapshot(IReadOnlyCollection<T> items)
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteSnapshot(items, entry.Writer);
-        entry.Commit();
+        _codec.WriteSnapshot(items, GetStorage());
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
@@ -134,12 +121,9 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     void IDurableSetOperationHandler<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
 
-    [DoesNotReturn]
-    private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
-
-    private ILogWriter GetStorage()
+    private LogWriter GetStorage()
     {
-        Debug.Assert(_storage is not null);
+        Debug.Assert(_storage.IsInitialized);
         return _storage;
     }
 

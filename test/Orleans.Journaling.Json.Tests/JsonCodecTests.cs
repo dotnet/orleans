@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -206,6 +207,53 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonLinesLogFormat_TryAppendFormattedEntry_WritesEntryDirectly()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+
+        var accepted = writer.CreateLogWriter(new LogStreamId(8)).TryAppendFormattedEntry(JsonFormattedLogEntry.Create(42, static (jsonWriter, value) =>
+        {
+            jsonWriter.WriteStartObject();
+            jsonWriter.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
+            jsonWriter.WriteNumber(JsonLogEntryFields.Value, value);
+            jsonWriter.WriteEndObject();
+        }));
+
+        Assert.True(accepted);
+        Assert.Equal("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", GetString(writer));
+    }
+
+    [Fact]
+    public void JsonValueCodec_LogWriterOverload_UsesFormattedEntryForJsonWriter()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+        var codec = new JsonValueOperationCodec<int>(Options);
+
+        codec.WriteSet(42, writer.CreateLogWriter(new LogStreamId(8)));
+
+        Assert.Equal("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", GetString(writer));
+    }
+
+    [Fact]
+    public void JsonValueCodec_LogWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
+    {
+        using var writer = new LogSegmentBuffer();
+        var codec = new JsonValueOperationCodec<int>(Options);
+
+        codec.WriteSet(42, writer.CreateLogWriter(new LogStreamId(8)));
+
+        using var committed = writer.GetCommittedBuffer();
+        var bytes = committed.ToArray();
+        var payload = """{"cmd":"set","value":42}"""u8.ToArray();
+
+        Assert.Equal((uint)(1 + payload.Length), BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0, 4)));
+        Assert.Equal(8, bytes[4]);
+        Assert.Equal(payload, bytes[5..]);
+    }
+
+    [Fact]
     public void JsonLinesLogFormat_Writer_DisposeWithoutCommit_TruncatesIncompleteLine()
     {
         var format = new JsonLinesLogFormat();
@@ -271,8 +319,6 @@ public class JsonCodecTests
     [InlineData("""{"streamId":"8","entry":{"cmd":"set","value":42}}""" + "\n", "unsigned integer")]
     [InlineData("""{"streamId":8,"entry":null}""" + "\n", "must be a JSON object")]
     [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42},"extra":true}""" + "\n", "unexpected property")]
-    [InlineData("""{"streamId":8,"streamId":9,"entry":{"cmd":"set","value":42}}""" + "\n", "duplicate property")]
-    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42},"entry":{"cmd":"set","value":43}}""" + "\n", "duplicate property")]
     [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}}{}""" + "\n", "invalid JSON")]
     [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}""" + "\n", "invalid JSON")]
     public void JsonLinesLogFormat_Read_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
@@ -540,7 +586,7 @@ public class JsonCodecTests
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        public void Reset(ILogWriter storage) { }
+        public void Reset(LogWriter storage) { }
         public void AppendEntries(LogWriter writer) { }
         public void AppendSnapshot(LogWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
@@ -558,7 +604,7 @@ public class JsonCodecTests
         public object OperationCodec => codec;
 
         public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
-        public void Reset(ILogWriter storage) { }
+        public void Reset(LogWriter storage) { }
         public void AppendEntries(LogWriter writer) { }
         public void AppendSnapshot(LogWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
@@ -571,7 +617,7 @@ public class JsonCodecTests
         public object OperationCodec { get; } = new();
 
         public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
-        public void Reset(ILogWriter storage) { }
+        public void Reset(LogWriter storage) { }
         public void AppendEntries(LogWriter writer) { }
         public void AppendSnapshot(LogWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();

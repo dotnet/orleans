@@ -23,7 +23,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     private readonly DeepCopier<Exception> _exceptionCopier;
 
     private TaskCompletionSource<T> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
-    private ILogWriter? _storage;
     private DurableTaskCompletionSourceStatus _status;
     private T? _value;
     private Exception? _exception;
@@ -126,7 +125,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(ILogWriter storage)
+    void IDurableStateMachine.Reset(LogWriter storage)
     {
         // Reset the task completion source if necessary.
         if (_completion.Task.IsCompleted)
@@ -134,7 +133,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
-        _storage = storage;
     }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
@@ -154,24 +152,21 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     private void WriteState(LogWriter writer)
     {
-        using var entry = writer.BeginEntry();
         switch (_status)
         {
             case DurableTaskCompletionSourceStatus.Completed:
-                _codec.WriteCompleted(_value!, entry.Writer);
+                _codec.WriteCompleted(_value!, writer);
                 break;
             case DurableTaskCompletionSourceStatus.Faulted:
-                _codec.WriteFaulted(_exception!, entry.Writer);
+                _codec.WriteFaulted(_exception!, writer);
                 break;
             case DurableTaskCompletionSourceStatus.Canceled:
-                _codec.WriteCanceled(entry.Writer);
+                _codec.WriteCanceled(writer);
                 break;
             default:
-                _codec.WritePending(entry.Writer);
+                _codec.WritePending(writer);
                 break;
         }
-
-        entry.Commit();
     }
 
     void IDurableTaskCompletionSourceOperationHandler<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;

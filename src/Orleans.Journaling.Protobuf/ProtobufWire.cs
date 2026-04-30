@@ -1,184 +1,13 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using System.Runtime.CompilerServices;
-using System.Text;
 
 namespace Orleans.Journaling.Protobuf;
 
 internal static class ProtobufWire
 {
     public const uint WireTypeVarint = 0;
-    public const uint WireTypeFixed64 = 1;
     public const uint WireTypeLengthDelimited = 2;
-    public const uint WireTypeFixed32 = 5;
-
-    public static void WriteTag(IBufferWriter<byte> output, uint fieldNumber, uint wireType)
-        => WriteVarUInt32(output, (fieldNumber << 3) | wireType);
-
-    public static void WriteUInt32Field(IBufferWriter<byte> output, uint fieldNumber, uint value)
-    {
-        WriteTag(output, fieldNumber, WireTypeVarint);
-        WriteVarUInt32(output, value);
-    }
-
-    public static void WriteUInt64Field(IBufferWriter<byte> output, uint fieldNumber, ulong value)
-    {
-        WriteTag(output, fieldNumber, WireTypeVarint);
-        WriteVarUInt64(output, value);
-    }
-
-    public static void WriteStringField(IBufferWriter<byte> output, uint fieldNumber, string value)
-        => WriteBytesField(output, fieldNumber, Encoding.UTF8.GetBytes(value));
-
-    public static void WriteBytesField(IBufferWriter<byte> output, uint fieldNumber, ReadOnlySpan<byte> value)
-    {
-        WriteTag(output, fieldNumber, WireTypeLengthDelimited);
-        WriteVarUInt32(output, (uint)value.Length);
-        WriteRaw(output, value);
-    }
-
-    public static void WriteBytesField(IBufferWriter<byte> output, uint fieldNumber, ReadOnlySequence<byte> value)
-    {
-        WriteTag(output, fieldNumber, WireTypeLengthDelimited);
-        WriteLengthDelimited(output, value);
-    }
-
-    public static void WriteBytesField<TState>(IBufferWriter<byte> output, uint fieldNumber, int length, TState state, Action<TState, IBufferWriter<byte>> write)
-    {
-        if (length < 0)
-        {
-            throw new InvalidOperationException("Length-delimited protobuf value cannot have a negative length.");
-        }
-
-        WriteTag(output, fieldNumber, WireTypeLengthDelimited);
-        WriteVarUInt32(output, (uint)length);
-        write(state, output);
-    }
-
-    public static void WriteLengthDelimited(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
-    {
-        WriteVarUInt32(output, (uint)value.Length);
-        WriteRaw(output, value);
-    }
-
-    public static void WriteLengthDelimited(IBufferWriter<byte> output, ReadOnlySequence<byte> value)
-    {
-        if (value.Length > uint.MaxValue)
-        {
-            throw new InvalidOperationException("Length-delimited protobuf value is too large.");
-        }
-
-        WriteVarUInt32(output, (uint)value.Length);
-        WriteRaw(output, value);
-    }
-
-    public static uint ReadTag(ref SequenceReader<byte> reader)
-    {
-        var tag = ReadVarUInt32(ref reader);
-        if (tag == 0)
-        {
-            throw new InvalidOperationException("Malformed protobuf log entry: field number 0 is not valid.");
-        }
-
-        return tag;
-    }
-
-    public static uint ReadUInt32(ref SequenceReader<byte> reader) => ReadVarUInt32(ref reader);
-
-    public static int ReadNonNegativeInt32(ref SequenceReader<byte> reader, string fieldName)
-    {
-        var value = ReadUInt32(ref reader);
-        if (value > int.MaxValue)
-        {
-            throw new InvalidOperationException($"Malformed protobuf log entry: field '{fieldName}' value {value} exceeds the maximum supported value {int.MaxValue}.");
-        }
-
-        return (int)value;
-    }
-
-    public static ulong ReadUInt64(ref SequenceReader<byte> reader) => ReadVarUInt64(ref reader);
-
-    public static int GetSnapshotCount<T>(IReadOnlyCollection<T> items)
-    {
-        ArgumentNullException.ThrowIfNull(items);
-
-        var count = items.Count;
-        if (count < 0)
-        {
-            throw new InvalidOperationException($"Snapshot collection count {count} is negative.");
-        }
-
-        return count;
-    }
-
-    public static void ThrowIfSnapshotItemCountExceeded(int expectedCount, int actualCount)
-    {
-        if (actualCount >= expectedCount)
-        {
-            throw new InvalidOperationException($"Snapshot collection count {expectedCount} did not match the number of items produced by the collection ({(long)actualCount + 1}).");
-        }
-    }
-
-    public static void RequireSnapshotWriteCount(int expectedCount, int actualCount)
-    {
-        if (actualCount != expectedCount)
-        {
-            throw new InvalidOperationException($"Snapshot collection count {expectedCount} did not match the number of items produced by the collection ({actualCount}).");
-        }
-    }
-
-    public static void RequireCommand(bool hasCommand)
-    {
-        if (!hasCommand)
-        {
-            throw new InvalidOperationException("Malformed protobuf log entry: missing required field 'command'.");
-        }
-    }
-
-    public static void RequireNoDuplicateCommand(bool hasCommand)
-    {
-        if (hasCommand)
-        {
-            throw new InvalidOperationException("Malformed protobuf log entry: duplicate field 'command'.");
-        }
-    }
-
-    public static void RequireField(bool hasField, string fieldName, uint command)
-    {
-        if (!hasField)
-        {
-            throw new InvalidOperationException($"Malformed protobuf log entry: missing required field '{fieldName}' for command {command}.");
-        }
-    }
-
-    public static T RequireValue<T>(bool hasField, T? value, string fieldName, uint command)
-    {
-        RequireField(hasField, fieldName, command);
-        return value!;
-    }
-
-    public static void RequireSnapshotCount(int expectedCount, int actualCount, uint command)
-    {
-        if (expectedCount != actualCount)
-        {
-            throw new InvalidOperationException($"Malformed protobuf log entry: command {command} declared {expectedCount} snapshot item(s) but contained {actualCount}.");
-        }
-    }
-
-    public static ReadOnlySequence<byte> ReadBytes(ref SequenceReader<byte> reader)
-    {
-        var length = ReadVarUInt32(ref reader);
-        EnsureRemaining(ref reader, length, "length-delimited field");
-        var result = reader.Sequence.Slice(reader.Position, length);
-        reader.Advance(length);
-        return result;
-    }
-
-    public static string ReadString(ref SequenceReader<byte> reader)
-    {
-        var bytes = ReadBytes(ref reader);
-        return Encoding.UTF8.GetString(bytes.ToArray());
-    }
 
     public static int ComputeVarUInt32Size(uint value)
     {
@@ -319,52 +148,11 @@ internal static class ProtobufWire
         return BinaryPrimitives.ReadUInt64LittleEndian(bytes);
     }
 
-    public static void SkipField(ref SequenceReader<byte> reader, uint tag)
-    {
-        switch (tag & 0b111)
-        {
-            case WireTypeVarint:
-                _ = ReadVarUInt64(ref reader);
-                break;
-            case WireTypeFixed64:
-                EnsureRemaining(ref reader, 8, "fixed64 field");
-                reader.Advance(8);
-                break;
-            case WireTypeLengthDelimited:
-                var length = ReadVarUInt32(ref reader);
-                EnsureRemaining(ref reader, length, "length-delimited field");
-                reader.Advance(length);
-                break;
-            case WireTypeFixed32:
-                EnsureRemaining(ref reader, 4, "fixed32 field");
-                reader.Advance(4);
-                break;
-            default:
-                throw new NotSupportedException($"Unsupported protobuf wire type: {tag & 0b111}");
-        }
-    }
-
     public static void WriteRaw(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
     {
         var span = output.GetSpan(value.Length);
         value.CopyTo(span);
         output.Advance(value.Length);
-    }
-
-    private static void WriteRaw(IBufferWriter<byte> output, ReadOnlySequence<byte> value)
-    {
-        foreach (var segment in value)
-        {
-            WriteRaw(output, segment.Span);
-        }
-    }
-
-    private static void EnsureRemaining(ref SequenceReader<byte> reader, uint length, string fieldKind)
-    {
-        if (reader.Remaining < length)
-        {
-            throw new InvalidOperationException($"Malformed protobuf log entry: insufficient data for {fieldKind}.");
-        }
     }
 
     [MethodImpl(MethodImplOptions.AggressiveInlining)]

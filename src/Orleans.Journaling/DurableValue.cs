@@ -14,7 +14,6 @@ public interface IDurableValue<T>
 internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, IDurableValueOperationHandler<T>
 {
     private readonly IDurableValueOperationCodec<T> _codec;
-    private ILogWriter? _storage;
     private T? _value;
     private bool _isDirty;
 
@@ -53,10 +52,9 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(ILogWriter storage)
+    void IDurableStateMachine.Reset(LogWriter storage)
     {
         _value = default;
-        _storage = storage;
     }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
@@ -79,19 +77,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
 
     private void WriteState(LogWriter writer)
     {
-        using var entry = writer.BeginEntry();
-        _codec.WriteSet(_value!, entry.Writer);
-        entry.Commit();
+        _codec.WriteSet(_value!, writer);
     }
 
     void IDurableValueOperationHandler<T>.ApplySet(T value) => _value = value;
-
-    [DoesNotReturn]
-    private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
-
-    private ILogWriter GetStorage()
-    {
-        Debug.Assert(_storage is not null);
-        return _storage;
-    }
 }

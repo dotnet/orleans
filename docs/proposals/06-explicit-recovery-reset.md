@@ -61,7 +61,7 @@ private async Task RecoverAsync(CancellationToken cancellationToken)
 
 ## Open design question: unbound state machines
 
-Current `IDurableStateMachine.Reset` requires an `ILogWriter`. During recovery, known application state machines only get a valid writer when their stream id is replayed. If we explicitly clear all mappings up front, then application machines need one of these behaviors:
+Current `IDurableStateMachine.Reset` requires a `LogWriter`. During recovery, known application state machines only get a valid writer when their stream id is replayed. If we explicitly clear all mappings up front, then application machines need one of these behaviors:
 
 1. remain untouched until bound by the directory,
 2. be reset with a non-writing placeholder writer,

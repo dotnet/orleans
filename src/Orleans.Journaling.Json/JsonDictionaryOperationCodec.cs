@@ -19,102 +19,139 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     private readonly JsonValueSerializer<TValue> _valueSerializer = new(options);
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
+    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output) => Write(output, CreateSetOperation(key, value));
+
+    /// <inheritdoc/>
+    public void WriteSet(TKey key, TValue value, LogWriter writer) => Write(writer, CreateSetOperation(key, value));
+
+    private JsonDictionaryOperation CreateSetOperation(TKey key, TValue value)
     {
-        using var writer = new Utf8JsonWriter(output);
-        writer.WriteStartObject();
-        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
-        writer.WritePropertyName(JsonLogEntryFields.Key);
-        _keySerializer.Serialize(writer, key);
-        writer.WritePropertyName(JsonLogEntryFields.Value);
-        _valueSerializer.Serialize(writer, value);
-        writer.WriteEndObject();
+        return new()
+        {
+            Command = JsonLogEntryCommands.Set,
+            Key = _keySerializer.SerializeToElement(key),
+            Value = _valueSerializer.SerializeToElement(value)
+        };
     }
 
     /// <inheritdoc/>
-    public void WriteRemove(TKey key, IBufferWriter<byte> output)
+    public void WriteRemove(TKey key, IBufferWriter<byte> output) => Write(output, CreateRemoveOperation(key));
+
+    /// <inheritdoc/>
+    public void WriteRemove(TKey key, LogWriter writer) => Write(writer, CreateRemoveOperation(key));
+
+    private JsonDictionaryOperation CreateRemoveOperation(TKey key)
     {
-        using var writer = new Utf8JsonWriter(output);
-        writer.WriteStartObject();
-        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Remove);
-        writer.WritePropertyName(JsonLogEntryFields.Key);
-        _keySerializer.Serialize(writer, key);
-        writer.WriteEndObject();
+        return new()
+        {
+            Command = JsonLogEntryCommands.Remove,
+            Key = _keySerializer.SerializeToElement(key)
+        };
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
-    {
-        using var writer = new Utf8JsonWriter(output);
-        writer.WriteStartObject();
-        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Clear);
-        writer.WriteEndObject();
-    }
+    public void WriteClear(IBufferWriter<byte> output) => Write(output, CreateClearOperation());
+
+    /// <inheritdoc/>
+    public void WriteClear(LogWriter writer) => Write(writer, CreateClearOperation());
+
+    private static JsonDictionaryOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
         ArgumentNullException.ThrowIfNull(items);
 
-        using var writer = new Utf8JsonWriter(output);
-        writer.WriteStartObject();
-        writer.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Snapshot);
-        writer.WritePropertyName(JsonLogEntryFields.Items);
-        writer.WriteStartArray();
+        Write(output, CreateSnapshotOperation(items));
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogWriter writer)
+    {
+        ArgumentNullException.ThrowIfNull(items);
+
+        Write(writer, CreateSnapshotOperation(items));
+    }
+
+    private JsonDictionaryOperation CreateSnapshotOperation(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items)
+    {
+        var snapshotItems = new JsonDictionarySnapshotItem[items.Count];
+        var index = 0;
         foreach (var (key, value) in items)
         {
-            writer.WriteStartObject();
-            writer.WritePropertyName(JsonLogEntryFields.Key);
-            _keySerializer.Serialize(writer, key);
-            writer.WritePropertyName(JsonLogEntryFields.Value);
-            _valueSerializer.Serialize(writer, value);
-            writer.WriteEndObject();
+            snapshotItems[index++] = new()
+            {
+                Key = _keySerializer.SerializeToElement(key),
+                Value = _valueSerializer.SerializeToElement(value)
+            };
         }
 
-        writer.WriteEndArray();
-        writer.WriteEndObject();
+        return new()
+        {
+            Command = JsonLogEntryCommands.Snapshot,
+            Items = snapshotItems
+        };
     }
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
         var reader = new Utf8JsonReader(input);
-        using var document = JsonDocument.ParseValue(ref reader);
-        var root = document.RootElement;
-        Apply(root, consumer);
+        var operation = JsonSerializer.Deserialize(ref reader, JsonOperationCodecsJsonContext.Default.JsonDictionaryOperation);
+        Apply(operation, consumer);
     }
 
-    internal void Apply(JsonElement root, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    internal void Apply(JsonElement root, IDurableDictionaryOperationHandler<TKey, TValue> consumer) => Apply(root.Deserialize(JsonOperationCodecsJsonContext.Default.JsonDictionaryOperation), consumer);
+
+    private void Apply(JsonDictionaryOperation operation, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
-        switch (command)
+        switch (operation.Command)
         {
             case JsonLogEntryCommands.Set:
                 consumer.ApplySet(
-                    _keySerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Key))!,
-                    _valueSerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Value))!);
+                    _keySerializer.Deserialize(operation.Key.GetValueOrDefault())!,
+                    _valueSerializer.Deserialize(operation.Value.GetValueOrDefault())!);
                 break;
             case JsonLogEntryCommands.Remove:
-                consumer.ApplyRemove(_keySerializer.Deserialize(root.GetProperty(JsonLogEntryFields.Key))!);
+                consumer.ApplyRemove(_keySerializer.Deserialize(operation.Key.GetValueOrDefault())!);
                 break;
             case JsonLogEntryCommands.Clear:
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = root.GetProperty(JsonLogEntryFields.Items);
-                consumer.ApplySnapshotStart(items.GetArrayLength());
-                foreach (var item in items.EnumerateArray())
+                var items = operation.Items ?? [];
+                consumer.ApplySnapshotStart(items.Length);
+                foreach (var item in items)
                 {
                     consumer.ApplySnapshotItem(
-                        _keySerializer.Deserialize(item.GetProperty(JsonLogEntryFields.Key))!,
-                        _valueSerializer.Deserialize(item.GetProperty(JsonLogEntryFields.Value))!);
+                        _keySerializer.Deserialize(item.Key)!,
+                        _valueSerializer.Deserialize(item.Value)!);
                 }
 
                 break;
             default:
-                throw new NotSupportedException($"Command type '{command}' is not supported");
+                throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
         }
     }
+
+    private static void Write(LogWriter writer, JsonDictionaryOperation operation)
+    {
+        JsonOperationCodecWriter.Write(
+            writer,
+            operation,
+            static (jsonWriter, operation) => WriteJson(jsonWriter, operation),
+            static (output, operation) => WriteBytes(output, operation));
+    }
+
+    private static void Write(IBufferWriter<byte> output, JsonDictionaryOperation operation)
+    {
+        using var writer = new Utf8JsonWriter(output);
+        WriteJson(writer, operation);
+    }
+
+    private static void WriteJson(Utf8JsonWriter writer, JsonDictionaryOperation operation) => JsonSerializer.Serialize(writer, operation, JsonOperationCodecsJsonContext.Default.JsonDictionaryOperation);
+
+    private static void WriteBytes(IBufferWriter<byte> output, JsonDictionaryOperation operation) => Write(output, operation);
 
     void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
     {

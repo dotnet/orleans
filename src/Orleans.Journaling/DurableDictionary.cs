@@ -16,7 +16,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 {
     private readonly IDurableDictionaryOperationCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
-    private ILogWriter? _storage;
+    private LogWriter _storage;
 
     protected DurableDictionary(IDurableDictionaryOperationCodec<K, V> codec)
     {
@@ -57,7 +57,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(ILogWriter storage)
+    void IDurableStateMachine.Reset(LogWriter storage)
     {
         _items.Clear();
         _storage = storage;
@@ -75,17 +75,12 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
     {
-        using var entry = snapshotWriter.BeginEntry();
-        _codec.WriteSnapshot(_items, entry.Writer);
-        entry.Commit();
+        _codec.WriteSnapshot(_items, snapshotWriter);
     }
 
     public void Clear()
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteClear(entry.Writer);
-        entry.Commit();
-
+        _codec.WriteClear(GetStorage());
         ApplyClear();
     }
 
@@ -105,18 +100,14 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     private void WriteRemove(K key)
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteRemove(key, entry.Writer);
-        entry.Commit();
+        _codec.WriteRemove(key, GetStorage());
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
     private void WriteSet(K key, V value)
     {
-        using var entry = GetStorage().BeginEntry();
-        _codec.WriteSet(key, value, entry.Writer);
-        entry.Commit();
+        _codec.WriteSet(key, value, GetStorage());
     }
 
     protected virtual void OnSet(K key, V value) { }
@@ -140,9 +131,9 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     void IDurableDictionaryOperationHandler<K, V>.ApplySnapshotItem(K key, V value) => ApplySet(key, value);
 
-    protected virtual ILogWriter GetStorage()
+    protected virtual LogWriter GetStorage()
     {
-        Debug.Assert(_storage is not null);
+        Debug.Assert(_storage.IsInitialized);
         return _storage;
     }
 

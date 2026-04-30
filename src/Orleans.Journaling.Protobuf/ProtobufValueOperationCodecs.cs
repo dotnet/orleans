@@ -1,4 +1,5 @@
 using System.Buffers;
+using Google.Protobuf;
 
 namespace Orleans.Journaling.Protobuf;
 
@@ -8,53 +9,26 @@ namespace Orleans.Journaling.Protobuf;
 public sealed class ProtobufValueOperationCodec<T>(
     ProtobufValueConverter<T> converter) : IDurableValueOperationCodec<T>
 {
-    private const uint CommandField = 1;
-    private const uint ValueField = 2;
     private const uint SetCommand = 0;
 
     /// <inheritdoc/>
     public void WriteSet(T value, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
-        converter.WriteField(output, ValueField, value);
+        var operation = new ProtobufValueOperation();
+        operation.Command.Add(SetCommand);
+        operation.Value.Add(converter.ToByteString(value));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        var command = uint.MaxValue;
-        var hasCommand = false;
-        var hasValue = false;
-        T? value = default;
-
-        while (!reader.End)
-        {
-            var tag = ProtobufWire.ReadTag(ref reader);
-            var field = tag >> 3;
-            switch (field)
-            {
-                case CommandField:
-                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
-                    command = ProtobufWire.ReadUInt32(ref reader);
-                    hasCommand = true;
-                    break;
-                case ValueField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    value = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
-                    hasValue = true;
-                    break;
-                default:
-                    ProtobufWire.SkipField(ref reader, tag);
-                    break;
-            }
-        }
-
-        ProtobufWire.RequireCommand(hasCommand);
+        var operation = ProtobufGeneratedCodecHelpers.Parse(input, ProtobufValueOperation.Parser, "value operation");
+        var command = ProtobufGeneratedCodecHelpers.RequireCommand(operation.Command);
         switch (command)
         {
             case SetCommand:
-                consumer.ApplySet(ProtobufWire.RequireValue(hasValue, value, "value", command));
+                consumer.ApplySet(converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Value, "value", command)));
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
@@ -68,71 +42,38 @@ public sealed class ProtobufValueOperationCodec<T>(
 public sealed class ProtobufStateOperationCodec<T>(
     ProtobufValueConverter<T> converter) : IDurableStateOperationCodec<T>
 {
-    private const uint CommandField = 1;
-    private const uint StateField = 2;
-    private const uint VersionField = 3;
-
     private const uint SetCommand = 0;
     private const uint ClearCommand = 1;
 
     /// <inheritdoc/>
     public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, SetCommand);
-        converter.WriteField(output, StateField, state);
-        ProtobufWire.WriteUInt64Field(output, VersionField, version);
+        var operation = new ProtobufStateOperation();
+        operation.Command.Add(SetCommand);
+        operation.State.Add(converter.ToByteString(state));
+        operation.Version.Add(version);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteClear(IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, ClearCommand);
+        var operation = new ProtobufStateOperation();
+        operation.Command.Add(ClearCommand);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        var command = uint.MaxValue;
-        var version = 0UL;
-        var hasCommand = false;
-        var hasState = false;
-        var hasVersion = false;
-        T? state = default;
-
-        while (!reader.End)
-        {
-            var tag = ProtobufWire.ReadTag(ref reader);
-            var field = tag >> 3;
-            switch (field)
-            {
-                case CommandField:
-                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
-                    command = ProtobufWire.ReadUInt32(ref reader);
-                    hasCommand = true;
-                    break;
-                case StateField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    state = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
-                    hasState = true;
-                    break;
-                case VersionField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    version = ProtobufWire.ReadUInt64(ref reader);
-                    hasVersion = true;
-                    break;
-                default:
-                    ProtobufWire.SkipField(ref reader, tag);
-                    break;
-            }
-        }
-
-        ProtobufWire.RequireCommand(hasCommand);
+        var operation = ProtobufGeneratedCodecHelpers.Parse(input, ProtobufStateOperation.Parser, "state operation");
+        var command = ProtobufGeneratedCodecHelpers.RequireCommand(operation.Command);
         switch (command)
         {
             case SetCommand:
-                ProtobufWire.RequireField(hasVersion, "version", command);
-                consumer.ApplySet(ProtobufWire.RequireValue(hasState, state, "state", command), version);
+                consumer.ApplySet(
+                    converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.State, "state", command)),
+                    ProtobufGeneratedCodecHelpers.RequireUInt64(operation.Version, "version", command));
                 break;
             case ClearCommand:
                 consumer.ApplyClear();
@@ -149,10 +90,6 @@ public sealed class ProtobufStateOperationCodec<T>(
 public sealed class ProtobufTcsOperationCodec<T>(
     ProtobufValueConverter<T> converter) : IDurableTaskCompletionSourceOperationCodec<T>
 {
-    private const uint CommandField = 1;
-    private const uint ValueField = 2;
-    private const uint MessageField = 3;
-
     private const uint PendingCommand = 0;
     private const uint CompletedCommand = 1;
     private const uint FaultedCommand = 2;
@@ -161,79 +98,52 @@ public sealed class ProtobufTcsOperationCodec<T>(
     /// <inheritdoc/>
     public void WritePending(IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, PendingCommand);
+        var operation = new ProtobufTaskCompletionSourceOperation();
+        operation.Command.Add(PendingCommand);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteCompleted(T value, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, CompletedCommand);
-        converter.WriteField(output, ValueField, value);
+        var operation = new ProtobufTaskCompletionSourceOperation();
+        operation.Command.Add(CompletedCommand);
+        operation.Value.Add(converter.ToByteString(value));
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteFaulted(Exception exception, IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, FaultedCommand);
-        ProtobufWire.WriteStringField(output, MessageField, exception.Message);
+        var operation = new ProtobufTaskCompletionSourceOperation();
+        operation.Command.Add(FaultedCommand);
+        operation.Message.Add(exception.Message);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void WriteCanceled(IBufferWriter<byte> output)
     {
-        ProtobufWire.WriteUInt32Field(output, CommandField, CanceledCommand);
+        var operation = new ProtobufTaskCompletionSourceOperation();
+        operation.Command.Add(CanceledCommand);
+        operation.WriteTo(output);
     }
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        var command = uint.MaxValue;
-        var hasCommand = false;
-        var hasValue = false;
-        var hasMessage = false;
-        T? value = default;
-        string? message = null;
-
-        while (!reader.End)
-        {
-            var tag = ProtobufWire.ReadTag(ref reader);
-            var field = tag >> 3;
-            switch (field)
-            {
-                case CommandField:
-                    ProtobufWire.RequireNoDuplicateCommand(hasCommand);
-                    command = ProtobufWire.ReadUInt32(ref reader);
-                    hasCommand = true;
-                    break;
-                case ValueField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    value = converter.FromBytes(ProtobufWire.ReadBytes(ref reader));
-                    hasValue = true;
-                    break;
-                case MessageField:
-                    ProtobufWire.RequireCommand(hasCommand);
-                    message = ProtobufWire.ReadString(ref reader);
-                    hasMessage = true;
-                    break;
-                default:
-                    ProtobufWire.SkipField(ref reader, tag);
-                    break;
-            }
-        }
-
-        ProtobufWire.RequireCommand(hasCommand);
+        var operation = ProtobufGeneratedCodecHelpers.Parse(input, ProtobufTaskCompletionSourceOperation.Parser, "task completion source operation");
+        var command = ProtobufGeneratedCodecHelpers.RequireCommand(operation.Command);
         switch (command)
         {
             case PendingCommand:
                 consumer.ApplyPending();
                 break;
             case CompletedCommand:
-                consumer.ApplyCompleted(ProtobufWire.RequireValue(hasValue, value, "value", command));
+                consumer.ApplyCompleted(converter.FromByteString(ProtobufGeneratedCodecHelpers.RequireBytes(operation.Value, "value", command)));
                 break;
             case FaultedCommand:
-                ProtobufWire.RequireField(hasMessage, "message", command);
-                consumer.ApplyFaulted(new Exception(message));
+                consumer.ApplyFaulted(new Exception(ProtobufGeneratedCodecHelpers.RequireString(operation.Message, "message", command)));
                 break;
             case CanceledCommand:
                 consumer.ApplyCanceled();

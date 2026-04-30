@@ -41,11 +41,11 @@ public sealed class DurableListDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestLogManager(ILogWriter writer) : ILogManager
+    private sealed class TestLogManager(TestLogWriter writer) : ILogManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
-        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) => stateMachine.Reset(writer);
+        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) => stateMachine.Reset(writer.CreateWriter());
 
         public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine? stateMachine)
         {
@@ -58,13 +58,13 @@ public sealed class DurableListDirectWriteTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class TestLogWriter : ILogWriter
+    private sealed class TestLogWriter
     {
         private readonly LogSegmentBuffer _buffer = new();
 
         public long Length => _buffer.Length;
 
-        public LogEntry BeginEntry() => _buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        public LogWriter CreateWriter() => _buffer.CreateLogWriter(new LogStreamId(1));
     }
 
     private sealed class ThrowingAddCodec<T> : TestListCodec<T>

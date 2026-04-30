@@ -1,4 +1,5 @@
 using System.Buffers;
+using Google.Protobuf;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Protobuf;
@@ -119,17 +120,13 @@ internal sealed class ProtobufLogFormat : ILogFormat
         protected override void CommitEntry(LogStreamId streamId, int entryStart)
         {
             var payloadLength = _payload.Length;
-            var messageLength = GetMessageBodyLength(streamId.Value, payloadLength);
+            using var payload = _payload.PeekSlice(payloadLength);
+            var message = new ProtobufLogEntry();
+            message.StreamId.Add(streamId.Value);
+            message.Payload.Add(UnsafeByteOperations.UnsafeWrap(payload.AsReadOnlySequence().ToArray()));
+            var messageLength = message.CalculateSize();
             ProtobufWire.WriteVarUInt32(_buffer, checked((uint)messageLength));
-            ProtobufWire.WriteUInt64Field(_buffer, StreamIdFieldNumber, streamId.Value);
-            ProtobufWire.WriteTag(_buffer, PayloadFieldNumber, ProtobufWire.WireTypeLengthDelimited);
-            ProtobufWire.WriteVarUInt32(_buffer, checked((uint)payloadLength));
-
-            if (payloadLength > 0)
-            {
-                using var payload = _payload.PeekSlice(payloadLength);
-                _buffer.Write(payload.AsReadOnlySequence());
-            }
+            message.WriteTo(_buffer);
 
             _payload.Reset();
         }
@@ -138,15 +135,24 @@ internal sealed class ProtobufLogFormat : ILogFormat
 
         protected override void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
         {
-            if (entry is not ProtobufFormattedLogEntry protobufEntry)
+            if (!OnTryAppendFormattedEntry(streamId, entry))
             {
                 throw new InvalidOperationException(
                     $"The protobuf log writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+            }
+        }
+
+        protected override bool OnTryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+        {
+            if (entry is not ProtobufFormattedLogEntry protobufEntry)
+            {
+                return false;
             }
 
             using var logEntry = CreateLogWriter(streamId).BeginEntry();
             logEntry.Writer.Write(protobufEntry.Payload.Span);
             logEntry.Commit();
+            return true;
         }
 
         private int GetCurrentFrameLength()
@@ -190,139 +196,9 @@ internal sealed class ProtobufLogFormat : ILogFormat
             out LogStreamId streamId,
             out ReadOnlySequence<byte> payload)
         {
-            var reader = new SequenceReader<byte>(message);
-            ulong id = 0;
-            var hasStreamId = false;
-            payload = default;
-            var hasPayload = false;
-
-            while (!reader.End)
-            {
-                var tag = ReadVarUInt32(ref reader, offset, "field tag");
-                if (tag == 0)
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed protobuf log entry stream at byte offset {offset}: field number 0 is not valid.");
-                }
-
-                var fieldNumber = tag >> 3;
-                var wireType = tag & 0b111;
-                switch (fieldNumber)
-                {
-                    case StreamIdFieldNumber:
-                        if (wireType != ProtobufWire.WireTypeVarint)
-                        {
-                            throw new InvalidOperationException(
-                                $"Malformed protobuf log entry stream at byte offset {offset}: stream_id must be a varint field.");
-                        }
-
-                        if (hasStreamId)
-                        {
-                            throw new InvalidOperationException(
-                                $"Malformed protobuf log entry stream at byte offset {offset}: duplicate stream_id field.");
-                        }
-
-                        id = ReadVarUInt64(ref reader, offset, "stream_id");
-                        hasStreamId = true;
-                        break;
-                    case PayloadFieldNumber:
-                        if (wireType != ProtobufWire.WireTypeLengthDelimited)
-                        {
-                            throw new InvalidOperationException(
-                                $"Malformed protobuf log entry stream at byte offset {offset}: payload must be a bytes field.");
-                        }
-
-                        if (hasPayload)
-                        {
-                            throw new InvalidOperationException(
-                                $"Malformed protobuf log entry stream at byte offset {offset}: duplicate payload field.");
-                        }
-
-                        payload = ReadBytes(ref reader, offset, "payload");
-                        hasPayload = true;
-                        break;
-                    default:
-                        SkipField(ref reader, wireType, offset);
-                        break;
-                }
-            }
-
-            if (!hasStreamId)
-            {
-                throw new InvalidOperationException(
-                    $"Malformed protobuf log entry stream at byte offset {offset}: missing required stream_id field.");
-            }
-
-            if (!hasPayload)
-            {
-                throw new InvalidOperationException(
-                    $"Malformed protobuf log entry stream at byte offset {offset}: missing required payload field.");
-            }
-
-            streamId = new(id);
-        }
-
-        private static ReadOnlySequence<byte> ReadBytes(ref SequenceReader<byte> reader, long offset, string fieldName)
-        {
-            var length = ReadVarUInt32(ref reader, offset, fieldName);
-            EnsureRemaining(ref reader, length, offset, fieldName);
-            var result = reader.Sequence.Slice(reader.Position, length);
-            reader.Advance(length);
-            return result;
-        }
-
-        private static void SkipField(ref SequenceReader<byte> reader, uint wireType, long offset)
-        {
-            switch (wireType)
-            {
-                case ProtobufWire.WireTypeVarint:
-                    _ = ReadVarUInt64(ref reader, offset, "unknown varint field");
-                    break;
-                case ProtobufWire.WireTypeFixed64:
-                    EnsureRemaining(ref reader, 8, offset, "unknown fixed64 field");
-                    reader.Advance(8);
-                    break;
-                case ProtobufWire.WireTypeLengthDelimited:
-                    var length = ReadVarUInt32(ref reader, offset, "unknown length-delimited field");
-                    EnsureRemaining(ref reader, length, offset, "unknown length-delimited field");
-                    reader.Advance(length);
-                    break;
-                case ProtobufWire.WireTypeFixed32:
-                    EnsureRemaining(ref reader, 4, offset, "unknown fixed32 field");
-                    reader.Advance(4);
-                    break;
-                default:
-                    throw new InvalidOperationException(
-                        $"Malformed protobuf log entry stream at byte offset {offset}: unsupported wire type {wireType}.");
-            }
-        }
-
-        private static uint ReadVarUInt32(ref SequenceReader<byte> reader, long offset, string fieldName)
-        {
-            uint result = 0;
-            for (var index = 0; index < 5; index++)
-            {
-                if (!reader.TryRead(out var value))
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed protobuf log entry stream at byte offset {offset}: truncated {fieldName}.");
-                }
-
-                if (index == 4 && (value & 0xF0) != 0)
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed protobuf log entry stream at byte offset {offset}: malformed {fieldName}.");
-                }
-
-                result |= (uint)(value & 0x7F) << (index * 7);
-                if ((value & 0x80) == 0)
-                {
-                    return result;
-                }
-            }
-
-            throw new InvalidOperationException(
-                $"Malformed protobuf log entry stream at byte offset {offset}: malformed {fieldName}.");
+            var logEntry = ProtobufGeneratedCodecHelpers.Parse(message, ProtobufLogEntry.Parser, "LogEntry");
+            streamId = new(ProtobufGeneratedCodecHelpers.RequireStreamUInt64(logEntry.StreamId, "stream_id"));
+            payload = new ReadOnlySequence<byte>(ProtobufGeneratedCodecHelpers.RequirePayload(logEntry.Payload).Memory);
         }
 
         private static bool TryReadVarUInt32(
@@ -364,44 +240,6 @@ internal sealed class ProtobufLogFormat : ILogFormat
 
             throw new InvalidOperationException(
                 $"Malformed protobuf log entry stream at byte offset {offset}: malformed {fieldName}.");
-        }
-
-        private static ulong ReadVarUInt64(ref SequenceReader<byte> reader, long offset, string fieldName)
-        {
-            ulong result = 0;
-            for (var index = 0; index < 10; index++)
-            {
-                if (!reader.TryRead(out var value))
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed protobuf log entry stream at byte offset {offset}: truncated {fieldName}.");
-                }
-
-                var valueBits = value & 0x7F;
-                if (index == 9 && (valueBits > 1 || (value & 0x80) != 0))
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed protobuf log entry stream at byte offset {offset}: malformed {fieldName}.");
-                }
-
-                result |= (ulong)valueBits << (index * 7);
-                if ((value & 0x80) == 0)
-                {
-                    return result;
-                }
-            }
-
-            throw new InvalidOperationException(
-                $"Malformed protobuf log entry stream at byte offset {offset}: malformed {fieldName}.");
-        }
-
-        private static void EnsureRemaining(ref SequenceReader<byte> reader, uint length, long offset, string fieldName)
-        {
-            if (length > (ulong)reader.Remaining)
-            {
-                throw new InvalidOperationException(
-                    $"Malformed protobuf log entry stream at byte offset {offset}: {fieldName} length {length} exceeds remaining input bytes {reader.Remaining}.");
-            }
         }
     }
 }

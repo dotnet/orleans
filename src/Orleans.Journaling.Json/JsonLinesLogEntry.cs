@@ -3,56 +3,21 @@ using System.Text.Json.Serialization;
 
 namespace Orleans.Journaling.Json;
 
+[JsonSourceGenerationOptions(WriteIndented = false)]
 [JsonSerializable(typeof(JsonElement))]
 [JsonSerializable(typeof(JsonLinesLogEntry))]
 internal partial class JsonLinesLogEntryJsonContext : JsonSerializerContext;
 
-internal sealed class JsonLinesLogEntry
+internal struct JsonLinesLogEntry
 {
-    private JsonElement _streamId;
-    private JsonElement _entry;
-
+    [JsonRequired]
     [JsonPropertyName("streamId")]
-    public JsonElement StreamId
-    {
-        get => _streamId;
-        set
-        {
-            if (HasStreamId)
-            {
-                DuplicatePropertyName ??= "streamId";
-            }
+    public ulong StreamId { get; set; }
 
-            _streamId = value;
-            HasStreamId = true;
-        }
-    }
-
+    [JsonRequired]
     [JsonPropertyName("entry")]
-    public JsonElement Entry
-    {
-        get => _entry;
-        set
-        {
-            if (HasEntry)
-            {
-                DuplicatePropertyName ??= "entry";
-            }
-
-            _entry = value;
-            HasEntry = true;
-        }
-    }
+    public JsonElement Entry { get; set; }
 
     [JsonExtensionData]
     public Dictionary<string, JsonElement>? ExtensionData { get; set; }
-
-    [JsonIgnore]
-    public bool HasStreamId { get; private set; }
-
-    [JsonIgnore]
-    public bool HasEntry { get; private set; }
-
-    [JsonIgnore]
-    public string? DuplicatePropertyName { get; private set; }
 }

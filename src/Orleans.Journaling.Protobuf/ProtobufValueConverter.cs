@@ -1,4 +1,5 @@
 using System.Buffers;
+using Google.Protobuf;
 
 namespace Orleans.Journaling.Protobuf;
 
@@ -100,21 +101,9 @@ public sealed class ProtobufValueConverter<T>
         WriteNonNull(value, output);
     }
 
-    internal void WriteField(IBufferWriter<byte> output, uint fieldNumber, T value)
-    {
-        if (value is not null && _nativeCodec is null)
-        {
-            ProtobufWire.WriteBytesField(output, fieldNumber, ToBytes(value));
-            return;
-        }
+    internal ByteString ToByteString(T value) => UnsafeByteOperations.UnsafeWrap(ToBytes(value));
 
-        ProtobufWire.WriteBytesField(
-            output,
-            fieldNumber,
-            Measure(value),
-            (Converter: this, Value: value),
-            static (state, writer) => state.Converter.Write(state.Value, writer));
-    }
+    internal T FromByteString(ByteString bytes) => FromBytes(new ReadOnlySequence<byte>(bytes.Memory));
 
     /// <summary>
     /// Deserializes a length-delimited payload body.

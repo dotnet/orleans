@@ -9,7 +9,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineResolver, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineResolver, ILogWriterTarget, ILogEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationLogStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -98,7 +98,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                     // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
-                    stateMachine.Reset(new ManagerLogWriter(this, new(_logStreamIds[name])));
+                    stateMachine.Reset(CreateLogWriter(new(_logStreamIds[name])));
                     foreach (var entry in vessel.FormattedEntries)
                     {
                         stateMachine.Apply(new ReadOnlySequence<byte>(entry.Payload));
@@ -381,7 +381,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                     LogRemovingRetiredStateMachine(_logger, name);
 
                     // Since we are permanently removing this state machine, we will clean it up by reseting it.
-                    stateMachine.Reset(new ManagerLogWriter(this, new(id)));
+                    stateMachine.Reset(CreateLogWriter(new(id)));
 
                     _stateMachinesMap.Remove(id);
                     // We remove these from memory only, since the snapshot will persist these changes.
@@ -399,6 +399,8 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     }
 
     private ILogSegmentWriter GetOrCreateCurrentLogSegmentWriter() => _currentLogSegmentWriter ??= _logFormat.CreateWriter();
+
+    private LogWriter CreateLogWriter(LogStreamId streamId) => new(streamId, this);
 
     private static void AppendUpdatesOrSnapshotStateMachine(ILogSegmentWriter logSegmentWriter, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
     {
@@ -532,7 +534,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             if (_stateMachines.TryGetValue(name, out var stateMachine))
             {
                 _stateMachinesMap[id] = stateMachine;
-                stateMachine.Reset(new ManagerLogWriter(this, new(id)));
+                stateMachine.Reset(CreateLogWriter(new(id)));
             }
             else
             {
@@ -567,47 +569,72 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         _currentLogSegmentWriter?.Dispose();
     }
 
-    private sealed class ManagerLogWriter(LogManager manager, LogStreamId streamId) : ILogWriter, ILogEntryWriterCompletion
+    LogEntryWriter ILogWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
     {
-        private readonly LogManager _manager = manager;
-        private readonly LogStreamId _id = streamId;
-
-        public LogEntry BeginEntry()
+        if (completion is not null)
         {
-            EnterLock();
-            try
-            {
-                return _manager.GetOrCreateCurrentLogSegmentWriter().CreateLogWriter(_id).BeginEntry(this);
-            }
-            catch
-            {
-                ExitLock();
-                throw;
-            }
+            throw new InvalidOperationException("Manager-backed log writers do not support external completion callbacks.");
         }
 
-        void ILogEntryWriterCompletion.CompleteEntryWrite() => ExitLock();
-
-        private void EnterLock()
+        EnterLock();
+        try
         {
-#if NET9_0_OR_GREATER
-            _manager._lock.Enter();
-#else
-            Monitor.Enter(_manager._lock);
-#endif
+            return GetOrCreateCurrentLogSegmentWriter().CreateLogWriter(streamId).BeginEntryWriter(this);
         }
-
-        private void ExitLock()
+        catch
         {
-#if NET9_0_OR_GREATER
-            _manager._lock.Exit();
-#else
-            Monitor.Exit(_manager._lock);
-#endif
+            ExitLock();
+            throw;
         }
     }
 
-    private readonly struct WorkItem(LogManager.WorkItemType type, TaskCompletionSource? completion)
+    void ILogWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    {
+        EnterLock();
+        try
+        {
+            GetOrCreateCurrentLogSegmentWriter().CreateLogWriter(streamId).AppendFormattedEntry(entry);
+        }
+        finally
+        {
+            ExitLock();
+        }
+    }
+
+    bool ILogWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    {
+        EnterLock();
+        try
+        {
+            return GetOrCreateCurrentLogSegmentWriter().CreateLogWriter(streamId).TryAppendFormattedEntry(entry);
+        }
+        finally
+        {
+            ExitLock();
+        }
+    }
+
+    void ILogEntryWriterCompletion.CompleteEntryWrite() => ExitLock();
+
+    private void EnterLock()
+    {
+#if NET9_0_OR_GREATER
+        _lock.Enter();
+#else
+        Monitor.Enter(_lock);
+#endif
+    }
+
+    private void ExitLock()
+    {
+#if NET9_0_OR_GREATER
+        _lock.Exit();
+#else
+        Monitor.Exit(_lock);
+#endif
+    }
+
+    private readonly struct WorkItem(WorkItemType type, TaskCompletionSource? completion)
     {
         public WorkItemType Type { get; } = type;
         public TaskCompletionSource? CompletionSource { get; } = completion;
@@ -637,7 +664,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
         private readonly LogManager _manager = manager;
 
-        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(new ManagerLogWriter(_manager, new(Id)));
+        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_manager.CreateLogWriter(new(Id)));
 
         protected override void OnSet(string key, ulong value) => _manager.OnSetLogStreamId(key, value);
     }
@@ -652,9 +679,9 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     {
         public const int Id = 1;
 
-        private readonly ManagerLogWriter _logWriter = new(manager, new(Id));
+        private readonly LogWriter _logWriter = manager.CreateLogWriter(new(Id));
 
-        protected override ILogWriter GetStorage() => _logWriter;
+        protected override LogWriter GetStorage() => _logWriter;
     }
 
     /// <summary>
@@ -687,7 +714,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             }
         }
 
-        void IDurableStateMachine.Reset(ILogWriter storage) => _formattedEntries.Clear();
+        void IDurableStateMachine.Reset(LogWriter storage) => _formattedEntries.Clear();
         void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
         {
             throw new InvalidOperationException(

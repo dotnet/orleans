@@ -1,3 +1,5 @@
+using System.Diagnostics.CodeAnalysis;
+
 namespace Orleans.Journaling;
 
 /// <summary>
@@ -7,22 +9,25 @@ namespace Orleans.Journaling;
 /// Call <see cref="Commit"/> after successfully writing the entry payload. If the scope is
 /// disposed before it is committed, the pending entry is aborted.
 /// </remarks>
-public ref struct LogEntry
+public ref struct LogEntry : IDisposable
 {
-    private LogEntryWriter? _writer;
     private bool _completed;
 
     internal LogEntry(LogEntryWriter writer)
     {
-        _writer = writer;
+        Writer = writer;
         _completed = false;
     }
 
     /// <summary>
     /// Gets the payload writer for this entry.
     /// </summary>
-    public LogEntryWriter Writer => _writer ?? throw new InvalidOperationException(
-        _completed ? "The log entry has already completed." : "The log entry scope is not active.");
+    [AllowNull]
+    public LogEntryWriter Writer
+    {
+        readonly get => field ?? throw new InvalidOperationException(_completed ? "The log entry has already completed." : "The log entry scope is not active.");
+        private set;
+    }
 
     /// <summary>
     /// Commits the pending entry, making it visible to storage.
@@ -38,7 +43,7 @@ public ref struct LogEntry
         var writer = Writer;
         writer.Commit();
         _completed = true;
-        _writer = null;
+        Writer = null;
     }
 
     /// <summary>
@@ -53,7 +58,7 @@ public ref struct LogEntry
 
         var writer = Writer;
         _completed = true;
-        _writer = null;
+        Writer = null;
         writer.Abort();
     }
 }

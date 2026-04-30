@@ -41,9 +41,9 @@ private sealed class LogStreamDirectory :
     private readonly LogManager _manager;
     private readonly IDurableDictionaryOperationCodec<string, ulong> _codec;
     private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
-    private ILogWriter? _storage;
+    private LogWriter _storage;
 
-    public void Reset(ILogWriter storage)
+    public void Reset(LogWriter storage)
     {
         _ids.Clear();
         _storage = storage;
@@ -86,7 +86,7 @@ private void BindStateMachine(string name, ulong id)
     if (_stateMachines.TryGetValue(name, out var stateMachine))
     {
         _stateMachinesMap[id] = stateMachine;
-        stateMachine.Reset(new ManagerLogWriter(this, new(id)));
+        stateMachine.Reset(CreateLogWriter(new(id)));
     }
     else
     {

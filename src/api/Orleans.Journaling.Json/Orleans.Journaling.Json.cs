@@ -15,12 +15,16 @@ namespace Orleans.Journaling.Json
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteClear(LogWriter writer) { }
 
         public void WriteRemove(TKey key, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteRemove(TKey key, LogWriter writer) { }
 
         public void WriteSet(TKey key, TValue value, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSet(TKey key, TValue value, LogWriter writer) { }
 
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, LogWriter writer) { }
     }
 
     public static partial class JsonJournalingExtensions
@@ -44,16 +48,22 @@ namespace Orleans.Journaling.Json
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteAdd(T item, LogWriter writer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteClear(LogWriter writer) { }
 
         public void WriteInsert(int index, T item, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteInsert(int index, T item, LogWriter writer) { }
 
         public void WriteRemoveAt(int index, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteRemoveAt(int index, LogWriter writer) { }
 
         public void WriteSet(int index, T item, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSet(int index, T item, LogWriter writer) { }
 
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogWriter writer) { }
     }
 
     public sealed partial class JsonQueueOperationCodec<T> : IDurableQueueOperationCodec<T>
@@ -63,12 +73,16 @@ namespace Orleans.Journaling.Json
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteClear(LogWriter writer) { }
 
         public void WriteDequeue(System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteDequeue(LogWriter writer) { }
 
         public void WriteEnqueue(T item, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteEnqueue(T item, LogWriter writer) { }
 
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogWriter writer) { }
     }
 
     public sealed partial class JsonSetOperationCodec<T> : IDurableSetOperationCodec<T>
@@ -78,12 +92,16 @@ namespace Orleans.Journaling.Json
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer) { }
 
         public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteAdd(T item, LogWriter writer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteClear(LogWriter writer) { }
 
         public void WriteRemove(T item, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteRemove(T item, LogWriter writer) { }
 
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogWriter writer) { }
     }
 
     public sealed partial class JsonStateOperationCodec<T> : IDurableStateOperationCodec<T>
@@ -93,8 +111,10 @@ namespace Orleans.Journaling.Json
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer) { }
 
         public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteClear(LogWriter writer) { }
 
         public void WriteSet(T state, ulong version, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSet(T state, ulong version, LogWriter writer) { }
     }
 
     public sealed partial class JsonTcsOperationCodec<T> : IDurableTaskCompletionSourceOperationCodec<T>
@@ -104,12 +124,16 @@ namespace Orleans.Journaling.Json
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer) { }
 
         public void WriteCanceled(System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteCanceled(LogWriter writer) { }
 
         public void WriteCompleted(T value, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteCompleted(T value, LogWriter writer) { }
 
         public void WriteFaulted(System.Exception exception, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteFaulted(System.Exception exception, LogWriter writer) { }
 
         public void WritePending(System.Buffers.IBufferWriter<byte> output) { }
+        public void WritePending(LogWriter writer) { }
     }
 
     public sealed partial class JsonValueOperationCodec<T> : IDurableValueOperationCodec<T>
@@ -119,5 +143,6 @@ namespace Orleans.Journaling.Json
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) { }
 
         public void WriteSet(T value, System.Buffers.IBufferWriter<byte> output) { }
+        public void WriteSet(T value, LogWriter writer) { }
     }
 }
