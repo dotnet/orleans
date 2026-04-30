@@ -745,7 +745,6 @@ public class ArcBufferWriterTests
         Assert.False(reader.End);
         Assert.Equal(data.Length, reader.Length);
         Assert.Equal(data.Length, reader.Remaining);
-        Assert.Equal(0, reader.Consumed);
         Assert.Equal(PageSize, reader.UnreadSpan.Length);
         Assert.True(reader.TryPeek(out var value));
         Assert.Equal(data[0], value);
@@ -754,40 +753,20 @@ public class ArcBufferWriterTests
 
         Assert.True(reader.TryRead(out value));
         Assert.Equal(data[0], value);
-        Assert.Equal(1, reader.Consumed);
         Assert.Equal(data.Length - 1, reader.Remaining);
 
         reader.Advance(PageSize - 1);
-        Assert.Equal(PageSize, reader.Consumed);
         Assert.Equal(3, reader.Length);
         Assert.Equal(data.AsSpan(PageSize, 3).ToArray(), reader.UnreadSpan.ToArray());
 
         reader.AdvanceToEnd();
         Assert.True(reader.End);
-        Assert.Equal(data.Length, reader.Consumed);
         Assert.Equal(0, reader.Remaining);
         Assert.True(reader.UnreadSpan.IsEmpty);
         Assert.False(reader.TryPeek(out value));
         Assert.Equal(0, value);
         Assert.False(reader.TryRead(out value));
         Assert.Equal(0, value);
-    }
-
-    [Fact]
-    public void ArcBufferReader_ConsumedIsRelativeToReaderCreation()
-    {
-        using var buffer = new ArcBufferWriter();
-        buffer.Write(Enumerable.Range(0, 16).Select(static i => (byte)i).ToArray());
-        buffer.AdvanceReader(4);
-        var reader = new ArcBufferReader(buffer);
-
-        Assert.Equal(0, reader.Consumed);
-        reader.Advance(3);
-        Assert.Equal(3, reader.Consumed);
-
-        var secondReader = new ArcBufferReader(buffer);
-        Assert.Equal(0, secondReader.Consumed);
-        Assert.Equal(9, secondReader.Length);
     }
 
     [Fact]
@@ -802,7 +781,6 @@ public class ArcBufferWriterTests
         Span<byte> destination = stackalloc byte[6];
         Assert.True(reader.TryCopyTo(destination));
         Assert.Equal(data.AsSpan(PageSize - 2, 6).ToArray(), destination.ToArray());
-        Assert.Equal(PageSize - 2, reader.Consumed);
         Assert.Equal(data.Length - PageSize + 2, reader.Length);
 
         Span<byte> tooLarge = stackalloc byte[32];
@@ -826,10 +804,10 @@ public class ArcBufferWriterTests
             Assert.Equal(data.AsSpan(PageSize - 2, 4).ToArray(), slice.ToArray());
         }
 
-        Assert.Equal(PageSize + 2, reader.Consumed);
+        Assert.Equal(6, reader.Length);
         Assert.False(reader.TryReadExact(reader.Length + 1, out slice));
         Assert.Equal(default, slice);
-        Assert.Equal(PageSize + 2, reader.Consumed);
+        Assert.Equal(6, reader.Length);
 
         Assert.True(reader.TryReadExact(0, out slice));
         using (slice)
@@ -837,7 +815,7 @@ public class ArcBufferWriterTests
             Assert.Equal(0, slice.Length);
         }
 
-        Assert.Equal(PageSize + 2, reader.Consumed);
+        Assert.Equal(6, reader.Length);
     }
 
     [Fact]
@@ -857,7 +835,6 @@ public class ArcBufferWriterTests
             Assert.All(line.ToArray(), value => Assert.Equal((byte)'a', value));
         }
 
-        Assert.Equal(PageSize + 1, reader.Consumed);
         Assert.Equal(1, reader.Length);
         Assert.True(reader.TryPeek(out var next));
         Assert.Equal((byte)'b', next);
@@ -880,7 +857,6 @@ public class ArcBufferWriterTests
             Assert.All(line.ToArray(), value => Assert.Equal((byte)'a', value));
         }
 
-        Assert.Equal(PageSize + 1, reader.Consumed);
         Assert.Equal(1, reader.Length);
         Assert.True(reader.TryPeek(out var next));
         Assert.Equal((byte)'b', next);
@@ -897,7 +873,6 @@ public class ArcBufferWriterTests
         Assert.False(reader.TryReadTo(out var line, (byte)0));
 
         Assert.Equal(default, line);
-        Assert.Equal(0, reader.Consumed);
         Assert.Equal(data.Length, reader.Length);
     }
 
@@ -915,7 +890,7 @@ public class ArcBufferWriterTests
             Assert.Equal(new byte[] { (byte)'a', (byte)'\\', (byte)'|', (byte)'b' }, slice.ToArray());
         }
 
-        Assert.Equal(5, reader.Consumed);
+        Assert.Equal(1, reader.Length);
         Assert.True(reader.TryPeek(out var next));
         Assert.Equal((byte)'c', next);
     }
@@ -997,7 +972,6 @@ public class ArcBufferWriterTests
 
         Assert.Equal(0, value);
         Assert.Equal(1, reader.Length);
-        Assert.Equal(0, reader.Consumed);
     }
 
     /// <summary>

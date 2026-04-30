@@ -364,7 +364,6 @@ public class JsonCodecTests
 
         Assert.False(result);
         Assert.Equal(bytes.Length, reader.Length);
-        Assert.Equal(0, reader.Consumed);
         Assert.Empty(consumer.Entries);
     }
 
