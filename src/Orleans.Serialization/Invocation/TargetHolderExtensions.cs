@@ -1,4 +1,6 @@
+#nullable enable
 using Orleans.Serialization.Invocation;
+
 namespace Orleans.Runtime;
 
 /// <summary>
