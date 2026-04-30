@@ -37,6 +37,15 @@ namespace Orleans.Serialization.Buffers
         /// <param name="session">The session.</param>
         /// <returns>A new <see cref="Writer{TBufferWriter}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static Writer<ArcBufferWriterWrapper> Create(ArcBufferWriter destination, SerializerSession session) => new(new(destination), session);
+
+        /// <summary>
+        /// Creates a writer which writes to the specified destination.
+        /// </summary>
+        /// <param name="destination">The destination.</param>
+        /// <param name="session">The session.</param>
+        /// <returns>A new <see cref="Writer{TBufferWriter}"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Writer<MemoryStreamBufferWriter> Create(MemoryStream destination, SerializerSession session) => new(new MemoryStreamBufferWriter(destination), session);
 
         /// <summary>
@@ -93,6 +102,25 @@ namespace Orleans.Serialization.Buffers
         /// <returns>A new <see cref="Writer{TBufferWriter}"/>.</returns>
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public static Writer<PooledBuffer> CreatePooled(SerializerSession session) => new(new PooledBuffer(), session);
+    }
+
+    /// <summary>
+    /// Wraps an <see cref="ArcBufferWriter"/> for use as a serialization writer target.
+    /// </summary>
+    /// <remarks>
+    /// Disposing a <see cref="Writer{TBufferWriter}"/> over this wrapper does not dispose the underlying <see cref="ArcBufferWriter"/>.
+    /// </remarks>
+    /// <param name="bufferWriter">The wrapped buffer writer.</param>
+    public readonly struct ArcBufferWriterWrapper(ArcBufferWriter bufferWriter) : IBufferWriter<byte>
+    {
+        /// <inheritdoc/>
+        public void Advance(int count) => ((IBufferWriter<byte>)bufferWriter).Advance(count);
+
+        /// <inheritdoc/>
+        public Memory<byte> GetMemory(int sizeHint = 0) => bufferWriter.GetMemory(sizeHint);
+
+        /// <inheritdoc/>
+        public Span<byte> GetSpan(int sizeHint = 0) => bufferWriter.GetSpan(sizeHint);
     }
 
     /// <summary>
