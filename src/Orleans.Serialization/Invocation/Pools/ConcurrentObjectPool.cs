@@ -1,6 +1,7 @@
+#nullable enable
 using System;
 using System.Collections.Generic;
-using System.Threading;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.ObjectPool;
 
 namespace Orleans.Serialization.Invocation
@@ -12,21 +13,20 @@ namespace Orleans.Serialization.Invocation
         }
     }
 
-    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T>, IDisposable where T : class where TPoolPolicy : IPooledObjectPolicy<T>
+    internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T> where T : class where TPoolPolicy : IPooledObjectPolicy<T>
     {
-        private readonly ThreadLocal<Stack<T>> _objects = new(() => new());
-
         private readonly TPoolPolicy _policy;
-        private int _disposed;
 
         public ConcurrentObjectPool(TPoolPolicy policy) => _policy = policy;
 
         public int MaxPoolSize { get; set; } = int.MaxValue;
 
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        private static Stack<T> GetStack() => PerThreadStack.Stack ??= new();
+
         public override T Get()
         {
-            ThrowIfDisposed();
-            var stack = _objects.Value!;
+            var stack = GetStack();
             if (stack.TryPop(out var result))
             {
                 return result;
@@ -39,21 +39,7 @@ namespace Orleans.Serialization.Invocation
         {
             if (_policy.Return(obj))
             {
-                if (Volatile.Read(ref _disposed) != 0)
-                {
-                    return;
-                }
-
-                Stack<T> stack;
-                try
-                {
-                    stack = _objects.Value!;
-                }
-                catch (ObjectDisposedException)
-                {
-                    return;
-                }
-
+                var stack = GetStack();
                 if (stack.Count < MaxPoolSize)
                 {
                     stack.Push(obj);
@@ -61,21 +47,11 @@ namespace Orleans.Serialization.Invocation
             }
         }
 
-        public void Dispose()
+        // Nested class to hold ThreadStatic field per generic type instantiation
+        private static class PerThreadStack
         {
-            if (Interlocked.Exchange(ref _disposed, 1) == 0)
-            {
-                // Clear per-thread stacks so pooled objects do not keep their owning service provider alive.
-                _objects.Dispose();
-            }
-        }
-
-        private void ThrowIfDisposed()
-        {
-            if (Volatile.Read(ref _disposed) != 0)
-            {
-                throw new ObjectDisposedException(typeof(ConcurrentObjectPool<T, TPoolPolicy>).FullName);
-            }
+            [ThreadStatic]
+            internal static Stack<T>? Stack;
         }
     }
 }

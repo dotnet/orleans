@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading.Tasks;
+using Orleans.Serialization.Activators;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Invocation;
@@ -20,6 +21,9 @@ namespace Orleans.Runtime
     /// </summary>
     public class GrainReferenceShared
     {
+        private readonly object _activatorsLock = new();
+        private object[] _activators = [];
+
         public GrainReferenceShared(
             GrainType grainType,
             GrainInterfaceType grainInterfaceType,
@@ -79,6 +83,52 @@ namespace Orleans.Runtime
         /// Gets the interface version.
         /// </summary>
         public ushort InterfaceVersion { get; }
+
+        /// <summary>
+        /// Ensures an activator exists at the specified index, creating it if necessary.
+        /// This method is thread-safe and will grow the array if needed.
+        /// </summary>
+        /// <typeparam name="TInvokable">The invokable type.</typeparam>
+        /// <param name="index">The index of the activator in the array.</param>
+        public void EnsureActivator<TInvokable>(int index)
+        {
+            var activators = _activators;
+            if (activators.Length > index && activators[index] is not null)
+            {
+                return;
+            }
+
+            lock (_activatorsLock)
+            {
+                activators = _activators;
+                if (activators.Length > index && activators[index] is not null)
+                {
+                    return;
+                }
+
+                // Grow array if necessary
+                if (activators.Length <= index)
+                {
+                    var newActivators = new object[index + 1];
+                    Array.Copy(activators, newActivators, activators.Length);
+                    activators = newActivators;
+                }
+
+                // Create the activator
+                activators[index] = CodecProvider.GetActivator<TInvokable>();
+                _activators = activators;
+            }
+        }
+
+        /// <summary>
+        /// Gets an activator from the cached array at the specified index.
+        /// Callers must ensure <see cref="EnsureActivator{TInvokable}(int)"/> has been called first.
+        /// </summary>
+        /// <typeparam name="TInvokable">The invokable type.</typeparam>
+        /// <param name="index">The index of the activator in the array.</param>
+        /// <returns>The activator for the specified invokable type.</returns>
+        public IActivator<TInvokable> GetActivator<TInvokable>(int index)
+            => (IActivator<TInvokable>)_activators[index];
     }
 
     /// <summary>
@@ -296,6 +346,21 @@ namespace Orleans.Runtime
         /// Gets the serialization codec provider.
         /// </summary>
         protected CodecProvider CodecProvider => _shared.CodecProvider;
+
+        /// <summary>
+        /// Ensures an activator exists at the specified index for the given invokable type.
+        /// </summary>
+        /// <typeparam name="TInvokable">The invokable type.</typeparam>
+        /// <param name="index">The index of the activator in the array.</param>
+        protected void EnsureActivator<TInvokable>(int index) => _shared.EnsureActivator<TInvokable>(index);
+
+        /// <summary>
+        /// Gets an activator from the cached array at the specified index.
+        /// </summary>
+        /// <typeparam name="TInvokable">The invokable type.</typeparam>
+        /// <param name="index">The index of the activator in the array.</param>
+        /// <returns>The activator for the specified invokable type.</returns>
+        protected IActivator<TInvokable> GetActivator<TInvokable>(int index) => _shared.GetActivator<TInvokable>(index);
 
         /// <summary>Initializes a new instance of the <see cref="GrainReference"/> class.</summary>
         /// <param name="shared">
