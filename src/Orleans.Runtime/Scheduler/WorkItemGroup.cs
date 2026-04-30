@@ -2,19 +2,57 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Linq;
 using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 
 namespace Orleans.Runtime.Scheduler;
 
+internal readonly struct WorkItem
+{
+    public enum WorkItemType : byte
+    {
+        Task = 0,
+        SendOrPostCallback = 1,
+        ActionOfObject = 2
+    }
+
+    public readonly object Callback;
+    public readonly object? State;
+    public readonly WorkItemType Type;
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public WorkItem(Task task)
+    {
+        Callback = task;
+        State = null;
+        Type = WorkItemType.Task;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public WorkItem(SendOrPostCallback callback, object? state)
+    {
+        Callback = callback;
+        State = state;
+        Type = WorkItemType.SendOrPostCallback;
+    }
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public WorkItem(Action<object?> callback, object? state)
+    {
+        Callback = callback;
+        State = state;
+        Type = WorkItemType.ActionOfObject;
+    }
+}
+
 [DebuggerDisplay("WorkItemGroup Context={GrainContext} State={_state}")]
-internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemScheduler
+internal sealed partial class WorkItemGroup : SynchronizationContext, IThreadPoolWorkItem, IWorkItemScheduler
 {
     private enum WorkGroupStatus : byte
     {
@@ -23,14 +61,14 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         Running = 2
     }
 
+    private readonly ILogger _log;
 #if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
 #else
     private readonly object _lockObj = new();
 #endif
-    private readonly Queue<Task> _workItems = new();
+    private readonly Queue<WorkItem> _workItems = new();
     private readonly SchedulingOptions _schedulingOptions;
-    private readonly SchedulerInstruments _schedulerInstruments;
 
     private long _totalItemsEnqueued;
     private long _totalItemsProcessed;
@@ -40,16 +78,12 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     private Task? _currentTask;
     private long _currentTaskStarted;
 
+    // Dummy task used to make TaskScheduler.Current return our scheduler
+    private readonly Task _schedulerTask;
+
     internal ActivationTaskScheduler TaskScheduler { get; }
 
     public IGrainContext GrainContext { get; set; }
-
-    internal ILogger Logger => GrainContext switch
-    {
-        ActivationData activation => activation.Shared.SchedulerLogger,
-        SystemTarget systemTarget => systemTarget.SchedulerLogger,
-        _ => GrainContext.ActivationServices.GetRequiredService<ILogger<WorkItemGroup>>()
-    };
 
     internal int ExternalWorkItemCount
     {
@@ -58,15 +92,21 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
     public WorkItemGroup(
         IGrainContext grainContext,
-        IOptions<SchedulingOptions> schedulingOptions,
-        SchedulerInstruments schedulerInstruments)
+        ILogger<WorkItemGroup> logger,
+        ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
+        IOptions<SchedulingOptions> schedulingOptions)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         GrainContext = grainContext;
         _schedulingOptions = schedulingOptions.Value;
-        _schedulerInstruments = schedulerInstruments;
         _state = WorkGroupStatus.Waiting;
-        TaskScheduler = new ActivationTaskScheduler(this);
+        _log = logger;
+        TaskScheduler = new ActivationTaskScheduler(this, activationTaskSchedulerLogger);
+
+        // Create a dummy task associated with our scheduler (never actually runs)
+        // We set m_taskScheduler directly so TaskScheduler.Current returns our scheduler
+        _schedulerTask = new Task(() => { }, TaskCreationOptions.None);
+        GetTaskSchedulerRef(_schedulerTask) = TaskScheduler;
     }
 
     /// <summary>
@@ -77,19 +117,23 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     public void EnqueueTask(Task task)
     {
 #if DEBUG
-        var logger = Logger;
-        if (logger.IsEnabled(LogLevel.Trace))
+        if (_log.IsEnabled(LogLevel.Trace))
         {
-            LogTraceEnqueueWorkItem(logger, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
+            LogTraceEnqueueWorkItem(_log, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
         }
 #endif
 
+        EnqueueWorkItem(new WorkItem(task));
+    }
+
+    private void EnqueueWorkItem(WorkItem workItem)
+    {
         lock (_lockObj)
         {
             long thisSequenceNumber = _totalItemsEnqueued++;
             int count = _workItems.Count;
 
-            _workItems.Enqueue(task);
+            _workItems.Enqueue(workItem);
             int maxPendingItemsLimit = _schedulingOptions.MaxPendingWorkItemsSoftLimit;
             if (maxPendingItemsLimit > 0 && count > maxPendingItemsLimit)
             {
@@ -109,10 +153,12 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
             _state = WorkGroupStatus.Runnable;
 #if DEBUG
-            var runQueueLogger = Logger;
-            if (runQueueLogger.IsEnabled(LogLevel.Trace))
+            if (_log.IsEnabled(LogLevel.Trace))
             {
-                LogTraceAddToRunQueue(runQueueLogger, task, thisSequenceNumber, GrainContext);
+                _log.LogTrace(
+                    "Add to RunQueue #{SequenceNumber}, onto {GrainContext}",
+                    thisSequenceNumber,
+                    GrainContext);
             }
 #endif
             ScheduleExecution(this);
@@ -122,7 +168,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTooManyTasksInQueue(int count, int maxPendingItemsLimit)
     {
-        LogWarningTooManyPendingItems(Logger, count, GrainContext?.ToString() ?? "Unknown", maxPendingItemsLimit);
+        LogWarningTooManyPendingItems(_log, count, GrainContext?.ToString() ?? "Unknown", maxPendingItemsLimit);
     }
 
     /// <summary>
@@ -130,9 +176,12 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     /// </summary>
     internal IEnumerable<Task> GetScheduledTasks()
     {
-        foreach (var task in _workItems)
+        lock (_lockObj)
         {
-            yield return task;
+            var tasks = _workItems
+                .Where(item => item.Type == WorkItem.WorkItemType.Task)
+                .Select(item => Unsafe.As<Task>(item.Callback));
+            return [.. tasks];
         }
     }
 
@@ -142,6 +191,11 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     public void Execute()
     {
         RuntimeContext.SetExecutionContext(GrainContext, out var originalContext);
+
+        // Set t_currentTask so TaskScheduler.Current returns our ActivationTaskScheduler
+        var previousTask = GetCurrentTask();
+        SetCurrentTask(_schedulerTask);
+
         var turnWarningDurationMs = (long)Math.Ceiling(_schedulingOptions.TurnWarningLengthThreshold.TotalMilliseconds);
         var activationSchedulingQuantumMs = (long)_schedulingOptions.ActivationSchedulingQuantum.TotalMilliseconds;
         try
@@ -152,7 +206,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
             loopStart = taskStart = taskEnd = Environment.TickCount64;
             do
             {
-                Task task;
+                WorkItem workItem;
                 lock (_lockObj)
                 {
                     _state = WorkGroupStatus.Running;
@@ -160,7 +214,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
                     // Get the first Work Item on the list
                     if (_workItems.Count > 0)
                     {
-                        _currentTask = task = _workItems.Dequeue();
+                        workItem = _workItems.Dequeue();
                         _currentTaskStarted = taskStart;
                     }
                     else
@@ -170,12 +224,27 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
                     }
                 }
 
-#if DEBUG
-                LogTaskStart(task);
-#endif
                 try
                 {
-                    TaskScheduler.RunTaskFromWorkItemGroup(task);
+                    switch (workItem.Type)
+                    {
+                        case WorkItem.WorkItemType.Task:
+                            {
+                                var task = Unsafe.As<Task>(workItem.Callback);
+                                _currentTask = task;
+#if DEBUG
+                                LogTaskStart(task);
+#endif
+                                TaskScheduler.RunTaskFromWorkItemGroup(task);
+                            }
+                            break;
+                        case WorkItem.WorkItemType.SendOrPostCallback:
+                            Unsafe.As<SendOrPostCallback>(workItem.Callback)(workItem.State);
+                            break;
+                        case WorkItem.WorkItemType.ActionOfObject:
+                            Unsafe.As<Action<object?>>(workItem.Callback)(workItem.State);
+                            break;
+                    }
                 }
                 finally
                 {
@@ -185,8 +254,11 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
                     taskStart = taskEnd;
                     if (taskDurationMs > turnWarningDurationMs)
                     {
-                        _schedulerInstruments.OnLongRunningTurn();
-                        LogLongRunningTurn(task, taskDurationMs);
+                        SchedulerInstruments.LongRunningTurnsCounter.Add(1);
+                        if (workItem.Type == WorkItem.WorkItemType.Task)
+                        {
+                            LogLongRunningTurn(Unsafe.As<Task>(workItem.Callback), taskDurationMs);
+                        }
                     }
 
                     _currentTask = null;
@@ -215,7 +287,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
                     _state = WorkGroupStatus.Waiting;
                 }
             }
-
+            SetCurrentTask(previousTask);
             RuntimeContext.ResetExecutionContext(originalContext);
         }
     }
@@ -224,10 +296,9 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskStart(Task task)
     {
-        var logger = Logger;
-        if (logger.IsEnabled(LogLevel.Trace))
+        if (_log.IsEnabled(LogLevel.Trace))
         {
-            LogTraceAboutToExecuteTask(logger, task, GrainContext);
+            LogTraceAboutToExecuteTask(_log, task, GrainContext);
         }
     }
 #endif
@@ -235,7 +306,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskLoopError(Exception ex)
     {
-        LogErrorTaskLoop(Logger, ex, Environment.CurrentManagedThreadId);
+        LogErrorTaskLoop(_log, ex, Environment.CurrentManagedThreadId);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -248,7 +319,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
         LogWarningLongRunningTurn(
-            Logger,
+            _log,
             task.AsyncState ?? task,
             GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),
@@ -291,8 +362,8 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public static void ScheduleExecution(WorkItemGroup workItem) => ThreadPool.UnsafeQueueUserWorkItem(workItem, preferLocal: true);
 
-    public void QueueAction(Action action) => TaskScheduler.QueueAction(action);
-    public void QueueAction(Action<object> action, object state) => TaskScheduler.QueueAction(action, state);
+    public void QueueAction(Action action) => EnqueueWorkItem(new WorkItem((Action<object?>)(static state => ((Action)state!)()), action));
+    public void QueueAction(Action<object?> action, object? state) => EnqueueWorkItem(new WorkItem(action, state));
     public void QueueTask(Task task) => task.Start(TaskScheduler);
 
     [LoggerMessage(
@@ -333,4 +404,46 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         Message = "Task {Task} in WorkGroup {GrainContext} took elapsed time {Duration} for execution, which is longer than {TurnWarningLengthThreshold}. Running on thread {Thread}"
     )]
     private static partial void LogWarningLongRunningTurn(ILogger logger, object task, string grainContext, string duration, TimeSpan turnWarningLengthThreshold, string thread);
+
+    #region SynchronizationContext overrides
+
+    /// <summary>
+    /// Asynchronously posts a callback to be executed on this WorkItemGroup.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public override void Post(SendOrPostCallback d, object? state) => EnqueueWorkItem(new WorkItem(d, state));
+
+    /// <summary>
+    /// Synchronously sends a callback. Not supported - throws.
+    /// </summary>
+    public override void Send(SendOrPostCallback d, object? state) => throw new NotSupportedException();
+
+    /// <summary>
+    /// Creates a copy (returns same instance for single-threaded behavior).
+    /// </summary>
+    public override SynchronizationContext CreateCopy() => this;
+
+    #endregion
+
+    #region UnsafeAccessor methods for Task internals
+
+    /// <summary>
+    /// Gets a reference to the thread-static Task.t_currentTask field.
+    /// </summary>
+    [UnsafeAccessor(UnsafeAccessorKind.StaticField, Name = "t_currentTask")]
+    private static extern ref Task? GetCurrentTaskRef(Task? _);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static Task? GetCurrentTask() => GetCurrentTaskRef(null);
+
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    private static void SetCurrentTask(Task? task) => GetCurrentTaskRef(null) = task;
+
+    /// <summary>
+    /// Sets the internal m_taskScheduler field on a Task.
+    /// </summary>
+    [UnsafeAccessor(UnsafeAccessorKind.Field, Name = "m_taskScheduler")]
+    private static extern ref TaskScheduler? GetTaskSchedulerRef(Task task);
+
+    #endregion
 }

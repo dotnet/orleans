@@ -8,6 +8,6 @@ namespace Orleans.Runtime.Scheduler
         IGrainContext GrainContext { get; }
         void Execute();
 
-        internal static readonly Action<object> ExecuteWorkItem = state => ((IWorkItem)state).Execute();
+        internal static readonly Action<object?> ExecuteWorkItem = state => ((IWorkItem)state!).Execute();
     }
 }
