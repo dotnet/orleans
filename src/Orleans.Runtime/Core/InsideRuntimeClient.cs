@@ -258,10 +258,10 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IGrainContext target, Message message)
         {
-            var disposeBody = message.BodyObject is IInvokable;
-            if (disposeBody)
+            var request = message.BodyObject as IInvokable;
+            if (request is not null)
             {
-                message.DisposeBodyObject = true;
+                message.DisposeBodyObject = false;
             }
 
             try
@@ -353,9 +353,13 @@ namespace Orleans.Runtime
             }
             finally
             {
-                if (disposeBody)
+                if (request is not null)
                 {
-                    message.DisposeBody();
+                    request.Dispose();
+                    if (ReferenceEquals(message.BodyObject, request))
+                    {
+                        message.BodyObject = null;
+                    }
                 }
             }
         }

@@ -253,10 +253,10 @@ namespace Orleans
 
             private async Task ProcessMessageAsync(Message message)
             {
-                var disposeBody = message.BodyObject is IInvokable;
-                if (disposeBody)
+                var invokable = message.BodyObject as IInvokable;
+                if (invokable is not null)
                 {
-                    message.DisposeBodyObject = true;
+                    message.DisposeBodyObject = false;
                 }
 
                 try
@@ -326,9 +326,13 @@ namespace Orleans
                 }
                 finally
                 {
-                    if (disposeBody)
+                    if (invokable is not null)
                     {
-                        message.DisposeBody();
+                        invokable.Dispose();
+                        if (ReferenceEquals(message.BodyObject, invokable))
+                        {
+                            message.BodyObject = null;
+                        }
                     }
 
                     // Clear the running request when done.
