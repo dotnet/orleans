@@ -374,12 +374,25 @@ namespace Orleans.Runtime.Messaging
                         {
                             throw;
                         }
+
+                        if (message is not null)
+                        {
+                            inflight.Remove(message);
+                            message = null;
+                        }
                     }
 
                     var flushResult = await output.FlushAsync();
                     if (flushResult.IsCompleted || flushResult.IsCanceled)
                     {
                         break;
+                    }
+
+                    // Release the send pipeline's reference after bytes have been flushed.
+                    foreach (var msg in inflight)
+                    {
+                        msg.MarkTransferred("Connection.ProcessOutgoing:Sent");
+                        msg.Release();
                     }
 
                     inflight.Clear();
@@ -490,6 +503,8 @@ namespace Orleans.Runtime.Messaging
                 response.BodyObject = Response.FromException(exception);
 
                 this.MessageCenter.DispatchLocalMessage(response);
+                message.MarkTransferred("Connection.HandleSendMessageFailure:RequestFailed");
+                message.Release();
             }
             else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
             {
@@ -509,6 +524,8 @@ namespace Orleans.Runtime.Messaging
                     message);
 
                 MessagingInstruments.OnDroppedSentMessage(message);
+                message.MarkTransferred("Connection.HandleSendMessageFailure:Dropped");
+                message.Release();
             }
 
             return true;

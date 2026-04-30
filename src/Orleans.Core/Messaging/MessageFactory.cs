@@ -32,16 +32,14 @@ namespace Orleans.Runtime
 
         public Message CreateMessage(object body, InvokeMethodOptions options)
         {
-            var message = new Message
-            {
-                Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request,
-                Id = GetNextCorrelationId(),
-                IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0,
-                IsUnordered = (options & InvokeMethodOptions.Unordered) != 0,
-                IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
-                BodyObject = body,
-                RequestContextData = RequestContextExtensions.Export(_deepCopier),
-            };
+            var message = MessagePool.Get();
+            message.Direction = (options & InvokeMethodOptions.OneWay) != 0 ? Message.Directions.OneWay : Message.Directions.Request;
+            message.Id = GetNextCorrelationId();
+            message.IsReadOnly = (options & InvokeMethodOptions.ReadOnly) != 0;
+            message.IsUnordered = (options & InvokeMethodOptions.Unordered) != 0;
+            message.IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0;
+            message.BodyObject = body;
+            message.RequestContextData = RequestContextExtensions.Export(_deepCopier);
 
             _messagingTrace.OnCreateMessage(message);
             return message;
@@ -55,21 +53,19 @@ namespace Orleans.Runtime
 
         public Message CreateResponseMessage(Message request)
         {
-            var response = new Message
-            {
-                IsSystemMessage = request.IsSystemMessage,
-                Direction = Message.Directions.Response,
-                Id = request.Id,
-                IsReadOnly = request.IsReadOnly,
-                IsAlwaysInterleave = request.IsAlwaysInterleave,
-                TargetSilo = request.SendingSilo,
-                TargetGrain = request.SendingGrain,
-                SendingSilo = request.TargetSilo,
-                SendingGrain = request.TargetGrain,
-                CacheInvalidationHeader = request.CacheInvalidationHeader,
-                TimeToLive = request.TimeToLive,
-                RequestContextData = RequestContextExtensions.Export(_deepCopier),
-            };
+            var response = MessagePool.Get();
+            response.IsSystemMessage = request.IsSystemMessage;
+            response.Direction = Message.Directions.Response;
+            response.Id = request.Id;
+            response.IsReadOnly = request.IsReadOnly;
+            response.IsAlwaysInterleave = request.IsAlwaysInterleave;
+            response.TargetSilo = request.SendingSilo;
+            response.TargetGrain = request.SendingGrain;
+            response.SendingSilo = request.TargetSilo;
+            response.SendingGrain = request.TargetGrain;
+            response.CacheInvalidationHeader = request.CacheInvalidationHeader;
+            response.TimeToLive = request.TimeToLive;
+            response.RequestContextData = RequestContextExtensions.Export(_deepCopier);
 
             _messagingTrace.OnCreateMessage(response);
             return response;

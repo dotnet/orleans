@@ -336,6 +336,8 @@ namespace Orleans
                     }
                 }
 
+                // Release the status response message - it's been fully processed
+                response.ReleaseDropped("StatusResponseHandled");
                 return;
             }
 
@@ -347,10 +349,13 @@ namespace Orleans
                 // Unfortunately, it is not enough, since CallContext.LogicalGetData will not flow "up" from task completion source into the resolved task.
                 // RequestContextExtensions.Import(response.RequestContextData);
                 callbackData.DoCallback(response);
+                response.MarkTransferred("OutsideRuntimeClient.ReceiveResponse:AfterDoCallback");
+                response.Release();
             }
             else
             {
                 LogDebugNoCallbackForResponseMessage(logger, response);
+                response.ReleaseDropped("NoCallbackNotFound");
             }
         }
 

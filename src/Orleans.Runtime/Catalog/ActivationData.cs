@@ -1088,6 +1088,7 @@ internal sealed partial class ActivationData :
                             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Transient, exception);
                         }
 
+                        message.ReleaseDropped("SchedulingException");
                         _waitingRequests.RemoveAt(i);
                         continue;
                     }
@@ -1496,6 +1497,11 @@ internal sealed partial class ActivationData :
 
         // Signal the message pump to see if there is another request which can be processed now that this one has completed
         _workSignal.Signal();
+
+        // Release the message - for local messages, CallbackData still holds a ref so it won't return to pool yet.
+        // For remote messages, this is the terminal owner so it returns to pool.
+        message.MarkTransferred("ActivationData.OnCompletedRequest");
+        message.Release();
     }
 
     public void ReceiveMessage(object message) => ReceiveMessage((Message)message);
@@ -1508,6 +1514,7 @@ internal sealed partial class ActivationData :
         {
             MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Dispatch);
+            message.ReleaseDropped("ExpiredAtDispatch");
             return;
         }
 
@@ -1546,6 +1553,7 @@ internal sealed partial class ActivationData :
         {
             MessagingProcessingInstruments.OnDispatcherMessageProcessedError(message);
             _shared.InternalRuntime.MessageCenter.RejectMessage(message, Message.RejectionTypes.Overloaded, overloadException, "Target activation is overloaded " + this);
+            message.ReleaseDropped("RejectedOverload");
             return;
         }
 

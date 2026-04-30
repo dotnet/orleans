@@ -81,6 +81,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
+                msg.ReleaseDropped("ExpiredAtReceive");
                 return;
             }
 
@@ -92,12 +93,14 @@ namespace Orleans.Runtime.Messaging
                 if (msg.Direction != Message.Directions.Request)
                 {
                     this.MessagingTrace.OnDropBlockedApplicationMessage(msg);
+                    msg.ReleaseDropped("BlockedApplicationMessage");
                     return;
                 }
 
                 MessagingInstruments.OnRejectedMessage(msg);
                 var rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, "Silo stopping", new SiloUnavailableException());
                 this.Send(rejection);
+                msg.ReleaseDropped("RejectedSiloStopping");
                 return;
             }
 
@@ -134,8 +137,14 @@ namespace Orleans.Runtime.Messaging
                 }
 
                 this.Send(rejection);
+                msg.ReleaseDropped("RejectedObsoleteEpoch");
 
                 LogDebugRejectingObsoleteRequest(this.Log, msg.TargetSilo?.ToString() ?? "null", this.LocalSiloAddress.ToString(), msg);
+            }
+            else
+            {
+                // Response or OneWay to obsolete epoch - drop it
+                msg.ReleaseDropped("DroppedObsoleteEpoch");
             }
         }
 
@@ -153,6 +162,7 @@ namespace Orleans.Runtime.Messaging
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable,
                     $"The target silo is no longer active: target was {msg.TargetSilo}, but this silo is {LocalSiloAddress}. The rejected ping message is {msg}.");
                 this.Send(rejection);
+                msg.ReleaseDropped("RejectedPingObsoleteEpoch");
             }
             else
             {
@@ -160,6 +170,8 @@ namespace Orleans.Runtime.Messaging
                 var response = this.MessageFactory.CreateResponseMessage(msg);
                 response.BodyObject = PingResponse;
                 this.Send(response);
+                msg.MarkTransferred("SiloConnection.HandlePingMessage");
+                msg.Release();
             }
         }
 
@@ -234,6 +246,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                msg.ReleaseDropped("ExpiredAtSend");
 
                 if (msg.IsPing())
                 {
@@ -277,10 +290,12 @@ namespace Orleans.Runtime.Messaging
                     Message.RejectionTypes.Transient,
                     $"Silo {this.LocalSiloAddress} is rejecting message: {msg}. Reason = {reason}",
                     new SiloUnavailableException());
+                msg.ReleaseDropped("FailedSendRequest");
             }
             else
             {
                 this.MessagingTrace.OnSiloDropSendingMessage(this.LocalSiloAddress, msg, reason);
+                msg.ReleaseDropped("FailedSendNonRequest");
             }
         }
 

@@ -198,6 +198,8 @@ namespace Orleans.Runtime
             if (request.IsExpired)
             {
                 this.messagingTrace.OnDropExpiredMessage(request, MessagingInstruments.Phase.Respond);
+                // Note: We don't release here because the request message is still owned by the activation.
+                // It will be released in ActivationData.OnCompletedRequest when invoke completes.
                 return;
             }
 
@@ -264,6 +266,8 @@ namespace Orleans.Runtime
                 if (message.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                    // Note: We don't release here because the message is still owned by the activation.
+                    // It will be released in ActivationData.OnCompletedRequest when this method returns.
                     return;
                 }
 
@@ -413,6 +417,7 @@ namespace Orleans.Runtime
                         break;
                     case Message.RejectionTypes.CacheInvalidation when message.HasCacheInvalidationHeader:
                         // The message targeted an invalid (eg, defunct) activation and this response serves only to invalidate this silo's activation cache.
+                        message.ReleaseDropped("CacheInvalidationResponse");
                         return;
                     default:
                         LogErrorUnsupportedRejectionType(this.logger, rejection.RejectionType);
@@ -452,6 +457,7 @@ namespace Orleans.Runtime
                     }
                 }
 
+                message.ReleaseDropped("StatusResponseHandled");
                 return;
             }
 
@@ -462,11 +468,16 @@ namespace Orleans.Runtime
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
                 // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
                 callbackData.DoCallback(message);
+                message.MarkTransferred("InsideRuntimeClient.ReceiveResponse:AfterDoCallback");
+                message.Release();
             }
             else
             {
                 LogDebugNoCallbackForResponse(this.logger, message);
+                message.MarkTransferred("InsideRuntimeClient.ReceiveResponse:NoCallbackNotFound");
+                message.Release();
             }
+
         }
 
         public string CurrentActivationIdentity => RuntimeContext.Current?.Address.ToString() ?? this.HostedClient.ToString();

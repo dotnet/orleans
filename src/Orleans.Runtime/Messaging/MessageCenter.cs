@@ -143,6 +143,7 @@ namespace Orleans.Runtime.Messaging
             {
                 // Drop the message on the floor if it's an application message that isn't a rejection
                 this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                msg.ReleaseDropped("BlockedApplicationMessage");
             }
             else
             {
@@ -159,6 +160,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                    msg.ReleaseDropped("ExpiredAtSend");
                     return;
                 }
 
@@ -532,8 +534,8 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
-                    targetActivation.ReceiveMessage(msg);
                     _messageObserver?.Invoke(msg);
+                    targetActivation.ReceiveMessage(msg);
                 }
             }
             catch (Exception ex)
