@@ -1,4 +1,5 @@
 using System.Diagnostics.CodeAnalysis;
+using System.Threading;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -61,7 +62,7 @@ internal partial class ActivationDataActivatorProvider(
         private readonly IServiceProvider _serviceProvider;
         private readonly GrainTypeSharedContext _sharedComponents;
         private readonly Func<IGrainContext, WorkItemGroup> _createWorkItemGroup;
-        private readonly Action<object?> _startActivation;
+        private readonly SendOrPostCallback _startActivation;
 
         public ActivationDataActivator(
             IGrainActivator grainActivator,
@@ -82,7 +83,7 @@ internal partial class ActivationDataActivatorProvider(
                 _workItemGroupLogger,
                 _activationTaskSchedulerLogger,
                 _schedulingOptions);
-             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
+            _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
 
         public IGrainContext CreateContext(GrainAddress activationAddress)
@@ -94,12 +95,7 @@ internal partial class ActivationDataActivatorProvider(
                 _sharedComponents);
 
             using var ecSuppressor = ExecutionContext.SuppressFlow();
-            _ = Task.Factory.StartNew(
-                _startActivation,
-                context,
-                CancellationToken.None,
-                TaskCreationOptions.DenyChildAttach,
-                context.ActivationTaskScheduler);
+            context.WorkItemGroup.Post(_startActivation, context);
             return context;
         }
     }
