@@ -254,7 +254,8 @@ namespace Orleans
             private async Task ProcessMessageAsync(Message message)
             {
                 var invokable = message.BodyObject as IInvokable;
-                if (invokable is not null)
+                var disposeInvokable = invokable is not null && message.DisposeBodyObject;
+                if (disposeInvokable)
                 {
                     message.DisposeBodyObject = false;
                 }
@@ -326,9 +327,9 @@ namespace Orleans
                 }
                 finally
                 {
-                    if (invokable is not null)
+                    if (disposeInvokable)
                     {
-                        invokable.Dispose();
+                        invokable!.Dispose();
                         if (ReferenceEquals(message.BodyObject, invokable))
                         {
                             message.BodyObject = null;

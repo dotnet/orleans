@@ -259,7 +259,8 @@ namespace Orleans.Runtime
         public async Task Invoke(IGrainContext target, Message message)
         {
             var request = message.BodyObject as IInvokable;
-            if (request is not null)
+            var disposeRequest = request is not null && message.DisposeBodyObject;
+            if (disposeRequest)
             {
                 message.DisposeBodyObject = false;
             }
@@ -353,7 +354,7 @@ namespace Orleans.Runtime
             }
             finally
             {
-                if (request is not null)
+                if (disposeRequest)
                 {
                     request.Dispose();
                     if (ReferenceEquals(message.BodyObject, request))

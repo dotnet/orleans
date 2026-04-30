@@ -140,6 +140,12 @@ namespace Orleans.Runtime.Messaging
                 var bodyCodec = _codecProvider.GetCodec(field.FieldType);
                 message.BodyObject = bodyCodec.ReadValue(ref reader, field);
             }
+
+            if (message.Direction is Directions.Request or Directions.OneWay)
+            {
+                message.DisposeBodyObject = message.BodyObject is IInvokable;
+                message.BodyObjectIsShared = false;
+            }
         }
 
         private ResponseCodec GetRawCodec(Type fieldType)

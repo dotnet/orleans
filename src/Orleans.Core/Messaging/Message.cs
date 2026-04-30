@@ -22,6 +22,12 @@ namespace Orleans.Runtime
         [NonSerialized]
         internal bool DisposeBodyObject;
 
+        /// <summary>
+        /// Indicates that <see cref="BodyObject"/> is shared with the local sender.
+        /// </summary>
+        [NonSerialized]
+        internal bool BodyObjectIsShared;
+
         public CoarseStopwatch _timeToExpiry;
 
         public object? BodyObject { get; set; }
@@ -387,6 +393,7 @@ grow:
             {
                 (BodyObject as IDisposable)?.Dispose();
                 DisposeBodyObject = false;
+                BodyObjectIsShared = false;
                 BodyObject = null;
             }
         }
@@ -400,6 +407,7 @@ grow:
             _timeToExpiry = default;
             DisposeBody();
             BodyObject = null;
+            BodyObjectIsShared = false;
             _headers = default;
             _id = default;
             _requestContextData = null;
