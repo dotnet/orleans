@@ -190,6 +190,41 @@ internal class Program
         {
             new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 1000).GetAwaiter().GetResult();
         },
+        ["AdaptivePing"] = _ =>
+        {
+            // Default: HostedClient mode with hill climbing concurrency tuning
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.HostedClient);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_HostedClient"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.HostedClient);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_ClientToOneSilo"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.ExternalClient, numSilos: 1);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_ClientToTwoSilos"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.ExternalClient, numSilos: 2);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_SiloToSilo"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.SiloToSilo, numSilos: 2);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_All"] = _ =>
+        {
+            AdaptivePingBenchmark.RunAllScenariosAsync().GetAwaiter().GetResult();
+        },
         ["ConcurrentPing_OneSilo_Forever"] = _ =>
         {
             new PingBenchmark(numSilos: 1, startClient: true).PingConcurrentForever().GetAwaiter().GetResult();
