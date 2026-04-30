@@ -3,6 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Diagnostics.CodeAnalysis;
 using System.Runtime.CompilerServices;
+using System.Threading;
 
 namespace Orleans.Serialization.Invocation
 {
@@ -11,12 +12,25 @@ namespace Orleans.Serialization.Invocation
     /// Registered as an open generic singleton and injected into generated activators.
     /// </summary>
     /// <typeparam name="T">The invokable type.</typeparam>
-    public sealed class InvokablePool<T> where T : class, IInvokable
+    public sealed class InvokablePool<T> : IDisposable where T : class, IInvokable
     {
         private const int MaxPoolSizePerThread = 128;
+        private readonly ThreadLocal<Stack<T>> _perThreadStack = new(static () => new());
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Stack<T> GetStack() => PerThreadStack.Stack ??= new();
+        private bool TryGetStack([NotNullWhen(true)] out Stack<T>? stack)
+        {
+            try
+            {
+                stack = _perThreadStack.Value;
+                return stack is not null;
+            }
+            catch (ObjectDisposedException)
+            {
+                stack = null;
+                return false;
+            }
+        }
 
         /// <summary>
         /// Tries to get an instance from the pool.
@@ -25,8 +39,13 @@ namespace Orleans.Serialization.Invocation
         /// <returns>True if an item was retrieved from the pool; false if the pool was empty.</returns>
         public bool TryGet([NotNullWhen(true)] out T? item)
         {
-            var stack = GetStack();
-            return stack.TryPop(out item);
+            if (TryGetStack(out var stack))
+            {
+                return stack.TryPop(out item);
+            }
+
+            item = null;
+            return false;
         }
 
         /// <summary>
@@ -35,19 +54,14 @@ namespace Orleans.Serialization.Invocation
         /// <param name="item">The item to return.</param>
         public void Return(T item)
         {
-            var stack = GetStack();
-            if (stack.Count < MaxPoolSizePerThread)
+            if (TryGetStack(out var stack) && stack.Count < MaxPoolSizePerThread)
             {
                 stack.Push(item);
             }
         }
 
-        // Nested class to hold ThreadStatic field per generic type instantiation
-        private static class PerThreadStack
-        {
-            [ThreadStatic]
-            internal static Stack<T>? Stack;
-        }
+        /// <inheritdoc />
+        public void Dispose() => _perThreadStack.Dispose();
     }
 
     /// <summary>

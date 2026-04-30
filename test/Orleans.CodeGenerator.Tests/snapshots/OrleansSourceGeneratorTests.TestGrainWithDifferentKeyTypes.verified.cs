@@ -1,4 +1,4 @@
-#pragma warning disable CS1591, RS0016, RS0041
+﻿#pragma warning disable CS1591, RS0016, RS0041
 [assembly: global::Orleans.ApplicationPartAttribute("TestProject")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Core.Abstractions")]
 [assembly: global::Orleans.ApplicationPartAttribute("Orleans.Serialization")]
@@ -9,6 +9,7 @@ namespace OrleansCodeGen.TestProject
 {
     using global::Orleans.Serialization.Codecs;
     using global::Orleans.Serialization.GeneratedCodeHelpers;
+    using global::Orleans.Serialization.Invocation;
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     [global::Orleans.CompoundTypeAliasAttribute("inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::TestProject.IMyGrainWithGuidKey), "8F0FEC0E")]
@@ -16,6 +17,12 @@ namespace OrleansCodeGen.TestProject
     {
         global::TestProject.IMyGrainWithGuidKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithGuidKey), "GetGuidValue", null, null);
+        private readonly InvokablePool<Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> _pool;
+        public Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E(InvokablePool<Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> pool) : base()
+        {
+            _pool = pool;
+        }
+
         public override string GetMethodName() => "GetGuidValue";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithGuidKey";
         public override string GetActivityName() => "IMyGrainWithGuidKey/GetGuidValue";
@@ -26,6 +33,7 @@ namespace OrleansCodeGen.TestProject
         public override void Dispose()
         {
             _target = default;
+            _pool.Return(this);
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Guid> InvokeInner() => _target.GetGuidValue();
@@ -36,11 +44,12 @@ namespace OrleansCodeGen.TestProject
     {
         public Proxy_IMyGrainWithGuidKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
+            EnsureActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E>(0);
         }
 
         global::System.Threading.Tasks.Task<global::System.Guid> global::TestProject.IMyGrainWithGuidKey.GetGuidValue()
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E();
+            var request = GetActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E>(0).Create();
             return base.InvokeAsync<global::System.Guid>(request).AsTask();
         }
     }
@@ -51,6 +60,12 @@ namespace OrleansCodeGen.TestProject
     {
         global::TestProject.IMyGrainWithStringKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithStringKey), "GetStringKey", null, null);
+        private readonly InvokablePool<Invokable_IMyGrainWithStringKey_GrainReference_43570316> _pool;
+        public Invokable_IMyGrainWithStringKey_GrainReference_43570316(InvokablePool<Invokable_IMyGrainWithStringKey_GrainReference_43570316> pool) : base()
+        {
+            _pool = pool;
+        }
+
         public override string GetMethodName() => "GetStringKey";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithStringKey";
         public override string GetActivityName() => "IMyGrainWithStringKey/GetStringKey";
@@ -61,6 +76,7 @@ namespace OrleansCodeGen.TestProject
         public override void Dispose()
         {
             _target = default;
+            _pool.Return(this);
         }
 
         protected override global::System.Threading.Tasks.Task<string> InvokeInner() => _target.GetStringKey();
@@ -71,11 +87,12 @@ namespace OrleansCodeGen.TestProject
     {
         public Proxy_IMyGrainWithStringKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
+            EnsureActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316>(0);
         }
 
         global::System.Threading.Tasks.Task<string> global::TestProject.IMyGrainWithStringKey.GetStringKey()
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316();
+            var request = GetActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316>(0).Create();
             return base.InvokeAsync<string>(request).AsTask();
         }
     }
@@ -86,6 +103,12 @@ namespace OrleansCodeGen.TestProject
     {
         global::TestProject.IMyGrainWithGuidCompoundKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithGuidCompoundKey), "GetGuidAndStringKey", null, null);
+        private readonly InvokablePool<Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> _pool;
+        public Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF(InvokablePool<Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> pool) : base()
+        {
+            _pool = pool;
+        }
+
         public override string GetMethodName() => "GetGuidAndStringKey";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithGuidCompoundKey";
         public override string GetActivityName() => "IMyGrainWithGuidCompoundKey/GetGuidAndStringKey";
@@ -96,6 +119,7 @@ namespace OrleansCodeGen.TestProject
         public override void Dispose()
         {
             _target = default;
+            _pool.Return(this);
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> InvokeInner() => _target.GetGuidAndStringKey();
@@ -106,11 +130,12 @@ namespace OrleansCodeGen.TestProject
     {
         public Proxy_IMyGrainWithGuidCompoundKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
+            EnsureActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF>(0);
         }
 
         global::System.Threading.Tasks.Task<global::System.Tuple<global::System.Guid, string>> global::TestProject.IMyGrainWithGuidCompoundKey.GetGuidAndStringKey()
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF();
+            var request = GetActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF>(0).Create();
             return base.InvokeAsync<global::System.Tuple<global::System.Guid, string>>(request).AsTask();
         }
     }
@@ -121,6 +146,12 @@ namespace OrleansCodeGen.TestProject
     {
         global::TestProject.IMyGrainWithIntegerCompoundKey _target;
         private static readonly global::System.Reflection.MethodInfo MethodBackingField = OrleansGeneratedCodeHelper.GetMethodInfoOrDefault(typeof(global::TestProject.IMyGrainWithIntegerCompoundKey), "GetIntegerAndStringKey", null, null);
+        private readonly InvokablePool<Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> _pool;
+        public Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A(InvokablePool<Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> pool) : base()
+        {
+            _pool = pool;
+        }
+
         public override string GetMethodName() => "GetIntegerAndStringKey";
         public override string GetInterfaceName() => "TestProject.IMyGrainWithIntegerCompoundKey";
         public override string GetActivityName() => "IMyGrainWithIntegerCompoundKey/GetIntegerAndStringKey";
@@ -131,6 +162,7 @@ namespace OrleansCodeGen.TestProject
         public override void Dispose()
         {
             _target = default;
+            _pool.Return(this);
         }
 
         protected override global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> InvokeInner() => _target.GetIntegerAndStringKey();
@@ -141,11 +173,12 @@ namespace OrleansCodeGen.TestProject
     {
         public Proxy_IMyGrainWithIntegerCompoundKey(global::Orleans.Runtime.GrainReferenceShared arg0, global::Orleans.Runtime.IdSpan arg1) : base(arg0, arg1)
         {
+            EnsureActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A>(0);
         }
 
         global::System.Threading.Tasks.Task<global::System.Tuple<long, string>> global::TestProject.IMyGrainWithIntegerCompoundKey.GetIntegerAndStringKey()
         {
-            var request = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A();
+            var request = GetActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A>(0).Create();
             return base.InvokeAsync<global::System.Tuple<long, string>>(request).AsTask();
         }
     }
@@ -154,6 +187,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E);
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> _activator;
+        public Codec_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -188,7 +227,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E();
+            var result = _activator.Create();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -198,14 +237,32 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E>
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E DeepCopy(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E();
+            var result = _activator.Create();
             return result;
         }
+
+        public Copier_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E>
+    {
+        private readonly InvokablePool<Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> _arg0;
+        public Activator_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E(InvokablePool<Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E> arg0)
+        {
+            _arg0 = arg0;
+        }
+
+        public OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -307,6 +364,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IMyGrainWithStringKey_GrainReference_43570316 : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316);
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316> _activator;
+        public Codec_Invokable_IMyGrainWithStringKey_GrainReference_43570316(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316 instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -341,7 +404,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316();
+            var result = _activator.Create();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -351,14 +414,32 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IMyGrainWithStringKey_GrainReference_43570316 : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316>
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316 DeepCopy(OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316 original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316();
+            var result = _activator.Create();
             return result;
         }
+
+        public Copier_Invokable_IMyGrainWithStringKey_GrainReference_43570316(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_Invokable_IMyGrainWithStringKey_GrainReference_43570316 : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316>
+    {
+        private readonly InvokablePool<Invokable_IMyGrainWithStringKey_GrainReference_43570316> _arg0;
+        public Activator_Invokable_IMyGrainWithStringKey_GrainReference_43570316(InvokablePool<Invokable_IMyGrainWithStringKey_GrainReference_43570316> arg0)
+        {
+            _arg0 = arg0;
+        }
+
+        public OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316 Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IMyGrainWithStringKey_GrainReference_43570316(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -460,6 +541,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF);
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> _activator;
+        public Codec_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -494,7 +581,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF();
+            var result = _activator.Create();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -504,14 +591,32 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF>
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF DeepCopy(OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF();
+            var result = _activator.Create();
             return result;
         }
+
+        public Copier_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF>
+    {
+        private readonly InvokablePool<Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> _arg0;
+        public Activator_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF(InvokablePool<Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF> arg0)
+        {
+            _arg0 = arg0;
+        }
+
+        public OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -613,6 +718,12 @@ namespace OrleansCodeGen.TestProject
     public sealed class Codec_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A : global::Orleans.Serialization.Codecs.IFieldCodec<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A>
     {
         private readonly global::System.Type _codecFieldType = typeof(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A);
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> _activator;
+        public Codec_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A instance)
             where TBufferWriter : global::System.Buffers.IBufferWriter<byte>
@@ -647,7 +758,7 @@ namespace OrleansCodeGen.TestProject
             if (field.IsReference)
                 return ReferenceCodec.ReadReference<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A, TReaderInput>(ref reader, field);
             field.EnsureWireTypeTagDelimited();
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A();
+            var result = _activator.Create();
             ReferenceCodec.MarkValueField(reader.Session);
             Deserialize(ref reader, result);
             return result;
@@ -657,14 +768,32 @@ namespace OrleansCodeGen.TestProject
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
     public sealed class Copier_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A : global::Orleans.Serialization.Cloning.IDeepCopier<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A>
     {
+        private readonly global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> _activator;
         [global::System.Runtime.CompilerServices.MethodImplAttribute(global::System.Runtime.CompilerServices.MethodImplOptions.AggressiveInlining)]
         public OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A DeepCopy(OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A original, global::Orleans.Serialization.Cloning.CopyContext context)
         {
             if (original is null)
                 return null;
-            var result = new OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A();
+            var result = _activator.Create();
             return result;
         }
+
+        public Copier_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A(global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> _activator)
+        {
+            this._activator = OrleansGeneratedCodeHelper.UnwrapService(this, _activator);
+        }
+    }
+
+    [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
+    internal sealed class Activator_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A : global::Orleans.Serialization.Activators.IActivator<OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A>
+    {
+        private readonly InvokablePool<Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> _arg0;
+        public Activator_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A(InvokablePool<Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A> arg0)
+        {
+            _arg0 = arg0;
+        }
+
+        public OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A Create() => _arg0.TryGet(out var item) ? item : new OrleansCodeGen.TestProject.Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A(_arg0);
     }
 
     [global::System.CodeDom.Compiler.GeneratedCodeAttribute("OrleansCodeGen", "10.0.0.0"), global::System.ComponentModel.EditorBrowsableAttribute(global::System.ComponentModel.EditorBrowsableState.Never), global::System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverageAttribute]
@@ -795,9 +924,13 @@ namespace OrleansCodeGen.TestProject
             config.InterfaceImplementations.Add(typeof(global::TestProject.GrainWithStringKey));
             config.InterfaceImplementations.Add(typeof(global::TestProject.GrainWithGuidCompoundKey));
             config.InterfaceImplementations.Add(typeof(global::TestProject.GrainWithIntegerCompoundKey));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IMyGrainWithGuidKey_GrainReference_8F0FEC0E));
             config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidKey));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IMyGrainWithStringKey_GrainReference_43570316));
             config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_GrainWithStringKey));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IMyGrainWithGuidCompoundKey_GrainReference_A9FEF7AF));
             config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_GrainWithGuidCompoundKey));
+            config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_Invokable_IMyGrainWithIntegerCompoundKey_GrainReference_9814021A));
             config.Activators.Add(typeof(OrleansCodeGen.TestProject.Activator_GrainWithIntegerCompoundKey));
             var n1 = config.CompoundTypeAliases.Add("inv");
             var n2 = n1.Add(typeof(global::Orleans.Runtime.GrainReference));
