@@ -1,67 +1,38 @@
-using System;
+#nullable enable
+using System.Collections.Generic;
+using System.Net;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
-using Microsoft.Extensions.Options;
-using Orleans.Configuration;
+using Orleans.Connections.Transport;
 
-#nullable disable
-namespace Orleans.Runtime.Messaging
+namespace Orleans.Runtime.Messaging;
+
+internal abstract class ConnectionFactory
 {
-    internal abstract class ConnectionFactory
+    private readonly MessageTransportConnector _transportConnector;
+
+    protected ConnectionFactory(MessageTransportConnector transportConnector, IEnumerable<IMessageTransportConnectorMiddleware> middleware)
     {
-        private readonly IConnectionFactory connectionFactory;
-        private readonly IServiceProvider serviceProvider;
-        private ConnectionDelegate connectionDelegate;
-
-        protected ConnectionFactory(
-            IConnectionFactory connectionFactory,
-            IServiceProvider serviceProvider,
-            IOptions<ConnectionOptions> connectionOptions)
+        var connector = transportConnector;
+        foreach (var mw in middleware)
         {
-            this.connectionFactory = connectionFactory;
-            this.serviceProvider = serviceProvider;
-            this.ConnectionOptions = connectionOptions.Value;
+            connector = mw.Apply(connector);
         }
 
-        protected ConnectionOptions ConnectionOptions { get; }
-
-        protected ConnectionDelegate ConnectionDelegate
-        {
-            get
-            {
-                if (this.connectionDelegate != null) return this.connectionDelegate;
-
-                lock (this)
-                {
-                    if (this.connectionDelegate != null) return this.connectionDelegate;
-
-                    // Configure the connection builder using the user-defined options.
-                    var connectionBuilder = new ConnectionBuilder(this.serviceProvider);
-                    connectionBuilder.Use(next =>
-                    {
-                        return context =>
-                        {
-                            context.Features.Set<IUnderlyingTransportFeature>(new UnderlyingConnectionTransportFeature { Transport = context.Transport });
-                            return next(context);
-                        };
-                    });
-                    this.ConfigureConnectionBuilder(connectionBuilder);
-                    Connection.ConfigureBuilder(connectionBuilder);
-                    return this.connectionDelegate = connectionBuilder.Build();
-                }
-            }
-        }
-
-        protected virtual void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder) { }
-
-        protected abstract Connection CreateConnection(SiloAddress address, ConnectionContext context);
-
-        public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
-        {
-            var connectionContext = await this.connectionFactory.ConnectAsync(address.Endpoint, cancellationToken);
-            var connection = this.CreateConnection(address, connectionContext);
-            return connection;
-        }
+        _transportConnector = connector;
     }
+
+    protected abstract Connection CreateConnection(SiloAddress address, MessageTransport context);
+
+    public virtual async ValueTask<Connection> ConnectAsync(SiloAddress address, CancellationToken cancellationToken)
+    {
+        // Connect to the endpoint.
+        var transport = await _transportConnector.CreateAsync(GetEndPoint(address), cancellationToken);
+
+        // Create a connection object to represent the connection.
+        var connection = CreateConnection(address, transport);
+        return connection;
+    }
+
+    protected abstract EndPoint GetEndPoint(SiloAddress address);
 }

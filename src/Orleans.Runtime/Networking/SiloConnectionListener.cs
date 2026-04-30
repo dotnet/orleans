@@ -1,84 +1,66 @@
 using System;
-using System.Net;
+using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.AspNetCore.Connections;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 
 #nullable disable
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class SiloConnectionListener : ConnectionListener, ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
+    internal sealed class SiloConnectionListener(
+        IEnumerable<MessageTransportListener> listeners,
+        IEnumerable<IMessageTransportListenerMiddleware> listenerMiddleware,
+        IOptions<ConnectionOptions> connectionOptions,
+        MessageCenter messageCenter,
+        IOptions<EndpointOptions> endpointOptions,
+        ILocalSiloDetails localSiloDetails,
+        ConnectionManager connectionManager,
+        ConnectionCommon connectionShared,
+        ProbeRequestMonitor probeRequestMonitor,
+        ConnectionPreambleHelper connectionPreambleHelper) : ConnectionListener(
+              listeners.Where(static listener => listener.ListenerName.Equals(DefaultListenerName, StringComparison.Ordinal)),
+              listenerMiddleware,
+              connectionOptions,
+              connectionManager,
+              connectionShared), ILifecycleParticipant<ISiloLifecycle>, ILifecycleObserver
     {
-        internal static readonly object ServicesKey = new object();
-        private readonly ILocalSiloDetails localSiloDetails;
-        private readonly SiloConnectionOptions siloConnectionOptions;
-        private readonly MessageCenter messageCenter;
-        private readonly EndpointOptions endpointOptions;
-        private readonly ConnectionManager connectionManager;
-        private readonly ConnectionCommon connectionShared;
-        private readonly ProbeRequestMonitor probeRequestMonitor;
-        private readonly ConnectionPreambleHelper connectionPreambleHelper;
+        public const string DefaultListenerName = "silo";
+        private readonly ILocalSiloDetails _localSiloDetails = localSiloDetails;
+        private readonly MessageCenter _messageCenter = messageCenter;
+        private readonly EndpointOptions _endpointOptions = endpointOptions.Value;
+        private readonly ConnectionManager _connectionManager = connectionManager;
+        private readonly ConnectionCommon _connectionShared = connectionShared;
+        private readonly ProbeRequestMonitor _probeRequestMonitor = probeRequestMonitor;
+        private readonly ConnectionPreambleHelper _connectionPreambleHelper = connectionPreambleHelper;
 
-        public SiloConnectionListener(
-            IServiceProvider serviceProvider,
-            IOptions<ConnectionOptions> connectionOptions,
-            IOptions<SiloConnectionOptions> siloConnectionOptions,
-            MessageCenter messageCenter,
-            IOptions<EndpointOptions> endpointOptions,
-            ILocalSiloDetails localSiloDetails,
-            ConnectionManager connectionManager,
-            ConnectionCommon connectionShared,
-            ProbeRequestMonitor probeRequestMonitor,
-            ConnectionPreambleHelper connectionPreambleHelper)
-            : base(serviceProvider.GetRequiredKeyedService<IConnectionListenerFactory>(ServicesKey), connectionOptions, connectionManager, connectionShared)
-        {
-            this.siloConnectionOptions = siloConnectionOptions.Value;
-            this.messageCenter = messageCenter;
-            this.localSiloDetails = localSiloDetails;
-            this.connectionManager = connectionManager;
-            this.connectionShared = connectionShared;
-            this.probeRequestMonitor = probeRequestMonitor;
-            this.connectionPreambleHelper = connectionPreambleHelper;
-            this.endpointOptions = endpointOptions.Value;
-        }
-
-        public override EndPoint Endpoint => this.endpointOptions.GetListeningSiloEndpoint();
-
-        protected override Connection CreateConnection(ConnectionContext context)
+        protected override Connection CreateConnection(MessageTransport transport)
         {
             return new SiloConnection(
                 default,
-                context,
-                this.ConnectionDelegate,
-                this.messageCenter,
-                this.localSiloDetails,
-                this.connectionManager,
-                this.ConnectionOptions,
-                this.connectionShared,
-                this.probeRequestMonitor,
-                this.connectionPreambleHelper);
-        }
-
-        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
-        {
-            var configureDelegate = (SiloConnectionOptions.ISiloConnectionBuilderOptions)this.siloConnectionOptions;
-            configureDelegate.ConfigureSiloInboundBuilder(connectionBuilder);
-            base.ConfigureConnectionBuilder(connectionBuilder);
+                transport,
+                _messageCenter,
+                _localSiloDetails,
+                _connectionManager,
+                ConnectionOptions,
+                _connectionShared,
+                _probeRequestMonitor,
+                _connectionPreambleHelper);
         }
 
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
-            if (this.Endpoint is null) return;
+            if (!HasListeners) return;
 
             lifecycle.Subscribe(nameof(SiloConnectionListener), ServiceLifecycleStage.RuntimeInitialize - 1, this);
         }
 
         Task ILifecycleObserver.OnStart(CancellationToken ct) => Task.Run(async () =>
         {
-            await BindAsync();
+            await BindAsync(ct);
+
             // Start accepting connections immediately.
             Start();
         });

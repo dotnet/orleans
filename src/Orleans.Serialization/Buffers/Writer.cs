@@ -104,6 +104,13 @@ namespace Orleans.Serialization.Buffers
         public static Writer<PooledBuffer> CreatePooled(SerializerSession session) => new(new PooledBuffer(), session);
     }
 
+    public readonly struct ArcBufferWriterWrapper(ArcBufferWriter bufferWriter) : IBufferWriter<byte>
+    {
+        public void Advance(int count) => ((IBufferWriter<byte>)bufferWriter).Advance(count);
+        public Memory<byte> GetMemory(int sizeHint = 0) => bufferWriter.GetMemory(sizeHint);
+        public Span<byte> GetSpan(int sizeHint = 0) => bufferWriter.GetSpan(sizeHint);
+    }
+
     /// <summary>
     /// Wraps an <see cref="ArcBufferWriter"/> for use as a serialization writer target.
     /// </summary>

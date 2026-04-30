@@ -1,79 +1,68 @@
-using System.Threading;
-using Microsoft.AspNetCore.Connections;
+#nullable enable
+using System.Collections.Generic;
+using System.Diagnostics;
+using System.Diagnostics.CodeAnalysis;
+using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
+using Orleans.Connections.Transport;
 using Orleans.Messaging;
 
-#nullable disable
 namespace Orleans.Runtime.Messaging
 {
-    internal sealed class ClientOutboundConnectionFactory : ConnectionFactory
+    internal sealed class ClientOutboundConnectionFactory(
+        IOptions<ConnectionOptions> connectionOptions,
+        IOptions<ClusterOptions> clusterOptions,
+        MessageTransportConnector connector,
+        IEnumerable<IMessageTransportConnectorMiddleware> connectorMiddleware,
+        ConnectionCommon connectionShared,
+        ConnectionPreambleHelper connectionPreambleHelper) : ConnectionFactory(connector, connectorMiddleware)
     {
-        internal static readonly object ServicesKey = new object();
-        private readonly ConnectionCommon connectionShared;
-        private readonly ClientConnectionOptions clientConnectionOptions;
-        private readonly ClusterOptions clusterOptions;
-        private readonly ConnectionPreambleHelper connectionPreambleHelper;
-#if NET9_0_OR_GREATER
-        private readonly Lock initializationLock = new();
-#else
-        private readonly object initializationLock = new();
-#endif
-        private volatile bool isInitialized;
-        private ClientMessageCenter messageCenter;
-        private ConnectionManager connectionManager;
+        private readonly object _initializationLock = new();
+        private readonly ConnectionCommon _connectionShared = connectionShared;
+        private readonly ConnectionOptions _connectionOptions = connectionOptions.Value;
+        private readonly ClusterOptions _clusterOptions = clusterOptions.Value;
+        private readonly ConnectionPreambleHelper _connectionPreambleHelper = connectionPreambleHelper;
+        private volatile bool _isInitialized;
+        private ClientMessageCenter? _messageCenter;
+        private ConnectionManager? _connectionManager;
 
-        public ClientOutboundConnectionFactory(
-            IOptions<ConnectionOptions> connectionOptions,
-            IOptions<ClientConnectionOptions> clientConnectionOptions,
-            IOptions<ClusterOptions> clusterOptions,
-            ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper)
-            : base(connectionShared.ServiceProvider.GetRequiredKeyedService<IConnectionFactory>(ServicesKey), connectionShared.ServiceProvider, connectionOptions)
-        {
-            this.connectionShared = connectionShared;
-            this.clientConnectionOptions = clientConnectionOptions.Value;
-            this.clusterOptions = clusterOptions.Value;
-            this.connectionPreambleHelper = connectionPreambleHelper;
-        }
-
-        protected override Connection CreateConnection(SiloAddress address, ConnectionContext context)
+        protected override Connection CreateConnection(SiloAddress address, MessageTransport transport)
         {
             EnsureInitialized();
 
             return new ClientOutboundConnection(
                 address,
-                context,
-                this.ConnectionDelegate,
-                this.messageCenter,
-                this.connectionManager,
-                this.ConnectionOptions,
-                this.connectionShared,
-                this.connectionPreambleHelper,
-                this.clusterOptions);
+                transport,
+                _messageCenter,
+                _connectionManager,
+                _connectionShared,
+                _connectionOptions,
+                _connectionPreambleHelper,
+                _clusterOptions);
         }
 
-        protected override void ConfigureConnectionBuilder(IConnectionBuilder connectionBuilder)
-        {
-            this.clientConnectionOptions.ConfigureConnectionBuilder(connectionBuilder);
-            base.ConfigureConnectionBuilder(connectionBuilder);
-        }
+        protected override EndPoint GetEndPoint(SiloAddress address) => address.Endpoint;
 
+        [MemberNotNull(nameof(_messageCenter), nameof(_connectionManager))]
         private void EnsureInitialized()
         {
-            if (!isInitialized)
+            if (!_isInitialized)
             {
-                lock (this.initializationLock)
+                lock (_initializationLock)
                 {
-                    if (!isInitialized)
+                    if (!_isInitialized)
                     {
-                        this.messageCenter = this.connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
-                        this.connectionManager = this.connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
-                        this.isInitialized = true;
+                        _messageCenter = _connectionShared.ServiceProvider.GetRequiredService<ClientMessageCenter>();
+                        _connectionManager = _connectionShared.ServiceProvider.GetRequiredService<ConnectionManager>();
+                        _isInitialized = true;
                     }
                 }
             }
+
+            Debug.Assert(_messageCenter is not null);
+            Debug.Assert(_connectionManager is not null);
         }
     }
 }

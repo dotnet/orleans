@@ -33,8 +33,6 @@ namespace Orleans.Runtime.Messaging
 
         public SiloAddress ReadRaw<TInput>(ref Reader<TInput> reader)
         {
-            var currentTimestamp = Environment.TickCount64;
-
             SiloAddress result = null;
             byte[] payloadArray = default;
             var length = (int)reader.ReadVarUInt32();
@@ -52,6 +50,7 @@ namespace Orleans.Runtime.Messaging
             var hashCode = innerReader.ReadInt32();
 
             ref var cacheEntry = ref CollectionsMarshal.GetValueRefOrAddDefault(_cache, hashCode, out var exists);
+            var currentTimestamp = Environment.TickCount64;
             if (exists && payloadSpan.SequenceEqual(cacheEntry.Encoded))
             {
                 result = cacheEntry.Value;

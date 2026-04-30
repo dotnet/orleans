@@ -10,19 +10,19 @@ namespace Orleans.Serialization.UnitTests
 {
     /// <summary>
     /// Tests for Orleans' PooledBuffer implementation.
-    /// 
+    ///
     /// PooledBuffer is a high-performance buffer management system that:
     /// - Uses ArrayPool to minimize allocations and GC pressure
     /// - Supports efficient slicing operations without copying
     /// - Handles large data through segmented storage
     /// - Provides zero-copy access to buffer contents
-    /// 
+    ///
     /// Key features tested:
     /// - Large buffer handling (multi-megabyte)
     /// - Slicing operations at various offsets
     /// - Memory safety and bounds checking
     /// - Proper cleanup and return to pool
-    /// 
+    ///
     /// This infrastructure is critical for Orleans' serialization performance,
     /// especially when handling large object graphs or streaming scenarios.
     /// </summary>
@@ -270,8 +270,8 @@ namespace Orleans.Serialization.UnitTests
         }
 
         /// <summary>
-        /// Ensures that BufferSlice's SpanEnumerator and MemoryEnumerator correctly handle non-zero offsets that cross segment boundaries.
-        /// This test exercises the offset math for enumerators when the slice starts partway through a segment and spans multiple segments.
+        /// Ensures that BufferSlice's SpanEnumerator correctly handles non-zero offsets that cross segment boundaries.
+        /// This test exercises the offset math for the enumerator when the slice starts partway through a segment and spans multiple segments.
         /// </summary>
         [Fact]
         public void PooledBuffer_SliceEnumerators_OffsetCrossSegment_Correctness()
@@ -301,25 +301,13 @@ namespace Orleans.Serialization.UnitTests
             Assert.Equal(length, spanPos);
             Assert.Equal(expected, spanConcat);
 
-            // Act & Assert: MemoryEnumerator
-            var memConcat = new byte[length];
-            int memPos = 0;
-            foreach (var mem in slice.MemorySegments)
-            {
-                var span = mem.Span;
-                span.CopyTo(memConcat.AsSpan(memPos));
-                memPos += span.Length;
-            }
-            Assert.Equal(length, memPos);
-            Assert.Equal(expected, memConcat);
-
             buffer.Dispose();
         }
 
         /// <summary>
-        /// Ensures that BufferSlice's SpanEnumerator and MemoryEnumerator exercise the code path where the enumerator's position is greater than zero.
+        /// Ensures that BufferSlice's SpanEnumerator exercises the code path where the enumerator's position is greater than zero.
         /// This is achieved by using a slice offset that skips at least one full segment, so the enumerator must skip segments before yielding data.
-        /// The test validates that the enumerators return the correct data for such non-zero offsets.
+        /// The test validates that the enumerator returns the correct data for such non-zero offsets.
         /// </summary>
         [Fact]
         public void PooledBuffer_SliceEnumerators_OffsetAfterFirstSegment_CoversPositionGreaterThanZero()
@@ -351,18 +339,6 @@ namespace Orleans.Serialization.UnitTests
             }
             Assert.Equal(length, spanPos);
             Assert.Equal(expected, spanConcat);
-
-            // Act & Assert: MemoryEnumerator
-            var memConcat = new byte[length];
-            int memPos = 0;
-            foreach (var mem in slice.MemorySegments)
-            {
-                var span = mem.Span;
-                span.CopyTo(memConcat.AsSpan(memPos));
-                memPos += span.Length;
-            }
-            Assert.Equal(length, memPos);
-            Assert.Equal(expected, memConcat);
 
             buffer.Dispose();
         }

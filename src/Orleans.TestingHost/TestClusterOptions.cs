@@ -102,7 +102,7 @@ namespace Orleans.TestingHost
         /// <remarks>
         /// Defaults to InMemory.
         /// </remarks>
-        public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.InMemory;
+        public ConnectionTransportType ConnectionTransport { get; set; } = ConnectionTransportType.TcpSocket;
 
         /// <summary>
         /// Converts these options into a dictionary.
@@ -133,7 +133,7 @@ namespace Orleans.TestingHost
             }
 
             result["UseRealEnvironmentStatistics"] = UseRealEnvironmentStatistics ? "True" : "False";
-            
+
             if (this.SiloBuilderConfiguratorTypes != null)
             {
                 for (int i = 0; i < this.SiloBuilderConfiguratorTypes.Count; i++)
