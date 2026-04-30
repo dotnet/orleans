@@ -258,6 +258,12 @@ namespace Orleans.Runtime
 
         public async Task Invoke(IGrainContext target, Message message)
         {
+            var disposeBody = message.BodyObject is IInvokable;
+            if (disposeBody)
+            {
+                message.DisposeBodyObject = true;
+            }
+
             try
             {
                 // Don't process messages that have already timed out
@@ -294,7 +300,6 @@ namespace Orleans.Runtime
                                     response = this.responseCopier.Copy(response);
                                 }
 
-                                invokable.Dispose();
                                 break;
                             }
                         default:
@@ -344,6 +349,13 @@ namespace Orleans.Runtime
                 if (message.Direction != Message.Directions.OneWay)
                 {
                     SafeSendExceptionResponse(message, exc2);
+                }
+            }
+            finally
+            {
+                if (disposeBody)
+                {
+                    message.DisposeBody();
                 }
             }
         }

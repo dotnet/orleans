@@ -253,6 +253,12 @@ namespace Orleans
 
             private async Task ProcessMessageAsync(Message message)
             {
+                var disposeBody = message.BodyObject is IInvokable;
+                if (disposeBody)
+                {
+                    message.DisposeBodyObject = true;
+                }
+
                 try
                 {
                     if (message.IsExpired)
@@ -312,19 +318,24 @@ namespace Orleans
                     {
                         this.ReportException(message, exc);
                     }
-                    finally
-                    {
-                        // Clear the running request when done.
-                        lock (Messages)
-                        {
-                            _runningRequests.Remove(message);
-                        }
-                    }
                 }
                 catch (Exception outerException)
                 {
                     // Ignore and keep looping.
                     LogErrorProcessingMessage(_manager.logger, outerException, message);
+                }
+                finally
+                {
+                    if (disposeBody)
+                    {
+                        message.DisposeBody();
+                    }
+
+                    // Clear the running request when done.
+                    lock (Messages)
+                    {
+                        _runningRequests.Remove(message);
+                    }
                 }
             }
 
