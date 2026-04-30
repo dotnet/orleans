@@ -1,6 +1,6 @@
 #nullable enable
 using System;
-using System.Collections.Generic;
+using System.Collections.Concurrent;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Connections;
@@ -15,6 +15,9 @@ namespace Orleans.Runtime.Messaging
         IMessageCenter messageCenter)
     {
         private readonly IServiceProvider _serviceProvider = serviceProvider;
+        private readonly ConcurrentStack<MessageSerializer> _serializerPool = new();
+        private readonly ConcurrentStack<MessageReadRequest> _receivePool = new();
+        private readonly ConcurrentStack<MessageWriteRequest> _sendPool = new();
 
         public MessagingTrace MessagingTrace { get; } = messagingTrace;
         public ConnectionTrace ConnectionTrace { get; } = connectionTrace;
@@ -24,8 +27,7 @@ namespace Orleans.Runtime.Messaging
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal MessageSerializer GetMessageSerializer()
         {
-            var stack = SerializerPool.Stack ??= new();
-            if (stack.TryPop(out var result))
+            if (_serializerPool.TryPop(out var result))
             {
                 return result;
             }
@@ -36,15 +38,13 @@ namespace Orleans.Runtime.Messaging
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Return(MessageSerializer serializer)
         {
-            var stack = SerializerPool.Stack ??= new();
-            stack.Push(serializer);
+            _serializerPool.Push(serializer);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal MessageReadRequest GetReceiveMessageHandler()
         {
-            var stack = ReceivePool.Stack ??= new();
-            if (stack.TryPop(out var result))
+            if (_receivePool.TryPop(out var result))
             {
                 return result;
             }
@@ -55,15 +55,13 @@ namespace Orleans.Runtime.Messaging
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Return(MessageReadRequest handler)
         {
-            var stack = ReceivePool.Stack ??= new();
-            stack.Push(handler);
+            _receivePool.Push(handler);
         }
 
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal MessageWriteRequest GetSendMessageHandler()
         {
-            var stack = SendPool.Stack ??= new();
-            if (stack.TryPop(out var result))
+            if (_sendPool.TryPop(out var result))
             {
                 return result;
             }
@@ -74,27 +72,7 @@ namespace Orleans.Runtime.Messaging
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         internal void Return(MessageWriteRequest handler)
         {
-            var stack = SendPool.Stack ??= new();
-            stack.Push(handler);
-        }
-
-        // Thread-local pools using nested classes to ensure proper ThreadStatic semantics per type
-        private static class SerializerPool
-        {
-            [ThreadStatic]
-            internal static Stack<MessageSerializer>? Stack;
-        }
-
-        private static class ReceivePool
-        {
-            [ThreadStatic]
-            internal static Stack<MessageReadRequest>? Stack;
-        }
-
-        private static class SendPool
-        {
-            [ThreadStatic]
-            internal static Stack<MessageWriteRequest>? Stack;
+            _sendPool.Push(handler);
         }
     }
 }
