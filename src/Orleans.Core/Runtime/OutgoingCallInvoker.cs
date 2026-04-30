@@ -115,7 +115,7 @@ namespace Orleans.Runtime
                     stage++;
                     var responseCompletionSource = ResponseCompletionSourcePool.Get();
                     this.sendRequest(this.grainReference, responseCompletionSource, this.request, this.options);
-                    this.Response = await responseCompletionSource.AsValueTask();
+                    this.Response = await responseCompletionSource.AsValueTask().ConfigureAwait(false);
 
                     return;
                 }
