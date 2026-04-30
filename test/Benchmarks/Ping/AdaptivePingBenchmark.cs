@@ -136,7 +136,7 @@ public class AdaptivePingBenchmark : IDisposable
 
     /// <summary>
     /// Runs the adaptive benchmark, tuning concurrency via hill climbing.
-    /// Terminates after maxStableRounds without improvement (default 10), or runs forever if 0.
+    /// Terminates after maxStableRounds without improvement (default 3), or runs forever if 0.
     /// </summary>
     public async Task RunAsync(
         int initialConcurrency = 100,
@@ -144,7 +144,7 @@ public class AdaptivePingBenchmark : IDisposable
         int maxConcurrency = 2000,
         TimeSpan? warmupDuration = null,
         TimeSpan? measurementInterval = null,
-        int maxStableRounds = 10)
+        int maxStableRounds = 3)
     {
         var grainFactory = GetGrainFactory();
 
@@ -209,7 +209,7 @@ public class AdaptivePingBenchmark : IDisposable
     /// <summary>
     /// Runs all adaptive ping benchmark scenarios and prints a summary.
     /// </summary>
-    public static async Task RunAllScenariosAsync(int maxStableRounds = 10)
+    public static async Task RunAllScenariosAsync(int maxStableRounds = 3)
     {
         var results = new List<(string Description, int BestConcurrency, double BestThroughput)>();
 

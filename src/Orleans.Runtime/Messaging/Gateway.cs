@@ -248,7 +248,7 @@ namespace Orleans.Runtime.Messaging
         /// </summary>
         /// <param name="msg"></param>
         /// <returns>true if the message should be delivered to a proxied grain, false if not.</returns>
-        internal bool TryDeliverToProxy(Message msg)
+        internal bool TryDeliverToProxy(Message msg, IMessageReceiverCache targetCache)
         {
             // See if it's a grain we're proxying.
             var targetGrain = msg.TargetGrain;
@@ -262,22 +262,13 @@ namespace Orleans.Runtime.Messaging
                 return false;
             }
 
-            // when this Gateway receives a message from client X to client addressable object Y
-            // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
-            // it will use this Gateway to re-route the REPLY from Y back to X.
-            if (msg.SendingGrain.IsClient())
-            {
-                clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
-            }
+            client.ReceiveMessage(msg);
+            targetCache?.MessageReceiver = client;
 
-            msg.TargetSilo = null;
-            msg.SendingSilo ??= gatewayAddress;
-
-            client.Send(msg);
             return true;
         }
 
-        private class ClientState
+        private class ClientState : IMessageReceiver
         {
             private readonly Gateway _gateway;
             private readonly Task _messageLoop;
@@ -354,11 +345,46 @@ namespace Orleans.Runtime.Messaging
                 _signal.Signal();
             }
 
-            public void Send(Message msg)
+            public void ReceiveMessage(Message msg, IMessageReceiverCache cache)
             {
-                _pendingToSend.Enqueue(msg);
-                _signal.Signal();
-                LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
+                if (IsDropped)
+                {
+                    // Invalidate the cache.
+                    // The message will be handled by the message loop.
+                    cache.MessageReceiver = null;
+                }
+
+                ReceiveMessage(msg);
+            }
+
+            public void ReceiveMessage(Message msg)
+            {
+                // When this Gateway receives a message from client X to client addressable object Y
+                // it needs to record the original Gateway address through which this message came from (the address of the Gateway that X is connected to)
+                // it will use this Gateway to re-route the REPLY from Y back to X.
+                if (msg.SendingGrain.IsClient())
+                {
+                    _gateway.clientsReplyRoutingCache.RecordClientRoute(msg.SendingGrain, msg.SendingSilo);
+                }
+
+                msg.TargetSilo = null;
+
+                // Override the SendingSilo only if the sending grain is not
+                // a system target
+                if (!msg.SendingGrain.IsSystemTarget())
+                {
+                    msg.SendingSilo = _gateway.gatewayAddress;
+                }
+
+                var connection = Volatile.Read(ref _connection);
+                if (connection is null || !TrySend(connection, msg))
+                {
+                    _pendingToSend.Enqueue(msg);
+                    _signal.Signal();
+                    LogTraceQueuedMessage(_gateway.logger, msg, msg.TargetGrain);
+                    return;
+                }
+                LogTraceSentQueuedMessage(_gateway.logger, msg, Id);
             }
 
             private async Task RunMessageLoop()

@@ -18,7 +18,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// A client which is hosted within a silo.
     /// </summary>
-    internal sealed partial class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>
+    internal sealed partial class HostedClient : IGrainContext, IGrainExtensionBinder, IDisposable, ILifecycleParticipant<ISiloLifecycle>, IMessageReceiver
     {
 #if NET9_0_OR_GREATER
         private readonly Lock lockObj = new();
@@ -215,6 +215,16 @@ namespace Orleans.Runtime
                 // Requests against client objects are scheduled for execution on the client.
                 this.incomingMessages.Writer.TryWrite(msg);
             }
+        }
+
+        public void ReceiveMessage(Message message, IMessageReceiverCache cache)
+        {
+            if (this.disposing)
+            {
+                cache.MessageReceiver = null;
+            }
+
+            ReceiveMessage(message);
         }
 
         /// <inheritdoc />
