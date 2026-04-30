@@ -29,15 +29,12 @@ internal sealed class JsonLinesLogFormat : ILogFormat
             return false;
         }
 
-        using var buffered = input.PeekSlice(input.Length);
-        var sequence = buffered.AsReadOnlySequence();
-        if (StartsWithBom(sequence))
+        if (input.IsNext(Bom))
         {
             throw new InvalidOperationException("Malformed JSON Lines log segment: UTF-8 byte order marks are not supported.");
         }
 
-        var reader = new SequenceReader<byte>(sequence);
-        if (!reader.TryReadTo(out ReadOnlySequence<byte> line, LineFeed, advancePastDelimiter: true))
+        if (!input.TryReadTo(out var lineBuffer, LineFeed, advancePastDelimiter: true))
         {
             if (!isCompleted)
             {
@@ -47,24 +44,22 @@ internal sealed class JsonLinesLogFormat : ILogFormat
             throw new InvalidOperationException("Malformed JSON Lines log segment at byte offset 0: log entries must end with a newline.");
         }
 
-        var consumed = reader.Consumed;
-        if (line.Length > int.MaxValue || consumed > int.MaxValue)
+        using (lineBuffer)
         {
-            throw new InvalidOperationException("Malformed JSON Lines log segment: log entry exceeds maximum supported frame size.");
+            var line = lineBuffer.AsReadOnlySequence();
+            if (!line.IsEmpty && EndsWith(line, CarriageReturn))
+            {
+                line = line.Slice(0, line.Length - 1);
+            }
+
+            if (IsBlankLine(line))
+            {
+                throw new InvalidOperationException("Malformed JSON Lines log segment at byte offset 0: blank lines are not valid log entries.");
+            }
+
+            ReadLine(line, offset: 0, consumer);
         }
 
-        input.Skip(checked((int)consumed));
-        if (!line.IsEmpty && EndsWith(line, CarriageReturn))
-        {
-            line = line.Slice(0, line.Length - 1);
-        }
-
-        if (IsBlankLine(line))
-        {
-            throw new InvalidOperationException("Malformed JSON Lines log segment at byte offset 0: blank lines are not valid log entries.");
-        }
-
-        ReadLine(line, offset: 0, consumer);
         return true;
     }
 
@@ -175,18 +170,6 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         }
 
         consumer.OnEntry(new(streamId), line.Slice(entryStart, entryLength));
-    }
-
-    private static bool StartsWithBom(ReadOnlySequence<byte> input)
-    {
-        if (input.Length < Bom.Length)
-        {
-            return false;
-        }
-
-        Span<byte> prefix = stackalloc byte[3];
-        input.Slice(0, Bom.Length).CopyTo(prefix);
-        return prefix.SequenceEqual(Bom);
     }
 
     private static bool EndsWith(ReadOnlySequence<byte> input, byte value)

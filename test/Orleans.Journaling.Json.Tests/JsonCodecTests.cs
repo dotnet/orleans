@@ -324,6 +324,51 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonLinesLogFormat_Read_NewlineAtArcBufferPageBoundary_Parses()
+    {
+        var format = new JsonLinesLogFormat();
+        var prefix = "{\"streamId\":8,\"entry\":{\"text\":\"";
+        var suffix = "\"}}";
+        var text = new string('a', ArcBufferWriter.MinimumPageSize - Encoding.UTF8.GetByteCount(prefix + suffix));
+        var line = prefix + text + suffix;
+        Assert.Equal(ArcBufferWriter.MinimumPageSize, Encoding.UTF8.GetByteCount(line));
+        var bytes = Encoding.UTF8.GetBytes(line + "\n");
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        var reader = new ArcBufferReader(buffer);
+        var consumer = new RecordingLogEntrySink();
+
+        var result = format.TryRead(reader, consumer, isCompleted: false);
+
+        Assert.True(result);
+        Assert.Equal(0, reader.Length);
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal($$"""{"text":"{{text}}"}""", Encoding.UTF8.GetString(entry.Payload));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_MultiPagePartialLineWaitsForNewlineWhenInputIsNotCompleted()
+    {
+        var format = new JsonLinesLogFormat();
+        var prefix = "{\"streamId\":8,\"entry\":{\"text\":\"";
+        var suffix = "\"}}";
+        var text = new string('a', ArcBufferWriter.MinimumPageSize + 8 - Encoding.UTF8.GetByteCount(prefix + suffix));
+        var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        var reader = new ArcBufferReader(buffer);
+        var consumer = new RecordingLogEntrySink();
+
+        var result = format.TryRead(reader, consumer, isCompleted: false);
+
+        Assert.False(result);
+        Assert.Equal(bytes.Length, reader.Length);
+        Assert.Equal(0, reader.Consumed);
+        Assert.Empty(consumer.Entries);
+    }
+
+    [Fact]
     public void JsonLinesLogFormat_Read_ParsesCrLfLines()
     {
         var format = new JsonLinesLogFormat();

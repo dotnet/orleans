@@ -734,6 +734,272 @@ public class ArcBufferWriterTests
         Assert.Equal(50, reader.Length);
     }
 
+    [Fact]
+    public void ArcBufferReader_StateAndReadAcrossPages_WorksCorrectly()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize + 3).Select(static i => (byte)(i % 251)).ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.False(reader.End);
+        Assert.Equal(data.Length, reader.Length);
+        Assert.Equal(data.Length, reader.Remaining);
+        Assert.Equal(0, reader.Consumed);
+        Assert.Equal(PageSize, reader.UnreadSpan.Length);
+        Assert.True(reader.TryPeek(out var value));
+        Assert.Equal(data[0], value);
+        Assert.True(reader.TryPeek(PageSize, out value));
+        Assert.Equal(data[PageSize], value);
+
+        Assert.True(reader.TryRead(out value));
+        Assert.Equal(data[0], value);
+        Assert.Equal(1, reader.Consumed);
+        Assert.Equal(data.Length - 1, reader.Remaining);
+
+        reader.Advance(PageSize - 1);
+        Assert.Equal(PageSize, reader.Consumed);
+        Assert.Equal(3, reader.Length);
+        Assert.Equal(data.AsSpan(PageSize, 3).ToArray(), reader.UnreadSpan.ToArray());
+
+        reader.AdvanceToEnd();
+        Assert.True(reader.End);
+        Assert.Equal(data.Length, reader.Consumed);
+        Assert.Equal(0, reader.Remaining);
+        Assert.True(reader.UnreadSpan.IsEmpty);
+        Assert.False(reader.TryPeek(out value));
+        Assert.Equal(0, value);
+        Assert.False(reader.TryRead(out value));
+        Assert.Equal(0, value);
+    }
+
+    [Fact]
+    public void ArcBufferReader_ConsumedIsRelativeToReaderCreation()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(Enumerable.Range(0, 16).Select(static i => (byte)i).ToArray());
+        buffer.AdvanceReader(4);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.Equal(0, reader.Consumed);
+        reader.Advance(3);
+        Assert.Equal(3, reader.Consumed);
+
+        var secondReader = new ArcBufferReader(buffer);
+        Assert.Equal(0, secondReader.Consumed);
+        Assert.Equal(9, secondReader.Length);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryCopyTo_DoesNotAdvanceAndHandlesInsufficientData()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize + 8).Select(static i => (byte)(i % 251)).ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+        reader.Advance(PageSize - 2);
+
+        Span<byte> destination = stackalloc byte[6];
+        Assert.True(reader.TryCopyTo(destination));
+        Assert.Equal(data.AsSpan(PageSize - 2, 6).ToArray(), destination.ToArray());
+        Assert.Equal(PageSize - 2, reader.Consumed);
+        Assert.Equal(data.Length - PageSize + 2, reader.Length);
+
+        Span<byte> tooLarge = stackalloc byte[32];
+        reader.Advance(reader.Length - 3);
+        Assert.False(reader.TryCopyTo(tooLarge));
+        Assert.Equal(3, reader.Length);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryReadExact_ReturnsSliceAndAdvances()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize + 8).Select(static i => (byte)(i % 251)).ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+        reader.Advance(PageSize - 2);
+
+        Assert.True(reader.TryReadExact(4, out var slice));
+        using (slice)
+        {
+            Assert.Equal(data.AsSpan(PageSize - 2, 4).ToArray(), slice.ToArray());
+        }
+
+        Assert.Equal(PageSize + 2, reader.Consumed);
+        Assert.False(reader.TryReadExact(reader.Length + 1, out slice));
+        Assert.Equal(default, slice);
+        Assert.Equal(PageSize + 2, reader.Consumed);
+
+        Assert.True(reader.TryReadExact(0, out slice));
+        using (slice)
+        {
+            Assert.Equal(0, slice.Length);
+        }
+
+        Assert.Equal(PageSize + 2, reader.Consumed);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryReadTo_FindsDelimiterAcrossPageBoundary()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)'a', PageSize)
+            .Concat([(byte)'\n', (byte)'b'])
+            .ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.True(reader.TryReadTo(out var line, (byte)'\n'));
+        using (line)
+        {
+            Assert.Equal(PageSize, line.Length);
+            Assert.All(line.ToArray(), value => Assert.Equal((byte)'a', value));
+        }
+
+        Assert.Equal(PageSize + 1, reader.Consumed);
+        Assert.Equal(1, reader.Length);
+        Assert.True(reader.TryPeek(out var next));
+        Assert.Equal((byte)'b', next);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryReadTo_MultiByteDelimiterAcrossPageBoundary()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)'a', PageSize - 1)
+            .Concat([(byte)'\r', (byte)'\n', (byte)'b'])
+            .ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.True(reader.TryReadTo(out var line, [(byte)'\r', (byte)'\n']));
+        using (line)
+        {
+            Assert.Equal(PageSize - 1, line.Length);
+            Assert.All(line.ToArray(), value => Assert.Equal((byte)'a', value));
+        }
+
+        Assert.Equal(PageSize + 1, reader.Consumed);
+        Assert.Equal(1, reader.Length);
+        Assert.True(reader.TryPeek(out var next));
+        Assert.Equal((byte)'b', next);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryReadTo_NotFoundDoesNotAdvance()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize + 1).Select(static i => (byte)((i % 250) + 1)).ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.False(reader.TryReadTo(out var line, (byte)0));
+
+        Assert.Equal(default, line);
+        Assert.Equal(0, reader.Consumed);
+        Assert.Equal(data.Length, reader.Length);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryReadTo_EscapeDelimiterSkipsEscapedDelimiter()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = new byte[] { (byte)'a', (byte)'\\', (byte)'|', (byte)'b', (byte)'|', (byte)'c' };
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.True(reader.TryReadTo(out var slice, (byte)'|', (byte)'\\'));
+        using (slice)
+        {
+            Assert.Equal(new byte[] { (byte)'a', (byte)'\\', (byte)'|', (byte)'b' }, slice.ToArray());
+        }
+
+        Assert.Equal(5, reader.Consumed);
+        Assert.True(reader.TryPeek(out var next));
+        Assert.Equal((byte)'c', next);
+    }
+
+    [Fact]
+    public void ArcBufferReader_AdvanceHelpers_WorkAcrossPages()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)' ', PageSize - 1)
+            .Concat([(byte)' ', (byte)'\t', (byte)'x', (byte)'y', (byte)'z'])
+            .ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.Equal(PageSize + 1, reader.AdvancePastAny((byte)' ', (byte)'\t'));
+        Assert.True(reader.IsNext((byte)'x'));
+        Assert.True(reader.IsNext([(byte)'x', (byte)'y'], advancePast: true));
+        Assert.Equal(1, reader.Length);
+        Assert.True(reader.TryAdvanceToAny([(byte)'z', (byte)'q'], advancePastDelimiter: false));
+        Assert.True(reader.IsNext((byte)'z'));
+        Assert.True(reader.TryAdvanceTo((byte)'z'));
+        Assert.True(reader.End);
+    }
+
+    [Fact]
+    public void ArcBufferReader_IsNext_MatchesAcrossPageBoundary()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)'x', PageSize - 1)
+            .Concat([(byte)'A', (byte)'B', (byte)'C'])
+            .ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+        reader.Advance(PageSize - 1);
+
+        Assert.True(reader.IsNext([(byte)'A', (byte)'B']));
+        Assert.Equal(3, reader.Length);
+        Assert.True(reader.IsNext([(byte)'A', (byte)'B'], advancePast: true));
+        Assert.Equal(1, reader.Length);
+        Assert.True(reader.IsNext((byte)'C', advancePast: true));
+        Assert.True(reader.End);
+    }
+
+    [Fact]
+    public void ArcBufferReader_BinaryReads_WorkAcrossPageBoundary()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)0, PageSize - 1)
+            .Concat([
+                (byte)0x01, (byte)0x02,
+                (byte)0x01, (byte)0x02, (byte)0x03, (byte)0x04,
+                (byte)0x05, (byte)0x06, (byte)0x07, (byte)0x08, (byte)0x09, (byte)0x00, (byte)0x01, (byte)0x02,
+                (byte)0x03, (byte)0x04
+            ])
+            .ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+        reader.Advance(PageSize - 1);
+
+        Assert.True(reader.TryReadLittleEndian(out short littleEndianShort));
+        Assert.Equal(0x0201, littleEndianShort);
+        Assert.True(reader.TryReadBigEndian(out int bigEndianInt));
+        Assert.Equal(0x01020304, bigEndianInt);
+        Assert.True(reader.TryReadLittleEndian(out long littleEndianLong));
+        Assert.Equal(0x0201000908070605L, littleEndianLong);
+        Assert.True(reader.TryReadBigEndian(out short bigEndianShort));
+        Assert.Equal(0x0304, bigEndianShort);
+        Assert.True(reader.End);
+    }
+
+    [Fact]
+    public void ArcBufferReader_BinaryReads_InsufficientDataDoesNotAdvance()
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write([1]);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.False(reader.TryReadBigEndian(out short value));
+
+        Assert.Equal(0, value);
+        Assert.Equal(1, reader.Length);
+        Assert.Equal(0, reader.Consumed);
+    }
+
     /// <summary>
     /// Verifies that large pages are reused by the pool.
     /// </summary>

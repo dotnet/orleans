@@ -1,5 +1,6 @@
 using System;
 using System.Buffers;
+using System.Buffers.Binary;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -39,6 +40,9 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
     // The total length of the buffer.
     private int _totalLength;
+
+    // The total number of bytes consumed from this buffer.
+    private long _consumed;
 
     // Indicates whether the writer has been disposed.
     private bool _disposed;
@@ -238,6 +242,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
         UnpinAll();
         _totalLength = _readIndex = 0;
+        _consumed = 0;
         _readPage = _writePage = _tail = ArcBufferPagePool.Shared.Rent();
         Debug.Assert(_readPage.ReferenceCount == 0);
         _readPage.Pin(_readPage.Version);
@@ -250,6 +255,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
         UnpinAll();
         _totalLength = _readIndex = 0;
+        _consumed = 0;
         _readPage = _writePage = _tail = null!;
         _disposed = true;
     }
@@ -325,6 +331,140 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         }
 
         return bytesCopied;
+    }
+
+    /// <summary>
+    /// Gets the contiguous unread bytes in the current read page.
+    /// </summary>
+    internal ReadOnlySpan<byte> UnreadSpan
+    {
+        get
+        {
+            ThrowIfDisposed();
+            if (Length == 0)
+            {
+                return default;
+            }
+
+            return _readPage.AsSpan(_readIndex, _readPage.Length - _readIndex);
+        }
+    }
+
+    /// <summary>
+    /// Gets the total number of bytes which have been consumed from this buffer.
+    /// </summary>
+    internal long Consumed
+    {
+        get
+        {
+            ThrowIfDisposed();
+            return _consumed;
+        }
+    }
+
+    /// <summary>
+    /// Peeks at a byte at the specified offset into the unread data.
+    /// </summary>
+    internal bool TryPeek(long offset, out byte value)
+    {
+        ThrowIfDisposed();
+
+        if (offset < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset));
+        }
+
+        if (offset >= Length)
+        {
+            value = default;
+            return false;
+        }
+
+        Debug.Assert(offset <= int.MaxValue);
+        var remainingOffset = (int)offset;
+        var current = _readPage;
+        var pageOffset = _readIndex;
+        while (current is not null)
+        {
+            var available = current.Length - pageOffset;
+            if (remainingOffset < available)
+            {
+                value = current.AsSpan(pageOffset + remainingOffset, 1)[0];
+                return true;
+            }
+
+            remainingOffset -= available;
+            current = current.Next;
+            pageOffset = 0;
+        }
+
+        value = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the offset of the first occurrence of <paramref name="value"/> in the unread data, or -1 if it is not found.
+    /// </summary>
+    internal int IndexOf(byte value)
+    {
+        ThrowIfDisposed();
+
+        var result = 0;
+        var remaining = Length;
+        var current = _readPage;
+        var pageOffset = _readIndex;
+        while (remaining > 0 && current is not null)
+        {
+            var span = current.AsSpan(pageOffset, Math.Min(current.Length - pageOffset, remaining));
+            var index = span.IndexOf(value);
+            if (index >= 0)
+            {
+                return result + index;
+            }
+
+            result += span.Length;
+            remaining -= span.Length;
+            current = current.Next;
+            pageOffset = 0;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Returns the offset of the first occurrence of any of <paramref name="values"/> in the unread data, or -1 if none are found.
+    /// </summary>
+    internal int IndexOfAny(ReadOnlySpan<byte> values)
+    {
+        ThrowIfDisposed();
+
+        if (values.IsEmpty)
+        {
+            return -1;
+        }
+
+        var result = 0;
+        var remaining = Length;
+        var current = _readPage;
+        var pageOffset = _readIndex;
+        while (remaining > 0 && current is not null)
+        {
+            var span = current.AsSpan(pageOffset, Math.Min(current.Length - pageOffset, remaining));
+            for (var i = 0; i < span.Length; i++)
+            {
+                if (values.IndexOf(span[i]) >= 0)
+                {
+                    return result + i;
+                }
+            }
+
+            result += span.Length;
+            remaining -= span.Length;
+            current = current.Next;
+            pageOffset = 0;
+        }
+
+        return -1;
     }
 
     /// <summary>
@@ -448,8 +588,15 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     {
         ThrowIfDisposed();
 
-        Debug.Assert(count >= 0);
-        Debug.Assert(count <= Length);
+#if NET6_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, Length);
+#else
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count), "Count must be greater than or equal to 0.");
+        if (count > Length) throw new ArgumentOutOfRangeException(nameof(count), "Count must be less than or equal to the unconsumed length of the buffer.");
+#endif
+
+        _consumed += count;
 
         _readIndex += count;
 
@@ -853,6 +1000,8 @@ public sealed class ArcBufferPage
 /// <param name="writer">The writer.</param>
 public readonly struct ArcBufferReader(ArcBufferWriter writer)
 {
+    private readonly long _consumedOffset = writer.Consumed;
+
     /// <summary>
     /// Gets the number of unconsumed bytes.
     /// </summary>
@@ -863,12 +1012,97 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     }
 
     /// <summary>
+    /// Gets a value indicating whether there are no unread bytes.
+    /// </summary>
+    public bool End
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => writer.Length == 0;
+    }
+
+    /// <summary>
+    /// Gets the total number of bytes which have been consumed by this reader.
+    /// </summary>
+    public long Consumed
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => writer.Consumed - _consumedOffset;
+    }
+
+    /// <summary>
+    /// Gets the number of unread bytes.
+    /// </summary>
+    public long Remaining
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => writer.Length;
+    }
+
+    /// <summary>
+    /// Gets the contiguous unread bytes in the current read page.
+    /// </summary>
+    public ReadOnlySpan<byte> UnreadSpan
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => writer.UnreadSpan;
+    }
+
+    /// <summary>
     /// Attempts to read the provided number of bytes from the buffer.
     /// </summary>
     /// <param name="destination">The destination, which may be used to hold the requested data if the data needs to be copied.</param>
     /// <returns>A span of either zero length, if the data is unavailable, or the requested length if the data is available.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ReadOnlySpan<byte> Peek(scoped in Span<byte> destination) => writer.Peek(in destination);
+
+    /// <summary>
+    /// Peeks at the next byte without advancing.
+    /// </summary>
+    /// <param name="value">The next byte, or zero if the reader is at the end.</param>
+    /// <returns><see langword="true"/> if a byte was available; otherwise, <see langword="false"/>.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryPeek(out byte value) => writer.TryPeek(0, out value);
+
+    /// <summary>
+    /// Peeks at the byte at the specified offset without advancing.
+    /// </summary>
+    /// <param name="offset">The offset from the current reader position.</param>
+    /// <param name="value">The byte at the specified offset, or zero if the offset is past the end.</param>
+    /// <returns><see langword="true"/> if a byte was available at the specified offset; otherwise, <see langword="false"/>.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public bool TryPeek(long offset, out byte value) => writer.TryPeek(offset, out value);
+
+    /// <summary>
+    /// Reads the next byte and advances the reader.
+    /// </summary>
+    /// <param name="value">The byte read, or zero if the reader is at the end.</param>
+    /// <returns><see langword="true"/> if a byte was read; otherwise, <see langword="false"/>.</returns>
+    public bool TryRead(out byte value)
+    {
+        if (!writer.TryPeek(0, out value))
+        {
+            return false;
+        }
+
+        writer.AdvanceReader(1);
+        return true;
+    }
+
+    /// <summary>
+    /// Copies unread bytes into <paramref name="destination"/> without advancing the reader.
+    /// </summary>
+    /// <param name="destination">The destination span.</param>
+    /// <returns><see langword="true"/> if enough unread bytes were available to fill <paramref name="destination"/>; otherwise, <see langword="false"/>.</returns>
+    public bool TryCopyTo(Span<byte> destination)
+    {
+        if (writer.Length < destination.Length)
+        {
+            return false;
+        }
+
+        writer.Peek(destination);
+        return true;
+    }
 
     /// <summary>
     /// Returns a slice of the provided length without marking the data referred to it as consumed.
@@ -887,6 +1121,472 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     public ArcBuffer ConsumeSlice(int count) => writer.ConsumeSlice(count);
 
     /// <summary>
+    /// Reads exactly <paramref name="count"/> bytes as a zero-copy slice and advances the reader.
+    /// </summary>
+    /// <param name="count">The number of bytes to read.</param>
+    /// <param name="slice">The consumed slice, if enough data was available.</param>
+    /// <returns><see langword="true"/> if the requested number of bytes was read; otherwise, <see langword="false"/>.</returns>
+    public bool TryReadExact(int count, out ArcBuffer slice)
+    {
+#if NET6_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
+#else
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count), "Count must be greater than or equal to 0.");
+#endif
+
+        if (writer.Length < count)
+        {
+            slice = default;
+            return false;
+        }
+
+        slice = writer.ConsumeSlice(count);
+        return true;
+    }
+
+    /// <summary>
+    /// Advances the reader to the specified delimiter.
+    /// </summary>
+    /// <param name="delimiter">The delimiter to search for.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
+    /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryAdvanceTo(byte delimiter, bool advancePastDelimiter = true)
+    {
+        var index = writer.IndexOf(delimiter);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        writer.AdvanceReader(index + (advancePastDelimiter ? 1 : 0));
+        return true;
+    }
+
+    /// <summary>
+    /// Advances the reader to any of the specified delimiters.
+    /// </summary>
+    /// <param name="delimiters">The delimiters to search for.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when one is found.</param>
+    /// <returns><see langword="true"/> if a delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryAdvanceToAny(ReadOnlySpan<byte> delimiters, bool advancePastDelimiter = true)
+    {
+        var index = writer.IndexOfAny(delimiters);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        writer.AdvanceReader(index + (advancePastDelimiter ? 1 : 0));
+        return true;
+    }
+
+    /// <summary>
+    /// Reads bytes until <paramref name="delimiter"/> is found.
+    /// </summary>
+    /// <param name="slice">The bytes before the delimiter, if it was found.</param>
+    /// <param name="delimiter">The delimiter to search for.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
+    /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true)
+    {
+        var index = writer.IndexOf(delimiter);
+        if (index < 0)
+        {
+            slice = default;
+            return false;
+        }
+
+        slice = writer.ConsumeSlice(index);
+        if (advancePastDelimiter)
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reads bytes until an unescaped <paramref name="delimiter"/> is found.
+    /// </summary>
+    /// <param name="slice">The bytes before the delimiter, if it was found.</param>
+    /// <param name="delimiter">The delimiter to search for.</param>
+    /// <param name="delimiterEscape">The escape byte which causes a delimiter to be skipped.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
+    /// <returns><see langword="true"/> if an unescaped delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryReadTo(out ArcBuffer slice, byte delimiter, byte delimiterEscape, bool advancePastDelimiter = true)
+    {
+        var offset = 0;
+        while (TryFind(delimiter, offset, out var index))
+        {
+            if (!IsEscaped(index, delimiterEscape))
+            {
+                slice = writer.ConsumeSlice(index);
+                if (advancePastDelimiter)
+                {
+                    writer.AdvanceReader(1);
+                }
+
+                return true;
+            }
+
+            offset = index + 1;
+        }
+
+        slice = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Reads bytes until the specified delimiter sequence is found.
+    /// </summary>
+    /// <param name="slice">The bytes before the delimiter, if it was found.</param>
+    /// <param name="delimiter">The delimiter sequence to search for.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
+    /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryReadTo(out ArcBuffer slice, ReadOnlySpan<byte> delimiter, bool advancePastDelimiter = true)
+    {
+        if (delimiter.IsEmpty)
+        {
+            slice = writer.PeekSlice(0);
+            return true;
+        }
+
+        if (delimiter.Length == 1)
+        {
+            return TryReadTo(out slice, delimiter[0], advancePastDelimiter);
+        }
+
+        var index = IndexOf(delimiter);
+        if (index < 0)
+        {
+            slice = default;
+            return false;
+        }
+
+        slice = writer.ConsumeSlice(index);
+        if (advancePastDelimiter)
+        {
+            writer.AdvanceReader(delimiter.Length);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reads bytes until any of the specified delimiters is found.
+    /// </summary>
+    /// <param name="slice">The bytes before the delimiter, if one was found.</param>
+    /// <param name="delimiters">The delimiters to search for.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when one is found.</param>
+    /// <returns><see langword="true"/> if a delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryReadToAny(out ArcBuffer slice, ReadOnlySpan<byte> delimiters, bool advancePastDelimiter = true)
+    {
+        var index = writer.IndexOfAny(delimiters);
+        if (index < 0)
+        {
+            slice = default;
+            return false;
+        }
+
+        slice = writer.ConsumeSlice(index);
+        if (advancePastDelimiter)
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Advances past consecutive instances of <paramref name="value"/>.
+    /// </summary>
+    /// <param name="value">The value to advance past.</param>
+    /// <returns>The number of bytes advanced.</returns>
+    public long AdvancePast(byte value)
+    {
+        var start = writer.Consumed;
+        while (writer.TryPeek(0, out var current) && current == value)
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return writer.Consumed - start;
+    }
+
+    /// <summary>
+    /// Advances past consecutive instances of any of the specified values.
+    /// </summary>
+    /// <param name="values">The values to advance past.</param>
+    /// <returns>The number of bytes advanced.</returns>
+    public long AdvancePastAny(ReadOnlySpan<byte> values)
+    {
+        var start = writer.Consumed;
+        while (writer.TryPeek(0, out var current) && values.IndexOf(current) >= 0)
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return writer.Consumed - start;
+    }
+
+    /// <summary>
+    /// Advances past consecutive instances of <paramref name="value0"/> or <paramref name="value1"/>.
+    /// </summary>
+    /// <returns>The number of bytes advanced.</returns>
+    public long AdvancePastAny(byte value0, byte value1)
+    {
+        var start = writer.Consumed;
+        while (writer.TryPeek(0, out var current) && (current == value0 || current == value1))
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return writer.Consumed - start;
+    }
+
+    /// <summary>
+    /// Advances past consecutive instances of <paramref name="value0"/>, <paramref name="value1"/>, or <paramref name="value2"/>.
+    /// </summary>
+    /// <returns>The number of bytes advanced.</returns>
+    public long AdvancePastAny(byte value0, byte value1, byte value2)
+    {
+        var start = writer.Consumed;
+        while (writer.TryPeek(0, out var current) && (current == value0 || current == value1 || current == value2))
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return writer.Consumed - start;
+    }
+
+    /// <summary>
+    /// Advances past consecutive instances of <paramref name="value0"/>, <paramref name="value1"/>, <paramref name="value2"/>, or <paramref name="value3"/>.
+    /// </summary>
+    /// <returns>The number of bytes advanced.</returns>
+    public long AdvancePastAny(byte value0, byte value1, byte value2, byte value3)
+    {
+        var start = writer.Consumed;
+        while (writer.TryPeek(0, out var current) && (current == value0 || current == value1 || current == value2 || current == value3))
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return writer.Consumed - start;
+    }
+
+    /// <summary>
+    /// Checks whether the next byte matches <paramref name="next"/>.
+    /// </summary>
+    /// <param name="next">The byte to compare to the next byte.</param>
+    /// <param name="advancePast">Whether to advance past the byte if it matches.</param>
+    /// <returns><see langword="true"/> if the next byte matches; otherwise, <see langword="false"/>.</returns>
+    public bool IsNext(byte next, bool advancePast = false)
+    {
+        if (!writer.TryPeek(0, out var value) || value != next)
+        {
+            return false;
+        }
+
+        if (advancePast)
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Checks whether the next bytes match <paramref name="next"/>.
+    /// </summary>
+    /// <param name="next">The bytes to compare to the next bytes.</param>
+    /// <param name="advancePast">Whether to advance past the bytes if they match.</param>
+    /// <returns><see langword="true"/> if the next bytes match; otherwise, <see langword="false"/>.</returns>
+    public bool IsNext(ReadOnlySpan<byte> next, bool advancePast = false)
+    {
+        if (next.Length > writer.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < next.Length; i++)
+        {
+            if (!writer.TryPeek(i, out var value) || value != next[i])
+            {
+                return false;
+            }
+        }
+
+        if (advancePast)
+        {
+            writer.AdvanceReader(next.Length);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a 16-bit integer encoded in little-endian byte order.
+    /// </summary>
+    public bool TryReadLittleEndian(out short value)
+    {
+        if (writer.Length < sizeof(short))
+        {
+            value = default;
+            return false;
+        }
+
+        var unread = writer.UnreadSpan;
+        if (unread.Length >= sizeof(short))
+        {
+            value = BinaryPrimitives.ReadInt16LittleEndian(unread);
+        }
+        else
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(short)];
+            writer.Peek(bytes);
+            value = BinaryPrimitives.ReadInt16LittleEndian(bytes);
+        }
+
+        writer.AdvanceReader(sizeof(short));
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a 32-bit integer encoded in little-endian byte order.
+    /// </summary>
+    public bool TryReadLittleEndian(out int value)
+    {
+        if (writer.Length < sizeof(int))
+        {
+            value = default;
+            return false;
+        }
+
+        var unread = writer.UnreadSpan;
+        if (unread.Length >= sizeof(int))
+        {
+            value = BinaryPrimitives.ReadInt32LittleEndian(unread);
+        }
+        else
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(int)];
+            writer.Peek(bytes);
+            value = BinaryPrimitives.ReadInt32LittleEndian(bytes);
+        }
+
+        writer.AdvanceReader(sizeof(int));
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a 64-bit integer encoded in little-endian byte order.
+    /// </summary>
+    public bool TryReadLittleEndian(out long value)
+    {
+        if (writer.Length < sizeof(long))
+        {
+            value = default;
+            return false;
+        }
+
+        var unread = writer.UnreadSpan;
+        if (unread.Length >= sizeof(long))
+        {
+            value = BinaryPrimitives.ReadInt64LittleEndian(unread);
+        }
+        else
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(long)];
+            writer.Peek(bytes);
+            value = BinaryPrimitives.ReadInt64LittleEndian(bytes);
+        }
+
+        writer.AdvanceReader(sizeof(long));
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a 16-bit integer encoded in big-endian byte order.
+    /// </summary>
+    public bool TryReadBigEndian(out short value)
+    {
+        if (writer.Length < sizeof(short))
+        {
+            value = default;
+            return false;
+        }
+
+        var unread = writer.UnreadSpan;
+        if (unread.Length >= sizeof(short))
+        {
+            value = BinaryPrimitives.ReadInt16BigEndian(unread);
+        }
+        else
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(short)];
+            writer.Peek(bytes);
+            value = BinaryPrimitives.ReadInt16BigEndian(bytes);
+        }
+
+        writer.AdvanceReader(sizeof(short));
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a 32-bit integer encoded in big-endian byte order.
+    /// </summary>
+    public bool TryReadBigEndian(out int value)
+    {
+        if (writer.Length < sizeof(int))
+        {
+            value = default;
+            return false;
+        }
+
+        var unread = writer.UnreadSpan;
+        if (unread.Length >= sizeof(int))
+        {
+            value = BinaryPrimitives.ReadInt32BigEndian(unread);
+        }
+        else
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(int)];
+            writer.Peek(bytes);
+            value = BinaryPrimitives.ReadInt32BigEndian(bytes);
+        }
+
+        writer.AdvanceReader(sizeof(int));
+        return true;
+    }
+
+    /// <summary>
+    /// Reads a 64-bit integer encoded in big-endian byte order.
+    /// </summary>
+    public bool TryReadBigEndian(out long value)
+    {
+        if (writer.Length < sizeof(long))
+        {
+            value = default;
+            return false;
+        }
+
+        var unread = writer.UnreadSpan;
+        if (unread.Length >= sizeof(long))
+        {
+            value = BinaryPrimitives.ReadInt64BigEndian(unread);
+        }
+        else
+        {
+            Span<byte> bytes = stackalloc byte[sizeof(long)];
+            writer.Peek(bytes);
+            value = BinaryPrimitives.ReadInt64BigEndian(bytes);
+        }
+
+        writer.AdvanceReader(sizeof(long));
+        return true;
+    }
+
+    /// <summary>
     /// Consumes the amount of data present in the span.
     /// </summary>
     /// <param name="output"></param>
@@ -901,9 +1601,104 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
         writer.AdvanceReader(count);
     }
 
+    /// <summary>
+    /// Advances the reader by the specified number of bytes.
+    /// </summary>
+    /// <param name="count">The number of bytes to advance.</param>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void Advance(int count) => writer.AdvanceReader(count);
+
+    /// <summary>
+    /// Advances the reader by the specified number of bytes.
+    /// </summary>
+    /// <param name="count">The number of bytes to advance.</param>
+    public void Advance(long count)
+    {
+#if NET6_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, int.MaxValue);
+#else
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count), "Count must be greater than or equal to 0.");
+        if (count > int.MaxValue) throw new ArgumentOutOfRangeException(nameof(count), "Count must be less than or equal to Int32.MaxValue.");
+#endif
+
+        writer.AdvanceReader((int)count);
+    }
+
+    /// <summary>
+    /// Advances the reader to the end.
+    /// </summary>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public void AdvanceToEnd() => writer.AdvanceReader(writer.Length);
+
+    /// <summary>
+    /// Advances the reader by the specified number of bytes.
+    /// </summary>
+    /// <param name="count">The number of bytes to advance.</param>
     public void Skip(int count)
     {
         writer.AdvanceReader(count);
+    }
+
+    private bool TryFind(byte value, int offset, out int index)
+    {
+#if NET6_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
+#else
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be greater than or equal to 0.");
+#endif
+
+        for (var i = offset; i < writer.Length; i++)
+        {
+            if (writer.TryPeek(i, out var current) && current == value)
+            {
+                index = i;
+                return true;
+            }
+        }
+
+        index = -1;
+        return false;
+    }
+
+    private int IndexOf(ReadOnlySpan<byte> delimiter)
+    {
+        var maxStart = writer.Length - delimiter.Length;
+        for (var i = 0; i <= maxStart; i++)
+        {
+            var found = true;
+            for (var j = 0; j < delimiter.Length; j++)
+            {
+                if (!writer.TryPeek(i + j, out var value) || value != delimiter[j])
+                {
+                    found = false;
+                    break;
+                }
+            }
+
+            if (found)
+            {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private bool IsEscaped(int delimiterIndex, byte delimiterEscape)
+    {
+        var escapeCount = 0;
+        for (var i = delimiterIndex - 1; i >= 0; i--)
+        {
+            if (!writer.TryPeek(i, out var value) || value != delimiterEscape)
+            {
+                break;
+            }
+
+            escapeCount++;
+        }
+
+        return (escapeCount & 1) != 0;
     }
 }
 
