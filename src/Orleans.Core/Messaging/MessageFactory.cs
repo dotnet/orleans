@@ -41,6 +41,7 @@ namespace Orleans.Runtime
                 IsAlwaysInterleave = (options & InvokeMethodOptions.AlwaysInterleave) != 0,
                 BodyObject = body,
                 DisposeBodyObject = body is IInvokable,
+                BodyObjectIsShared = body is IInvokable,
                 RequestContextData = RequestContextExtensions.Export(_deepCopier),
             };
 

@@ -208,6 +208,11 @@ namespace Orleans.Runtime.Messaging
 
                     _messagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
+                    if (msg.Direction == Message.Directions.Request && msg.BodyObjectIsShared)
+                    {
+                        msg.DisposeBodyObject = false;
+                    }
+
                     this.ReceiveMessage(msg);
                 }
                 else

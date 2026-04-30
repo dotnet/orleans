@@ -108,7 +108,6 @@ namespace Orleans.Runtime
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
             _cancellationTokenRegistration.Dispose();
-            this.Message.DisposeBody();
         }
 
         public void OnTimeout()
@@ -139,7 +138,6 @@ namespace Orleans.Runtime
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
             context.Complete(Response.FromException(exception));
-            this.Message.DisposeBody();
         }
 
         public void OnTargetSiloFail()
@@ -160,7 +158,6 @@ namespace Orleans.Runtime
             LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
             this.context.Complete(Response.FromException(exception));
-            this.Message.DisposeBody();
         }
 
         public void DoCallback(Message response)
@@ -177,14 +174,7 @@ namespace Orleans.Runtime
             _applicationRequestInstruments.OnAppRequestsEnd((long)this.stopwatch.Elapsed.TotalMilliseconds);
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
-            try
-            {
-                ResponseCallback(response, this.context);
-            }
-            finally
-            {
-                this.Message.DisposeBody();
-            }
+            ResponseCallback(response, this.context);
         }
 
         private static void ResponseCallback(Message message, IResponseCompletionSource context)

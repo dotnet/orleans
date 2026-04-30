@@ -91,19 +91,34 @@ namespace Orleans.Runtime
         /// <typeparam name="TInvokable">The invokable type.</typeparam>
         /// <param name="index">The index of the activator in the array.</param>
         public void EnsureActivator<TInvokable>(int index)
+            => _ = GetOrCreateActivator<TInvokable>(index);
+
+        /// <summary>
+        /// Gets an activator from the cached array at the specified index.
+        /// Callers must ensure <see cref="EnsureActivator{TInvokable}(int)"/> has been called first.
+        /// </summary>
+        /// <typeparam name="TInvokable">The invokable type.</typeparam>
+        /// <param name="index">The index of the activator in the array.</param>
+        /// <returns>The activator for the specified invokable type.</returns>
+        public IActivator<TInvokable> GetActivator<TInvokable>(int index)
         {
             var activators = _activators;
-            if (activators.Length > index && activators[index] is not null)
+            if (activators.Length > index && activators[index] is IActivator<TInvokable> result)
             {
-                return;
+                return result;
             }
 
+            return GetOrCreateActivator<TInvokable>(index);
+        }
+
+        private IActivator<TInvokable> GetOrCreateActivator<TInvokable>(int index)
+        {
             lock (_activatorsLock)
             {
-                activators = _activators;
-                if (activators.Length > index && activators[index] is not null)
+                var activators = _activators;
+                if (activators.Length > index && activators[index] is IActivator<TInvokable> result)
                 {
-                    return;
+                    return result;
                 }
 
                 // Grow array if necessary
@@ -115,20 +130,12 @@ namespace Orleans.Runtime
                 }
 
                 // Create the activator
-                activators[index] = CodecProvider.GetActivator<TInvokable>();
+                result = CodecProvider.GetActivator<TInvokable>();
+                activators[index] = result;
                 _activators = activators;
+                return result;
             }
         }
-
-        /// <summary>
-        /// Gets an activator from the cached array at the specified index.
-        /// Callers must ensure <see cref="EnsureActivator{TInvokable}(int)"/> has been called first.
-        /// </summary>
-        /// <typeparam name="TInvokable">The invokable type.</typeparam>
-        /// <param name="index">The index of the activator in the array.</param>
-        /// <returns>The activator for the specified invokable type.</returns>
-        public IActivator<TInvokable> GetActivator<TInvokable>(int index)
-            => (IActivator<TInvokable>)_activators[index];
     }
 
     /// <summary>
