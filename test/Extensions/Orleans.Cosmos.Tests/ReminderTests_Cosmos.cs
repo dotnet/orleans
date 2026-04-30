@@ -325,7 +325,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         await AdvanceReminderTimeAsync(period, cts.Token);
         await Task.WhenAll(g1TickTask, g2TickTask);
 
-        await StopReminderAndWaitForInactiveAsync(g1, DR, g1.StopReminder, cts.Token);
+        await StopReminderAndWaitForQuiescenceAsync(g1, DR, g1.StopReminder, cts.Token);
         Assert.Null(await g1.GetReminderObject(DR));
         Assert.Equal(1, observer.GetActiveReminderCount(g2.GetGrainId(), DR));
 
@@ -333,7 +333,7 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         await AdvanceReminderTimeAndWaitForTickAsync(g2, DR, period, cts.Token);
         Assert.Equal(stopped1TickCount, observer.GetTickCount(g1.GetGrainId(), DR));
 
-        await StopReminderAndWaitForInactiveAsync(g2, DR, g2.StopReminder, cts.Token);
+        await StopReminderAndWaitForQuiescenceAsync(g2, DR, g2.StopReminder, cts.Token);
         var stopped2TickCount = observer.GetTickCount(g2.GetGrainId(), DR);
         await AdvanceReminderTimeAsync(period, cts.Token);
         Assert.Equal(stopped2TickCount, observer.GetTickCount(g2.GetGrainId(), DR));
@@ -345,16 +345,6 @@ public class ReminderTests_Cosmos : ReminderTestsBase, IClassFixture<ReminderTes
         var tickTask = observer.WaitForAdditionalTickCountAsync(grain, 1, cancellationToken, reminderName);
         await AdvanceReminderTimeAsync(amount, cancellationToken);
         await tickTask;
-    }
-
-    private async Task StopReminderAndWaitForInactiveAsync(IAddressable grain, string reminderName, Func<string, Task> stopReminder, CancellationToken cancellationToken)
-    {
-        var unregisteredTask = observer.WaitForReminderUnregisteredAsync(grain, reminderName, cancellationToken);
-        var inactiveTask = observer.WaitForReminderQuiescenceAsync(grain, reminderName, cancellationToken);
-
-        await stopReminder(reminderName);
-        await unregisteredTask;
-        await inactiveTask;
     }
 
     [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/4319"), TestCategory("Functional")]
