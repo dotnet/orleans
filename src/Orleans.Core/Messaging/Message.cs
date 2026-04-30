@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
@@ -14,6 +15,14 @@ namespace Orleans.Runtime
 
         [NonSerialized]
         private short _retryCount;
+
+        [NonSerialized]
+        private int _refCount;
+
+#if DEBUG
+        [NonSerialized]
+        private string? _lastTransferTag;
+#endif
 
         public CoarseStopwatch _timeToExpiry;
 
@@ -303,6 +312,73 @@ namespace Orleans.Runtime
             }
         }
 
+        internal void InitializeRefCount()
+        {
+            // Messages are acquired once when checked out from the pool.
+            // Additional owners must call Acquire() and Release().
+            _refCount = 1;
+#if DEBUG
+            _lastTransferTag = null;
+#endif
+        }
+
+        internal void Acquire()
+        {
+            var newRefCount = Interlocked.Increment(ref _refCount);
+            Debug.Assert(newRefCount > 1);
+        }
+
+        internal void Release()
+        {
+            var newRefCount = Interlocked.Decrement(ref _refCount);
+            if (newRefCount == 0)
+            {
+                MessagePool.ReturnCore(this);
+            }
+            else if (newRefCount < 0)
+            {
+                // Ref count should never go negative - indicates a double release.
+#if DEBUG
+                Debug.Fail($"Message ref count went negative. Last transfer tag: '{_lastTransferTag}'");
+#else
+                Debug.Fail("Message ref count went negative.");
+#endif
+            }
+        }
+
+        [Conditional("DEBUG")]
+        internal void MarkTransferred(string tag)
+        {
+#if DEBUG
+            _lastTransferTag = tag;
+#endif
+        }
+
+        /// <summary>
+        /// Releases this message after it has been dropped (expired, rejected, blocked, etc).
+        /// Marks the transfer for debugging and releases the reference.
+        /// </summary>
+        /// <param name="reason">A short description of why the message was dropped.</param>
+        internal void ReleaseDropped(string reason)
+        {
+            MarkTransferred($"Dropped:{reason}");
+            Release();
+        }
+
+        /// <summary>
+        /// Asserts that this message has not been released (refcount > 0).
+        /// Only executes in DEBUG builds.
+        /// </summary>
+        [Conditional("DEBUG")]
+        internal void AssertNotReleased([System.Runtime.CompilerServices.CallerMemberName] string? caller = null)
+        {
+#if DEBUG
+            var currentRefCount = Volatile.Read(ref _refCount);
+            Debug.Assert(currentRefCount > 0,
+                $"Message used after release. Caller: {caller}, RefCount: {currentRefCount}, LastTransfer: {_lastTransferTag}");
+#endif
+        }
+
         public override string ToString() => $"{this}";
 
         string IFormattable.ToString(string? format, IFormatProvider? formatProvider) => ToString();
@@ -371,6 +447,31 @@ grow:
 
         internal bool IsPing() => _requestContextData?.TryGetValue(RequestContext.PING_APPLICATION_HEADER, out var value) == true && value is bool isPing && isPing;
 
+        /// <summary>
+        /// Resets the message to its default state for reuse.
+        /// </summary>
+        internal void Reset()
+        {
+            _retryCount = 0;
+            _timeToExpiry = default;
+            BodyObject = null;
+            _headers = default;
+            _id = default;
+            _refCount = 0;
+#if DEBUG
+            _lastTransferTag = null;
+#endif
+
+            _requestContextData = null;
+            _targetSilo = null;
+            _targetGrain = default;
+            _sendingSilo = null;
+            _sendingGrain = default;
+            _interfaceVersion = 0;
+            _interfaceType = default;
+            _cacheInvalidationHeader = null;
+        }
+
         [Flags]
         internal enum MessageFlags : ushort
         {
@@ -386,10 +487,10 @@ grow:
             HasTimeToLive = 1 << 8,
 
             // Message cannot be forwarded to another activation.
-            IsLocalOnly = 1 << 9, 
+            IsLocalOnly = 1 << 9,
 
             // Message must not trigger grain activation or extend an activation's lifetime.
-            SuppressKeepAlive = 1 << 10,  
+            SuppressKeepAlive = 1 << 10,
 
             // The most significant bit is reserved, possibly for use to indicate more data follows.
             Reserved = 1 << 15,

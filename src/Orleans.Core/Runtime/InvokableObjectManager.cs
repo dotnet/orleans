@@ -63,6 +63,7 @@ namespace Orleans
             if (!ObserverGrainId.TryParse(message.TargetGrain, out var observerId))
             {
                 LogNotAddressedToAnObserver(logger, message);
+                message.ReleaseDropped("NotAddressedToObserver");
                 return;
             }
 
@@ -73,6 +74,7 @@ namespace Orleans
             else
             {
                 LogUnexpectedTargetInRequest(logger, message.TargetGrain, message);
+                message.ReleaseDropped("ObserverNotFound");
             }
         }
 
@@ -159,6 +161,7 @@ namespace Orleans
                     LogObserverGarbageCollected(_manager.logger, this.ObserverId, message);
                     // Try to remove. If it's not there, we don't care.
                     _manager.TryDeregister(this.ObserverId);
+                    message.ReleaseDropped("ObserverGarbageCollected");
                     return;
                 }
 
@@ -258,6 +261,7 @@ namespace Orleans
                     if (message.IsExpired)
                     {
                         _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Invoke);
+                        message.ReleaseDropped("ExpiredAtInvoke");
                         return;
                     }
 
@@ -333,6 +337,7 @@ namespace Orleans
                 if (message.IsExpired)
                 {
                     _manager.messagingTrace.OnDropExpiredMessage(message, MessagingInstruments.Phase.Respond);
+                    message.ReleaseDropped("ExpiredAtRespond");
                     return;
                 }
 

@@ -62,6 +62,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
+                msg.ReleaseDropped("ExpiredAtReceive");
                 return;
             }
 
@@ -73,6 +74,7 @@ namespace Orleans.Runtime.Messaging
                 this.messageCenter.TryDeliverToProxy(rejection);
                 LogRejectingRequestDueToOverloading(this.Log, msg);
                 GatewayInstruments.GatewayLoadShedding.Add(1);
+                msg.ReleaseDropped("RejectedGatewayOverload");
                 return;
             }
 
@@ -147,6 +149,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                msg.ReleaseDropped("ExpiredAtSend");
                 return false;
             }
 
@@ -169,11 +172,13 @@ namespace Orleans.Runtime.Messaging
                     Message.RejectionTypes.Transient,
                     $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
                     new SiloUnavailableException());
+                msg.ReleaseDropped("FailedSendRequest");
             }
             else
             {
                 LogSiloDroppingMessage(this.Log, this.myAddress, msg, reason);
                 MessagingInstruments.OnDroppedSentMessage(msg);
+                msg.ReleaseDropped("FailedSendNonRequest");
             }
         }
 

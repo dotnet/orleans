@@ -85,7 +85,8 @@ namespace Orleans.Runtime.Messaging
                 var body = input.Slice(bodyOffset, bodyLength);
 
                 // Build message
-                message = new();
+                message = MessagePool.Get();
+
                 if (header.IsSingleSegment)
                 {
                     var headersReader = Reader.Create(header.First.Span, _deserializationSession);

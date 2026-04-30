@@ -24,6 +24,8 @@ namespace Orleans.Runtime
         {
             this.shared = shared;
             this.context = ctx;
+            // CallbackData holds a reference to the request message while awaiting completion.
+            msg.Acquire();
             this.Message = msg;
             _applicationRequestInstruments = applicationRequestInstruments;
             this.stopwatch = ValueStopwatch.StartNew();
@@ -108,6 +110,7 @@ namespace Orleans.Runtime
             OrleansCallBackDataEvent.Instance.OnCanceled(Message);
             context.Complete(Response.FromException(new OperationCanceledException(_cancellationTokenRegistration.Token)));
             _cancellationTokenRegistration.Dispose();
+            ReleaseRequest("CallbackData.OnCancellation");
         }
 
         public void OnTimeout()
@@ -138,6 +141,7 @@ namespace Orleans.Runtime
 
             var exception = new TimeoutException($"Response did not arrive on time in {timeout} for message: {msg}. {statusMessage}");
             context.Complete(Response.FromException(exception));
+            ReleaseRequest("CallbackData.OnTimeout");
         }
 
         public void OnTargetSiloFail()
@@ -158,6 +162,7 @@ namespace Orleans.Runtime
             LogTargetSiloFail(this.shared.Logger, msg, statusMessage, Constants.TroubleshootingHelpLink);
             var exception = new SiloUnavailableException($"The target silo became unavailable for message: {msg}. {statusMessage}See {Constants.TroubleshootingHelpLink} for troubleshooting help.");
             this.context.Complete(Response.FromException(exception));
+            ReleaseRequest("CallbackData.OnTargetSiloFail");
         }
 
         public void DoCallback(Message response)
@@ -175,6 +180,13 @@ namespace Orleans.Runtime
 
             // do callback outside the CallbackData lock. Just not a good practice to hold a lock for this unrelated operation.
             ResponseCallback(response, this.context);
+            ReleaseRequest("CallbackData.DoCallback");
+        }
+
+        private void ReleaseRequest(string tag)
+        {
+            Message.MarkTransferred($"{tag}:ReleaseRequest");
+            Message.Release();
         }
 
         private static void ResponseCallback(Message message, IResponseCompletionSource context)

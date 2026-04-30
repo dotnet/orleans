@@ -298,6 +298,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                 Message.RejectionTypes.Transient,
                 exception,
                 "Exception while creating grain context");
+            msg.ReleaseDropped("ExceptionCreatingContext");
         }
     }
 
