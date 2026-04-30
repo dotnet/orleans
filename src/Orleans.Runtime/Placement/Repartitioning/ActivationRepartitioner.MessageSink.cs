@@ -41,7 +41,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
     {
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ForceYielding | ConfigureAwaitOptions.ContinueOnCapturedContext);
 
-        var drainBuffer = new Message[128];
+        var drainBuffer = new RecordedMessage[128];
         var iteration = 0;
         const int MaxIterationsPerYield = 128;
         while (!cancellationToken.IsCancellationRequested)
@@ -51,8 +51,7 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
             {
                 foreach (var message in drainBuffer[..count])
                 {
-                    if (!IsFullyAddressed(message) || // The silo addresses (likely the target) is set null some time later (after the message is recorded), this can lead to a NRE
-                        !_messageFilter.IsAcceptable(message, out var isSenderMigratable, out var isTargetMigratable))
+                    if (!_messageFilter.IsAcceptable(message.SendingGrain, message.TargetGrain, out var isSenderMigratable, out var isTargetMigratable))
                     {
                         continue;
                     }
@@ -122,7 +121,8 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
             return;
         }
 
-        if (_pendingMessages.TryAdd(message) == Utilities.BufferStatus.Success)
+        var recordedMessage = new RecordedMessage(message.SendingGrain, message.SendingSilo!, message.TargetGrain, message.TargetSilo!);
+        if (_pendingMessages.TryAdd(recordedMessage) == Utilities.BufferStatus.Success)
         {
             _pendingMessageEvent.Signal();
         }
@@ -131,6 +131,14 @@ internal sealed partial class ActivationRepartitioner : IMessageStatisticsSink
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     private static bool IsFullyAddressed(Message message) =>
         message.IsSenderFullyAddressed && message.IsTargetFullyAddressed;
+
+    private sealed class RecordedMessage(GrainId sendingGrain, SiloAddress sendingSilo, GrainId targetGrain, SiloAddress targetSilo)
+    {
+        public GrainId SendingGrain { get; } = sendingGrain;
+        public SiloAddress SendingSilo { get; } = sendingSilo;
+        public GrainId TargetGrain { get; } = targetGrain;
+        public SiloAddress TargetSilo { get; } = targetSilo;
+    }
 
     async ValueTask IActivationRepartitionerSystemTarget.FlushBuffers()
     {

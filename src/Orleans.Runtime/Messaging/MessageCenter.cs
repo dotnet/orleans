@@ -534,8 +534,8 @@ namespace Orleans.Runtime.Messaging
                         return;
                     }
 
-                    targetActivation.ReceiveMessage(msg);
                     _messageObserver?.Invoke(msg);
+                    targetActivation.ReceiveMessage(msg);
                 }
             }
             catch (Exception ex)
