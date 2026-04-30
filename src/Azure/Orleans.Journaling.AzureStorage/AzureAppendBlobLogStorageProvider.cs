@@ -8,7 +8,7 @@ namespace Orleans.Journaling;
 internal sealed class AzureAppendBlobLogStorageProvider(
     IOptions<AzureAppendBlobLogStorageOptions> options,
     IServiceProvider serviceProvider,
-    ILogger<AzureAppendBlobLogStorage> logger) : ILogStorageProvider, ILifecycleParticipant<ISiloLifecycle>
+    ILogger<AzureAppendBlobLogStorage> logger) : ILogStorageProvider, ILogFormatKeyProvider, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly IBlobContainerFactory _containerFactory = options.Value.BuildContainerFactory(serviceProvider, options.Value);
     private readonly AzureAppendBlobLogStorageOptions _options = options.Value;
@@ -24,9 +24,11 @@ internal sealed class AzureAppendBlobLogStorageProvider(
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
         var blobName = _options.GetBlobName(grainContext.GrainId);
         var blobClient = container.GetAppendBlobClient(blobName);
-        var logFormatKey = _options.GetLogFormatKey(grainContext.GrainId.Type);
-        return new AzureAppendBlobLogStorage(blobClient, logger, logFormatKey);
+        return new AzureAppendBlobLogStorage(blobClient, logger);
     }
+
+    public string GetLogFormatKey(IGrainContext grainContext)
+        => _options.GetLogFormatKey(grainContext.GrainId.Type);
 
     public void Participate(ISiloLifecycle observer)
     {

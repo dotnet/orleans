@@ -205,7 +205,7 @@ public class CodecRecoveryTests : JournalingTestBase
         return (manager, storage, lifecycle);
     }
 
-    private static VolatileLogStorage CreateProtobufStorage() => new(LogFormatKeys.Protobuf);
+    private static VolatileLogStorage CreateProtobufStorage() => new();
 
     private sealed class TestGrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
     {

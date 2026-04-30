@@ -15,7 +15,7 @@ public sealed class CodecRecoveryTests : JournalingTestBase
     [Fact]
     public async Task MessagePackCodec_Dictionary_WriteAndRecover()
     {
-        var storage = new VolatileLogStorage(LogFormatKeys.MessagePack);
+        var storage = new VolatileLogStorage();
 
         var sut = CreateTestSystemWithMessagePackCodec(storage);
         var dict = new DurableDictionary<string, int>("dict", sut.Manager, new MessagePackDictionaryOperationCodec<string, int>(SerializerOptions));

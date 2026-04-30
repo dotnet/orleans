@@ -10,7 +10,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class LogManager : ILogManager, ILogDataSink, ILogEntrySink, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class LogManager : ILogManager, ILogEntrySink, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationLogStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -35,18 +35,16 @@ internal sealed partial class LogManager : ILogManager, ILogDataSink, ILogEntryS
     private Task? _pendingWrite;
     private ulong _nextLogStreamId = MinApplicationLogStreamId;
     private ILogSegmentWriter? _currentLogSegmentWriter;
-    private ArcBufferWriter? _recoveryBuffer;
-    private int? _minimumRecoveryBufferLength;
 
     public LogManager(
         ILogStorage storage,
         ILogger<LogManager> logger,
         IOptions<LogManagerOptions> options,
         TimeProvider timeProvider,
-        IServiceProvider serviceProvider)
+        IServiceProvider serviceProvider,
+        LogFormatKey logFormatKey)
     {
         _storage = storage;
-        var logFormatKey = LogFormatServices.GetValidatedLogFormatKey(storage);
         _logFormat = LogFormatServices.GetRequiredKeyedService<ILogFormat>(serviceProvider, logFormatKey);
         var dictionaryCodecProvider = LogFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, logFormatKey);
         _logger = logger;
@@ -74,7 +72,6 @@ internal sealed partial class LogManager : ILogManager, ILogDataSink, ILogEntryS
         ILogFormat? logFormat = null)
     {
         _storage = storage;
-        LogFormatServices.GetValidatedLogFormatKey(storage);
         _logFormat = logFormat ?? OrleansBinaryLogFormat.Instance;
         _logger = logger;
         _timeProvider = timeProvider;
@@ -248,11 +245,11 @@ internal sealed partial class LogManager : ILogManager, ILogDataSink, ILogEntryS
                                 {
                                     if (isSnapshot)
                                     {
-                                        await _storage.ReplaceAsync(committedBuffer, cancellationToken).ConfigureAwait(true);
+                                        await _storage.ReplaceAsync(committedBuffer.AsReadOnlySequence(), cancellationToken).ConfigureAwait(true);
                                     }
                                     else
                                     {
-                                        await _storage.AppendAsync(committedBuffer, cancellationToken).ConfigureAwait(true);
+                                        await _storage.AppendAsync(committedBuffer.AsReadOnlySequence(), cancellationToken).ConfigureAwait(true);
                                     }
 
                                     writeSucceeded = true;
@@ -440,18 +437,8 @@ internal sealed partial class LogManager : ILogManager, ILogDataSink, ILogEntryS
         }
 
         using var recoveryBuffer = new ArcBufferWriter();
-        _recoveryBuffer = recoveryBuffer;
-        _minimumRecoveryBufferLength = null;
-        try
-        {
-            await _storage.ReadAsync(this, cancellationToken).ConfigureAwait(true);
-            ProcessRecoveryBuffer(isCompleted: true);
-        }
-        finally
-        {
-            _recoveryBuffer = null;
-            _minimumRecoveryBufferLength = null;
-        }
+        await _storage.ReadAsync(recoveryBuffer, ProcessRecoveryBuffer, cancellationToken).ConfigureAwait(true);
+        ProcessRecoveryBuffer(new ArcBufferReader(recoveryBuffer), isCompleted: true);
 
         lock (_lock)
         {
@@ -482,57 +469,18 @@ internal sealed partial class LogManager : ILogManager, ILogDataSink, ILogEntryS
         stateMachine.Apply(payload);
     }
 
-    void ILogDataSink.OnLogData(ArcBuffer data)
-    {
-        var recoveryBuffer = _recoveryBuffer ?? throw new InvalidOperationException("Log recovery is not active.");
-        data.CopyTo(recoveryBuffer);
-        ProcessRecoveryBuffer(isCompleted: false);
-    }
+    private void ProcessRecoveryBuffer(ArcBufferReader reader) => ProcessRecoveryBuffer(reader, isCompleted: false);
 
-    private void ProcessRecoveryBuffer(bool isCompleted)
+    private void ProcessRecoveryBuffer(ArcBufferReader reader, bool isCompleted)
     {
-        var recoveryBuffer = _recoveryBuffer ?? throw new InvalidOperationException("Log recovery is not active.");
-        while (recoveryBuffer.Length > 0)
+        while (_logFormat.TryRead(reader, this, isCompleted))
         {
-            if (!isCompleted && _minimumRecoveryBufferLength is { } minimumBufferLength && recoveryBuffer.Length < minimumBufferLength)
-            {
-                return;
-            }
-
-            using var data = recoveryBuffer.PeekSlice(recoveryBuffer.Length);
-            var result = _logFormat.Read(data, this, isCompleted);
-            if (result.BytesConsumed > data.Length)
-            {
-                throw new InvalidOperationException(
-                    $"The log format consumed {result.BytesConsumed} byte(s), exceeding the supplied buffer length {data.Length}.");
-            }
-
-            if (result.BytesConsumed == 0)
-            {
-                if (isCompleted)
-                {
-                    throw new InvalidOperationException("The log format did not consume the completed log data.");
-                }
-
-                _minimumRecoveryBufferLength = result.MinimumBufferLength;
-                return;
-            }
-
-            recoveryBuffer.AdvanceReader(result.BytesConsumed);
-            _minimumRecoveryBufferLength = null;
-            if (recoveryBuffer.Length == 0)
-            {
-                return;
-            }
-
-            _minimumRecoveryBufferLength = result.MinimumBufferLength;
-            if (!isCompleted)
-            {
-                return;
-            }
         }
 
-        _minimumRecoveryBufferLength = null;
+        if (isCompleted && reader.Length > 0)
+        {
+            throw new InvalidOperationException("The log format did not consume the completed log data.");
+        }
     }
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken)

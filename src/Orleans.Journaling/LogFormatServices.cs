@@ -4,25 +4,19 @@ namespace Orleans.Journaling;
 
 internal static class LogFormatServices
 {
-    public static string GetValidatedLogFormatKey(ILogStorage storage)
-    {
-        ArgumentNullException.ThrowIfNull(storage);
-        return ValidateLogFormatKey(storage.LogFormatKey);
-    }
-
     public static string ValidateLogFormatKey(string? logFormatKey)
     {
         if (string.IsNullOrWhiteSpace(logFormatKey))
         {
-            throw new InvalidOperationException($"The configured {nameof(ILogStorage)}.{nameof(ILogStorage.LogFormatKey)} must be a non-empty log format key.");
+            throw new InvalidOperationException("The configured log format key must be non-empty.");
         }
 
         return logFormatKey;
     }
 
-    public static T GetRequiredKeyedService<T>(IServiceProvider serviceProvider, ILogStorage storage)
+    public static T GetRequiredKeyedService<T>(IServiceProvider serviceProvider, LogFormatKey logFormatKey)
         where T : notnull
-        => GetRequiredKeyedService<T>(serviceProvider, GetValidatedLogFormatKey(storage));
+        => GetRequiredKeyedService<T>(serviceProvider, logFormatKey.Value);
 
     public static T GetRequiredKeyedService<T>(IServiceProvider serviceProvider, string logFormatKey)
         where T : notnull

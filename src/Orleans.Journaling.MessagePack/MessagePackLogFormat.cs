@@ -9,24 +9,30 @@ internal sealed class MessagePackLogFormat : ILogFormat
     public ILogSegmentWriter CreateWriter()
         => new MessagePackLogSegmentWriter();
 
-    public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
-        var reader = new SequenceReader<byte>(input.AsReadOnlySequence());
-        int? minimumBufferLength = null;
-        while (!reader.End)
+        if (input.Length == 0)
         {
-            var offset = reader.Consumed;
-            if (!MessagePackLogEntryReader.TryReadEntry(ref reader, offset, isCompleted, out var streamId, out var payload, out minimumBufferLength))
-            {
-                break;
-            }
-
-            consumer.OnEntry(streamId, payload);
+            return false;
         }
 
-        return new(checked((int)reader.Consumed), reader.End ? null : minimumBufferLength);
+        using var buffered = input.PeekSlice(input.Length);
+        var reader = new SequenceReader<byte>(buffered.AsReadOnlySequence());
+        if (!MessagePackLogEntryReader.TryReadEntry(ref reader, offset: 0, isCompleted, out var streamId, out var payload, out _))
+        {
+            return false;
+        }
+
+        if (reader.Consumed > int.MaxValue)
+        {
+            throw new InvalidOperationException("Malformed MessagePack log entry stream: log entry exceeds maximum supported frame size.");
+        }
+
+        input.Skip(checked((int)reader.Consumed));
+        consumer.OnEntry(streamId, payload);
+        return true;
     }
 
     private sealed class MessagePackLogSegmentWriter : LogSegmentWriterBase

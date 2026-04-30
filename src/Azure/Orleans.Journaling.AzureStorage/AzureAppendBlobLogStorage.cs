@@ -13,27 +13,22 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
     private static readonly AppendBlobCreateOptions CreateOptions = new() { Conditions = new() { IfNoneMatch = ETag.All } };
     private readonly AppendBlobClient _client;
     private readonly ILogger<AzureAppendBlobLogStorage> _logger;
-    private readonly string _logFormatKey;
     private readonly AppendBlobAppendBlockOptions _appendOptions;
     private bool _exists;
     private int _numBlocks;
 
     public bool IsCompactionRequested => _numBlocks > 10;
 
-    public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger, string logFormatKey)
+    public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger)
     {
         _client = client;
         _logger = logger;
-        ArgumentException.ThrowIfNullOrWhiteSpace(logFormatKey);
-        _logFormatKey = logFormatKey;
 
         // For the first request, if we have not performed a read yet, we want to guard against clobbering an existing blob.
         _appendOptions = new AppendBlobAppendBlockOptions() { Conditions = new AppendBlobRequestConditions { IfNoneMatch = ETag.All } };
     }
 
-    public string LogFormatKey => _logFormatKey;
-
-    public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+    public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         if (!_exists)
         {
@@ -43,7 +38,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
             _exists = true;
         }
 
-        using var stream = new BorrowedArcBufferReadOnlyStream(value);
+        using var stream = new ReadOnlySequenceStream(value);
         var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
         LogAppend(_logger, stream.Length, _client.BlobContainerName, _client.Name);
 
@@ -63,7 +58,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         _numBlocks = 0;
     }
 
-    public async ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken)
+    public async ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
     {
         Response<BlobDownloadStreamingResult> result;
         try
@@ -93,7 +88,6 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         long totalBytesRead = 0;
         while (true)
         {
-            using var buffer = new ArcBufferWriter();
             var mem = buffer.GetMemory();
             var bytesRead = await rawStream.ReadAsync(mem, cancellationToken).ConfigureAwait(false);
             if (bytesRead == 0)
@@ -104,8 +98,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
 
             buffer.AdvanceWriter(bytesRead);
             totalBytesRead += bytesRead;
-            using var data = buffer.ConsumeSlice(buffer.Length);
-            consumer.OnLogData(data);
+            consume(new ArcBufferReader(buffer));
         }
     }
 
@@ -128,7 +121,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         return result;
     }
 
-    public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+    public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         // Create a snapshot of the blob for recovery purposes.
         var blobSnapshot = await _client.CreateSnapshotAsync(conditions: _appendOptions.Conditions, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -144,7 +137,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         _appendOptions.Conditions.IfNoneMatch = default;
 
         // Write the state machine snapshot.
-        using var stream = new BorrowedArcBufferReadOnlyStream(value);
+        using var stream = new ReadOnlySequenceStream(value);
         var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
         LogReplace(_logger, _client.BlobContainerName, _client.Name, stream.Length);
 
@@ -171,9 +164,9 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         Message = "Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
 
-    private sealed class BorrowedArcBufferReadOnlyStream(ArcBuffer buffer) : Stream
+    private sealed class ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
     {
-        private readonly ReadOnlySequence<byte> _sequence = buffer.AsReadOnlySequence();
+        private readonly ReadOnlySequence<byte> _sequence = sequence;
         private long _position;
         private bool _disposed;
 
@@ -288,7 +281,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         {
             if (_disposed)
             {
-                throw new ObjectDisposedException(nameof(BorrowedArcBufferReadOnlyStream));
+                throw new ObjectDisposedException(nameof(ReadOnlySequenceStream));
             }
         }
 

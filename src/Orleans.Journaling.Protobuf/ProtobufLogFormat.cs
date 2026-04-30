@@ -11,50 +11,52 @@ internal sealed class ProtobufLogFormat : ILogFormat
     public ILogSegmentWriter CreateWriter()
         => new ProtobufLogSegmentWriter();
 
-    public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
-        var remaining = input.AsReadOnlySequence();
-        var offset = 0L;
-        int? minimumBufferLength = null;
-        while (!remaining.IsEmpty)
+        if (input.Length == 0)
         {
-            var reader = new SequenceReader<byte>(remaining);
-            if (!ProtobufLogEntryReader.TryReadLengthPrefix(ref reader, offset, isCompleted, out var messageLength, out minimumBufferLength))
-            {
-                break;
-            }
-
-            var prefixLength = reader.Consumed;
-            if (messageLength == 0)
-            {
-                throw new InvalidOperationException(
-                    $"Malformed protobuf log entry stream at byte offset {offset}: empty LogEntry messages are not valid.");
-            }
-
-            if (messageLength > (ulong)reader.Remaining)
-            {
-                if (!isCompleted)
-                {
-                    minimumBufferLength = messageLength <= int.MaxValue - prefixLength ? checked((int)(prefixLength + messageLength)) : null;
-                    break;
-                }
-
-                throw new InvalidOperationException(
-                    $"Malformed protobuf log entry stream at byte offset {offset}: LogEntry length {messageLength} exceeds remaining input bytes {reader.Remaining}.");
-            }
-
-            var message = remaining.Slice(prefixLength, messageLength);
-            ProtobufLogEntryReader.ReadMessage(message, offset, out var streamId, out var payload);
-            consumer.OnEntry(streamId, payload);
-
-            var frameLength = checked(prefixLength + (long)messageLength);
-            remaining = remaining.Slice(frameLength);
-            offset += frameLength;
+            return false;
         }
 
-        return new(checked((int)offset), remaining.IsEmpty ? null : minimumBufferLength);
+        using var buffered = input.PeekSlice(input.Length);
+        var remaining = buffered.AsReadOnlySequence();
+        var reader = new SequenceReader<byte>(remaining);
+        if (!ProtobufLogEntryReader.TryReadLengthPrefix(ref reader, offset: 0, isCompleted, out var messageLength, out _))
+        {
+            return false;
+        }
+
+        var prefixLength = reader.Consumed;
+        if (messageLength == 0)
+        {
+            throw new InvalidOperationException(
+                "Malformed protobuf log entry stream at byte offset 0: empty LogEntry messages are not valid.");
+        }
+
+        if (messageLength > (ulong)reader.Remaining)
+        {
+            if (!isCompleted)
+            {
+                return false;
+            }
+
+            throw new InvalidOperationException(
+                $"Malformed protobuf log entry stream at byte offset 0: LogEntry length {messageLength} exceeds remaining input bytes {reader.Remaining}.");
+        }
+
+        var frameLength = checked(prefixLength + (long)messageLength);
+        if (frameLength > int.MaxValue)
+        {
+            throw new InvalidOperationException("Malformed protobuf log entry stream: LogEntry exceeds maximum supported frame size.");
+        }
+
+        input.Skip(checked((int)frameLength));
+        var message = remaining.Slice(prefixLength, messageLength);
+        ProtobufLogEntryReader.ReadMessage(message, offset: 0, out var streamId, out var payload);
+        consumer.OnEntry(streamId, payload);
+        return true;
     }
 
     private sealed class ProtobufLogSegmentWriter : LogSegmentWriterBase

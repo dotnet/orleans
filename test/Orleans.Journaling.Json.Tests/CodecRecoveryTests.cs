@@ -150,7 +150,7 @@ public class CodecRecoveryTests : JournalingTestBase
         return (manager, storage, lifecycle);
     }
 
-    private static VolatileLogStorage CreateJsonStorage() => new(LogFormatKeys.Json);
+    private static VolatileLogStorage CreateJsonStorage() => new();
 
     private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };

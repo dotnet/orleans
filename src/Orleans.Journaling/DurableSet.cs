@@ -27,10 +27,10 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     private readonly HashSet<T> _items = [];
     private ILogWriter? _storage;
 
-    public DurableSet([ServiceKey] string key, ILogManager manager, ILogStorage storage, IServiceProvider serviceProvider)
+    public DurableSet([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 

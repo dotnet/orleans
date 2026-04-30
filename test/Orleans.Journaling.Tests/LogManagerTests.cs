@@ -73,7 +73,7 @@ public class LogManagerTests : JournalingTestBase
         }
 
         using var data = segment.GetCommittedBuffer();
-        await storage.AppendAsync(data, CancellationToken.None);
+        await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         var sut = CreateTestSystem(storage: storage);
 
         await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
@@ -87,7 +87,7 @@ public class LogManagerTests : JournalingTestBase
         var storage = new CapturingStorage { IsCompactionRequested = true };
         using (var data = CreateBuffer(physicalBytes))
         {
-            await storage.AppendAsync(data, CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
         var format = new DecodedPayloadOnlyLogFormat(new LogStreamId(99), decodedPayload);
@@ -204,7 +204,6 @@ public class LogManagerTests : JournalingTestBase
 
         Assert.NotNull(storage.AppendBytesAfterYield);
         Assert.NotEmpty(storage.AppendBytesAfterYield);
-        Assert.Throws<InvalidOperationException>(storage.ReadRetainedAppendBuffer);
     }
 
     [Fact]
@@ -220,7 +219,6 @@ public class LogManagerTests : JournalingTestBase
 
         Assert.NotNull(storage.ReplaceBytesAfterYield);
         Assert.NotEmpty(storage.ReplaceBytesAfterYield);
-        Assert.Throws<InvalidOperationException>(storage.ReadRetainedReplaceBuffer);
     }
 
     [Fact]
@@ -753,19 +751,17 @@ public class LogManagerTests : JournalingTestBase
     {
         public bool StreamingReadCalled { get; private set; }
 
-        public string LogFormatKey => LogFormatKeys.OrleansBinary;
-
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
         {
             StreamingReadCalled = true;
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -787,9 +783,11 @@ public class LogManagerTests : JournalingTestBase
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        using var buffer = writer.ConsumeSlice(writer.Length);
+        var reader = new ArcBufferReader(writer);
         var consumer = new CapturingLogEntrySink();
-        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(buffer, consumer, isCompleted: true);
+        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true))
+        {
+        }
 
         return consumer.Entries;
     }
@@ -825,12 +823,18 @@ public class LogManagerTests : JournalingTestBase
 
         public ILogSegmentWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
+        public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
         {
+            if (input.Length == 0)
+            {
+                return false;
+            }
+
             var callbackPayload = _payload.ToArray();
             consumer.OnEntry(_streamId, new ReadOnlySequence<byte>(callbackPayload));
             Array.Fill(callbackPayload, byte.MaxValue);
-            return new LogFormatReadResult(input.Length);
+            input.Skip(input.Length);
+            return true;
         }
     }
 
@@ -847,10 +851,10 @@ public class LogManagerTests : JournalingTestBase
             return writer;
         }
 
-        public LogFormatReadResult Read(ArcBuffer input, ILogEntrySink consumer, bool isCompleted)
+        public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
         {
             ReadCount++;
-            return ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(input, consumer, isCompleted);
+            return ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(input, consumer, isCompleted);
         }
     }
 
@@ -910,26 +914,22 @@ public class LogManagerTests : JournalingTestBase
 
         public int ReadCallbackCount { get; private set; }
 
-        public string LogFormatKey => LogFormatKeys.OrleansBinary;
-
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
         {
             if (ConcatenateReads)
             {
-                using var writer = new ArcBufferWriter();
                 foreach (var segment in _segments)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    writer.Write(segment);
+                    buffer.Write(segment);
                 }
 
-                if (writer.Length > 0)
+                if (_segments.Count > 0)
                 {
-                    using var data = writer.ConsumeSlice(writer.Length);
                     ReadCallbackCount++;
-                    consumer.OnLogData(data);
+                    consume(new ArcBufferReader(buffer));
                 }
 
                 return default;
@@ -938,17 +938,15 @@ public class LogManagerTests : JournalingTestBase
             foreach (var segment in _segments)
             {
                 cancellationToken.ThrowIfCancellationRequested();
-                using var writer = new ArcBufferWriter();
-                writer.Write(segment);
-                using var data = writer.ConsumeSlice(writer.Length);
                 ReadCallbackCount++;
-                consumer.OnLogData(data);
+                buffer.Write(segment);
+                consume(new ArcBufferReader(buffer));
             }
 
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var bytes = value.ToArray();
@@ -958,7 +956,7 @@ public class LogManagerTests : JournalingTestBase
             return default;
         }
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var bytes = value.ToArray();
@@ -977,23 +975,19 @@ public class LogManagerTests : JournalingTestBase
 
     private sealed class RawReadStorage(byte[] bytes) : ILogStorage
     {
-        public string LogFormatKey => LogFormatKeys.OrleansBinary;
-
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            using var writer = new ArcBufferWriter();
-            writer.Write(bytes);
-            using var data = writer.ConsumeSlice(writer.Length);
-            consumer.OnLogData(data);
+            buffer.Write(bytes);
+            consume(new ArcBufferReader(buffer));
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
@@ -1002,69 +996,54 @@ public class LogManagerTests : JournalingTestBase
     {
         public int ReadCallbackCount { get; private set; }
 
-        public string LogFormatKey => LogFormatKeys.OrleansBinary;
-
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
         {
             for (var offset = 0; offset < bytes.Length; offset += chunkSize)
             {
                 cancellationToken.ThrowIfCancellationRequested();
                 var length = Math.Min(chunkSize, bytes.Length - offset);
-                using var writer = new ArcBufferWriter();
-                writer.Write(bytes.AsSpan(offset, length));
-                using var data = writer.ConsumeSlice(writer.Length);
                 ReadCallbackCount++;
-                consumer.OnLogData(data);
+                buffer.Write(bytes.AsSpan(offset, length));
+                consume(new ArcBufferReader(buffer));
             }
 
             return default;
         }
 
-        public ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
-        public ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken) => default;
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
     private sealed class DelayedBorrowingStorage : ILogStorage
     {
-        private ArcBuffer _retainedAppendBuffer;
-        private ArcBuffer _retainedReplaceBuffer;
-
         public byte[]? AppendBytesAfterYield { get; private set; }
 
         public byte[]? ReplaceBytesAfterYield { get; private set; }
 
-        public string LogFormatKey => LogFormatKeys.OrleansBinary;
-
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken) => default;
+        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken) => default;
 
-        public async ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
-            _retainedReplaceBuffer = value;
             await Task.Yield();
             cancellationToken.ThrowIfCancellationRequested();
             ReplaceBytesAfterYield = value.ToArray();
         }
 
-        public async ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken)
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
-            _retainedAppendBuffer = value;
             await Task.Yield();
             cancellationToken.ThrowIfCancellationRequested();
             AppendBytesAfterYield = value.ToArray();
         }
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
-
-        public byte[] ReadRetainedAppendBuffer() => _retainedAppendBuffer.ToArray();
-
-        public byte[] ReadRetainedReplaceBuffer() => _retainedReplaceBuffer.ToArray();
     }
 
     private sealed class ManualDirectWriteStateMachine : IDurableStateMachine

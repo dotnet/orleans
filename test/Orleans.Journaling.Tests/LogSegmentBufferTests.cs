@@ -54,7 +54,7 @@ public sealed class LogSegmentBufferTests
         using var data = buffer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
-        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(data, consumer, isCompleted: true);
+        ReadAll(data, consumer);
 
         Assert.Collection(
             consumer.Entries,
@@ -80,7 +80,7 @@ public sealed class LogSegmentBufferTests
         using var data = buffer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
-        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(data, consumer, isCompleted: true);
+        ReadAll(data, consumer);
 
         Assert.Collection(
             consumer.Entries,
@@ -295,11 +295,12 @@ public sealed class LogSegmentBufferTests
     [InlineData(new byte[] { 255, 255, 255, 255 }, "exceeds remaining input bytes")]
     public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
-        using var data = CreateBuffer(bytes);
+        using var data = CreateWriter(bytes);
+        var reader = new ArcBufferReader(data);
         var consumer = new CollectingConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(data, consumer, isCompleted: true));
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -318,11 +319,21 @@ public sealed class LogSegmentBufferTests
         entry.Commit();
     }
 
-    private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> bytes)
+    private static ArcBufferWriter CreateWriter(ReadOnlySpan<byte> bytes)
+    {
+        var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        return writer;
+    }
+
+    private static void ReadAll(ArcBuffer data, ILogEntrySink consumer)
     {
         using var writer = new ArcBufferWriter();
-        writer.Write(bytes);
-        return writer.ConsumeSlice(writer.Length);
+        writer.Write(data.AsReadOnlySequence());
+        var reader = new ArcBufferReader(writer);
+        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true))
+        {
+        }
     }
 
     private static (uint Length, ulong StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)

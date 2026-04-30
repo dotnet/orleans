@@ -10,21 +10,20 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_AppendAndReplaceStoreRawBuffers()
     {
-        var storage = new VolatileLogStorage("custom-format");
+        var storage = new VolatileLogStorage();
         var segmentBytes = new byte[] { 1, 2, 3, 4 };
         var snapshotBytes = new byte[] { 5, 6, 7 };
 
         using (var segmentData = CreateBuffer(segmentBytes))
         {
-            await storage.AppendAsync(segmentData, CancellationToken.None);
+            await storage.AppendAsync(segmentData.AsReadOnlySequence(), CancellationToken.None);
         }
 
         using (var snapshotData = CreateBuffer(snapshotBytes))
         {
-            await storage.ReplaceAsync(snapshotData, CancellationToken.None);
+            await storage.ReplaceAsync(snapshotData.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        Assert.Equal("custom-format", storage.LogFormatKey);
         Assert.Single(storage.Segments);
         Assert.Equal(snapshotBytes, storage.Segments[0]);
     }
@@ -32,36 +31,43 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_ReadsRawBuffersWithoutFormatDecoding()
     {
-        var storage = new VolatileLogStorage("custom-format");
+        var storage = new VolatileLogStorage();
         var rawBytes = new byte[] { 255, 0, 1 };
-        var consumer = new CapturingLogDataConsumer();
+        using var buffer = new ArcBufferWriter();
+        var buffers = new List<byte[]>();
 
         using (var data = CreateBuffer(rawBytes))
         {
-            await storage.AppendAsync(data, CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        await storage.ReadAsync(consumer, CancellationToken.None);
+        await storage.ReadAsync(buffer, reader =>
+        {
+            using var data = reader.PeekSlice(reader.Length);
+            buffers.Add(data.ToArray());
+            reader.Skip(reader.Length);
+        }, CancellationToken.None);
 
-        var buffer = Assert.Single(consumer.Buffers);
-        Assert.Equal(rawBytes, buffer);
+        var captured = Assert.Single(buffers);
+        Assert.Equal(rawBytes, captured);
     }
 
     [Fact]
-    public async Task VolatileStorage_DisposesReadBufferAfterCallbackReturns()
+    public async Task VolatileStorage_AppendsReadsIntoCallerOwnedBuffer()
     {
         var storage = new VolatileLogStorage();
         var rawBytes = new byte[] { 1, 2, 3 };
-        var consumer = new RetainingLogDataConsumer();
+        using var buffer = new ArcBufferWriter();
 
         using (var data = CreateBuffer(rawBytes))
         {
-            await storage.AppendAsync(data, CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        await storage.ReadAsync(consumer, CancellationToken.None);
+        await storage.ReadAsync(buffer, _ => { }, CancellationToken.None);
 
-        Assert.Throws<InvalidOperationException>(() => consumer.RetainedBuffer.ToArray());
+        using var retained = buffer.PeekSlice(buffer.Length);
+        Assert.Equal(rawBytes, retained.ToArray());
     }
 
     [Fact]
@@ -69,26 +75,35 @@ public sealed class StorageStreamingTests
     {
         var storage = new VolatileLogStorage();
         var rawBytes = new byte[] { 1, 2, 3 };
-        using var consumer = new PinningLogDataConsumer();
+        using var buffer = new ArcBufferWriter();
+        ArcBuffer retainedBuffer = default;
 
         using (var data = CreateBuffer(rawBytes))
         {
-            await storage.AppendAsync(data, CancellationToken.None);
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        await storage.ReadAsync(consumer, CancellationToken.None);
+        try
+        {
+            await storage.ReadAsync(buffer, reader => retainedBuffer = reader.PeekSlice(reader.Length), CancellationToken.None);
 
-        Assert.Equal(rawBytes, consumer.RetainedBuffer.ToArray());
+            Assert.Equal(rawBytes, retainedBuffer.ToArray());
+        }
+        finally
+        {
+            retainedBuffer.Dispose();
+        }
     }
 
     [Fact]
     public void BinaryFormatRead_RejectsTruncatedFixed32Frame()
     {
-        using var data = CreateBuffer([10, 0, 0, 0, 1, 2]);
+        using var writer = CreateWriter([10, 0, 0, 0, 1, 2]);
+        var reader = new ArcBufferReader(writer);
         var consumer = new CapturingLogEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(data, consumer, isCompleted: true));
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true));
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -97,33 +112,37 @@ public sealed class StorageStreamingTests
     [Fact]
     public void BinaryFormatRead_WaitsForIncompleteFrameWhenInputIsNotCompleted()
     {
-        using var data = CreateBuffer([10, 0, 0, 0, 1, 2]);
+        using var writer = CreateWriter([10, 0, 0, 0, 1, 2]);
+        var reader = new ArcBufferReader(writer);
         var consumer = new CapturingLogEntrySink();
 
-        var result = ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(data, consumer, isCompleted: false);
+        var result = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: false);
 
-        Assert.Equal(0, result.BytesConsumed);
-        Assert.Equal(14, result.MinimumBufferLength);
+        Assert.False(result);
+        Assert.Equal(6, reader.Length);
         Assert.Empty(consumer.Entries);
     }
 
     [Fact]
-    public void BinaryFormatRead_ReturnsConsumedPrefixAndMinimumForPartialSuffix()
+    public void BinaryFormatRead_ConsumesCompletePrefixAndWaitsForPartialSuffix()
     {
         using var buffer = new LogSegmentBuffer();
         AppendEntry(buffer.CreateLogWriter(new LogStreamId(8)), [1, 2, 3]);
         using var committed = buffer.GetCommittedBuffer();
         var entryBytes = committed.ToArray();
-        using var data = CreateBuffer([.. entryBytes, 10, 0]);
+        using var data = CreateWriter([.. entryBytes, 10, 0]);
+        var reader = new ArcBufferReader(data);
         var consumer = new CapturingLogEntrySink();
 
-        var result = ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(data, consumer, isCompleted: false);
+        var firstResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: false);
+        var secondResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: false);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
         Assert.Equal([1, 2, 3], entry.Payload);
-        Assert.Equal(entryBytes.Length, result.BytesConsumed);
-        Assert.Equal(4, result.MinimumBufferLength);
+        Assert.True(firstResult);
+        Assert.False(secondResult);
+        Assert.Equal(2, reader.Length);
     }
 
     private static void AppendEntry(LogWriter writer, ReadOnlySpan<byte> payload)
@@ -140,11 +159,11 @@ public sealed class StorageStreamingTests
         return buffer.ConsumeSlice(buffer.Length);
     }
 
-    private sealed class CapturingLogDataConsumer : ILogDataSink
+    private static ArcBufferWriter CreateWriter(ReadOnlySpan<byte> value)
     {
-        public List<byte[]> Buffers { get; } = [];
-
-        public void OnLogData(ArcBuffer data) => Buffers.Add(data.ToArray());
+        var buffer = new ArcBufferWriter();
+        buffer.Write(value);
+        return buffer;
     }
 
     private sealed class CapturingLogEntrySink : ILogEntrySink
@@ -154,19 +173,4 @@ public sealed class StorageStreamingTests
         public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
     }
 
-    private sealed class RetainingLogDataConsumer : ILogDataSink
-    {
-        public ArcBuffer RetainedBuffer { get; private set; }
-
-        public void OnLogData(ArcBuffer data) => RetainedBuffer = data;
-    }
-
-    private sealed class PinningLogDataConsumer : ILogDataSink, IDisposable
-    {
-        public ArcBuffer RetainedBuffer { get; private set; }
-
-        public void OnLogData(ArcBuffer data) => RetainedBuffer = data.Slice(0, data.Length);
-
-        public void Dispose() => RetainedBuffer.Dispose();
-    }
 }

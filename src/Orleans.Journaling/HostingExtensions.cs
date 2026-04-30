@@ -9,6 +9,7 @@ public static class HostingExtensions
     public static ISiloBuilder AddLogStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<LogManagerOptions>();
+        builder.Services.TryAddScoped(static sp => new LogFormatKey(GetLogFormatKey(sp)));
         builder.Services.TryAddScoped<ILogStorage>(sp => sp.GetRequiredService<ILogStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<ILogManager, LogManager>();
 
@@ -45,5 +46,17 @@ public static class HostingExtensions
         builder.Services.TryAddKeyedScoped(typeof(IDurableTaskCompletionSource<>), KeyedService.AnyKey, typeof(DurableTaskCompletionSource<>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableNothing), KeyedService.AnyKey, typeof(DurableNothing));
         return builder;
+    }
+
+    private static string GetLogFormatKey(IServiceProvider serviceProvider)
+    {
+        var grainContext = serviceProvider.GetRequiredService<IGrainContext>();
+        var logFormatKeyProvider = serviceProvider.GetService<ILogFormatKeyProvider>();
+        if (logFormatKeyProvider is null && serviceProvider.GetService<ILogStorageProvider>() is ILogFormatKeyProvider storageProvider)
+        {
+            logFormatKeyProvider = storageProvider;
+        }
+
+        return logFormatKeyProvider?.GetLogFormatKey(grainContext) ?? LogFormatKeys.OrleansBinary;
     }
 }

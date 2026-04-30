@@ -1,9 +1,10 @@
-using Orleans.Serialization.Buffers;
+using System.Buffers;
 using System.Collections.Concurrent;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-public sealed class VolatileLogStorageProvider : ILogStorageProvider
+public sealed class VolatileLogStorageProvider : ILogStorageProvider, ILogFormatKeyProvider
 {
     private readonly string _logFormatKey;
     private readonly Func<GrainType, string>? _logFormatKeySelector;
@@ -34,10 +35,10 @@ public sealed class VolatileLogStorageProvider : ILogStorageProvider
     }
 
     public ILogStorage Create(IGrainContext grainContext)
-    {
-        var logFormatKey = GetLogFormatKey(grainContext.GrainId.Type);
-        return _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileLogStorage(logFormatKey));
-    }
+        => _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileLogStorage());
+
+    public string GetLogFormatKey(IGrainContext grainContext)
+        => GetLogFormatKey(grainContext.GrainId.Type);
 
     private string GetLogFormatKey(GrainType grainType)
     {
@@ -53,40 +54,29 @@ public sealed class VolatileLogStorageProvider : ILogStorageProvider
 public sealed class VolatileLogStorage : ILogStorage
 {
     private readonly List<byte[]> _segments = [];
-    private readonly string _logFormatKey;
 
-    public VolatileLogStorage() : this(LogFormatKeys.OrleansBinary)
+    public VolatileLogStorage()
     {
     }
-
-    public VolatileLogStorage(string logFormatKey)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(logFormatKey);
-        _logFormatKey = logFormatKey;
-    }
-
-    public string LogFormatKey => _logFormatKey;
 
     public bool IsCompactionRequested => _segments.Count > 10;
 
     internal IReadOnlyList<byte[]> Segments => _segments;
 
     /// <inheritdoc/>
-    public async ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken)
+    public async ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
     {
         await Task.CompletedTask;
-        using var buffer = new ArcBufferWriter();
         foreach (var segment in _segments)
         {
             cancellationToken.ThrowIfCancellationRequested();
             buffer.Write(segment);
-            using var data = buffer.ConsumeSlice(segment.Length);
-            consumer.OnLogData(data);
+            consume(new ArcBufferReader(buffer));
         }
     }
 
     /// <inheritdoc/>
-    public ValueTask AppendAsync(ArcBuffer segment, CancellationToken cancellationToken)
+    public ValueTask AppendAsync(ReadOnlySequence<byte> segment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _segments.Add(segment.ToArray());
@@ -94,7 +84,7 @@ public sealed class VolatileLogStorage : ILogStorage
     }
 
     /// <inheritdoc/>
-    public ValueTask ReplaceAsync(ArcBuffer snapshot, CancellationToken cancellationToken)
+    public ValueTask ReplaceAsync(ReadOnlySequence<byte> snapshot, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
         _segments.Clear();

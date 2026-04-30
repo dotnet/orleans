@@ -1,3 +1,4 @@
+using System.Buffers;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
@@ -8,17 +9,13 @@ namespace Orleans.Journaling;
 public interface ILogStorage
 {
     /// <summary>
-    /// Gets the configured physical log format key for this storage instance.
+    /// Reads all log data belonging to this instance into <paramref name="buffer"/> and invokes <paramref name="consume"/> after adding data.
     /// </summary>
-    string LogFormatKey { get; }
-
-    /// <summary>
-    /// Reads all log data belonging to this instance and pushes it to <paramref name="consumer"/>.
-    /// </summary>
-    /// <param name="consumer">The consumer which receives ordered raw log data chunks. Chunk boundaries are not log-entry boundaries.</param>
+    /// <param name="buffer">The buffer to append ordered raw log data to. Chunk boundaries are not log-entry boundaries.</param>
+    /// <param name="consume">Callback invoked after appending data so the caller can consume complete entries.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask ReadAsync(ILogDataSink consumer, CancellationToken cancellationToken);
+    ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken);
 
     /// <summary>
     /// Replaces the log with the provided value atomically.
@@ -26,7 +23,7 @@ public interface ILogStorage
     /// <param name="value">The encoded log bytes to write. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask ReplaceAsync(ArcBuffer value, CancellationToken cancellationToken);
+    ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken);
 
     /// <summary>
     /// Appends the provided segment to the log atomically.
@@ -34,7 +31,7 @@ public interface ILogStorage
     /// <param name="value">The encoded log bytes to append. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask AppendAsync(ArcBuffer value, CancellationToken cancellationToken);
+    ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken);
 
     /// <summary>
     /// Deletes the log atomically.

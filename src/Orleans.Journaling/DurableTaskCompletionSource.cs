@@ -31,13 +31,13 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         ILogManager manager,
-        ILogStorage storage,
+        LogFormatKey logFormatKey,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, storage).GetCodec<T>();
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterStateMachine(key, this);

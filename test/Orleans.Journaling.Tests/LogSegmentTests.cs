@@ -25,6 +25,7 @@ public sealed class AzureStorageLogSegmentTests : LogSegmentTests
         services.Configure<AzureAppendBlobLogStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
         services.AddSingleton<AzureAppendBlobLogStorageProvider>();
         services.AddFromExisting<ILogStorageProvider, AzureAppendBlobLogStorageProvider>();
+        services.AddFromExisting<ILogFormatKeyProvider, AzureAppendBlobLogStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobLogStorageProvider>();
     }
 }
