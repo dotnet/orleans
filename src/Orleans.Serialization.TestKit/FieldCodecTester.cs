@@ -971,27 +971,28 @@ namespace Orleans.Serialization.TestKit
         protected object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream)
         {
             object result;
-            using (var readerSession = SessionPool.GetSession())
-            using (var writeSession = SessionPool.GetSession())
+            using var readerSession = SessionPool.GetSession();
+            using var writeSession = SessionPool.GetSession();
+
+            using var bufferWriter = new ArcBufferWriter();
+            var writer = Writer.Create(bufferWriter, writeSession);
+            try
             {
-                var writer = Writer.CreatePooled(writeSession);
-                try
-                {
-                    var serializer = ServiceProvider.GetService<Serializer<object>>();
-                    serializer.Serialize(original, ref writer);
+                var serializer = ServiceProvider.GetService<Serializer<object>>();
+                serializer.Serialize(original, ref writer);
 
-                    using var analyzerSession = SessionPool.GetSession();
-                    var output = writer.Output.Slice();
-                    formattedBitStream = BitStreamFormatter.Format(output, analyzerSession);
+                using var analyzerSession = SessionPool.GetSession();
+                using var output = bufferWriter.ConsumeSlice(bufferWriter.Length);
+                var analyzerReader = Reader.Create(output, analyzerSession);
+                formattedBitStream = BitStreamFormatter.Format(ref analyzerReader);
 
-                    var reader = Reader.Create(output, readerSession);
+                var reader = Reader.Create(output, readerSession);
 
-                    result = serializer.Deserialize(ref reader);
-                }
-                finally
-                {
-                    writer.Dispose();
-                }
+                result = serializer.Deserialize(ref reader);
+            }
+            finally
+            {
+                writer.Dispose();
             }
 
             return result;
