@@ -169,7 +169,7 @@ namespace Orleans.Runtime
         /// </summary>
         /// <param name="action">The work item.</param>
         /// <param name="state">The state passed when invoking the item.</param>
-        void QueueAction(Action<object> action, object state);
+        void QueueAction(Action<object?> action, object? state);
     }
 
     /// <summary>
