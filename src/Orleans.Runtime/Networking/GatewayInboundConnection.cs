@@ -6,6 +6,7 @@ using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
 using Orleans.Messaging;
 
+#nullable disable
 namespace Orleans.Runtime.Messaging
 {
     internal sealed partial class GatewayInboundConnection : Connection
@@ -14,7 +15,6 @@ namespace Orleans.Runtime.Messaging
         private readonly ConnectionPreambleHelper connectionPreambleHelper;
         private readonly ConnectionOptions connectionOptions;
         private readonly Gateway gateway;
-        private readonly GatewayInstruments gatewayInstruments;
         private readonly OverloadDetector overloadDetector;
         private readonly SiloAddress myAddress;
         private readonly string myClusterId;
@@ -28,13 +28,11 @@ namespace Orleans.Runtime.Messaging
             ConnectionOptions connectionOptions,
             MessageCenter messageCenter,
             ConnectionCommon connectionShared,
-            ConnectionPreambleHelper connectionPreambleHelper,
-            GatewayInstruments gatewayInstruments)
+            ConnectionPreambleHelper connectionPreambleHelper)
             : base(connection, middleware, connectionShared)
         {
             this.connectionOptions = connectionOptions;
             this.gateway = gateway;
-            this.gatewayInstruments = gatewayInstruments;
             this.overloadDetector = overloadDetector;
             this.messageCenter = messageCenter;
             this.connectionPreambleHelper = connectionPreambleHelper;
@@ -48,14 +46,14 @@ namespace Orleans.Runtime.Messaging
 
         protected override void RecordMessageReceive(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstrumentation.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            this.gatewayInstruments.OnGatewayReceived();
+            MessagingInstruments.OnMessageReceive(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            GatewayInstruments.GatewayReceived.Add(1);
         }
 
         protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes)
         {
-            MessagingInstrumentation.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
-            this.gatewayInstruments.OnGatewaySent();
+            MessagingInstruments.OnMessageSend(msg, numTotalBytes, headerBytes, ConnectionDirection);
+            GatewayInstruments.GatewaySent.Add(1);
         }
 
         protected override void OnReceivedMessage(Message msg)
@@ -64,21 +62,23 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Receive);
+                msg.ReleaseDropped("ExpiredAtReceive");
                 return;
             }
 
             // Are we overloaded?
             if (this.overloadDetector.IsOverloaded)
             {
-                MessagingInstrumentation.OnRejectedMessage(msg);
+                MessagingInstruments.OnRejectedMessage(msg);
                 Message rejection = this.MessageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.GatewayTooBusy, "Shedding load");
                 this.messageCenter.TryDeliverToProxy(rejection);
                 LogRejectingRequestDueToOverloading(this.Log, msg);
-                this.gatewayInstruments.OnGatewayLoadShedding();
+                GatewayInstruments.GatewayLoadShedding.Add(1);
+                msg.ReleaseDropped("RejectedGatewayOverload");
                 return;
             }
 
-            SiloAddress? targetAddress = this.gateway.TryToReroute(msg);
+            SiloAddress targetAddress = this.gateway.TryToReroute(msg);
             msg.SendingSilo = this.myAddress;
             if (targetAddress is null)
             {
@@ -91,7 +91,7 @@ namespace Orleans.Runtime.Messaging
                     msg.TargetGrain = systemTargetId.WithSiloAddress(this.myAddress).GrainId;
                 }
 
-                MessagingInstrumentation.OnMessageReRoute(msg);
+                MessagingInstruments.OnMessageReRoute(msg);
                 this.messageCenter.RerouteMessage(msg);
             }
             else
@@ -149,6 +149,7 @@ namespace Orleans.Runtime.Messaging
             if (msg.IsExpired)
             {
                 this.MessagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                msg.ReleaseDropped("ExpiredAtSend");
                 return false;
             }
 
@@ -160,7 +161,7 @@ namespace Orleans.Runtime.Messaging
 
         public void FailMessage(Message msg, string reason)
         {
-            MessagingInstrumentation.OnFailedSentMessage(msg);
+            MessagingInstruments.OnFailedSentMessage(msg);
             if (msg.Direction == Message.Directions.Request)
             {
                 LogSiloRejectingMessage(this.Log, this.myAddress, msg, reason);
@@ -171,15 +172,17 @@ namespace Orleans.Runtime.Messaging
                     Message.RejectionTypes.Transient,
                     $"Silo {this.myAddress} is rejecting message: {msg}. Reason = {reason}",
                     new SiloUnavailableException());
+                msg.ReleaseDropped("FailedSendRequest");
             }
             else
             {
                 LogSiloDroppingMessage(this.Log, this.myAddress, msg, reason);
-                MessagingInstrumentation.OnDroppedSentMessage(msg);
+                MessagingInstruments.OnDroppedSentMessage(msg);
+                msg.ReleaseDropped("FailedSendNonRequest");
             }
         }
 
-        protected override void RetryMessage(Message msg, Exception? ex = null)
+        protected override void RetryMessage(Message msg, Exception ex = null)
         {
             if (msg == null) return;
 

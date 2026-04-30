@@ -373,6 +373,7 @@ namespace Orleans.Messaging
             if (msg.Direction != Message.Directions.Request)
             {
                 LogDroppingMessage(msg, reason);
+                msg.ReleaseDropped("DroppedNonRequest");
             }
             else
             {
@@ -380,6 +381,7 @@ namespace Orleans.Messaging
                 _messagingInstruments.OnRejectedMessage(msg);
                 var error = this.messageFactory.CreateRejectionResponse(msg, Message.RejectionTypes.Unrecoverable, reason, exc);
                 DispatchLocalMessage(error);
+                msg.ReleaseDropped("RejectedRequest");
             }
         }
 

@@ -19,8 +19,6 @@ namespace Orleans.Runtime.Messaging
         private readonly MessageFactory messageFactory;
         private readonly ConnectionManager connectionManager;
         private readonly RuntimeMessagingTrace messagingTrace;
-        private readonly MessagingInstruments _messagingInstruments;
-        private readonly MessagingProcessingInstruments _messagingProcessingInstruments;
         private readonly SiloAddress _siloAddress;
         private readonly SiloMessagingOptions messagingOptions;
         private readonly PlacementService placementService;
@@ -41,8 +39,6 @@ namespace Orleans.Runtime.Messaging
             ISiloStatusOracle siloStatusOracle,
             ConnectionManager senderManager,
             RuntimeMessagingTrace messagingTrace,
-            MessagingInstruments messagingInstruments,
-            MessagingProcessingInstruments messagingProcessingInstruments,
             IOptions<SiloMessagingOptions> messagingOptions,
             PlacementService placementService,
             GrainLocator grainLocator,
@@ -53,8 +49,6 @@ namespace Orleans.Runtime.Messaging
             this.siloStatusOracle = siloStatusOracle;
             this.connectionManager = senderManager;
             this.messagingTrace = messagingTrace;
-            _messagingInstruments = messagingInstruments;
-            _messagingProcessingInstruments = messagingProcessingInstruments;
             this.placementService = placementService;
             _grainLocator = grainLocator;
             _messageObserver = messageStatisticsSink.GetMessageObserver();
@@ -98,9 +92,8 @@ namespace Orleans.Runtime.Messaging
         /// Indicates that application messages should be blocked from being sent or received.
         /// This method is used by the "fast stop" process.
         /// <para>
-        /// Specifically, all outbound application requests and one-way messages are rejected or dropped,
-        /// while responses and messages to the membership table grain are allowed to complete.
-        /// Inbound application requests are rejected with cache invalidation, and other inbound application messages are dropped.
+        /// Specifically, all outbound application messages are dropped, except for rejections and messages to the membership table grain.
+        /// Inbound application requests are rejected, and other inbound application messages are dropped.
         /// </para>
         /// </summary>
         public void BlockApplicationMessages()
@@ -146,27 +139,11 @@ namespace Orleans.Runtime.Messaging
             Debug.Assert(!msg.IsLocalOnly);
 
             // Note that if we identify or add other grains that are required for proper stopping, we will need to treat them as we do the membership table grain here.
-            var isBlockedApplicationMessage = IsBlockingApplicationMessages
-                && !msg.IsSystemMessage
-                && msg.Direction is not Message.Directions.Response
-                && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain);
-            if (isBlockedApplicationMessage)
+            if (IsBlockingApplicationMessages && !msg.IsSystemMessage && msg.Result is not Message.ResponseTypes.Rejection && !Constants.SystemMembershipTableType.Equals(msg.TargetGrain))
             {
-                if (msg.Direction == Message.Directions.Request)
-                {
-                    ProcessRequestToInvalidActivation(
-                        msg,
-                        new GrainAddress { GrainId = msg.TargetGrain, SiloAddress = msg.TargetSilo },
-                        forwardingAddress: null,
-                        failedOperation: "Silo stopping",
-                        rejectMessages: true);
-                }
-                else
-                {
-                    this.messagingTrace.OnDropBlockedApplicationMessage(msg);
-                }
-
-                return;
+                // Drop the message on the floor if it's an application message that isn't a rejection
+                this.messagingTrace.OnDropBlockedApplicationMessage(msg);
+                msg.ReleaseDropped("BlockedApplicationMessage");
             }
             else
             {
@@ -183,6 +160,7 @@ namespace Orleans.Runtime.Messaging
                 if (msg.IsExpired)
                 {
                     this.messagingTrace.OnDropExpiredMessage(msg, MessagingInstruments.Phase.Send);
+                    msg.ReleaseDropped("ExpiredAtSend");
                     return;
                 }
 
@@ -206,7 +184,7 @@ namespace Orleans.Runtime.Messaging
                 {
                     LogTraceMessageLoopedBack(log, msg);
 
-                    _messagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
+                    MessagingInstruments.LocalMessagesSentCounterAggregator.Add(1);
 
                     this.ReceiveMessage(msg);
                 }
@@ -333,7 +311,7 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
-        internal void ProcessRequestToInvalidActivation(
+        private void ProcessRequestToInvalidActivation(
             Message message,
             GrainAddress? oldAddress,
             SiloAddress? forwardingAddress,
@@ -352,11 +330,6 @@ namespace Orleans.Runtime.Messaging
             // IMPORTANT: do not do anything on activation context anymore, since this activation is invalid already.
             if (rejectMessages)
             {
-                if (oldAddress != null)
-                {
-                    message.AddToCacheInvalidationHeader(oldAddress, validAddress: null);
-                }
-
                 this.RejectMessage(message, Message.RejectionTypes.Transient, exc, failedOperation);
             }
             else
@@ -438,7 +411,7 @@ namespace Orleans.Runtime.Messaging
             if (!MayForward(message, this.messagingOptions)) return false;
 
             message.ForwardCount = message.ForwardCount + 1;
-            _messagingProcessingInstruments.OnDispatcherMessageForwared(message);
+            MessagingProcessingInstruments.OnDispatcherMessageForwared(message);
 
             ResendMessageImpl(message, forwardingAddress);
             return true;
@@ -572,7 +545,7 @@ namespace Orleans.Runtime.Messaging
 
             void HandleReceiveFailure(Message msg, Exception ex)
             {
-                _messagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
+                MessagingProcessingInstruments.OnDispatcherMessageProcessedError(msg);
                 LogErrorCreatingActivation(log, ex, msg.TargetGrain, msg.InterfaceType, msg);
 
                 this.RejectMessage(msg, Message.RejectionTypes.Transient, ex);
@@ -584,7 +557,7 @@ namespace Orleans.Runtime.Messaging
             var target = msg.TargetGrain;
             if (target.IsSystemTarget())
             {
-                _messagingInstruments.OnRejectedMessage(msg);
+                MessagingInstruments.OnRejectedMessage(msg);
                 LogWarningUnknownSystemTarget(log, msg, msg.TargetGrain);
 
                 // Send a rejection only on a request
@@ -610,12 +583,12 @@ namespace Orleans.Runtime.Messaging
 
         internal void SendRejection(Message msg, Message.RejectionTypes rejectionType, string reason, Exception? exception = null)
         {
-            _messagingInstruments.OnRejectedMessage(msg);
+            MessagingInstruments.OnRejectedMessage(msg);
 
             if (msg.Direction is Message.Directions.Response && msg.Result is Message.ResponseTypes.Rejection)
             {
                 // Do not send reject a rejection locally, it will create a stack overflow
-                _messagingInstruments.OnDroppedSentMessage(msg);
+                MessagingInstruments.OnDroppedSentMessage(msg);
                 LogDebugDroppingRejection(log, msg);
             }
             else
