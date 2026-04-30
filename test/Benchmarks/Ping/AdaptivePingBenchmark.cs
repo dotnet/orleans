@@ -30,6 +30,12 @@ public class AdaptivePingBenchmark : IDisposable
     private readonly BenchmarkMode _mode;
     private readonly int _numSilos;
     private readonly CancellationTokenSource _cts = new();
+    private const int DefaultRequestsPerBlock = 100;
+    private const int DefaultInitialStepSize = 50;
+    private const int DefaultMaxStableRounds = 5;
+    private const double DefaultMinimumRelativeImprovement = 0.005;
+    private static readonly TimeSpan DefaultMeasurementInterval = TimeSpan.FromSeconds(2);
+    private static readonly TimeSpan DefaultSampleInterval = TimeSpan.FromMilliseconds(250);
 
     public string Description { get; }
     public int BestConcurrency { get; private set; }
@@ -136,7 +142,7 @@ public class AdaptivePingBenchmark : IDisposable
 
     /// <summary>
     /// Runs the adaptive benchmark, tuning concurrency via hill climbing.
-    /// Terminates after maxStableRounds without improvement (default 3), or runs forever if 0.
+    /// Terminates after maxStableRounds without a statistically significant improvement (default 5), or runs forever if 0.
     /// </summary>
     public async Task RunAsync(
         int initialConcurrency = 100,
@@ -144,7 +150,10 @@ public class AdaptivePingBenchmark : IDisposable
         int maxConcurrency = 2000,
         TimeSpan? warmupDuration = null,
         TimeSpan? measurementInterval = null,
-        int maxStableRounds = 3)
+        int maxStableRounds = DefaultMaxStableRounds,
+        int initialStepSize = DefaultInitialStepSize,
+        TimeSpan? sampleInterval = null,
+        double minimumRelativeImprovement = DefaultMinimumRelativeImprovement)
     {
         var grainFactory = GetGrainFactory();
 
@@ -154,13 +163,16 @@ public class AdaptivePingBenchmark : IDisposable
         var loadGenerator = new AdaptiveConcurrencyLoadGenerator<IPingGrain>(
             issueRequest: g => g.Run(),
             getStateForWorker: workerId => grainFactory.GetGrain<IPingGrain>(workerId),
-            requestsPerBlock: 500,
+            requestsPerBlock: DefaultRequestsPerBlock,
             warmupDuration: warmupDuration ?? TimeSpan.FromSeconds(5),
-            measurementInterval: measurementInterval ?? TimeSpan.FromSeconds(5),
+            measurementInterval: measurementInterval ?? DefaultMeasurementInterval,
             minConcurrency: minConcurrency,
             maxConcurrency: maxConcurrency,
             initialConcurrency: initialConcurrency,
-            maxStableRounds: maxStableRounds);
+            maxStableRounds: maxStableRounds,
+            initialStepSize: initialStepSize,
+            sampleInterval: sampleInterval ?? DefaultSampleInterval,
+            minimumRelativeImprovement: minimumRelativeImprovement);
 
         try
         {
@@ -209,7 +221,7 @@ public class AdaptivePingBenchmark : IDisposable
     /// <summary>
     /// Runs all adaptive ping benchmark scenarios and prints a summary.
     /// </summary>
-    public static async Task RunAllScenariosAsync(int maxStableRounds = 3)
+    public static async Task RunAllScenariosAsync(int maxStableRounds = DefaultMaxStableRounds)
     {
         var results = new List<(string Description, int BestConcurrency, double BestThroughput)>();
 
