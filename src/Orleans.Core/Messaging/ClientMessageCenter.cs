@@ -169,11 +169,17 @@ namespace Orleans.Messaging
             static void ThrowNullMessageHandler() => throw new InvalidOperationException("MessageCenter does not have a message handler set");
         }
 
-        public void SendMessage(Message msg)
+        public void SendMessage(Message msg, IMessageReceiverCache receiverCache)
         {
             if (!Running)
             {
                 LogNotRunning(msg);
+                return;
+            }
+
+            if (receiverCache?.MessageReceiver is IMessageReceiver receiver)
+            {
+                receiver.ReceiveMessage(msg, receiverCache);
                 return;
             }
 
@@ -184,13 +190,15 @@ namespace Orleans.Messaging
                 if (connection is null) return;
 
                 connection.Send(msg);
+                receiverCache?.MessageReceiver = connection;
+
                 LogSendingMessage(msg, connection.RemoteEndPoint);
             }
             else
             {
-                _ = SendAsync(connectionTask, msg);
+                _ = SendAsync(connectionTask, msg, receiverCache);
 
-                async Task SendAsync(ValueTask<Connection> task, Message message)
+                async Task SendAsync(ValueTask<Connection> task, Message message, IMessageReceiverCache targetCache)
                 {
                     try
                     {
@@ -200,6 +208,7 @@ namespace Orleans.Messaging
                         if (connection is null) return;
 
                         connection.Send(message);
+                        targetCache?.MessageReceiver = connection;
 
                         LogSendingMessage(message, connection.RemoteEndPoint);
                     }
@@ -210,7 +219,7 @@ namespace Orleans.Messaging
                             ++message.RetryCount;
 
                             _ = Task.Factory.StartNew(
-                                state => this.SendMessage((Message)state),
+                                state => this.SendMessage((Message)state, targetCache),
                                 message,
                                 CancellationToken.None,
                                 TaskCreationOptions.DenyChildAttach,
@@ -230,8 +239,7 @@ namespace Orleans.Messaging
             // If there's a specific gateway specified, use it
             if (msg.TargetSilo != null && gatewayManager.IsGatewayAvailable(msg.TargetSilo))
             {
-                var siloAddress = SiloAddress.New(msg.TargetSilo.Endpoint, 0);
-                var connectionTask = this.connectionManager.GetConnection(siloAddress);
+                var connectionTask = this.connectionManager.GetConnection(msg.TargetSilo);
                 if (connectionTask.IsCompletedSuccessfully) return connectionTask;
 
                 return ConnectAsync(msg.TargetSilo, connectionTask, msg, directGatewayMessage: true);
