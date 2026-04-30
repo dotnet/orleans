@@ -32,7 +32,7 @@ namespace Orleans.Runtime
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
+        private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackDataOwner> callbacks;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
@@ -74,7 +74,7 @@ namespace Orleans.Runtime
             this._applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
-            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
+            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackDataOwner>();
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
@@ -177,9 +177,27 @@ namespace Orleans.Runtime
                 Debug.Assert(context is not null);
 
                 // Register a callback for the request.
-                var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
-                callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
-                callbackData.SubscribeForCancellation(cancellationToken);
+                var callbackData = CallbackDataPool.Get();
+                callbackData.Initialize(sharedData, context, message, _applicationRequestInstruments);
+                var owner = new CallbackDataOwner(callbackData);
+                var callbackKey = (message.SendingGrain, message.Id);
+                if (!callbacks.TryAdd(callbackKey, owner))
+                {
+                    CallbackDataPool.Return(owner);
+                    throw new InvalidOperationException($"Duplicate callback registration for message {message}.");
+                }
+
+                // Cancellation can run synchronously during registration.
+                using var lease = owner.Acquire();
+                try
+                {
+                    callbackData.SubscribeForCancellation(cancellationToken);
+                }
+                catch
+                {
+                    UnregisterCallback(message.SendingGrain, message.Id);
+                    throw;
+                }
             }
             else
             {
@@ -209,7 +227,11 @@ namespace Orleans.Runtime
         /// </summary>
         private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
         {
-            callbacks.TryRemove((grainId, correlationId), out _);
+            if (callbacks.TryRemove((grainId, correlationId), out var owner))
+            {
+                // Release the owner's reference - this will return to pool when all leases are released
+                CallbackDataPool.Return(owner);
+            }
         }
 
         public void SniffIncomingMessage(Message message)
@@ -294,7 +316,7 @@ namespace Orleans.Runtime
                                     response = this.responseCopier.Copy(response);
                                 }
 
-                                invokable.Dispose();
+                                // Note: invokable disposal happens at the end of Invoke to return it to its pool
                                 break;
                             }
                         default:
@@ -422,46 +444,59 @@ namespace Orleans.Runtime
             else if (message.Result == Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)message.BodyObject;
-                callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
-                var request = callback?.Message;
-                if (request is not null)
+                if (callbacks.TryGetValue((message.TargetGrain, message.Id), out var owner))
                 {
-                    callback.OnStatusUpdate(status);
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                    using var lease = owner.Acquire();
+                    if (lease.TryGetValue(out var callback))
                     {
-                        LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
+                        var request = callback.Message;
+                        callback.OnStatusUpdate(message.Id, status);
+                        if (status.Diagnostics != null && status.Diagnostics.Count > 0)
+                        {
+                            LogInformationReceivedStatusUpdate(this.logger, request, status.Diagnostics);
+                        }
+
+                        return;
                     }
                 }
-                else
-                {
-                    if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
-                    {
-                        // Cancel the call since the caller has abandoned it.
-                        // Note that the target and sender arguments are swapped because this is a response to the original request.
-                        _cancellationManager.SignalCancellation(
-                            message.SendingSilo,
-                            targetGrainId: message.SendingGrain,
-                            sendingGrainId: message.TargetGrain,
-                            messageId: message.Id);
-                    }
 
-                    if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
-                    {
-                        var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
-                    }
+                if (messagingOptions.CancelUnknownRequestOnStatusUpdate)
+                {
+                    // Cancel the call since the caller has abandoned it.
+                    // Note that the target and sender arguments are swapped because this is a response to the original request.
+                    _cancellationManager.SignalCancellation(
+                        message.SendingSilo,
+                        targetGrainId: message.SendingGrain,
+                        sendingGrainId: message.TargetGrain,
+                        messageId: message.Id);
+                }
+
+                if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
+                {
+                    var diagnosticsString = string.Join("\n", status.Diagnostics);
+                    LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
                 }
 
                 return;
             }
 
-            CallbackData callbackData;
-            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
+            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out var removedOwner);
             if (found)
             {
-                // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
-                // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
-                callbackData.DoCallback(message);
+                using var removedLease = removedOwner.Acquire();
+                if (removedLease.TryGetValue(out var callbackData))
+                {
+                    // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
+                    // is to resolve/break the resolver. The continuations/waits that are based on this resolution will be scheduled as work items.
+                    callbackData.DoCallback(message);
+                }
+                else
+                {
+                    LogDebugNoCallbackForResponse(this.logger, message);
+                }
+
+                // Release the owner's reference - this will return to pool when all leases are released
+                CallbackDataPool.Return(removedOwner);
             }
             else
             {
@@ -527,11 +562,12 @@ namespace Orleans.Runtime
 
         public void BreakOutstandingMessagesToSilo(SiloAddress deadSilo)
         {
-            foreach (var callback in callbacks)
+            foreach (var (_, owner) in callbacks)
             {
-                if (deadSilo.Equals(callback.Value.Message.TargetSilo))
+                using var lease = owner.Acquire();
+                if (lease.TryGetValue(out var callback) && deadSilo.Equals(callback.Message.TargetSilo))
                 {
-                    callback.Value.OnTargetSiloFail();
+                    callback.OnTargetSiloFail();
                 }
             }
         }
@@ -545,7 +581,18 @@ namespace Orleans.Runtime
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+        {
+            var count = 0;
+            foreach (var (_, owner) in callbacks)
+            {
+                using var lease = owner.Acquire();
+                if (lease.TryGetValue(out var callback) && callback.Message.InterfaceType == grainInterfaceType)
+                {
+                    count++;
+                }
+            }
+            return count;
+        }
 
         private async Task MonitorCallbackExpiry()
         {
@@ -554,8 +601,14 @@ namespace Orleans.Runtime
                 try
                 {
                     var currentStopwatchTicks = ValueStopwatch.GetTimestamp();
-                    foreach (var (_, callback) in callbacks)
+                    foreach (var (_, owner) in callbacks)
                     {
+                        using var lease = owner.Acquire();
+                        if (!lease.TryGetValue(out var callback))
+                        {
+                            continue;
+                        }
+
                         if (callback.IsCompleted)
                         {
                             continue;
