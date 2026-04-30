@@ -112,6 +112,31 @@ public class ArcBufferWriterTests
         Assert.Equal(randomData.Length - 6000, bufferWriter.Length);
     }
 
+    [Fact]
+    public void AsReadOnlySequence_SingleSegment_DoesNotAllocate()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, 128).Select(static i => (byte)i).ToArray();
+        buffer.Write(data);
+        using var slice = buffer.PeekSlice(data.Length);
+
+        var sequence = slice.AsReadOnlySequence();
+        Assert.True(sequence.IsSingleSegment);
+        Assert.Equal(data, sequence.FirstSpan.ToArray());
+
+        _ = slice.AsReadOnlySequence().Length;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var length = 0L;
+        for (var i = 0; i < 1_000; i++)
+        {
+            length += slice.AsReadOnlySequence().Length;
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        Assert.Equal(0, allocated);
+        Assert.Equal(data.Length * 1_000L, length);
+    }
+
     /// <summary>
     /// Verifies that page reference counts and versions are managed correctly as slices are consumed and disposed.
     /// </summary>

@@ -13,10 +13,10 @@ namespace Orleans.Journaling.Json;
 public sealed class JsonJournalingOptions
 {
     /// <summary>
-    /// Gets or sets the <see cref="System.Text.Json.JsonSerializerOptions"/> used for serialization.
+    /// Gets or sets the <see cref="JsonSerializerOptions"/> used for serialization.
     /// </summary>
     /// <remarks>
-    /// Durable entry codecs resolve <see cref="System.Text.Json.Serialization.Metadata.JsonTypeInfo{T}"/>
+    /// Durable entry codecs resolve <see cref="JsonTypeInfo{T}"/>
     /// metadata for each journaled payload type from this options instance. Configure
     /// <see cref="JsonSerializerOptions.TypeInfoResolver"/> or <see cref="JsonSerializerOptions.TypeInfoResolverChain"/>
     /// with source-generated metadata for journaled value, key, and state types when trimming or using Native AOT.
@@ -85,7 +85,7 @@ public static class JsonJournalingExtensions
         builder.Services.AddSingleton<JsonLinesLogFormat>();
         builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonLinesLogFormat>());
         builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<JsonLinesLogFormat>());
-        builder.Services.AddSingleton<JsonOperationCodecProvider>(_ => new JsonOperationCodecProvider(jsonOptions));
+        builder.Services.AddSingleton(_ => new JsonOperationCodecProvider(jsonOptions));
         builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
         builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
         builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKeys.Json, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());

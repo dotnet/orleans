@@ -1800,6 +1800,18 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// </summary>
     public readonly ReadOnlySequence<byte> AsReadOnlySequence()
     {
+        if (Length == 0)
+        {
+            return ReadOnlySequence<byte>.Empty;
+        }
+
+        CheckValidity();
+
+        if (Length <= First.Length - Offset)
+        {
+            return new ReadOnlySequence<byte>(First.AsMemory(Offset, Length));
+        }
+
         var runningIndex = 0L;
         ReadOnlySequenceSegment? first = null;
         ReadOnlySequenceSegment? previous = null;
