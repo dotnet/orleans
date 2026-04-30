@@ -13,7 +13,7 @@ namespace Orleans.Journaling.Json;
 /// </code>
 /// </example>
 public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOptions? options = null)
-    : IDurableDictionaryOperationCodec<TKey, TValue> where TKey : notnull
+    : IDurableDictionaryOperationCodec<TKey, TValue>, IJsonLogEntryCodec where TKey : notnull
 {
     private readonly JsonValueSerializer<TKey> _keySerializer = new(options);
     private readonly JsonValueSerializer<TValue> _valueSerializer = new(options);
@@ -81,6 +81,11 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         var reader = new Utf8JsonReader(input);
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        Apply(root, consumer);
+    }
+
+    internal void Apply(JsonElement root, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    {
         var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
         switch (command)
         {
@@ -109,5 +114,16 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
             default:
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
+    }
+
+    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    {
+        if (stateMachine is not IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+        {
+            throw new InvalidOperationException(
+                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+        }
+
+        Apply(entry, consumer);
     }
 }

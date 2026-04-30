@@ -29,41 +29,10 @@ public readonly struct LogWriter
     internal LogEntry BeginEntry(ILogEntryWriterCompletion? completion) => new(GetTarget().BeginEntry(_id, completion));
 
     /// <summary>
-    /// Appends an already decoded durable operation payload for retired or unknown state-machine preservation.
+    /// Appends a format-owned entry for retired or unknown state-machine preservation.
     /// </summary>
-    /// <remarks>
-    /// This helper preserves payload bytes which were decoded by the active log format during recovery.
-    /// It is not a normal durable write convenience API and does not accept physical log-entry bytes.
-    /// </remarks>
-    internal void AppendPreservedDecodedPayload(byte[] value) => AppendPreservedDecodedPayload((ReadOnlySpan<byte>)value);
-
-    /// <summary>
-    /// Appends an already decoded durable operation payload for retired or unknown state-machine preservation.
-    /// </summary>
-    /// <remarks>
-    /// This helper preserves payload bytes which were decoded by the active log format during recovery.
-    /// It is not a normal durable write convenience API and does not accept physical log-entry bytes.
-    /// </remarks>
-    internal void AppendPreservedDecodedPayload(ReadOnlySpan<byte> value)
-    {
-        using var entry = BeginEntry();
-        entry.Writer.Write(value);
-        entry.Commit();
-    }
-
-    /// <summary>
-    /// Appends an already decoded durable operation payload for retired or unknown state-machine preservation.
-    /// </summary>
-    /// <remarks>
-    /// This helper preserves payload bytes which were decoded by the active log format during recovery.
-    /// It is not a normal durable write convenience API and does not accept physical log-entry bytes.
-    /// </remarks>
-    internal void AppendPreservedDecodedPayload(ReadOnlySequence<byte> value)
-    {
-        using var entry = BeginEntry();
-        entry.Writer.Write(value);
-        entry.Commit();
-    }
+    /// <param name="entry">The format-owned entry.</param>
+    internal void AppendFormattedEntry(IFormattedLogEntry entry) => GetTarget().AppendFormattedEntry(_id, entry);
 
     private ILogWriterTarget GetTarget()
     {
@@ -79,4 +48,6 @@ public readonly struct LogWriter
 internal interface ILogWriterTarget
 {
     LogEntryWriter BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion);
+
+    void AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry);
 }

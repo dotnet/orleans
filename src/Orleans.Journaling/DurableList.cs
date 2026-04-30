@@ -58,6 +58,8 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 
     bool ICollection<T>.IsReadOnly => false;
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();

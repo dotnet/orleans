@@ -8,6 +8,11 @@ namespace Orleans.Journaling;
 public interface IDurableStateMachine
 {
     /// <summary>
+    /// Gets the durable operation codec used by this state machine.
+    /// </summary>
+    object OperationCodec { get; }
+
+    /// <summary>
     /// Resets the state machine.
     /// </summary>
     /// <remarks>

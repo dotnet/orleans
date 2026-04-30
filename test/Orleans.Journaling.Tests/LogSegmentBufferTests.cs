@@ -326,7 +326,7 @@ public sealed class LogSegmentBufferTests
         return writer;
     }
 
-    private static void ReadAll(ArcBuffer data, ILogEntrySink consumer)
+    private static void ReadAll(ArcBuffer data, ILogStreamStateMachineResolver consumer)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
@@ -352,11 +352,25 @@ public sealed class LogSegmentBufferTests
         return (length, streamId, payload);
     }
 
-    private sealed class CollectingConsumer : ILogEntrySink
+    private sealed class CollectingConsumer : ILogStreamStateMachineResolver, IDurableStateMachine
     {
+        private LogStreamId _streamId;
+
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) =>
-            Entries.Add((streamId.Value, payload.ToArray()));
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add((_streamId.Value, payload.ToArray()));
+
+        public void Reset(ILogWriter storage) { }
+        public void AppendEntries(LogWriter writer) { }
+        public void AppendSnapshot(LogWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 }

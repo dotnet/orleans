@@ -9,9 +9,9 @@ internal sealed class MessagePackLogFormat : ILogFormat
     public ILogSegmentWriter CreateWriter()
         => new MessagePackLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
     {
-        ArgumentNullException.ThrowIfNull(consumer);
+        ArgumentNullException.ThrowIfNull(resolver);
 
         if (input.Length == 0)
         {
@@ -31,7 +31,16 @@ internal sealed class MessagePackLogFormat : ILogFormat
         }
 
         input.Skip(checked((int)reader.Consumed));
-        consumer.OnEntry(streamId, payload);
+        var stateMachine = resolver.ResolveStateMachine(streamId);
+        if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
+        {
+            formattedEntryBuffer.AddFormattedEntry(new MessagePackFormattedLogEntry(payload));
+        }
+        else
+        {
+            stateMachine.Apply(payload);
+        }
+
         return true;
     }
 
@@ -100,8 +109,31 @@ internal sealed class MessagePackLogFormat : ILogFormat
 
         protected override void AbortEntry(LogStreamId streamId, int entryStart) => _payload.Reset();
 
+        protected override void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+        {
+            if (entry is not MessagePackFormattedLogEntry messagePackEntry)
+            {
+                throw new InvalidOperationException(
+                    $"The MessagePack log writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+            }
+
+            using var logEntry = CreateLogWriter(streamId).BeginEntry();
+            logEntry.Writer.Write(messagePackEntry.Payload.Span);
+            logEntry.Commit();
+        }
+
         private int GetCurrentFrameLength()
             => checked(1 + GetUInt64Size(ActiveStreamId.Value) + GetBinHeaderSize(_payload.Length) + _payload.Length);
+    }
+
+    private sealed class MessagePackFormattedLogEntry : IFormattedLogEntry
+    {
+        public MessagePackFormattedLogEntry(ReadOnlySequence<byte> payload)
+        {
+            Payload = payload.ToArray();
+        }
+
+        public ReadOnlyMemory<byte> Payload { get; }
     }
 
     private static class MessagePackLogEntryReader

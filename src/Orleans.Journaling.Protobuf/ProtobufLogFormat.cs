@@ -11,9 +11,9 @@ internal sealed class ProtobufLogFormat : ILogFormat
     public ILogSegmentWriter CreateWriter()
         => new ProtobufLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
     {
-        ArgumentNullException.ThrowIfNull(consumer);
+        ArgumentNullException.ThrowIfNull(resolver);
 
         if (input.Length == 0)
         {
@@ -55,7 +55,16 @@ internal sealed class ProtobufLogFormat : ILogFormat
         input.Skip(checked((int)frameLength));
         var message = remaining.Slice(prefixLength, messageLength);
         ProtobufLogEntryReader.ReadMessage(message, offset: 0, out var streamId, out var payload);
-        consumer.OnEntry(streamId, payload);
+        var stateMachine = resolver.ResolveStateMachine(streamId);
+        if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
+        {
+            formattedEntryBuffer.AddFormattedEntry(new ProtobufFormattedLogEntry(payload));
+        }
+        else
+        {
+            stateMachine.Apply(payload);
+        }
+
         return true;
     }
 
@@ -127,6 +136,19 @@ internal sealed class ProtobufLogFormat : ILogFormat
 
         protected override void AbortEntry(LogStreamId streamId, int entryStart) => _payload.Reset();
 
+        protected override void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+        {
+            if (entry is not ProtobufFormattedLogEntry protobufEntry)
+            {
+                throw new InvalidOperationException(
+                    $"The protobuf log writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+            }
+
+            using var logEntry = CreateLogWriter(streamId).BeginEntry();
+            logEntry.Writer.Write(protobufEntry.Payload.Span);
+            logEntry.Commit();
+        }
+
         private int GetCurrentFrameLength()
         {
             var messageLength = GetMessageBodyLength(ActiveStreamId.Value, _payload.Length);
@@ -140,6 +162,16 @@ internal sealed class ProtobufLogFormat : ILogFormat
                 ProtobufWire.ComputeVarUInt32Size((PayloadFieldNumber << 3) | ProtobufWire.WireTypeLengthDelimited) +
                 ProtobufWire.ComputeVarUInt32Size((uint)payloadLength) +
                 payloadLength);
+    }
+
+    private sealed class ProtobufFormattedLogEntry : IFormattedLogEntry
+    {
+        public ProtobufFormattedLogEntry(ReadOnlySequence<byte> payload)
+        {
+            Payload = payload.ToArray();
+        }
+
+        public ReadOnlyMemory<byte> Payload { get; }
     }
 
     private static class ProtobufLogEntryReader

@@ -42,6 +42,8 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     public int Count => _items.Count;
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();

@@ -103,6 +103,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     private void OnValuePersisted()
     {
         switch (_status)

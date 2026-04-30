@@ -166,11 +166,26 @@ public sealed class StorageStreamingTests
         return buffer;
     }
 
-    private sealed class CapturingLogEntrySink : ILogEntrySink
+    private sealed class CapturingLogEntrySink : ILogStreamStateMachineResolver, IDurableStateMachine
     {
+        private LogStreamId _streamId;
+
         public List<(LogStreamId StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
+
+        public void Reset(ILogWriter storage) { }
+        public void AppendEntries(LogWriter writer) { }
+        public void AppendSnapshot(LogWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
 }

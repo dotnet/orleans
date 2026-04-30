@@ -7,7 +7,7 @@ namespace Orleans.Journaling.Json;
 /// JSON codec for durable list log entries.
 /// </summary>
 public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableListOperationCodec<T>
+    : IDurableListOperationCodec<T>, IJsonLogEntryCodec
 {
     private readonly JsonValueSerializer<T> _itemSerializer = new(options);
 
@@ -90,6 +90,11 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         var reader = new Utf8JsonReader(input);
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        Apply(root, consumer);
+    }
+
+    internal void Apply(JsonElement root, IDurableListOperationHandler<T> consumer)
+    {
         var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
         switch (command)
         {
@@ -121,13 +126,24 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
+
+    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    {
+        if (stateMachine is not IDurableListOperationHandler<T> consumer)
+        {
+            throw new InvalidOperationException(
+                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+        }
+
+        Apply(entry, consumer);
+    }
 }
 
 /// <summary>
 /// JSON codec for durable queue log entries.
 /// </summary>
 public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableQueueOperationCodec<T>
+    : IDurableQueueOperationCodec<T>, IJsonLogEntryCodec
 {
     private readonly JsonValueSerializer<T> _itemSerializer = new(options);
 
@@ -185,6 +201,11 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         var reader = new Utf8JsonReader(input);
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        Apply(root, consumer);
+    }
+
+    internal void Apply(JsonElement root, IDurableQueueOperationHandler<T> consumer)
+    {
         var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
         switch (command)
         {
@@ -210,13 +231,24 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
+
+    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    {
+        if (stateMachine is not IDurableQueueOperationHandler<T> consumer)
+        {
+            throw new InvalidOperationException(
+                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+        }
+
+        Apply(entry, consumer);
+    }
 }
 
 /// <summary>
 /// JSON codec for durable set log entries.
 /// </summary>
 public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableSetOperationCodec<T>
+    : IDurableSetOperationCodec<T>, IJsonLogEntryCodec
 {
     private readonly JsonValueSerializer<T> _itemSerializer = new(options);
 
@@ -276,6 +308,11 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         var reader = new Utf8JsonReader(input);
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        Apply(root, consumer);
+    }
+
+    internal void Apply(JsonElement root, IDurableSetOperationHandler<T> consumer)
+    {
         var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
         switch (command)
         {
@@ -300,5 +337,16 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
             default:
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
+    }
+
+    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    {
+        if (stateMachine is not IDurableSetOperationHandler<T> consumer)
+        {
+            throw new InvalidOperationException(
+                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+        }
+
+        Apply(entry, consumer);
     }
 }
