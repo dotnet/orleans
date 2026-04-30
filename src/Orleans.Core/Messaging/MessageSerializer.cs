@@ -103,7 +103,7 @@ namespace Orleans.Runtime.Messaging
             ResponseCodec? rawCodec = null;
             var bodyObject = message._bodyObject;
             var readRequest = bodyObject as MessageReadRequest;
-            if (readRequest is not null && headers.ResponseType is ResponseTypes.None)
+            if (readRequest is not null)
             {
                 var originalHeaders = readRequest._originalHeaders;
                 headers.ResponseType = originalHeaders.ResponseType;
