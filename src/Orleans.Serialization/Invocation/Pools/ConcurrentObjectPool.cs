@@ -1,7 +1,7 @@
 #nullable enable
 using System;
 using System.Collections.Generic;
-using System.Runtime.CompilerServices;
+using System.Threading;
 using Microsoft.Extensions.ObjectPool;
 
 namespace Orleans.Serialization.Invocation
@@ -16,17 +16,15 @@ namespace Orleans.Serialization.Invocation
     internal class ConcurrentObjectPool<T, TPoolPolicy> : ObjectPool<T> where T : class where TPoolPolicy : IPooledObjectPolicy<T>
     {
         private readonly TPoolPolicy _policy;
+        private readonly ThreadLocal<Stack<T>> _objects = new(static () => new());
 
         public ConcurrentObjectPool(TPoolPolicy policy) => _policy = policy;
 
         public int MaxPoolSize { get; set; } = int.MaxValue;
 
-        [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        private static Stack<T> GetStack() => PerThreadStack.Stack ??= new();
-
         public override T Get()
         {
-            var stack = GetStack();
+            var stack = _objects.Value!;
             if (stack.TryPop(out var result))
             {
                 return result;
@@ -39,19 +37,12 @@ namespace Orleans.Serialization.Invocation
         {
             if (_policy.Return(obj))
             {
-                var stack = GetStack();
+                var stack = _objects.Value!;
                 if (stack.Count < MaxPoolSize)
                 {
                     stack.Push(obj);
                 }
             }
-        }
-
-        // Nested class to hold ThreadStatic field per generic type instantiation
-        private static class PerThreadStack
-        {
-            [ThreadStatic]
-            internal static Stack<T>? Stack;
         }
     }
 }
