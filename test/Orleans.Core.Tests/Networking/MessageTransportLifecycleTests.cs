@@ -93,16 +93,10 @@ public class MessageTransportLifecycleTests
     [Fact]
     public void MessageSerializer_Write_CopiesBufferedRawResponse()
     {
-        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        using var serviceProvider = CreateServiceProvider();
         var sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
         var serializer = new MessageSerializer(sessionPool, new SiloMessagingOptions());
-        var messagingTrace = new MessagingTrace(NullLoggerFactory.Instance);
-        var shared = new MessageHandlerShared(
-            messagingTrace,
-            new ConnectionTrace(NullLoggerFactory.Instance),
-            serviceProvider,
-            new MessageFactory(serviceProvider.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, messagingTrace),
-            Substitute.For<IMessageCenter>());
+        var shared = CreateMessageHandlerShared(serviceProvider);
         using var bodyWriter = new ArcBufferWriter();
         byte[] bodyBytes = [1, 2, 3, 4];
         bodyWriter.Write(bodyBytes);
@@ -127,5 +121,60 @@ public class MessageTransportLifecycleTests
         output.Peek(outputBytes);
         Assert.Equal(bodyBytes, outputBytes[headerLength..(headerLength + bodyLength)]);
         Assert.Null(message._bodyObject);
+    }
+
+    [Fact]
+    public void MessageHandlerShared_DoesNotReuseSerializersAcrossInstances()
+    {
+        using var firstServiceProvider = CreateServiceProvider();
+        using var secondServiceProvider = CreateServiceProvider();
+        var first = CreateMessageHandlerShared(firstServiceProvider);
+        var second = CreateMessageHandlerShared(secondServiceProvider);
+
+        var serializer = first.GetMessageSerializer();
+        first.Return(serializer);
+        var other = second.GetMessageSerializer();
+
+        Assert.NotSame(serializer, other);
+        second.Return(other);
+    }
+
+    [Fact]
+    public void MessageHandlerShared_DoesNotReuseHandlersAcrossInstances()
+    {
+        using var firstServiceProvider = CreateServiceProvider();
+        using var secondServiceProvider = CreateServiceProvider();
+        var first = CreateMessageHandlerShared(firstServiceProvider);
+        var second = CreateMessageHandlerShared(secondServiceProvider);
+
+        var readHandler = first.GetReceiveMessageHandler();
+        first.Return(readHandler);
+        var otherReadHandler = second.GetReceiveMessageHandler();
+
+        Assert.NotSame(readHandler, otherReadHandler);
+        second.Return(otherReadHandler);
+
+        var writeHandler = first.GetSendMessageHandler();
+        first.Return(writeHandler);
+        var otherWriteHandler = second.GetSendMessageHandler();
+
+        Assert.NotSame(writeHandler, otherWriteHandler);
+        second.Return(otherWriteHandler);
+    }
+
+    private static ServiceProvider CreateServiceProvider() => new ServiceCollection()
+        .AddSerializer()
+        .AddTransient(sp => new MessageSerializer(sp.GetRequiredService<SerializerSessionPool>(), new SiloMessagingOptions()))
+        .BuildServiceProvider();
+
+    private static MessageHandlerShared CreateMessageHandlerShared(IServiceProvider serviceProvider)
+    {
+        var messagingTrace = new MessagingTrace(NullLoggerFactory.Instance);
+        return new(
+            messagingTrace,
+            new ConnectionTrace(NullLoggerFactory.Instance),
+            serviceProvider,
+            new MessageFactory(serviceProvider.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, messagingTrace),
+            Substitute.For<IMessageCenter>());
     }
 }
