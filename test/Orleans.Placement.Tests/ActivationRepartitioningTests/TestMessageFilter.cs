@@ -10,7 +10,7 @@ internal sealed class TestMessageFilter(GrainMigratabilityChecker checker) : IRe
 {
     private readonly RepartitionerMessageFilter _messageFilter = new(checker);
 
-    public bool IsAcceptable(Message message, out bool isSenderMigratable, out bool isTargetMigratable) =>
-        _messageFilter.IsAcceptable(message, out isSenderMigratable, out isTargetMigratable) &&
-        !message.SendingGrain.IsClient() && !message.TargetGrain.IsClient();
+    public bool IsAcceptable(GrainId sendingGrain, GrainId targetGrain, out bool isSenderMigratable, out bool isTargetMigratable) =>
+        _messageFilter.IsAcceptable(sendingGrain, targetGrain, out isSenderMigratable, out isTargetMigratable) &&
+        !sendingGrain.IsClient() && !targetGrain.IsClient();
 }
