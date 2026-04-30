@@ -1,7 +1,18 @@
 #nullable enable
 using System;
+using System.Reflection;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using NSubstitute;
 using Orleans.Configuration;
+using Orleans.Connections;
 using Orleans.Connections.Transport;
+using Orleans.Runtime;
+using Orleans.Runtime.Messaging;
+using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Cloning;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Core.Tests.Networking;
@@ -77,5 +88,44 @@ public class MessageTransportLifecycleTests
     public void ConnectionOptions_DEFAULT_CLOSECONNECTION_TIMEOUT_HasCorrectValue()
     {
         Assert.Equal(TimeSpan.FromSeconds(30), ConnectionOptions.DEFAULT_CLOSECONNECTION_TIMEOUT);
+    }
+
+    [Fact]
+    public void MessageSerializer_Write_CopiesBufferedRawResponse()
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
+        var serializer = new MessageSerializer(sessionPool, new SiloMessagingOptions());
+        var messagingTrace = new MessagingTrace(NullLoggerFactory.Instance);
+        var shared = new MessageHandlerShared(
+            messagingTrace,
+            new ConnectionTrace(NullLoggerFactory.Instance),
+            serviceProvider,
+            new MessageFactory(serviceProvider.GetRequiredService<DeepCopier>(), NullLogger<MessageFactory>.Instance, messagingTrace),
+            Substitute.For<IMessageCenter>());
+        using var bodyWriter = new ArcBufferWriter();
+        byte[] bodyBytes = [1, 2, 3, 4];
+        bodyWriter.Write(bodyBytes);
+
+        var readRequest = new MessageReadRequest(shared);
+        readRequest._originalHeaders.ResponseType = Message.ResponseTypes.Success;
+        readRequest.Body = bodyWriter.ConsumeSlice(bodyBytes.Length);
+        typeof(MessageReadRequest).GetField("_bodyLength", BindingFlags.Instance | BindingFlags.NonPublic)!.SetValue(readRequest, bodyBytes.Length);
+
+        var message = new Message
+        {
+            Direction = Message.Directions.Response,
+            Result = Message.ResponseTypes.Success,
+            BodyObject = readRequest
+        };
+
+        using var output = new ArcBufferWriter();
+        var (headerLength, bodyLength) = serializer.Write(output, message);
+
+        Assert.Equal(bodyBytes.Length, bodyLength);
+        var outputBytes = new byte[output.Length];
+        output.Peek(outputBytes);
+        Assert.Equal(bodyBytes, outputBytes[headerLength..(headerLength + bodyLength)]);
+        Assert.Null(message._bodyObject);
     }
 }
