@@ -99,19 +99,19 @@ public class PingBenchmark : IDisposable
         blocksPerWorker: 10);
 
     public Task PingConcurrent() => this.Run(
-        runs: 3,
+        runs: 10,
         grainFactory: this.client,
         blocksPerWorker: 10);
 
     public Task PingConcurrentHostedClient(int blocksPerWorker = 30) => this.Run(
-        runs: 3,
+        runs: 10,
         grainFactory: (IGrainFactory)this.hosts[0].Services.GetService(typeof(IGrainFactory)),
         blocksPerWorker: blocksPerWorker);
 
     private async Task Run(int runs, IGrainFactory grainFactory, int blocksPerWorker)
     {
         var loadGenerator = new ConcurrentLoadGenerator<IPingGrain>(
-            maxConcurrency: 250,
+            maxConcurrency: 100,
             blocksPerWorker: blocksPerWorker,
             requestsPerBlock: 500,
             issueRequest: g => g.Run(),
