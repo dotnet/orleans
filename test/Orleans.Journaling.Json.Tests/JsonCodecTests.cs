@@ -271,6 +271,8 @@ public class JsonCodecTests
     [InlineData("""{"streamId":"8","entry":{"cmd":"set","value":42}}""" + "\n", "unsigned integer")]
     [InlineData("""{"streamId":8,"entry":null}""" + "\n", "must be a JSON object")]
     [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42},"extra":true}""" + "\n", "unexpected property")]
+    [InlineData("""{"streamId":8,"streamId":9,"entry":{"cmd":"set","value":42}}""" + "\n", "duplicate property")]
+    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42},"entry":{"cmd":"set","value":43}}""" + "\n", "duplicate property")]
     [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}}{}""" + "\n", "invalid JSON")]
     [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}""" + "\n", "invalid JSON")]
     public void JsonLinesLogFormat_Read_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)

@@ -11,8 +11,6 @@ internal sealed class JsonLinesLogFormat : ILogFormat
     private static ReadOnlySpan<byte> EntryPrefixStart => "{\"streamId\":"u8;
     private static ReadOnlySpan<byte> EntryPrefixEnd => ",\"entry\":"u8;
     private static ReadOnlySpan<byte> EntrySuffix => "}\n"u8;
-    private static ReadOnlySpan<byte> StreamIdPropertyNameUtf8 => "streamId"u8;
-    private static ReadOnlySpan<byte> EntryPropertyNameUtf8 => "entry"u8;
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
     private const string StreamIdPropertyName = "streamId";
@@ -66,12 +64,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
     private static void ReadLine(ReadOnlySequence<byte> line, long offset, ILogStreamStateMachineResolver resolver)
     {
         var reader = new Utf8JsonReader(line);
-        var hasStreamId = false;
-        var hasEntry = false;
-        ulong streamId = 0;
-        long entryStart = 0;
-        long entryLength = 0;
-        JsonDocument? entryDocument = null;
+        JsonLinesLogEntry? logEntry;
 
         try
         {
@@ -85,108 +78,73 @@ internal sealed class JsonLinesLogFormat : ILogFormat
                 throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must be a JSON object.");
             }
 
-            while (reader.Read())
-            {
-                if (reader.TokenType is JsonTokenType.EndObject)
-                {
-                    break;
-                }
-
-                if (reader.TokenType is not JsonTokenType.PropertyName)
-                {
-                    throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: expected a property name.");
-                }
-
-                if (reader.ValueTextEquals(StreamIdPropertyNameUtf8))
-                {
-                    if (hasStreamId)
-                    {
-                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: duplicate property '{StreamIdPropertyName}'.");
-                    }
-
-                    if (!reader.Read())
-                    {
-                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing value for property '{StreamIdPropertyName}'.");
-                    }
-
-                    if (reader.TokenType is not JsonTokenType.Number || !reader.TryGetUInt64(out streamId))
-                    {
-                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property '{StreamIdPropertyName}' must be an unsigned integer.");
-                    }
-
-                    hasStreamId = true;
-                }
-                else if (reader.ValueTextEquals(EntryPropertyNameUtf8))
-                {
-                    if (hasEntry)
-                    {
-                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: duplicate property '{EntryPropertyName}'.");
-                    }
-
-                    if (!reader.Read())
-                    {
-                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing value for property '{EntryPropertyName}'.");
-                    }
-
-                    if (reader.TokenType is not JsonTokenType.StartObject)
-                    {
-                        throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property '{EntryPropertyName}' must be a JSON object.");
-                    }
-
-                    entryStart = reader.TokenStartIndex;
-                    entryDocument = JsonDocument.ParseValue(ref reader);
-                    entryLength = reader.BytesConsumed - entryStart;
-                    hasEntry = true;
-                }
-                else
-                {
-                    var propertyName = reader.GetString();
-                    throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: unexpected property '{propertyName}'.");
-                }
-            }
-
-            if (reader.TokenType is not JsonTokenType.EndObject)
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must contain one complete JSON object.");
-            }
-
-            if (!hasStreamId)
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing required property '{StreamIdPropertyName}'.");
-            }
-
-            if (!hasEntry)
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing required property '{EntryPropertyName}'.");
-            }
-
+            logEntry = JsonSerializer.Deserialize(ref reader, JsonLinesLogEntryJsonContext.Default.JsonLinesLogEntry);
             if (reader.Read())
             {
                 throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: trailing JSON content after the log entry object.");
             }
-
-            var stateMachine = resolver.ResolveStateMachine(new(streamId));
-            if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
-            {
-                formattedEntryBuffer.AddFormattedEntry(new JsonFormattedLogEntry(line.Slice(entryStart, entryLength)));
-                return;
-            }
-
-            if (stateMachine is IDurableNothing)
-            {
-                return;
-            }
-
-            ApplyJsonEntry(new(streamId), stateMachine, entryDocument!.RootElement);
         }
         catch (JsonException exception)
         {
             throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: invalid JSON log entry.", exception);
         }
-        finally
+
+        logEntry = ValidateLogEntry(logEntry, offset);
+        var streamId = logEntry.StreamId.GetUInt64();
+        var stream = new LogStreamId(streamId);
+        var stateMachine = resolver.ResolveStateMachine(stream);
+        if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
         {
-            entryDocument?.Dispose();
+            formattedEntryBuffer.AddFormattedEntry(new JsonFormattedLogEntry(logEntry.Entry));
+            return;
         }
+
+        if (stateMachine is IDurableNothing)
+        {
+            return;
+        }
+
+        ApplyJsonEntry(stream, stateMachine, logEntry.Entry);
+    }
+
+    private static JsonLinesLogEntry ValidateLogEntry(JsonLinesLogEntry? logEntry, long offset)
+    {
+        if (logEntry is null)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must be a JSON object.");
+        }
+
+        if (logEntry.ExtensionData is { Count: > 0 })
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: unexpected property '{logEntry.ExtensionData.Keys.First()}'.");
+        }
+
+        if (logEntry.DuplicatePropertyName is { } duplicatePropertyName)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: duplicate property '{duplicatePropertyName}'.");
+        }
+
+        if (!logEntry.HasStreamId)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing required property '{StreamIdPropertyName}'.");
+        }
+
+        if (logEntry.StreamId.ValueKind is not JsonValueKind.Number || !logEntry.StreamId.TryGetUInt64(out _))
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property '{StreamIdPropertyName}' must be an unsigned integer.");
+        }
+
+        if (!logEntry.HasEntry)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: missing required property '{EntryPropertyName}'.");
+        }
+
+        if (logEntry.Entry.ValueKind is not JsonValueKind.Object)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property '{EntryPropertyName}' must be a JSON object.");
+        }
+
+        return logEntry;
     }
 
     private static void ApplyJsonEntry(LogStreamId streamId, IDurableStateMachine stateMachine, JsonElement entry)
@@ -318,9 +276,9 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
     private sealed class JsonFormattedLogEntry : IFormattedLogEntry
     {
-        public JsonFormattedLogEntry(ReadOnlySequence<byte> payload)
+        public JsonFormattedLogEntry(JsonElement payload)
         {
-            Payload = payload.ToArray();
+            Payload = JsonSerializer.SerializeToUtf8Bytes(payload, JsonLinesLogEntryJsonContext.Default.JsonElement);
         }
 
         public ReadOnlyMemory<byte> Payload { get; }
