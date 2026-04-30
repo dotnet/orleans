@@ -335,13 +335,19 @@ namespace Orleans.Runtime.Messaging
                     var response = MessageFactory.CreateResponseMessage(message);
                     response.Result = Message.ResponseTypes.Error;
                     response.BodyObject = Response.FromException(exception);
-                    Send(response);
+                    MessageCenter.DispatchLocalMessage(response);
                 }
-                else if (message.Direction == Message.Directions.Response)
+                else if (message.Direction == Message.Directions.Response && message.RetryCount < MessagingOptions.DEFAULT_MAX_MESSAGE_SEND_RETRIES)
                 {
                     message.Result = Message.ResponseTypes.Error;
                     message.BodyObject = Response.FromException(exception);
-                    OnReceivedMessage(message);
+                    ++message.RetryCount;
+                    Send(message);
+                }
+                else
+                {
+                    LogWarningDroppingMessage(Log, exception, message);
+                    MessagingInstruments.OnDroppedSentMessage(message);
                 }
             }
         }
