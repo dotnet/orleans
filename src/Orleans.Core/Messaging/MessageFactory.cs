@@ -50,6 +50,8 @@ namespace Orleans.Runtime
             return message;
         }
 
+        public object CopyBodyObject(object body) => _deepCopier.Copy(body);
+
         private CorrelationId GetNextCorrelationId()
         {
             var id = _seed ^ Interlocked.Increment(ref _nextId);

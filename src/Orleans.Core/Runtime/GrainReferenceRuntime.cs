@@ -107,13 +107,27 @@ namespace Orleans.Runtime
             }
         }
 
-        private async ValueTask<TResult> InvokeMethodAsyncCore<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        private ValueTask<TResult> InvokeMethodAsyncCore<TResult>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
+            ResponseCompletionSource<TResult> responseCompletionSource;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                var responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
+                responseCompletionSource = ResponseCompletionSourcePool.Get<TResult>();
                 this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                return CompleteInvokeAsync(responseCompletionSource, request, options);
+            }
+            catch
+            {
+                DisposeRequest(request, options);
+                throw;
+            }
+        }
+
+        private static async ValueTask<TResult> CompleteInvokeAsync<TResult>(ResponseCompletionSource<TResult> responseCompletionSource, IInvokable request, InvokeMethodOptions options)
+        {
+            try
+            {
                 return await responseCompletionSource.AsValueTask();
             }
             finally
@@ -122,13 +136,27 @@ namespace Orleans.Runtime
             }
         }
 
-        private async ValueTask InvokeMethodAsyncCore(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+        private ValueTask InvokeMethodAsyncCore(GrainReference reference, IInvokable request, InvokeMethodOptions options)
         {
+            ResponseCompletionSource responseCompletionSource;
             try
             {
                 SetGrainCancellationTokensTarget(reference, request);
-                var responseCompletionSource = ResponseCompletionSourcePool.Get();
+                responseCompletionSource = ResponseCompletionSourcePool.Get();
                 this.RuntimeClient.SendRequest(reference, request, responseCompletionSource, options);
+                return CompleteInvokeAsync(responseCompletionSource, request, options);
+            }
+            catch
+            {
+                DisposeRequest(request, options);
+                throw;
+            }
+        }
+
+        private static async ValueTask CompleteInvokeAsync(ResponseCompletionSource responseCompletionSource, IInvokable request, InvokeMethodOptions options)
+        {
+            try
+            {
                 await responseCompletionSource.AsVoidValueTask();
             }
             finally
