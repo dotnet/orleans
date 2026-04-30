@@ -11,6 +11,8 @@ namespace Orleans.Serialization.Invocation
     /// </summary>
     public sealed class ResponseCompletionSource : IResponseCompletionSource, IValueTaskSource<Response>, IValueTaskSource
     {
+        // This source is pooled and GetResult returns it to the pool. Continuations must not run inline from SetResult/SetException,
+        // or they can reset/reuse this instance before completion unwinds.
         private ManualResetValueTaskSourceCore<Response> _core = new() { RunContinuationsAsynchronously = true };
 
         /// <summary>
@@ -114,6 +116,8 @@ namespace Orleans.Serialization.Invocation
     /// <typeparam name="TResult">The underlying result type.</typeparam>
     public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult>, IValueTaskSource
     {
+        // This source is pooled and GetResult returns it to the pool. Continuations must not run inline from SetResult/SetException,
+        // or they can reset/reuse this instance before completion unwinds.
         private ManualResetValueTaskSourceCore<TResult> _core = new() { RunContinuationsAsynchronously = true };
 
         /// <summary>
