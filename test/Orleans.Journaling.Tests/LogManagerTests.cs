@@ -800,11 +800,26 @@ public class LogManagerTests : JournalingTestBase
         Assert.Contains(entries, entry => entry.StreamId.Value >= 8 && entry.Payload.Length > 0);
     }
 
-    private sealed class CapturingLogEntrySink : ILogEntrySink
+    private sealed class CapturingLogEntrySink : ILogStreamStateMachineResolver, IDurableStateMachine
     {
+        private LogStreamId _streamId;
+
         public List<CapturedLogEntry> Entries { get; } = [];
 
-        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
+
+        public void Reset(ILogWriter storage) { }
+        public void AppendEntries(LogWriter writer) { }
+        public void AppendSnapshot(LogWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class DecodedPayloadOnlyLogFormat : ILogFormat
@@ -823,7 +838,7 @@ public class LogManagerTests : JournalingTestBase
 
         public ILogSegmentWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
+        public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
         {
             if (input.Length == 0)
             {
@@ -831,11 +846,25 @@ public class LogManagerTests : JournalingTestBase
             }
 
             var callbackPayload = _payload.ToArray();
-            consumer.OnEntry(_streamId, new ReadOnlySequence<byte>(callbackPayload));
+            var stateMachine = resolver.ResolveStateMachine(_streamId);
+            if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
+            {
+                formattedEntryBuffer.AddFormattedEntry(new TestFormattedLogEntry(callbackPayload));
+            }
+            else
+            {
+                stateMachine.Apply(new ReadOnlySequence<byte>(callbackPayload));
+            }
+
             Array.Fill(callbackPayload, byte.MaxValue);
             input.Skip(input.Length);
             return true;
         }
+    }
+
+    private sealed class TestFormattedLogEntry(ReadOnlyMemory<byte> payload) : IFormattedLogEntry
+    {
+        public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
     }
 
     private sealed class TrackingLogFormat : ILogFormat
@@ -851,7 +880,7 @@ public class LogManagerTests : JournalingTestBase
             return writer;
         }
 
-        public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
+        public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver consumer, bool isCompleted)
         {
             ReadCount++;
             return ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(input, consumer, isCompleted);
@@ -898,6 +927,14 @@ public class LogManagerTests : JournalingTestBase
             {
                 owner.BeganEntryIds.Add(streamId.Value);
                 return owner._inner.BeginEntry(streamId, completion);
+            }
+
+            public void AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+            {
+                owner.BeganEntryIds.Add(streamId.Value);
+                using var logEntry = new LogEntry(owner._inner.BeginEntry(streamId));
+                logEntry.Writer.Write(entry.Payload.Span);
+                logEntry.Commit();
             }
         }
     }
@@ -1051,6 +1088,8 @@ public class LogManagerTests : JournalingTestBase
         private ILogWriter? _writer;
 
         public LogEntry BeginEntry() => (_writer ?? throw new InvalidOperationException("State machine is not initialized.")).BeginEntry();
+
+        public object OperationCodec => this;
 
         public void Reset(ILogWriter storage) => _writer = storage;
 

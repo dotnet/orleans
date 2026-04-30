@@ -15,11 +15,15 @@ public interface IDurableNothing
 /// </summary>
 internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 {
+    private static readonly object NoOpCodec = new();
+
     public DurableNothing([ServiceKey] string key, ILogManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
     }
+
+    object IDurableStateMachine.OperationCodec => NoOpCodec;
 
     void IDurableStateMachine.Reset(ILogWriter storage) { }
 

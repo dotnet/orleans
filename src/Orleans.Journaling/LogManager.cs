@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Collections.ObjectModel;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -10,7 +9,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class LogManager : ILogManager, ILogEntrySink, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineResolver, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationLogStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -100,9 +99,9 @@ internal sealed partial class LogManager : ILogManager, ILogEntrySink, ILifecycl
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
                     stateMachine.Reset(new ManagerLogWriter(this, new(_logStreamIds[name])));
-                    foreach (var entry in vessel.BufferedData)
+                    foreach (var entry in vessel.FormattedEntries)
                     {
-                        stateMachine.Apply(new ReadOnlySequence<byte>(entry));
+                        stateMachine.Apply(new ReadOnlySequence<byte>(entry.Payload));
                     }
                     _stateMachines[name] = stateMachine;
                 }
@@ -458,7 +457,7 @@ internal sealed partial class LogManager : ILogManager, ILogEntrySink, ILifecycl
         }
     }
 
-    void ILogEntrySink.OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload)
+    IDurableStateMachine ILogStreamStateMachineResolver.ResolveStateMachine(LogStreamId streamId)
     {
         if (!_stateMachinesMap.TryGetValue(streamId.Value, out var stateMachine))
         {
@@ -466,7 +465,7 @@ internal sealed partial class LogManager : ILogManager, ILogEntrySink, ILifecycl
             _stateMachinesMap[streamId.Value] = stateMachine;
         }
 
-        stateMachine.Apply(payload);
+        return stateMachine;
     }
 
     private void ProcessRecoveryBuffer(ArcBufferReader reader) => ProcessRecoveryBuffer(reader, isCompleted: false);
@@ -663,27 +662,36 @@ internal sealed partial class LogManager : ILogManager, ILogEntrySink, ILifecycl
     /// This keeps buffering entries and dumps them back into the log upon compaction.
     /// </summary>
     [DebuggerDisplay("RetiredLogStream Id = {StreamId.Value}")]
-    private sealed class RetiredLogStream(LogStreamId streamId) : IDurableStateMachine
+    private sealed class RetiredLogStream(LogStreamId streamId) : IDurableStateMachine, IFormattedLogEntryBuffer
     {
-        private readonly List<byte[]> _bufferedData = [];
+        private static readonly object NoOpCodec = new();
+        private readonly List<IFormattedLogEntry> _formattedEntries = [];
 
         public LogStreamId StreamId { get; } = streamId;
 
-        public ReadOnlyCollection<byte[]> BufferedData => _bufferedData.AsReadOnly();
+        public IReadOnlyList<IFormattedLogEntry> FormattedEntries => _formattedEntries;
+
+        object IDurableStateMachine.OperationCodec => NoOpCodec;
+
+        public void AddFormattedEntry(IFormattedLogEntry entry)
+        {
+            ArgumentNullException.ThrowIfNull(entry);
+            _formattedEntries.Add(entry);
+        }
 
         void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
         {
-            foreach (var data in _bufferedData)
+            foreach (var entry in _formattedEntries)
             {
-                snapshotWriter.AppendPreservedDecodedPayload(data);
+                snapshotWriter.AppendFormattedEntry(entry);
             }
         }
 
-        void IDurableStateMachine.Reset(ILogWriter storage) => _bufferedData.Clear();
+        void IDurableStateMachine.Reset(ILogWriter storage) => _formattedEntries.Clear();
         void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
         {
-            // Recovery buffers are callback-scoped, so copy the decoded durable payload.
-            _bufferedData.Add(logEntry.ToArray());
+            throw new InvalidOperationException(
+                "Retired log streams can only buffer formatted entries supplied by the active log format.");
         }
 
         void IDurableStateMachine.AppendEntries(LogWriter logWriter) { }

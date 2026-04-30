@@ -20,9 +20,9 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
     public ILogSegmentWriter CreateWriter() => new JsonLinesLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
     {
-        ArgumentNullException.ThrowIfNull(consumer);
+        ArgumentNullException.ThrowIfNull(resolver);
 
         if (input.Length == 0)
         {
@@ -57,13 +57,13 @@ internal sealed class JsonLinesLogFormat : ILogFormat
                 throw new InvalidOperationException("Malformed JSON Lines log segment at byte offset 0: blank lines are not valid log entries.");
             }
 
-            ReadLine(line, offset: 0, consumer);
+            ReadLine(line, offset: 0, resolver);
         }
 
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, ILogEntrySink consumer)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, ILogStreamStateMachineResolver resolver)
     {
         var reader = new Utf8JsonReader(line);
         var hasStreamId = false;
@@ -71,6 +71,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         ulong streamId = 0;
         long entryStart = 0;
         long entryLength = 0;
+        JsonDocument? entryDocument = null;
 
         try
         {
@@ -133,7 +134,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
                     }
 
                     entryStart = reader.TokenStartIndex;
-                    reader.Skip();
+                    entryDocument = JsonDocument.ParseValue(ref reader);
                     entryLength = reader.BytesConsumed - entryStart;
                     hasEntry = true;
                 }
@@ -163,13 +164,43 @@ internal sealed class JsonLinesLogFormat : ILogFormat
             {
                 throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: trailing JSON content after the log entry object.");
             }
+
+            var stateMachine = resolver.ResolveStateMachine(new(streamId));
+            if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
+            {
+                formattedEntryBuffer.AddFormattedEntry(new JsonFormattedLogEntry(line.Slice(entryStart, entryLength)));
+                return;
+            }
+
+            if (stateMachine is IDurableNothing)
+            {
+                return;
+            }
+
+            ApplyJsonEntry(new(streamId), stateMachine, entryDocument!.RootElement);
         }
         catch (JsonException exception)
         {
             throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: invalid JSON log entry.", exception);
         }
+        finally
+        {
+            entryDocument?.Dispose();
+        }
+    }
 
-        consumer.OnEntry(new(streamId), line.Slice(entryStart, entryLength));
+    private static void ApplyJsonEntry(LogStreamId streamId, IDurableStateMachine stateMachine, JsonElement entry)
+    {
+        var operationCodec = stateMachine.OperationCodec;
+        if (operationCodec is not IJsonLogEntryCodec jsonCodec)
+        {
+            var codecType = operationCodec?.GetType().FullName ?? "<null>";
+            throw new InvalidOperationException(
+                $"The JSON log entry for stream {streamId.Value} resolved to state machine " +
+                $"'{stateMachine.GetType().FullName}', but its codec '{codecType}' does not implement IJsonLogEntryCodec.");
+        }
+
+        jsonCodec.Apply(entry, stateMachine);
     }
 
     private static bool EndsWith(ReadOnlySequence<byte> input, byte value)
@@ -270,5 +301,28 @@ internal sealed class JsonLinesLogFormat : ILogFormat
             _activePayloadStart = 0;
             _buffer.Truncate(entryStart);
         }
+
+        protected override void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+        {
+            if (entry is not JsonFormattedLogEntry jsonEntry)
+            {
+                throw new InvalidOperationException(
+                    $"The JSON log writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+            }
+
+            using var logEntry = CreateLogWriter(streamId).BeginEntry();
+            logEntry.Writer.Write(jsonEntry.Payload.Span);
+            logEntry.Commit();
+        }
+    }
+
+    private sealed class JsonFormattedLogEntry : IFormattedLogEntry
+    {
+        public JsonFormattedLogEntry(ReadOnlySequence<byte> payload)
+        {
+            Payload = payload.ToArray();
+        }
+
+        public ReadOnlyMemory<byte> Payload { get; }
     }
 }

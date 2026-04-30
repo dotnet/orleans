@@ -378,6 +378,67 @@ public class JsonCodecTests
         Assert.Equal("""{"cmd":"set","value":42}""", Encoding.UTF8.GetString(entry.Payload));
     }
 
+    [Fact]
+    public void JsonLinesLogFormat_Read_ActiveStateMachine_UsesJsonCodecBridge()
+    {
+        var format = new JsonLinesLogFormat();
+        var codec = new RecordingJsonLogEntryCodec();
+        var stateMachine = new RecordingStateMachine(codec);
+
+        ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine));
+
+        Assert.Same(stateMachine, codec.StateMachine);
+        Assert.Equal(42, codec.Value);
+        Assert.False(stateMachine.RawApplyCalled);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_ActiveStateMachine_ThrowsWhenCodecIsNotJsonBridge()
+    {
+        var format = new JsonLinesLogFormat();
+        var stateMachine = new RecordingStateMachine(new object());
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine)));
+
+        Assert.Contains("does not implement IJsonLogEntryCodec", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_ActiveStateMachine_ThrowsWhenCodecHandlerDoesNotMatch()
+    {
+        var format = new JsonLinesLogFormat();
+        var stateMachine = new RecordingStateMachine(new JsonValueOperationCodec<int>(Options));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine)));
+
+        Assert.Contains("not compatible", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_DurableNothingIgnoresEntryWithoutJsonCodec()
+    {
+        var format = new JsonLinesLogFormat();
+        var stateMachine = new NoOpStateMachine();
+
+        ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine));
+
+        Assert.False(stateMachine.RawApplyCalled);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Writer_RejectsWrongFormattedEntryType()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+        var logWriter = writer.CreateLogWriter(new LogStreamId(8));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
+
+        Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
+    }
+
     private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
     {
         var buffer = new ArrayBufferWriter<byte>();
@@ -446,13 +507,90 @@ public class JsonCodecTests
         return consumer.Entries;
     }
 
+    private static void ReadOne(JsonLinesLogFormat format, string jsonLines, ILogStreamStateMachineResolver resolver)
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
+        var reader = new ArcBufferReader(buffer);
+        Assert.True(format.TryRead(reader, resolver, isCompleted: true));
+        Assert.Equal(0, reader.Length);
+    }
+
     private sealed record RecordedLogEntry(LogStreamId StreamId, byte[] Payload);
 
-    private sealed class RecordingLogEntrySink : ILogEntrySink
+    private sealed class RecordingLogEntrySink : ILogStreamStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
     {
+        private LogStreamId _streamId;
+
         public List<RecordedLogEntry> Entries { get; } = [];
 
-        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) => Entries.Add(new(streamId, payload.ToArray()));
+        public IReadOnlyList<IFormattedLogEntry> FormattedEntries => [];
+
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void AddFormattedEntry(IFormattedLogEntry entry) => Entries.Add(new(_streamId, entry.Payload.ToArray()));
+
+        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
+
+        public void Reset(ILogWriter storage) { }
+        public void AppendEntries(LogWriter writer) { }
+        public void AppendSnapshot(LogWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class SingleStateMachineResolver(IDurableStateMachine stateMachine) : ILogStreamStateMachineResolver
+    {
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId) => stateMachine;
+    }
+
+    private sealed class RecordingStateMachine(object codec) : IDurableStateMachine
+    {
+        public bool RawApplyCalled { get; private set; }
+
+        public object OperationCodec => codec;
+
+        public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
+        public void Reset(ILogWriter storage) { }
+        public void AppendEntries(LogWriter writer) { }
+        public void AppendSnapshot(LogWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class NoOpStateMachine : IDurableNothing, IDurableStateMachine
+    {
+        public bool RawApplyCalled { get; private set; }
+
+        public object OperationCodec { get; } = new();
+
+        public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
+        public void Reset(ILogWriter storage) { }
+        public void AppendEntries(LogWriter writer) { }
+        public void AppendSnapshot(LogWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingJsonLogEntryCodec : IJsonLogEntryCodec
+    {
+        public IDurableStateMachine? StateMachine { get; private set; }
+
+        public int? Value { get; private set; }
+
+        public void Apply(JsonElement entry, IDurableStateMachine stateMachine)
+        {
+            StateMachine = stateMachine;
+            Value = entry.GetProperty(JsonLogEntryFields.Value).GetInt32();
+        }
+    }
+
+    private sealed class TestFormattedLogEntry : IFormattedLogEntry
+    {
+        public ReadOnlyMemory<byte> Payload => ReadOnlyMemory<byte>.Empty;
     }
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull

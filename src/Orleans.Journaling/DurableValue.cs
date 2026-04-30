@@ -48,6 +48,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
 
     public void OnModified() => _isDirty = true;
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 

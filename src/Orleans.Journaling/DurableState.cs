@@ -39,6 +39,8 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     void IDurableStateMachine.OnWriteCompleted()
     {
         _version++;

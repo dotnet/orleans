@@ -405,7 +405,7 @@ public class ProtobufCodecTests
         return writer;
     }
 
-    private static void ReadAll(ProtobufLogFormat format, ArcBuffer data, ILogEntrySink consumer)
+    private static void ReadAll(ProtobufLogFormat format, ArcBuffer data, ILogStreamStateMachineResolver consumer)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
@@ -521,12 +521,26 @@ public class ProtobufCodecTests
         public void ApplyCanceled() => Commands.Add("canceled");
     }
 
-    private sealed class CollectingConsumer : ILogEntrySink
+    private sealed class CollectingConsumer : ILogStreamStateMachineResolver, IDurableStateMachine
     {
+        private LogStreamId _streamId;
+
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload) =>
-            Entries.Add((streamId.Value, payload.ToArray()));
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add((_streamId.Value, payload.ToArray()));
+
+        public void Reset(ILogWriter storage) { }
+        public void AppendEntries(LogWriter writer) { }
+        public void AppendSnapshot(LogWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class MiscountedReadOnlyCollection<T>(int count, IReadOnlyCollection<T> items) : IReadOnlyCollection<T>

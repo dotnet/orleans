@@ -96,6 +96,17 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
     protected abstract void WritePayload(ReadOnlySequence<byte> value);
 
     /// <summary>
+    /// Appends a format-owned entry for retired or unknown state-machine preservation.
+    /// </summary>
+    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="entry">The format-owned entry.</param>
+    protected virtual void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    {
+        throw new InvalidOperationException(
+            $"The log segment writer '{GetType().FullName}' cannot append formatted entry of type '{entry.GetType().FullName}'.");
+    }
+
+    /// <summary>
     /// Commits the active entry.
     /// </summary>
     /// <param name="streamId">The durable state machine id.</param>
@@ -122,6 +133,17 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
         _activeEntryStart = entryStart;
         _entryWriter.Initialize(_target, entryStart, completion);
         return _entryWriter;
+    }
+
+    private void AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (_entryWriter.IsActive)
+        {
+            throw new InvalidOperationException("The log segment already has an active entry.");
+        }
+
+        OnAppendFormattedEntry(streamId, entry);
     }
 
     private void CommitActiveEntry(int entryStart)
@@ -176,5 +198,8 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
 
         LogEntryWriter ILogWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion) =>
             owner.BeginEntry(streamId, completion);
+
+        void ILogWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
+            owner.AppendFormattedEntry(streamId, entry);
     }
 }

@@ -86,7 +86,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     {
         public ILogSegmentWriter CreateWriter() => throw new NotSupportedException();
 
-        public bool TryRead(ArcBufferReader input, ILogEntrySink consumer, bool isCompleted) => throw new NotSupportedException();
+        public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodecProvider : IDurableDictionaryOperationCodecProvider

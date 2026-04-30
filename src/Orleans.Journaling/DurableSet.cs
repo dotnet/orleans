@@ -44,6 +44,8 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     public int Count => _items.Count;
     public bool IsReadOnly => false;
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();

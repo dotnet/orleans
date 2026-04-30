@@ -14,14 +14,14 @@ internal sealed class OrleansBinaryLogFormat : ILogFormat
 
     ILogSegmentWriter ILogFormat.CreateWriter() => new LogSegmentBuffer();
 
-    bool ILogFormat.TryRead(ArcBufferReader input, ILogEntrySink sink, bool isCompleted) => OrleansBinaryLogReader.TryRead(input, sink, isCompleted);
+    bool ILogFormat.TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted) => OrleansBinaryLogReader.TryRead(input, resolver, isCompleted);
 }
 
 internal static class OrleansBinaryLogReader
 {
-    public static bool TryRead(ArcBufferReader input, ILogEntrySink sink, bool isCompleted)
+    public static bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
     {
-        ArgumentNullException.ThrowIfNull(sink);
+        ArgumentNullException.ThrowIfNull(resolver);
 
         if (input.Length == 0)
         {
@@ -68,7 +68,16 @@ internal static class OrleansBinaryLogReader
         }
 
         input.Skip((int)frameLength);
-        sink.OnEntry(streamId, payload);
+        var stateMachine = resolver.ResolveStateMachine(streamId);
+        if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
+        {
+            formattedEntryBuffer.AddFormattedEntry(new OrleansBinaryFormattedLogEntry(payload));
+        }
+        else
+        {
+            stateMachine.Apply(payload);
+        }
+
         return true;
     }
 }

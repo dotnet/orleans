@@ -174,7 +174,7 @@ public class DurableListJournalBenchmarks
     private sealed class RecoveryConsumer(
         LogStreamId expectedStreamId,
         IDurableListOperationCodec<int> codec,
-        int capacity) : ILogEntrySink, IDurableListOperationHandler<int>
+        int capacity) : ILogStreamStateMachineResolver, IDurableStateMachine, IDurableListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -182,15 +182,27 @@ public class DurableListJournalBenchmarks
 
         public void Reset() => _items.Clear();
 
-        public void OnEntry(LogStreamId streamId, ReadOnlySequence<byte> payload)
+        object IDurableStateMachine.OperationCodec => codec;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
         {
             if (streamId != expectedStreamId)
             {
                 throw new InvalidOperationException("The encoded journaling benchmark data contained an unexpected stream id.");
             }
 
+            return this;
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload)
+        {
             codec.Apply(payload, this);
         }
+
+        void IDurableStateMachine.Reset(ILogWriter storage) => Reset();
+        void IDurableStateMachine.AppendEntries(LogWriter writer) { }
+        void IDurableStateMachine.AppendSnapshot(LogWriter writer) { }
+        IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
 
         public void ApplyAdd(int item) => _items.Add(item);
 

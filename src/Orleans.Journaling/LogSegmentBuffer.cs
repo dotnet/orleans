@@ -94,6 +94,20 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
 
     LogEntryWriter ILogWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion) => BeginEntry(streamId, completion);
 
+    void ILogWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    {
+        ArgumentNullException.ThrowIfNull(entry);
+        if (entry is not OrleansBinaryFormattedLogEntry binaryEntry)
+        {
+            throw new InvalidOperationException(
+                $"The Orleans binary log writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+        }
+
+        using var logEntry = new LogEntry(BeginEntry(streamId));
+        logEntry.Writer.Write(binaryEntry.Payload.Span);
+        logEntry.Commit();
+    }
+
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream
     {
         private ArcBuffer _buffer = buffer;

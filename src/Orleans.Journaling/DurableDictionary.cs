@@ -55,6 +55,8 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     void IDurableStateMachine.Reset(ILogWriter storage)
     {
         _items.Clear();

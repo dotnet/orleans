@@ -208,6 +208,8 @@ namespace Orleans.Journaling
 
     public partial interface IDurableStateMachine
     {
+        object OperationCodec { get; }
+
         void AppendEntries(LogWriter writer);
         void AppendSnapshot(LogWriter writer);
         void Apply(System.Buffers.ReadOnlySequence<byte> entry);
@@ -277,9 +279,16 @@ namespace Orleans.Journaling
         void Write(T value, System.Buffers.IBufferWriter<byte> output);
     }
 
-    public partial interface ILogEntrySink
+    public partial interface IFormattedLogEntry
     {
-        void OnEntry(LogStreamId streamId, System.Buffers.ReadOnlySequence<byte> payload);
+        System.ReadOnlyMemory<byte> Payload { get; }
+    }
+
+    public partial interface IFormattedLogEntryBuffer
+    {
+        System.Collections.Generic.IReadOnlyList<IFormattedLogEntry> FormattedEntries { get; }
+
+        void AddFormattedEntry(IFormattedLogEntry entry);
     }
 
     public partial interface ILogSegmentWriter : System.IDisposable
@@ -294,7 +303,7 @@ namespace Orleans.Journaling
     public partial interface ILogFormat
     {
         ILogSegmentWriter CreateWriter();
-        bool TryRead(Serialization.Buffers.ArcBufferReader input, ILogEntrySink sink, bool isCompleted);
+        bool TryRead(Serialization.Buffers.ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted);
     }
 
     public partial interface ILogFormatKeyProvider
@@ -305,6 +314,11 @@ namespace Orleans.Journaling
     public partial interface ILogWriter
     {
         LogEntry BeginEntry();
+    }
+
+    public partial interface ILogStreamStateMachineResolver
+    {
+        IDurableStateMachine ResolveStateMachine(LogStreamId streamId);
     }
 
     public partial interface ILogManager
@@ -429,6 +443,7 @@ namespace Orleans.Journaling
         protected abstract int GetEntryStart(LogStreamId streamId);
         protected abstract System.Memory<byte> GetPayloadMemory(int sizeHint);
         protected abstract System.Span<byte> GetPayloadSpan(int sizeHint);
+        protected virtual void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) { }
         protected virtual void OnBeginEntry(LogStreamId streamId) { }
 
         public abstract void Reset();

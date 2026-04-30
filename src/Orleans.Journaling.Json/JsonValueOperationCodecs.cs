@@ -7,7 +7,7 @@ namespace Orleans.Journaling.Json;
 /// JSON codec for durable value log entries.
 /// </summary>
 public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableValueOperationCodec<T>
+    : IDurableValueOperationCodec<T>, IJsonLogEntryCodec
 {
     private readonly JsonValueSerializer<T> _valueSerializer = new(options);
 
@@ -28,6 +28,11 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         var reader = new Utf8JsonReader(input);
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        Apply(root, consumer);
+    }
+
+    internal void Apply(JsonElement root, IDurableValueOperationHandler<T> consumer)
+    {
         var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
         switch (command)
         {
@@ -38,13 +43,24 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
+
+    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    {
+        if (stateMachine is not IDurableValueOperationHandler<T> consumer)
+        {
+            throw new InvalidOperationException(
+                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+        }
+
+        Apply(entry, consumer);
+    }
 }
 
 /// <summary>
 /// JSON codec for durable persistent state log entries.
 /// </summary>
 public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableStateOperationCodec<T>
+    : IDurableStateOperationCodec<T>, IJsonLogEntryCodec
 {
     private readonly JsonValueSerializer<T> _stateSerializer = new(options);
 
@@ -75,6 +91,11 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         var reader = new Utf8JsonReader(input);
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        Apply(root, consumer);
+    }
+
+    internal void Apply(JsonElement root, IDurableStateOperationHandler<T> consumer)
+    {
         var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
         switch (command)
         {
@@ -88,13 +109,24 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
+
+    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    {
+        if (stateMachine is not IDurableStateOperationHandler<T> consumer)
+        {
+            throw new InvalidOperationException(
+                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+        }
+
+        Apply(entry, consumer);
+    }
 }
 
 /// <summary>
 /// JSON codec for durable task completion source log entries.
 /// </summary>
 public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableTaskCompletionSourceOperationCodec<T>
+    : IDurableTaskCompletionSourceOperationCodec<T>, IJsonLogEntryCodec
 {
     private readonly JsonValueSerializer<T> _valueSerializer = new(options);
 
@@ -143,6 +175,11 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         var reader = new Utf8JsonReader(input);
         using var document = JsonDocument.ParseValue(ref reader);
         var root = document.RootElement;
+        Apply(root, consumer);
+    }
+
+    internal void Apply(JsonElement root, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    {
         var command = root.GetProperty(JsonLogEntryFields.Command).GetString();
         switch (command)
         {
@@ -161,5 +198,16 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
             default:
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
+    }
+
+    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    {
+        if (stateMachine is not IDurableTaskCompletionSourceOperationHandler<T> consumer)
+        {
+            throw new InvalidOperationException(
+                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+        }
+
+        Apply(entry, consumer);
     }
 }
