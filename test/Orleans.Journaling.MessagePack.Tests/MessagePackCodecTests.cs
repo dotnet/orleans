@@ -261,6 +261,18 @@ public sealed class MessagePackCodecTests
         entry.Dispose();
     }
 
+    [Fact]
+    public void MessagePackLogFormat_Writer_RejectsWrongFormattedEntryType()
+    {
+        var format = new MessagePackLogFormat();
+        using var writer = format.CreateWriter();
+        var logWriter = writer.CreateLogWriter(new LogStreamId(8));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
+
+        Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(new byte[] { 0x91, 0x01 }, "expected entry array with 2 item(s)")]
     [InlineData(new byte[] { 0x92 }, "truncated streamId")]
@@ -303,6 +315,11 @@ public sealed class MessagePackCodecTests
         while (format.TryRead(reader, consumer, isCompleted: true))
         {
         }
+    }
+
+    private sealed class TestFormattedLogEntry : IFormattedLogEntry
+    {
+        public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
     }
 
     private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
