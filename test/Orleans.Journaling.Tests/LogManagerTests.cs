@@ -486,6 +486,59 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task LogManager_RecoveryRetry_ReplaysFixedStorage()
+    {
+        var validBytes = CreatePersistedValueBytes("value", 42);
+        var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]);
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.Bytes = validBytes;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(42, value.Value);
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task LogManager_RecoveryRetry_PreservesUnknownStreamOnce()
+    {
+        var validBytes = CreateUnknownStreamBytes(new LogStreamId(99), [1, 2, 3]);
+        var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]) { IsCompactionRequested = true };
+        var sut = CreateTestSystem(storage: storage);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.Bytes = validBytes;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        var replacement = Assert.Single(storage.Replaces);
+        var preserved = Assert.Single(ReadBinaryEntries(replacement), entry => entry.StreamId.Value == 99);
+        Assert.Equal([1, 2, 3], preserved.Payload);
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task LogManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
+    {
+        var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new LogStreamId(8), [1, 2, 3]), 1, 2, 3]);
+        var sut = CreateTestSystem(storage: storage);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.Bytes = [];
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(sut.Manager.TryGetStateMachine("stale", out _));
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+    }
+
+    [Fact]
     public async Task LogManager_Recovery_DoesNotWrapStorageReadException()
     {
         var storage = new ThrowingReadStorage();
@@ -829,6 +882,56 @@ public class LogManagerTests : JournalingTestBase
     private OrleansBinaryValueOperationCodec<T> CreateValueCodec<T>() =>
         new(new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
 
+    private byte[] CreatePersistedValueBytes(string name, int value)
+    {
+        using var segment = new LogSegmentBuffer();
+        AppendDirectorySet(segment, name, new LogStreamId(8));
+        var codec = CreateValueCodec<int>();
+        using (var entry = segment.CreateLogWriter(new LogStreamId(8)).BeginEntry())
+        {
+            codec.WriteSet(value, entry.Writer);
+            entry.Commit();
+        }
+
+        using var committed = segment.GetCommittedBuffer();
+        return committed.ToArray();
+    }
+
+    private byte[] CreateUnknownStreamBytes(LogStreamId streamId, ReadOnlySpan<byte> payload)
+    {
+        using var segment = new LogSegmentBuffer();
+        using (var entry = segment.CreateLogWriter(streamId).BeginEntry())
+        {
+            entry.Writer.Write(payload);
+            entry.Commit();
+        }
+
+        using var committed = segment.GetCommittedBuffer();
+        return committed.ToArray();
+    }
+
+    private byte[] CreateNamedUnknownStreamBytes(string name, LogStreamId streamId, ReadOnlySpan<byte> payload)
+    {
+        using var segment = new LogSegmentBuffer();
+        AppendDirectorySet(segment, name, streamId);
+        using (var entry = segment.CreateLogWriter(streamId).BeginEntry())
+        {
+            entry.Writer.Write(payload);
+            entry.Commit();
+        }
+
+        using var committed = segment.GetCommittedBuffer();
+        return committed.ToArray();
+    }
+
+    private void AppendDirectorySet(LogSegmentBuffer segment, string name, LogStreamId streamId)
+    {
+        var codec = CreateDictionaryCodec<string, ulong>();
+        using var entry = segment.CreateLogWriter(new LogStreamId(0)).BeginEntry();
+        codec.WriteSet(name, streamId.Value, entry.Writer);
+        entry.Commit();
+    }
+
     private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> value)
     {
         using var writer = new ArcBufferWriter();
@@ -1090,6 +1193,50 @@ public class LogManagerTests : JournalingTestBase
         public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class MutableReadStorage(byte[] bytes) : ILogStorage
+    {
+        public byte[] Bytes { get; set; } = bytes;
+
+        public List<byte[]> Replaces { get; } = [];
+
+        public bool IsCompactionRequested { get; set; }
+
+        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (Bytes.Length > 0)
+            {
+                buffer.Write(Bytes);
+                consume(new ArcBufferReader(buffer));
+            }
+
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytes = value.ToArray();
+            Replaces.Add(bytes);
+            Bytes = bytes;
+            return default;
+        }
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Bytes = [.. Bytes, .. value.ToArray()];
+            return default;
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Bytes = [];
+            return default;
+        }
     }
 
     private sealed class ThrowingReadStorage : ILogStorage
