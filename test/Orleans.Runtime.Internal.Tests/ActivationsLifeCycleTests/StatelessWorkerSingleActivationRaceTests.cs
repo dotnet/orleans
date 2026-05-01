@@ -38,9 +38,9 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
                 hostBuilder.Services.AddSingleton<StatelessWorkerSingleActivationTracker>();
                 hostBuilder.Services.Configure<StatelessWorkerOptions>(options =>
                 {
-                    // These tests explicitly terminate the wrapper after capturing it from the directory.
-                    // Disable proactive idle collection so the setup is not racing a timer.
-                    options.RemoveIdleWorkers = false;
+                    options.RemoveIdleWorkers = true;
+                    options.IdleWorkersInspectionPeriod = TimeSpan.FromMilliseconds(5);
+                    options.MinIdleCyclesBeforeRemoval = 1;
                 });
             }
         }
@@ -66,9 +66,7 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
 
         await grain.DoWork();
 
-        var c1 = Assert.IsType<StatelessWorkerGrainContext>(directory.FindTarget(grainId));
-        collector.Clear();
-
+        var c1 = Assert.IsType<StatelessWorkerGrainContext>((await WaitForWorkerCreatedAsync(collector, grainId)).Context);
         c1.Deactivate(new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "test"), CancellationToken.None);
 
         var terminated = await WaitForContextTerminatedAsync(collector, c1);
@@ -107,9 +105,7 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
         tracker.Reset();
         await grain.DoWork();
 
-        var c1 = Assert.IsType<StatelessWorkerGrainContext>(directory.FindTarget(grainId));
-        collector.Clear();
-
+        var c1 = Assert.IsType<StatelessWorkerGrainContext>((await WaitForWorkerCreatedAsync(collector, grainId)).Context);
         c1.Deactivate(new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "test"), CancellationToken.None);
         _ = await WaitForContextTerminatedAsync(collector, c1);
 
@@ -185,6 +181,18 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
                 && ReferenceEquals(forwarded.Context, context),
             TimeSpan.FromSeconds(10));
         return Assert.IsType<StatelessWorkerEvents.MessageForwarded>(evt.Payload);
+    }
+
+    private static async Task<StatelessWorkerEvents.WorkerCreated> WaitForWorkerCreatedAsync(
+        DiagnosticEventCollector collector,
+        GrainId grainId)
+    {
+        var evt = await collector.WaitForEventAsync(
+            nameof(StatelessWorkerEvents.WorkerCreated),
+            diagnosticEvent => diagnosticEvent.Payload is StatelessWorkerEvents.WorkerCreated workerCreated
+                && workerCreated.GrainId.Equals(grainId),
+            TimeSpan.FromSeconds(10));
+        return Assert.IsType<StatelessWorkerEvents.WorkerCreated>(evt.Payload);
     }
 
     private static async Task<StatelessWorkerEvents.WorkerCreated> WaitForWorkerCreatedAsync(
