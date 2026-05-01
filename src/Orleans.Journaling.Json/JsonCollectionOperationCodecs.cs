@@ -170,7 +170,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         JsonOperationCodecWriter.Write(
             writer,
             operation,
-            static (jsonWriter, operation) => WriteJson(jsonWriter, operation),
+            static (jsonWriter, operation) => JsonListOperationConverter.WriteArrayElements(jsonWriter, operation),
             static (output, operation) => WriteBytes(output, operation));
     }
 
@@ -307,7 +307,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         JsonOperationCodecWriter.Write(
             writer,
             operation,
-            static (jsonWriter, operation) => WriteJson(jsonWriter, operation),
+            static (jsonWriter, operation) => JsonQueueOperationConverter.WriteArrayElements(jsonWriter, operation),
             static (output, operation) => WriteBytes(output, operation));
     }
 
@@ -451,7 +451,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         JsonOperationCodecWriter.Write(
             writer,
             operation,
-            static (jsonWriter, operation) => WriteJson(jsonWriter, operation),
+            static (jsonWriter, operation) => JsonSetOperationConverter.WriteArrayElements(jsonWriter, operation),
             static (output, operation) => WriteBytes(output, operation));
     }
 

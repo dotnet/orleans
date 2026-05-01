@@ -9,7 +9,6 @@ internal sealed class JsonLinesLogFormat : ILogFormat
     private static readonly byte[] Bom = [0xEF, 0xBB, 0xBF];
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
-    private const string StreamIdPropertyName = "streamId";
 
     public ILogSegmentWriter CreateWriter() => new JsonLinesLogSegmentWriter();
 
@@ -58,52 +57,51 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
     private static void ReadLine(ReadOnlySequence<byte> line, long offset, ILogStreamStateMachineResolver resolver)
     {
-        var reader = new Utf8JsonReader(line);
-        JsonLinesLogEntry logEntry;
+        JsonElement logEntry;
 
         try
         {
-            if (!reader.Read())
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: blank lines are not valid log entries.");
-            }
-
-            if (reader.TokenType is not JsonTokenType.StartObject)
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must be a JSON object.");
-            }
-
-            logEntry = JsonSerializer.Deserialize(ref reader, JsonLinesLogEntryJsonContext.Default.JsonLinesLogEntry);
-            if (reader.Read())
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: trailing JSON content after the log entry object.");
-            }
+            using var document = JsonDocument.Parse(line);
+            logEntry = document.RootElement.Clone();
         }
         catch (JsonException exception)
         {
-            if (exception.Path == $"$.{StreamIdPropertyName}")
-            {
-                throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property '{StreamIdPropertyName}' must be an unsigned integer.", exception);
-            }
-
             throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: invalid JSON log entry. {exception.Message}", exception);
         }
 
-        if (logEntry.ExtensionData is { Count: > 0 })
+        if (logEntry.ValueKind is not JsonValueKind.Array)
         {
-            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: unexpected property '{logEntry.ExtensionData.Keys.First()}'.");
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must be a JSON array.");
         }
 
-        if (logEntry.Entry.ValueKind is not JsonValueKind.Object)
+        var length = logEntry.GetArrayLength();
+        if (length == 0)
         {
-            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: property 'entry' must be a JSON object.");
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must include a stream id.");
         }
 
-        var stream = new LogStreamId(logEntry.StreamId);
+        var streamElement = logEntry[0];
+        if (streamElement.ValueKind is not JsonValueKind.Number || !streamElement.TryGetUInt64(out var streamId))
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: element 0 must be an unsigned integer stream id.");
+        }
+
+        if (length == 1)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: each line must include an operation command.");
+        }
+
+        if (logEntry[1].ValueKind is not JsonValueKind.String)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: element 1 must be an operation command string.");
+        }
+
+        var entry = CreateOperationEntry(logEntry);
+        var stream = new LogStreamId(streamId);
         var stateMachine = resolver.ResolveStateMachine(stream);
         if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
         {
-            formattedEntryBuffer.AddFormattedEntry(JsonFormattedLogEntry.Create(logEntry.Entry));
+            formattedEntryBuffer.AddFormattedEntry(JsonFormattedLogEntry.Create(entry));
             return;
         }
 
@@ -112,11 +110,16 @@ internal sealed class JsonLinesLogFormat : ILogFormat
             return;
         }
 
-        ApplyJsonEntry(stream, stateMachine, logEntry.Entry);
+        ApplyJsonEntry(stream, stateMachine, entry);
     }
 
     private static void ApplyJsonEntry(LogStreamId streamId, IDurableStateMachine stateMachine, JsonElement entry)
     {
+        if (entry.ValueKind is not JsonValueKind.Array)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment for stream {streamId.Value}: operation entry must be a JSON array.");
+        }
+
         var operationCodec = stateMachine.OperationCodec;
         if (operationCodec is not IJsonLogEntryCodec jsonCodec)
         {
@@ -127,6 +130,25 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         }
 
         jsonCodec.Apply(entry, stateMachine);
+    }
+
+    private static JsonElement CreateOperationEntry(JsonElement logEntry)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        using (var writer = new Utf8JsonWriter(buffer))
+        {
+            writer.WriteStartArray();
+            var length = logEntry.GetArrayLength();
+            for (var i = 1; i < length; i++)
+            {
+                logEntry[i].WriteTo(writer);
+            }
+
+            writer.WriteEndArray();
+        }
+
+        using var document = JsonDocument.Parse(buffer.WrittenMemory);
+        return document.RootElement.Clone();
     }
 
     private static bool EndsWith(ReadOnlySequence<byte> input, byte value)
@@ -239,14 +261,13 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         private static void WriteLogEntry(LogStreamId streamId, ReadOnlySequence<byte> payload, ArcBufferWriter buffer)
         {
             using var payloadDocument = JsonDocument.Parse(payload);
-            var logEntry = new JsonLinesLogEntry
+            if (payloadDocument.RootElement.ValueKind is not JsonValueKind.Array)
             {
-                StreamId = streamId.Value,
-                Entry = payloadDocument.RootElement
-            };
+                throw new InvalidOperationException("The JSON Lines log entry payload must be a JSON operation array.");
+            }
 
             using var jsonWriter = new Utf8JsonWriter(buffer);
-            JsonSerializer.Serialize(jsonWriter, logEntry, JsonLinesLogEntryJsonContext.Default.JsonLinesLogEntry);
+            WriteLogEntry(jsonWriter, streamId, payloadDocument.RootElement);
             jsonWriter.Flush();
             buffer.Write("\n"u8);
         }
@@ -254,13 +275,24 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         private static void WriteLogEntry(LogStreamId streamId, JsonFormattedLogEntry entry, ArcBufferWriter buffer)
         {
             using var jsonWriter = new Utf8JsonWriter(buffer);
-            jsonWriter.WriteStartObject();
-            jsonWriter.WriteNumber(StreamIdPropertyName, streamId.Value);
-            jsonWriter.WritePropertyName("entry");
-            entry.WriteTo(jsonWriter);
-            jsonWriter.WriteEndObject();
+            jsonWriter.WriteStartArray();
+            jsonWriter.WriteNumberValue(streamId.Value);
+            entry.WriteArrayElementsTo(jsonWriter);
+            jsonWriter.WriteEndArray();
             jsonWriter.Flush();
             buffer.Write("\n"u8);
+        }
+
+        private static void WriteLogEntry(Utf8JsonWriter writer, LogStreamId streamId, JsonElement entry)
+        {
+            writer.WriteStartArray();
+            writer.WriteNumberValue(streamId.Value);
+            foreach (var element in entry.EnumerateArray())
+            {
+                element.WriteTo(writer);
+            }
+
+            writer.WriteEndArray();
         }
     }
 }
@@ -271,15 +303,17 @@ internal abstract class JsonFormattedLogEntry : IFormattedLogEntry
 
     public static JsonFormattedLogEntry Create(JsonElement payload) => new JsonElementFormattedLogEntry(payload);
 
-    public static JsonFormattedLogEntry Create<TArg>(TArg argument, Action<Utf8JsonWriter, TArg> writeTo)
+    public static JsonFormattedLogEntry Create<TArg>(TArg argument, Action<Utf8JsonWriter, TArg> writeArrayElementsTo)
     {
-        ArgumentNullException.ThrowIfNull(writeTo);
-        return new JsonFormattedLogEntry<TArg>(argument, writeTo);
+        ArgumentNullException.ThrowIfNull(writeArrayElementsTo);
+        return new JsonFormattedLogEntry<TArg>(argument, writeArrayElementsTo);
     }
 
     public ReadOnlyMemory<byte> Payload => _payload ??= SerializePayload();
 
     public abstract void WriteTo(Utf8JsonWriter writer);
+
+    public abstract void WriteArrayElementsTo(Utf8JsonWriter writer);
 
     private byte[] SerializePayload()
     {
@@ -300,20 +334,40 @@ internal abstract class JsonFormattedLogEntry : IFormattedLogEntry
         }
 
         public override void WriteTo(Utf8JsonWriter writer) => _element.WriteTo(writer);
+
+        public override void WriteArrayElementsTo(Utf8JsonWriter writer)
+        {
+            if (_element.ValueKind is not JsonValueKind.Array)
+            {
+                throw new InvalidOperationException("The JSON formatted log entry payload must be a JSON operation array.");
+            }
+
+            foreach (var element in _element.EnumerateArray())
+            {
+                element.WriteTo(writer);
+            }
+        }
     }
 }
 
 internal sealed class JsonFormattedLogEntry<TArg> : JsonFormattedLogEntry
 {
     private readonly TArg _argument;
-    private readonly Action<Utf8JsonWriter, TArg> _writeTo;
+    private readonly Action<Utf8JsonWriter, TArg> _writeArrayElementsTo;
 
-    public JsonFormattedLogEntry(TArg argument, Action<Utf8JsonWriter, TArg> writeTo)
+    public JsonFormattedLogEntry(TArg argument, Action<Utf8JsonWriter, TArg> writeArrayElementsTo)
     {
-        ArgumentNullException.ThrowIfNull(writeTo);
+        ArgumentNullException.ThrowIfNull(writeArrayElementsTo);
         _argument = argument;
-        _writeTo = writeTo;
+        _writeArrayElementsTo = writeArrayElementsTo;
     }
 
-    public override void WriteTo(Utf8JsonWriter writer) => _writeTo(writer, _argument);
+    public override void WriteTo(Utf8JsonWriter writer)
+    {
+        writer.WriteStartArray();
+        _writeArrayElementsTo(writer, _argument);
+        writer.WriteEndArray();
+    }
+
+    public override void WriteArrayElementsTo(Utf8JsonWriter writer) => _writeArrayElementsTo(writer, _argument);
 }

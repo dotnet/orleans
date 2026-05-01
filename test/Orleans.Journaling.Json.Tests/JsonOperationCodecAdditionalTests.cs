@@ -46,7 +46,7 @@ public sealed class JsonOperationCodecAdditionalTests
     [Fact]
     public void OperationCodecs_RejectUnsupportedCommands()
     {
-        var payload = CodecTestHelpers.Sequence("""{"cmd":"unknown"}"""u8.ToArray());
+        var payload = CodecTestHelpers.Sequence("""["unknown"]"""u8.ToArray());
 
         Assert.Throws<NotSupportedException>(() => new JsonDictionaryOperationCodec<string, int>(Options).Apply(payload, new RecordingDictionaryOperationHandler<string, int>()));
         Assert.Throws<NotSupportedException>(() => new JsonListOperationCodec<int>(Options).Apply(payload, new RecordingListOperationHandler<int>()));

@@ -8,10 +8,10 @@ internal static class JsonOperationCodecWriter
     public static void Write<TArg>(
         LogWriter writer,
         TArg argument,
-        Action<Utf8JsonWriter, TArg> writeJson,
+        Action<Utf8JsonWriter, TArg> writeJsonArrayElements,
         Action<IBufferWriter<byte>, TArg> writeBytes)
     {
-        if (writer.TryAppendFormattedEntry(JsonFormattedLogEntry.Create(argument, writeJson)))
+        if (writer.TryAppendFormattedEntry(JsonFormattedLogEntry.Create(argument, writeJsonArrayElements)))
         {
             return;
         }
