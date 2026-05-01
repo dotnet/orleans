@@ -45,7 +45,7 @@ public abstract class JournalingTestBase
     /// Creates a log manager with in-memory storage
     /// </summary>
     internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle)
-        CreateTestSystem(ILogStorage? storage = null, TimeProvider? provider = null, ILogFormat? logFormat = null)
+        CreateTestSystem(ILogStorage? storage = null, TimeProvider? provider = null, ILogFormat? logFormat = null, string? logFormatKey = null)
     {
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
@@ -56,7 +56,7 @@ public abstract class JournalingTestBase
         var dateTimeCodec = new OrleansLogValueCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
         var logStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager = new LogManager(storage, logger, Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, provider, logFormat);
+        var manager = new LogManager(storage, logger, Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, provider, logFormat, logFormatKey);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

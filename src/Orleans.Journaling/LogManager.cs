@@ -22,6 +22,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     private readonly Dictionary<ulong, IDurableStateMachine> _stateMachinesMap = [];
     private readonly ILogStorage _storage;
     private readonly ILogFormat _logFormat;
+    private readonly string _logFormatKey;
     private readonly ILogger<LogManager> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -45,8 +46,9 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey)
     {
         _storage = storage;
-        _logFormat = LogFormatServices.GetRequiredKeyedService<ILogFormat>(serviceProvider, logFormatKey);
-        var dictionaryCodecProvider = LogFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, logFormatKey);
+        _logFormatKey = LogFormatServices.ValidateLogFormatKey(logFormatKey);
+        _logFormat = LogFormatServices.GetRequiredKeyedService<ILogFormat>(serviceProvider, _logFormatKey);
+        var dictionaryCodecProvider = LogFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, _logFormatKey);
         _logger = logger;
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
@@ -69,9 +71,11 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         IDurableDictionaryOperationCodec<string, ulong> logStreamIdsCodec,
         IDurableDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
         TimeProvider timeProvider,
-        ILogFormat? logFormat = null)
+        ILogFormat? logFormat = null,
+        string? logFormatKey = null)
     {
         _storage = storage;
+        _logFormatKey = LogFormatServices.ValidateLogFormatKey(logFormatKey ?? OrleansBinaryLogFormat.LogFormatKey);
         _logFormat = logFormat ?? OrleansBinaryLogFormat.Instance;
         _logger = logger;
         _timeProvider = timeProvider;
@@ -478,15 +482,35 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
     private void ProcessRecoveryBuffer(ArcBufferReader reader, bool isCompleted)
     {
-        while (_logFormat.TryRead(reader, this, isCompleted))
+        try
         {
-        }
+            while (_logFormat.TryRead(reader, this, isCompleted))
+            {
+            }
 
-        if (isCompleted && reader.Length > 0)
+            if (isCompleted && reader.Length > 0)
+            {
+                throw new InvalidOperationException("The log format did not consume the completed log data.");
+            }
+        }
+        catch (Exception exception) when (ShouldWrapRecoveryFormatException(exception))
         {
-            throw new InvalidOperationException("The log format did not consume the completed log data.");
+            throw CreateRecoveryFormatException(exception);
         }
     }
+
+    private static bool ShouldWrapRecoveryFormatException(Exception exception) =>
+        exception is not OperationCanceledException && !IsRecoveryFormatException(exception);
+
+    private static bool IsRecoveryFormatException(Exception exception) =>
+        exception is InvalidOperationException { InnerException: not null }
+        && exception.Message.StartsWith("Failed to recover journaling state using configured log format key ", StringComparison.Ordinal);
+
+    private InvalidOperationException CreateRecoveryFormatException(Exception exception) =>
+        new(
+            $"Failed to recover journaling state using configured log format key '{_logFormatKey}'. " +
+            "If this grain previously used another journaling format key, restore that key or migrate the data.",
+            exception);
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
     {
