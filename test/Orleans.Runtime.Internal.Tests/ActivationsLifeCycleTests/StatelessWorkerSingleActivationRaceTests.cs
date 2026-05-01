@@ -38,9 +38,9 @@ public class StatelessWorkerSingleActivationRaceTests(StatelessWorkerSingleActiv
                 hostBuilder.Services.AddSingleton<StatelessWorkerSingleActivationTracker>();
                 hostBuilder.Services.Configure<StatelessWorkerOptions>(options =>
                 {
-                    options.RemoveIdleWorkers = true;
-                    options.IdleWorkersInspectionPeriod = TimeSpan.FromMilliseconds(5);
-                    options.MinIdleCyclesBeforeRemoval = 1;
+                    // These tests explicitly terminate the wrapper after capturing it from the directory.
+                    // Disable proactive idle collection so the setup is not racing a timer.
+                    options.RemoveIdleWorkers = false;
                 });
             }
         }
