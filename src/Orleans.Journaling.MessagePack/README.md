@@ -20,13 +20,18 @@ dotnet add package Microsoft.Orleans.Journaling.MessagePack
 using MessagePack;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
+using Orleans.Journaling;
+using Orleans.Journaling.MessagePack;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobLogStorage()
+            .AddAzureAppendBlobLogStorage(options =>
+            {
+                options.LogFormatKey = MessagePackJournalingExtensions.LogFormatKey;
+            })
             .UseMessagePackCodec(options =>
             {
                 options.SerializerOptions = MessagePackSerializerOptions.Standard;
@@ -36,7 +41,7 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.Build().RunAsync();
 ```
 
-If you use a different Journaling storage provider, call `UseMessagePackCodec(...)` after registering that provider.
+If you use a different Journaling storage provider, configure it to use the `MessagePackJournalingExtensions.LogFormatKey` format key and call `UseMessagePackCodec(...)` after registering that provider.
 
 ## Value payloads and Native AOT
 

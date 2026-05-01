@@ -17,13 +17,18 @@ dotnet add package Microsoft.Orleans.Journaling.Protobuf
 using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
+using Orleans.Journaling;
+using Orleans.Journaling.Protobuf;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobLogStorage()
+            .AddAzureAppendBlobLogStorage(options =>
+            {
+                options.LogFormatKey = ProtobufJournalingExtensions.LogFormatKey;
+            })
             .UseProtobufCodec(options =>
             {
                 options.AddMessageParser(StringValue.Parser);
@@ -33,7 +38,7 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.Build().RunAsync();
 ```
 
-If you use a different Journaling storage provider, call `UseProtobufCodec(...)` after registering that provider.
+If you use a different Journaling storage provider, configure it to use the `ProtobufJournalingExtensions.LogFormatKey` format key and call `UseProtobufCodec(...)` after registering that provider.
 
 ## Value payloads and Native AOT
 
@@ -43,7 +48,10 @@ Generated protobuf message types are encoded natively only when their generated 
 
 ```csharp
 siloBuilder
-    .AddAzureAppendBlobLogStorage()
+    .AddAzureAppendBlobLogStorage(options =>
+    {
+        options.LogFormatKey = ProtobufJournalingExtensions.LogFormatKey;
+    })
     .UseProtobufCodec(options =>
     {
         options.AddMessageParser(MyJournaledMessage.Parser);
