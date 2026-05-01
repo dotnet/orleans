@@ -133,6 +133,17 @@ public sealed class LogSegmentBufferTests
     }
 
     [Fact]
+    public void AppendFormattedEntry_RejectsWrongFormattedEntryType()
+    {
+        using var buffer = new LogSegmentBuffer();
+        var logWriter = buffer.CreateLogWriter(new LogStreamId(1));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
+
+        Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void Commit_ThrowsOnDoubleCommit()
     {
         using var buffer = new LogSegmentBuffer();
@@ -372,5 +383,10 @@ public sealed class LogSegmentBufferTests
         public void AppendEntries(LogWriter writer) { }
         public void AppendSnapshot(LogWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class TestFormattedLogEntry : IFormattedLogEntry
+    {
+        public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
     }
 }

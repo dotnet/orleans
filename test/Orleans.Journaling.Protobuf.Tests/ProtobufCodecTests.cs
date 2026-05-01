@@ -363,6 +363,18 @@ public class ProtobufCodecTests
         entry.Dispose();
     }
 
+    [Fact]
+    public void ProtobufLogFormat_Writer_RejectsWrongFormattedEntryType()
+    {
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        var logWriter = writer.CreateLogWriter(new LogStreamId(8));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
+
+        Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
+    }
+
     [Theory]
     [InlineData(new byte[] { 0x80 }, "truncated LogEntry length prefix")]
     [InlineData(new byte[] { 0x02, 0x08 }, "exceeds remaining input bytes")]
@@ -413,6 +425,11 @@ public class ProtobufCodecTests
         while (format.TryRead(reader, consumer, isCompleted: true))
         {
         }
+    }
+
+    private sealed class TestFormattedLogEntry : IFormattedLogEntry
+    {
+        public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
     }
 
     private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
