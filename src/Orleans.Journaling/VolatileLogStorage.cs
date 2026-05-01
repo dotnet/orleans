@@ -10,7 +10,7 @@ public sealed class VolatileLogStorageProvider : ILogStorageProvider, ILogFormat
     private readonly Func<GrainType, string>? _logFormatKeySelector;
     private readonly ConcurrentDictionary<GrainId, VolatileLogStorage> _storage = new();
 
-    public VolatileLogStorageProvider() : this(LogFormatKeys.OrleansBinary)
+    public VolatileLogStorageProvider() : this(OrleansBinaryLogFormat.LogFormatKey)
     {
     }
 

@@ -22,14 +22,14 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         builder.AddLogStorage();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.Same(OrleansBinaryLogFormat.Instance, serviceProvider.GetRequiredKeyedService<ILogFormat>(LogFormatKeys.OrleansBinary));
-        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.OrleansBinary));
-        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableListOperationCodecProvider>(LogFormatKeys.OrleansBinary));
-        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(LogFormatKeys.OrleansBinary));
-        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(LogFormatKeys.OrleansBinary));
-        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.OrleansBinary));
-        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(LogFormatKeys.OrleansBinary));
-        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.OrleansBinary));
+        Assert.Same(OrleansBinaryLogFormat.Instance, serviceProvider.GetRequiredKeyedService<ILogFormat>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableListOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey));
     }
 
     [Fact]

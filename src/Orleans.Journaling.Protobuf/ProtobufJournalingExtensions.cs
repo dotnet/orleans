@@ -11,6 +11,11 @@ namespace Orleans.Journaling.Protobuf;
 public static class ProtobufJournalingExtensions
 {
     /// <summary>
+    /// The well-known key for the Protocol Buffers log format.
+    /// </summary>
+    public const string LogFormatKey = "protobuf";
+
+    /// <summary>
     /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log entry serialization.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
@@ -76,16 +81,16 @@ public static class ProtobufJournalingExtensions
         }
 
         builder.Services.AddSingleton<ProtobufLogFormat>();
-        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufLogFormat>());
+        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufLogFormat>());
         builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<ProtobufLogFormat>());
         builder.Services.AddSingleton<ProtobufOperationCodecProvider>();
-        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.Protobuf, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
         builder.Services.AddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
         builder.Services.AddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
         builder.Services.AddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());

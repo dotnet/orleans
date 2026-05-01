@@ -8,7 +8,7 @@ Draft
 
 Each journaling format package repeats the same dependency-injection pattern:
 
-- register an `ILogFormat` keyed by `LogFormatKeys.*`,
+- register an `ILogFormat` keyed by the format provider's key,
 - register one provider implementing seven durable operation codec provider interfaces,
 - register each keyed provider interface,
 - register each unkeyed provider interface for compatibility,
@@ -60,7 +60,7 @@ Usage:
 
 ```csharp
 builder.Services
-    .AddJournalingFormatFamily(LogFormatKeys.Json)
+    .AddJournalingFormatFamily(JsonJournalingExtensions.LogFormatKey)
     .AddLogFormat<JsonLinesLogFormat>()
     .AddOperationCodecProvider<JsonOperationCodecProvider>();
 ```

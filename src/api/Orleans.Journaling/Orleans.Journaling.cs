@@ -472,14 +472,6 @@ namespace Orleans.Journaling
         protected abstract void WritePayload(System.ReadOnlySpan<byte> value);
     }
 
-    public static partial class LogFormatKeys
-    {
-        public const string Json = "json";
-        public const string MessagePack = "messagepack";
-        public const string OrleansBinary = "orleans-binary";
-        public const string Protobuf = "protobuf";
-    }
-
     public readonly partial struct LogWriter
     {
         private readonly object _dummy;
