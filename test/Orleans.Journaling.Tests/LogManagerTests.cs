@@ -238,6 +238,34 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task LogManager_DeleteState_ReallocatesApplicationStreamsAboveInternalRange()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("before", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        await sut.Manager.DeleteStateAsync(CancellationToken.None);
+        dictionary.Add("after", 2);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(2, storage.Appends.Count);
+        var entries = ReadBinaryEntries(storage.Appends[^1]);
+        Assert.DoesNotContain(entries, entry => entry.StreamId.Value == 1);
+        Assert.Contains(entries, entry => entry.StreamId.Value >= 8);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Single(recoveredDictionary);
+        Assert.Equal(2, recoveredDictionary["after"]);
+    }
+
+    [Fact]
     public async Task LogManager_SnapshotFlush_ResetsPendingAppendData()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
@@ -690,7 +718,13 @@ public class LogManagerTests : JournalingTestBase
         // This is similar to step 2, but there we avoided purging due to time not being due, whereas here we avoid purging due to re-registration.
         timeProvider.Advance(period / 2);
 
+        dictToRetire3["b"] = 2;
         await TriggerCompaction(sut3.Manager, dictToKeep3);
+
+        var sut3Recovered = CreateTestSystem(storage, timeProvider);
+        var dictToRetire3Recovered = CreateTestMachine(DictToRetireKey, sut3Recovered.Manager);
+        await sut3Recovered.Lifecycle.OnStart();
+        Assert.Equal(2, dictToRetire3Recovered["b"]);
 
         // -------------- STEP 4 --------------
 

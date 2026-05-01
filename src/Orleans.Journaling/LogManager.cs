@@ -103,7 +103,10 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                     {
                         stateMachine.Apply(new ReadOnlySequence<byte>(entry.Payload));
                     }
+
+                    var id = _logStreamIds[name];
                     _stateMachines[name] = stateMachine;
+                    _stateMachinesMap[id] = stateMachine;
                 }
                 else
                 {
@@ -294,7 +297,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
                                 // Allocate new state machine ids for each state machine.
                                 // Doing so will trigger a reset, since _logStreamIds will call OnSetLogStreamId, which resets the state machine in question.
-                                _nextLogStreamId = 1;
+                                _nextLogStreamId = MinApplicationLogStreamId;
                                 foreach (var (name, stateMachine) in _stateMachines)
                                 {
                                     var id = _nextLogStreamId++;
