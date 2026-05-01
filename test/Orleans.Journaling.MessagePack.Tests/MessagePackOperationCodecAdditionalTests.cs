@@ -94,6 +94,7 @@ public sealed class MessagePackOperationCodecAdditionalTests
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<MessagePackLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(MessagePackJournalingExtensions.LogFormatKey));
+        Assert.IsType<MessagePackLogFormat>(serviceProvider.GetRequiredService<ILogFormat>());
         Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(MessagePackJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableListOperationCodecProvider>(MessagePackJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(MessagePackJournalingExtensions.LogFormatKey));
@@ -101,6 +102,13 @@ public sealed class MessagePackOperationCodecAdditionalTests
         Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(MessagePackJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(MessagePackJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(MessagePackJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableDictionaryOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableListOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableQueueOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableSetOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableValueOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableStateOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<MessagePackOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableTaskCompletionSourceOperationCodecProvider>());
     }
 
     [Fact]

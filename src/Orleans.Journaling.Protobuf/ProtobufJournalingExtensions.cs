@@ -80,24 +80,10 @@ public static class ProtobufJournalingExtensions
             options.Apply(builder.Services);
         }
 
-        builder.Services.AddSingleton<ProtobufLogFormat>();
-        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufLogFormat>());
-        builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<ProtobufLogFormat>());
-        builder.Services.AddSingleton<ProtobufOperationCodecProvider>();
-        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableSetOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableValueOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableStateOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(static sp => sp.GetRequiredService<ProtobufOperationCodecProvider>());
+        builder.Services
+            .AddJournalingFormatFamily(LogFormatKey)
+            .AddLogFormat<ProtobufLogFormat>()
+            .AddOperationCodecProvider<ProtobufOperationCodecProvider>();
 
         return builder;
     }

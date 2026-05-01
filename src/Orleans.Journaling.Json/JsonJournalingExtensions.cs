@@ -87,24 +87,10 @@ public static class JsonJournalingExtensions
         var jsonOptions = options.SerializerOptions;
 
         // Replace the default segment and operation codec providers with JSON implementations.
-        builder.Services.AddSingleton<JsonLinesLogFormat>();
-        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonLinesLogFormat>());
-        builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<JsonLinesLogFormat>());
-        builder.Services.AddSingleton(_ => new JsonOperationCodecProvider(jsonOptions));
-        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableSetOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableValueOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableStateOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
-        builder.Services.AddSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(static sp => sp.GetRequiredService<JsonOperationCodecProvider>());
+        builder.Services
+            .AddJournalingFormatFamily(LogFormatKey)
+            .AddLogFormat<JsonLinesLogFormat>()
+            .AddOperationCodecProvider<JsonOperationCodecProvider>(_ => new JsonOperationCodecProvider(jsonOptions));
 
         return builder;
     }
