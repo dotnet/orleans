@@ -1,5 +1,0 @@
-# Cohesive journaling codec families
-
-Orleans Journaling uses cohesive codec families: selecting JSON, protobuf, MessagePack, or Orleans binary selects the physical log format, durable operation codecs, and value codecs together. The manager resolves the keyed `ILogFormat` from storage `LogFormatKey`, writes through the format-owned `ILogSegmentWriter`, and persists only the committed `ArcBuffer` returned by `GetCommittedBuffer()`.
-
-We rejected a universal value codec because JSON token writing, protobuf length measurement, MessagePack reader/writer shapes, and Orleans binary field writing have different constraints; forcing them through one abstraction would either hide buffering or reintroduce format mixing that works against the low-allocation, AOT-friendly design. A codec family is enforced by keyed registration (`UseJsonCodec`, `UseProtobufCodec`, `UseMessagePackCodec`, or the Orleans binary default) selected from storage `LogFormatKey`, not by adding a public `IJournalingCodecFamily` abstraction.
