@@ -28,7 +28,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
-    private readonly LogManagerState _logStreamIds;
+    private readonly LogStreamDirectory _logStreamDirectory;
     private readonly RetiredLogStreamTracker _retirementTracker;
     private readonly TimeSpan _retirementGracePeriod;
     private Task? _workLoop;
@@ -55,11 +55,11 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
         // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
         // This allows us to recover the list of state machines ids without having to store it separately.
-        _logStreamIds = new LogManagerState(this, dictionaryCodecProvider.GetCodec<string, ulong>());
-        _stateMachinesMap[LogManagerState.Id] = _logStreamIds;
+        _logStreamDirectory = new LogStreamDirectory(this, dictionaryCodecProvider.GetCodec<string, ulong>());
+        _stateMachinesMap[LogStreamDirectory.Id] = _logStreamDirectory;
 
         // The retirement tracker is a special internal state machine with a fixed id.
-        // It is not stored in _logStreamIds and does not participate in the general name->id mapping.
+        // It is not stored in _logStreamDirectory and does not participate in the general name->id mapping.
         _retirementTracker = new RetiredLogStreamTracker(this, dictionaryCodecProvider.GetCodec<string, DateTime>());
         _stateMachinesMap[RetiredLogStreamTracker.Id] = _retirementTracker;
     }
@@ -81,8 +81,8 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
-        _logStreamIds = new LogManagerState(this, logStreamIdsCodec);
-        _stateMachinesMap[LogManagerState.Id] = _logStreamIds;
+        _logStreamDirectory = new LogStreamDirectory(this, logStreamIdsCodec);
+        _stateMachinesMap[LogStreamDirectory.Id] = _logStreamDirectory;
 
         _retirementTracker = new RetiredLogStreamTracker(this, retirementTrackerCodec);
         _stateMachinesMap[RetiredLogStreamTracker.Id] = _retirementTracker;
@@ -103,13 +103,13 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                     // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
-                    stateMachine.Reset(CreateLogWriter(new(_logStreamIds[name])));
+                    stateMachine.Reset(CreateLogWriter(new(_logStreamDirectory[name])));
                     foreach (var entry in vessel.FormattedEntries)
                     {
                         stateMachine.Apply(new ReadOnlySequence<byte>(entry.Payload));
                     }
 
-                    var id = _logStreamIds[name];
+                    var id = _logStreamDirectory[name];
                     _stateMachines[name] = stateMachine;
                     _stateMachinesMap[id] = stateMachine;
                 }
@@ -220,7 +220,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                                 // The map of state machine ids is itself stored as a durable state machine with the id 0.
                                 // This must be stored first, since it includes the identities of all other state machines, which are needed when replaying the log.
                                 // If we removed retired machines, this snapshot will persist that change.
-                                AppendUpdatesOrSnapshotStateMachine(currentLogSegmentWriter, isSnapshot, 0, _logStreamIds);
+                                AppendUpdatesOrSnapshotStateMachine(currentLogSegmentWriter, isSnapshot, LogStreamDirectory.Id, _logStreamDirectory);
 
                                 foreach (var (id, stateMachine) in _stateMachinesMap)
                                 {
@@ -298,15 +298,15 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                             lock (_lock)
                             {
                                 // Reset the state machine id collection.
-                                _logStreamIds.ResetVolatileState();
+                                _logStreamDirectory.ResetVolatileState();
 
                                 // Allocate new state machine ids for each state machine.
-                                // Doing so will trigger a reset, since _logStreamIds will call OnSetLogStreamId, which resets the state machine in question.
+                                // Doing so will trigger a reset, since _logStreamDirectory will bind the state machine in question.
                                 _nextLogStreamId = MinApplicationLogStreamId;
                                 foreach (var (name, stateMachine) in _stateMachines)
                                 {
                                     var id = _nextLogStreamId++;
-                                    _logStreamIds[name] = id;
+                                    _logStreamDirectory.Set(name, id);
                                 }
                             }
                         }
@@ -327,10 +327,10 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                                 }
 
                                 var name = (string)workItem.Context!;
-                                if (!_logStreamIds.ContainsKey(name))
+                                if (!_logStreamDirectory.ContainsKey(name))
                                 {
-                                    // Doing so will trigger a reset, since _logStreamIds will call OnSetLogStreamId, which resets the state machine in question.
-                                    _logStreamIds[name] = _nextLogStreamId++;
+                                    // Doing so will trigger a reset, since _logStreamDirectory will bind the state machine in question.
+                                    _logStreamDirectory.Set(name, _nextLogStreamId++);
                                 }
                             }
                         }
@@ -378,7 +378,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         foreach (var (name, timestamp) in _retirementTracker)
         {
             var isDuetime = _timeProvider.GetUtcNow().UtcDateTime - timestamp >= _retirementGracePeriod;
-            if (isDuetime && _logStreamIds.TryGetValue(name, out var id))
+            if (isDuetime && _logStreamDirectory.TryGetValue(name, out var id))
             {
                 var stateMachine = _stateMachines[name];
 
@@ -393,7 +393,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
                     _stateMachinesMap.Remove(id);
                     // We remove these from memory only, since the snapshot will persist these changes.
-                    _logStreamIds.ApplyRemove(name);
+                    _logStreamDirectory.ApplyRemove(name);
                     _retirementTracker.ApplyRemove(name);
                 }
                 else
@@ -442,7 +442,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         lock (_lock)
         {
             _currentLogSegmentWriter?.Reset();
-            _logStreamIds.ResetVolatileState();
+            _logStreamDirectory.ResetVolatileState();
         }
 
         using var recoveryBuffer = new ArcBufferWriter();
@@ -550,7 +550,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         }
     }
 
-    private void OnSetLogStreamId(string name, ulong id)
+    private void BindStateMachine(string name, ulong id)
     {
         lock (_lock)
         {
@@ -684,17 +684,74 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         Ready
     }
 
-    private sealed class LogManagerState(
+    private sealed class LogStreamDirectory(
         LogManager manager,
-        IDurableDictionaryOperationCodec<string, ulong> codec) : DurableDictionary<string, ulong>(codec)
+        IDurableDictionaryOperationCodec<string, ulong> codec) : IDurableStateMachine, IDurableDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
         private readonly LogManager _manager = manager;
+        private readonly IDurableDictionaryOperationCodec<string, ulong> _codec = codec;
+        private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
+        private LogWriter _storage;
+
+        public ulong this[string name] => _ids[name];
+
+        object IDurableStateMachine.OperationCodec => _codec;
+
+        public bool ContainsKey(string name) => _ids.ContainsKey(name);
+
+        public bool TryGetValue(string name, out ulong id) => _ids.TryGetValue(name, out id);
+
+        public void Set(string name, ulong id)
+        {
+            _codec.WriteSet(name, id, GetStorage());
+            ApplySet(name, id);
+        }
+
+        public bool ApplyRemove(string name) => _ids.Remove(name);
 
         public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_manager.CreateLogWriter(new(Id)));
 
-        protected override void OnSet(string key, ulong value) => _manager.OnSetLogStreamId(key, value);
+        void IDurableStateMachine.Reset(LogWriter storage)
+        {
+            _ids.Clear();
+            _storage = storage;
+        }
+
+        void IDurableStateMachine.Apply(ReadOnlySequence<byte> entry) => _codec.Apply(entry, this);
+
+        void IDurableStateMachine.AppendEntries(LogWriter writer) { }
+
+        void IDurableStateMachine.AppendSnapshot(LogWriter writer) => _codec.WriteSnapshot(_ids, writer);
+
+        IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
+
+        void IDurableDictionaryOperationHandler<string, ulong>.ApplySet(string key, ulong value) => ApplySet(key, value);
+
+        void IDurableDictionaryOperationHandler<string, ulong>.ApplyRemove(string key) => ApplyRemove(key);
+
+        void IDurableDictionaryOperationHandler<string, ulong>.ApplyClear() => _ids.Clear();
+
+        void IDurableDictionaryOperationHandler<string, ulong>.ApplySnapshotStart(int count)
+        {
+            _ids.Clear();
+            _ids.EnsureCapacity(count);
+        }
+
+        void IDurableDictionaryOperationHandler<string, ulong>.ApplySnapshotItem(string key, ulong value) => ApplySet(key, value);
+
+        private void ApplySet(string name, ulong id)
+        {
+            _ids[name] = id;
+            _manager.BindStateMachine(name, id);
+        }
+
+        private LogWriter GetStorage()
+        {
+            Debug.Assert(_storage.IsInitialized);
+            return _storage;
+        }
     }
 
     /// <summary>
