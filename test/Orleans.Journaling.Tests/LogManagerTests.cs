@@ -479,8 +479,31 @@ public class LogManagerTests : JournalingTestBase
             await sut.Lifecycle.OnStop(CancellationToken.None);
         }
 
-        Assert.Contains("Malformed binary log entry stream", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("truncated fixed32 entry length prefix", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("configured log format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
+        var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("Malformed binary log entry stream", inner.Message, StringComparison.Ordinal);
+        Assert.Contains("truncated fixed32 entry length prefix", inner.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task LogManager_Recovery_DoesNotWrapStorageReadException()
+    {
+        var storage = new ThrowingReadStorage();
+        var sut = CreateTestSystem(storage: storage);
+
+        InvalidOperationException exception;
+        try
+        {
+            exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            await sut.Lifecycle.OnStop(CancellationToken.None);
+        }
+
+        Assert.Same(storage.Exception, exception);
+        Assert.Null(exception.InnerException);
     }
 
     /// <summary>
@@ -1061,6 +1084,22 @@ public class LogManagerTests : JournalingTestBase
             consume(new ArcBufferReader(buffer));
             return default;
         }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class ThrowingReadStorage : ILogStorage
+    {
+        public InvalidOperationException Exception { get; } = new("Storage read failed.");
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+            => ValueTask.FromException(Exception);
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
 

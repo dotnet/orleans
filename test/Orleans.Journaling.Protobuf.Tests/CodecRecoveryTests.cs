@@ -1,5 +1,7 @@
-using Microsoft.Extensions.Logging;
+using System.Buffers;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Journaling.Protobuf;
 using Orleans.Journaling.Tests;
@@ -222,6 +224,30 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(17, await tcs2.Task);
     }
 
+    [Fact]
+    public async Task ProtobufRecovery_WithJsonBytes_IncludesConfiguredFormatKeyDiagnostic()
+    {
+        var storage = CreateProtobufStorage();
+        await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes("""[0,"set","dict",8]""" + "\n")), CancellationToken.None);
+        var sut = CreateTestSystemWithProtobufCodec(storage);
+
+        InvalidOperationException exception;
+        try
+        {
+            exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            await sut.Lifecycle.OnStop(CancellationToken.None);
+        }
+
+        Assert.Contains("configured log format key 'protobuf'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("restore that key or migrate the data", exception.Message, StringComparison.Ordinal);
+        var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("Malformed protobuf log entry stream", inner.Message, StringComparison.Ordinal);
+    }
+
     private ProtobufValueConverter<T> CreateConverter<T>()
         => ProtobufValueConverter<T>.IsNativeType
             ? new ProtobufValueConverter<T>()
@@ -239,7 +265,15 @@ public class CodecRecoveryTests : JournalingTestBase
 
         var logStreamIdsCodec = new ProtobufDictionaryOperationCodec<string, ulong>(stringConverter, ulongConverter);
         var retirementTrackerCodec = new ProtobufDictionaryOperationCodec<string, DateTime>(stringConverter, dateTimeConverter);
-        var manager = new LogManager(storage, LoggerFactory.CreateLogger<LogManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new ProtobufLogFormat());
+        var manager = new LogManager(
+            storage,
+            LoggerFactory.CreateLogger<LogManager>(),
+            Microsoft.Extensions.Options.Options.Create(ManagerOptions),
+            logStreamIdsCodec,
+            retirementTrackerCodec,
+            TimeProvider.System,
+            new ProtobufLogFormat(),
+            ProtobufJournalingExtensions.LogFormatKey);
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
