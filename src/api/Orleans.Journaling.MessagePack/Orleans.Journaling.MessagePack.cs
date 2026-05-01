@@ -25,6 +25,8 @@ namespace Orleans.Journaling.MessagePack
 
     public static partial class MessagePackJournalingExtensions
     {
+        public const string LogFormatKey = "messagepack";
+
         public static Hosting.ISiloBuilder UseMessagePackCodec(this Hosting.ISiloBuilder builder, System.Action<MessagePackJournalingOptions> configure) { throw null; }
 
         public static Hosting.ISiloBuilder UseMessagePackCodec(this Hosting.ISiloBuilder builder) { throw null; }

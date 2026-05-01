@@ -15,20 +15,20 @@ public static class HostingExtensions
 
         // Register the default data codec (Orleans IFieldCodec adapter).
         builder.Services.TryAddSingleton(typeof(ILogValueCodec<>), typeof(OrleansLogValueCodec<>));
-        builder.Services.TryAddKeyedSingleton<ILogFormat>(LogFormatKeys.OrleansBinary, static (_, _) => OrleansBinaryLogFormat.Instance);
+        builder.Services.TryAddKeyedSingleton<ILogFormat>(OrleansBinaryLogFormat.LogFormatKey, static (_, _) => OrleansBinaryLogFormat.Instance);
         builder.Services.TryAddSingleton<ILogFormat>(_ => OrleansBinaryLogFormat.Instance);
 
         // Register the binary codec providers for each durable type.
         // Each durable type injects its specific provider interface and calls GetCodec<...>() with
         // its known type arguments, avoiding reflection (MakeGenericType/GetGenericTypeDefinition).
         builder.Services.TryAddSingleton<OrleansBinaryOperationCodecProvider>();
-        builder.Services.TryAddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.OrleansBinary, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        builder.Services.TryAddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKeys.OrleansBinary, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        builder.Services.TryAddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKeys.OrleansBinary, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        builder.Services.TryAddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKeys.OrleansBinary, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        builder.Services.TryAddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKeys.OrleansBinary, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        builder.Services.TryAddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKeys.OrleansBinary, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        builder.Services.TryAddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.OrleansBinary, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        builder.Services.TryAddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        builder.Services.TryAddKeyedSingleton<IDurableListOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        builder.Services.TryAddKeyedSingleton<IDurableQueueOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        builder.Services.TryAddKeyedSingleton<IDurableSetOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        builder.Services.TryAddKeyedSingleton<IDurableValueOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        builder.Services.TryAddKeyedSingleton<IDurableStateOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        builder.Services.TryAddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(OrleansBinaryLogFormat.LogFormatKey, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
         builder.Services.TryAddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
         builder.Services.TryAddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
         builder.Services.TryAddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
@@ -57,6 +57,6 @@ public static class HostingExtensions
             logFormatKeyProvider = storageProvider;
         }
 
-        return logFormatKeyProvider?.GetLogFormatKey(grainContext) ?? LogFormatKeys.OrleansBinary;
+        return logFormatKeyProvider?.GetLogFormatKey(grainContext) ?? OrleansBinaryLogFormat.LogFormatKey;
     }
 }

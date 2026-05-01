@@ -41,8 +41,8 @@ public class JsonCodecTests
         var builder = new TestSiloBuilder();
         builder.UseJsonCodec(JsonCodecTestJsonContext.Default);
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(LogFormatKeys.Json));
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.Json).GetCodec<JsonCodecTestValue>();
+        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey).GetCodec<JsonCodecTestValue>();
         var buffer = new ArrayBufferWriter<byte>();
 
         codec.WriteSet(new("test", 1), buffer);

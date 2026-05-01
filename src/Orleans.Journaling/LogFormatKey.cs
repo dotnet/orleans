@@ -1,11 +1,6 @@
 namespace Orleans.Journaling;
 
-internal sealed class LogFormatKey
+internal record class LogFormatKey(string Value)
 {
-    public LogFormatKey(string value)
-    {
-        Value = LogFormatServices.ValidateLogFormatKey(value);
-    }
-
-    public string Value { get; }
+    public string Value { get; } = LogFormatServices.ValidateLogFormatKey(Value);
 }

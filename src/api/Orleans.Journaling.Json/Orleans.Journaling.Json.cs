@@ -29,6 +29,8 @@ namespace Orleans.Journaling.Json
 
     public static partial class JsonJournalingExtensions
     {
+        public const string LogFormatKey = "json";
+
         public static Hosting.ISiloBuilder UseJsonCodec(this Hosting.ISiloBuilder builder, System.Action<JsonJournalingOptions>? configure = null) { throw null; }
 
         public static Hosting.ISiloBuilder UseJsonCodec(this Hosting.ISiloBuilder builder, System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }

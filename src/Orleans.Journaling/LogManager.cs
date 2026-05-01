@@ -725,7 +725,6 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
     }
 
-
     [LoggerMessage(
         Level = LogLevel.Error,
         Message = "Error processing work items.")]

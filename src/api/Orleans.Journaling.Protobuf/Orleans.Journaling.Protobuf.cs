@@ -25,6 +25,8 @@ namespace Orleans.Journaling.Protobuf
 
     public static partial class ProtobufJournalingExtensions
     {
+        public const string LogFormatKey = "protobuf";
+
         public static Hosting.ISiloBuilder UseProtobufCodec(this Hosting.ISiloBuilder builder, System.Action<ProtobufJournalingOptions> configure) { throw null; }
 
         public static Hosting.ISiloBuilder UseProtobufCodec(this Hosting.ISiloBuilder builder) { throw null; }

@@ -10,6 +10,11 @@ namespace Orleans.Journaling.MessagePack;
 public static class MessagePackJournalingExtensions
 {
     /// <summary>
+    /// The well-known key for the MessagePack log format.
+    /// </summary>
+    public const string LogFormatKey = "messagepack";
+
+    /// <summary>
     /// Configures Orleans.Journaling to use MessagePack for durable log entry serialization.
     /// </summary>
     public static ISiloBuilder UseMessagePackCodec(this ISiloBuilder builder)
@@ -34,16 +39,16 @@ public static class MessagePackJournalingExtensions
 
         builder.Services.AddSingleton(options);
         builder.Services.AddSingleton<MessagePackLogFormat>();
-        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackLogFormat>());
+        builder.Services.AddKeyedSingleton<ILogFormat>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackLogFormat>());
         builder.Services.AddSingleton<ILogFormat>(static sp => sp.GetRequiredService<MessagePackLogFormat>());
         builder.Services.AddSingleton<MessagePackOperationCodecProvider>();
-        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
-        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.MessagePack, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableListOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableQueueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableSetOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableStateOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
+        builder.Services.AddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKey, static (sp, _) => sp.GetRequiredService<MessagePackOperationCodecProvider>());
         builder.Services.AddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
         builder.Services.AddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());
         builder.Services.AddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<MessagePackOperationCodecProvider>());

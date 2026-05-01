@@ -65,14 +65,14 @@ public sealed class JsonOperationCodecAdditionalTests
         builder.UseJsonCodec(JsonCodecTestJsonContext.Default);
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(LogFormatKeys.Json));
-        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(LogFormatKeys.Json));
-        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableListOperationCodecProvider>(LogFormatKeys.Json));
-        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(LogFormatKeys.Json));
-        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(LogFormatKeys.Json));
-        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(LogFormatKeys.Json));
-        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(LogFormatKeys.Json));
-        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(LogFormatKeys.Json));
+        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableListOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<JsonOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey));
     }
 
     [Fact]

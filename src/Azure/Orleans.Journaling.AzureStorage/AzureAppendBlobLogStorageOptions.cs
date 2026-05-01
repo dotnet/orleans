@@ -11,6 +11,7 @@ namespace Orleans.Journaling;
 /// </summary>
 public sealed class AzureAppendBlobLogStorageOptions
 {
+    private const string DefaultLogFormatKey = "orleans-binary";
     private BlobServiceClient? _blobServiceClient;
 
     /// <summary>
@@ -29,7 +30,7 @@ public sealed class AzureAppendBlobLogStorageOptions
     /// <summary>
     /// Gets or sets the default state machine log format key.
     /// </summary>
-    public string LogFormatKey { get; set; } = LogFormatKeys.OrleansBinary;
+    public string LogFormatKey { get; set; } = DefaultLogFormatKey;
 
     /// <summary>
     /// Gets or sets an optional selector for choosing the log format key by grain type.

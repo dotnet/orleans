@@ -6,6 +6,8 @@ namespace Orleans.Journaling;
 
 internal sealed class OrleansBinaryLogFormat : ILogFormat
 {
+    internal const string LogFormatKey = "orleans-binary";
+
     public static OrleansBinaryLogFormat Instance { get; } = new();
 
     private OrleansBinaryLogFormat()
