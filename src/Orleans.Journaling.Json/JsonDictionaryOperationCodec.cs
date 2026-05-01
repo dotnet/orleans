@@ -8,8 +8,8 @@ namespace Orleans.Journaling.Json;
 /// </summary>
 /// <example>
 /// <code>
-/// {"cmd":"set","key":"alice","value":42}
-/// {"cmd":"snapshot","items":[{"key":"alice","value":42}]}
+/// ["set","alice",42]
+/// ["snapshot",[["alice",42]]]
 /// </code>
 /// </example>
 public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOptions? options = null)
@@ -139,7 +139,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         JsonOperationCodecWriter.Write(
             writer,
             operation,
-            static (jsonWriter, operation) => WriteJson(jsonWriter, operation),
+            static (jsonWriter, operation) => JsonDictionaryOperationConverter.WriteArrayElements(jsonWriter, operation),
             static (output, operation) => WriteBytes(output, operation));
     }
 

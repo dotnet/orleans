@@ -70,9 +70,9 @@ public class CodecRecoveryTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         var log = Encoding.UTF8.GetString(storage.Segments.Single());
         Assert.Equal(
-            """{"streamId":0,"entry":{"cmd":"set","key":"dict","value":8}}""" + "\n" +
-            """{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}""" + "\n" +
-            """{"streamId":8,"entry":{"cmd":"set","key":"beta","value":2}}""" + "\n",
+            """[0,"set","dict",8]""" + "\n" +
+            """[8,"set","alpha",1]""" + "\n" +
+            """[8,"set","beta",2]""" + "\n",
             log);
 
         // Recovery phase

@@ -108,7 +108,7 @@ internal static class Program
 
         EnsureEqual("inventory", written.Inventory, recovered.Inventory, InventoryEntryEquals);
         EnsureEqual("events", written.Events, recovered.Events, JournalEventEquals);
-        EnsureEqual("work queue", written.WorkQueue, recovered.WorkQueue, static (left, right) => left == right);
+        EnsureEqual("work queue", written.WorkQueue, recovered.WorkQueue, WorkItemEquals);
         EnsureEqual("tags", written.Tags, recovered.Tags, static (left, right) => string.Equals(left, right, StringComparison.Ordinal));
         EnsureEqual("balance", written.Balance, recovered.Balance, AccountBalanceEquals);
         EnsureEqual("profile", written.Profile, recovered.Profile, ProfileStateEquals);
@@ -155,6 +155,12 @@ internal static class Program
             && left.Timestamp == right.Timestamp
             && string.Equals(left.Kind, right.Kind, StringComparison.Ordinal)
             && left.Notes.SequenceEqual(right.Notes, StringComparer.Ordinal);
+
+    private static bool WorkItemEquals(WorkItem left, WorkItem right)
+        => left.WorkId == right.WorkId
+            && string.Equals(left.Kind, right.Kind, StringComparison.Ordinal)
+            && left.Priority == right.Priority
+            && left.Urgent == right.Urgent;
 
     private static bool AccountBalanceEquals(AccountBalance left, AccountBalance right)
         => string.Equals(left.Currency, right.Currency, StringComparison.Ordinal)

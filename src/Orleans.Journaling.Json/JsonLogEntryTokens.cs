@@ -2,7 +2,6 @@ namespace Orleans.Journaling.Json;
 
 internal static class JsonLogEntryFields
 {
-    public const string Command = "cmd";
     public const string Index = "index";
     public const string Item = "item";
     public const string Items = "items";

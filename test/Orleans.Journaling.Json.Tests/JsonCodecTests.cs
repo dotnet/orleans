@@ -30,7 +30,7 @@ public class JsonCodecTests
         var consumer = new DictionaryConsumer<string, int>();
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
-        Assert.Equal("""{"cmd":"set","key":"alice","value":42}""", json);
+        Assert.Equal("""["set","alice",42]""", json);
         Assert.Equal("alice", consumer.LastSetKey);
         Assert.Equal(42, consumer.LastSetValue);
     }
@@ -68,7 +68,7 @@ public class JsonCodecTests
         var consumer = new DictionaryConsumer<string, int>();
         codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
 
-        Assert.Equal("""{"cmd":"snapshot","items":[{"key":"alpha","value":1},{"key":"beta","value":2}]}""", json);
+        Assert.Equal("""["snapshot",[["alpha",1],["beta",2]]]""", json);
         Assert.Equal(items, consumer.Items);
     }
 
@@ -201,8 +201,8 @@ public class JsonCodecTests
         AppendValueSet(writer, 9, 43);
 
         Assert.Equal(
-            """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n" +
-            """{"streamId":9,"entry":{"cmd":"set","value":43}}""" + "\n",
+            """[8,"set",42]""" + "\n" +
+            """[9,"set",43]""" + "\n",
             GetString(writer));
     }
 
@@ -214,14 +214,12 @@ public class JsonCodecTests
 
         var accepted = writer.CreateLogWriter(new LogStreamId(8)).TryAppendFormattedEntry(JsonFormattedLogEntry.Create(42, static (jsonWriter, value) =>
         {
-            jsonWriter.WriteStartObject();
-            jsonWriter.WriteString(JsonLogEntryFields.Command, JsonLogEntryCommands.Set);
-            jsonWriter.WriteNumber(JsonLogEntryFields.Value, value);
-            jsonWriter.WriteEndObject();
+            jsonWriter.WriteStringValue(JsonLogEntryCommands.Set);
+            jsonWriter.WriteNumberValue(value);
         }));
 
         Assert.True(accepted);
-        Assert.Equal("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", GetString(writer));
+        Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
     }
 
     [Fact]
@@ -233,7 +231,7 @@ public class JsonCodecTests
 
         codec.WriteSet(42, writer.CreateLogWriter(new LogStreamId(8)));
 
-        Assert.Equal("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", GetString(writer));
+        Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
     }
 
     [Fact]
@@ -246,7 +244,7 @@ public class JsonCodecTests
 
         using var committed = writer.GetCommittedBuffer();
         var bytes = committed.ToArray();
-        var payload = """{"cmd":"set","value":42}"""u8.ToArray();
+        var payload = """["set",42]"""u8.ToArray();
 
         Assert.Equal((uint)(1 + payload.Length), BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0, 4)));
         Assert.Equal(8, bytes[4]);
@@ -262,14 +260,14 @@ public class JsonCodecTests
         AppendValueSet(writer, 8, 42);
         using (var aborted = writer.CreateLogWriter(new LogStreamId(9)).BeginEntry())
         {
-            aborted.Writer.Write("""{"cmd":"set","value":100"""u8);
+            aborted.Writer.Write("""["set",100"""u8);
         }
 
         AppendValueSet(writer, 10, 43);
 
         Assert.Equal(
-            """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n" +
-            """{"streamId":10,"entry":{"cmd":"set","value":43}}""" + "\n",
+            """[8,"set",42]""" + "\n" +
+            """[10,"set",43]""" + "\n",
             GetString(writer));
     }
 
@@ -283,7 +281,7 @@ public class JsonCodecTests
         writer.Reset();
         AppendValueSet(writer, 9, 43);
 
-        Assert.Equal("""{"streamId":9,"entry":{"cmd":"set","value":43}}""" + "\n", GetString(writer));
+        Assert.Equal("""[9,"set",43]""" + "\n", GetString(writer));
     }
 
     [Fact]
@@ -299,7 +297,7 @@ public class JsonCodecTests
     public void JsonLinesLogFormat_Read_DispatchesEntries()
     {
         var format = new JsonLinesLogFormat();
-        var entries = Read(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n");
+        var entries = Read(format, """[8,"set",42]""" + "\n");
         var entry = Assert.Single(entries);
         var valueCodec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
@@ -312,15 +310,14 @@ public class JsonCodecTests
 
     [Theory]
     [InlineData("\n", "blank lines")]
-    [InlineData("""[{"streamId":8,"entry":{"cmd":"set","value":42}}]""" + "\n", "must be a JSON object")]
-    [InlineData("null\n", "must be a JSON object")]
-    [InlineData("""{"entry":{"cmd":"set","value":42}}""" + "\n", "streamId")]
-    [InlineData("""{"streamId":8}""" + "\n", "entry")]
-    [InlineData("""{"streamId":"8","entry":{"cmd":"set","value":42}}""" + "\n", "unsigned integer")]
-    [InlineData("""{"streamId":8,"entry":null}""" + "\n", "must be a JSON object")]
-    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42},"extra":true}""" + "\n", "unexpected property")]
-    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}}{}""" + "\n", "invalid JSON")]
-    [InlineData("""{"streamId":8,"entry":{"cmd":"set","value":42}""" + "\n", "invalid JSON")]
+    [InlineData("""{"streamId":8,"entry":["set",42]}""" + "\n", "must be a JSON array")]
+    [InlineData("null\n", "must be a JSON array")]
+    [InlineData("[]\n", "stream id")]
+    [InlineData("[8]\n", "operation command")]
+    [InlineData("""["8","set",42]""" + "\n", "unsigned integer")]
+    [InlineData("[8,null]\n", "operation command string")]
+    [InlineData("""[8,"set",42]{}""" + "\n", "invalid JSON")]
+    [InlineData("""[8,"set",42""" + "\n", "invalid JSON")]
     public void JsonLinesLogFormat_Read_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
     {
         var format = new JsonLinesLogFormat();
@@ -334,7 +331,7 @@ public class JsonCodecTests
     public void JsonLinesLogFormat_Read_Bom_Throws()
     {
         var format = new JsonLinesLogFormat();
-        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n")).ToArray();
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""[8,"set",42]""" + "\n")).ToArray();
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, bytes));
 
@@ -346,8 +343,8 @@ public class JsonCodecTests
     {
         var format = new JsonLinesLogFormat();
         var jsonLines =
-            """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n" +
-            """{"streamId":9,"entry":{"cmd":"set","value":43}""";
+            """[8,"set",42]""" + "\n" +
+            """[9,"set",43""";
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
 
@@ -358,7 +355,7 @@ public class JsonCodecTests
     public void JsonLinesLogFormat_Read_PartialLineWaitsForNewlineWhenInputIsNotCompleted()
     {
         var format = new JsonLinesLogFormat();
-        var bytes = Encoding.UTF8.GetBytes("""{"streamId":8,"entry":{"cmd":"set","value":42}}""");
+        var bytes = Encoding.UTF8.GetBytes("""[8,"set",42]""");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
         var reader = new ArcBufferReader(buffer);
@@ -375,8 +372,8 @@ public class JsonCodecTests
     public void JsonLinesLogFormat_Read_NewlineAtArcBufferPageBoundary_Parses()
     {
         var format = new JsonLinesLogFormat();
-        var prefix = "{\"streamId\":8,\"entry\":{\"text\":\"";
-        var suffix = "\"}}";
+        var prefix = "[8,\"set\",\"";
+        var suffix = "\"]";
         var text = new string('a', ArcBufferWriter.MinimumPageSize - Encoding.UTF8.GetByteCount(prefix + suffix));
         var line = prefix + text + suffix;
         Assert.Equal(ArcBufferWriter.MinimumPageSize, Encoding.UTF8.GetByteCount(line));
@@ -392,15 +389,15 @@ public class JsonCodecTests
         Assert.Equal(0, reader.Length);
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
-        Assert.Equal($$"""{"text":"{{text}}"}""", Encoding.UTF8.GetString(entry.Payload));
+        Assert.Equal($$"""["set","{{text}}"]""", Encoding.UTF8.GetString(entry.Payload));
     }
 
     [Fact]
     public void JsonLinesLogFormat_Read_MultiPagePartialLineWaitsForNewlineWhenInputIsNotCompleted()
     {
         var format = new JsonLinesLogFormat();
-        var prefix = "{\"streamId\":8,\"entry\":{\"text\":\"";
-        var suffix = "\"}}";
+        var prefix = "[8,\"set\",\"";
+        var suffix = "\"]";
         var text = new string('a', ArcBufferWriter.MinimumPageSize + 8 - Encoding.UTF8.GetByteCount(prefix + suffix));
         var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
         using var buffer = new ArcBufferWriter();
@@ -419,11 +416,11 @@ public class JsonCodecTests
     public void JsonLinesLogFormat_Read_ParsesCrLfLines()
     {
         var format = new JsonLinesLogFormat();
-        var entries = Read(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\r\n");
+        var entries = Read(format, """[8,"set",42]""" + "\r\n");
         var entry = Assert.Single(entries);
 
         Assert.Equal((ulong)8, entry.StreamId.Value);
-        Assert.Equal("""{"cmd":"set","value":42}""", Encoding.UTF8.GetString(entry.Payload));
+        Assert.Equal("""["set",42]""", Encoding.UTF8.GetString(entry.Payload));
     }
 
     [Fact]
@@ -433,7 +430,7 @@ public class JsonCodecTests
         var codec = new RecordingJsonLogEntryCodec();
         var stateMachine = new RecordingStateMachine(codec);
 
-        ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine));
+        ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine));
 
         Assert.Same(stateMachine, codec.StateMachine);
         Assert.Equal(42, codec.Value);
@@ -447,7 +444,7 @@ public class JsonCodecTests
         var stateMachine = new RecordingStateMachine(new object());
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine)));
+            ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine)));
 
         Assert.Contains("does not implement IJsonLogEntryCodec", exception.Message, StringComparison.Ordinal);
     }
@@ -459,7 +456,7 @@ public class JsonCodecTests
         var stateMachine = new RecordingStateMachine(new JsonValueOperationCodec<int>(Options));
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine)));
+            ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine)));
 
         Assert.Contains("not compatible", exception.Message, StringComparison.Ordinal);
     }
@@ -470,7 +467,7 @@ public class JsonCodecTests
         var format = new JsonLinesLogFormat();
         var stateMachine = new NoOpStateMachine();
 
-        ReadOne(format, """{"streamId":8,"entry":{"cmd":"set","value":42}}""" + "\n", new SingleStateMachineResolver(stateMachine));
+        ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine));
 
         Assert.False(stateMachine.RawApplyCalled);
     }
@@ -632,7 +629,7 @@ public class JsonCodecTests
         public void Apply(JsonElement entry, IDurableStateMachine stateMachine)
         {
             StateMachine = stateMachine;
-            Value = entry.GetProperty(JsonLogEntryFields.Value).GetInt32();
+            Value = entry[1].GetInt32();
         }
     }
 
