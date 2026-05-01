@@ -8,15 +8,16 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <IsAspireHost>true</IsAspireHost>
-    <UserSecretsId>8cceaca4-1c1f-473f-ac3a-6f220c8791cf</UserSecretsId>
+    <UserSecretsId>0a54ca71-bfc4-45f3-9b9c-7613d2c9eb4f</UserSecretsId>
   </PropertyGroup>
 
   <ItemGroup>
     <PackageReference Include="Aspire.Hosting.AppHost" />
+    <PackageReference Include="Aspire.Hosting.Azure.Storage" />
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\ChaoticCluster.Silo\ChaoticCluster.Silo.csproj" />
+    <ProjectReference Include="..\JournalingAzureBlobJson\JournalingAzureBlobJson.csproj" />
   </ItemGroup>
 
 </Project>

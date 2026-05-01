@@ -4,6 +4,7 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -17,15 +18,21 @@ internal static class Program
 {
     private const string ConnectionStringEnvironmentVariable = "ORLEANS_AZURE_STORAGE_CONNECTION_STRING";
     private const string AzureWebJobsStorageEnvironmentVariable = "AzureWebJobsStorage";
+    private const string AspireBlobConnectionName = "blobs";
+    private const string ContainerEnvironmentVariable = "ORLEANS_JOURNALING_CONTAINER";
+    private const string BlobEnvironmentVariable = "ORLEANS_JOURNALING_BLOB";
     private const string DefaultContainerName = "orleans-journaling-json-sample";
     private const string DefaultBlobName = "journaled-json-sample.jsonl";
 
     public static async Task<int> Main(string[] args)
     {
-        var settings = SampleSettings.Parse(args);
+        var builder = Host.CreateApplicationBuilder(args);
+        builder.Logging.AddConsole();
+
+        var settings = SampleSettings.Parse(args, builder.Configuration.GetConnectionString(AspireBlobConnectionName));
         if (string.IsNullOrWhiteSpace(settings.ConnectionString))
         {
-            Console.Error.WriteLine($"Set {ConnectionStringEnvironmentVariable}, set {AzureWebJobsStorageEnvironmentVariable}, or pass --connection-string <value>.");
+            Console.Error.WriteLine($"Run the Aspire AppHost, set {ConnectionStringEnvironmentVariable}, set {AzureWebJobsStorageEnvironmentVariable}, or pass --connection-string <value>.");
             return 1;
         }
 
@@ -39,28 +46,27 @@ internal static class Program
             await blob.DeleteIfExistsAsync();
         }
 
-        using var host = Host.CreateDefaultBuilder(args)
-            .ConfigureLogging(logging => logging.AddConsole())
-            .UseOrleans(siloBuilder =>
-            {
-                siloBuilder
-                    .UseLocalhostClustering()
-                    .Configure<ClusterOptions>(options =>
-                    {
-                        options.ClusterId = "journaling-azure-blob-json-sample";
-                        options.ServiceId = "journaling-azure-blob-json-sample";
-                    })
-                    .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                    .AddAzureAppendBlobLogStorage(options =>
-                    {
-                        options.BlobServiceClient = blobServiceClient;
-                        options.ContainerName = settings.ContainerName;
-                        options.GetBlobName = _ => settings.BlobName;
-                        options.LogFormatKey = LogFormatKeys.Json;
-                    })
-                    .UseJsonCodec(JournalingSampleJsonContext.Default);
-            })
-            .Build();
+        builder.UseOrleans(siloBuilder =>
+        {
+            siloBuilder
+                .UseLocalhostClustering()
+                .Configure<ClusterOptions>(options =>
+                {
+                    options.ClusterId = "journaling-azure-blob-json-sample";
+                    options.ServiceId = "journaling-azure-blob-json-sample";
+                })
+                .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
+                .AddAzureAppendBlobLogStorage(options =>
+                {
+                    options.BlobServiceClient = blobServiceClient;
+                    options.ContainerName = settings.ContainerName;
+                    options.GetBlobName = _ => settings.BlobName;
+                    options.LogFormatKey = LogFormatKeys.Json;
+                })
+                .UseJsonCodec(JournalingSampleJsonContext.Default);
+        });
+
+        using var host = builder.Build();
 
         await host.StartAsync();
 
@@ -100,37 +106,94 @@ internal static class Program
             throw new InvalidOperationException("The grain did not reactivate after DeactivateOnIdle.");
         }
 
-        if (written.Inventory.Length != recovered.Inventory.Length
-            || written.Events.Length != recovered.Events.Length
-            || written.WorkQueue.Length != recovered.WorkQueue.Length
-            || written.Tags.Length != recovered.Tags.Length)
+        EnsureEqual("inventory", written.Inventory, recovered.Inventory, InventoryEntryEquals);
+        EnsureEqual("events", written.Events, recovered.Events, JournalEventEquals);
+        EnsureEqual("work queue", written.WorkQueue, recovered.WorkQueue, static (left, right) => left == right);
+        EnsureEqual("tags", written.Tags, recovered.Tags, static (left, right) => string.Equals(left, right, StringComparison.Ordinal));
+        EnsureEqual("balance", written.Balance, recovered.Balance, AccountBalanceEquals);
+        EnsureEqual("profile", written.Profile, recovered.Profile, ProfileStateEquals);
+        EnsureEqual("completion status", written.CompletionStatus, recovered.CompletionStatus, static (left, right) => left == right);
+        EnsureEqual("receipt", written.Receipt, recovered.Receipt, static (left, right) => left == right);
+    }
+
+    private static void EnsureEqual<T>(string name, IReadOnlyList<T> written, IReadOnlyList<T> recovered, Func<T, T, bool> equals)
+    {
+        if (written.Count != recovered.Count)
         {
-            throw new InvalidOperationException("Recovered collection counts do not match the state that was written.");
+            throw new InvalidOperationException($"Recovered {name} count does not match. Written: {written.Count}, recovered: {recovered.Count}.");
         }
 
-        if (!written.Inventory.SequenceEqual(recovered.Inventory)
-            || !written.Events.SequenceEqual(recovered.Events)
-            || !written.WorkQueue.SequenceEqual(recovered.WorkQueue)
-            || !written.Tags.SequenceEqual(recovered.Tags)
-            || written.Balance != recovered.Balance
-            || written.Profile != recovered.Profile
-            || written.CompletionStatus != recovered.CompletionStatus
-            || written.Receipt != recovered.Receipt)
+        for (var i = 0; i < written.Count; i++)
         {
-            throw new InvalidOperationException("Recovered state does not match the state that was written.");
+            if (!equals(written[i], recovered[i]))
+            {
+                throw new InvalidOperationException($"Recovered {name} item {i} does not match. Written: {Serialize(written[i])}, recovered: {Serialize(recovered[i])}.");
+            }
         }
+    }
+
+    private static void EnsureEqual<T>(string name, T written, T recovered, Func<T, T, bool> equals)
+    {
+        if (!equals(written, recovered))
+        {
+            throw new InvalidOperationException($"Recovered {name} does not match. Written: {Serialize(written)}, recovered: {Serialize(recovered)}.");
+        }
+    }
+
+    private static bool InventoryEntryEquals(InventoryEntry left, InventoryEntry right)
+        => string.Equals(left.Key, right.Key, StringComparison.Ordinal)
+            && InventoryItemEquals(left.Value, right.Value);
+
+    private static bool InventoryItemEquals(InventoryItem left, InventoryItem right)
+        => string.Equals(left.Sku, right.Sku, StringComparison.Ordinal)
+            && left.Quantity == right.Quantity
+            && left.UnitPrice == right.UnitPrice
+            && left.Attributes.SequenceEqual(right.Attributes, StringComparer.Ordinal);
+
+    private static bool JournalEventEquals(JournalEvent left, JournalEvent right)
+        => string.Equals(left.EventId, right.EventId, StringComparison.Ordinal)
+            && left.Timestamp == right.Timestamp
+            && string.Equals(left.Kind, right.Kind, StringComparison.Ordinal)
+            && left.Notes.SequenceEqual(right.Notes, StringComparer.Ordinal);
+
+    private static bool AccountBalanceEquals(AccountBalance left, AccountBalance right)
+        => string.Equals(left.Currency, right.Currency, StringComparison.Ordinal)
+            && left.Amount == right.Amount
+            && left.Ledger.SequenceEqual(right.Ledger);
+
+    private static bool ProfileStateEquals(ProfileState left, ProfileState right)
+        => string.Equals(left.Owner, right.Owner, StringComparison.Ordinal)
+            && left.Revision == right.Revision
+            && left.UpdatedAt == right.UpdatedAt
+            && AccountBalanceEquals(left.LastBalance, right.LastBalance);
+
+    private static string Serialize<T>(T value)
+    {
+        if (value is null)
+        {
+            return "null";
+        }
+
+        return JsonSerializer.Serialize(value, value.GetType(), JournalingSampleJsonContext.Default);
     }
 
     private sealed record SampleSettings(string? ConnectionString, string ContainerName, string BlobName, bool ResetBlob)
     {
-        public static SampleSettings Parse(string[] args)
+        public static SampleSettings Parse(string[] args, string? aspireBlobConnectionString)
         {
             var connectionString = GetOptionValue(args, "--connection-string")
+                ?? aspireBlobConnectionString
                 ?? Environment.GetEnvironmentVariable(ConnectionStringEnvironmentVariable)
                 ?? Environment.GetEnvironmentVariable(AzureWebJobsStorageEnvironmentVariable);
 
-            var containerName = GetOptionValue(args, "--container") ?? DefaultContainerName;
-            var blobName = GetOptionValue(args, "--blob") ?? DefaultBlobName;
+            var containerName = GetOptionValue(args, "--container")
+                ?? Environment.GetEnvironmentVariable(ContainerEnvironmentVariable)
+                ?? DefaultContainerName;
+
+            var blobName = GetOptionValue(args, "--blob")
+                ?? Environment.GetEnvironmentVariable(BlobEnvironmentVariable)
+                ?? DefaultBlobName;
+
             var resetBlob = !args.Contains("--no-reset", StringComparer.OrdinalIgnoreCase);
 
             return new(connectionString, containerName, blobName, resetBlob);
