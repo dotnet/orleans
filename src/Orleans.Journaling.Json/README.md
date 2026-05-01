@@ -18,6 +18,8 @@ using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
+using Orleans.Journaling;
+using Orleans.Journaling.Json;
 
 [JsonSerializable(typeof(DateTime))]
 [JsonSerializable(typeof(int))]
@@ -30,7 +32,10 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobLogStorage()
+            .AddAzureAppendBlobLogStorage(options =>
+            {
+                options.LogFormatKey = JsonJournalingExtensions.LogFormatKey;
+            })
             .UseJsonCodec(JournalJsonContext.Default);
     });
 
@@ -41,7 +46,10 @@ If you need to customize `JsonSerializerOptions`, add the generated context thro
 
 ```csharp
 siloBuilder
-    .AddAzureAppendBlobLogStorage()
+    .AddAzureAppendBlobLogStorage(options =>
+    {
+        options.LogFormatKey = JsonJournalingExtensions.LogFormatKey;
+    })
     .UseJsonCodec(options =>
     {
         options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -49,7 +57,7 @@ siloBuilder
     });
 ```
 
-If you use a different Journaling storage provider, call `UseJsonCodec(...)` after registering that provider.
+If you use a different Journaling storage provider, configure it to use the `JsonJournalingExtensions.LogFormatKey` format key and call `UseJsonCodec(...)` after registering that provider.
 
 ## Example - Using durable state machines
 ```csharp
