@@ -26,14 +26,24 @@ public sealed class DirectoryMembershipSnapshotTests
         return new ClusterMembershipSnapshot(dict.ToImmutable(), new(1));
     });
 
-    private static readonly Gen<DirectoryMembershipSnapshot> GenDirectoryMembershipSnapshot =
+    private sealed record DirectoryMembershipSnapshotTestCase(DirectoryMembershipSnapshot Snapshot, uint[][] HashesByMember);
+
+    private static readonly Gen<DirectoryMembershipSnapshotTestCase> GenDirectoryMembershipSnapshotTestCase =
         GenClusterMembershipSnapshot.SelectMany(snapshot =>
-            Gen.Int[1, DirectoryMembershipSnapshot.PartitionsPerSilo * 2].SelectMany(partitionCount =>
-                Gen.UInt.Array[partitionCount].Array[snapshot.Members.Count].Select(hashes =>
+        {
+            var activeMemberCount = snapshot.Members.Count(static member => member.Value.Status == SiloStatus.Active);
+            return Gen.Int[1, DirectoryMembershipSnapshot.PartitionsPerSilo * 2].SelectMany(partitionCount =>
+                Gen.UInt.Array[partitionCount].Array[activeMemberCount].Select(hashes =>
                 {
                     var i = 0;
-                    return new DirectoryMembershipSnapshot(snapshot, null!, partitionCount, (_, _) => hashes[i++]);
-                })));
+                    return new DirectoryMembershipSnapshotTestCase(
+                        new DirectoryMembershipSnapshot(snapshot, null!, partitionCount, (_, _) => hashes[i++]),
+                        hashes);
+                }));
+        });
+
+    private static readonly Gen<DirectoryMembershipSnapshot> GenDirectoryMembershipSnapshot =
+        GenDirectoryMembershipSnapshotTestCase.Select(static testCase => testCase.Snapshot);
 
     [Fact]
     public void GetOwnerTest()
@@ -68,24 +78,78 @@ public sealed class DirectoryMembershipSnapshotTests
     [Fact]
     public void GetRangeReturnsRangeForRequestedPartition()
     {
-        GenDirectoryMembershipSnapshot.Where(s => s.Members.Length > 0)
-            .Sample(snapshot =>
+        GenDirectoryMembershipSnapshotTestCase.Where(testCase => testCase.Snapshot.Members.Length > 0)
+            .Sample(testCase =>
             {
-                var expectedRanges = new Dictionary<(SiloAddress Member, int PartitionIndex), RingRange>();
-                foreach (var (range, memberIndex, partitionIndex) in snapshot.RangeOwners)
-                {
-                    expectedRanges.Add((snapshot.Members[memberIndex], partitionIndex), range);
-                }
+                var snapshot = testCase.Snapshot;
 
-                foreach (var member in snapshot.Members)
+                for (var memberIndex = 0; memberIndex < snapshot.Members.Length; memberIndex++)
                 {
+                    var member = snapshot.Members[memberIndex];
                     for (var partitionIndex = 0; partitionIndex < snapshot.PartitionCount; partitionIndex++)
                     {
-                        expectedRanges.TryGetValue((member, partitionIndex), out var expectedRange);
+                        var expectedRange = GetExpectedRange(testCase.HashesByMember, memberIndex, partitionIndex);
                         Assert.Equal(expectedRange, snapshot.GetRange(member, partitionIndex));
                     }
                 }
             });
+    }
+
+    private static RingRange GetExpectedRange(uint[][] hashesByMember, int memberIndex, int partitionIndex)
+    {
+        var boundaries = new List<(uint Hash, int MemberIndex, int PartitionIndex)>();
+        for (var i = 0; i < hashesByMember.Length; i++)
+        {
+            var hashes = hashesByMember[i];
+            for (var j = 0; j < hashes.Length; j++)
+            {
+                boundaries.Add((hashes[j], i, j));
+            }
+        }
+
+        boundaries.Sort(static (left, right) =>
+        {
+            var hashCompare = left.Hash.CompareTo(right.Hash);
+            if (hashCompare != 0)
+            {
+                return hashCompare;
+            }
+
+            var partitionCompare = left.PartitionIndex.CompareTo(right.PartitionIndex);
+            if (partitionCompare != 0)
+            {
+                return partitionCompare;
+            }
+
+            return left.MemberIndex.CompareTo(right.MemberIndex);
+        });
+
+        for (var i = 1; i < boundaries.Count;)
+        {
+            if (boundaries[i].Hash == boundaries[i - 1].Hash)
+            {
+                boundaries.RemoveAt(i);
+            }
+            else
+            {
+                i++;
+            }
+        }
+
+        var boundaryIndex = boundaries.FindIndex(boundary => boundary.MemberIndex == memberIndex && boundary.PartitionIndex == partitionIndex);
+        if (boundaryIndex < 0)
+        {
+            return RingRange.Empty;
+        }
+
+        if (boundaries.Count == 1)
+        {
+            return RingRange.Full;
+        }
+
+        var current = boundaries[boundaryIndex];
+        var next = boundaries[(boundaryIndex + 1) % boundaries.Count];
+        return RingRange.Create(current.Hash, next.Hash);
     }
 
     [Fact]

@@ -51,11 +51,10 @@ internal sealed class DirectoryMembershipSnapshot
         for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
         {
             var activeMember = sortedActiveMembers[memberIndex];
-            var hashCodes = getRingBoundaries(activeMember, partitionCount).ToList();
-            hashCodes.Sort();
-            Debug.Assert(hashCodes.Count == partitionCount);
+            var hashCodes = getRingBoundaries(activeMember, partitionCount);
+            Debug.Assert(hashCodes.Length == partitionCount);
             var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(partitionCount);
-            for (var partitionIndex = 0; partitionIndex < hashCodes.Count; partitionIndex++)
+            for (var partitionIndex = 0; partitionIndex < hashCodes.Length; partitionIndex++)
             {
                 var hashCode = hashCodes[partitionIndex];
                 hashIndexPairs.Add((hashCode, memberIndex, partitionIndex));
