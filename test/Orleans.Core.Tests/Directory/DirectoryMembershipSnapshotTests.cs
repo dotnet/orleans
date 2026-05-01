@@ -2,7 +2,6 @@ using System.Collections.Immutable;
 using Orleans.Runtime.GrainDirectory;
 using CsCheck;
 using Xunit;
-using Orleans.Configuration;
 
 namespace NonSilo.Tests.Directory;
 
@@ -28,11 +27,13 @@ public sealed class DirectoryMembershipSnapshotTests
     });
 
     private static readonly Gen<DirectoryMembershipSnapshot> GenDirectoryMembershipSnapshot =
-        GenClusterMembershipSnapshot.SelectMany(snapshot => Gen.UInt.Array[ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS].Array[snapshot.Members.Count].Select(hashes => 
-    {
-        var i = 0;
-        return new DirectoryMembershipSnapshot(snapshot, null!, (_, _) => hashes[i++]);
-    }));
+        GenClusterMembershipSnapshot.SelectMany(snapshot =>
+            Gen.Int[1, DirectoryMembershipSnapshot.PartitionsPerSilo * 2].SelectMany(partitionCount =>
+                Gen.UInt.Array[partitionCount].Array[snapshot.Members.Count].Select(hashes =>
+                {
+                    var i = 0;
+                    return new DirectoryMembershipSnapshot(snapshot, null!, partitionCount, (_, _) => hashes[i++]);
+                })));
 
     [Fact]
     public void GetOwnerTest()
@@ -78,7 +79,7 @@ public sealed class DirectoryMembershipSnapshotTests
 
                 foreach (var member in snapshot.Members)
                 {
-                    for (var partitionIndex = 0; partitionIndex < ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS; partitionIndex++)
+                    for (var partitionIndex = 0; partitionIndex < snapshot.PartitionCount; partitionIndex++)
                     {
                         expectedRanges.TryGetValue((member, partitionIndex), out var expectedRange);
                         Assert.Equal(expectedRange, snapshot.GetRange(member, partitionIndex));

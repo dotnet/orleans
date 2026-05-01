@@ -20,12 +20,21 @@ internal sealed class DirectoryMembershipSnapshot
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
-    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory) : this(snapshot, grainFactory, static (silo, count) => silo.GetUniformHashCodes(count))
+    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory)
+        : this(snapshot, grainFactory, PartitionsPerSilo, static (silo, count) => silo.GetUniformHashCodes(count))
     {
     }
 
     internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, int, uint[]> getRingBoundaries)
+        : this(snapshot, grainFactory, PartitionsPerSilo, getRingBoundaries)
     {
+    }
+
+    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionCount, Func<SiloAddress, int, uint[]> getRingBoundaries)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(partitionCount, 1);
+        PartitionCount = partitionCount;
+
         var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
         foreach (var member in snapshot.Members)
         {
@@ -37,15 +46,15 @@ internal sealed class DirectoryMembershipSnapshot
         }
 
         sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
-        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(PartitionsPerSilo * sortedActiveMembers.Count);
+        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(partitionCount * sortedActiveMembers.Count);
         var memberPartitions = ImmutableArray.CreateBuilder<ImmutableArray<IGrainDirectoryPartition>>();
         for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
         {
             var activeMember = sortedActiveMembers[memberIndex];
-            var hashCodes = getRingBoundaries(activeMember, PartitionsPerSilo).ToList();
+            var hashCodes = getRingBoundaries(activeMember, partitionCount).ToList();
             hashCodes.Sort();
-            Debug.Assert(hashCodes.Count == PartitionsPerSilo);
-            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(PartitionsPerSilo);
+            Debug.Assert(hashCodes.Count == partitionCount);
+            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(partitionCount);
             for (var partitionIndex = 0; partitionIndex < hashCodes.Count; partitionIndex++)
             {
                 var hashCode = hashCodes[partitionIndex];
@@ -97,7 +106,7 @@ internal sealed class DirectoryMembershipSnapshot
         var rangesByMemberPartitionBuilders = new RingRange[sortedActiveMembers.Count][];
         for (var i = 0; i < sortedActiveMembers.Count; i++)
         {
-            rangesByMemberPartitionBuilders[i] = new RingRange[PartitionsPerSilo];
+            rangesByMemberPartitionBuilders[i] = new RingRange[partitionCount];
         }
 
         var rangesByMemberPartition = ImmutableArray.CreateBuilder<ImmutableArray<RingRange>>(sortedActiveMembers.Count);
@@ -130,12 +139,14 @@ internal sealed class DirectoryMembershipSnapshot
 
     public MembershipVersion Version => ClusterMembershipSnapshot.Version;
 
+    internal int PartitionCount { get; }
+
     public ImmutableArray<SiloAddress> Members { get; }
 
     public RingRange GetRange(SiloAddress address, int partitionIndex)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionIndex, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(partitionIndex, PartitionsPerSilo - 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(partitionIndex, PartitionCount - 1);
 
         var memberIndex = TryGetMemberIndex(address);
         if (memberIndex < 0)
