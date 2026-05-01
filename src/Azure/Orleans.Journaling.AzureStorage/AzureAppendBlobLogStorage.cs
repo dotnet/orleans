@@ -11,7 +11,7 @@ namespace Orleans.Journaling;
 internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
 {
     private static readonly AppendBlobCreateOptions CreateOptions = new() { Conditions = new() { IfNoneMatch = ETag.All } };
-    private readonly AppendBlobClient _client;
+    private readonly IAppendBlobClient _client;
     private readonly ILogger<AzureAppendBlobLogStorage> _logger;
     private readonly AppendBlobAppendBlockOptions _appendOptions;
     private bool _exists;
@@ -20,6 +20,11 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
     public bool IsCompactionRequested => _numBlocks > 10;
 
     public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger)
+        : this(new AppendBlobClientAdapter(client), logger)
+    {
+    }
+
+    internal AzureAppendBlobLogStorage(IAppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger)
     {
         _client = client;
         _logger = logger;
@@ -55,6 +60,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         // Expect no blob to have been created when we append to it.
         _appendOptions.Conditions.IfNoneMatch = ETag.All;
         _appendOptions.Conditions.IfMatch = default;
+        _exists = false;
         _numBlocks = 0;
     }
 
@@ -109,7 +115,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         var uri = snapshot.GenerateSasUri(permissions: BlobSasPermissions.Read, expiresOn: DateTimeOffset.UtcNow.AddHours(1));
         var copyResult = await _client.SyncCopyFromUriAsync(
             uri,
-            new BlobCopyFromUriOptions { DestinationConditions = new BlobRequestConditions { IfNoneMatch = eTag } },
+            new BlobCopyFromUriOptions { DestinationConditions = new BlobRequestConditions { IfMatch = eTag } },
             cancellationToken).ConfigureAwait(false);
         if (copyResult.Value.CopyStatus is not CopyStatus.Success)
         {
@@ -146,7 +152,7 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
         _numBlocks = result.Value.BlobCommittedBlockCount;
 
         // Delete the blob snapshot.
-        await _client.WithSnapshot(blobSnapshot.Value.Snapshot).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        await _client.WithSnapshot(blobSnapshot.Value.Snapshot).DeleteAsync(conditions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     [LoggerMessage(
@@ -287,4 +293,46 @@ internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
 
         private static NotSupportedException GetReadOnlyException() => new("This stream is read-only.");
     }
+}
+
+internal interface IAppendBlobClient
+{
+    string BlobContainerName { get; }
+    string Name { get; }
+    Task<Response<BlobContentInfo>> CreateAsync(AppendBlobCreateOptions options, CancellationToken cancellationToken);
+    Task<Response<BlobAppendInfo>> AppendBlockAsync(Stream content, AppendBlobAppendBlockOptions options, CancellationToken cancellationToken);
+    Task DeleteAsync(BlobRequestConditions? conditions, CancellationToken cancellationToken);
+    Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(CancellationToken cancellationToken);
+    Task<Response<BlobCopyInfo>> SyncCopyFromUriAsync(Uri source, BlobCopyFromUriOptions options, CancellationToken cancellationToken);
+    Task<Response<BlobSnapshotInfo>> CreateSnapshotAsync(BlobRequestConditions? conditions, CancellationToken cancellationToken);
+    IAppendBlobClient WithSnapshot(string snapshot);
+    Uri GenerateSasUri(BlobSasPermissions permissions, DateTimeOffset expiresOn);
+}
+
+internal sealed class AppendBlobClientAdapter(AppendBlobClient client) : IAppendBlobClient
+{
+    public string BlobContainerName => client.BlobContainerName;
+    public string Name => client.Name;
+
+    public async Task<Response<BlobContentInfo>> CreateAsync(AppendBlobCreateOptions options, CancellationToken cancellationToken)
+        => await client.CreateAsync(options, cancellationToken).ConfigureAwait(false);
+
+    public async Task<Response<BlobAppendInfo>> AppendBlockAsync(Stream content, AppendBlobAppendBlockOptions options, CancellationToken cancellationToken)
+        => await client.AppendBlockAsync(content, options, cancellationToken).ConfigureAwait(false);
+
+    public async Task DeleteAsync(BlobRequestConditions? conditions, CancellationToken cancellationToken)
+        => await client.DeleteAsync(conditions: conditions, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+    public async Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(CancellationToken cancellationToken)
+        => await client.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+
+    public async Task<Response<BlobCopyInfo>> SyncCopyFromUriAsync(Uri source, BlobCopyFromUriOptions options, CancellationToken cancellationToken)
+        => await client.SyncCopyFromUriAsync(source, options, cancellationToken).ConfigureAwait(false);
+
+    public async Task<Response<BlobSnapshotInfo>> CreateSnapshotAsync(BlobRequestConditions? conditions, CancellationToken cancellationToken)
+        => await client.CreateSnapshotAsync(conditions: conditions, cancellationToken: cancellationToken).ConfigureAwait(false);
+
+    public IAppendBlobClient WithSnapshot(string snapshot) => new AppendBlobClientAdapter(client.WithSnapshot(snapshot));
+
+    public Uri GenerateSasUri(BlobSasPermissions permissions, DateTimeOffset expiresOn) => client.GenerateSasUri(permissions, expiresOn);
 }
