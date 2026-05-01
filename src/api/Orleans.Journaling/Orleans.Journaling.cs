@@ -52,6 +52,31 @@ namespace Orleans.Journaling
         public static Hosting.ISiloBuilder AddLogStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
+    public sealed partial class JournalingFormatFamilyBuilder
+    {
+        internal JournalingFormatFamilyBuilder() { }
+
+        public string Key { get { throw null; } }
+
+        public Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get { throw null; } }
+
+        public JournalingFormatFamilyBuilder AddLogFormat(ILogFormat logFormat) { throw null; }
+
+        public JournalingFormatFamilyBuilder AddLogFormat<TFormat>()
+            where TFormat : class, ILogFormat { throw null; }
+
+        public JournalingFormatFamilyBuilder AddOperationCodecProvider<TProvider>()
+            where TProvider : class, IDurableDictionaryOperationCodecProvider, IDurableListOperationCodecProvider, IDurableQueueOperationCodecProvider, IDurableSetOperationCodecProvider, IDurableValueOperationCodecProvider, IDurableStateOperationCodecProvider, IDurableTaskCompletionSourceOperationCodecProvider { throw null; }
+
+        public JournalingFormatFamilyBuilder AddOperationCodecProvider<TProvider>(System.Func<System.IServiceProvider, TProvider> factory)
+            where TProvider : class, IDurableDictionaryOperationCodecProvider, IDurableListOperationCodecProvider, IDurableQueueOperationCodecProvider, IDurableSetOperationCodecProvider, IDurableValueOperationCodecProvider, IDurableStateOperationCodecProvider, IDurableTaskCompletionSourceOperationCodecProvider { throw null; }
+    }
+
+    public static partial class JournalingFormatFamilyServiceCollectionExtensions
+    {
+        public static JournalingFormatFamilyBuilder AddJournalingFormatFamily(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string key) { throw null; }
+    }
+
     public partial interface IDurableDictionaryOperationCodecProvider
     {
         IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>();

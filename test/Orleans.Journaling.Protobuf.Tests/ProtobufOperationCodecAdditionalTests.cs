@@ -111,6 +111,7 @@ public sealed class ProtobufOperationCodecAdditionalTests
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(ProtobufJournalingExtensions.LogFormatKey));
+        Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredService<ILogFormat>());
         Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableListOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey));
@@ -118,6 +119,13 @@ public sealed class ProtobufOperationCodecAdditionalTests
         Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey));
         Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey));
+        Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableDictionaryOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableListOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableQueueOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableSetOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableValueOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableStateOperationCodecProvider>());
+        Assert.Same(serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>(), serviceProvider.GetRequiredService<IDurableTaskCompletionSourceOperationCodecProvider>());
     }
 
     [Fact]
