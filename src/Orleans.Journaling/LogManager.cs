@@ -441,8 +441,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     {
         lock (_lock)
         {
-            _currentLogSegmentWriter?.Reset();
-            _logStreamDirectory.ResetVolatileState();
+            ResetForRecovery();
         }
 
         using var recoveryBuffer = new ArcBufferWriter();
@@ -465,6 +464,35 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                 }
             }
         }
+    }
+
+    private void ResetForRecovery()
+    {
+        _currentLogSegmentWriter?.Reset();
+        _stateMachinesMap.Clear();
+        _stateMachinesMap[LogStreamDirectory.Id] = _logStreamDirectory;
+        _stateMachinesMap[RetiredLogStreamTracker.Id] = _retirementTracker;
+        _nextLogStreamId = MinApplicationLogStreamId;
+
+        List<string>? retiredNames = null;
+        foreach (var (name, stateMachine) in _stateMachines)
+        {
+            if (stateMachine is RetiredLogStream)
+            {
+                (retiredNames ??= []).Add(name);
+            }
+        }
+
+        if (retiredNames is not null)
+        {
+            foreach (var name in retiredNames)
+            {
+                _stateMachines.Remove(name);
+            }
+        }
+
+        _logStreamDirectory.ResetVolatileState();
+        _retirementTracker.ResetVolatileState();
     }
 
     IDurableStateMachine ILogStreamStateMachineResolver.ResolveStateMachine(LogStreamId streamId)
@@ -765,6 +793,8 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         public const int Id = 1;
 
         private readonly LogWriter _logWriter = manager.CreateLogWriter(new(Id));
+
+        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_logWriter);
 
         protected override LogWriter GetStorage() => _logWriter;
     }
