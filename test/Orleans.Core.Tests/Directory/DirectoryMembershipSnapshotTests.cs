@@ -65,6 +65,32 @@ public sealed class DirectoryMembershipSnapshotTests
     }
 
     [Fact]
+    public void GetRangeReturnsRangeForRequestedPartition()
+    {
+        var siloAddress = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11111), 1);
+        var clusterSnapshot = new ClusterMembershipSnapshot(
+            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(siloAddress, new ClusterMember(siloAddress, SiloStatus.Active, "Silo_1")),
+            new(1));
+        var hashes = Enumerable
+            .Range(0, ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS)
+            .Select(index => (uint)(ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS - index))
+            .ToArray();
+        var snapshot = new DirectoryMembershipSnapshot(clusterSnapshot, null!, (_, _) => hashes);
+        var expectedRanges = new RingRange[ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS];
+
+        foreach (var (range, memberIndex, partitionIndex) in snapshot.RangeOwners)
+        {
+            Assert.Equal(siloAddress, snapshot.Members[memberIndex]);
+            expectedRanges[partitionIndex] = range;
+        }
+
+        for (var partitionIndex = 0; partitionIndex < expectedRanges.Length; partitionIndex++)
+        {
+            Assert.Equal(expectedRanges[partitionIndex], snapshot.GetRange(siloAddress, partitionIndex));
+        }
+    }
+
+    [Fact]
     public void ViewCoversRingTest()
     {
         // The union of all member ranges should cover the entire ring.
