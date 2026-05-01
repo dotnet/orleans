@@ -67,27 +67,24 @@ public sealed class DirectoryMembershipSnapshotTests
     [Fact]
     public void GetRangeReturnsRangeForRequestedPartition()
     {
-        var siloAddress = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 11111), 1);
-        var clusterSnapshot = new ClusterMembershipSnapshot(
-            ImmutableDictionary<SiloAddress, ClusterMember>.Empty.Add(siloAddress, new ClusterMember(siloAddress, SiloStatus.Active, "Silo_1")),
-            new(1));
-        var hashes = Enumerable
-            .Range(0, ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS)
-            .Select(index => (uint)(ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS - index))
-            .ToArray();
-        var snapshot = new DirectoryMembershipSnapshot(clusterSnapshot, null!, (_, _) => hashes);
-        var expectedRanges = new RingRange[ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS];
+        GenDirectoryMembershipSnapshot.Where(s => s.Members.Length > 0)
+            .Sample(snapshot =>
+            {
+                var expectedRanges = new Dictionary<(SiloAddress Member, int PartitionIndex), RingRange>();
+                foreach (var (range, memberIndex, partitionIndex) in snapshot.RangeOwners)
+                {
+                    expectedRanges.Add((snapshot.Members[memberIndex], partitionIndex), range);
+                }
 
-        foreach (var (range, memberIndex, partitionIndex) in snapshot.RangeOwners)
-        {
-            Assert.Equal(siloAddress, snapshot.Members[memberIndex]);
-            expectedRanges[partitionIndex] = range;
-        }
-
-        for (var partitionIndex = 0; partitionIndex < expectedRanges.Length; partitionIndex++)
-        {
-            Assert.Equal(expectedRanges[partitionIndex], snapshot.GetRange(siloAddress, partitionIndex));
-        }
+                foreach (var member in snapshot.Members)
+                {
+                    for (var partitionIndex = 0; partitionIndex < ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS; partitionIndex++)
+                    {
+                        expectedRanges.TryGetValue((member, partitionIndex), out var expectedRange);
+                        Assert.Equal(expectedRange, snapshot.GetRange(member, partitionIndex));
+                    }
+                }
+            });
     }
 
     [Fact]
