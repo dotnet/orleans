@@ -44,7 +44,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             Options.Create(ManagerOptions),
             TimeProvider.System,
             serviceProvider,
-            new LogFormatKey(CustomFormatKey)));
+            CustomFormatKey));
 
         Assert.Contains(CustomFormatKey, exception.Message);
         Assert.Contains(nameof(ILogFormat), exception.Message);
@@ -60,7 +60,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddOptions();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ILogStorage>(_ => storage);
-        services.AddScoped(_ => new LogFormatKey(CustomFormatKey));
+        services.AddKeyedScoped<string>(LogFormatServices.LogFormatKeyServiceKey, (_, _) => CustomFormatKey);
         services.AddScoped<ILogManager, LogManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<ILogFormat>(CustomFormatKey, new TestLogFormat());

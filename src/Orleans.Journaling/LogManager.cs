@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
@@ -41,7 +42,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         IOptions<LogManagerOptions> options,
         TimeProvider timeProvider,
         IServiceProvider serviceProvider,
-        LogFormatKey logFormatKey)
+        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey)
     {
         _storage = storage;
         _logFormat = LogFormatServices.GetRequiredKeyedService<ILogFormat>(serviceProvider, logFormatKey);

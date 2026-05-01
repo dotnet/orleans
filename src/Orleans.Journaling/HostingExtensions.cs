@@ -9,7 +9,7 @@ public static class HostingExtensions
     public static ISiloBuilder AddLogStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<LogManagerOptions>();
-        builder.Services.TryAddScoped(static sp => new LogFormatKey(GetLogFormatKey(sp)));
+        builder.Services.TryAddKeyedScoped<string>(LogFormatServices.LogFormatKeyServiceKey, static (sp, _) => GetLogFormatKey(sp));
         builder.Services.TryAddScoped<ILogStorage>(sp => sp.GetRequiredService<ILogStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<ILogManager, LogManager>();
 

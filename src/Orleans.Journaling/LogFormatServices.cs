@@ -4,6 +4,8 @@ namespace Orleans.Journaling;
 
 internal static class LogFormatServices
 {
+    public const string LogFormatKeyServiceKey = "Orleans.Journaling.LogFormatKey";
+
     public static string ValidateLogFormatKey(string? logFormatKey)
     {
         if (string.IsNullOrWhiteSpace(logFormatKey))
@@ -13,10 +15,6 @@ internal static class LogFormatServices
 
         return logFormatKey;
     }
-
-    public static T GetRequiredKeyedService<T>(IServiceProvider serviceProvider, LogFormatKey logFormatKey)
-        where T : notnull
-        => GetRequiredKeyedService<T>(serviceProvider, logFormatKey.Value);
 
     public static T GetRequiredKeyedService<T>(IServiceProvider serviceProvider, string logFormatKey)
         where T : notnull
