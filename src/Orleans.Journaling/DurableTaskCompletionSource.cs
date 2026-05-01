@@ -30,7 +30,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         ILogManager manager,
-        LogFormatKey logFormatKey,
+        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)

@@ -17,7 +17,11 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     private bool _hasState;
     private bool _clearRequested;
 
-    public DurableState([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
+    public DurableState(
+        [ServiceKey] string key,
+        ILogManager manager,
+        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = LogFormatServices.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();

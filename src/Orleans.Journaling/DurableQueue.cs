@@ -26,7 +26,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     private readonly Queue<T> _items = new();
     private LogWriter _storage;
 
-    public DurableQueue([ServiceKey] string key, ILogManager manager, LogFormatKey logFormatKey, IServiceProvider serviceProvider)
+    public DurableQueue(
+        [ServiceKey] string key,
+        ILogManager manager,
+        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = LogFormatServices.GetRequiredKeyedService<IDurableQueueOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
