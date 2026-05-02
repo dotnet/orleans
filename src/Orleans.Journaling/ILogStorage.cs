@@ -1,5 +1,4 @@
 using System.Buffers;
-using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -9,13 +8,16 @@ namespace Orleans.Journaling;
 public interface ILogStorage
 {
     /// <summary>
-    /// Reads all log data belonging to this instance into <paramref name="buffer"/> and invokes <paramref name="consume"/> after adding data.
+    /// Reads all log data belonging to this instance and sends it to <paramref name="consumer"/>.
     /// </summary>
-    /// <param name="buffer">The buffer to append ordered raw log data to. Chunk boundaries are not log-entry boundaries.</param>
-    /// <param name="consume">Callback invoked after appending data so the caller can consume complete entries.</param>
+    /// <remarks>
+    /// Implementations must notify <paramref name="consumer"/> when the read is complete by passing a
+    /// <see cref="LogReadBuffer"/> with <see cref="LogReadBuffer.IsCompleted"/> set to <see langword="true"/>.
+    /// </remarks>
+    /// <param name="consumer">The consumer of ordered raw log data. Chunk boundaries are not log-entry boundaries.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
-    ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken);
+    ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken);
 
     /// <summary>
     /// Replaces the log with the provided value atomically.

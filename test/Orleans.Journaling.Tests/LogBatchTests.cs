@@ -13,9 +13,9 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 [TestCategory("AzureStorage"), TestCategory("Functional")]
-public sealed class AzureStorageLogSegmentTests : LogSegmentTests
+public sealed class AzureStorageLogBatchTests : LogBatchTests
 {
-    public AzureStorageLogSegmentTests()
+    public AzureStorageLogBatchTests()
     {
         JournalingAzureStorageTestConfiguration.CheckPreconditionsOrThrow();
     }
@@ -30,7 +30,7 @@ public sealed class AzureStorageLogSegmentTests : LogSegmentTests
     }
 }
 
-public sealed class InMemoryLogSegmentTests : LogSegmentTests
+public sealed class InMemoryLogBatchTests : LogBatchTests
 {
     protected override void ConfigureServices(IServiceCollection services)
     {
@@ -44,12 +44,12 @@ public sealed class InMemoryLogSegmentTests : LogSegmentTests
 /// This class provides a suite of common tests for validating the behavior of <see cref="DurableList{T}"/>
 /// against different storage backends.
 /// </summary>
-public abstract class LogSegmentTests : IAsyncLifetime
+public abstract class LogBatchTests : IAsyncLifetime
 {
     private IServiceProvider _serviceProvider = null!;
     private SiloLifecycleSubject? _siloLifecycle;
     private ILogStorageProvider _storageProvider = null!;
-    private static readonly IOptions<LogManagerOptions> ManagerOptions = Options.Create(new LogManagerOptions());
+    private static readonly IOptions<StateMachineManagerOptions> ManagerOptions = Options.Create(new StateMachineManagerOptions());
 
     public virtual async Task InitializeAsync()
     {
@@ -81,7 +81,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
 
     protected abstract void ConfigureServices(IServiceCollection services);
 
-    private (LogManager Manager, DurableList<T> List, ILogStorage Storage) CreateTestComponents<T>(string listName, GrainId grainId)
+    private (LogStateMachineManager Manager, DurableList<T> List, ILogStorage Storage) CreateTestComponents<T>(string listName, GrainId grainId)
     {
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
@@ -92,7 +92,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
         var dateTimeCodec = new OrleansLogValueCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
         var logStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager = new LogManager(storage, _serviceProvider.GetRequiredService<ILogger<LogManager>>(), ManagerOptions, logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);
+        var manager = new LogStateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<LogStateMachineManager>>(), ManagerOptions, logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);
         var list = new DurableList<T>(listName, manager, new OrleansBinaryListOperationCodec<T>(new OrleansLogValueCodec<T>(codecProvider.GetCodec<T>(), sessionPool)));
         return (manager, list, storage);
     }
@@ -155,7 +155,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
         var dateTimeCodec = new OrleansLogValueCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
         var logStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager2 = new LogManager(storage, _serviceProvider.GetRequiredService<ILogger<LogManager>>(), ManagerOptions, logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);
+        var manager2 = new LogStateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<LogStateMachineManager>>(), ManagerOptions, logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);
         var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool)));
         await manager2.InitializeAsync(cts.Token);
 
@@ -359,7 +359,7 @@ public abstract class LogSegmentTests : IAsyncLifetime
         var dateTimeCodec = new OrleansLogValueCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
         var logStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager2 = new LogManager(storage, _serviceProvider.GetRequiredService<ILogger<LogManager>>(), ManagerOptions, logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);// Reuses the storage object linked via grainId
+        var manager2 = new LogStateMachineManager(storage, _serviceProvider.GetRequiredService<ILogger<LogStateMachineManager>>(), ManagerOptions, logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);// Reuses the storage object linked via grainId
         var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListOperationCodec<int>(new OrleansLogValueCodec<int>(codecProvider.GetCodec<int>(), sessionPool)));
         await manager2.InitializeAsync(cts.Token);
 

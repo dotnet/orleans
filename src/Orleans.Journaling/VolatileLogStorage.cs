@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Collections.Concurrent;
-using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -64,14 +63,20 @@ public sealed class VolatileLogStorage : ILogStorage
     internal IReadOnlyList<byte[]> Segments => _segments;
 
     /// <inheritdoc/>
-    public async ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+    public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
     {
-        await Task.CompletedTask;
-        foreach (var segment in _segments)
+        ArgumentNullException.ThrowIfNull(consumer);
+
+        consumer.Consume(GetSegments(_segments, cancellationToken));
+        return default;
+    }
+
+    private static IEnumerable<ReadOnlyMemory<byte>> GetSegments(IEnumerable<byte[]> segments, CancellationToken cancellationToken)
+    {
+        foreach (var segment in segments)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            buffer.Write(segment);
-            consume(new ArcBufferReader(buffer));
+            yield return segment;
         }
     }
 

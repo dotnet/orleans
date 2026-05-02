@@ -10,7 +10,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineResolver, ILogWriterTarget, ILogEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class LogStateMachineManager : IStateMachineManager, IStateMachineResolver, ILogStreamWriterTarget, ILogEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationLogStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -23,24 +23,24 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     private readonly ILogStorage _storage;
     private readonly ILogFormat _logFormat;
     private readonly string _logFormatKey;
-    private readonly ILogger<LogManager> _logger;
+    private readonly ILogger<LogStateMachineManager> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
-    private readonly LogStreamDirectory _logStreamDirectory;
-    private readonly RetiredLogStreamTracker _retirementTracker;
+    private readonly StateMachineDirectory _logStreamDirectory;
+    private readonly RetiredStateMachineTracker _retirementTracker;
     private readonly TimeSpan _retirementGracePeriod;
     private Task? _workLoop;
     private ManagerState _state;
     private Task? _pendingWrite;
     private ulong _nextLogStreamId = MinApplicationLogStreamId;
-    private ILogSegmentWriter? _currentLogSegmentWriter;
+    private ILogBatchWriter? _currentLogBatchWriter;
 
-    public LogManager(
+    public LogStateMachineManager(
         ILogStorage storage,
-        ILogger<LogManager> logger,
-        IOptions<LogManagerOptions> options,
+        ILogger<LogStateMachineManager> logger,
+        IOptions<StateMachineManagerOptions> options,
         TimeProvider timeProvider,
         IServiceProvider serviceProvider,
         [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey)
@@ -55,19 +55,19 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
         // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
         // This allows us to recover the list of state machines ids without having to store it separately.
-        _logStreamDirectory = new LogStreamDirectory(this, dictionaryCodecProvider.GetCodec<string, ulong>());
-        _stateMachinesMap[LogStreamDirectory.Id] = _logStreamDirectory;
+        _logStreamDirectory = new StateMachineDirectory(this, dictionaryCodecProvider.GetCodec<string, ulong>());
+        _stateMachinesMap[StateMachineDirectory.Id] = _logStreamDirectory;
 
         // The retirement tracker is a special internal state machine with a fixed id.
         // It is not stored in _logStreamDirectory and does not participate in the general name->id mapping.
-        _retirementTracker = new RetiredLogStreamTracker(this, dictionaryCodecProvider.GetCodec<string, DateTime>());
-        _stateMachinesMap[RetiredLogStreamTracker.Id] = _retirementTracker;
+        _retirementTracker = new RetiredStateMachineTracker(this, dictionaryCodecProvider.GetCodec<string, DateTime>());
+        _stateMachinesMap[RetiredStateMachineTracker.Id] = _retirementTracker;
     }
 
-    internal LogManager(
+    internal LogStateMachineManager(
         ILogStorage storage,
-        ILogger<LogManager> logger,
-        IOptions<LogManagerOptions> options,
+        ILogger<LogStateMachineManager> logger,
+        IOptions<StateMachineManagerOptions> options,
         IDurableDictionaryOperationCodec<string, ulong> logStreamIdsCodec,
         IDurableDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
         TimeProvider timeProvider,
@@ -81,11 +81,11 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
-        _logStreamDirectory = new LogStreamDirectory(this, logStreamIdsCodec);
-        _stateMachinesMap[LogStreamDirectory.Id] = _logStreamDirectory;
+        _logStreamDirectory = new StateMachineDirectory(this, logStreamIdsCodec);
+        _stateMachinesMap[StateMachineDirectory.Id] = _logStreamDirectory;
 
-        _retirementTracker = new RetiredLogStreamTracker(this, retirementTrackerCodec);
-        _stateMachinesMap[RetiredLogStreamTracker.Id] = _retirementTracker;
+        _retirementTracker = new RetiredStateMachineTracker(this, retirementTrackerCodec);
+        _stateMachinesMap[RetiredStateMachineTracker.Id] = _retirementTracker;
     }
 
     public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
@@ -97,13 +97,13 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         {
             if (_stateMachines.TryGetValue(name, out var machine))
             {
-                if (machine is RetiredLogStream vessel)
+                if (machine is RetiredStateMachine vessel)
                 {
                     // If the existing machine is a vessel for a retired one, it means the machine was loaded from a previous
                     // log during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
-                    stateMachine.Reset(CreateLogWriter(new(_logStreamDirectory[name])));
+                    stateMachine.Reset(CreateLogStreamWriter(new(_logStreamDirectory[name])));
                     foreach (var entry in vessel.FormattedEntries)
                     {
                         stateMachine.Apply(new ReadOnlySequence<byte>(entry.Payload));
@@ -161,7 +161,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     private async Task WorkLoop()
     {
         var cancellationToken = _shutdownCancellation.Token;
-        using var cancellationRegistration = cancellationToken.Register(state => ((LogManager)state!)._workSignal.Signal(), this);
+        using var cancellationRegistration = cancellationToken.Register(state => ((LogStateMachineManager)state!)._workSignal.Signal(), this);
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var needsRecovery = true;
         while (true)
@@ -198,7 +198,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                             // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current log length.
                             //       If the current log length is greater than the snapshot size, then take a snapshot instead of appending more log entries.
                             var isSnapshot = workItem.Type is WorkItemType.WriteSnapshot;
-                            ILogSegmentWriter? logSegmentWriter;
+                            ILogBatchWriter? logBatchWriter;
                             ArcBuffer committedBuffer = default;
 
                             lock (_lock)
@@ -207,7 +207,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                                 {
                                     // If there are pending writes, reset them since they will be captured by the snapshot instead.
                                     // If we did not do this, the log would begin with some writes which would be followed by a snapshot which also included those writes.
-                                    _currentLogSegmentWriter?.Reset();
+                                    _currentLogBatchWriter?.Reset();
 
                                     if (_retirementTracker.Count > 0)
                                     {
@@ -215,12 +215,12 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                                     }
                                 }
 
-                                var currentLogSegmentWriter = GetOrCreateCurrentLogSegmentWriter();
+                                var currentLogBatchWriter = GetOrCreateCurrentLogBatchWriter();
 
                                 // The map of state machine ids is itself stored as a durable state machine with the id 0.
                                 // This must be stored first, since it includes the identities of all other state machines, which are needed when replaying the log.
                                 // If we removed retired machines, this snapshot will persist that change.
-                                AppendUpdatesOrSnapshotStateMachine(currentLogSegmentWriter, isSnapshot, LogStreamDirectory.Id, _logStreamDirectory);
+                                AppendUpdatesOrSnapshotStateMachine(currentLogBatchWriter, isSnapshot, StateMachineDirectory.Id, _logStreamDirectory);
 
                                 foreach (var (id, stateMachine) in _stateMachinesMap)
                                 {
@@ -229,23 +229,23 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                                         continue;
                                     }
 
-                                    AppendUpdatesOrSnapshotStateMachine(currentLogSegmentWriter, isSnapshot, id, stateMachine);
+                                    AppendUpdatesOrSnapshotStateMachine(currentLogBatchWriter, isSnapshot, id, stateMachine);
                                 }
 
-                                committedBuffer = currentLogSegmentWriter.GetCommittedBuffer();
+                                committedBuffer = currentLogBatchWriter.GetCommittedBuffer();
                                 if (committedBuffer.Length == 0)
                                 {
                                     committedBuffer.Dispose();
-                                    logSegmentWriter = null;
+                                    logBatchWriter = null;
                                 }
                                 else
                                 {
-                                    logSegmentWriter = currentLogSegmentWriter;
-                                    _currentLogSegmentWriter = null;
+                                    logBatchWriter = currentLogBatchWriter;
+                                    _currentLogBatchWriter = null;
                                 }
                             }
 
-                            if (logSegmentWriter is not null)
+                            if (logBatchWriter is not null)
                             {
                                 var writeSucceeded = false;
                                 try
@@ -266,21 +266,21 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
                                     committedBuffer.Dispose();
                                     if (!writeSucceeded)
                                     {
-                                        logSegmentWriter.Dispose();
+                                        logBatchWriter.Dispose();
                                     }
                                 }
 
                                 // Notify all state machines that the operation completed.
                                 lock (_lock)
                                 {
-                                    if (_currentLogSegmentWriter is null)
+                                    if (_currentLogBatchWriter is null)
                                     {
-                                        logSegmentWriter.Reset();
-                                        _currentLogSegmentWriter = logSegmentWriter;
+                                        logBatchWriter.Reset();
+                                        _currentLogBatchWriter = logBatchWriter;
                                     }
                                     else
                                     {
-                                        logSegmentWriter.Dispose();
+                                        logBatchWriter.Dispose();
                                     }
 
                                     foreach (var stateMachine in _stateMachines.Values)
@@ -384,12 +384,12 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
                 Debug.Assert(stateMachine is not null);
 
-                if (stateMachine is RetiredLogStream)
+                if (stateMachine is RetiredStateMachine)
                 {
                     LogRemovingRetiredStateMachine(_logger, name);
 
                     // Since we are permanently removing this state machine, we will clean it up by reseting it.
-                    stateMachine.Reset(CreateLogWriter(new(id)));
+                    stateMachine.Reset(CreateLogStreamWriter(new(id)));
 
                     _stateMachinesMap.Remove(id);
                     // We remove these from memory only, since the snapshot will persist these changes.
@@ -406,13 +406,13 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         }
     }
 
-    private ILogSegmentWriter GetOrCreateCurrentLogSegmentWriter() => _currentLogSegmentWriter ??= _logFormat.CreateWriter();
+    private ILogBatchWriter GetOrCreateCurrentLogBatchWriter() => _currentLogBatchWriter ??= _logFormat.CreateWriter();
 
-    private LogWriter CreateLogWriter(LogStreamId streamId) => new(streamId, this);
+    private LogStreamWriter CreateLogStreamWriter(LogStreamId streamId) => new(streamId, this);
 
-    private static void AppendUpdatesOrSnapshotStateMachine(ILogSegmentWriter logSegmentWriter, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
+    private static void AppendUpdatesOrSnapshotStateMachine(ILogBatchWriter logBatchWriter, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
     {
-        var writer = logSegmentWriter.CreateLogWriter(new(id));
+        var writer = logBatchWriter.CreateLogStreamWriter(new(id));
         if (isSnapshot)
         {
             stateMachine.AppendSnapshot(writer);
@@ -444,9 +444,8 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             ResetForRecovery();
         }
 
-        using var recoveryBuffer = new ArcBufferWriter();
-        await _storage.ReadAsync(recoveryBuffer, ProcessRecoveryBuffer, cancellationToken).ConfigureAwait(true);
-        ProcessRecoveryBuffer(new ArcBufferReader(recoveryBuffer), isCompleted: true);
+        var recoveryConsumer = new RecoveryLogStorageConsumer(this);
+        await _storage.ReadAsync(recoveryConsumer, cancellationToken).ConfigureAwait(true);
 
         lock (_lock)
         {
@@ -454,7 +453,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             {
                 stateMachine.OnRecoveryCompleted();
 
-                if (stateMachine is RetiredLogStream)
+                if (stateMachine is RetiredStateMachine)
                 {
                     // We can use TryAdd since recovery has finished.
                     if (_retirementTracker.TryAdd(name, _timeProvider.GetUtcNow().UtcDateTime))
@@ -468,16 +467,16 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
     private void ResetForRecovery()
     {
-        _currentLogSegmentWriter?.Reset();
+        _currentLogBatchWriter?.Reset();
         _stateMachinesMap.Clear();
-        _stateMachinesMap[LogStreamDirectory.Id] = _logStreamDirectory;
-        _stateMachinesMap[RetiredLogStreamTracker.Id] = _retirementTracker;
+        _stateMachinesMap[StateMachineDirectory.Id] = _logStreamDirectory;
+        _stateMachinesMap[RetiredStateMachineTracker.Id] = _retirementTracker;
         _nextLogStreamId = MinApplicationLogStreamId;
 
         List<string>? retiredNames = null;
         foreach (var (name, stateMachine) in _stateMachines)
         {
-            if (stateMachine is RetiredLogStream)
+            if (stateMachine is RetiredStateMachine)
             {
                 (retiredNames ??= []).Add(name);
             }
@@ -495,18 +494,16 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         _retirementTracker.ResetVolatileState();
     }
 
-    IDurableStateMachine ILogStreamStateMachineResolver.ResolveStateMachine(LogStreamId streamId)
+    IDurableStateMachine IStateMachineResolver.ResolveStateMachine(LogStreamId streamId)
     {
         if (!_stateMachinesMap.TryGetValue(streamId.Value, out var stateMachine))
         {
-            stateMachine = new RetiredLogStream(streamId);
+            stateMachine = new RetiredStateMachine(streamId);
             _stateMachinesMap[streamId.Value] = stateMachine;
         }
 
         return stateMachine;
     }
-
-    private void ProcessRecoveryBuffer(ArcBufferReader reader) => ProcessRecoveryBuffer(reader, isCompleted: false);
 
     private void ProcessRecoveryBuffer(ArcBufferReader reader, bool isCompleted)
     {
@@ -590,11 +587,11 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             if (_stateMachines.TryGetValue(name, out var stateMachine))
             {
                 _stateMachinesMap[id] = stateMachine;
-                stateMachine.Reset(CreateLogWriter(new(id)));
+                stateMachine.Reset(CreateLogStreamWriter(new(id)));
             }
             else
             {
-                var vessel = new RetiredLogStream(new(id));
+                var vessel = new RetiredStateMachine(new(id));
 
                 // We must not make the vessel self-register with the manager, since it will
                 // result in a late-registration after the manager is 'ready'. Instead we add it inline here.
@@ -622,10 +619,10 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     void IDisposable.Dispose()
     {
         _shutdownCancellation.Dispose();
-        _currentLogSegmentWriter?.Dispose();
+        _currentLogBatchWriter?.Dispose();
     }
 
-    LogEntryWriter ILogWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
+    LogEntryWriter ILogStreamWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
     {
         if (completion is not null)
         {
@@ -635,7 +632,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         EnterLock();
         try
         {
-            return GetOrCreateCurrentLogSegmentWriter().CreateLogWriter(streamId).BeginEntryWriter(this);
+            return GetOrCreateCurrentLogBatchWriter().CreateLogStreamWriter(streamId).BeginEntryWriter(this);
         }
         catch
         {
@@ -644,12 +641,12 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         }
     }
 
-    void ILogWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    void ILogStreamWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
     {
         EnterLock();
         try
         {
-            GetOrCreateCurrentLogSegmentWriter().CreateLogWriter(streamId).AppendFormattedEntry(entry);
+            GetOrCreateCurrentLogBatchWriter().CreateLogStreamWriter(streamId).AppendFormattedEntry(entry);
         }
         finally
         {
@@ -657,12 +654,12 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         }
     }
 
-    bool ILogWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    bool ILogStreamWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
     {
         EnterLock();
         try
         {
-            return GetOrCreateCurrentLogSegmentWriter().CreateLogWriter(streamId).TryAppendFormattedEntry(entry);
+            return GetOrCreateCurrentLogBatchWriter().CreateLogStreamWriter(streamId).TryAppendFormattedEntry(entry);
         }
         finally
         {
@@ -712,16 +709,21 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
         Ready
     }
 
-    private sealed class LogStreamDirectory(
-        LogManager manager,
+    private sealed class RecoveryLogStorageConsumer(LogStateMachineManager manager) : ILogStorageConsumer
+    {
+        public void Consume(LogReadBuffer buffer) => manager.ProcessRecoveryBuffer(buffer.Reader, buffer.IsCompleted);
+    }
+
+    private sealed class StateMachineDirectory(
+        LogStateMachineManager manager,
         IDurableDictionaryOperationCodec<string, ulong> codec) : IDurableStateMachine, IDurableDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
-        private readonly LogManager _manager = manager;
+        private readonly LogStateMachineManager _manager = manager;
         private readonly IDurableDictionaryOperationCodec<string, ulong> _codec = codec;
         private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
-        private LogWriter _storage;
+        private LogStreamWriter _storage;
 
         public ulong this[string name] => _ids[name];
 
@@ -739,19 +741,19 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
 
         public bool ApplyRemove(string name) => _ids.Remove(name);
 
-        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_manager.CreateLogWriter(new(Id)));
+        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_manager.CreateLogStreamWriter(new(Id)));
 
-        void IDurableStateMachine.Reset(LogWriter storage)
+        void IDurableStateMachine.Reset(LogStreamWriter writer)
         {
             _ids.Clear();
-            _storage = storage;
+            _storage = writer;
         }
 
         void IDurableStateMachine.Apply(ReadOnlySequence<byte> entry) => _codec.Apply(entry, this);
 
-        void IDurableStateMachine.AppendEntries(LogWriter writer) { }
+        void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
 
-        void IDurableStateMachine.AppendSnapshot(LogWriter writer) => _codec.WriteSnapshot(_ids, writer);
+        void IDurableStateMachine.AppendSnapshot(LogStreamWriter writer) => _codec.WriteSnapshot(_ids, writer);
 
         IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
 
@@ -775,7 +777,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             _manager.BindStateMachine(name, id);
         }
 
-        private LogWriter GetStorage()
+        private LogStreamWriter GetStorage()
         {
             Debug.Assert(_storage.IsInitialized);
             return _storage;
@@ -786,25 +788,25 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
     /// Used to track state machines that are not registered via user-code anymore, until time-based purging has elapsed.
     /// </summary>
     /// <remarks>Resurrecting of retired machines is supported.</remarks>
-    private sealed class RetiredLogStreamTracker(
-        LogManager manager, IDurableDictionaryOperationCodec<string, DateTime> codec)
+    private sealed class RetiredStateMachineTracker(
+        LogStateMachineManager manager, IDurableDictionaryOperationCodec<string, DateTime> codec)
             : DurableDictionary<string, DateTime>(codec)
     {
         public const int Id = 1;
 
-        private readonly LogWriter _logWriter = manager.CreateLogWriter(new(Id));
+        private readonly LogStreamWriter _logWriter = manager.CreateLogStreamWriter(new(Id));
 
         public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_logWriter);
 
-        protected override LogWriter GetStorage() => _logWriter;
+        protected override LogStreamWriter GetStorage() => _logWriter;
     }
 
     /// <summary>
     /// Used to keep retired machines into a purgatory state until time-based purging or if a comeback occurs.
     /// This keeps buffering entries and dumps them back into the log upon compaction.
     /// </summary>
-    [DebuggerDisplay("RetiredLogStream Id = {StreamId.Value}")]
-    private sealed class RetiredLogStream(LogStreamId streamId) : IDurableStateMachine, IFormattedLogEntryBuffer
+    [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
+    private sealed class RetiredStateMachine(LogStreamId streamId) : IDurableStateMachine, IFormattedLogEntryBuffer
     {
         private static readonly object NoOpCodec = new();
         private readonly List<IFormattedLogEntry> _formattedEntries = [];
@@ -821,7 +823,7 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             _formattedEntries.Add(entry);
         }
 
-        void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
+        void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter)
         {
             foreach (var entry in _formattedEntries)
             {
@@ -829,14 +831,14 @@ internal sealed partial class LogManager : ILogManager, ILogStreamStateMachineRe
             }
         }
 
-        void IDurableStateMachine.Reset(LogWriter storage) => _formattedEntries.Clear();
+        void IDurableStateMachine.Reset(LogStreamWriter writer) => _formattedEntries.Clear();
         void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
         {
             throw new InvalidOperationException(
-                "Retired log streams can only buffer formatted entries supplied by the active log format.");
+                "Retired state machines can only buffer formatted entries supplied by the active log format.");
         }
 
-        void IDurableStateMachine.AppendEntries(LogWriter logWriter) { }
+        void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
         IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
     }
 

@@ -4,14 +4,14 @@ using Orleans.Serialization.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Base class for format-owned state machine log segment writers.
+/// Base class for format-owned state machine log batch writers.
 /// </summary>
 /// <remarks>
 /// Derived classes own the physical framing and committed buffer. This base class only
-/// connects <see cref="LogWriter"/> and <see cref="LogEntryWriter"/> to the
+/// connects <see cref="LogStreamWriter"/> and <see cref="LogEntryWriter"/> to the
 /// derived payload writer and entry completion hooks.
 /// </remarks>
-public abstract class LogSegmentWriterBase : ILogSegmentWriter
+public abstract class LogBatchWriterBase : ILogBatchWriter
 {
     private readonly LogEntryWriter _entryWriter = new();
     private readonly Target _target;
@@ -19,9 +19,9 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
     private int _activeEntryStart;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="LogSegmentWriterBase"/> class.
+    /// Initializes a new instance of the <see cref="LogBatchWriterBase"/> class.
     /// </summary>
-    protected LogSegmentWriterBase() => _target = new(this);
+    protected LogBatchWriterBase() => _target = new(this);
 
     /// <inheritdoc/>
     public abstract long Length { get; }
@@ -37,7 +37,7 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
     protected LogStreamId ActiveStreamId => _activeStreamId;
 
     /// <inheritdoc/>
-    public LogWriter CreateLogWriter(LogStreamId streamId) => new(streamId, _target);
+    public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId) => new(streamId, _target);
 
     /// <inheritdoc/>
     public abstract ArcBuffer GetCommittedBuffer();
@@ -103,7 +103,7 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
     protected virtual void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
     {
         throw new InvalidOperationException(
-            $"The log segment writer '{GetType().FullName}' cannot append formatted entry of type '{entry.GetType().FullName}'.");
+            $"The log batch writer '{GetType().FullName}' cannot append formatted entry of type '{entry.GetType().FullName}'.");
     }
 
     /// <summary>
@@ -132,7 +132,7 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
     {
         if (_entryWriter.IsActive)
         {
-            throw new InvalidOperationException("The log segment already has an active entry.");
+            throw new InvalidOperationException("The log batch already has an active entry.");
         }
 
         OnBeginEntry(streamId);
@@ -148,7 +148,7 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
         ArgumentNullException.ThrowIfNull(entry);
         if (_entryWriter.IsActive)
         {
-            throw new InvalidOperationException("The log segment already has an active entry.");
+            throw new InvalidOperationException("The log batch already has an active entry.");
         }
 
         OnAppendFormattedEntry(streamId, entry);
@@ -159,7 +159,7 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
         ArgumentNullException.ThrowIfNull(entry);
         if (_entryWriter.IsActive)
         {
-            throw new InvalidOperationException("The log segment already has an active entry.");
+            throw new InvalidOperationException("The log batch already has an active entry.");
         }
 
         return OnTryAppendFormattedEntry(streamId, entry);
@@ -199,7 +199,7 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
         _activeStreamId = default;
     }
 
-    private sealed class Target(LogSegmentWriterBase owner) : ILogWriterTarget, ILogEntryWriterTarget
+    private sealed class Target(LogBatchWriterBase owner) : ILogStreamWriterTarget, ILogEntryWriterTarget
     {
         public void Advance(int count) => owner.AdvancePayload(count);
 
@@ -215,13 +215,13 @@ public abstract class LogSegmentWriterBase : ILogSegmentWriter
 
         public void AbortEntry(int entryStart) => owner.AbortActiveEntry(entryStart);
 
-        LogEntryWriter ILogWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion) =>
+        LogEntryWriter ILogStreamWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion) =>
             owner.BeginEntry(streamId, completion);
 
-        void ILogWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
+        void ILogStreamWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
             owner.AppendFormattedEntry(streamId, entry);
 
-        bool ILogWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
+        bool ILogStreamWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
             owner.TryAppendFormattedEntry(streamId, entry);
     }
 }

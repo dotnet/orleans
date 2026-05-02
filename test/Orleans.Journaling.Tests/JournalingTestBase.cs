@@ -18,7 +18,7 @@ public abstract class JournalingTestBase
     protected readonly SerializerSessionPool SessionPool;
     protected readonly ICodecProvider CodecProvider;
     protected readonly ILoggerFactory LoggerFactory;
-    protected readonly LogManagerOptions ManagerOptions = new();
+    protected readonly StateMachineManagerOptions ManagerOptions = new();
 
     protected JournalingTestBase()
     {
@@ -44,19 +44,19 @@ public abstract class JournalingTestBase
     /// <summary>
     /// Creates a log manager with in-memory storage
     /// </summary>
-    internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle)
+    internal (IStateMachineManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle)
         CreateTestSystem(ILogStorage? storage = null, TimeProvider? provider = null, ILogFormat? logFormat = null, string? logFormatKey = null)
     {
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
 
-        var logger = LoggerFactory.CreateLogger<LogManager>();
+        var logger = LoggerFactory.CreateLogger<LogStateMachineManager>();
         var stringCodec = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
         var uint64Codec = new OrleansLogValueCodec<ulong>(CodecProvider.GetCodec<ulong>(), SessionPool);
         var dateTimeCodec = new OrleansLogValueCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
         var logStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager = new LogManager(storage, logger, Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, provider, logFormat, logFormatKey);
+        var manager = new LogStateMachineManager(storage, logger, Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, provider, logFormat, logFormatKey);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

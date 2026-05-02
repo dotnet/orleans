@@ -17,7 +17,7 @@ internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 {
     private static readonly object NoOpCodec = new();
 
-    public DurableNothing([ServiceKey] string key, ILogManager manager)
+    public DurableNothing([ServiceKey] string key, IStateMachineManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
@@ -25,13 +25,13 @@ internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 
     object IDurableStateMachine.OperationCodec => NoOpCodec;
 
-    void IDurableStateMachine.Reset(LogWriter storage) { }
+    void IDurableStateMachine.Reset(LogStreamWriter writer) { }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) { }
 
-    void IDurableStateMachine.AppendEntries(LogWriter logWriter) { }
+    void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
 
-    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter) { }
+    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter) { }
 
     public IDurableStateMachine DeepCopy() => this;
 }

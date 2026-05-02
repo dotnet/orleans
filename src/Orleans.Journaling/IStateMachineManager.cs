@@ -5,7 +5,7 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Manages the state machines for a given grain.
 /// </summary>
-public interface ILogManager
+public interface IStateMachineManager
 {
     /// <summary>
     /// Initializes the state machine manager.
@@ -15,7 +15,7 @@ public interface ILogManager
     ValueTask InitializeAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Registers a state machine with the manager.
+    /// Attempts to get a state machine registered with the manager.
     /// </summary>
     /// <param name="name">The state machine's stable identifier.</param>
     /// <param name="stateMachine">The state machine instance to register.</param>

@@ -5,7 +5,6 @@ using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Sas;
 using Microsoft.Extensions.Logging.Abstractions;
-using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -17,7 +16,7 @@ public sealed class AzureAppendBlobLogStorageTests
     public async Task DeleteAsync_AllowsNextAppendToRecreateBlob()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobLogStorage(client, NullLogger<AzureAppendBlobLogStorage>.Instance);
+        var storage = new AzureAppendBlobLogStorage(client, NullLogger<AzureAppendBlobLogStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.DeleteAsync(CancellationToken.None);
@@ -34,10 +33,9 @@ public sealed class AzureAppendBlobLogStorageTests
         var client = new FakeAppendBlobClient();
         client.Downloads.Enqueue(new DownloadResult([], emptyBlobETag, new Dictionary<string, string> { ["snapshot"] = "snapshot-1" }));
         client.Downloads.Enqueue(new DownloadResult([1, 2, 3], new ETag("\"restored\""), new Dictionary<string, string>()));
-        var storage = new AzureAppendBlobLogStorage(client, NullLogger<AzureAppendBlobLogStorage>.Instance);
-        using var buffer = new ArcBufferWriter();
+        var storage = new AzureAppendBlobLogStorage(client, NullLogger<AzureAppendBlobLogStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
-        await storage.ReadAsync(buffer, reader => reader.Skip(reader.Length), CancellationToken.None);
+        await storage.ReadAsync(DiscardingLogStorageConsumer.Instance, CancellationToken.None);
 
         Assert.Equal(1, client.CopyCallCount);
         Assert.NotNull(client.LastCopyOptions);
@@ -46,7 +44,14 @@ public sealed class AzureAppendBlobLogStorageTests
         Assert.Equal("snapshot-1", client.LastSnapshot);
     }
 
-    private sealed class FakeAppendBlobClient : IAppendBlobClient
+    private sealed class DiscardingLogStorageConsumer : ILogStorageConsumer
+    {
+        public static DiscardingLogStorageConsumer Instance { get; } = new();
+
+        public void Consume(LogReadBuffer buffer) => buffer.Skip(buffer.Length);
+    }
+
+    private sealed class FakeAppendBlobClient : AppendBlobClient
     {
         private readonly FakeAppendBlobClient _root;
         private readonly string? _snapshot;
@@ -64,9 +69,9 @@ public sealed class AzureAppendBlobLogStorageTests
             _snapshot = snapshot;
         }
 
-        public string BlobContainerName => "container";
+        public override string BlobContainerName => "container";
 
-        public string Name => "blob";
+        public override string Name => "blob";
 
         public int CreateCallCount { get; private set; }
 
@@ -80,7 +85,7 @@ public sealed class AzureAppendBlobLogStorageTests
 
         public Queue<DownloadResult> Downloads { get; } = new();
 
-        public Task<Response<BlobContentInfo>> CreateAsync(AppendBlobCreateOptions options, CancellationToken cancellationToken)
+        public override Task<Response<BlobContentInfo>> CreateAsync(AppendBlobCreateOptions options, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             CreateCallCount++;
@@ -91,7 +96,7 @@ public sealed class AzureAppendBlobLogStorageTests
                 TestResponse.Instance));
         }
 
-        public async Task<Response<BlobAppendInfo>> AppendBlockAsync(Stream content, AppendBlobAppendBlockOptions options, CancellationToken cancellationToken)
+        public override async Task<Response<BlobAppendInfo>> AppendBlockAsync(Stream content, AppendBlobAppendBlockOptions options, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             if (!_exists)
@@ -108,14 +113,14 @@ public sealed class AzureAppendBlobLogStorageTests
                 TestResponse.Instance);
         }
 
-        public Task DeleteAsync(BlobRequestConditions? conditions, CancellationToken cancellationToken)
+        public override Task<Response> DeleteAsync(DeleteSnapshotsOption snapshotsOption = DeleteSnapshotsOption.None, BlobRequestConditions? conditions = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             _root._exists = false;
-            return Task.CompletedTask;
+            return Task.FromResult<Response>(TestResponse.Instance);
         }
 
-        public Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(CancellationToken cancellationToken)
+        public override Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(BlobDownloadOptions? options = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             var download = Downloads.Dequeue();
@@ -129,7 +134,7 @@ public sealed class AzureAppendBlobLogStorageTests
             return Task.FromResult(Response.FromValue(result, TestResponse.Instance));
         }
 
-        public Task<Response<BlobCopyInfo>> SyncCopyFromUriAsync(Uri source, BlobCopyFromUriOptions options, CancellationToken cancellationToken)
+        public override Task<Response<BlobCopyInfo>> SyncCopyFromUriAsync(Uri source, BlobCopyFromUriOptions options, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             CopyCallCount++;
@@ -140,7 +145,7 @@ public sealed class AzureAppendBlobLogStorageTests
                 TestResponse.Instance));
         }
 
-        public Task<Response<BlobSnapshotInfo>> CreateSnapshotAsync(BlobRequestConditions? conditions, CancellationToken cancellationToken)
+        public override Task<Response<BlobSnapshotInfo>> CreateSnapshotAsync(IDictionary<string, string>? metadata = null, BlobRequestConditions? conditions = null, CancellationToken cancellationToken = default)
         {
             cancellationToken.ThrowIfCancellationRequested();
             return Task.FromResult(Response.FromValue(
@@ -148,13 +153,13 @@ public sealed class AzureAppendBlobLogStorageTests
                 TestResponse.Instance));
         }
 
-        public IAppendBlobClient WithSnapshot(string snapshot)
+        public AppendBlobClient CreateSnapshotClient(string snapshot)
         {
             _root.LastSnapshot = snapshot;
             return new FakeAppendBlobClient(_root, snapshot);
         }
 
-        public Uri GenerateSasUri(BlobSasPermissions permissions, DateTimeOffset expiresOn)
+        public override Uri GenerateSasUri(BlobSasPermissions permissions, DateTimeOffset expiresOn)
             => new($"https://example.com/{Name}?snapshot={_snapshot}");
     }
 

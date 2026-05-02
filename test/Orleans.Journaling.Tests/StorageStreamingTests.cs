@@ -33,66 +33,92 @@ public sealed class StorageStreamingTests
     {
         var storage = new VolatileLogStorage();
         var rawBytes = new byte[] { 255, 0, 1 };
-        using var buffer = new ArcBufferWriter();
-        var buffers = new List<byte[]>();
+        var consumer = new CapturingLogStorageConsumer();
 
         using (var data = CreateBuffer(rawBytes))
         {
             await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        await storage.ReadAsync(buffer, reader =>
-        {
-            using var data = reader.PeekSlice(reader.Length);
-            buffers.Add(data.ToArray());
-            reader.Skip(reader.Length);
-        }, CancellationToken.None);
+        await storage.ReadAsync(consumer, CancellationToken.None);
 
-        var captured = Assert.Single(buffers);
+        var captured = Assert.Single(consumer.Segments);
         Assert.Equal(rawBytes, captured);
     }
 
     [Fact]
-    public async Task VolatileStorage_AppendsReadsIntoCallerOwnedBuffer()
+    public async Task VolatileStorage_InvokesConsumerForEachStoredSegment()
     {
         var storage = new VolatileLogStorage();
-        var rawBytes = new byte[] { 1, 2, 3 };
-        using var buffer = new ArcBufferWriter();
+        var first = new byte[] { 1, 2, 3 };
+        var second = new byte[] { 4, 5 };
+        var consumer = new CapturingLogStorageConsumer();
 
-        using (var data = CreateBuffer(rawBytes))
+        using (var data = CreateBuffer(first))
         {
             await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        await storage.ReadAsync(buffer, _ => { }, CancellationToken.None);
+        using (var data = CreateBuffer(second))
+        {
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+        }
 
-        using var retained = buffer.PeekSlice(buffer.Length);
-        Assert.Equal(rawBytes, retained.ToArray());
+        await storage.ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Collection(
+            consumer.Segments,
+            segment => Assert.Equal(first, segment),
+            segment => Assert.Equal(second, segment));
     }
 
     [Fact]
-    public async Task VolatileStorage_ReadConsumerCanRetainPinnedSlice()
+    public async Task StreamConsumerHelper_BuffersUnconsumedBytesAcrossReads()
     {
-        var storage = new VolatileLogStorage();
-        var rawBytes = new byte[] { 1, 2, 3 };
-        using var buffer = new ArcBufferWriter();
-        ArcBuffer retainedBuffer = default;
+        var stream = new ChunkedReadStream([1, 2, 3, 4], chunkSize: 1);
+        var consumer = new TwoByteLogStorageConsumer();
 
-        using (var data = CreateBuffer(rawBytes))
-        {
-            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
-        }
+        var totalBytesRead = await consumer.ConsumeAsync(stream, CancellationToken.None);
 
-        try
-        {
-            await storage.ReadAsync(buffer, reader => retainedBuffer = reader.PeekSlice(reader.Length), CancellationToken.None);
+        Assert.Equal(4, totalBytesRead);
+        Assert.Equal(4, stream.ReadCount);
+        Assert.Collection(
+            consumer.Segments,
+            segment => Assert.Equal([1, 2], segment),
+            segment => Assert.Equal([3, 4], segment));
+    }
 
-            Assert.Equal(rawBytes, retainedBuffer.ToArray());
-        }
-        finally
-        {
-            retainedBuffer.Dispose();
-        }
+    [Fact]
+    public void SegmentConsumerHelper_BuffersUnconsumedBytesAcrossSegments()
+    {
+        var consumer = new TwoByteLogStorageConsumer();
+        ReadOnlyMemory<byte>[] segments = [new byte[] { 1 }, new byte[] { 2, 3 }, new byte[] { 4 }];
+
+        consumer.Consume(segments);
+
+        Assert.Collection(
+            consumer.Segments,
+            segment => Assert.Equal([1, 2], segment),
+            segment => Assert.Equal([3, 4], segment));
+    }
+
+    [Fact]
+    public void MemoryConsumerHelper_CompletesEmptyInput()
+    {
+        var consumer = new CompletionTrackingLogStorageConsumer();
+
+        consumer.Consume(ReadOnlyMemory<byte>.Empty);
+
+        Assert.True(consumer.IsCompleted);
+        Assert.Equal(0, consumer.CompletedLength);
+    }
+
+    [Fact]
+    public void MemoryConsumerHelper_RejectsUnconsumedDataWhenNotCompleted()
+    {
+        var consumer = new LeavingLogStorageConsumer();
+
+        Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }, complete: false));
     }
 
     [Fact]
@@ -126,8 +152,8 @@ public sealed class StorageStreamingTests
     [Fact]
     public void BinaryFormatRead_ConsumesCompletePrefixAndWaitsForPartialSuffix()
     {
-        using var buffer = new LogSegmentBuffer();
-        AppendEntry(buffer.CreateLogWriter(new LogStreamId(8)), [1, 2, 3]);
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(8)), [1, 2, 3]);
         using var committed = buffer.GetCommittedBuffer();
         var entryBytes = committed.ToArray();
         using var data = CreateWriter([.. entryBytes, 10, 0]);
@@ -145,7 +171,7 @@ public sealed class StorageStreamingTests
         Assert.Equal(2, reader.Length);
     }
 
-    private static void AppendEntry(LogWriter writer, ReadOnlySpan<byte> payload)
+    private static void AppendEntry(LogStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
@@ -166,7 +192,112 @@ public sealed class StorageStreamingTests
         return buffer;
     }
 
-    private sealed class CapturingLogEntrySink : ILogStreamStateMachineResolver, IDurableStateMachine
+    private sealed class CapturingLogStorageConsumer : ILogStorageConsumer
+    {
+        public List<byte[]> Segments { get; } = [];
+
+        public void Consume(LogReadBuffer buffer)
+        {
+            if (buffer.IsCompleted || buffer.Length == 0)
+            {
+                return;
+            }
+
+            var segment = new byte[buffer.Length];
+            buffer.Consume(segment);
+            Segments.Add(segment);
+        }
+    }
+
+    private sealed class TwoByteLogStorageConsumer : ILogStorageConsumer
+    {
+        public List<byte[]> Segments { get; } = [];
+
+        public void Consume(LogReadBuffer buffer)
+        {
+            var temp = new byte[2];
+            while (buffer.TryPeek(temp))
+            {
+                var segment = new byte[2];
+                Assert.True(buffer.TryConsume(segment));
+                Segments.Add(segment);
+            }
+
+            if (buffer.IsCompleted && buffer.Length > 0)
+            {
+                Assert.False(buffer.TryConsume(new byte[buffer.Length + 1]));
+                var segment = new byte[buffer.Length];
+                buffer.Consume(segment);
+                Segments.Add(segment);
+            }
+        }
+    }
+
+    private sealed class CompletionTrackingLogStorageConsumer : ILogStorageConsumer
+    {
+        public bool IsCompleted { get; private set; }
+
+        public int CompletedLength { get; private set; }
+
+        public void Consume(LogReadBuffer buffer)
+        {
+            IsCompleted = buffer.IsCompleted;
+            CompletedLength = buffer.Length;
+        }
+    }
+
+    private sealed class LeavingLogStorageConsumer : ILogStorageConsumer
+    {
+        public void Consume(LogReadBuffer buffer) { }
+    }
+
+    private sealed class ChunkedReadStream(byte[] data, int chunkSize) : Stream
+    {
+        private int _position;
+
+        public int ReadCount { get; private set; }
+
+        public override bool CanRead => true;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => data.Length;
+
+        public override long Position
+        {
+            get => _position;
+            set => throw new NotSupportedException();
+        }
+
+        public override void Flush() { }
+
+        public override int Read(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (_position >= data.Length)
+            {
+                return new(0);
+            }
+
+            var count = Math.Min(Math.Min(buffer.Length, chunkSize), data.Length - _position);
+            data.AsSpan(_position, count).CopyTo(buffer.Span);
+            _position += count;
+            ReadCount++;
+            return new(count);
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw new NotSupportedException();
+
+        public override void SetLength(long value) => throw new NotSupportedException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
+    }
+
+    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine
     {
         private LogStreamId _streamId;
 
@@ -182,9 +313,9 @@ public sealed class StorageStreamingTests
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        public void Reset(LogWriter storage) { }
-        public void AppendEntries(LogWriter writer) { }
-        public void AppendSnapshot(LogWriter writer) { }
+        public void Reset(LogStreamWriter writer) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 

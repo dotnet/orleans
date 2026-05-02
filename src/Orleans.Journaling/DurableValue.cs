@@ -19,7 +19,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
 
     public DurableValue(
         [ServiceKey] string key,
-        ILogManager manager,
+        IStateMachineManager manager,
         [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
         IServiceProvider serviceProvider)
     {
@@ -28,7 +28,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableValue(string key, ILogManager manager, IDurableValueOperationCodec<T> codec)
+    internal DurableValue(string key, IStateMachineManager manager, IDurableValueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -56,7 +56,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(LogWriter storage)
+    void IDurableStateMachine.Reset(LogStreamWriter writer)
     {
         _value = default;
     }
@@ -66,20 +66,20 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
     {
         if (_isDirty)
         {
-            WriteState(logWriter);
+            WriteState(writer);
             _isDirty = false;
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter) => WriteState(snapshotWriter);
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(LogWriter writer)
+    private void WriteState(LogStreamWriter writer)
     {
         _codec.WriteSet(_value!, writer);
     }

@@ -1,9 +1,9 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Options to configure the <see cref="ILogManager"/>.
+/// Options to configure the <see cref="IStateMachineManager"/>.
 /// </summary>
-public sealed class LogManagerOptions
+public sealed class StateMachineManagerOptions
 {
     /// <summary>
     /// Specifies the period of time to wait until the manager retires

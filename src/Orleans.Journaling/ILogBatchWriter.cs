@@ -6,10 +6,10 @@ namespace Orleans.Journaling;
 /// Writes a mutable batch of physical state machine log entries.
 /// </summary>
 /// <remarks>
-/// The segment writer is caller-owned and may be reused after a successful append or replace
+/// The batch writer is caller-owned and may be reused after a successful append or replace
 /// by calling <see cref="Reset"/>.
 /// </remarks>
-public interface ILogSegmentWriter : IDisposable
+public interface ILogBatchWriter : IDisposable
 {
     /// <summary>
     /// Gets the number of raw bytes written, including any currently active uncommitted entry.
@@ -20,8 +20,8 @@ public interface ILogSegmentWriter : IDisposable
     /// Creates a writer for entries belonging to <paramref name="streamId"/>.
     /// </summary>
     /// <param name="streamId">The durable state machine id.</param>
-    /// <returns>A log writer for the specified state machine.</returns>
-    LogWriter CreateLogWriter(LogStreamId streamId);
+    /// <returns>A log stream writer for the specified state machine.</returns>
+    LogStreamWriter CreateLogStreamWriter(LogStreamId streamId);
 
     /// <summary>
     /// Gets a borrowed buffer containing only committed bytes which are safe to persist.
@@ -31,7 +31,7 @@ public interface ILogSegmentWriter : IDisposable
     ArcBuffer GetCommittedBuffer();
 
     /// <summary>
-    /// Clears all buffered data so the writer can be reused for another segment.
+    /// Clears all buffered data so the writer can be reused for another batch.
     /// </summary>
     void Reset();
 }

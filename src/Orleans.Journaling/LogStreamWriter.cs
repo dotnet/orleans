@@ -3,18 +3,18 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Writes log entries for one state machine into the current log segment.
+/// Writes log entries for one state machine into the current log batch.
 /// </summary>
 /// <remarks>
 /// This type does not write to storage directly. Entries are buffered by the owning
-/// <see cref="ILogSegmentWriter"/> or by the current segment writer owned by the log manager.
+/// <see cref="ILogBatchWriter"/> or by the current batch writer owned by the log manager.
 /// </remarks>
-public readonly struct LogWriter
+public readonly struct LogStreamWriter
 {
     private readonly LogStreamId _id;
-    private readonly ILogWriterTarget? _target;
+    private readonly ILogStreamWriterTarget? _target;
 
-    internal LogWriter(LogStreamId id, ILogWriterTarget target)
+    internal LogStreamWriter(LogStreamId id, ILogStreamWriterTarget target)
     {
         _id = id;
         _target = target;
@@ -45,18 +45,18 @@ public readonly struct LogWriter
     /// <returns><see langword="true"/> if the writer accepted <paramref name="entry"/>; otherwise, <see langword="false"/>.</returns>
     public bool TryAppendFormattedEntry(IFormattedLogEntry entry) => GetTarget().TryAppendFormattedEntry(_id, entry);
 
-    private ILogWriterTarget GetTarget()
+    private ILogStreamWriterTarget GetTarget()
     {
         if (_target is null)
         {
-            throw new InvalidOperationException("The state machine log writer is not initialized.");
+            throw new InvalidOperationException("The state machine log stream writer is not initialized.");
         }
 
         return _target;
     }
 }
 
-internal interface ILogWriterTarget
+internal interface ILogStreamWriterTarget
 {
     LogEntryWriter BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion);
 

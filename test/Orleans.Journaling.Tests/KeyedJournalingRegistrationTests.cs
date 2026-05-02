@@ -41,14 +41,14 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     }
 
     [Fact]
-    public void LogManager_MissingKeyedFormat_ThrowsClearConfigurationError()
+    public void StateMachineManager_MissingKeyedFormat_ThrowsClearConfigurationError()
     {
         using var serviceProvider = new ServiceCollection().BuildServiceProvider();
         var storage = new VolatileLogStorage();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => new LogManager(
+        var exception = Assert.Throws<InvalidOperationException>(() => new LogStateMachineManager(
             storage,
-            LoggerFactory.CreateLogger<LogManager>(),
+            LoggerFactory.CreateLogger<LogStateMachineManager>(),
             Options.Create(ManagerOptions),
             TimeProvider.System,
             serviceProvider,
@@ -69,7 +69,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<ILogStorage>(_ => storage);
         services.AddKeyedScoped<string>(LogFormatServices.LogFormatKeyServiceKey, (_, _) => CustomFormatKey);
-        services.AddScoped<ILogManager, LogManager>();
+        services.AddScoped<IStateMachineManager, LogStateMachineManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<ILogFormat>(CustomFormatKey, new TestLogFormat());
         services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(CustomFormatKey, new TestDictionaryCodecProvider());
@@ -92,9 +92,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class TestLogFormat : ILogFormat
     {
-        public ILogSegmentWriter CreateWriter() => throw new NotSupportedException();
+        public ILogBatchWriter CreateWriter() => throw new NotSupportedException();
 
-        public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted) => throw new NotSupportedException();
+        public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodecProvider : IDurableDictionaryOperationCodecProvider

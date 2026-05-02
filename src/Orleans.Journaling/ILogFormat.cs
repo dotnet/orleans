@@ -12,10 +12,10 @@ namespace Orleans.Journaling;
 public interface ILogFormat
 {
     /// <summary>
-    /// Creates a writer for a new mutable log segment.
+    /// Creates a writer for a new mutable log batch.
     /// </summary>
-    /// <returns>A new log segment writer.</returns>
-    ILogSegmentWriter CreateWriter();
+    /// <returns>A new log batch writer.</returns>
+    ILogBatchWriter CreateWriter();
 
     /// <summary>
     /// Attempts to read one complete log entry from <paramref name="input"/> and apply it to a resolved state machine.
@@ -24,5 +24,5 @@ public interface ILogFormat
     /// <param name="resolver">The resolver used to locate state machines by log stream id.</param>
     /// <param name="isCompleted">A value indicating whether no more persisted bytes will be supplied after <paramref name="input"/>.</param>
     /// <returns><see langword="true"/> if a complete entry was consumed; otherwise, <see langword="false"/>.</returns>
-    bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted);
+    bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted);
 }

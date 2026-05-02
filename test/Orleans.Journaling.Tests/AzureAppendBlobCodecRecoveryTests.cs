@@ -60,7 +60,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     public async Task AzureAppendBlobStorage_AllDurableTypes_RecoverWithBinaryCodec()
     {
         var grainId = GrainId.Create("journaling-codec-recovery", Guid.NewGuid().ToString("N"));
-        var storage = _storageProvider.Create(new LogSegmentTests.TestGrainContext(grainId));
+        var storage = _storageProvider.Create(new LogBatchTests.TestGrainContext(grainId));
         var first = CreateStateMachines(storage);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await first.Manager.InitializeAsync(cts.Token);
@@ -78,7 +78,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         Assert.True(first.Tcs.TrySetResult(17));
         await first.Manager.WriteStateAsync(cts.Token);
 
-        var recoveredStorage = _storageProvider.Create(new LogSegmentTests.TestGrainContext(grainId));
+        var recoveredStorage = _storageProvider.Create(new LogBatchTests.TestGrainContext(grainId));
         var recovered = CreateStateMachines(recoveredStorage);
         await recovered.Manager.InitializeAsync(cts.Token);
 
@@ -116,10 +116,10 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
                 Copier<Exception>()));
     }
 
-    private LogManager CreateManager(ILogStorage storage)
+    private LogStateMachineManager CreateManager(ILogStorage storage)
         => new(
             storage,
-            LoggerFactory.CreateLogger<LogManager>(),
+            LoggerFactory.CreateLogger<LogStateMachineManager>(),
             Options.Create(ManagerOptions),
             new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>()),
             new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>()),
@@ -130,7 +130,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
     private sealed record DurableStateMachines(
-        LogManager Manager,
+        LogStateMachineManager Manager,
         DurableDictionary<string, int> Dictionary,
         DurableList<string> List,
         DurableQueue<string> Queue,

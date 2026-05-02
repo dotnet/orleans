@@ -8,10 +8,10 @@ public static class HostingExtensions
 {
     public static ISiloBuilder AddLogStorage(this ISiloBuilder builder)
     {
-        builder.Services.AddOptions<LogManagerOptions>();
+        builder.Services.AddOptions<StateMachineManagerOptions>();
         builder.Services.TryAddKeyedScoped<string>(LogFormatServices.LogFormatKeyServiceKey, static (sp, _) => GetLogFormatKey(sp));
         builder.Services.TryAddScoped<ILogStorage>(sp => sp.GetRequiredService<ILogStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
-        builder.Services.TryAddScoped<ILogManager, LogManager>();
+        builder.Services.TryAddScoped<IStateMachineManager, LogStateMachineManager>();
 
         // Register the default data codec (Orleans IFieldCodec adapter).
         builder.Services.TryAddSingleton(typeof(ILogValueCodec<>), typeof(OrleansLogValueCodec<>));
