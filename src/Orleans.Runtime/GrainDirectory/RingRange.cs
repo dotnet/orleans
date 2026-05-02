@@ -191,6 +191,22 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
         {
             yield return this;
         }
+        else if (IsWrapped && other.IsWrapped)
+        {
+            yield return new RingRange(Math.Max(Start, other.Start), Math.Min(End, other.End));
+
+            if (Start < other.Start)
+            {
+                if (Start < other.End)
+                {
+                    yield return new RingRange(Start, other.End);
+                }
+            }
+            else if (other.Start < Start && other.Start < End)
+            {
+                yield return new RingRange(other.Start, End);
+            }
+        }
         else if (IsWrapped ^ other.IsWrapped)
         {
             var wrapped = IsWrapped ? this : other;
@@ -206,14 +222,14 @@ internal readonly struct RingRange : IEquatable<RingRange>, ISpanFormattable, IC
             if (wrappedEnd > normalStart)
             {
                 // ---NB====WE---
-                yield return new RingRange(normalStart, wrappedEnd);
+                yield return new RingRange(normalStart, Math.Min(normalEnd, wrappedEnd));
             }
 
             // Intersection at the high side.
             if (wrappedStart < normalEnd)
             {
                 // ---WB====NE---
-                yield return new RingRange(wrappedStart, normalEnd);
+                yield return new RingRange(Math.Max(normalStart, wrappedStart), normalEnd);
             }
         }
         else
