@@ -19,7 +19,7 @@ public interface IDurableStateMachine
     /// If the state machine has any volatile state, it must be cleared by this method.
     /// This method can be called at any point in the state machine's lifetime, including during recovery.
     /// </remarks>
-    void Reset(LogWriter storage);
+    void Reset(LogStreamWriter writer);
 
     /// <summary>
     /// Called during recovery to apply the provided log entry or snapshot.
@@ -40,14 +40,14 @@ public interface IDurableStateMachine
     /// <summary>
     /// Writes pending state changes to the log.
     /// </summary>
-    /// <param name="writer">The log writer.</param>
-    void AppendEntries(LogWriter writer);
+    /// <param name="writer">The log stream writer.</param>
+    void AppendEntries(LogStreamWriter writer);
 
     /// <summary>
     /// Writes a snapshot of the state machine to the provided writer.
     /// </summary>
-    /// <param name="writer">The log writer.</param>
-    void AppendSnapshot(LogWriter writer);
+    /// <param name="writer">The log stream writer.</param>
+    void AppendSnapshot(LogStreamWriter writer);
 
     /// <summary>
     /// Notifies the state machine that all prior log entries and snapshots which it has written have been written to stable storage.

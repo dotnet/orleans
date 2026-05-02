@@ -29,7 +29,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
-        ILogManager manager,
+        IStateMachineManager manager,
         [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
@@ -44,7 +44,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     internal DurableTaskCompletionSource(
         string key,
-        ILogManager manager,
+        IStateMachineManager manager,
         IDurableTaskCompletionSourceOperationCodec<T> codec,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
@@ -125,7 +125,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(LogWriter storage)
+    void IDurableStateMachine.Reset(LogStreamWriter writer)
     {
         // Reset the task completion source if necessary.
         if (_completion.Task.IsCompleted)
@@ -140,17 +140,17 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
-            WriteState(logWriter);
+            WriteState(writer);
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter) => WriteState(snapshotWriter);
 
-    private void WriteState(LogWriter writer)
+    private void WriteState(LogStreamWriter writer)
     {
         switch (_status)
         {

@@ -130,7 +130,7 @@ public sealed class DurableCollectionDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestLogManager(TestLogWriter writer) : ILogManager
+    private sealed class TestLogManager(TestLogWriter writer) : IStateMachineManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
@@ -149,11 +149,11 @@ public sealed class DurableCollectionDirectWriteTests
 
     private sealed class TestLogWriter
     {
-        private readonly LogSegmentBuffer _buffer = new();
+        private readonly OrleansBinaryLogBatchWriter _buffer = new();
 
         public long Length => _buffer.Length;
 
-        public LogWriter CreateWriter() => _buffer.CreateLogWriter(new LogStreamId(1));
+        public LogStreamWriter CreateWriter() => _buffer.CreateLogStreamWriter(new LogStreamId(1));
     }
 
     private sealed class DirectQueueCodec<T> : TestQueueCodec<T>

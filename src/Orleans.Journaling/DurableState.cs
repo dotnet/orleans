@@ -9,7 +9,7 @@ namespace Orleans.Journaling;
 internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine, IDurableStateOperationHandler<T>
 {
     private readonly IDurableStateOperationCodec<T> _codec;
-    private readonly ILogManager _manager;
+    private readonly IStateMachineManager _manager;
     private T? _value;
     private ulong _version;
     private ulong _pendingVersion;
@@ -19,7 +19,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
 
     public DurableState(
         [ServiceKey] string key,
-        ILogManager manager,
+        IStateMachineManager manager,
         [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
         IServiceProvider serviceProvider)
     {
@@ -29,7 +29,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         _manager = manager;
     }
 
-    internal DurableState(string key, ILogManager manager, IDurableStateOperationCodec<T> codec)
+    internal DurableState(string key, IStateMachineManager manager, IDurableStateOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -79,7 +79,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         OnPersisted?.Invoke();
     }
 
-    void IDurableStateMachine.Reset(LogWriter storage)
+    void IDurableStateMachine.Reset(LogStreamWriter writer)
     {
         _value = default;
         _version = 0;
@@ -94,19 +94,19 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
     {
         if (_clearRequested)
         {
-            WriteClear(logWriter);
+            WriteClear(writer);
         }
         else if (_hasState)
         {
-            WriteState(logWriter);
+            WriteState(writer);
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter)
     {
         if (_clearRequested)
         {
@@ -121,7 +121,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(LogWriter writer)
+    private void WriteState(LogStreamWriter writer)
     {
         var version = _version + 1;
         _codec.WriteSet(_value!, version, writer);
@@ -129,7 +129,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         _pendingVersion = version;
     }
 
-    private void WriteClear(LogWriter writer)
+    private void WriteClear(LogStreamWriter writer)
     {
         _codec.WriteClear(writer);
         _pendingWrite = PendingWriteKind.Clear;

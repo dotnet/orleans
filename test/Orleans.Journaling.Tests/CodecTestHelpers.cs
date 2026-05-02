@@ -38,7 +38,7 @@ public static class CodecTestHelpers
         return new ReadOnlySequence<byte>(first!, 0, last!, last!.Memory.Length);
     }
 
-    public static void AppendEntry(LogWriter writer, ReadOnlySpan<byte> payload)
+    public static void AppendEntry(LogStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);

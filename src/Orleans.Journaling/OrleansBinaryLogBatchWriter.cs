@@ -4,7 +4,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILogSegmentWriter, ILogWriterTarget
+internal sealed class OrleansBinaryLogBatchWriter : IDisposable, ILogEntryWriterTarget, ILogBatchWriter, ILogStreamWriterTarget
 {
     private const int LengthPrefixSize = sizeof(uint);
     private readonly ArcBufferWriter _buffer = new();
@@ -12,11 +12,11 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
 
     public int Length => _buffer.Length;
 
-    long ILogSegmentWriter.Length => _buffer.Length;
+    long ILogBatchWriter.Length => _buffer.Length;
 
     public bool IsEmpty => _buffer.Length == 0;
 
-    public LogWriter CreateLogWriter(LogStreamId streamId) => new(streamId, this);
+    public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId) => new(streamId, this);
 
     public void Advance(int count) => _buffer.AdvanceWriter(count);
 
@@ -39,7 +39,7 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
     {
         if (_entryWriter.IsActive)
         {
-            throw new InvalidOperationException("The log segment already has an active entry.");
+            throw new InvalidOperationException("The log batch already has an active entry.");
         }
 
         var entryStart = Length;
@@ -66,7 +66,7 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
     {
         if (_entryWriter.IsActive)
         {
-            throw new InvalidOperationException("The log segment has an active entry.");
+            throw new InvalidOperationException("The log batch has an active entry.");
         }
 
         return _buffer.PeekSlice(_buffer.Length);
@@ -84,7 +84,7 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
     {
         if (_entryWriter.IsActive)
         {
-            throw new InvalidOperationException("The log segment cannot be reset while an entry is active.");
+            throw new InvalidOperationException("The log batch cannot be reset while an entry is active.");
         }
 
         _buffer.Reset();
@@ -92,15 +92,15 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
 
     public void Dispose() => _buffer.Dispose();
 
-    LogEntryWriter ILogWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion) => BeginEntry(streamId, completion);
+    LogEntryWriter ILogStreamWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion) => BeginEntry(streamId, completion);
 
-    void ILogWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    void ILogStreamWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
         if (entry is not OrleansBinaryFormattedLogEntry binaryEntry)
         {
             throw new InvalidOperationException(
-                $"The Orleans binary log writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+                $"The Orleans binary log batch writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
         }
 
         using var logEntry = new LogEntry(BeginEntry(streamId));
@@ -108,7 +108,7 @@ internal sealed class LogSegmentBuffer : IDisposable, ILogEntryWriterTarget, ILo
         logEntry.Commit();
     }
 
-    bool ILogWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+    bool ILogStreamWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
         if (entry is not OrleansBinaryFormattedLogEntry binaryEntry)

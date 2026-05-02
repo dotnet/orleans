@@ -6,14 +6,14 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 [TestCategory("BVT")]
-public sealed class LogSegmentBufferTests
+public sealed class OrleansBinaryLogBatchWriterTests
 {
     [Fact]
     public void Commit_WritesFixed32FramedEntry()
     {
-        using var buffer = new LogSegmentBuffer();
+        using var buffer = new OrleansBinaryLogBatchWriter();
 
-        using var entry = buffer.CreateLogWriter(new LogStreamId(42)).BeginEntry();
+        using var entry = buffer.CreateLogStreamWriter(new LogStreamId(42)).BeginEntry();
         entry.Writer.Write([1, 2, 3]);
         entry.Commit();
 
@@ -27,10 +27,10 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void Commit_WritesMultipleEntries()
     {
-        using var buffer = new LogSegmentBuffer();
+        using var buffer = new OrleansBinaryLogBatchWriter();
 
-        AppendEntry(buffer.CreateLogWriter(new LogStreamId(1)), [10]);
-        AppendEntry(buffer.CreateLogWriter(new LogStreamId(300)), [20, 21]);
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(1)), [10]);
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(300)), [20, 21]);
 
         var reader = new SequenceReader<byte>(buffer.AsReadOnlySequence());
         var firstEntry = ReadEntry(ref reader);
@@ -48,9 +48,9 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void BinaryFormat_Read_ParsesConcatenatedEntries()
     {
-        using var buffer = new LogSegmentBuffer();
-        AppendEntry(buffer.CreateLogWriter(new LogStreamId(1)), [10]);
-        AppendEntry(buffer.CreateLogWriter(new LogStreamId(300)), [20, 21]);
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(1)), [10]);
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(300)), [20, 21]);
         using var data = buffer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
@@ -73,10 +73,10 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void BinaryFormat_Read_HandlesSegmentedFrames()
     {
-        using var buffer = new LogSegmentBuffer();
+        using var buffer = new OrleansBinaryLogBatchWriter();
         var payload = Enumerable.Repeat((byte)0xAA, ArcBufferWriter.MinimumPageSize - 7).ToArray();
-        AppendEntry(buffer.CreateLogWriter(new LogStreamId(1)), payload);
-        AppendEntry(buffer.CreateLogWriter(new LogStreamId(300)), [20, 21]);
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(1)), payload);
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(300)), [20, 21]);
         using var data = buffer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
@@ -99,14 +99,14 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void DisposeWithoutCommit_TruncatesPendingEntry()
     {
-        using var buffer = new LogSegmentBuffer();
+        using var buffer = new OrleansBinaryLogBatchWriter();
 
-        using var committed = buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        using var committed = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
         committed.Writer.Write([1]);
         committed.Commit();
         var committedBytes = ToArray(buffer);
 
-        using (var aborted = buffer.CreateLogWriter(new LogStreamId(2)).BeginEntry())
+        using (var aborted = buffer.CreateLogStreamWriter(new LogStreamId(2)).BeginEntry())
         {
             aborted.Writer.Write([2, 3, 4]);
         }
@@ -117,8 +117,8 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void GetCommittedBuffer_ThrowsWhenEntryIsActive()
     {
-        using var buffer = new LogSegmentBuffer();
-        var entry = buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        var entry = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
         entry.Writer.Write([1]);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -135,10 +135,10 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void AppendFormattedEntry_RejectsWrongFormattedEntryType()
     {
-        using var buffer = new LogSegmentBuffer();
-        var logWriter = buffer.CreateLogWriter(new LogStreamId(1));
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        var logStreamWriter = buffer.CreateLogStreamWriter(new LogStreamId(1));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
+        var exception = Assert.Throws<InvalidOperationException>(() => logStreamWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
 
         Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
     }
@@ -146,8 +146,8 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void Commit_ThrowsOnDoubleCommit()
     {
-        using var buffer = new LogSegmentBuffer();
-        using var entry = buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        using var entry = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
         entry.Writer.Write([1]);
         entry.Commit();
         var committedBytes = ToArray(buffer);
@@ -170,8 +170,8 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void CommitAfterDispose_ThrowsAndKeepsEntryAborted()
     {
-        using var buffer = new LogSegmentBuffer();
-        var entry = buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        var entry = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
         entry.Writer.Write([1]);
         entry.Dispose();
 
@@ -193,14 +193,14 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void Reset_ReusesBuffer()
     {
-        using var buffer = new LogSegmentBuffer();
+        using var buffer = new OrleansBinaryLogBatchWriter();
 
-        using var first = buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        using var first = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
         first.Writer.Write([1]);
         first.Commit();
         buffer.Reset();
 
-        using var second = buffer.CreateLogWriter(new LogStreamId(2)).BeginEntry();
+        using var second = buffer.CreateLogStreamWriter(new LogStreamId(2)).BeginEntry();
         second.Writer.Write([2]);
         second.Commit();
 
@@ -215,8 +215,8 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void Reset_ThrowsWhenEntryIsActive()
     {
-        using var buffer = new LogSegmentBuffer();
-        var entry = buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        var entry = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
         entry.Writer.Write([1]);
 
         var exception = Assert.Throws<InvalidOperationException>(buffer.Reset);
@@ -229,10 +229,10 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void Commit_BackpatchesLengthAcrossSegments()
     {
-        using var buffer = new LogSegmentBuffer();
+        using var buffer = new OrleansBinaryLogBatchWriter();
         buffer.Write(new byte[ArcBufferWriter.MinimumPageSize - 2]);
 
-        using var entry = buffer.CreateLogWriter(new LogStreamId(1)).BeginEntry();
+        using var entry = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
         entry.Writer.Write([42]);
         entry.Commit();
 
@@ -247,8 +247,8 @@ public sealed class LogSegmentBufferTests
     [Fact]
     public void ReadOnlyStream_ReadsCommittedBytes()
     {
-        using var buffer = new LogSegmentBuffer();
-        using var entry = buffer.CreateLogWriter(new LogStreamId(7)).BeginEntry();
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        using var entry = buffer.CreateLogStreamWriter(new LogStreamId(7)).BeginEntry();
         entry.Writer.Write([8, 9]);
         entry.Commit();
         var expected = ToArray(buffer);
@@ -317,13 +317,13 @@ public sealed class LogSegmentBufferTests
         Assert.Empty(consumer.Entries);
     }
 
-    private static byte[] ToArray(LogSegmentBuffer buffer)
+    private static byte[] ToArray(OrleansBinaryLogBatchWriter buffer)
     {
         using var slice = buffer.PeekSlice();
         return slice.ToArray();
     }
 
-    private static void AppendEntry(LogWriter writer, ReadOnlySpan<byte> payload)
+    private static void AppendEntry(LogStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
@@ -337,7 +337,7 @@ public sealed class LogSegmentBufferTests
         return writer;
     }
 
-    private static void ReadAll(ArcBuffer data, ILogStreamStateMachineResolver consumer)
+    private static void ReadAll(ArcBuffer data, IStateMachineResolver consumer)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
@@ -363,7 +363,7 @@ public sealed class LogSegmentBufferTests
         return (length, streamId, payload);
     }
 
-    private sealed class CollectingConsumer : ILogStreamStateMachineResolver, IDurableStateMachine
+    private sealed class CollectingConsumer : IStateMachineResolver, IDurableStateMachine
     {
         private LogStreamId _streamId;
 
@@ -379,9 +379,9 @@ public sealed class LogSegmentBufferTests
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add((_streamId.Value, payload.ToArray()));
 
-        public void Reset(LogWriter storage) { }
-        public void AppendEntries(LogWriter writer) { }
-        public void AppendSnapshot(LogWriter writer) { }
+        public void Reset(LogStreamWriter writer) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 

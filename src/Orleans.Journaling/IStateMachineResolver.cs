@@ -3,7 +3,7 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Resolves persisted log stream ids to durable state machines during recovery.
 /// </summary>
-public interface ILogStreamStateMachineResolver
+public interface IStateMachineResolver
 {
     /// <summary>
     /// Resolves the durable state machine for <paramref name="streamId"/>.

@@ -24,11 +24,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 {
     private readonly IDurableQueueOperationCodec<T> _codec;
     private readonly Queue<T> _items = new();
-    private LogWriter _storage;
+    private LogStreamWriter _storage;
 
     public DurableQueue(
         [ServiceKey] string key,
-        ILogManager manager,
+        IStateMachineManager manager,
         [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
         IServiceProvider serviceProvider)
     {
@@ -37,7 +37,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
         manager.RegisterStateMachine(key, this);
     }
 
-    internal DurableQueue(string key, ILogManager manager, IDurableQueueOperationCodec<T> codec)
+    internal DurableQueue(string key, IStateMachineManager manager, IDurableQueueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -48,10 +48,10 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(LogWriter storage)
+    void IDurableStateMachine.Reset(LogStreamWriter writer)
     {
         _items.Clear();
-        _storage = storage;
+        _storage = writer;
     }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
@@ -59,12 +59,12 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
         _codec.Apply(logEntry, this);
     }
 
-    void IDurableStateMachine.AppendEntries(LogWriter logWriter)
+    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
     {
         // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -123,7 +123,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
 
     void IDurableQueueOperationHandler<T>.ApplySnapshotItem(T item) => ApplyEnqueue(item);
 
-    private LogWriter GetStorage()
+    private LogStreamWriter GetStorage()
     {
         Debug.Assert(_storage.IsInitialized);
         return _storage;

@@ -7,15 +7,15 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 /// <summary>
-/// Tests for LogManager, the core component of Orleans' journaling infrastructure.
+/// Tests for the state machine manager, the core component of Orleans' journaling infrastructure.
 /// 
-/// LogManager coordinates multiple durable data structures (DurableDictionary, DurableList, etc.)
+/// The state machine manager coordinates multiple durable data structures (DurableDictionary, DurableList, etc.)
 /// within a single grain, ensuring that all state changes are atomically journaled and can be
 /// recovered together. It manages the lifecycle of state machines, handles persistence through
 /// WriteStateAsync calls, and ensures consistent recovery after failures.
 /// </summary>
 [TestCategory("BVT")]
-public class LogManagerTests : JournalingTestBase
+public class StateMachineManagerTests : JournalingTestBase
 {
     /// <summary>
     /// Tests the registration and basic operation of multiple state machines.
@@ -23,7 +23,7 @@ public class LogManagerTests : JournalingTestBase
     /// with the manager and operate independently.
     /// </summary>
     [Fact]
-    public async Task LogManager_RegisterStateMachine_Test()
+    public async Task StateMachineManager_RegisterStateMachine_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -51,7 +51,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_Initialize_UsesStreamingStorageRead()
+    public async Task StateMachineManager_Initialize_UsesStreamingStorageRead()
     {
         var storage = new StreamingOnlyStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -62,11 +62,11 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_Recovery_PreservesUnknownStateMachineEntry()
+    public async Task StateMachineManager_Recovery_PreservesUnknownStateMachineEntry()
     {
         var storage = new VolatileLogStorage();
-        using var segment = new LogSegmentBuffer();
-        using (var entry = segment.CreateLogWriter(new LogStreamId(99)).BeginEntry())
+        using var segment = new OrleansBinaryLogBatchWriter();
+        using (var entry = segment.CreateLogStreamWriter(new LogStreamId(99)).BeginEntry())
         {
             entry.Writer.Write([1, 2, 3]);
             entry.Commit();
@@ -80,7 +80,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_UnknownStateMachineCompaction_PreservesDecodedPayloadThroughFormatWriter()
+    public async Task StateMachineManager_UnknownStateMachineCompaction_PreservesDecodedPayloadThroughFormatWriter()
     {
         var physicalBytes = new byte[] { 0xF0, 0x0D, 0x99 };
         var decodedPayload = new byte[] { 1, 2, 3 };
@@ -108,7 +108,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_RetiredStateMachineCompaction_WritesPreservedPayloadThroughFormatOwnedEntry()
+    public async Task StateMachineManager_RetiredStateMachineCompaction_WritesPreservedPayloadThroughFormatOwnedEntry()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -137,7 +137,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_DirectWrites_UseFormatOwnedCurrentSegmentWriter()
+    public async Task StateMachineManager_DirectWrites_UseFormatOwnedCurrentSegmentWriter()
     {
         var storage = new CapturingStorage();
         var format = new TrackingLogFormat();
@@ -158,7 +158,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_AppendLogFlush_UsesFormatOwnedWriter()
+    public async Task StateMachineManager_AppendLogFlush_UsesFormatOwnedWriter()
     {
         var storage = new CapturingStorage();
         var format = new TrackingLogFormat();
@@ -176,7 +176,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_DefaultAppend_StoresBinaryFixed32Entries()
+    public async Task StateMachineManager_DefaultAppend_StoresBinaryFixed32Entries()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -192,7 +192,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_AppendBufferIsBorrowedUntilStorageCompletes()
+    public async Task StateMachineManager_AppendBufferIsBorrowedUntilStorageCompletes()
     {
         var storage = new DelayedBorrowingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -207,7 +207,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_ReplaceBufferIsBorrowedUntilStorageCompletes()
+    public async Task StateMachineManager_ReplaceBufferIsBorrowedUntilStorageCompletes()
     {
         var storage = new DelayedBorrowingStorage { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
@@ -222,7 +222,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_DefaultSnapshot_StoresBinaryFixed32Entries()
+    public async Task StateMachineManager_DefaultSnapshot_StoresBinaryFixed32Entries()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
@@ -238,7 +238,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_DeleteState_ReallocatesApplicationStreamsAboveInternalRange()
+    public async Task StateMachineManager_DeleteState_ReallocatesApplicationStreamsAboveInternalRange()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -266,7 +266,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_SnapshotFlush_ResetsPendingAppendData()
+    public async Task StateMachineManager_SnapshotFlush_ResetsPendingAppendData()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
         var format = new TrackingLogFormat();
@@ -290,7 +290,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_DirectWriteFailure_AbortsEntryBeforeMutation()
+    public async Task StateMachineManager_DirectWriteFailure_AbortsEntryBeforeMutation()
     {
         var storage = new CapturingStorage();
         var format = new TrackingLogFormat();
@@ -310,7 +310,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_WriteStateAsync_DoesNotObserveActiveEntry()
+    public async Task StateMachineManager_WriteStateAsync_DoesNotObserveActiveEntry()
     {
         var storage = new CapturingStorage();
         var format = new TrackingLogFormat();
@@ -348,7 +348,7 @@ public class LogManagerTests : JournalingTestBase
     /// during recovery from persisted state.
     /// </summary>
     [Fact]
-    public async Task LogManager_StateRecovery_Test()
+    public async Task StateMachineManager_StateRecovery_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -382,7 +382,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_Recovery_UsesSelectedLogFormatRead()
+    public async Task StateMachineManager_Recovery_UsesSelectedLogFormatRead()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -403,7 +403,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_Recovery_ReadsConcatenatedLogData()
+    public async Task StateMachineManager_Recovery_ReadsConcatenatedLogData()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -422,11 +422,11 @@ public class LogManagerTests : JournalingTestBase
         await recovered.Lifecycle.OnStart();
 
         Assert.Equal(2, recoveredValue.Value);
-        Assert.Equal(1, storage.ReadCallbackCount);
+        Assert.Equal(1, storage.ReadConsumeCount);
     }
 
     [Fact]
-    public async Task LogManager_Recovery_BuffersEntriesSplitAcrossStorageChunks()
+    public async Task StateMachineManager_Recovery_BuffersEntriesSplitAcrossStorageChunks()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -446,16 +446,16 @@ public class LogManagerTests : JournalingTestBase
         await recovered.Lifecycle.OnStart();
 
         Assert.Equal(2, recoveredValue.Value);
-        Assert.Equal(persistedBytes.Length, splitStorage.ReadCallbackCount);
+        Assert.Equal(persistedBytes.Length, splitStorage.ReadConsumeCount);
     }
 
     [Fact]
-    public async Task LogManager_Recovery_RejectsMalformedTrailingData()
+    public async Task StateMachineManager_Recovery_RejectsMalformedTrailingData()
     {
         byte[] bytes;
-        using (var segment = new LogSegmentBuffer())
+        using (var segment = new OrleansBinaryLogBatchWriter())
         {
-            using (var entry = segment.CreateLogWriter(new LogStreamId(99)).BeginEntry())
+            using (var entry = segment.CreateLogStreamWriter(new LogStreamId(99)).BeginEntry())
             {
                 entry.Writer.Write([1, 2, 3]);
                 entry.Commit();
@@ -486,7 +486,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_RecoveryRetry_ReplaysFixedStorage()
+    public async Task StateMachineManager_RecoveryRetry_ReplaysFixedStorage()
     {
         var validBytes = CreatePersistedValueBytes("value", 42);
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]);
@@ -504,7 +504,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_RecoveryRetry_PreservesUnknownStreamOnce()
+    public async Task StateMachineManager_RecoveryRetry_PreservesUnknownStreamOnce()
     {
         var validBytes = CreateUnknownStreamBytes(new LogStreamId(99), [1, 2, 3]);
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]) { IsCompactionRequested = true };
@@ -523,7 +523,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
+    public async Task StateMachineManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
     {
         var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new LogStreamId(8), [1, 2, 3]), 1, 2, 3]);
         var sut = CreateTestSystem(storage: storage);
@@ -539,7 +539,7 @@ public class LogManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task LogManager_Recovery_DoesNotWrapStorageReadException()
+    public async Task StateMachineManager_Recovery_DoesNotWrapStorageReadException()
     {
         var storage = new ThrowingReadStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -565,7 +565,7 @@ public class LogManagerTests : JournalingTestBase
     /// and that the final state is correctly recovered.
     /// </summary>
     [Fact]
-    public async Task LogManager_MultipleWriteStates_Test()
+    public async Task StateMachineManager_MultipleWriteStates_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -608,7 +608,7 @@ public class LogManagerTests : JournalingTestBase
     /// (dictionaries with different key/value types, lists, values) in a single grain.
     /// </summary>
     [Fact]
-    public async Task LogManager_MultipleStateMachines_Test()
+    public async Task StateMachineManager_MultipleStateMachines_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -666,7 +666,7 @@ public class LogManagerTests : JournalingTestBase
     /// Verifies namespace isolation between different state machines with similar keys.
     /// </summary>
     [Fact]
-    public async Task LogManager_Concurrency_Test()
+    public async Task StateMachineManager_Concurrency_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -701,7 +701,7 @@ public class LogManagerTests : JournalingTestBase
     /// containing thousands of entries without data loss or corruption.
     /// </summary>
     [Fact]
-    public async Task LogManager_LargeStateRecovery_Test()
+    public async Task StateMachineManager_LargeStateRecovery_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -735,7 +735,7 @@ public class LogManagerTests : JournalingTestBase
     /// early compaction, but purged eventually after its grace period expires on later compactions.
     /// </summary>
     [Fact]
-    public async Task LogManager_AutoRetiringStateMachines()
+    public async Task StateMachineManager_AutoRetiringStateMachines()
     {
         const string DictToKeepKey = "dictToKeep";
         const string DictToRetireKey = "dictToRetire";
@@ -844,10 +844,10 @@ public class LogManagerTests : JournalingTestBase
 
         // Note: The retirement of state machines has the nice benefit of being able to reuse machine names.
 
-        DurableDictionary<string, int> CreateTestMachine(string key, ILogManager manager) =>
+        DurableDictionary<string, int> CreateTestMachine(string key, IStateMachineManager manager) =>
             new(key, manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
 
-        static async Task TriggerCompaction(ILogManager manager, DurableDictionary<string, int> dict)
+        static async Task TriggerCompaction(IStateMachineManager manager, DurableDictionary<string, int> dict)
         {
             for (var i = 0; i < 11; i++)
             {
@@ -863,9 +863,10 @@ public class LogManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
         {
             StreamingReadCalled = true;
+            consumer.Complete();
             return default;
         }
 
@@ -884,10 +885,10 @@ public class LogManagerTests : JournalingTestBase
 
     private byte[] CreatePersistedValueBytes(string name, int value)
     {
-        using var segment = new LogSegmentBuffer();
+        using var segment = new OrleansBinaryLogBatchWriter();
         AppendDirectorySet(segment, name, new LogStreamId(8));
         var codec = CreateValueCodec<int>();
-        using (var entry = segment.CreateLogWriter(new LogStreamId(8)).BeginEntry())
+        using (var entry = segment.CreateLogStreamWriter(new LogStreamId(8)).BeginEntry())
         {
             codec.WriteSet(value, entry.Writer);
             entry.Commit();
@@ -899,8 +900,8 @@ public class LogManagerTests : JournalingTestBase
 
     private byte[] CreateUnknownStreamBytes(LogStreamId streamId, ReadOnlySpan<byte> payload)
     {
-        using var segment = new LogSegmentBuffer();
-        using (var entry = segment.CreateLogWriter(streamId).BeginEntry())
+        using var segment = new OrleansBinaryLogBatchWriter();
+        using (var entry = segment.CreateLogStreamWriter(streamId).BeginEntry())
         {
             entry.Writer.Write(payload);
             entry.Commit();
@@ -912,9 +913,9 @@ public class LogManagerTests : JournalingTestBase
 
     private byte[] CreateNamedUnknownStreamBytes(string name, LogStreamId streamId, ReadOnlySpan<byte> payload)
     {
-        using var segment = new LogSegmentBuffer();
+        using var segment = new OrleansBinaryLogBatchWriter();
         AppendDirectorySet(segment, name, streamId);
-        using (var entry = segment.CreateLogWriter(streamId).BeginEntry())
+        using (var entry = segment.CreateLogStreamWriter(streamId).BeginEntry())
         {
             entry.Writer.Write(payload);
             entry.Commit();
@@ -924,10 +925,10 @@ public class LogManagerTests : JournalingTestBase
         return committed.ToArray();
     }
 
-    private void AppendDirectorySet(LogSegmentBuffer segment, string name, LogStreamId streamId)
+    private void AppendDirectorySet(OrleansBinaryLogBatchWriter segment, string name, LogStreamId streamId)
     {
         var codec = CreateDictionaryCodec<string, ulong>();
-        using var entry = segment.CreateLogWriter(new LogStreamId(0)).BeginEntry();
+        using var entry = segment.CreateLogStreamWriter(new LogStreamId(0)).BeginEntry();
         codec.WriteSet(name, streamId.Value, entry.Writer);
         entry.Commit();
     }
@@ -960,7 +961,7 @@ public class LogManagerTests : JournalingTestBase
         Assert.Contains(entries, entry => entry.StreamId.Value >= 8 && entry.Payload.Length > 0);
     }
 
-    private sealed class CapturingLogEntrySink : ILogStreamStateMachineResolver, IDurableStateMachine
+    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine
     {
         private LogStreamId _streamId;
 
@@ -976,9 +977,9 @@ public class LogManagerTests : JournalingTestBase
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        public void Reset(LogWriter storage) { }
-        public void AppendEntries(LogWriter writer) { }
-        public void AppendSnapshot(LogWriter writer) { }
+        public void Reset(LogStreamWriter writer) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
@@ -994,11 +995,11 @@ public class LogManagerTests : JournalingTestBase
             _payload = payload.ToArray();
         }
 
-        public List<TrackingLogSegmentWriter> Writers => _writerFormat.Writers;
+        public List<TrackingLogBatchWriter> Writers => _writerFormat.Writers;
 
-        public ILogSegmentWriter CreateWriter() => _writerFormat.CreateWriter();
+        public ILogBatchWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
+        public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
         {
             if (input.Length == 0)
             {
@@ -1029,27 +1030,27 @@ public class LogManagerTests : JournalingTestBase
 
     private sealed class TrackingLogFormat : ILogFormat
     {
-        public List<TrackingLogSegmentWriter> Writers { get; } = [];
+        public List<TrackingLogBatchWriter> Writers { get; } = [];
 
         public int ReadCount { get; private set; }
 
-        public ILogSegmentWriter CreateWriter()
+        public ILogBatchWriter CreateWriter()
         {
-            var writer = new TrackingLogSegmentWriter();
+            var writer = new TrackingLogBatchWriter();
             Writers.Add(writer);
             return writer;
         }
 
-        public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver consumer, bool isCompleted)
+        public bool TryRead(ArcBufferReader input, IStateMachineResolver consumer, bool isCompleted)
         {
             ReadCount++;
             return ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(input, consumer, isCompleted);
         }
     }
 
-    private sealed class TrackingLogSegmentWriter : ILogSegmentWriter
+    private sealed class TrackingLogBatchWriter : ILogBatchWriter
     {
-        private readonly LogSegmentBuffer _inner = new();
+        private readonly OrleansBinaryLogBatchWriter _inner = new();
 
         public List<ulong> CreatedLogWriterIds { get; } = [];
 
@@ -1061,10 +1062,10 @@ public class LogManagerTests : JournalingTestBase
 
         public long Length => _inner.Length;
 
-        public LogWriter CreateLogWriter(LogStreamId streamId)
+        public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId)
         {
             CreatedLogWriterIds.Add(streamId.Value);
-            return new(streamId, new TrackingLogWriterTarget(this));
+            return new(streamId, new TrackingLogStreamWriterTarget(this));
         }
 
         public ArcBuffer GetCommittedBuffer()
@@ -1081,7 +1082,7 @@ public class LogManagerTests : JournalingTestBase
 
         public void Dispose() => _inner.Dispose();
 
-        private sealed class TrackingLogWriterTarget(TrackingLogSegmentWriter owner) : ILogWriterTarget
+        private sealed class TrackingLogStreamWriterTarget(TrackingLogBatchWriter owner) : ILogStreamWriterTarget
         {
             public LogEntryWriter BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
             {
@@ -1115,38 +1116,56 @@ public class LogManagerTests : JournalingTestBase
 
         public bool ConcatenateReads { get; set; }
 
-        public int ReadCallbackCount { get; private set; }
+        public int ReadConsumeCount { get; private set; }
 
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(consumer);
+
             if (ConcatenateReads)
             {
+                var totalLength = 0;
                 foreach (var segment in _segments)
                 {
                     cancellationToken.ThrowIfCancellationRequested();
-                    buffer.Write(segment);
+                    totalLength += segment.Length;
                 }
 
-                if (_segments.Count > 0)
+                if (totalLength > 0)
                 {
-                    ReadCallbackCount++;
-                    consume(new ArcBufferReader(buffer));
+                    var concatenated = new byte[totalLength];
+                    var offset = 0;
+                    foreach (var segment in _segments)
+                    {
+                        segment.CopyTo(concatenated.AsSpan(offset));
+                        offset += segment.Length;
+                    }
+
+                    ReadConsumeCount++;
+                    consumer.Consume(concatenated);
+                }
+                else
+                {
+                    consumer.Complete();
                 }
 
                 return default;
             }
 
-            foreach (var segment in _segments)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                ReadCallbackCount++;
-                buffer.Write(segment);
-                consume(new ArcBufferReader(buffer));
-            }
-
+            consumer.Consume(GetSegments());
             return default;
+
+            IEnumerable<ReadOnlyMemory<byte>> GetSegments()
+            {
+                foreach (var segment in _segments)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ReadConsumeCount++;
+                    yield return segment;
+                }
+            }
         }
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
@@ -1180,11 +1199,11 @@ public class LogManagerTests : JournalingTestBase
     {
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            buffer.Write(bytes);
-            consume(new ArcBufferReader(buffer));
+            consumer.Consume(bytes);
             return default;
         }
 
@@ -1203,15 +1222,11 @@ public class LogManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
         {
+            ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            if (Bytes.Length > 0)
-            {
-                buffer.Write(Bytes);
-                consume(new ArcBufferReader(buffer));
-            }
-
+            consumer.Consume(Bytes);
             return default;
         }
 
@@ -1245,7 +1260,7 @@ public class LogManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
             => ValueTask.FromException(Exception);
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
@@ -1257,22 +1272,27 @@ public class LogManagerTests : JournalingTestBase
 
     private sealed class ChunkedReadStorage(byte[] bytes, int chunkSize) : ILogStorage
     {
-        public int ReadCallbackCount { get; private set; }
+        public int ReadConsumeCount { get; private set; }
 
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
         {
-            for (var offset = 0; offset < bytes.Length; offset += chunkSize)
-            {
-                cancellationToken.ThrowIfCancellationRequested();
-                var length = Math.Min(chunkSize, bytes.Length - offset);
-                ReadCallbackCount++;
-                buffer.Write(bytes.AsSpan(offset, length));
-                consume(new ArcBufferReader(buffer));
-            }
+            ArgumentNullException.ThrowIfNull(consumer);
 
+            consumer.Consume(GetChunks());
             return default;
+
+            IEnumerable<ReadOnlyMemory<byte>> GetChunks()
+            {
+                for (var offset = 0; offset < bytes.Length; offset += chunkSize)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var length = Math.Min(chunkSize, bytes.Length - offset);
+                    ReadConsumeCount++;
+                    yield return new ReadOnlyMemory<byte>(bytes, offset, length);
+                }
+            }
         }
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
@@ -1290,7 +1310,11 @@ public class LogManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ArcBufferWriter buffer, Action<ArcBufferReader> consume, CancellationToken cancellationToken) => default;
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            consumer.Complete();
+            return default;
+        }
 
         public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
@@ -1311,19 +1335,19 @@ public class LogManagerTests : JournalingTestBase
 
     private sealed class ManualDirectWriteStateMachine : IDurableStateMachine
     {
-        private LogWriter _writer;
+        private LogStreamWriter _writer;
 
         public LogEntry BeginEntry() => _writer.BeginEntry();
 
         public object OperationCodec => this;
 
-        public void Reset(LogWriter storage) => _writer = storage;
+        public void Reset(LogStreamWriter writer) => _writer = writer;
 
         public void Apply(ReadOnlySequence<byte> logEntry) { }
 
-        public void AppendEntries(LogWriter writer) { }
+        public void AppendEntries(LogStreamWriter writer) { }
 
-        public void AppendSnapshot(LogWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
 
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
