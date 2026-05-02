@@ -5,11 +5,11 @@ using System.ComponentModel;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
 using System.Threading.Tasks;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Placement;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -25,14 +25,14 @@ namespace Orleans.Runtime.GrainDirectory
 #else
         private readonly object writeLock = new();
 #endif
-        private readonly IServiceProvider _serviceProvider;
+        private readonly ActivationDirectory activations;
+        private readonly GrainDirectoryResolver grainDirectoryResolver;
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
 
         // Consider: move these constants into an appropriate place
         internal const int HOP_LIMIT = 6; // forward a remote request no more than 5 times
         public static readonly TimeSpan RETRY_DELAY = TimeSpan.FromMilliseconds(200); // Pause 200ms between forwards to let the membership directory settle down
         internal bool Running;
-        private Catalog? _catalog;
 
         internal SiloAddress MyAddress { get; }
 
@@ -50,6 +50,8 @@ namespace Orleans.Runtime.GrainDirectory
             ILocalSiloDetails siloDetails,
             ISiloStatusOracle siloStatusOracle,
             IInternalGrainFactory grainFactory,
+            ActivationDirectory activationDirectory,
+            GrainDirectoryResolver grainDirectoryResolver,
             Factory<LocalGrainDirectoryPartition> grainDirectoryPartitionFactory,
             IOptions<DevelopmentClusterMembershipOptions> developmentClusterMembershipOptions,
             IOptions<GrainDirectoryOptions> grainDirectoryOptions,
@@ -62,6 +64,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             this.siloStatusOracle = siloStatusOracle;
             this.grainFactory = grainFactory;
+            this.activations = activationDirectory;
+            this.grainDirectoryResolver = grainDirectoryResolver;
 
             DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeDirectoryCache);
 
@@ -89,7 +93,6 @@ namespace Orleans.Runtime.GrainDirectory
                 return ring.Count == 0 ? 0 : ((float)100 / (float)ring.Count);
             });
             DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
-            _serviceProvider = serviceProvider;
         }
 
         public void Start()
@@ -160,25 +163,20 @@ namespace Orleans.Runtime.GrainDirectory
 
         private void RemoveServer(SiloAddress silo, SiloStatus status)
         {
+            List<IGrainContext>? activationsToShutdown = null;
+
             lock (this.writeLock)
             {
-                try
-                {
-                    // Only notify the catalog once. Order is important: call BEFORE updating membershipRingList.
-                    _catalog = _serviceProvider.GetRequiredService<Catalog>();
-                    _catalog.OnSiloStatusChange(this, silo, status);
-                }
-                catch (Exception exc)
-                {
-                    LogErrorCatalogSiloStatusChangeNotificationException(exc, new(silo));
-                }
-
                 var existing = this.directoryMembership;
                 if (!existing.MembershipCache.Contains(silo))
                 {
                     // we have already removed this silo
                     return;
                 }
+
+                // Collect activations to deactivate BEFORE updating membershipRingList,
+                // since GetPrimaryForGrain depends on the current ring membership.
+                activationsToShutdown = CollectActivationsToDeactivate(silo);
 
                 this.directoryMembership = new DirectoryMembership(
                     existing.MembershipRingList.Remove(silo),
@@ -188,6 +186,64 @@ namespace Orleans.Runtime.GrainDirectory
                 AdjustLocalCache(silo, dead: true);
 
                 LogDebugSiloRemovedSilo(MyAddress, silo);
+            }
+
+            // Deactivate activations outside the lock
+            if (activationsToShutdown is { Count: > 0 })
+            {
+                var reasonText = $"This activation is being deactivated due to a failure of server {silo}, since it was responsible for this activation's grain directory registration.";
+                var reason = new DeactivationReason(DeactivationReasonCode.DirectoryFailure, reasonText);
+                DeactivateActivations(reason, activationsToShutdown);
+            }
+        }
+
+        /// <summary>
+        /// Collects activations that should be deactivated because the removed silo was their primary directory partition owner.
+        /// </summary>
+        private List<IGrainContext> CollectActivationsToDeactivate(SiloAddress removedSilo)
+        {
+            var result = new List<IGrainContext>();
+            try
+            {
+                // Scan all activations and find those that the removed silo is their primary partition owner.
+                foreach (var activation in activations)
+                {
+                    try
+                    {
+                        var activationData = activation.Value;
+                        var placementStrategy = activationData.GetComponent<PlacementStrategy>();
+                        var isUsingGrainDirectory = placementStrategy is { IsUsingGrainDirectory: true };
+                        if (!isUsingGrainDirectory || !grainDirectoryResolver.IsUsingDhtGrainDirectory(activationData.GrainId.Type)) continue;
+                        if (!removedSilo.Equals(GetPrimaryForGrain(activationData.GrainId))) continue;
+
+                        result.Add(activationData);
+                    }
+                    catch (Exception exc)
+                    {
+                        LogErrorCollectActivationsToDeactivate(new(removedSilo), exc);
+                    }
+                }
+
+                if (result.Count > 0)
+                {
+                    LogInfoDeactivatingActivationsDueToSiloFailure(result.Count, new(removedSilo));
+                }
+            }
+            catch (Exception exc)
+            {
+                LogErrorCollectActivationsToDeactivate(new(removedSilo), exc);
+            }
+
+            return result;
+        }
+
+        private void DeactivateActivations(DeactivationReason reason, List<IGrainContext> activations)
+        {
+            LogDebugDeactivateActivations(activations.Count);
+
+            foreach (var activation in activations)
+            {
+                activation.Deactivate(reason, CancellationToken.None);
             }
         }
 
@@ -835,9 +891,22 @@ namespace Orleans.Runtime.GrainDirectory
         [LoggerMessage(
             EventId = (int)ErrorCode.Directory_SiloStatusChangeNotification_Exception,
             Level = LogLevel.Error,
-            Message = "CatalogSiloStatusListener.SiloStatusChangeNotification has thrown an exception when notified about removed silo {Silo}."
+            Message = "Exception while collecting activations to deactivate after removal of silo {Silo}."
         )]
-        private partial void LogErrorCatalogSiloStatusChangeNotificationException(Exception exception, SiloAddressLogValue silo);
+        private partial void LogErrorCollectActivationsToDeactivate(SiloAddressLogValue silo, Exception exception);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.Catalog_SiloStatusChangeNotification,
+            Level = LogLevel.Information,
+            Message = "Deactivating {Count} activations due to failure of silo {Silo}, since it was the primary directory partition for these grain ids."
+        )]
+        private partial void LogInfoDeactivatingActivationsDueToSiloFailure(int count, SiloAddressLogValue silo);
+
+        [LoggerMessage(
+            Level = LogLevel.Debug,
+            Message = "DeactivateActivations: {Count} activations."
+        )]
+        private partial void LogDebugDeactivateActivations(int count);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

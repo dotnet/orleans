@@ -34,7 +34,7 @@ namespace Orleans.Runtime.GrainDirectory
 
         public async ValueTask<GrainAddress> Lookup(GrainId grainId) => (await _localGrainDirectory.LookupAsync(grainId)).Address;
 
-        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress) => (await _localGrainDirectory.RegisterAsync(address, currentRegistration: previousAddress)).Address;
+        public async Task<GrainAddress> Register(GrainAddress address, GrainAddress previousAddress) => (await _localGrainDirectory.RegisterAsync(address, previousAddress, hopCount: 0)).Address;
 
         public Task Unregister(GrainAddress address, UnregistrationCause cause)
         {
@@ -138,7 +138,7 @@ namespace Orleans.Runtime.GrainDirectory
 
                         if (operations.Count > 0)
                         {
-                            await _localGrainDirectory.UnregisterManyAsync(addresses, _cause);
+                            await _localGrainDirectory.UnregisterManyAsync(addresses, _cause, hopCount: 0);
                             foreach (var op in operations)
                             {
                                 op.TrySetResult(true);

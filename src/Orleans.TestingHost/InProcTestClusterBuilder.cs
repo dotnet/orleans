@@ -32,6 +32,7 @@ public sealed class InProcessTestClusterBuilder
             ClusterId = CreateClusterId(),
             ServiceId = Guid.NewGuid().ToString("N"),
             UseTestClusterMembership = true,
+            UseTestClusterGrainDirectory = true,
             InitializeClientOnDeploy = true,
             ConfigureFileLogging = true,
             AssumeHomogenousSilosForTesting = true
