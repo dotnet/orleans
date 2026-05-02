@@ -15,7 +15,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     public void WriteSet(T value, IBufferWriter<byte> output) => Write(output, CreateSetOperation(value));
 
     /// <inheritdoc/>
-    public void WriteSet(T value, LogWriter writer) => Write(writer, CreateSetOperation(value));
+    public void WriteSet(T value, LogStreamWriter writer) => Write(writer, CreateSetOperation(value));
 
     private JsonValueOperation CreateSetOperation(T value)
     {
@@ -62,7 +62,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         Apply(entry, consumer);
     }
 
-    private static void Write(LogWriter writer, JsonValueOperation operation)
+    private static void Write(LogStreamWriter writer, JsonValueOperation operation)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -97,7 +97,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     public void WriteSet(T state, ulong version, IBufferWriter<byte> output) => Write(output, CreateSetOperation(state, version));
 
     /// <inheritdoc/>
-    public void WriteSet(T state, ulong version, LogWriter writer) => Write(writer, CreateSetOperation(state, version));
+    public void WriteSet(T state, ulong version, LogStreamWriter writer) => Write(writer, CreateSetOperation(state, version));
 
     private JsonStateOperation CreateSetOperation(T state, ulong version)
     {
@@ -113,7 +113,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     public void WriteClear(IBufferWriter<byte> output) => Write(output, CreateClearOperation());
 
     /// <inheritdoc/>
-    public void WriteClear(LogWriter writer) => Write(writer, CreateClearOperation());
+    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
 
     private static JsonStateOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
 
@@ -158,7 +158,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         Apply(entry, consumer);
     }
 
-    private static void Write(LogWriter writer, JsonStateOperation operation)
+    private static void Write(LogStreamWriter writer, JsonStateOperation operation)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -193,7 +193,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WritePending(IBufferWriter<byte> output) => Write(output, CreatePendingOperation());
 
     /// <inheritdoc/>
-    public void WritePending(LogWriter writer) => Write(writer, CreatePendingOperation());
+    public void WritePending(LogStreamWriter writer) => Write(writer, CreatePendingOperation());
 
     private static JsonTaskCompletionSourceOperation CreatePendingOperation() => new() { Command = JsonLogEntryCommands.Pending };
 
@@ -201,7 +201,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WriteCompleted(T value, IBufferWriter<byte> output) => Write(output, CreateCompletedOperation(value));
 
     /// <inheritdoc/>
-    public void WriteCompleted(T value, LogWriter writer) => Write(writer, CreateCompletedOperation(value));
+    public void WriteCompleted(T value, LogStreamWriter writer) => Write(writer, CreateCompletedOperation(value));
 
     private JsonTaskCompletionSourceOperation CreateCompletedOperation(T value)
     {
@@ -216,7 +216,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WriteFaulted(Exception exception, IBufferWriter<byte> output) => Write(output, CreateFaultedOperation(exception));
 
     /// <inheritdoc/>
-    public void WriteFaulted(Exception exception, LogWriter writer) => Write(writer, CreateFaultedOperation(exception));
+    public void WriteFaulted(Exception exception, LogStreamWriter writer) => Write(writer, CreateFaultedOperation(exception));
 
     private static JsonTaskCompletionSourceOperation CreateFaultedOperation(Exception exception)
     {
@@ -231,7 +231,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WriteCanceled(IBufferWriter<byte> output) => Write(output, CreateCanceledOperation());
 
     /// <inheritdoc/>
-    public void WriteCanceled(LogWriter writer) => Write(writer, CreateCanceledOperation());
+    public void WriteCanceled(LogStreamWriter writer) => Write(writer, CreateCanceledOperation());
 
     private static JsonTaskCompletionSourceOperation CreateCanceledOperation() => new() { Command = JsonLogEntryCommands.Canceled };
 
@@ -280,7 +280,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         Apply(entry, consumer);
     }
 
-    private static void Write(LogWriter writer, JsonTaskCompletionSourceOperation operation)
+    private static void Write(LogStreamWriter writer, JsonTaskCompletionSourceOperation operation)
     {
         JsonOperationCodecWriter.Write(
             writer,

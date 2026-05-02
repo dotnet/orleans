@@ -6,10 +6,10 @@ namespace Orleans.Journaling.MessagePack;
 
 internal sealed class MessagePackLogFormat : ILogFormat
 {
-    public ILogSegmentWriter CreateWriter()
+    public ILogBatchWriter CreateWriter()
         => new MessagePackLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -44,7 +44,7 @@ internal sealed class MessagePackLogFormat : ILogFormat
         return true;
     }
 
-    private sealed class MessagePackLogSegmentWriter : LogSegmentWriterBase
+    private sealed class MessagePackLogSegmentWriter : LogBatchWriterBase
     {
         private readonly ArcBufferWriter _buffer = new();
         private readonly ArcBufferWriter _payload = new();
@@ -125,7 +125,7 @@ internal sealed class MessagePackLogFormat : ILogFormat
                 return false;
             }
 
-            using var logEntry = CreateLogWriter(streamId).BeginEntry();
+            using var logEntry = CreateLogStreamWriter(streamId).BeginEntry();
             logEntry.Writer.Write(messagePackEntry.Payload.Span);
             logEntry.Commit();
             return true;

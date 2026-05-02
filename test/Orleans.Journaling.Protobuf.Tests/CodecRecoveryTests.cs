@@ -255,7 +255,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
-    internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithProtobufCodec(ILogStorage? storage = null)
+    internal (IStateMachineManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithProtobufCodec(ILogStorage? storage = null)
     {
         storage ??= CreateProtobufStorage();
 
@@ -265,9 +265,9 @@ public class CodecRecoveryTests : JournalingTestBase
 
         var logStreamIdsCodec = new ProtobufDictionaryOperationCodec<string, ulong>(stringConverter, ulongConverter);
         var retirementTrackerCodec = new ProtobufDictionaryOperationCodec<string, DateTime>(stringConverter, dateTimeConverter);
-        var manager = new LogManager(
+        var manager = new LogStateMachineManager(
             storage,
-            LoggerFactory.CreateLogger<LogManager>(),
+            LoggerFactory.CreateLogger<LogStateMachineManager>(),
             Microsoft.Extensions.Options.Options.Create(ManagerOptions),
             logStreamIdsCodec,
             retirementTrackerCodec,

@@ -15,7 +15,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     public void WriteAdd(T item, IBufferWriter<byte> output) => Write(output, CreateAddOperation(item));
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, LogWriter writer) => Write(writer, CreateAddOperation(item));
+    public void WriteAdd(T item, LogStreamWriter writer) => Write(writer, CreateAddOperation(item));
 
     private JsonListOperation CreateAddOperation(T item)
     {
@@ -30,7 +30,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     public void WriteSet(int index, T item, IBufferWriter<byte> output) => Write(output, CreateSetOperation(index, item));
 
     /// <inheritdoc/>
-    public void WriteSet(int index, T item, LogWriter writer) => Write(writer, CreateSetOperation(index, item));
+    public void WriteSet(int index, T item, LogStreamWriter writer) => Write(writer, CreateSetOperation(index, item));
 
     private JsonListOperation CreateSetOperation(int index, T item)
     {
@@ -46,7 +46,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     public void WriteInsert(int index, T item, IBufferWriter<byte> output) => Write(output, CreateInsertOperation(index, item));
 
     /// <inheritdoc/>
-    public void WriteInsert(int index, T item, LogWriter writer) => Write(writer, CreateInsertOperation(index, item));
+    public void WriteInsert(int index, T item, LogStreamWriter writer) => Write(writer, CreateInsertOperation(index, item));
 
     private JsonListOperation CreateInsertOperation(int index, T item)
     {
@@ -62,7 +62,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     public void WriteRemoveAt(int index, IBufferWriter<byte> output) => Write(output, CreateRemoveAtOperation(index));
 
     /// <inheritdoc/>
-    public void WriteRemoveAt(int index, LogWriter writer) => Write(writer, CreateRemoveAtOperation(index));
+    public void WriteRemoveAt(int index, LogStreamWriter writer) => Write(writer, CreateRemoveAtOperation(index));
 
     private static JsonListOperation CreateRemoveAtOperation(int index)
     {
@@ -77,7 +77,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     public void WriteClear(IBufferWriter<byte> output) => Write(output, CreateClearOperation());
 
     /// <inheritdoc/>
-    public void WriteClear(LogWriter writer) => Write(writer, CreateClearOperation());
+    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
 
     private static JsonListOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
 
@@ -89,7 +89,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, LogWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
         Write(writer, CreateSnapshotOperation(items));
@@ -165,7 +165,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         Apply(entry, consumer);
     }
 
-    private static void Write(LogWriter writer, JsonListOperation operation)
+    private static void Write(LogStreamWriter writer, JsonListOperation operation)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -197,7 +197,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     public void WriteEnqueue(T item, IBufferWriter<byte> output) => Write(output, CreateEnqueueOperation(item));
 
     /// <inheritdoc/>
-    public void WriteEnqueue(T item, LogWriter writer) => Write(writer, CreateEnqueueOperation(item));
+    public void WriteEnqueue(T item, LogStreamWriter writer) => Write(writer, CreateEnqueueOperation(item));
 
     private JsonQueueOperation CreateEnqueueOperation(T item)
     {
@@ -212,7 +212,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     public void WriteDequeue(IBufferWriter<byte> output) => Write(output, CreateDequeueOperation());
 
     /// <inheritdoc/>
-    public void WriteDequeue(LogWriter writer) => Write(writer, CreateDequeueOperation());
+    public void WriteDequeue(LogStreamWriter writer) => Write(writer, CreateDequeueOperation());
 
     private static JsonQueueOperation CreateDequeueOperation() => new() { Command = JsonLogEntryCommands.Dequeue };
 
@@ -220,7 +220,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     public void WriteClear(IBufferWriter<byte> output) => Write(output, CreateClearOperation());
 
     /// <inheritdoc/>
-    public void WriteClear(LogWriter writer) => Write(writer, CreateClearOperation());
+    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
 
     private static JsonQueueOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
 
@@ -232,7 +232,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, LogWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
         Write(writer, CreateSnapshotOperation(items));
@@ -302,7 +302,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         Apply(entry, consumer);
     }
 
-    private static void Write(LogWriter writer, JsonQueueOperation operation)
+    private static void Write(LogStreamWriter writer, JsonQueueOperation operation)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -334,7 +334,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WriteAdd(T item, IBufferWriter<byte> output) => Write(output, CreateAddOperation(item));
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, LogWriter writer) => Write(writer, CreateAddOperation(item));
+    public void WriteAdd(T item, LogStreamWriter writer) => Write(writer, CreateAddOperation(item));
 
     private JsonSetOperation CreateAddOperation(T item)
     {
@@ -349,7 +349,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WriteRemove(T item, IBufferWriter<byte> output) => Write(output, CreateRemoveOperation(item));
 
     /// <inheritdoc/>
-    public void WriteRemove(T item, LogWriter writer) => Write(writer, CreateRemoveOperation(item));
+    public void WriteRemove(T item, LogStreamWriter writer) => Write(writer, CreateRemoveOperation(item));
 
     private JsonSetOperation CreateRemoveOperation(T item)
     {
@@ -364,7 +364,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WriteClear(IBufferWriter<byte> output) => Write(output, CreateClearOperation());
 
     /// <inheritdoc/>
-    public void WriteClear(LogWriter writer) => Write(writer, CreateClearOperation());
+    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
 
     private static JsonSetOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
 
@@ -376,7 +376,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, LogWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
         Write(writer, CreateSnapshotOperation(items));
@@ -446,7 +446,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         Apply(entry, consumer);
     }
 
-    private static void Write(LogWriter writer, JsonSetOperation operation)
+    private static void Write(LogStreamWriter writer, JsonSetOperation operation)
     {
         JsonOperationCodecWriter.Write(
             writer,

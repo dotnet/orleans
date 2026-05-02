@@ -188,14 +188,14 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(17, await tcs2.Task);
     }
 
-    internal (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(ILogStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
+    internal (IStateMachineManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(ILogStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
         storage ??= CreateJsonStorage();
         jsonOptions ??= CreateJsonOptions();
 
         var logStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
-        var manager = new LogManager(storage, LoggerFactory.CreateLogger<LogManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new JsonLinesLogFormat());
+        var manager = new LogStateMachineManager(storage, LoggerFactory.CreateLogger<LogStateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new JsonLinesLogFormat());
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

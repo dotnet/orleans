@@ -22,7 +22,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output) => Write(output, CreateSetOperation(key, value));
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, LogWriter writer) => Write(writer, CreateSetOperation(key, value));
+    public void WriteSet(TKey key, TValue value, LogStreamWriter writer) => Write(writer, CreateSetOperation(key, value));
 
     private JsonDictionaryOperation CreateSetOperation(TKey key, TValue value)
     {
@@ -38,7 +38,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     public void WriteRemove(TKey key, IBufferWriter<byte> output) => Write(output, CreateRemoveOperation(key));
 
     /// <inheritdoc/>
-    public void WriteRemove(TKey key, LogWriter writer) => Write(writer, CreateRemoveOperation(key));
+    public void WriteRemove(TKey key, LogStreamWriter writer) => Write(writer, CreateRemoveOperation(key));
 
     private JsonDictionaryOperation CreateRemoveOperation(TKey key)
     {
@@ -53,7 +53,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     public void WriteClear(IBufferWriter<byte> output) => Write(output, CreateClearOperation());
 
     /// <inheritdoc/>
-    public void WriteClear(LogWriter writer) => Write(writer, CreateClearOperation());
+    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
 
     private static JsonDictionaryOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
 
@@ -66,7 +66,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -134,7 +134,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         }
     }
 
-    private static void Write(LogWriter writer, JsonDictionaryOperation operation)
+    private static void Write(LogStreamWriter writer, JsonDictionaryOperation operation)
     {
         JsonOperationCodecWriter.Write(
             writer,

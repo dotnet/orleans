@@ -212,7 +212,7 @@ public class JsonCodecTests
         var format = new JsonLinesLogFormat();
         using var writer = format.CreateWriter();
 
-        var accepted = writer.CreateLogWriter(new LogStreamId(8)).TryAppendFormattedEntry(JsonFormattedLogEntry.Create(42, static (jsonWriter, value) =>
+        var accepted = writer.CreateLogStreamWriter(new LogStreamId(8)).TryAppendFormattedEntry(JsonFormattedLogEntry.Create(42, static (jsonWriter, value) =>
         {
             jsonWriter.WriteStringValue(JsonLogEntryCommands.Set);
             jsonWriter.WriteNumberValue(value);
@@ -223,24 +223,24 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonValueCodec_LogWriterOverload_UsesFormattedEntryForJsonWriter()
+    public void JsonValueCodec_LogStreamWriterOverload_UsesFormattedEntryForJsonWriter()
     {
         var format = new JsonLinesLogFormat();
         using var writer = format.CreateWriter();
         var codec = new JsonValueOperationCodec<int>(Options);
 
-        codec.WriteSet(42, writer.CreateLogWriter(new LogStreamId(8)));
+        codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
 
         Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
     }
 
     [Fact]
-    public void JsonValueCodec_LogWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
+    public void JsonValueCodec_LogStreamWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
     {
-        using var writer = new LogSegmentBuffer();
+        using var writer = new OrleansBinaryLogBatchWriter();
         var codec = new JsonValueOperationCodec<int>(Options);
 
-        codec.WriteSet(42, writer.CreateLogWriter(new LogStreamId(8)));
+        codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
 
         using var committed = writer.GetCommittedBuffer();
         var bytes = committed.ToArray();
@@ -258,7 +258,7 @@ public class JsonCodecTests
         using var writer = format.CreateWriter();
 
         AppendValueSet(writer, 8, 42);
-        using (var aborted = writer.CreateLogWriter(new LogStreamId(9)).BeginEntry())
+        using (var aborted = writer.CreateLogStreamWriter(new LogStreamId(9)).BeginEntry())
         {
             aborted.Writer.Write("""["set",100"""u8);
         }
@@ -477,7 +477,7 @@ public class JsonCodecTests
     {
         var format = new JsonLinesLogFormat();
         using var writer = format.CreateWriter();
-        var logWriter = writer.CreateLogWriter(new LogStreamId(8));
+        var logWriter = writer.CreateLogStreamWriter(new LogStreamId(8));
 
         var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
 
@@ -521,16 +521,16 @@ public class JsonCodecTests
 
     private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
 
-    private static string GetString(ILogSegmentWriter writer)
+    private static string GetString(ILogBatchWriter writer)
     {
         using var buffer = writer.GetCommittedBuffer();
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private static void AppendValueSet(ILogSegmentWriter writer, ulong streamId, int value)
+    private static void AppendValueSet(ILogBatchWriter writer, ulong streamId, int value)
     {
         var codec = new JsonValueOperationCodec<int>(Options);
-        using var entry = writer.CreateLogWriter(new LogStreamId(streamId)).BeginEntry();
+        using var entry = writer.CreateLogStreamWriter(new LogStreamId(streamId)).BeginEntry();
         codec.WriteSet(value, entry.Writer);
         entry.Commit();
     }
@@ -552,7 +552,7 @@ public class JsonCodecTests
         return consumer.Entries;
     }
 
-    private static void ReadOne(JsonLinesLogFormat format, string jsonLines, ILogStreamStateMachineResolver resolver)
+    private static void ReadOne(JsonLinesLogFormat format, string jsonLines, IStateMachineResolver resolver)
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
@@ -563,7 +563,7 @@ public class JsonCodecTests
 
     private sealed record RecordedLogEntry(LogStreamId StreamId, byte[] Payload);
 
-    private sealed class RecordingLogEntrySink : ILogStreamStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
+    private sealed class RecordingLogEntrySink : IStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
     {
         private LogStreamId _streamId;
 
@@ -583,13 +583,13 @@ public class JsonCodecTests
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        public void Reset(LogWriter storage) { }
-        public void AppendEntries(LogWriter writer) { }
-        public void AppendSnapshot(LogWriter writer) { }
+        public void Reset(LogStreamWriter storage) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class SingleStateMachineResolver(IDurableStateMachine stateMachine) : ILogStreamStateMachineResolver
+    private sealed class SingleStateMachineResolver(IDurableStateMachine stateMachine) : IStateMachineResolver
     {
         public IDurableStateMachine ResolveStateMachine(LogStreamId streamId) => stateMachine;
     }
@@ -601,9 +601,9 @@ public class JsonCodecTests
         public object OperationCodec => codec;
 
         public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
-        public void Reset(LogWriter storage) { }
-        public void AppendEntries(LogWriter writer) { }
-        public void AppendSnapshot(LogWriter writer) { }
+        public void Reset(LogStreamWriter storage) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
@@ -614,9 +614,9 @@ public class JsonCodecTests
         public object OperationCodec { get; } = new();
 
         public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
-        public void Reset(LogWriter storage) { }
-        public void AppendEntries(LogWriter writer) { }
-        public void AppendSnapshot(LogWriter writer) { }
+        public void Reset(LogStreamWriter storage) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 

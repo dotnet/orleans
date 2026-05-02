@@ -10,7 +10,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Queue_Enqueue_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var queue = new DurableQueue<int>("queue", new TestLogManager(writer), new ThrowingQueueCodec<int>(throwOnEnqueue: true));
 
         Assert.Throws<InvalidOperationException>(() => queue.Enqueue(1));
@@ -22,7 +22,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Queue_Dequeue_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var queue = new DurableQueue<int>("queue", new TestLogManager(writer), new ThrowingQueueCodec<int>(throwOnDequeue: true));
         ((IDurableQueueOperationHandler<int>)queue).ApplyEnqueue(1);
 
@@ -36,7 +36,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_Add_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var set = new DurableSet<int>("set", new TestLogManager(writer), new ThrowingSetCodec<int>(throwOnAdd: true));
 
         Assert.Throws<InvalidOperationException>(() => set.Add(1));
@@ -48,7 +48,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_Remove_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var set = new DurableSet<int>("set", new TestLogManager(writer), new ThrowingSetCodec<int>(throwOnRemove: true));
         ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
 
@@ -61,7 +61,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_IntersectWith_DoesNotMutateWhenSnapshotEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var set = new DurableSet<int>("set", new TestLogManager(writer), new ThrowingSetCodec<int>(throwOnSnapshot: true));
         ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
         ((IDurableSetOperationHandler<int>)set).ApplyAdd(2);
@@ -76,7 +76,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Dictionary_Add_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestLogManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnSet: true));
 
         Assert.Throws<InvalidOperationException>(() => dictionary.Add(1, 1));
@@ -88,7 +88,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Dictionary_Set_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestLogManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnSet: true));
         ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
 
@@ -101,7 +101,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Dictionary_Remove_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestLogManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnRemove: true));
         ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
 
@@ -114,7 +114,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Collections_UseDirectEntryWriter()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var manager = new TestLogManager(writer);
         var queue = new DurableQueue<int>("queue", manager, new DirectQueueCodec<int>());
         var set = new DurableSet<int>("set", manager, new DirectSetCodec<int>());
@@ -130,7 +130,7 @@ public sealed class DurableCollectionDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestLogManager(TestLogWriter writer) : IStateMachineManager
+    private sealed class TestLogManager(TestLogStreamWriter writer) : IStateMachineManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
@@ -147,7 +147,7 @@ public sealed class DurableCollectionDirectWriteTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class TestLogWriter
+    private sealed class TestLogStreamWriter
     {
         private readonly OrleansBinaryLogBatchWriter _buffer = new();
 
