@@ -10,9 +10,9 @@ internal sealed class JsonLinesLogFormat : ILogFormat
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
 
-    public ILogSegmentWriter CreateWriter() => new JsonLinesLogSegmentWriter();
+    public ILogBatchWriter CreateWriter() => new JsonLinesLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -55,7 +55,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, ILogStreamStateMachineResolver resolver)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateMachineResolver resolver)
     {
         JsonElement logEntry;
 
@@ -176,7 +176,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         return true;
     }
 
-    private sealed class JsonLinesLogSegmentWriter : LogSegmentWriterBase
+    private sealed class JsonLinesLogSegmentWriter : LogBatchWriterBase
     {
         private readonly ArcBufferWriter _buffer = new();
         private readonly ArcBufferWriter _payload = new();

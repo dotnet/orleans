@@ -9,10 +9,10 @@ internal sealed class ProtobufLogFormat : ILogFormat
     private const uint StreamIdFieldNumber = 1;
     private const uint PayloadFieldNumber = 2;
 
-    public ILogSegmentWriter CreateWriter()
+    public ILogBatchWriter CreateWriter()
         => new ProtobufLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, ILogStreamStateMachineResolver resolver, bool isCompleted)
+    public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -69,7 +69,7 @@ internal sealed class ProtobufLogFormat : ILogFormat
         return true;
     }
 
-    private sealed class ProtobufLogSegmentWriter : LogSegmentWriterBase
+    private sealed class ProtobufLogSegmentWriter : LogBatchWriterBase
     {
         private readonly ArcBufferWriter _buffer = new();
         private readonly ArcBufferWriter _payload = new();
@@ -149,7 +149,7 @@ internal sealed class ProtobufLogFormat : ILogFormat
                 return false;
             }
 
-            using var logEntry = CreateLogWriter(streamId).BeginEntry();
+            using var logEntry = CreateLogStreamWriter(streamId).BeginEntry();
             logEntry.Writer.Write(protobufEntry.Payload.Span);
             logEntry.Commit();
             return true;

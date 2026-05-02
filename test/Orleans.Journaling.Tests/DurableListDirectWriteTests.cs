@@ -10,7 +10,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Add_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingAddCodec<int>());
 
         var thrown = false;
@@ -31,7 +31,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Add_UsesDirectEntryWriter()
     {
-        var writer = new TestLogWriter();
+        var writer = new TestLogStreamWriter();
         var list = new DurableList<int>("list", new TestLogManager(writer), new DirectAddCodec<int>());
 
         list.Add(1);
@@ -41,7 +41,7 @@ public sealed class DurableListDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestLogManager(TestLogWriter writer) : IStateMachineManager
+    private sealed class TestLogManager(TestLogStreamWriter writer) : IStateMachineManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
@@ -58,7 +58,7 @@ public sealed class DurableListDirectWriteTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class TestLogWriter
+    private sealed class TestLogStreamWriter
     {
         private readonly OrleansBinaryLogBatchWriter _buffer = new();
 

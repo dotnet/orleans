@@ -151,8 +151,8 @@ public class StateMachineManagerTests : JournalingTestBase
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
         Assert.Empty(storage.Replaces);
-        Assert.Contains(0UL, writer.CreatedLogWriterIds);
-        Assert.Contains(writer.CreatedLogWriterIds, id => id >= 8);
+        Assert.Contains(0UL, writer.CreatedLogStreamWriterIds);
+        Assert.Contains(writer.CreatedLogStreamWriterIds, id => id >= 8);
         Assert.True(writer.GetCommittedBufferCount > 0);
         Assert.True(writer.ResetCount > 0);
     }
@@ -171,7 +171,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
-        Assert.Contains(writer.CreatedLogWriterIds, id => id >= 8);
+        Assert.Contains(writer.CreatedLogStreamWriterIds, id => id >= 8);
         Assert.True(storage.Appends[0].Length > 0);
     }
 
@@ -1052,7 +1052,7 @@ public class StateMachineManagerTests : JournalingTestBase
     {
         private readonly OrleansBinaryLogBatchWriter _inner = new();
 
-        public List<ulong> CreatedLogWriterIds { get; } = [];
+        public List<ulong> CreatedLogStreamWriterIds { get; } = [];
 
         public List<ulong> BeganEntryIds { get; } = [];
 
@@ -1064,7 +1064,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId)
         {
-            CreatedLogWriterIds.Add(streamId.Value);
+            CreatedLogStreamWriterIds.Add(streamId.Value);
             return new(streamId, new TrackingLogStreamWriterTarget(this));
         }
 

@@ -6,7 +6,7 @@ namespace Orleans.Journaling.Json;
 internal static class JsonOperationCodecWriter
 {
     public static void Write<TArg>(
-        LogWriter writer,
+        LogStreamWriter writer,
         TArg argument,
         Action<Utf8JsonWriter, TArg> writeJsonArrayElements,
         Action<IBufferWriter<byte>, TArg> writeBytes)

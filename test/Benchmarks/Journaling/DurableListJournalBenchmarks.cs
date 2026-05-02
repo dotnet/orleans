@@ -18,8 +18,8 @@ public class DurableListJournalBenchmarks
     private ILogFormat _logFormat;
     private DurableList<int> _list;
     private IDurableStateMachine _stateMachine;
-    private LogSegmentBuffer _writeBuffer;
-    private LogSegmentBuffer _encodedLogWriter;
+    private OrleansBinaryLogBatchWriter _writeBuffer;
+    private OrleansBinaryLogBatchWriter _encodedLogStreamWriter;
     private ArcBuffer _encodedLogData;
     private ArcBufferWriter _recoveryBuffer;
     private RecoveryConsumer _recoveryConsumer;
@@ -29,7 +29,7 @@ public class DurableListJournalBenchmarks
     {
         _codec = new OrleansBinaryListOperationCodec<int>(RawInt32LogValueCodec.Instance);
         _logFormat = OrleansBinaryLogFormat.Instance;
-        _writeBuffer = new LogSegmentBuffer();
+        _writeBuffer = new OrleansBinaryLogBatchWriter();
         _list = new DurableList<int>("list", new BenchmarkLogManager(_writeBuffer, ListLogStreamId), _codec);
         _stateMachine = _list;
         _recoveryConsumer = new RecoveryConsumer(ListLogStreamId, _codec, OperationsPerInvocation);
@@ -45,7 +45,7 @@ public class DurableListJournalBenchmarks
     {
         _encodedLogData.Dispose();
         _recoveryBuffer.Dispose();
-        _encodedLogWriter.Dispose();
+        _encodedLogStreamWriter.Dispose();
         _writeBuffer.Dispose();
     }
 
@@ -83,13 +83,13 @@ public class DurableListJournalBenchmarks
     private void ResetWritePath()
     {
         _writeBuffer.Reset();
-        _stateMachine.Reset(_writeBuffer.CreateLogWriter(ListLogStreamId));
+        _stateMachine.Reset(_writeBuffer.CreateLogStreamWriter(ListLogStreamId));
     }
 
     private ArcBuffer CreateEncodedLogData()
     {
-        _encodedLogWriter = new LogSegmentBuffer();
-        var writer = _encodedLogWriter.CreateLogWriter(ListLogStreamId);
+        _encodedLogStreamWriter = new OrleansBinaryLogBatchWriter();
+        var writer = _encodedLogStreamWriter.CreateLogStreamWriter(ListLogStreamId);
         for (var i = 0; i < OperationsPerInvocation; i++)
         {
             using var entry = writer.BeginEntry();
@@ -97,7 +97,7 @@ public class DurableListJournalBenchmarks
             entry.Commit();
         }
 
-        return _encodedLogWriter.GetCommittedBuffer();
+        return _encodedLogStreamWriter.GetCommittedBuffer();
     }
 
     private void ValidateEncodedLogData()
@@ -147,11 +147,11 @@ public class DurableListJournalBenchmarks
         }
     }
 
-    private sealed class BenchmarkLogManager(LogSegmentBuffer buffer, LogStreamId streamId) : ILogManager
+    private sealed class BenchmarkLogManager(OrleansBinaryLogBatchWriter buffer, LogStreamId streamId) : IStateMachineManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
-        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) => stateMachine.Reset(buffer.CreateLogWriter(streamId));
+        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) => stateMachine.Reset(buffer.CreateLogStreamWriter(streamId));
 
         public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine stateMachine)
         {
@@ -167,7 +167,7 @@ public class DurableListJournalBenchmarks
     private sealed class RecoveryConsumer(
         LogStreamId expectedStreamId,
         IDurableListOperationCodec<int> codec,
-        int capacity) : ILogStreamStateMachineResolver, IDurableStateMachine, IDurableListOperationHandler<int>
+        int capacity) : IStateMachineResolver, IDurableStateMachine, IDurableListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -192,9 +192,9 @@ public class DurableListJournalBenchmarks
             codec.Apply(payload, this);
         }
 
-        void IDurableStateMachine.Reset(LogWriter storage) => Reset();
-        void IDurableStateMachine.AppendEntries(LogWriter writer) { }
-        void IDurableStateMachine.AppendSnapshot(LogWriter writer) { }
+        void IDurableStateMachine.Reset(LogStreamWriter storage) => Reset();
+        void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
+        void IDurableStateMachine.AppendSnapshot(LogStreamWriter writer) { }
         IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
 
         public void ApplyAdd(int item) => _items.Add(item);

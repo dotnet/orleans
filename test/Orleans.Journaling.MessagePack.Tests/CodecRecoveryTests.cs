@@ -108,13 +108,13 @@ public sealed class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(17, await tcs2.Task);
     }
 
-    private (ILogManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithMessagePackCodec(ILogStorage storage)
+    private (IStateMachineManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithMessagePackCodec(ILogStorage storage)
     {
         var logStreamIdsCodec = new MessagePackDictionaryOperationCodec<string, ulong>(SerializerOptions);
         var retirementTrackerCodec = new MessagePackDictionaryOperationCodec<string, DateTime>(SerializerOptions);
-        var manager = new LogManager(
+        var manager = new LogStateMachineManager(
             storage,
-            LoggerFactory.CreateLogger<LogManager>(),
+            LoggerFactory.CreateLogger<LogStateMachineManager>(),
             Microsoft.Extensions.Options.Options.Create(ManagerOptions),
             logStreamIdsCodec,
             retirementTrackerCodec,

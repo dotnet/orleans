@@ -139,8 +139,8 @@ public sealed class MessagePackCodecTests
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
 
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(300)), [0xCC]);
 
         using var data = writer.GetCommittedBuffer();
 
@@ -157,8 +157,8 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(300)), [0xCC]);
         using var data = writer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
@@ -183,13 +183,13 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var firstWriter = format.CreateWriter();
-        AppendEntry(firstWriter.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(firstWriter.CreateLogStreamWriter(new LogStreamId(8)), [0xAA, 0xBB]);
         using var firstData = firstWriter.GetCommittedBuffer();
         var firstBytes = firstData.ToArray();
 
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [0xAA, 0xBB]);
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(300)), [0xCC]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(300)), [0xCC]);
         using var fullData = writer.GetCommittedBuffer();
         var partialBytes = fullData.ToArray()[..^1];
         using var data = CreateWriter(partialBytes);
@@ -212,11 +212,11 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [1]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(8)), [1]);
         using var beforeAbort = writer.GetCommittedBuffer();
         var committedBytes = beforeAbort.ToArray();
 
-        using (var aborted = writer.CreateLogWriter(new LogStreamId(9)).BeginEntry())
+        using (var aborted = writer.CreateLogStreamWriter(new LogStreamId(9)).BeginEntry())
         {
             aborted.Writer.Write([2, 3, 4]);
         }
@@ -230,10 +230,10 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(8)), [1]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(8)), [1]);
 
         writer.Reset();
-        AppendEntry(writer.CreateLogWriter(new LogStreamId(9)), [2]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(9)), [2]);
         using var data = writer.GetCommittedBuffer();
         var consumer = new CollectingConsumer();
 
@@ -249,7 +249,7 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        var entry = writer.CreateLogWriter(new LogStreamId(8)).BeginEntry();
+        var entry = writer.CreateLogStreamWriter(new LogStreamId(8)).BeginEntry();
         entry.Writer.Write([1]);
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -266,7 +266,7 @@ public sealed class MessagePackCodecTests
     {
         var format = new MessagePackLogFormat();
         using var writer = format.CreateWriter();
-        var logWriter = writer.CreateLogWriter(new LogStreamId(8));
+        var logWriter = writer.CreateLogStreamWriter(new LogStreamId(8));
 
         var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
 
@@ -293,7 +293,7 @@ public sealed class MessagePackCodecTests
         Assert.Empty(consumer.Entries);
     }
 
-    private static void AppendEntry(LogWriter writer, ReadOnlySpan<byte> payload)
+    private static void AppendEntry(LogStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
@@ -307,7 +307,7 @@ public sealed class MessagePackCodecTests
         return writer;
     }
 
-    private static void ReadAll(MessagePackLogFormat format, ArcBuffer data, ILogStreamStateMachineResolver consumer)
+    private static void ReadAll(MessagePackLogFormat format, ArcBuffer data, IStateMachineResolver consumer)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
@@ -435,7 +435,7 @@ public sealed class MessagePackCodecTests
         public void ApplyCanceled() => Commands.Add("canceled");
     }
 
-    private sealed class CollectingConsumer : ILogStreamStateMachineResolver, IDurableStateMachine
+    private sealed class CollectingConsumer : IStateMachineResolver, IDurableStateMachine
     {
         private LogStreamId _streamId;
 
@@ -451,9 +451,9 @@ public sealed class MessagePackCodecTests
 
         public void Apply(ReadOnlySequence<byte> payload) => Entries.Add((_streamId.Value, payload.ToArray()));
 
-        public void Reset(LogWriter storage) { }
-        public void AppendEntries(LogWriter writer) { }
-        public void AppendSnapshot(LogWriter writer) { }
+        public void Reset(LogStreamWriter storage) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
