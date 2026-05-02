@@ -90,27 +90,24 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         _serviceProvider = serviceProvider;
         _membershipService = membershipService;
         _logger = logger;
-        var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(DirectoryMembershipSnapshot.PartitionsPerSilo);
-        for (var i = 0; i < DirectoryMembershipSnapshot.PartitionsPerSilo; i++)
+        var partitionsPerSilo = membershipService.PartitionsPerSilo;
+        var partitions = ImmutableArray.CreateBuilder<GrainDirectoryPartition>(partitionsPerSilo);
+        for (var i = 0; i < partitionsPerSilo; i++)
         {
             partitions.Add(new GrainDirectoryPartition(i, this, grainFactory, shared));
         }
 
         _partitions = partitions.ToImmutable();
         shared.ActivationDirectory.RecordNewTarget(this);
+
+        // Register IRemoteGrainDirectory system targets so that silos running LocalGrainDirectory
+        // can forward directory requests to this silo during a rolling upgrade.
+        DistributedRemoteGrainDirectory.Create(this, membershipService, shared);
     }
 
-    public async Task<GrainAddress?> Lookup(GrainId grainId) => await InvokeAsync(
-        grainId,
-        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId),
-        grainId,
-        CancellationToken.None);
+    public async Task<GrainAddress?> Lookup(GrainId grainId) => await LookupAsync(grainId, CancellationToken.None);
 
-    public async Task<GrainAddress?> Register(GrainAddress address) => await InvokeAsync(
-        address.GrainId,
-        static (partition, version, address, cancellationToken) => partition.RegisterAsync(version, address, null),
-        address,
-        CancellationToken.None);
+    public async Task<GrainAddress?> Register(GrainAddress address) => await RegisterAsync(address, null, CancellationToken.None);
 
     public async Task Unregister(GrainAddress address) => await InvokeAsync(
         address.GrainId,
@@ -118,13 +115,27 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         address,
         CancellationToken.None);
 
-    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await InvokeAsync(
+    public async Task<GrainAddress?> Register(GrainAddress address, GrainAddress? previousAddress) => await RegisterAsync(address, previousAddress, CancellationToken.None);
+
+    public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
+
+    internal Task<GrainAddress?> LookupAsync(GrainId grainId, CancellationToken cancellationToken) => InvokeAsync(
+        grainId,
+        static (partition, version, grainId, cancellationToken) => partition.LookupAsync(version, grainId),
+        grainId,
+        cancellationToken);
+
+    internal async Task<GrainAddress?> RegisterAsync(GrainAddress address, GrainAddress? previousAddress, CancellationToken cancellationToken) => await InvokeAsync(
         address.GrainId,
         static (partition, version, state, cancellationToken) => partition.RegisterAsync(version, state.Address, state.PreviousAddress),
         (Address: address, PreviousAddress: previousAddress),
-        CancellationToken.None);
+        cancellationToken);
 
-    public Task UnregisterSilos(List<SiloAddress> siloAddresses) => Task.CompletedTask;
+    internal Task UnregisterAsync(GrainAddress address, CancellationToken cancellationToken) => InvokeAsync(
+        address.GrainId,
+        static (partition, version, address, cancellationToken) => partition.DeregisterAsync(version, address),
+        address,
+        cancellationToken);
 
     private async Task<TResult> InvokeAsync<TState, TResult>(
         GrainId grainId,
