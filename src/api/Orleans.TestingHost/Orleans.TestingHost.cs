@@ -547,6 +547,80 @@ namespace Orleans.TestingHost
     }
 }
 
+namespace Orleans.TestingHost.Diagnostics
+{
+    public readonly partial struct DiagnosticEvent : System.IEquatable<DiagnosticEvent>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public DiagnosticEvent(string Name, object? Payload, System.DateTimeOffset Timestamp) { }
+
+        public string Name { get { throw null; } init { } }
+
+        public object? Payload { get { throw null; } init { } }
+
+        public System.DateTimeOffset Timestamp { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out string Name, out object? Payload, out System.DateTimeOffset Timestamp) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(DiagnosticEvent other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(DiagnosticEvent left, DiagnosticEvent right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(DiagnosticEvent left, DiagnosticEvent right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
+    }
+
+    public sealed partial class DiagnosticEventCollector : System.IDisposable, System.IObserver<System.Diagnostics.DiagnosticListener>, System.IObserver<System.Collections.Generic.KeyValuePair<string, object?>>
+    {
+        public DiagnosticEventCollector(System.Collections.Generic.IEnumerable<string>? listenerPrefixes = null) { }
+
+        public DiagnosticEventCollector(params string[] listenerPrefixes) { }
+
+        public System.Collections.Generic.IReadOnlyList<DiagnosticEvent> Events { get { throw null; } }
+
+        public void Clear() { }
+
+        public System.Threading.Tasks.TaskCompletionSource<DiagnosticEvent> CreateEventAwaiter(string eventName) { throw null; }
+
+        public void Dispose() { }
+
+        public int GetEventCount(string eventName) { throw null; }
+
+        public System.Collections.Generic.IEnumerable<DiagnosticEvent> GetEvents(string eventName) { throw null; }
+
+        void System.IObserver<System.Collections.Generic.KeyValuePair<string, object>>.OnCompleted() { }
+
+        void System.IObserver<System.Collections.Generic.KeyValuePair<string, object>>.OnError(System.Exception error) { }
+
+        void System.IObserver<System.Collections.Generic.KeyValuePair<string, object>>.OnNext(System.Collections.Generic.KeyValuePair<string, object?> kvp) { }
+
+        void System.IObserver<System.Diagnostics.DiagnosticListener>.OnCompleted() { }
+
+        void System.IObserver<System.Diagnostics.DiagnosticListener>.OnError(System.Exception error) { }
+
+        void System.IObserver<System.Diagnostics.DiagnosticListener>.OnNext(System.Diagnostics.DiagnosticListener listener) { }
+
+        public System.Threading.Tasks.Task<DiagnosticEvent> WaitForEventAsync(string eventName, System.Func<DiagnosticEvent, bool> predicate, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<DiagnosticEvent> WaitForEventAsync(string eventName, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.Task<System.Collections.Generic.IReadOnlyList<DiagnosticEvent>> WaitForEventCountAsync(string eventName, int expectedCount, System.TimeSpan timeout, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+}
+
 namespace Orleans.TestingHost.Logging
 {
     public partial class FileLogger : Microsoft.Extensions.Logging.ILogger
@@ -581,6 +655,97 @@ namespace Orleans.TestingHost.Logging
         public void Dispose() { }
 
         public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception exception, System.Func<TState, System.Exception, string> formatter, string category) { }
+    }
+
+    public sealed partial class InMemoryLogBuffer
+    {
+        public System.Collections.Generic.IReadOnlyList<LogEntry> AllEntries { get { throw null; } }
+
+        public long ApproximateSizeBytes { get { throw null; } }
+
+        public bool HasWarningsOrErrors { get { throw null; } }
+
+        public void AssertNoWarningsOrErrors() { }
+
+        public void Clear() { }
+
+        public string FormatAllEntries() { throw null; }
+
+        public (string Content, long SizeBytes) FormatAllEntriesWithSize() { throw null; }
+
+        public string FormatEntries(Microsoft.Extensions.Logging.LogLevel minimumLevel) { throw null; }
+
+        public (string Content, long SizeBytes) FormatEntriesWithSize(Microsoft.Extensions.Logging.LogLevel minimumLevel) { throw null; }
+
+        public System.Collections.Generic.IEnumerable<LogEntry> GetEntries(Microsoft.Extensions.Logging.LogLevel minimumLevel) { throw null; }
+
+        public bool HasEntriesAtOrAbove(Microsoft.Extensions.Logging.LogLevel level) { throw null; }
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter, string category) { }
+    }
+
+    public sealed partial class InMemoryLogger : Microsoft.Extensions.Logging.ILogger
+    {
+        public InMemoryLogger(string categoryName, InMemoryLogBuffer buffer) { }
+
+        public System.IDisposable? BeginScope<TState>(TState state) { throw null; }
+
+        public bool IsEnabled(Microsoft.Extensions.Logging.LogLevel logLevel) { throw null; }
+
+        public void Log<TState>(Microsoft.Extensions.Logging.LogLevel logLevel, Microsoft.Extensions.Logging.EventId eventId, TState state, System.Exception? exception, System.Func<TState, System.Exception?, string> formatter) { }
+    }
+
+    public sealed partial class InMemoryLoggerProvider : Microsoft.Extensions.Logging.ILoggerProvider, System.IDisposable
+    {
+        public InMemoryLoggerProvider() { }
+
+        public InMemoryLoggerProvider(InMemoryLogBuffer sharedBuffer) { }
+
+        public InMemoryLogBuffer Buffer { get { throw null; } }
+
+        public Microsoft.Extensions.Logging.ILogger CreateLogger(string categoryName) { throw null; }
+
+        public void Dispose() { }
+    }
+
+    public readonly partial struct LogEntry : System.IEquatable<LogEntry>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public LogEntry(System.DateTimeOffset Timestamp, Microsoft.Extensions.Logging.LogLevel LogLevel, string Category, Microsoft.Extensions.Logging.EventId EventId, string Message, System.Exception? Exception) { }
+
+        public string Category { get { throw null; } init { } }
+
+        public Microsoft.Extensions.Logging.EventId EventId { get { throw null; } init { } }
+
+        public System.Exception? Exception { get { throw null; } init { } }
+
+        public Microsoft.Extensions.Logging.LogLevel LogLevel { get { throw null; } init { } }
+
+        public string Message { get { throw null; } init { } }
+
+        public System.DateTimeOffset Timestamp { get { throw null; } init { } }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly void Deconstruct(out System.DateTimeOffset Timestamp, out Microsoft.Extensions.Logging.LogLevel LogLevel, out string Category, out Microsoft.Extensions.Logging.EventId EventId, out string Message, out System.Exception? Exception) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public readonly bool Equals(LogEntry other) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly bool Equals(object obj) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly int GetHashCode() { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator ==(LogEntry left, LogEntry right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public static bool operator !=(LogEntry left, LogEntry right) { throw null; }
+
+        [System.Runtime.CompilerServices.CompilerGenerated]
+        public override readonly string ToString() { throw null; }
     }
 }
 

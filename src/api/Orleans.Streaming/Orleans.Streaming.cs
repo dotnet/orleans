@@ -1109,6 +1109,120 @@ namespace Orleans.Runtime.Providers
     }
 }
 
+namespace Orleans.Streaming.Diagnostics
+{
+    public static partial class StreamingEvents
+    {
+        public const string ListenerName = "Orleans.Streaming";
+        public static System.IObservable<StreamingEvent> AllEvents { get { throw null; } }
+
+        public sealed partial class BalancerChanged : StreamingEvent
+        {
+            public readonly Streams.QueueId[] CurrentQueues;
+            public readonly Streams.QueueId[] PreviousQueues;
+            public readonly Streams.IStreamQueueBalancer QueueBalancer;
+            public BalancerChanged(string streamProvider, Runtime.SiloAddress? siloAddress, Streams.QueueId[] previousQueues, Streams.QueueId[] currentQueues, Streams.IStreamQueueBalancer queueBalancer) : base(default!, default) { }
+        }
+
+        public sealed partial class ConsumerCursorDrained : StreamingEvent
+        {
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public ConsumerCursorDrained(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class ItemDelivered : StreamingEvent
+        {
+            public readonly Streams.StreamSequenceToken? SequenceToken;
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public ItemDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Streams.StreamSequenceToken? sequenceToken) : base(default!, default) { }
+        }
+
+        public sealed partial class MessageDelivered : StreamingEvent
+        {
+            public readonly Streams.IBatchContainer Batch;
+            public readonly Runtime.IAddressable Consumer;
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public MessageDelivered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress, Runtime.IAddressable consumer, Streams.IBatchContainer batch) : base(default!, default) { }
+        }
+
+        public sealed partial class ProducerRegistered : StreamingEvent
+        {
+            public readonly Runtime.GrainId ProducerGrainId;
+            public readonly Runtime.StreamId StreamId;
+            public ProducerRegistered(string streamProvider, Runtime.StreamId streamId, Runtime.GrainId producerGrainId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class ProducerUnregistered : StreamingEvent
+        {
+            public readonly Runtime.GrainId ProducerGrainId;
+            public readonly Runtime.StreamId StreamId;
+            public ProducerUnregistered(string streamProvider, Runtime.StreamId streamId, Runtime.GrainId producerGrainId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class StreamInactive : StreamingEvent
+        {
+            public readonly System.TimeSpan InactivityPeriod;
+            public readonly Runtime.StreamId StreamId;
+            public StreamInactive(string streamProvider, Runtime.StreamId streamId, System.TimeSpan inactivityPeriod, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public abstract partial class StreamingEvent
+        {
+            public readonly Runtime.SiloAddress? SiloAddress;
+            public readonly string StreamProvider;
+            protected StreamingEvent(string streamProvider, Runtime.SiloAddress? siloAddress) { }
+        }
+
+        public sealed partial class SubscriptionAdded : StreamingEvent
+        {
+            public readonly Runtime.GrainId ConsumerGrainId;
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public SubscriptionAdded(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.GrainId consumerGrainId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class SubscriptionAttached : StreamingEvent
+        {
+            public readonly Runtime.GrainId ConsumerGrainId;
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public SubscriptionAttached(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.GrainId consumerGrainId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class SubscriptionDetached : StreamingEvent
+        {
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public SubscriptionDetached(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class SubscriptionRegistered : StreamingEvent
+        {
+            public readonly Runtime.GrainId ConsumerGrainId;
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public SubscriptionRegistered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.GrainId consumerGrainId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class SubscriptionRemoved : StreamingEvent
+        {
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public SubscriptionRemoved(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+
+        public sealed partial class SubscriptionUnregistered : StreamingEvent
+        {
+            public readonly Runtime.StreamId StreamId;
+            public readonly System.Guid SubscriptionId;
+            public SubscriptionUnregistered(string streamProvider, Runtime.StreamId streamId, System.Guid subscriptionId, Runtime.SiloAddress? siloAddress) : base(default!, default) { }
+        }
+    }
+}
+
 namespace Orleans.Streams
 {
     public partial class AggregatedQueueFlowController : System.Collections.Generic.List<IQueueFlowController>, IQueueFlowController
