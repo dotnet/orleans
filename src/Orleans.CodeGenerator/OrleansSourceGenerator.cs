@@ -1,90 +1,212 @@
-using System;
-using System.Diagnostics;
-using System.Linq;
 using System.Text;
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
+using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Text;
-using Orleans.CodeGenerator.Diagnostics;
 using Orleans.CodeGenerator.Model;
 
-#pragma warning disable RS1035 // Do not use APIs banned for analyzers
-namespace Orleans.CodeGenerator
+namespace Orleans.CodeGenerator;
+
+[Generator]
+public sealed class OrleansSerializationSourceGenerator : IIncrementalGenerator
 {
-    [Generator]
-    public class OrleansSerializationSourceGenerator : ISourceGenerator
+    internal const string GeneratorOptionsTrackingName = "Orleans.GeneratorOptions";
+    internal const string AssemblyNameTrackingName = "Orleans.AssemblyName";
+    internal const string SerializableTypeResultsTrackingName = "Orleans.SerializableTypeResults";
+    internal const string CollectedSerializableTypesTrackingName = "Orleans.CollectedSerializableTypes";
+    internal const string DirectProxyInterfacesTrackingName = "Orleans.DirectProxyInterfaces";
+    internal const string InheritedProxyInterfacesTrackingName = "Orleans.InheritedProxyInterfaces";
+    internal const string CollectedProxyInterfacesTrackingName = "Orleans.CollectedProxyInterfaces";
+    internal const string PreparedProxyOutputsTrackingName = "Orleans.PreparedProxyOutputs";
+    internal const string ReferenceAssemblyDataTrackingName = "Orleans.ReferenceAssemblyData";
+    internal const string MetadataAggregateTrackingName = "Orleans.MetadataAggregate";
+    internal const string SerializerOutputsTrackingName = "Orleans.SerializerOutputs";
+    internal const string ReferencedSerializerOutputsTrackingName = "Orleans.ReferencedSerializerOutputs";
+    internal const string ProxyOutputsTrackingName = "Orleans.ProxyOutputs";
+    internal const string MetadataOutputsTrackingName = "Orleans.MetadataOutputs";
+
+
+    public void Initialize(IncrementalGeneratorInitializationContext context)
     {
-        public void Execute(GeneratorExecutionContext context)
+        var generatorOptions = context.AnalyzerConfigOptionsProvider
+            .Select(static (provider, _) => SourceGeneratorOptionsParser.ParseOptions(provider.GlobalOptions))
+            .WithTrackingName(GeneratorOptionsTrackingName);
+        var compilationProvider = context.CompilationProvider;
+        var assemblyNameProvider = compilationProvider
+            .Select(static (compilation, _) => compilation.AssemblyName ?? "assembly")
+            .WithTrackingName(AssemblyNameTrackingName);
+
+        // Incremental discovery of [GenerateSerializer] types
+        var serializableTypeContexts = context.SyntaxProvider
+            .ForAttributeWithMetadataName<GeneratorAttributeSyntaxContext>(
+                "Orleans.GenerateSerializerAttribute",
+                predicate: static (node, _) => node is TypeDeclarationSyntax or EnumDeclarationSyntax,
+                transform: static (ctx, _) => ctx);
+
+        var serializableTypeResults = serializableTypeContexts
+            .Combine(generatorOptions)
+            .Select(static (input, ct) => SerializableSourceOutputGenerator.CreateSerializableTypeResult(
+                input.Left,
+                input.Right,
+                ct))
+            .WithTrackingName(SerializableTypeResultsTrackingName);
+
+        var collectedSerializableTypeResults = serializableTypeResults
+            .Collect()
+            .Select(static (input, _) => GeneratedSourceOutput.DeduplicateSerializableTypeResults(input))
+            .WithComparer(ImmutableArrayComparer<SerializableTypeResult>.Instance);
+
+        var collectedTypes = collectedSerializableTypeResults
+            .Select(static (input, _) => GeneratedSourceOutput.GetSerializableTypeModels(input))
+            .WithComparer(ImmutableArrayComparer<SerializableTypeModel>.Instance)
+            .WithTrackingName(CollectedSerializableTypesTrackingName);
+
+        context.RegisterSourceOutput(collectedSerializableTypeResults.SelectMany(static (input, _) => input), static (productionContext, result) =>
         {
-            try
+            if (result.Diagnostic is { } diagnostic)
             {
-                var processName = Process.GetCurrentProcess().ProcessName.ToLowerInvariant();
-                if (processName.Contains("devenv") || processName.Contains("servicehub"))
-                {
-                    return;
-                }
-
-                if (!Debugger.IsAttached &&
-                    context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_designtimebuild", out var isDesignTimeBuild)
-                    && string.Equals("true", isDesignTimeBuild, StringComparison.OrdinalIgnoreCase))
-                {
-                    return;
-                }
-
-                if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_attachdebugger", out var attachDebuggerOption)
-                    && string.Equals("true", attachDebuggerOption, StringComparison.OrdinalIgnoreCase))
-                {
-                    Debugger.Launch();
-                }
-
-                var options = new CodeGeneratorOptions();
-
-                if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleans_generatefieldids", out var generateFieldIds) && generateFieldIds is { Length: > 0 })
-                {
-                    if (Enum.TryParse(generateFieldIds, out GenerateFieldIds fieldIdOption))
-                    {
-                        options.GenerateFieldIds = fieldIdOption;
-                    }
-                }
-
-                if (context.AnalyzerConfigOptions.GlobalOptions.TryGetValue("build_property.orleansgeneratecompatibilityinvokers", out var generateCompatInvokersValue)
-                    && bool.TryParse(generateCompatInvokersValue, out var genCompatInvokers))
-                {
-                    options.GenerateCompatibilityInvokers = genCompatInvokers;
-                }
-
-                var codeGenerator = new CodeGenerator(context.Compilation, options);
-                var syntax = codeGenerator.GenerateCode(context.CancellationToken);
-                var sourceString = syntax.NormalizeWhitespace().ToFullString();
-                var sourceText = SourceText.From(sourceString, Encoding.UTF8);
-                context.AddSource($"{context.Compilation.AssemblyName ?? "assembly"}.orleans.g.cs", sourceText);
+                productionContext.ReportDiagnostic(diagnostic);
             }
-            catch (Exception exception)
-            {
-                if (!HandleException(context, exception))
-                {
-                    throw;
-                }
-            }
+        });
 
-            static bool HandleException(GeneratorExecutionContext context, Exception exception)
-            {
-                if (exception is OrleansGeneratorDiagnosticAnalysisException analysisException)
-                {
-                    context.ReportDiagnostic(analysisException.Diagnostic);
-                    return true;
-                }
+        // Attribute-driven discovery of [GenerateMethodSerializers] interfaces, plus a
+        // constrained syntax provider for interfaces which inherit the attribute from a base interface.
+        var directProxyInterfaces = context.SyntaxProvider
+            .ForAttributeWithMetadataName<ProxyInterfaceModel?>(
+                "Orleans.GenerateMethodSerializersAttribute",
+                predicate: static (node, _) => node is InterfaceDeclarationSyntax,
+                transform: static (ctx, ct) => ModelExtractor.ExtractProxyInterfaceFromAttributeContext(ctx, ct))
+            .Where(static model => model is not null)
+            .Select(static (model, _) => model!)
+            .WithTrackingName(DirectProxyInterfacesTrackingName);
 
-                context.ReportDiagnostic(UnhandledCodeGenerationExceptionDiagnostic.CreateDiagnostic(exception));
-                Console.WriteLine(exception);
-                Console.WriteLine(exception.StackTrace);
-                return false;
-            }
-        }
+        var inheritedProxyInterfaces = context.SyntaxProvider
+            .CreateSyntaxProvider(
+                predicate: static (node, _) => node is InterfaceDeclarationSyntax { BaseList: not null },
+                transform: static (ctx, ct) => ModelExtractor.ExtractInheritedProxyInterfaceFromSyntaxContext(ctx, ct))
+            .Where(static model => model is not null)
+            .Select(static (model, _) => model!)
+            .Collect()
+            .Select(static (input, _) => ModelExtractor.NormalizeProxyInterfaceModels(input))
+            .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance)
+            .WithTrackingName(InheritedProxyInterfacesTrackingName);
 
-        public void Initialize(GeneratorInitializationContext context)
+        var collectedDirectProxyInterfaces = directProxyInterfaces
+            .Collect()
+            .Select(static (input, _) => ModelExtractor.NormalizeProxyInterfaceModels(input))
+            .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance);
+
+        var collectedProxies = collectedDirectProxyInterfaces
+            .Combine(inheritedProxyInterfaces)
+            .Select(static (input, _) => ModelExtractor.MergeProxyInterfaces(input.Left, input.Right))
+            .WithComparer(ImmutableArrayComparer<ProxyInterfaceModel>.Instance)
+            .WithTrackingName(CollectedProxyInterfacesTrackingName);
+
+        var preparedProxyOutputs = collectedProxies
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .Select(static (input, ct) => ProxySourceOutputGenerator.CreateProxyOutputPreparation(input.Left.Right, input.Left.Left, input.Right, ct))
+            .WithTrackingName(PreparedProxyOutputsTrackingName);
+
+        context.RegisterSourceOutput(preparedProxyOutputs, static (productionContext, input) =>
         {
-        }
+            if (input.Diagnostic is { } diagnostic)
+            {
+                productionContext.ReportDiagnostic(diagnostic);
+            }
+        });
+
+        // Extract reference assembly data (application parts, well-known type IDs, aliases)
+        var refAssemblyDataResults = compilationProvider
+            .Combine(generatorOptions)
+            .Select(static (input, ct) => ReferenceAssemblyDataProvider.CreateReferenceAssemblyDataResult(
+                input.Left,
+                input.Right,
+                ct))
+            .WithTrackingName(ReferenceAssemblyDataTrackingName);
+
+        context.RegisterSourceOutput(refAssemblyDataResults, static (productionContext, result) =>
+        {
+            if (!result.Diagnostics.IsDefaultOrEmpty)
+            {
+                foreach (var diagnostic in result.Diagnostics)
+                {
+                    productionContext.ReportDiagnostic(diagnostic);
+                }
+            }
+        });
+
+        var refAssemblyData = refAssemblyDataResults
+            .Select(static (result, _) => result.Model);
+
+        var preparedProxyOutputModels = preparedProxyOutputs
+            .Select(static (result, _) => result.ProxyOutputModels)
+            .WithComparer(ImmutableArrayComparer<ProxyOutputModel>.Instance);
+
+        // Combine source/reference models before metadata generation.
+        var metadataAggregate = collectedTypes
+            .Combine(preparedProxyOutputModels)
+            .Combine(refAssemblyData)
+            .Select(static (input, ct) => ModelExtractor.CreateMetadataAggregate(
+                input.Right.AssemblyName,
+                input.Left.Left,
+                input.Left.Right,
+                input.Right))
+            .WithTrackingName(MetadataAggregateTrackingName);
+
+        var serializerOutputs = collectedTypes
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .Select(static (input, ct) => SerializableSourceOutputGenerator.CreateSerializableSourceOutputs(
+                input.Left.Right,
+                input.Left.Left,
+                input.Right,
+                ct))
+            .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
+            .WithTrackingName(SerializerOutputsTrackingName);
+
+        context.RegisterSourceOutput(serializerOutputs.SelectMany(static (input, _) => input), static (productionContext, input) =>
+        {
+            GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
+        });
+
+        var referencedSerializerOutputs = refAssemblyData
+            .Combine(compilationProvider)
+            .Combine(generatorOptions)
+            .Select(static (input, ct) => SerializableSourceOutputGenerator.CreateReferencedSerializableSourceOutputs(
+                input.Left.Right,
+                input.Left.Left,
+                input.Right,
+                ct))
+            .WithComparer(ImmutableArrayComparer<SourceOutputResult>.Instance)
+            .WithTrackingName(ReferencedSerializerOutputsTrackingName);
+
+        context.RegisterSourceOutput(referencedSerializerOutputs.SelectMany(static (input, _) => input), static (productionContext, input) =>
+        {
+            GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
+        });
+
+        var proxyOutputs = preparedProxyOutputs
+            .SelectMany(static (result, _) => result.SourceOutputs)
+            .WithTrackingName(ProxyOutputsTrackingName);
+
+        context.RegisterSourceOutput(proxyOutputs, static (productionContext, input) =>
+        {
+            GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
+        });
+
+        context.RegisterSourceOutput(assemblyNameProvider, static (productionContext, assemblyName) =>
+        {
+            productionContext.AddSource($"{assemblyName}.orleans.g.cs", SourceText.From(string.Empty, Encoding.UTF8));
+        });
+
+        var metadataOutputs = metadataAggregate
+            .Combine(generatorOptions)
+            .Select(static (input, _) => MetadataSourceOutputGenerator.CreateMetadataSourceOutput(input.Left, input.Right))
+            .WithTrackingName(MetadataOutputsTrackingName);
+
+        context.RegisterSourceOutput(metadataOutputs, static (productionContext, input) =>
+        {
+            GeneratedSourceOutput.EmitSourceOutputResult(productionContext, input);
+        });
     }
 }
-#pragma warning restore RS1035 // Do not use APIs banned for analyzers

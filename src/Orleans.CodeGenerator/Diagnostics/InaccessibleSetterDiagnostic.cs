@@ -12,5 +12,5 @@ public static class InaccessibleSetterDiagnostic
 
     internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true, description: Description);
 
-    public static Diagnostic CreateDiagnostic(Location location, string identifier) => Diagnostic.Create(Rule, location, identifier);
+    public static Diagnostic CreateDiagnostic(Location? location, string identifier) => Diagnostic.Create(Rule, location, identifier);
 }
