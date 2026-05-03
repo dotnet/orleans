@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Runtime.CompilerServices;
 using System.Runtime.InteropServices;
 using System.Threading;
+using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime
 {
@@ -30,7 +31,7 @@ namespace Orleans.Runtime
         public SiloAddress? _sendingSilo;
         public GrainId _sendingGrain;
 
-        public ushort _interfaceVersion;
+        public GrainInterfaceVersion _interfaceVersion;
         public GrainInterfaceType _interfaceType;
 
         public List<GrainAddressCacheUpdate>? _cacheInvalidationHeader;
@@ -190,13 +191,13 @@ namespace Orleans.Runtime
             }
         }
 
-        public ushort InterfaceVersion
+        public GrainInterfaceVersion InterfaceVersion
         {
             get => _interfaceVersion;
             set
             {
                 _interfaceVersion = value;
-                _headers.SetFlag(MessageFlags.HasInterfaceVersion, value is not 0);
+                _headers.SetFlag(MessageFlags.HasInterfaceVersion, !value.IsDefault);
             }
         }
 
@@ -390,10 +391,10 @@ grow:
             HasTimeToLive = 1 << 8,
 
             // Message cannot be forwarded to another activation.
-            IsLocalOnly = 1 << 9, 
+            IsLocalOnly = 1 << 9,
 
             // Message must not trigger grain activation or extend an activation's lifetime.
-            SuppressKeepAlive = 1 << 10,  
+            SuppressKeepAlive = 1 << 10,
 
             // The most significant bit is reserved, possibly for use to indicate more data follows.
             Reserved = 1 << 15,

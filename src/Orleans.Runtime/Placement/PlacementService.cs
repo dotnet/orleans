@@ -229,7 +229,7 @@ namespace Orleans.Runtime.Placement
             }
         }
 
-        public IReadOnlyDictionary<ushort, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
+        public IReadOnlyDictionary<GrainInterfaceVersion, SiloAddress[]> GetCompatibleSilosWithVersions(PlacementTarget target)
         {
             if (target.InterfaceVersion == 0)
             {

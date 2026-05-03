@@ -12,6 +12,7 @@ using System.Text;
 using System.Diagnostics;
 using System.Collections.Generic;
 using System.Threading;
+using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime
 {
@@ -23,7 +24,7 @@ namespace Orleans.Runtime
         public GrainReferenceShared(
             GrainType grainType,
             GrainInterfaceType grainInterfaceType,
-            ushort interfaceVersion,
+            GrainInterfaceVersion interfaceVersion,
             IGrainReferenceRuntime runtime,
             InvokeMethodOptions invokeMethodOptions,
             CodecProvider codecProvider,
@@ -78,7 +79,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the interface version.
         /// </summary>
-        public ushort InterfaceVersion { get; }
+        public GrainInterfaceVersion InterfaceVersion { get; }
     }
 
     /// <summary>
@@ -392,7 +393,7 @@ namespace Orleans.Runtime
         /// <summary>
         /// Gets the interface version.
         /// </summary>
-        public ushort InterfaceVersion => Shared.InterfaceVersion;
+        public GrainInterfaceVersion InterfaceVersion => Shared.InterfaceVersion;
 
         /// <summary>
         /// Gets the interface name.

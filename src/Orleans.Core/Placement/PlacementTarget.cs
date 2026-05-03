@@ -1,4 +1,5 @@
 using System.Collections.Generic;
+using Orleans.Runtime.Versions;
 
 namespace Orleans.Runtime.Placement
 {
@@ -14,7 +15,7 @@ namespace Orleans.Runtime.Placement
         /// <param name="requestContextData">The <see cref="RequestContext"/> dictionary for the request which triggered placement.</param>
         /// <param name="interfaceType">The interface being requested.</param>
         /// <param name="interfaceVersion">The interface version being requested.</param>
-        public PlacementTarget(GrainId grainIdentity, Dictionary<string, object> requestContextData, GrainInterfaceType interfaceType, ushort interfaceVersion)
+        public PlacementTarget(GrainId grainIdentity, Dictionary<string, object> requestContextData, GrainInterfaceType interfaceType, GrainInterfaceVersion interfaceVersion)
         {
             this.GrainIdentity = grainIdentity;
             this.InterfaceType = interfaceType;
@@ -35,7 +36,7 @@ namespace Orleans.Runtime.Placement
         /// <summary>
         /// Gets the interface version being requested.
         /// </summary>
-        public ushort InterfaceVersion { get; }
+        public GrainInterfaceVersion InterfaceVersion { get; }
 
         /// <summary>
         /// Gets the <see cref="RequestContext"/> dictionary for the request which triggered placement.

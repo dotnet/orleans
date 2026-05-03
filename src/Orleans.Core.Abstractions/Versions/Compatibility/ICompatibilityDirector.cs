@@ -1,4 +1,5 @@
 using System;
+using Orleans.Runtime.Versions;
 
 namespace Orleans.Versions.Compatibility
 {
@@ -13,7 +14,7 @@ namespace Orleans.Versions.Compatibility
         /// <param name="requestedVersion">The requested interface version.</param>
         /// <param name="currentVersion">The currently available interface version.</param>
         /// <returns><see langword="true"/> if the current version of an interface is compatible with the requested version, <see langword="false"/> otherwise.</returns>
-        bool IsCompatible(ushort requestedVersion, ushort currentVersion);
+        bool IsCompatible(GrainInterfaceVersion requestedVersion, GrainInterfaceVersion currentVersion);
     }
 
     /// <summary>
