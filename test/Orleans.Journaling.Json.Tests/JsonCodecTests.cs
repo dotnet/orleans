@@ -93,7 +93,7 @@ public class JsonCodecTests
 
         codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(new[] { "one", "two" }, writer)), consumer);
 
-        Assert.Equal(["snapshot:2", "snapshot-item:one", "snapshot-item:two"], consumer.Commands);
+        Assert.Equal(["reset:2", "add:one", "add:two"], consumer.Commands);
     }
 
     [Fact]
@@ -107,7 +107,7 @@ public class JsonCodecTests
         Apply(codec, writer => codec.WriteClear(writer), consumer);
         Apply(codec, writer => codec.WriteSnapshot(new[] { 20, 30 }, writer), consumer);
 
-        Assert.Equal(["enqueue:10", "dequeue", "clear", "snapshot:2", "snapshot-item:20", "snapshot-item:30"], consumer.Commands);
+        Assert.Equal(["enqueue:10", "dequeue", "clear", "reset:2", "enqueue:20", "enqueue:30"], consumer.Commands);
     }
 
     [Fact]
@@ -121,7 +121,7 @@ public class JsonCodecTests
         Apply(codec, writer => codec.WriteClear(writer), consumer);
         Apply(codec, writer => codec.WriteSnapshot(new[] { "b", "c" }, writer), consumer);
 
-        Assert.Equal(["add:a", "remove:a", "clear", "snapshot:2", "snapshot-item:b", "snapshot-item:c"], consumer.Commands);
+        Assert.Equal(["add:a", "remove:a", "clear", "reset:2", "add:b", "add:c"], consumer.Commands);
     }
 
     [Fact]
@@ -629,12 +629,12 @@ public class JsonCodecTests
         {
             LastSetKey = key;
             LastSetValue = value;
+            Items.Add(new(key, value));
         }
 
         public void ApplyRemove(TKey key) { }
         public void ApplyClear() => Items.Clear();
-        public void ApplySnapshotStart(int count) => Items.Clear();
-        public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
+        public void Reset(int capacityHint) => Items.Clear();
     }
 
     private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
@@ -645,8 +645,7 @@ public class JsonCodecTests
         public void ApplyInsert(int index, T item) => Commands.Add($"insert:{index}:{item}");
         public void ApplyRemoveAt(int index) => Commands.Add($"remove:{index}");
         public void ApplyClear() => Commands.Add("clear");
-        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
     private sealed class QueueConsumer<T> : IDurableQueueOperationHandler<T>
@@ -655,8 +654,7 @@ public class JsonCodecTests
         public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
         public void ApplyDequeue() => Commands.Add("dequeue");
         public void ApplyClear() => Commands.Add("clear");
-        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
     private sealed class SetConsumer<T> : IDurableSetOperationHandler<T>
@@ -665,8 +663,7 @@ public class JsonCodecTests
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
         public void ApplyRemove(T item) => Commands.Add($"remove:{item}");
         public void ApplyClear() => Commands.Add("clear");
-        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
     private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>

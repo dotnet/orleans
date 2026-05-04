@@ -25,10 +25,10 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
                 "set:alpha:1",
                 "remove:alpha",
                 "clear",
-                "snapshot:2",
-                "snapshot-item:beta:2",
-                "snapshot-item:gamma:3",
-                "snapshot:0"
+                "reset:2",
+                "set:beta:2",
+                "set:gamma:3",
+                "reset:0"
             ],
             consumer.Commands);
         Assert.Empty(consumer.SnapshotItems);
@@ -55,10 +55,10 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
                 "insert:1:two",
                 "remove:0",
                 "clear",
-                "snapshot:2",
-                "snapshot-item:three",
-                "snapshot-item:four",
-                "snapshot:0"
+                "reset:2",
+                "add:three",
+                "add:four",
+                "reset:0"
             ],
             consumer.Commands);
     }
@@ -80,10 +80,10 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
                 "enqueue:10",
                 "dequeue",
                 "clear",
-                "snapshot:2",
-                "snapshot-item:20",
-                "snapshot-item:30",
-                "snapshot:0"
+                "reset:2",
+                "enqueue:20",
+                "enqueue:30",
+                "reset:0"
             ],
             consumer.Commands);
     }
@@ -105,10 +105,10 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
                 "add:a",
                 "remove:a",
                 "clear",
-                "snapshot:2",
-                "snapshot-item:b",
-                "snapshot-item:c",
-                "snapshot:0"
+                "reset:2",
+                "add:b",
+                "add:c",
+                "reset:0"
             ],
             consumer.Commands);
     }

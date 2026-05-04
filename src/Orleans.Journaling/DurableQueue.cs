@@ -115,13 +115,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     void IDurableQueueOperationHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
     void IDurableQueueOperationHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
     void IDurableQueueOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IDurableQueueOperationHandler<T>.ApplySnapshotStart(int count)
+    void IDurableQueueOperationHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
-        _items.EnsureCapacity(count);
+        _items.EnsureCapacity(capacityHint);
     }
-
-    void IDurableQueueOperationHandler<T>.ApplySnapshotItem(T item) => ApplyEnqueue(item);
 
     private LogStreamWriter GetStorage()
     {

@@ -30,10 +30,10 @@ public sealed class MessagePackOperationCodecAdditionalTests
                 "set:alpha:1",
                 "remove:alpha",
                 "clear",
-                "snapshot:2",
-                "snapshot-item:beta:2",
-                "snapshot-item:gamma:3",
-                "snapshot:0"
+                "reset:2",
+                "set:beta:2",
+                "set:gamma:3",
+                "reset:0"
             ],
             consumer.Commands);
     }

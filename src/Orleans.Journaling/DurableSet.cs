@@ -117,13 +117,11 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     void IDurableSetOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
     void IDurableSetOperationHandler<T>.ApplyRemove(T item) => ApplyRemove(item);
     void IDurableSetOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IDurableSetOperationHandler<T>.ApplySnapshotStart(int count)
+    void IDurableSetOperationHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
-        _items.EnsureCapacity(count);
+        _items.EnsureCapacity(capacityHint);
     }
-
-    void IDurableSetOperationHandler<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
 
     private LogStreamWriter GetStorage()
     {

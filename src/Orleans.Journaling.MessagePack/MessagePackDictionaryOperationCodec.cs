@@ -112,10 +112,10 @@ public sealed class MessagePackDictionaryOperationCodec<TKey, TValue>(MessagePac
                     throw new InvalidOperationException("Malformed MessagePack dictionary snapshot: key/value item count is not balanced.");
                 }
 
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(
+                    consumer.ApplySet(
                         MessagePackCodecHelpers.ReadValue<TKey>(ref reader, options),
                         MessagePackCodecHelpers.ReadValue<TValue>(ref reader, options));
                 }

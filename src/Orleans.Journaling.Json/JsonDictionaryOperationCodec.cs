@@ -103,10 +103,10 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
                 break;
             case JsonLogEntryCommands.Snapshot:
                 var items = operation.Items ?? [];
-                consumer.ApplySnapshotStart(items.Length);
+                consumer.Reset(items.Length);
                 foreach (var item in items)
                 {
-                    consumer.ApplySnapshotItem(
+                    consumer.ApplySet(
                         _keySerializer.Deserialize(item.Key)!,
                         _valueSerializer.Deserialize(item.Value)!);
                 }

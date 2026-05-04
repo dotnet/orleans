@@ -120,10 +120,10 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
                 break;
             case JsonLogEntryCommands.Snapshot:
                 var items = operation.Items ?? [];
-                consumer.ApplySnapshotStart(items.Length);
+                consumer.Reset(items.Length);
                 foreach (var item in items)
                 {
-                    consumer.ApplySnapshotItem(_itemSerializer.Deserialize(item)!);
+                    consumer.ApplyAdd(_itemSerializer.Deserialize(item)!);
                 }
 
                 break;
@@ -241,10 +241,10 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
                 break;
             case JsonLogEntryCommands.Snapshot:
                 var items = operation.Items ?? [];
-                consumer.ApplySnapshotStart(items.Length);
+                consumer.Reset(items.Length);
                 foreach (var item in items)
                 {
-                    consumer.ApplySnapshotItem(_itemSerializer.Deserialize(item)!);
+                    consumer.ApplyEnqueue(_itemSerializer.Deserialize(item)!);
                 }
 
                 break;
@@ -369,10 +369,10 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
                 break;
             case JsonLogEntryCommands.Snapshot:
                 var items = operation.Items ?? [];
-                consumer.ApplySnapshotStart(items.Length);
+                consumer.Reset(items.Length);
                 foreach (var item in items)
                 {
-                    consumer.ApplySnapshotItem(_itemSerializer.Deserialize(item)!);
+                    consumer.ApplyAdd(_itemSerializer.Deserialize(item)!);
                 }
 
                 break;

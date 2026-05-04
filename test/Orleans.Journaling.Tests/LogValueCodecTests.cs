@@ -167,12 +167,12 @@ public class LogValueCodecTests
         {
             LastSetKey = key;
             LastSetValue = value;
+            Items.Add(new(key, value));
         }
 
         public void ApplyRemove(TKey key) { }
         public void ApplyClear() => Items.Clear();
-        public void ApplySnapshotStart(int count) => Items.Clear();
-        public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
+        public void Reset(int capacityHint) => Items.Clear();
     }
 
     private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
@@ -182,8 +182,7 @@ public class LogValueCodecTests
         public void ApplyInsert(int index, T item) { }
         public void ApplyRemoveAt(int index) { }
         public void ApplyClear() { }
-        public void ApplySnapshotStart(int count) { }
-        public void ApplySnapshotItem(T item) { }
+        public void Reset(int capacityHint) { }
     }
 
     private sealed class MiscountedReadOnlyCollection<T>(int count, IReadOnlyCollection<T> items) : IReadOnlyCollection<T>
