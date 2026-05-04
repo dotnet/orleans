@@ -1,7 +1,6 @@
 #nullable enable
 using System.Collections.Concurrent;
 using System.Globalization;
-using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -44,13 +43,24 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     [Fact]
     public async Task RollingUpgrade_LocalToDistributed_NoErrors()
     {
-        var builder = new TestClusterBuilder(3);
-        // Remove the default DistributedGrainDirectory configurator — initial silos use LocalGrainDirectory only.
-        builder.Options.SiloBuilderConfiguratorTypes.RemoveAll(
-            t => t.Contains(nameof(ConfigureDistributedGrainDirectory), StringComparison.Ordinal));
-        builder.AddSiloBuilderConfigurator<RollingUpgradeSiloConfigurator>();
-        builder.AddSiloBuilderConfigurator<ErrorLogCaptureSiloConfigurator>();
-        builder.AddSiloBuilderConfigurator<RollingUpgradeDiagnosticCaptureSiloConfigurator>();
+        var builder = new InProcessTestClusterBuilder(3);
+        // Initial silos use LocalGrainDirectory only; later silos opt into DistributedGrainDirectory.
+        builder.Options.UseTestClusterGrainDirectory = false;
+        var initialSiloCount = builder.Options.InitialSilosCount;
+        var clusterId = builder.Options.ClusterId;
+        builder.ConfigureSilo((siloOptions, siloBuilder) =>
+        {
+            if (!ShouldUseDistributedDirectory(siloOptions.SiloName, initialSiloCount))
+            {
+                return;
+            }
+
+#pragma warning disable ORLEANSEXP003
+            siloBuilder.AddDistributedGrainDirectory();
+#pragma warning restore ORLEANSEXP003
+        });
+        builder.ConfigureSiloHost((_, hostBuilder) => ConfigureErrorLogCapture(hostBuilder, clusterId));
+        builder.ConfigureSiloHost((_, hostBuilder) => ConfigureRollingUpgradeDiagnosticCapture(hostBuilder, clusterId));
 
         var cluster = builder.Build();
         var errorLogs = ErrorLogCaptureRegistry.Get(cluster.Options.ClusterId);
@@ -90,7 +100,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
                 // Phase 3: Stop old silos one at a time, non-primary first.
                 output.WriteLine($"Phase 3: Removing {oldSilos.Count} old LocalGrainDirectory silos...");
-                foreach (var oldSilo in oldSilos.OrderBy(s => s == cluster.Primary ? 1 : 0))
+                foreach (var oldSilo in oldSilos.OrderBy(static s => s.InstanceNumber == 0 ? 1 : 0))
                 {
                     await cluster.StopSiloAsync(oldSilo);
                     output.WriteLine($"  Stopped old silo: {oldSilo.SiloAddress}");
@@ -193,7 +203,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
     }
 
-    private async Task DumpFailureDiagnosticsAsync(TestCluster cluster, ErrorLogCapture errorLogs, DiagnosticLogCapture diagnosticLogs, long? failingGrainKey)
+    private async Task DumpFailureDiagnosticsAsync(InProcessTestCluster cluster, ErrorLogCapture errorLogs, DiagnosticLogCapture diagnosticLogs, long? failingGrainKey)
     {
         DumpCapturedMessages("ERROR LOGS", errorLogs.ToArray());
         DumpCapturedMessages("ROLLING UPGRADE DIAGNOSTICS", diagnosticLogs.ToArray(), limit: 200);
@@ -210,7 +220,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         {
             try
             {
-                var siloControl = cluster.InternalGrainFactory.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo.SiloAddress);
+                var siloControl = cluster.InternalClient.GetSystemTarget<ISiloControl>(Constants.SiloControlType, silo.SiloAddress);
                 var report = await siloControl.GetDetailedGrainReport(grainId);
                 output.WriteLine(report.ToString());
             }
@@ -245,18 +255,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         }
     }
 
-    private static bool ShouldUseDistributedDirectory(IConfiguration configuration)
-    {
-        var initialSiloCountText = configuration[nameof(TestClusterOptions.InitialSilosCount)]
-            ?? throw new InvalidOperationException($"Missing {nameof(TestClusterOptions.InitialSilosCount)} configuration.");
-        var initialSiloCount = int.Parse(initialSiloCountText, CultureInfo.InvariantCulture);
-        return GetSiloInstanceNumber(configuration) >= initialSiloCount;
-    }
+    private static bool ShouldUseDistributedDirectory(string siloName, int initialSiloCount) =>
+        GetSiloInstanceNumber(siloName) >= initialSiloCount;
 
-    private static int GetSiloInstanceNumber(IConfiguration configuration)
+    private static int GetSiloInstanceNumber(string siloName)
     {
-        var siloName = configuration["Orleans:Name"]
-            ?? throw new InvalidOperationException("Missing Orleans:Name configuration.");
         if (string.Equals(siloName, Silo.PrimarySiloName, StringComparison.Ordinal))
         {
             return 0;
@@ -269,55 +272,28 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             return instanceNumber;
         }
 
+        const string inProcessSiloPrefix = "Silo_";
+        if (siloName.StartsWith(inProcessSiloPrefix, StringComparison.Ordinal)
+            && int.TryParse(siloName.AsSpan(inProcessSiloPrefix.Length), NumberStyles.None, CultureInfo.InvariantCulture, out instanceNumber))
+        {
+            return instanceNumber;
+        }
+
         throw new InvalidOperationException($"Unexpected silo name '{siloName}'.");
     }
 
-    private sealed class RollingUpgradeSiloConfigurator : IHostConfigurator
+    private static void ConfigureErrorLogCapture(IHostApplicationBuilder hostBuilder, string clusterId)
     {
-        public void Configure(IHostBuilder hostBuilder)
-        {
-            if (!ShouldUseDistributedDirectory(hostBuilder.GetConfiguration()))
-            {
-                return;
-            }
-
-#pragma warning disable ORLEANSEXP003
-            hostBuilder.UseOrleans(static (_, siloBuilder) => siloBuilder.AddDistributedGrainDirectory());
-#pragma warning restore ORLEANSEXP003
-        }
+        hostBuilder.Services.AddSingleton(ErrorLogCaptureRegistry.Get(clusterId));
+        hostBuilder.Services.AddSingleton<ILoggerProvider, ErrorCapturingLoggerProvider>();
     }
 
-    private sealed class ErrorLogCaptureSiloConfigurator : IHostConfigurator
+    private static void ConfigureRollingUpgradeDiagnosticCapture(IHostApplicationBuilder hostBuilder, string clusterId)
     {
-        public void Configure(IHostBuilder hostBuilder)
-        {
-            var clusterId = hostBuilder.GetConfiguration()["Orleans:ClusterId"]
-                ?? throw new InvalidOperationException("Missing Orleans:ClusterId configuration.");
-            hostBuilder.ConfigureServices(services =>
-            {
-                services.AddSingleton(ErrorLogCaptureRegistry.Get(clusterId));
-                services.AddSingleton<ILoggerProvider, ErrorCapturingLoggerProvider>();
-            });
-        }
-    }
-
-    private sealed class RollingUpgradeDiagnosticCaptureSiloConfigurator : IHostConfigurator
-    {
-        public void Configure(IHostBuilder hostBuilder)
-        {
-            var clusterId = hostBuilder.GetConfiguration()["Orleans:ClusterId"]
-                ?? throw new InvalidOperationException("Missing Orleans:ClusterId configuration.");
-            hostBuilder.ConfigureLogging(logging =>
-            {
-                logging.AddFilter(typeof(DistributedRemoteGrainDirectory).FullName, LogLevel.Information);
-                logging.AddFilter(typeof(GrainDirectoryHandoffManager).FullName, LogLevel.Information);
-            });
-            hostBuilder.ConfigureServices(services =>
-            {
-                services.AddSingleton(DiagnosticLogCaptureRegistry.Get(clusterId));
-                services.AddSingleton<ILoggerProvider, DiagnosticCapturingLoggerProvider>();
-            });
-        }
+        hostBuilder.Logging.AddFilter(typeof(DistributedRemoteGrainDirectory).FullName, LogLevel.Information);
+        hostBuilder.Logging.AddFilter(typeof(GrainDirectoryHandoffManager).FullName, LogLevel.Information);
+        hostBuilder.Services.AddSingleton(DiagnosticLogCaptureRegistry.Get(clusterId));
+        hostBuilder.Services.AddSingleton<ILoggerProvider, DiagnosticCapturingLoggerProvider>();
     }
 
     private sealed class ErrorCapturingLoggerProvider(ErrorLogCapture errorLogs) : ILoggerProvider
