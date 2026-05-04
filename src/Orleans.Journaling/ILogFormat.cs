@@ -16,10 +16,14 @@ public interface ILogFormat
     ILogBatchWriter CreateWriter();
 
     /// <summary>
-    /// Attempts to read one complete log entry from <paramref name="input"/> and apply it to a resolved state machine.
+    /// Reads as many complete log entries as possible from <paramref name="input"/> and applies them to resolved state machines.
     /// </summary>
     /// <param name="input">The buffered persisted log data, including its completion state.</param>
     /// <param name="resolver">The resolver used to locate state machines by log stream id.</param>
-    /// <returns><see langword="true"/> if a complete entry was consumed; otherwise, <see langword="false"/>.</returns>
-    bool TryRead(LogReadBuffer input, IStateMachineResolver resolver);
+    /// <remarks>
+    /// If <see cref="LogReadBuffer.IsCompleted"/> is <see langword="false"/>, this method returns when
+    /// there is insufficient data to read another complete log entry. If <see cref="LogReadBuffer.IsCompleted"/>
+    /// is <see langword="true"/>, this method throws if the remaining data does not contain complete log entries.
+    /// </remarks>
+    void Read(LogReadBuffer input, IStateMachineResolver resolver);
 }

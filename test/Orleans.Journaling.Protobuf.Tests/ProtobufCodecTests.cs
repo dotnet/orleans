@@ -293,14 +293,11 @@ public class ProtobufCodecTests
         var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CollectingConsumer();
 
-        var firstResult = format.TryRead(reader, consumer);
-        var secondResult = format.TryRead(reader, consumer);
+        format.Read(reader, consumer);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId);
         Assert.Equal([0xAA, 0xBB], entry.Payload);
-        Assert.True(firstResult);
-        Assert.False(secondResult);
         Assert.Equal(partialBytes.Length - firstBytes.Length, reader.Length);
     }
 
@@ -385,7 +382,7 @@ public class ProtobufCodecTests
         var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: true);
         var consumer = new CollectingConsumer();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => format.TryRead(reader, consumer));
+        var exception = Assert.Throws<InvalidOperationException>(() => format.Read(reader, consumer));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -417,9 +414,8 @@ public class ProtobufCodecTests
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
         var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
-        while (format.TryRead(reader, consumer))
-        {
-        }
+        format.Read(reader, consumer);
+        Assert.Equal(0, reader.Length);
     }
 
     private sealed class TestFormattedLogEntry : IFormattedLogEntry

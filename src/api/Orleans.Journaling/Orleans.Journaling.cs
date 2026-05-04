@@ -324,7 +324,7 @@ namespace Orleans.Journaling
     public partial interface ILogFormat
     {
         ILogBatchWriter CreateWriter();
-        bool TryRead(LogReadBuffer input, IStateMachineResolver resolver);
+        void Read(LogReadBuffer input, IStateMachineResolver resolver);
     }
 
     public partial interface ILogFormatKeyProvider
