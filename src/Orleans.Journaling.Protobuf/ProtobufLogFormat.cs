@@ -12,7 +12,7 @@ internal sealed class ProtobufLogFormat : ILogFormat
     public ILogBatchWriter CreateWriter()
         => new ProtobufLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
+    public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -24,7 +24,7 @@ internal sealed class ProtobufLogFormat : ILogFormat
         using var buffered = input.PeekSlice(input.Length);
         var remaining = buffered.AsReadOnlySequence();
         var reader = new SequenceReader<byte>(remaining);
-        if (!ProtobufLogEntryReader.TryReadLengthPrefix(ref reader, offset: 0, isCompleted, out var messageLength, out _))
+        if (!ProtobufLogEntryReader.TryReadLengthPrefix(ref reader, offset: 0, input.IsCompleted, out var messageLength, out _))
         {
             return false;
         }
@@ -38,7 +38,7 @@ internal sealed class ProtobufLogFormat : ILogFormat
 
         if (messageLength > (ulong)reader.Remaining)
         {
-            if (!isCompleted)
+            if (!input.IsCompleted)
             {
                 return false;
             }

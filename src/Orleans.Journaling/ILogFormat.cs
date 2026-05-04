@@ -1,5 +1,3 @@
-using Orleans.Serialization.Buffers;
-
 namespace Orleans.Journaling;
 
 /// <summary>
@@ -20,9 +18,8 @@ public interface ILogFormat
     /// <summary>
     /// Attempts to read one complete log entry from <paramref name="input"/> and apply it to a resolved state machine.
     /// </summary>
-    /// <param name="input">The buffered persisted log data.</param>
+    /// <param name="input">The buffered persisted log data, including its completion state.</param>
     /// <param name="resolver">The resolver used to locate state machines by log stream id.</param>
-    /// <param name="isCompleted">A value indicating whether no more persisted bytes will be supplied after <paramref name="input"/>.</param>
     /// <returns><see langword="true"/> if a complete entry was consumed; otherwise, <see langword="false"/>.</returns>
-    bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted);
+    bool TryRead(LogReadBuffer input, IStateMachineResolver resolver);
 }

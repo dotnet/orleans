@@ -7,7 +7,12 @@ namespace Orleans.Journaling;
 /// </summary>
 public readonly struct LogReadBuffer
 {
-    internal LogReadBuffer(ArcBufferReader reader, bool isCompleted)
+    /// <summary>
+    /// Initializes a new instance of the <see cref="LogReadBuffer"/> struct.
+    /// </summary>
+    /// <param name="reader">The underlying buffer reader.</param>
+    /// <param name="isCompleted">A value indicating whether no more data will be appended to this buffer.</param>
+    public LogReadBuffer(ArcBufferReader reader, bool isCompleted)
     {
         Reader = reader;
         IsCompleted = isCompleted;
@@ -64,6 +69,31 @@ public readonly struct LogReadBuffer
         Peek(destination.Length, destination).CopyTo(destination);
         return true;
     }
+
+    /// <summary>
+    /// Returns a slice of the provided length without consuming the data.
+    /// </summary>
+    /// <param name="count">The number of bytes to read.</param>
+    /// <returns>A slice of unconsumed data.</returns>
+    public readonly ArcBuffer PeekSlice(int count) => Reader.PeekSlice(count);
+
+    /// <summary>
+    /// Reads bytes until <paramref name="delimiter"/> is found.
+    /// </summary>
+    /// <param name="slice">The bytes before the delimiter, if it was found.</param>
+    /// <param name="delimiter">The delimiter to search for.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
+    /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public readonly bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true) =>
+        Reader.TryReadTo(out slice, delimiter, advancePastDelimiter);
+
+    /// <summary>
+    /// Checks whether the next bytes match <paramref name="next"/>.
+    /// </summary>
+    /// <param name="next">The bytes to compare to the next bytes.</param>
+    /// <param name="advancePast">Whether to advance past the bytes if they match.</param>
+    /// <returns><see langword="true"/> if the next bytes match; otherwise, <see langword="false"/>.</returns>
+    public readonly bool IsNext(ReadOnlySpan<byte> next, bool advancePast = false) => Reader.IsNext(next, advancePast);
 
     /// <summary>
     /// Copies the next bytes into <paramref name="destination"/> and consumes them.

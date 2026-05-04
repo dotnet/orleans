@@ -350,10 +350,10 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes("""[8,"set",42]""");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new ArcBufferReader(buffer);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingLogEntrySink();
 
-        var result = format.TryRead(reader, consumer, isCompleted: false);
+        var result = format.TryRead(reader, consumer);
 
         Assert.False(result);
         Assert.Equal(bytes.Length, reader.Length);
@@ -372,10 +372,10 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes(line + "\n");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new ArcBufferReader(buffer);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingLogEntrySink();
 
-        var result = format.TryRead(reader, consumer, isCompleted: false);
+        var result = format.TryRead(reader, consumer);
 
         Assert.True(result);
         Assert.Equal(0, reader.Length);
@@ -394,10 +394,10 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new ArcBufferReader(buffer);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingLogEntrySink();
 
-        var result = format.TryRead(reader, consumer, isCompleted: false);
+        var result = format.TryRead(reader, consumer);
 
         Assert.False(result);
         Assert.Equal(bytes.Length, reader.Length);
@@ -525,9 +525,9 @@ public class JsonCodecTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new ArcBufferReader(buffer);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
         var consumer = new RecordingLogEntrySink();
-        while (format.TryRead(reader, consumer, isCompleted: true))
+        while (format.TryRead(reader, consumer))
         {
         }
 
@@ -538,8 +538,8 @@ public class JsonCodecTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
-        var reader = new ArcBufferReader(buffer);
-        Assert.True(format.TryRead(reader, resolver, isCompleted: true));
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
+        Assert.True(format.TryRead(reader, resolver));
         Assert.Equal(0, reader.Length);
     }
 

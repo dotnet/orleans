@@ -938,9 +938,9 @@ public class StateMachineManagerTests : JournalingTestBase
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        var reader = new ArcBufferReader(writer);
+        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingLogEntrySink();
-        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true))
+        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer))
         {
         }
 
@@ -993,7 +993,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public ILogBatchWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
+        public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
         {
             if (input.Length == 0)
             {
@@ -1035,10 +1035,10 @@ public class StateMachineManagerTests : JournalingTestBase
             return writer;
         }
 
-        public bool TryRead(ArcBufferReader input, IStateMachineResolver consumer, bool isCompleted)
+        public bool TryRead(LogReadBuffer input, IStateMachineResolver consumer)
         {
             ReadCount++;
-            return ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(input, consumer, isCompleted);
+            return ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(input, consumer);
         }
     }
 

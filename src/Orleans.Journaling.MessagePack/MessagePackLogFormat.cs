@@ -9,7 +9,7 @@ internal sealed class MessagePackLogFormat : ILogFormat
     public ILogBatchWriter CreateWriter()
         => new MessagePackLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
+    public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -20,7 +20,7 @@ internal sealed class MessagePackLogFormat : ILogFormat
 
         using var buffered = input.PeekSlice(input.Length);
         var reader = new SequenceReader<byte>(buffered.AsReadOnlySequence());
-        if (!MessagePackLogEntryReader.TryReadEntry(ref reader, offset: 0, isCompleted, out var streamId, out var payload, out _))
+        if (!MessagePackLogEntryReader.TryReadEntry(ref reader, offset: 0, input.IsCompleted, out var streamId, out var payload, out _))
         {
             return false;
         }
