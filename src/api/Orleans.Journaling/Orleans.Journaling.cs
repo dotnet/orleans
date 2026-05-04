@@ -324,7 +324,7 @@ namespace Orleans.Journaling
     public partial interface ILogFormat
     {
         ILogBatchWriter CreateWriter();
-        bool TryRead(Serialization.Buffers.ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted);
+        bool TryRead(LogReadBuffer input, IStateMachineResolver resolver);
     }
 
     public partial interface ILogFormatKeyProvider
@@ -379,39 +379,21 @@ namespace Orleans.Journaling
     {
         private object _dummy;
         private int _dummyPrimitive;
-        internal LogReadBuffer(Serialization.Buffers.ArcBufferReader reader, bool isCompleted) { }
+        public LogReadBuffer(Serialization.Buffers.ArcBufferReader reader, bool isCompleted) { }
 
         public bool IsCompleted { get { throw null; } }
 
         public int Length { get { throw null; } }
 
         public void Consume(System.Span<byte> destination) { }
+        public bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
         public System.ReadOnlySpan<byte> Peek(int count, System.Span<byte> destination) { throw null; }
+        public Serialization.Buffers.ArcBuffer PeekSlice(int count) { throw null; }
         public void Skip(int count) { }
         public bool TryConsume(System.Span<byte> destination) { throw null; }
         public bool TryPeek(System.Span<byte> destination) { throw null; }
+        public bool TryReadTo(out Serialization.Buffers.ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true) { throw null; }
         public bool TrySkip(int count) { throw null; }
-    }
-
-    public ref partial struct LogEntryReader
-    {
-        private object _dummy;
-        private int _dummyPrimitive;
-        public LogEntryReader(System.Buffers.ReadOnlySequence<byte> input) { }
-
-        public long Consumed { get { throw null; } }
-
-        public bool End { get { throw null; } }
-
-        public System.Buffers.ReadOnlySequence<byte> Remaining { get { throw null; } }
-
-        public byte ReadByte() { throw null; }
-
-        public System.Buffers.ReadOnlySequence<byte> ReadBytes(int length) { throw null; }
-
-        public uint ReadVarUInt32() { throw null; }
-
-        public ulong ReadVarUInt64() { throw null; }
     }
 
     public sealed partial class LogEntryWriter : System.Buffers.IBufferWriter<byte>

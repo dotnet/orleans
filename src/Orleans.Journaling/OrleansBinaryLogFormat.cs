@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Buffers.Binary;
-using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -16,12 +15,12 @@ internal sealed class OrleansBinaryLogFormat : ILogFormat
 
     ILogBatchWriter ILogFormat.CreateWriter() => new OrleansBinaryLogBatchWriter();
 
-    bool ILogFormat.TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted) => OrleansBinaryLogReader.TryRead(input, resolver, isCompleted);
+    bool ILogFormat.TryRead(LogReadBuffer input, IStateMachineResolver resolver) => OrleansBinaryLogReader.TryRead(input, resolver);
 }
 
 internal static class OrleansBinaryLogReader
 {
-    public static bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
+    public static bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -32,7 +31,7 @@ internal static class OrleansBinaryLogReader
 
         if (input.Length < OrleansBinaryLogEntryFrameReader.LengthPrefixSize)
         {
-            if (!isCompleted)
+            if (!input.IsCompleted)
             {
                 return false;
             }
@@ -42,12 +41,12 @@ internal static class OrleansBinaryLogReader
         }
 
         Span<byte> lengthBytes = stackalloc byte[OrleansBinaryLogEntryFrameReader.LengthPrefixSize];
-        var lengthPrefix = input.Peek(lengthBytes);
+        var lengthPrefix = input.Peek(lengthBytes.Length, lengthBytes);
         var bodyLength = BinaryPrimitives.ReadUInt32LittleEndian(lengthPrefix[..OrleansBinaryLogEntryFrameReader.LengthPrefixSize]);
         var frameLength = checked(OrleansBinaryLogEntryFrameReader.LengthPrefixSize + (long)bodyLength);
         if (input.Length < frameLength)
         {
-            if (!isCompleted)
+            if (!input.IsCompleted)
             {
                 return false;
             }

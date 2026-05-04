@@ -125,11 +125,11 @@ public sealed class StorageStreamingTests
     public void BinaryFormatRead_RejectsTruncatedFixed32Frame()
     {
         using var writer = CreateWriter([10, 0, 0, 0, 1, 2]);
-        var reader = new ArcBufferReader(writer);
+        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingLogEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true));
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer));
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -139,10 +139,10 @@ public sealed class StorageStreamingTests
     public void BinaryFormatRead_WaitsForIncompleteFrameWhenInputIsNotCompleted()
     {
         using var writer = CreateWriter([10, 0, 0, 0, 1, 2]);
-        var reader = new ArcBufferReader(writer);
+        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: false);
         var consumer = new CapturingLogEntrySink();
 
-        var result = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: false);
+        var result = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer);
 
         Assert.False(result);
         Assert.Equal(6, reader.Length);
@@ -157,11 +157,11 @@ public sealed class StorageStreamingTests
         using var committed = buffer.GetCommittedBuffer();
         var entryBytes = committed.ToArray();
         using var data = CreateWriter([.. entryBytes, 10, 0]);
-        var reader = new ArcBufferReader(data);
+        var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CapturingLogEntrySink();
 
-        var firstResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: false);
-        var secondResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: false);
+        var firstResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer);
+        var secondResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);

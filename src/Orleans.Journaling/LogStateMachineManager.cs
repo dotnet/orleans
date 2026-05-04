@@ -505,15 +505,15 @@ internal sealed partial class LogStateMachineManager : IStateMachineManager, ISt
         return stateMachine;
     }
 
-    private void ProcessRecoveryBuffer(ArcBufferReader reader, bool isCompleted)
+    private void ProcessRecoveryBuffer(LogReadBuffer buffer)
     {
         try
         {
-            while (_logFormat.TryRead(reader, this, isCompleted))
+            while (_logFormat.TryRead(buffer, this))
             {
             }
 
-            if (isCompleted && reader.Length > 0)
+            if (buffer.IsCompleted && buffer.Length > 0)
             {
                 throw new InvalidOperationException("The log format did not consume the completed log data.");
             }
@@ -711,7 +711,7 @@ internal sealed partial class LogStateMachineManager : IStateMachineManager, ISt
 
     private sealed class RecoveryLogStorageConsumer(LogStateMachineManager manager) : ILogStorageConsumer
     {
-        public void Consume(LogReadBuffer buffer) => manager.ProcessRecoveryBuffer(buffer.Reader, buffer.IsCompleted);
+        public void Consume(LogReadBuffer buffer) => manager.ProcessRecoveryBuffer(buffer);
     }
 
     private sealed class StateMachineDirectory(

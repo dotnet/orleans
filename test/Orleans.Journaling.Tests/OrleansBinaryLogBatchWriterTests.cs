@@ -262,38 +262,6 @@ public sealed class OrleansBinaryLogBatchWriterTests
         Assert.Equal(7, stream.ReadByte());
     }
 
-    [Fact]
-    public void LogEntryReader_ReadsValuesAndRemainingPayload()
-    {
-        var payload = new byte[] { 0xAC, 0x02, 0x03, 0xAA, 0xBB, 0xCC };
-        var reader = new LogEntryReader(new ReadOnlySequence<byte>(payload));
-
-        Assert.Equal(300U, reader.ReadVarUInt32());
-        var bytes = reader.ReadBytes(2);
-
-        Assert.Equal([0x03, 0xAA], bytes.ToArray());
-        Assert.Equal([0xBB, 0xCC], reader.Remaining.ToArray());
-        Assert.False(reader.End);
-    }
-
-    [Fact]
-    public void LogEntryReader_ThrowsOnTruncatedPayload()
-    {
-        var reader = new LogEntryReader(new ReadOnlySequence<byte>(new byte[] { 1, 2 }));
-
-        var thrown = false;
-        try
-        {
-            reader.ReadBytes(3);
-        }
-        catch (InvalidOperationException)
-        {
-            thrown = true;
-        }
-
-        Assert.True(thrown);
-    }
-
     [Theory]
     [InlineData(new byte[] { 1, 2, 3 }, "truncated fixed32 entry length prefix")]
     [InlineData(new byte[] { 0, 0, 0, 0 }, "zero-length entries")]
@@ -307,11 +275,11 @@ public sealed class OrleansBinaryLogBatchWriterTests
     public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
         using var data = CreateWriter(bytes);
-        var reader = new ArcBufferReader(data);
+        var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: true);
         var consumer = new CollectingConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true));
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -341,8 +309,8 @@ public sealed class OrleansBinaryLogBatchWriterTests
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
-        var reader = new ArcBufferReader(writer);
-        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer, isCompleted: true))
+        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer))
         {
         }
     }

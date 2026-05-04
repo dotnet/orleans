@@ -94,7 +94,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     {
         public ILogBatchWriter CreateWriter() => throw new NotSupportedException();
 
-        public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted) => throw new NotSupportedException();
+        public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodecProvider : IDurableDictionaryOperationCodecProvider

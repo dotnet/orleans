@@ -12,7 +12,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
     public ILogBatchWriter CreateWriter() => new JsonLinesLogSegmentWriter();
 
-    public bool TryRead(ArcBufferReader input, IStateMachineResolver resolver, bool isCompleted)
+    public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -28,7 +28,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
         if (!input.TryReadTo(out var lineBuffer, LineFeed, advancePastDelimiter: true))
         {
-            if (!isCompleted)
+            if (!input.IsCompleted)
             {
                 return false;
             }

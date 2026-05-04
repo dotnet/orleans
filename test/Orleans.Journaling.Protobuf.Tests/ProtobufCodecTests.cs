@@ -290,11 +290,11 @@ public class ProtobufCodecTests
         using var fullData = writer.GetCommittedBuffer();
         var partialBytes = fullData.ToArray()[..^1];
         using var data = CreateWriter(partialBytes);
-        var reader = new ArcBufferReader(data);
+        var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CollectingConsumer();
 
-        var firstResult = format.TryRead(reader, consumer, isCompleted: false);
-        var secondResult = format.TryRead(reader, consumer, isCompleted: false);
+        var firstResult = format.TryRead(reader, consumer);
+        var secondResult = format.TryRead(reader, consumer);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId);
@@ -382,10 +382,10 @@ public class ProtobufCodecTests
     {
         var format = new ProtobufLogFormat();
         using var data = CreateWriter(bytes);
-        var reader = new ArcBufferReader(data);
+        var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: true);
         var consumer = new CollectingConsumer();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => format.TryRead(reader, consumer, isCompleted: true));
+        var exception = Assert.Throws<InvalidOperationException>(() => format.TryRead(reader, consumer));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -416,8 +416,8 @@ public class ProtobufCodecTests
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
-        var reader = new ArcBufferReader(writer);
-        while (format.TryRead(reader, consumer, isCompleted: true))
+        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        while (format.TryRead(reader, consumer))
         {
         }
     }
