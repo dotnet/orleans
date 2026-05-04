@@ -181,9 +181,9 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
         var setCodec = new OrleansBinarySetOperationCodec<int>(ValueCodec<int>());
 
         var queueException = Assert.Throws<InvalidOperationException>(
-            () => queueCodec.WriteSnapshot(new MiscountedReadOnlyCollection<int>(1, [1, 2]), new ArrayBufferWriter<byte>()));
+            () => CodecTestHelpers.WriteEntry(writer => queueCodec.WriteSnapshot(new MiscountedReadOnlyCollection<int>(1, [1, 2]), writer)));
         var setException = Assert.Throws<InvalidOperationException>(
-            () => setCodec.WriteSnapshot(new MiscountedReadOnlyCollection<int>(1, [1, 2]), new ArrayBufferWriter<byte>()));
+            () => CodecTestHelpers.WriteEntry(writer => setCodec.WriteSnapshot(new MiscountedReadOnlyCollection<int>(1, [1, 2]), writer)));
 
         Assert.Contains("did not match", queueException.Message);
         Assert.Contains("did not match", setException.Message);
@@ -214,66 +214,59 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<TKey, TValue>(
         IDurableDictionaryOperationCodec<TKey, TValue> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingDictionaryOperationHandler<TKey, TValue> consumer)
         where TKey : notnull
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static void Apply<T>(
         IDurableListOperationCodec<T> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingListOperationHandler<T> consumer)
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static void Apply<T>(
         IDurableQueueOperationCodec<T> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingQueueOperationHandler<T> consumer)
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static void Apply<T>(
         IDurableSetOperationCodec<T> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingSetOperationHandler<T> consumer)
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static void Apply<T>(
         IDurableValueOperationCodec<T> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingValueOperationHandler<T> consumer)
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static void Apply<T>(
         IDurableStateOperationCodec<T> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingStateOperationHandler<T> consumer)
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static void Apply<T>(
         IDurableTaskCompletionSourceOperationCodec<T> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static ReadOnlySequence<byte> VersionedCommand(uint command)

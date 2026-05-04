@@ -158,134 +158,162 @@ public sealed class DurableCollectionDirectWriteTests
 
     private sealed class DirectQueueCodec<T> : TestQueueCodec<T>
     {
-        public override void WriteEnqueue(T item, IBufferWriter<byte> output) => WriteByte(output);
+        public override void WriteEnqueue(T item, LogStreamWriter writer) => WriteCommittedByte(writer);
 
-        public override void WriteDequeue(IBufferWriter<byte> output) => WriteByte(output);
+        public override void WriteDequeue(LogStreamWriter writer) => WriteCommittedByte(writer);
     }
 
     private sealed class ThrowingQueueCodec<T>(bool throwOnEnqueue = false, bool throwOnDequeue = false) : TestQueueCodec<T>
     {
-        public override void WriteEnqueue(T item, IBufferWriter<byte> output)
+        public override void WriteEnqueue(T item, LogStreamWriter writer)
         {
-            WriteByte(output);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             if (throwOnEnqueue)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
+
+            entry.Commit();
         }
 
-        public override void WriteDequeue(IBufferWriter<byte> output)
+        public override void WriteDequeue(LogStreamWriter writer)
         {
-            WriteByte(output);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             if (throwOnDequeue)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
+
+            entry.Commit();
         }
     }
 
     private abstract class TestQueueCodec<T> : IDurableQueueOperationCodec<T>
     {
-        public virtual void WriteEnqueue(T item, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteEnqueue(T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteDequeue(IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteDequeue(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectSetCodec<T> : TestSetCodec<T>
     {
-        public override void WriteAdd(T item, IBufferWriter<byte> output) => WriteByte(output);
+        public override void WriteAdd(T item, LogStreamWriter writer) => WriteCommittedByte(writer);
 
-        public override void WriteRemove(T item, IBufferWriter<byte> output) => WriteByte(output);
+        public override void WriteRemove(T item, LogStreamWriter writer) => WriteCommittedByte(writer);
     }
 
     private sealed class ThrowingSetCodec<T>(bool throwOnAdd = false, bool throwOnRemove = false, bool throwOnSnapshot = false) : TestSetCodec<T>
     {
-        public override void WriteAdd(T item, IBufferWriter<byte> output)
+        public override void WriteAdd(T item, LogStreamWriter writer)
         {
-            WriteByte(output);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             if (throwOnAdd)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
+
+            entry.Commit();
         }
 
-        public override void WriteRemove(T item, IBufferWriter<byte> output)
+        public override void WriteRemove(T item, LogStreamWriter writer)
         {
-            WriteByte(output);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             if (throwOnRemove)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
+
+            entry.Commit();
         }
 
-        public override void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+        public override void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
         {
-            WriteByte(output);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             if (throwOnSnapshot)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
+
+            entry.Commit();
         }
     }
 
     private abstract class TestSetCodec<T> : IDurableSetOperationCodec<T>
     {
-        public virtual void WriteAdd(T item, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteAdd(T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteRemove(T item, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteRemove(T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectDictionaryCodec<TKey, TValue> : TestDictionaryCodec<TKey, TValue> where TKey : notnull
     {
-        public override void WriteSet(TKey key, TValue value, IBufferWriter<byte> output) => WriteByte(output);
+        public override void WriteSet(TKey key, TValue value, LogStreamWriter writer) => WriteCommittedByte(writer);
 
-        public override void WriteRemove(TKey key, IBufferWriter<byte> output) => WriteByte(output);
+        public override void WriteRemove(TKey key, LogStreamWriter writer) => WriteCommittedByte(writer);
     }
 
     private sealed class ThrowingDictionaryCodec<TKey, TValue>(bool throwOnSet = false, bool throwOnRemove = false) : TestDictionaryCodec<TKey, TValue> where TKey : notnull
     {
-        public override void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
+        public override void WriteSet(TKey key, TValue value, LogStreamWriter writer)
         {
-            WriteByte(output);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             if (throwOnSet)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
+
+            entry.Commit();
         }
 
-        public override void WriteRemove(TKey key, IBufferWriter<byte> output)
+        public override void WriteRemove(TKey key, LogStreamWriter writer)
         {
-            WriteByte(output);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             if (throwOnRemove)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
+
+            entry.Commit();
         }
     }
 
     private abstract class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue> where TKey : notnull
     {
-        public virtual void WriteSet(TKey key, TValue value, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteSet(TKey key, TValue value, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteRemove(TKey key, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public virtual void WriteRemove(TKey key, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
+    }
+
+    private static void WriteCommittedByte(LogStreamWriter writer)
+    {
+        using var entry = writer.BeginEntry();
+        WriteByte(entry.Writer);
+        entry.Commit();
     }
 
     private static void WriteByte(IBufferWriter<byte> output)

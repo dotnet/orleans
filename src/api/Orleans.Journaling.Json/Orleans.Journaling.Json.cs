@@ -14,16 +14,12 @@ namespace Orleans.Journaling.Json
 
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) { }
 
-        public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
         public void WriteClear(LogStreamWriter writer) { }
 
-        public void WriteRemove(TKey key, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteRemove(TKey key, LogStreamWriter writer) { }
 
-        public void WriteSet(TKey key, TValue value, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSet(TKey key, TValue value, LogStreamWriter writer) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) { }
     }
 
@@ -49,22 +45,16 @@ namespace Orleans.Journaling.Json
 
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) { }
 
-        public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteAdd(T item, LogStreamWriter writer) { }
 
-        public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
         public void WriteClear(LogStreamWriter writer) { }
 
-        public void WriteInsert(int index, T item, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteInsert(int index, T item, LogStreamWriter writer) { }
 
-        public void WriteRemoveAt(int index, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteRemoveAt(int index, LogStreamWriter writer) { }
 
-        public void WriteSet(int index, T item, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSet(int index, T item, LogStreamWriter writer) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer) { }
     }
 
@@ -74,16 +64,12 @@ namespace Orleans.Journaling.Json
 
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer) { }
 
-        public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
         public void WriteClear(LogStreamWriter writer) { }
 
-        public void WriteDequeue(System.Buffers.IBufferWriter<byte> output) { }
         public void WriteDequeue(LogStreamWriter writer) { }
 
-        public void WriteEnqueue(T item, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteEnqueue(T item, LogStreamWriter writer) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer) { }
     }
 
@@ -93,16 +79,12 @@ namespace Orleans.Journaling.Json
 
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer) { }
 
-        public void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteAdd(T item, LogStreamWriter writer) { }
 
-        public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
         public void WriteClear(LogStreamWriter writer) { }
 
-        public void WriteRemove(T item, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteRemove(T item, LogStreamWriter writer) { }
 
-        public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer) { }
     }
 
@@ -112,10 +94,8 @@ namespace Orleans.Journaling.Json
 
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer) { }
 
-        public void WriteClear(System.Buffers.IBufferWriter<byte> output) { }
         public void WriteClear(LogStreamWriter writer) { }
 
-        public void WriteSet(T state, ulong version, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSet(T state, ulong version, LogStreamWriter writer) { }
     }
 
@@ -125,16 +105,12 @@ namespace Orleans.Journaling.Json
 
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer) { }
 
-        public void WriteCanceled(System.Buffers.IBufferWriter<byte> output) { }
         public void WriteCanceled(LogStreamWriter writer) { }
 
-        public void WriteCompleted(T value, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteCompleted(T value, LogStreamWriter writer) { }
 
-        public void WriteFaulted(System.Exception exception, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteFaulted(System.Exception exception, LogStreamWriter writer) { }
 
-        public void WritePending(System.Buffers.IBufferWriter<byte> output) { }
         public void WritePending(LogStreamWriter writer) { }
     }
 
@@ -144,7 +120,6 @@ namespace Orleans.Journaling.Json
 
         public void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) { }
 
-        public void WriteSet(T value, System.Buffers.IBufferWriter<byte> output) { }
         public void WriteSet(T value, LogStreamWriter writer) { }
     }
 }

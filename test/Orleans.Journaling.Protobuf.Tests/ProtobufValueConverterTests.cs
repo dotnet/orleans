@@ -3,6 +3,7 @@ using Google.Protobuf.WellKnownTypes;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Hosting;
+using Orleans.Journaling.Tests;
 using Xunit;
 
 namespace Orleans.Journaling.Protobuf.Tests;
@@ -38,13 +39,12 @@ public class ProtobufValueConverterTests
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(ProtobufJournalingExtensions.LogFormatKey));
         var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey).GetCodec<StringValue>();
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet(new StringValue { Value = "hello" }, buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new StringValue { Value = "hello" }, writer));
 
-        Assert.Equal([8, 0, 18, 8, 1, 10, 5, 104, 101, 108, 108, 111], buffer.WrittenSpan.ToArray());
+        Assert.Equal([8, 0, 18, 8, 1, 10, 5, 104, 101, 108, 108, 111], input.ToArray());
         var consumer = new ValueConsumer<StringValue>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
         Assert.Equal("hello", consumer.Value?.Value);
     }
 
@@ -57,13 +57,12 @@ public class ProtobufValueConverterTests
         builder.UseProtobufCodec();
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey).GetCodec<StringValue>();
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet(new StringValue { Value = "hello" }, buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new StringValue { Value = "hello" }, writer));
 
-        Assert.Equal([8, 0, 18, 2, 1, 42], buffer.WrittenSpan.ToArray());
+        Assert.Equal([8, 0, 18, 2, 1, 42], input.ToArray());
         var consumer = new ValueConsumer<StringValue>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
         Assert.Equal("fallback", consumer.Value?.Value);
         Assert.Equal(1, fallbackCodec.WriteCount);
         Assert.Equal(1, fallbackCodec.ReadCount);

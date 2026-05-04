@@ -92,9 +92,7 @@ public class DurableListJournalBenchmarks
         var writer = _encodedLogStreamWriter.CreateLogStreamWriter(ListLogStreamId);
         for (var i = 0; i < OperationsPerInvocation; i++)
         {
-            using var entry = writer.BeginEntry();
-            _codec.WriteAdd(i, entry.Writer);
-            entry.Commit();
+            _codec.WriteAdd(i, writer);
         }
 
         return _encodedLogStreamWriter.GetCommittedBuffer();

@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using MessagePack;
 using Orleans.Hosting;
 using Orleans.Journaling.MessagePack;
+using Orleans.Journaling.Tests;
 using Orleans.Serialization.Buffers;
 using Xunit;
 
@@ -52,11 +53,10 @@ public sealed class MessagePackCodecTests
             new("alpha", 1),
             new("beta", 2),
         };
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSnapshot(items, buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer));
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal(items, consumer.Items);
     }
@@ -128,7 +128,7 @@ public sealed class MessagePackCodecTests
         var items = new MiscountedReadOnlyCollection<string>(1, new[] { "one", "two" });
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => codec.WriteSnapshot(items, new ArrayBufferWriter<byte>()));
+            () => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer)));
 
         Assert.Contains("did not match", exception.Message);
     }
@@ -322,46 +322,34 @@ public sealed class MessagePackCodecTests
         public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
     }
 
-    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableListOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableQueueOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableSetOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableValueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableValueOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableValueOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableValueOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableStateOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

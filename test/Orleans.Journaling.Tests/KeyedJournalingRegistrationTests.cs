@@ -107,13 +107,13 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     private sealed class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue>
         where TKey : notnull
     {
-        public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSet(TKey key, TValue value, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteRemove(TKey key, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteRemove(TKey key, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
@@ -131,7 +131,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class TestValueCodec<T> : IDurableValueOperationCodec<T>
     {
-        public void WriteSet(T value, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSet(T value, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) => throw new NotSupportedException();
     }

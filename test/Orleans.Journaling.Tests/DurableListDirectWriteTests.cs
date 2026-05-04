@@ -69,39 +69,45 @@ public sealed class DurableListDirectWriteTests
 
     private sealed class ThrowingAddCodec<T> : TestListCodec<T>
     {
-        public override void WriteAdd(T item, IBufferWriter<byte> output)
+        public override void WriteAdd(T item, LogStreamWriter writer)
         {
-            var span = output.GetSpan(1);
-            span[0] = 1;
-            output.Advance(1);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
             throw new InvalidOperationException("Expected test exception.");
         }
     }
 
     private sealed class DirectAddCodec<T> : TestListCodec<T>
     {
-        public override void WriteAdd(T item, IBufferWriter<byte> output)
+        public override void WriteAdd(T item, LogStreamWriter writer)
         {
-            var span = output.GetSpan(1);
-            span[0] = 1;
-            output.Advance(1);
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
+            entry.Commit();
         }
     }
 
     private abstract class TestListCodec<T> : IDurableListOperationCodec<T>
     {
-        public abstract void WriteAdd(T item, IBufferWriter<byte> output);
+        public abstract void WriteAdd(T item, LogStreamWriter writer);
 
-        public void WriteSet(int index, T item, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSet(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteInsert(int index, T item, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteInsert(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteRemoveAt(int index, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteRemoveAt(int index, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) => throw new NotSupportedException();
+    }
+
+    private static void WriteByte(IBufferWriter<byte> output)
+    {
+        var span = output.GetSpan(1);
+        span[0] = 1;
+        output.Advance(1);
     }
 }

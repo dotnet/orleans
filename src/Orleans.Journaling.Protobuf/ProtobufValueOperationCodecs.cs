@@ -12,7 +12,10 @@ public sealed class ProtobufValueOperationCodec<T>(
     private const uint SetCommand = 0;
 
     /// <inheritdoc/>
-    public void WriteSet(T value, IBufferWriter<byte> output)
+    public void WriteSet(T value, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSetPayload(value, output));
+
+    private void WriteSetPayload(T value, IBufferWriter<byte> output)
     {
         var operation = new ProtobufValueOperation();
         operation.Command.Add(SetCommand);
@@ -46,7 +49,10 @@ public sealed class ProtobufStateOperationCodec<T>(
     private const uint ClearCommand = 1;
 
     /// <inheritdoc/>
-    public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
+    public void WriteSet(T state, ulong version, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSetPayload(state, version, output));
+
+    private void WriteSetPayload(T state, ulong version, IBufferWriter<byte> output)
     {
         var operation = new ProtobufStateOperation();
         operation.Command.Add(SetCommand);
@@ -56,7 +62,10 @@ public sealed class ProtobufStateOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufStateOperation();
         operation.Command.Add(ClearCommand);
@@ -96,7 +105,10 @@ public sealed class ProtobufTcsOperationCodec<T>(
     private const uint CanceledCommand = 3;
 
     /// <inheritdoc/>
-    public void WritePending(IBufferWriter<byte> output)
+    public void WritePending(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WritePendingPayload);
+
+    private static void WritePendingPayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufTaskCompletionSourceOperation();
         operation.Command.Add(PendingCommand);
@@ -104,7 +116,10 @@ public sealed class ProtobufTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteCompleted(T value, IBufferWriter<byte> output)
+    public void WriteCompleted(T value, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteCompletedPayload(value, output));
+
+    private void WriteCompletedPayload(T value, IBufferWriter<byte> output)
     {
         var operation = new ProtobufTaskCompletionSourceOperation();
         operation.Command.Add(CompletedCommand);
@@ -113,7 +128,10 @@ public sealed class ProtobufTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteFaulted(Exception exception, IBufferWriter<byte> output)
+    public void WriteFaulted(Exception exception, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteFaultedPayload(exception, output));
+
+    private static void WriteFaultedPayload(Exception exception, IBufferWriter<byte> output)
     {
         var operation = new ProtobufTaskCompletionSourceOperation();
         operation.Command.Add(FaultedCommand);
@@ -122,7 +140,10 @@ public sealed class ProtobufTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteCanceled(IBufferWriter<byte> output)
+    public void WriteCanceled(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WriteCanceledPayload);
+
+    private static void WriteCanceledPayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufTaskCompletionSourceOperation();
         operation.Command.Add(CanceledCommand);

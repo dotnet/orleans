@@ -15,7 +15,10 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void WriteEnqueue(T item, IBufferWriter<byte> output)
+    public void WriteEnqueue(T item, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteEnqueuePayload(item, output));
+
+    private void WriteEnqueuePayload(T item, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, EnqueueCommand);
@@ -23,21 +26,30 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteDequeue(IBufferWriter<byte> output)
+    public void WriteDequeue(LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteDequeuePayload);
+
+    private static void WriteDequeuePayload(IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, DequeueCommand);
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, ClearCommand);
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         WriteVersionByte(output);

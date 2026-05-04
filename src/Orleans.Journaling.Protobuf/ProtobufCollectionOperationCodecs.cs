@@ -17,7 +17,10 @@ public sealed class ProtobufListOperationCodec<T>(
     private const uint SnapshotCommand = 5;
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, IBufferWriter<byte> output)
+    public void WriteAdd(T item, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteAddPayload(item, output));
+
+    private void WriteAddPayload(T item, IBufferWriter<byte> output)
     {
         var operation = new ProtobufCollectionOperation();
         operation.Command.Add(AddCommand);
@@ -26,7 +29,10 @@ public sealed class ProtobufListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSet(int index, T item, IBufferWriter<byte> output)
+    public void WriteSet(int index, T item, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSetPayload(index, item, output));
+
+    private void WriteSetPayload(int index, T item, IBufferWriter<byte> output)
     {
         var operation = new ProtobufCollectionOperation();
         operation.Command.Add(SetCommand);
@@ -36,7 +42,10 @@ public sealed class ProtobufListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteInsert(int index, T item, IBufferWriter<byte> output)
+    public void WriteInsert(int index, T item, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteInsertPayload(index, item, output));
+
+    private void WriteInsertPayload(int index, T item, IBufferWriter<byte> output)
     {
         var operation = new ProtobufCollectionOperation();
         operation.Command.Add(InsertCommand);
@@ -46,7 +55,10 @@ public sealed class ProtobufListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteRemoveAt(int index, IBufferWriter<byte> output)
+    public void WriteRemoveAt(int index, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteRemoveAtPayload(index, output));
+
+    private static void WriteRemoveAtPayload(int index, IBufferWriter<byte> output)
     {
         var operation = new ProtobufCollectionOperation();
         operation.Command.Add(RemoveAtCommand);
@@ -55,7 +67,10 @@ public sealed class ProtobufListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufCollectionOperation();
         operation.Command.Add(ClearCommand);
@@ -63,7 +78,10 @@ public sealed class ProtobufListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = ProtobufGeneratedCodecHelpers.GetSnapshotCount(items);
         var operation = new ProtobufCollectionOperation();
@@ -150,7 +168,10 @@ public sealed class ProtobufQueueOperationCodec<T>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void WriteEnqueue(T item, IBufferWriter<byte> output)
+    public void WriteEnqueue(T item, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteEnqueuePayload(item, output));
+
+    private void WriteEnqueuePayload(T item, IBufferWriter<byte> output)
     {
         var operation = new ProtobufQueueOperation();
         operation.Command.Add(EnqueueCommand);
@@ -159,7 +180,10 @@ public sealed class ProtobufQueueOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteDequeue(IBufferWriter<byte> output)
+    public void WriteDequeue(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WriteDequeuePayload);
+
+    private static void WriteDequeuePayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufQueueOperation();
         operation.Command.Add(DequeueCommand);
@@ -167,7 +191,10 @@ public sealed class ProtobufQueueOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufQueueOperation();
         operation.Command.Add(ClearCommand);
@@ -175,7 +202,10 @@ public sealed class ProtobufQueueOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = ProtobufGeneratedCodecHelpers.GetSnapshotCount(items);
         var operation = new ProtobufQueueOperation();
@@ -237,7 +267,10 @@ public sealed class ProtobufSetOperationCodec<T>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, IBufferWriter<byte> output)
+    public void WriteAdd(T item, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteAddPayload(item, output));
+
+    private void WriteAddPayload(T item, IBufferWriter<byte> output)
     {
         var operation = new ProtobufSetOperation();
         operation.Command.Add(AddCommand);
@@ -246,7 +279,10 @@ public sealed class ProtobufSetOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteRemove(T item, IBufferWriter<byte> output)
+    public void WriteRemove(T item, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteRemovePayload(item, output));
+
+    private void WriteRemovePayload(T item, IBufferWriter<byte> output)
     {
         var operation = new ProtobufSetOperation();
         operation.Command.Add(RemoveCommand);
@@ -255,7 +291,10 @@ public sealed class ProtobufSetOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufSetOperation();
         operation.Command.Add(ClearCommand);
@@ -263,7 +302,10 @@ public sealed class ProtobufSetOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = ProtobufGeneratedCodecHelpers.GetSnapshotCount(items);
         var operation = new ProtobufSetOperation();

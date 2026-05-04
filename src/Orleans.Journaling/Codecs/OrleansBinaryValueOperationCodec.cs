@@ -12,7 +12,10 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
     private const uint SetValueCommand = 0;
 
     /// <inheritdoc/>
-    public void WriteSet(T value, IBufferWriter<byte> output)
+    public void WriteSet(T value, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(value, output));
+
+    private void WriteSetPayload(T value, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, SetValueCommand);

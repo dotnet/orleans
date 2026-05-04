@@ -82,12 +82,12 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
 
         public int WriteClearCount { get; private set; }
 
-        public void WriteSet(T state, ulong version, IBufferWriter<byte> output) => _inner.WriteSet(state, version, output);
+        public void WriteSet(T state, ulong version, LogStreamWriter writer) => _inner.WriteSet(state, version, writer);
 
-        public void WriteClear(IBufferWriter<byte> output)
+        public void WriteClear(LogStreamWriter writer)
         {
             WriteClearCount++;
-            _inner.WriteClear(output);
+            _inner.WriteClear(writer);
         }
 
         public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);

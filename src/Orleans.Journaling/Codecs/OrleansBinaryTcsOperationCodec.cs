@@ -16,14 +16,20 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     private const byte FormatVersion = 0;
 
     /// <inheritdoc/>
-    public void WritePending(IBufferWriter<byte> output)
+    public void WritePending(LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WritePendingPayload);
+
+    private static void WritePendingPayload(IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Pending);
     }
 
     /// <inheritdoc/>
-    public void WriteCompleted(T value, IBufferWriter<byte> output)
+    public void WriteCompleted(T value, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteCompletedPayload(value, output));
+
+    private void WriteCompletedPayload(T value, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Completed);
@@ -31,7 +37,10 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteFaulted(Exception exception, IBufferWriter<byte> output)
+    public void WriteFaulted(Exception exception, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteFaultedPayload(exception, output));
+
+    private void WriteFaultedPayload(Exception exception, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Faulted);
@@ -39,7 +48,10 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteCanceled(IBufferWriter<byte> output)
+    public void WriteCanceled(LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteCanceledPayload);
+
+    private static void WriteCanceledPayload(IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Canceled);

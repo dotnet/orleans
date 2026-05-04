@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling.Protobuf;
+using Orleans.Journaling.Tests;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
@@ -33,11 +34,10 @@ public class ProtobufCodecTests
     public void ProtobufDictionaryCodec_Set_RoundTrips()
     {
         var codec = new ProtobufDictionaryOperationCodec<string, int>(CreateConverter<string>(), CreateConverter<int>());
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet("key", 42, buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("key", 42, writer));
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal("key", consumer.LastSetKey);
         Assert.Equal(42, consumer.LastSetValue);
@@ -52,11 +52,10 @@ public class ProtobufCodecTests
             new("alpha", 1),
             new("beta", 2),
         };
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSnapshot(items, buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer));
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal(items, consumer.Items);
     }
@@ -134,7 +133,7 @@ public class ProtobufCodecTests
         var items = new MiscountedReadOnlyCollection<string>(1, new[] { "one", "two" });
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => codec.WriteSnapshot(items, new ArrayBufferWriter<byte>()));
+            () => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer)));
 
         Assert.Contains("did not match", exception.Message);
     }
@@ -144,10 +143,8 @@ public class ProtobufCodecTests
     {
         var codec = new ProtobufValueOperationCodec<int>(CreateConverter<int>());
         var consumer = new ValueConsumer<int>();
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet(42, buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(42, writer)), consumer);
 
         Assert.Equal(42, consumer.Value);
     }
@@ -157,10 +154,8 @@ public class ProtobufCodecTests
     {
         var codec = new ProtobufValueOperationCodec<string>(CreateConverter<string>());
         var consumer = new ValueConsumer<string>();
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet(null!, buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(null!, writer)), consumer);
 
         Assert.Null(consumer.Value);
     }
@@ -432,39 +427,29 @@ public class ProtobufCodecTests
         public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
     }
 
-    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableListOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableQueueOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableSetOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableStateOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull

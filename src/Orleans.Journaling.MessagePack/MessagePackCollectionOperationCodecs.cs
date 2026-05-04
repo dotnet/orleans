@@ -15,7 +15,10 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
     private const int ClearCommand = 4;
     private const int SnapshotCommand = 5;
 
-    public void WriteAdd(T item, IBufferWriter<byte> output)
+    public void WriteAdd(T item, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteAddPayload(item, output));
+
+    private void WriteAddPayload(T item, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(2);
@@ -24,7 +27,10 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteSet(int index, T item, IBufferWriter<byte> output)
+    public void WriteSet(int index, T item, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSetPayload(index, item, output));
+
+    private void WriteSetPayload(int index, T item, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(3);
@@ -34,7 +40,10 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteInsert(int index, T item, IBufferWriter<byte> output)
+    public void WriteInsert(int index, T item, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteInsertPayload(index, item, output));
+
+    private void WriteInsertPayload(int index, T item, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(3);
@@ -44,7 +53,10 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteRemoveAt(int index, IBufferWriter<byte> output)
+    public void WriteRemoveAt(int index, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteRemoveAtPayload(index, output));
+
+    private static void WriteRemoveAtPayload(int index, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(2);
@@ -53,7 +65,10 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(1);
@@ -61,7 +76,10 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);
@@ -153,7 +171,10 @@ public sealed class MessagePackQueueOperationCodec<T>(MessagePackSerializerOptio
     private const int ClearCommand = 2;
     private const int SnapshotCommand = 3;
 
-    public void WriteEnqueue(T item, IBufferWriter<byte> output)
+    public void WriteEnqueue(T item, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteEnqueuePayload(item, output));
+
+    private void WriteEnqueuePayload(T item, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(2);
@@ -162,11 +183,16 @@ public sealed class MessagePackQueueOperationCodec<T>(MessagePackSerializerOptio
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteDequeue(IBufferWriter<byte> output) => WriteCommand(DequeueCommand, output);
+    public void WriteDequeue(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteCommand(DequeueCommand, output));
 
-    public void WriteClear(IBufferWriter<byte> output) => WriteCommand(ClearCommand, output);
+    public void WriteClear(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteCommand(ClearCommand, output));
 
-    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);
@@ -258,13 +284,19 @@ public sealed class MessagePackSetOperationCodec<T>(MessagePackSerializerOptions
     private const int ClearCommand = 2;
     private const int SnapshotCommand = 3;
 
-    public void WriteAdd(T item, IBufferWriter<byte> output) => WriteItemCommand(AddCommand, item, output);
+    public void WriteAdd(T item, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteItemCommand(AddCommand, item, output));
 
-    public void WriteRemove(T item, IBufferWriter<byte> output) => WriteItemCommand(RemoveCommand, item, output);
+    public void WriteRemove(T item, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteItemCommand(RemoveCommand, item, output));
 
-    public void WriteClear(IBufferWriter<byte> output) => WriteCommand(ClearCommand, output);
+    public void WriteClear(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteCommand(ClearCommand, output));
 
-    public void WriteSnapshot(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);
