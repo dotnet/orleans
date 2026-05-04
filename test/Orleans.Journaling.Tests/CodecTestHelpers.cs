@@ -12,6 +12,27 @@ public static class CodecTestHelpers
         return buffer;
     }
 
+    public static ReadOnlySequence<byte> WriteEntry(Action<LogStreamWriter> write)
+    {
+        using var batch = new OrleansBinaryLogBatchWriter();
+        write(batch.CreateLogStreamWriter(new LogStreamId(1)));
+        using var committed = batch.PeekSlice();
+        var remaining = committed.AsReadOnlySequence();
+        if (!OrleansBinaryLogEntryFrameReader.TryReadEntry(
+            ref remaining,
+            offset: 0,
+            isCompleted: true,
+            out _,
+            out var payload,
+            out _,
+            out _))
+        {
+            throw new InvalidOperationException("The test log entry was not fully written.");
+        }
+
+        return Sequence(payload.ToArray());
+    }
+
     public static ReadOnlySequence<byte> Sequence(ReadOnlyMemory<byte> bytes) => new(bytes);
 
     public static ReadOnlySequence<byte> SegmentedSequence(params byte[][] segments)

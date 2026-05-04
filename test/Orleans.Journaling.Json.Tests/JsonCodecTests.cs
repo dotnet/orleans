@@ -5,6 +5,7 @@ using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling.Json;
+using Orleans.Journaling.Tests;
 using Orleans.Serialization.Buffers;
 using Orleans.Hosting;
 using Xunit;
@@ -23,12 +24,11 @@ public class JsonCodecTests
     public void JsonDictionaryCodec_Set_RoundTrips()
     {
         var codec = new JsonDictionaryOperationCodec<string, int>(Options);
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet("alice", 42, buffer);
-        var json = GetString(buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("alice", 42, writer));
+        var json = GetString(input);
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal("""["set","alice",42]""", json);
         Assert.Equal("alice", consumer.LastSetKey);
@@ -43,11 +43,10 @@ public class JsonCodecTests
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
         var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey).GetCodec<JsonCodecTestValue>();
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet(new("test", 1), buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
         var consumer = new ValueConsumer<JsonCodecTestValue>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal(new("test", 1), consumer.Value);
     }
@@ -61,12 +60,11 @@ public class JsonCodecTests
             new("alpha", 1),
             new("beta", 2),
         };
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSnapshot(items, buffer);
-        var json = GetString(buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer));
+        var json = GetString(input);
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal("""["snapshot",[["alpha",1],["beta",2]]]""", json);
         Assert.Equal(items, consumer.Items);
@@ -92,10 +90,8 @@ public class JsonCodecTests
     {
         var codec = new JsonListOperationCodec<string>(Options);
         var consumer = new ListConsumer<string>();
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSnapshot(new[] { "one", "two" }, buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(new[] { "one", "two" }, writer)), consumer);
 
         Assert.Equal(["snapshot:2", "snapshot-item:one", "snapshot-item:two"], consumer.Commands);
     }
@@ -133,10 +129,8 @@ public class JsonCodecTests
     {
         var codec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
-        var buffer = new ArrayBufferWriter<byte>();
 
-        codec.WriteSet(42, buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(42, writer)), consumer);
 
         Assert.Equal(42, consumer.Value);
     }
@@ -146,11 +140,9 @@ public class JsonCodecTests
     {
         var codec = new JsonValueOperationCodec<JsonCodecTestValue>(CreateOptions());
         var consumer = new ValueConsumer<JsonCodecTestValue>();
-        var buffer = new ArrayBufferWriter<byte>();
         var value = new JsonCodecTestValue("alpha", 3);
 
-        codec.WriteSet(value, buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(value, writer)), consumer);
 
         Assert.Equal(value, consumer.Value);
     }
@@ -484,42 +476,34 @@ public class JsonCodecTests
         Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
     }
 
-    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableListOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableListOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableQueueOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableQueueOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableSetOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableSetOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableStateOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableStateOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<IBufferWriter<byte>> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var buffer = new ArrayBufferWriter<byte>();
-        write(buffer);
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
+
+    private static string GetString(ReadOnlySequence<byte> payload) => Encoding.UTF8.GetString(payload.ToArray());
 
     private static string GetString(ILogBatchWriter writer)
     {
@@ -530,9 +514,7 @@ public class JsonCodecTests
     private static void AppendValueSet(ILogBatchWriter writer, ulong streamId, int value)
     {
         var codec = new JsonValueOperationCodec<int>(Options);
-        using var entry = writer.CreateLogStreamWriter(new LogStreamId(streamId)).BeginEntry();
-        codec.WriteSet(value, entry.Writer);
-        entry.Commit();
+        codec.WriteSet(value, writer.CreateLogStreamWriter(new LogStreamId(streamId)));
     }
 
     private static JsonSerializerOptions CreateOptions() => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };

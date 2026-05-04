@@ -16,7 +16,10 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
+    public void WriteSet(TKey key, TValue value, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(key, value, output));
+
+    private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, SetCommand);
@@ -25,7 +28,10 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteRemove(TKey key, IBufferWriter<byte> output)
+    public void WriteRemove(TKey key, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteRemovePayload(key, output));
+
+    private void WriteRemovePayload(TKey key, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, RemoveCommand);
@@ -33,14 +39,20 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, ClearCommand);
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         WriteVersionByte(output);

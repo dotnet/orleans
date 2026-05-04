@@ -74,11 +74,10 @@ public class LogValueCodecTests
         var valueCodec = new OrleansLogValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
         var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec);
 
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.WriteSet("key1", 42, buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("key1", 42, writer));
 
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal("key1", consumer.LastSetKey);
         Assert.Equal(42, consumer.LastSetValue);
@@ -96,11 +95,10 @@ public class LogValueCodecTests
             new("alpha", 1),
             new("beta", 2),
         };
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.WriteSnapshot(items, buffer);
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer));
 
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), consumer);
+        codec.Apply(input, consumer);
 
         Assert.Equal(2, consumer.Items.Count);
         Assert.Equal("alpha", consumer.Items[0].Key);
@@ -154,7 +152,7 @@ public class LogValueCodecTests
             });
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => codec.WriteSnapshot(items, new ArrayBufferWriter<byte>()));
+            () => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer)));
 
         Assert.Contains("did not match", exception.Message);
     }

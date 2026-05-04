@@ -888,11 +888,7 @@ public class StateMachineManagerTests : JournalingTestBase
         using var segment = new OrleansBinaryLogBatchWriter();
         AppendDirectorySet(segment, name, new LogStreamId(8));
         var codec = CreateValueCodec<int>();
-        using (var entry = segment.CreateLogStreamWriter(new LogStreamId(8)).BeginEntry())
-        {
-            codec.WriteSet(value, entry.Writer);
-            entry.Commit();
-        }
+        codec.WriteSet(value, segment.CreateLogStreamWriter(new LogStreamId(8)));
 
         using var committed = segment.GetCommittedBuffer();
         return committed.ToArray();
@@ -928,9 +924,7 @@ public class StateMachineManagerTests : JournalingTestBase
     private void AppendDirectorySet(OrleansBinaryLogBatchWriter segment, string name, LogStreamId streamId)
     {
         var codec = CreateDictionaryCodec<string, ulong>();
-        using var entry = segment.CreateLogStreamWriter(new LogStreamId(0)).BeginEntry();
-        codec.WriteSet(name, streamId.Value, entry.Writer);
-        entry.Commit();
+        codec.WriteSet(name, streamId.Value, segment.CreateLogStreamWriter(new LogStreamId(0)));
     }
 
     private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> value)
@@ -1354,18 +1348,19 @@ public class StateMachineManagerTests : JournalingTestBase
 
     private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryOperationCodec<K, V> where K : notnull
     {
-        public void WriteSet(K key, V value, IBufferWriter<byte> output)
+        public void WriteSet(K key, V value, LogStreamWriter writer)
         {
-            output.GetSpan(1)[0] = 1;
-            output.Advance(1);
+            using var entry = writer.BeginEntry();
+            entry.Writer.GetSpan(1)[0] = 1;
+            entry.Writer.Advance(1);
             throw new InvalidOperationException("Expected test exception.");
         }
 
-        public void WriteRemove(K key, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteRemove(K key, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, IBufferWriter<byte> output) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
     }

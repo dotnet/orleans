@@ -13,7 +13,10 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
     private const uint ClearValueCommand = 1;
 
     /// <inheritdoc/>
-    public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
+    public void WriteSet(T state, ulong version, LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(state, version, output));
+
+    private void WriteSetPayload(T state, ulong version, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, SetValueCommand);
@@ -22,7 +25,10 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        DurableOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
         VarIntHelper.WriteVarUInt32(output, ClearValueCommand);

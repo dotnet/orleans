@@ -54,7 +54,9 @@ public sealed class MessagePackOperationCodecAdditionalTests
     public void ValueCodec_RejectsTrailingData()
     {
         var codec = new MessagePackValueOperationCodec<int>(Options);
-        var buffer = CodecTestHelpers.Write(writer => codec.WriteSet(42, writer));
+        var payload = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(42, writer));
+        var buffer = new ArrayBufferWriter<byte>();
+        buffer.Write(payload.ToArray());
         var messagePackWriter = new MessagePackWriter(buffer);
         messagePackWriter.WriteNil();
         messagePackWriter.Flush();
@@ -128,12 +130,11 @@ public sealed class MessagePackOperationCodecAdditionalTests
 
     private static void Apply<TKey, TValue>(
         IDurableDictionaryOperationCodec<TKey, TValue> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingDictionaryOperationHandler<TKey, TValue> consumer)
         where TKey : notnull
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static ReadOnlySequence<byte> CommandOnly(int command)

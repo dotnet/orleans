@@ -14,7 +14,10 @@ public sealed class MessagePackDictionaryOperationCodec<TKey, TValue>(MessagePac
     private const int ClearCommand = 2;
     private const int SnapshotCommand = 3;
 
-    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
+    public void WriteSet(TKey key, TValue value, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSetPayload(key, value, output));
+
+    private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(3);
@@ -24,7 +27,10 @@ public sealed class MessagePackDictionaryOperationCodec<TKey, TValue>(MessagePac
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteRemove(TKey key, IBufferWriter<byte> output)
+    public void WriteRemove(TKey key, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteRemovePayload(key, output));
+
+    private void WriteRemovePayload(TKey key, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(2);
@@ -33,7 +39,10 @@ public sealed class MessagePackDictionaryOperationCodec<TKey, TValue>(MessagePac
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(1);
@@ -41,7 +50,10 @@ public sealed class MessagePackDictionaryOperationCodec<TKey, TValue>(MessagePac
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
         var count = MessagePackCodecHelpers.GetSnapshotCount(items);
         var writer = MessagePackCodecHelpers.CreateWriter(output);

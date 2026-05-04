@@ -85,13 +85,9 @@ namespace Orleans.Journaling
     public partial interface IDurableDictionaryOperationCodec<TKey, TValue>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer);
-        void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteClear(LogStreamWriter writer);
-        void WriteRemove(TKey key, System.Buffers.IBufferWriter<byte> output);
         void WriteRemove(TKey key, LogStreamWriter writer);
-        void WriteSet(TKey key, TValue value, System.Buffers.IBufferWriter<byte> output);
         void WriteSet(TKey key, TValue value, LogStreamWriter writer);
-        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, System.Buffers.IBufferWriter<byte> output);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, LogStreamWriter writer);
     }
 
@@ -116,17 +112,11 @@ namespace Orleans.Journaling
     public partial interface IDurableListOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer);
-        void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output);
         void WriteAdd(T item, LogStreamWriter writer);
-        void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteClear(LogStreamWriter writer);
-        void WriteInsert(int index, T item, System.Buffers.IBufferWriter<byte> output);
         void WriteInsert(int index, T item, LogStreamWriter writer);
-        void WriteRemoveAt(int index, System.Buffers.IBufferWriter<byte> output);
         void WriteRemoveAt(int index, LogStreamWriter writer);
-        void WriteSet(int index, T item, System.Buffers.IBufferWriter<byte> output);
         void WriteSet(int index, T item, LogStreamWriter writer);
-        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer);
     }
 
@@ -159,13 +149,9 @@ namespace Orleans.Journaling
     public partial interface IDurableQueueOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer);
-        void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteClear(LogStreamWriter writer);
-        void WriteDequeue(System.Buffers.IBufferWriter<byte> output);
         void WriteDequeue(LogStreamWriter writer);
-        void WriteEnqueue(T item, System.Buffers.IBufferWriter<byte> output);
         void WriteEnqueue(T item, LogStreamWriter writer);
-        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer);
     }
 
@@ -198,13 +184,9 @@ namespace Orleans.Journaling
     public partial interface IDurableSetOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer);
-        void WriteAdd(T item, System.Buffers.IBufferWriter<byte> output);
         void WriteAdd(T item, LogStreamWriter writer);
-        void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteClear(LogStreamWriter writer);
-        void WriteRemove(T item, System.Buffers.IBufferWriter<byte> output);
         void WriteRemove(T item, LogStreamWriter writer);
-        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, System.Buffers.IBufferWriter<byte> output);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer);
     }
 
@@ -239,9 +221,7 @@ namespace Orleans.Journaling
     public partial interface IDurableStateOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer);
-        void WriteClear(System.Buffers.IBufferWriter<byte> output);
         void WriteClear(LogStreamWriter writer);
-        void WriteSet(T state, ulong version, System.Buffers.IBufferWriter<byte> output);
         void WriteSet(T state, ulong version, LogStreamWriter writer);
     }
 
@@ -272,13 +252,9 @@ namespace Orleans.Journaling
     public partial interface IDurableTaskCompletionSourceOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer);
-        void WriteCanceled(System.Buffers.IBufferWriter<byte> output);
         void WriteCanceled(LogStreamWriter writer);
-        void WriteCompleted(T value, System.Buffers.IBufferWriter<byte> output);
         void WriteCompleted(T value, LogStreamWriter writer);
-        void WriteFaulted(System.Exception exception, System.Buffers.IBufferWriter<byte> output);
         void WriteFaulted(System.Exception exception, LogStreamWriter writer);
-        void WritePending(System.Buffers.IBufferWriter<byte> output);
         void WritePending(LogStreamWriter writer);
     }
 
@@ -309,7 +285,6 @@ namespace Orleans.Journaling
     public partial interface IDurableValueOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer);
-        void WriteSet(T value, System.Buffers.IBufferWriter<byte> output);
         void WriteSet(T value, LogStreamWriter writer);
     }
 

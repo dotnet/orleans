@@ -19,9 +19,6 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     private readonly JsonValueSerializer<TValue> _valueSerializer = new(options);
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output) => Write(output, CreateSetOperation(key, value));
-
-    /// <inheritdoc/>
     public void WriteSet(TKey key, TValue value, LogStreamWriter writer) => Write(writer, CreateSetOperation(key, value));
 
     private JsonDictionaryOperation CreateSetOperation(TKey key, TValue value)
@@ -33,9 +30,6 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
             Value = _valueSerializer.SerializeToElement(value)
         };
     }
-
-    /// <inheritdoc/>
-    public void WriteRemove(TKey key, IBufferWriter<byte> output) => Write(output, CreateRemoveOperation(key));
 
     /// <inheritdoc/>
     public void WriteRemove(TKey key, LogStreamWriter writer) => Write(writer, CreateRemoveOperation(key));
@@ -50,20 +44,9 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output) => Write(output, CreateClearOperation());
-
-    /// <inheritdoc/>
     public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
 
     private static JsonDictionaryOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
-
-    /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
-    {
-        ArgumentNullException.ThrowIfNull(items);
-
-        Write(output, CreateSnapshotOperation(items));
-    }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer)

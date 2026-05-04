@@ -10,7 +10,10 @@ public sealed class MessagePackValueOperationCodec<T>(MessagePackSerializerOptio
 {
     private const int SetCommand = 0;
 
-    public void WriteSet(T value, IBufferWriter<byte> output)
+    public void WriteSet(T value, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSetPayload(value, output));
+
+    private void WriteSetPayload(T value, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(2);
@@ -44,7 +47,10 @@ public sealed class MessagePackStateOperationCodec<T>(MessagePackSerializerOptio
     private const int SetCommand = 0;
     private const int ClearCommand = 1;
 
-    public void WriteSet(T state, ulong version, IBufferWriter<byte> output)
+    public void WriteSet(T state, ulong version, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteSetPayload(state, version, output));
+
+    private void WriteSetPayload(T state, ulong version, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(3);
@@ -54,7 +60,10 @@ public sealed class MessagePackStateOperationCodec<T>(MessagePackSerializerOptio
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(1);
@@ -108,9 +117,13 @@ public sealed class MessagePackTcsOperationCodec<T>(MessagePackSerializerOptions
     private const int FaultedCommand = 2;
     private const int CanceledCommand = 3;
 
-    public void WritePending(IBufferWriter<byte> output) => WriteCommand(PendingCommand, output);
+    public void WritePending(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteCommand(PendingCommand, output));
 
-    public void WriteCompleted(T value, IBufferWriter<byte> output)
+    public void WriteCompleted(T value, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteCompletedPayload(value, output));
+
+    private void WriteCompletedPayload(T value, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(2);
@@ -119,7 +132,10 @@ public sealed class MessagePackTcsOperationCodec<T>(MessagePackSerializerOptions
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteFaulted(Exception exception, IBufferWriter<byte> output)
+    public void WriteFaulted(Exception exception, LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteFaultedPayload(exception, output));
+
+    private static void WriteFaultedPayload(Exception exception, IBufferWriter<byte> output)
     {
         var writer = MessagePackCodecHelpers.CreateWriter(output);
         writer.WriteArrayHeader(2);
@@ -128,7 +144,8 @@ public sealed class MessagePackTcsOperationCodec<T>(MessagePackSerializerOptions
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    public void WriteCanceled(IBufferWriter<byte> output) => WriteCommand(CanceledCommand, output);
+    public void WriteCanceled(LogStreamWriter writer) =>
+        MessagePackOperationCodecWriter.Write(writer, output => WriteCommand(CanceledCommand, output));
 
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {

@@ -16,7 +16,10 @@ public sealed class ProtobufDictionaryOperationCodec<TKey, TValue>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, IBufferWriter<byte> output)
+    public void WriteSet(TKey key, TValue value, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSetPayload(key, value, output));
+
+    private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
     {
         var operation = new ProtobufDictionaryOperation();
         operation.Command.Add(SetCommand);
@@ -26,7 +29,10 @@ public sealed class ProtobufDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteRemove(TKey key, IBufferWriter<byte> output)
+    public void WriteRemove(TKey key, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteRemovePayload(key, output));
+
+    private void WriteRemovePayload(TKey key, IBufferWriter<byte> output)
     {
         var operation = new ProtobufDictionaryOperation();
         operation.Command.Add(RemoveCommand);
@@ -35,7 +41,10 @@ public sealed class ProtobufDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(IBufferWriter<byte> output)
+    public void WriteClear(LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, WriteClearPayload);
+
+    private static void WriteClearPayload(IBufferWriter<byte> output)
     {
         var operation = new ProtobufDictionaryOperation();
         operation.Command.Add(ClearCommand);
@@ -43,7 +52,10 @@ public sealed class ProtobufDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) =>
+        ProtobufOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+
+    private void WriteSnapshotPayload(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
         var count = ProtobufGeneratedCodecHelpers.GetSnapshotCount(items);
         var operation = new ProtobufDictionaryOperation();

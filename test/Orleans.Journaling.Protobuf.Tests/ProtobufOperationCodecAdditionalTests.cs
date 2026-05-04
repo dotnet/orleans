@@ -150,12 +150,11 @@ public sealed class ProtobufOperationCodecAdditionalTests
 
     private static void Apply<TKey, TValue>(
         IDurableDictionaryOperationCodec<TKey, TValue> codec,
-        Action<IBufferWriter<byte>> write,
+        Action<LogStreamWriter> write,
         RecordingDictionaryOperationHandler<TKey, TValue> consumer)
         where TKey : notnull
     {
-        var buffer = CodecTestHelpers.Write(write);
-        codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), consumer);
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
     private static void AssertNativeRoundTrip<T>(T value)
