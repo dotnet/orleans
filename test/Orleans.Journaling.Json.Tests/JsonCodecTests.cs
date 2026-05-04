@@ -353,9 +353,8 @@ public class JsonCodecTests
         var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingLogEntrySink();
 
-        var result = format.TryRead(reader, consumer);
+        format.Read(reader, consumer);
 
-        Assert.False(result);
         Assert.Equal(bytes.Length, reader.Length);
         Assert.Empty(consumer.Entries);
     }
@@ -375,9 +374,8 @@ public class JsonCodecTests
         var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingLogEntrySink();
 
-        var result = format.TryRead(reader, consumer);
+        format.Read(reader, consumer);
 
-        Assert.True(result);
         Assert.Equal(0, reader.Length);
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -397,9 +395,8 @@ public class JsonCodecTests
         var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingLogEntrySink();
 
-        var result = format.TryRead(reader, consumer);
+        format.Read(reader, consumer);
 
-        Assert.False(result);
         Assert.Equal(bytes.Length, reader.Length);
         Assert.Empty(consumer.Entries);
     }
@@ -527,9 +524,8 @@ public class JsonCodecTests
         buffer.Write(bytes);
         var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
         var consumer = new RecordingLogEntrySink();
-        while (format.TryRead(reader, consumer))
-        {
-        }
+        format.Read(reader, consumer);
+        Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
     }
@@ -539,7 +535,7 @@ public class JsonCodecTests
         using var buffer = new ArcBufferWriter();
         buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
         var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
-        Assert.True(format.TryRead(reader, resolver));
+        format.Read(reader, resolver);
         Assert.Equal(0, reader.Length);
     }
 

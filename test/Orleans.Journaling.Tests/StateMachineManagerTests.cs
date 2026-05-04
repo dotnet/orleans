@@ -62,6 +62,24 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateMachineManager_Initialize_ThrowsWhenCompletedReadLeavesData()
+    {
+        var storage = new VolatileLogStorage();
+        using (var data = CreateBuffer([1, 2, 3]))
+        {
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+        }
+
+        var sut = CreateTestSystem(storage: storage, logFormat: new NonConsumingLogFormat());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.NotNull(exception.InnerException);
+        Assert.Contains("did not consume the completed log data", exception.InnerException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public async Task StateMachineManager_Recovery_PreservesUnknownStateMachineEntry()
     {
         var storage = new VolatileLogStorage();
@@ -940,9 +958,8 @@ public class StateMachineManagerTests : JournalingTestBase
         writer.Write(bytes);
         var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingLogEntrySink();
-        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer))
-        {
-        }
+        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
+        Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
     }
@@ -993,11 +1010,11 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public ILogBatchWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
+        public void Read(LogReadBuffer input, IStateMachineResolver resolver)
         {
             if (input.Length == 0)
             {
-                return false;
+                return;
             }
 
             var callbackPayload = _payload.ToArray();
@@ -1013,13 +1030,21 @@ public class StateMachineManagerTests : JournalingTestBase
 
             Array.Fill(callbackPayload, byte.MaxValue);
             input.Skip(input.Length);
-            return true;
         }
     }
 
     private sealed class TestFormattedLogEntry(ReadOnlyMemory<byte> payload) : IFormattedLogEntry
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
+    }
+
+    private sealed class NonConsumingLogFormat : ILogFormat
+    {
+        public ILogBatchWriter CreateWriter() => throw new NotSupportedException();
+
+        public void Read(LogReadBuffer input, IStateMachineResolver resolver)
+        {
+        }
     }
 
     private sealed class TrackingLogFormat : ILogFormat
@@ -1035,10 +1060,10 @@ public class StateMachineManagerTests : JournalingTestBase
             return writer;
         }
 
-        public bool TryRead(LogReadBuffer input, IStateMachineResolver consumer)
+        public void Read(LogReadBuffer input, IStateMachineResolver consumer)
         {
             ReadCount++;
-            return ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(input, consumer);
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(input, consumer);
         }
     }
 

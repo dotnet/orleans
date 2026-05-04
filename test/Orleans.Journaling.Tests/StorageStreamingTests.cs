@@ -129,7 +129,7 @@ public sealed class StorageStreamingTests
         var consumer = new CapturingLogEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer));
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer));
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -142,9 +142,8 @@ public sealed class StorageStreamingTests
         var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: false);
         var consumer = new CapturingLogEntrySink();
 
-        var result = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer);
+        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
 
-        Assert.False(result);
         Assert.Equal(6, reader.Length);
         Assert.Empty(consumer.Entries);
     }
@@ -160,14 +159,11 @@ public sealed class StorageStreamingTests
         var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CapturingLogEntrySink();
 
-        var firstResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer);
-        var secondResult = ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer);
+        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
         Assert.Equal([1, 2, 3], entry.Payload);
-        Assert.True(firstResult);
-        Assert.False(secondResult);
         Assert.Equal(2, reader.Length);
     }
 

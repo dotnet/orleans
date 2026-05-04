@@ -12,10 +12,17 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
     public ILogBatchWriter CreateWriter() => new JsonLinesLogSegmentWriter();
 
-    public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
+    public void Read(LogReadBuffer input, IStateMachineResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
+        while (TryReadLine(input, resolver))
+        {
+        }
+    }
+
+    private static bool TryReadLine(LogReadBuffer input, IStateMachineResolver resolver)
+    {
         if (input.Length == 0)
         {
             return false;

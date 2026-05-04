@@ -9,10 +9,17 @@ internal sealed class MessagePackLogFormat : ILogFormat
     public ILogBatchWriter CreateWriter()
         => new MessagePackLogSegmentWriter();
 
-    public bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
+    public void Read(LogReadBuffer input, IStateMachineResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
+        while (TryReadEntry(input, resolver))
+        {
+        }
+    }
+
+    private static bool TryReadEntry(LogReadBuffer input, IStateMachineResolver resolver)
+    {
         if (input.Length == 0)
         {
             return false;

@@ -114,9 +114,7 @@ public class DurableListJournalBenchmarks
         _recoveryBuffer.Reset();
         _recoveryBuffer.Write(_encodedLogData.AsReadOnlySequence());
         var reader = new LogReadBuffer(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
-        while (_logFormat.TryRead(reader, _recoveryConsumer))
-        {
-        }
+        _logFormat.Read(reader, _recoveryConsumer);
     }
 
     private sealed class RawInt32LogValueCodec : ILogValueCodec<int>

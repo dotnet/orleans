@@ -509,9 +509,7 @@ internal sealed partial class LogStateMachineManager : IStateMachineManager, ISt
     {
         try
         {
-            while (_logFormat.TryRead(buffer, this))
-            {
-            }
+            _logFormat.Read(buffer, this);
 
             if (buffer.IsCompleted && buffer.Length > 0)
             {

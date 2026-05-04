@@ -279,7 +279,7 @@ public sealed class OrleansBinaryLogBatchWriterTests
         var consumer = new CollectingConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer));
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -310,9 +310,8 @@ public sealed class OrleansBinaryLogBatchWriterTests
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
         var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
-        while (((ILogFormat)OrleansBinaryLogFormat.Instance).TryRead(reader, consumer))
-        {
-        }
+        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
+        Assert.Equal(0, reader.Length);
     }
 
     private static (uint Length, ulong StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)

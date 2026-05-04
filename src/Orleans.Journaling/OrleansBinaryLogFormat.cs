@@ -15,15 +15,22 @@ internal sealed class OrleansBinaryLogFormat : ILogFormat
 
     ILogBatchWriter ILogFormat.CreateWriter() => new OrleansBinaryLogBatchWriter();
 
-    bool ILogFormat.TryRead(LogReadBuffer input, IStateMachineResolver resolver) => OrleansBinaryLogReader.TryRead(input, resolver);
+    void ILogFormat.Read(LogReadBuffer input, IStateMachineResolver resolver) => OrleansBinaryLogReader.Read(input, resolver);
 }
 
 internal static class OrleansBinaryLogReader
 {
-    public static bool TryRead(LogReadBuffer input, IStateMachineResolver resolver)
+    public static void Read(LogReadBuffer input, IStateMachineResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
+        while (TryReadEntry(input, resolver))
+        {
+        }
+    }
+
+    private static bool TryReadEntry(LogReadBuffer input, IStateMachineResolver resolver)
+    {
         if (input.Length == 0)
         {
             return false;
