@@ -148,12 +148,12 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
-        consumer.ApplySnapshotStart(count);
+        consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
             var item = codec.Read(remaining, out var consumed);
             remaining = remaining.Slice(consumed);
-            consumer.ApplySnapshotItem(item);
+            consumer.ApplyAdd(item);
         }
     }
 

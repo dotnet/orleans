@@ -205,12 +205,10 @@ public class DurableListJournalBenchmarks
 
         public void ApplyClear() => _items.Clear();
 
-        public void ApplySnapshotStart(int count)
+        public void Reset(int capacityHint)
         {
             _items.Clear();
-            _items.EnsureCapacity(count);
+            _items.EnsureCapacity(capacityHint);
         }
-
-        public void ApplySnapshotItem(int item) => _items.Add(item);
     }
 }

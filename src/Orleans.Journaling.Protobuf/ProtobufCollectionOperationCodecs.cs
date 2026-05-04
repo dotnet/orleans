@@ -110,8 +110,7 @@ public sealed class ProtobufListOperationCodec<T>(
         public void ApplyInsert(int index, T item) => consumer.ApplyInsert(index, item);
         public void ApplyRemoveAt(int index) => consumer.ApplyRemoveAt(index);
         public void ApplyClear() => consumer.ApplyClear();
-        public void ApplySnapshotStart(int count) => consumer.ApplySnapshotStart(count);
-        public void ApplySnapshotItem(T item) => consumer.ApplySnapshotItem(item);
+        public void Reset(int capacityHint) => consumer.Reset(capacityHint);
     }
 
     internal static void ApplyCollection<TConsumer>(ReadOnlySequence<byte> input, TConsumer consumer, ProtobufValueConverter<T> converter)
@@ -143,10 +142,10 @@ public sealed class ProtobufListOperationCodec<T>(
             case SnapshotCommand:
                 var count = ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Count, "count", command);
                 ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Item.Count, command);
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(converter.FromByteString(operation.Item[i]));
+                    consumer.ApplyAdd(converter.FromByteString(operation.Item[i]));
                 }
 
                 break;
@@ -242,10 +241,10 @@ public sealed class ProtobufQueueOperationCodec<T>(
             case SnapshotCommand:
                 var count = ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Count, "count", command);
                 ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Item.Count, command);
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(converter.FromByteString(operation.Item[i]));
+                    consumer.ApplyEnqueue(converter.FromByteString(operation.Item[i]));
                 }
 
                 break;
@@ -342,10 +341,10 @@ public sealed class ProtobufSetOperationCodec<T>(
             case SnapshotCommand:
                 var count = ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Count, "count", command);
                 ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Item.Count, command);
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(converter.FromByteString(operation.Item[i]));
+                    consumer.ApplyAdd(converter.FromByteString(operation.Item[i]));
                 }
 
                 break;
@@ -362,6 +361,5 @@ internal interface ICollectionConsumer<T>
     void ApplyInsert(int index, T item);
     void ApplyRemoveAt(int index);
     void ApplyClear();
-    void ApplySnapshotStart(int count);
-    void ApplySnapshotItem(T item);
+    void Reset(int capacityHint);
 }

@@ -144,13 +144,11 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     void IDurableListOperationHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
     void IDurableListOperationHandler<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
     void IDurableListOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IDurableListOperationHandler<T>.ApplySnapshotStart(int count)
+    void IDurableListOperationHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
-        _items.EnsureCapacity(count);
+        _items.EnsureCapacity(capacityHint);
     }
-
-    void IDurableListOperationHandler<T>.ApplySnapshotItem(T item) => ApplyAdd(item);
 
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");

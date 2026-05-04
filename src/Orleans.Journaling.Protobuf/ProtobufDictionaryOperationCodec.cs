@@ -97,10 +97,10 @@ public sealed class ProtobufDictionaryOperationCodec<TKey, TValue>(
                 var count = ProtobufGeneratedCodecHelpers.RequireNonNegativeInt32(operation.Count, "count", command);
                 ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Value.Count, command);
                 ProtobufGeneratedCodecHelpers.RequireSnapshotCount(count, operation.Key.Count, command);
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(
+                    consumer.ApplySet(
                         keyConverter.FromByteString(operation.Key[i]),
                         valueConverter.FromByteString(operation.Value[i]));
                 }

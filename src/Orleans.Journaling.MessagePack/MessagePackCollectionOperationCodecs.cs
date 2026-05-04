@@ -138,10 +138,10 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
 
                 var count = reader.ReadInt32();
                 MessagePackCodecHelpers.RequireSnapshotCount(count, itemCount - 2, command);
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                    consumer.ApplyAdd(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
                 }
 
                 break;
@@ -243,10 +243,10 @@ public sealed class MessagePackQueueOperationCodec<T>(MessagePackSerializerOptio
 
                 var count = reader.ReadInt32();
                 MessagePackCodecHelpers.RequireSnapshotCount(count, itemCount - 2, command);
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                    consumer.ApplyEnqueue(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
                 }
 
                 break;
@@ -347,10 +347,10 @@ public sealed class MessagePackSetOperationCodec<T>(MessagePackSerializerOptions
 
                 var count = reader.ReadInt32();
                 MessagePackCodecHelpers.RequireSnapshotCount(count, itemCount - 2, command);
-                consumer.ApplySnapshotStart(count);
+                consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplySnapshotItem(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                    consumer.ApplyAdd(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
                 }
 
                 break;

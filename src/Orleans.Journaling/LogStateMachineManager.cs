@@ -763,13 +763,11 @@ internal sealed partial class LogStateMachineManager : IStateMachineManager, ISt
 
         void IDurableDictionaryOperationHandler<string, ulong>.ApplyClear() => _ids.Clear();
 
-        void IDurableDictionaryOperationHandler<string, ulong>.ApplySnapshotStart(int count)
+        void IDurableDictionaryOperationHandler<string, ulong>.Reset(int capacityHint)
         {
             _ids.Clear();
-            _ids.EnsureCapacity(count);
+            _ids.EnsureCapacity(capacityHint);
         }
-
-        void IDurableDictionaryOperationHandler<string, ulong>.ApplySnapshotItem(string key, ulong value) => ApplySet(key, value);
 
         private void ApplySet(string name, ulong id)
         {

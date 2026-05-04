@@ -118,14 +118,14 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
         remaining = remaining.Slice(reader.Consumed);
 
-        consumer.ApplySnapshotStart(count);
+        consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
             var key = keyCodec.Read(remaining, out var consumed);
             remaining = remaining.Slice(consumed);
             var value = valueCodec.Read(remaining, out consumed);
             remaining = remaining.Slice(consumed);
-            consumer.ApplySnapshotItem(key, value);
+            consumer.ApplySet(key, value);
         }
     }
 

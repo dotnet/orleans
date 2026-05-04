@@ -23,7 +23,7 @@ public sealed class JsonOperationCodecAdditionalTests
         Apply(codec, writer => codec.WriteClear(writer), consumer);
         Apply(codec, writer => codec.WriteSnapshot([], writer), consumer);
 
-        Assert.Equal(["remove:alpha", "clear", "snapshot:0"], consumer.Commands);
+        Assert.Equal(["remove:alpha", "clear", "reset:0"], consumer.Commands);
         Assert.Empty(consumer.SnapshotItems);
     }
 

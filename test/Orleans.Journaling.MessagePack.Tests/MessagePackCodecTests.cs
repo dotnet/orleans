@@ -41,7 +41,7 @@ public sealed class MessagePackCodecTests
         Apply(codec, writer => codec.WriteClear(writer), consumer);
         Apply(codec, writer => codec.WriteSnapshot(new[] { "three", "four" }, writer), consumer);
 
-        Assert.Equal(["add:one", "set:0:updated", "insert:1:two", "remove:0", "clear", "snapshot:2", "snapshot-item:three", "snapshot-item:four"], consumer.Commands);
+        Assert.Equal(["add:one", "set:0:updated", "insert:1:two", "remove:0", "clear", "reset:2", "add:three", "add:four"], consumer.Commands);
     }
 
     [Fact]
@@ -76,8 +76,8 @@ public sealed class MessagePackCodecTests
         Apply(setCodec, writer => setCodec.WriteRemove("a", writer), setConsumer);
         Apply(setCodec, writer => setCodec.WriteSnapshot(new[] { "b", "c" }, writer), setConsumer);
 
-        Assert.Equal(["enqueue:10", "dequeue", "snapshot:2", "snapshot-item:20", "snapshot-item:30"], queueConsumer.Commands);
-        Assert.Equal(["add:a", "remove:a", "snapshot:2", "snapshot-item:b", "snapshot-item:c"], setConsumer.Commands);
+        Assert.Equal(["enqueue:10", "dequeue", "reset:2", "enqueue:20", "enqueue:30"], queueConsumer.Commands);
+        Assert.Equal(["add:a", "remove:a", "reset:2", "add:b", "add:c"], setConsumer.Commands);
     }
 
     [Fact]
@@ -365,8 +365,7 @@ public sealed class MessagePackCodecTests
         public void ApplySet(TKey key, TValue value) => Items.Add(new(key, value));
         public void ApplyRemove(TKey key) => throw new NotSupportedException();
         public void ApplyClear() => Items.Clear();
-        public void ApplySnapshotStart(int count) => Items.Clear();
-        public void ApplySnapshotItem(TKey key, TValue value) => Items.Add(new(key, value));
+        public void Reset(int capacityHint) => Items.Clear();
     }
 
     private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
@@ -377,8 +376,7 @@ public sealed class MessagePackCodecTests
         public void ApplyInsert(int index, T item) => Commands.Add($"insert:{index}:{item}");
         public void ApplyRemoveAt(int index) => Commands.Add($"remove:{index}");
         public void ApplyClear() => Commands.Add("clear");
-        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
     private sealed class QueueConsumer<T> : IDurableQueueOperationHandler<T>
@@ -387,8 +385,7 @@ public sealed class MessagePackCodecTests
         public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
         public void ApplyDequeue() => Commands.Add("dequeue");
         public void ApplyClear() => Commands.Add("clear");
-        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
     private sealed class SetConsumer<T> : IDurableSetOperationHandler<T>
@@ -397,8 +394,7 @@ public sealed class MessagePackCodecTests
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
         public void ApplyRemove(T item) => Commands.Add($"remove:{item}");
         public void ApplyClear() => Commands.Add("clear");
-        public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-        public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
     private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>

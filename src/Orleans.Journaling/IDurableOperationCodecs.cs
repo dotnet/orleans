@@ -231,11 +231,8 @@ public interface IDurableDictionaryOperationHandler<TKey, TValue> where TKey : n
     /// <summary>Applies a clear command.</summary>
     void ApplyClear();
 
-    /// <summary>Begins applying a snapshot.</summary>
-    void ApplySnapshotStart(int count);
-
-    /// <summary>Applies one snapshot item.</summary>
-    void ApplySnapshotItem(TKey key, TValue value);
+    /// <summary>Resets the receiver before applying replacement entries.</summary>
+    void Reset(int capacityHint);
 }
 
 /// <summary>
@@ -258,11 +255,8 @@ public interface IDurableListOperationHandler<T>
     /// <summary>Applies a clear command.</summary>
     void ApplyClear();
 
-    /// <summary>Begins applying a snapshot.</summary>
-    void ApplySnapshotStart(int count);
-
-    /// <summary>Applies one snapshot item.</summary>
-    void ApplySnapshotItem(T item);
+    /// <summary>Resets the receiver before applying replacement entries.</summary>
+    void Reset(int capacityHint);
 }
 
 /// <summary>
@@ -279,11 +273,8 @@ public interface IDurableQueueOperationHandler<T>
     /// <summary>Applies a clear command.</summary>
     void ApplyClear();
 
-    /// <summary>Begins applying a snapshot.</summary>
-    void ApplySnapshotStart(int count);
-
-    /// <summary>Applies one snapshot item.</summary>
-    void ApplySnapshotItem(T item);
+    /// <summary>Resets the receiver before applying replacement entries.</summary>
+    void Reset(int capacityHint);
 }
 
 /// <summary>
@@ -300,11 +291,8 @@ public interface IDurableSetOperationHandler<T>
     /// <summary>Applies a clear command.</summary>
     void ApplyClear();
 
-    /// <summary>Begins applying a snapshot.</summary>
-    void ApplySnapshotStart(int count);
-
-    /// <summary>Applies one snapshot item.</summary>
-    void ApplySnapshotItem(T item);
+    /// <summary>Resets the receiver before applying replacement entries.</summary>
+    void Reset(int capacityHint);
 }
 
 /// <summary>

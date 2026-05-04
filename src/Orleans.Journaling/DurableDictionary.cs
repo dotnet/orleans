@@ -127,13 +127,11 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     void IDurableDictionaryOperationHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
     void IDurableDictionaryOperationHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
     void IDurableDictionaryOperationHandler<K, V>.ApplyClear() => ApplyClear();
-    void IDurableDictionaryOperationHandler<K, V>.ApplySnapshotStart(int count)
+    void IDurableDictionaryOperationHandler<K, V>.Reset(int capacityHint)
     {
         ApplyClear();
-        _items.EnsureCapacity(count);
+        _items.EnsureCapacity(capacityHint);
     }
-
-    void IDurableDictionaryOperationHandler<K, V>.ApplySnapshotItem(K key, V value) => ApplySet(key, value);
 
     protected virtual LogStreamWriter GetStorage()
     {

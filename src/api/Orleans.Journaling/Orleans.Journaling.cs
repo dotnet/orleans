@@ -96,8 +96,7 @@ namespace Orleans.Journaling
         void ApplyClear();
         void ApplyRemove(TKey key);
         void ApplySet(TKey key, TValue value);
-        void ApplySnapshotItem(TKey key, TValue value);
-        void ApplySnapshotStart(int count);
+        void Reset(int capacityHint);
     }
 
     public partial interface IDurableDictionary<K, V> : System.Collections.Generic.IDictionary<K, V>, System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.IEnumerable
@@ -127,8 +126,7 @@ namespace Orleans.Journaling
         void ApplyInsert(int index, T item);
         void ApplyRemoveAt(int index);
         void ApplySet(int index, T item);
-        void ApplySnapshotItem(T item);
-        void ApplySnapshotStart(int count);
+        void Reset(int capacityHint);
     }
 
     public partial interface IDurableList<T> : System.Collections.Generic.IList<T>, System.Collections.Generic.ICollection<T>, System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable
@@ -160,8 +158,7 @@ namespace Orleans.Journaling
         void ApplyClear();
         void ApplyDequeue();
         void ApplyEnqueue(T item);
-        void ApplySnapshotItem(T item);
-        void ApplySnapshotStart(int count);
+        void Reset(int capacityHint);
     }
 
     public partial interface IDurableQueue<T> : System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable, System.Collections.Generic.IReadOnlyCollection<T>
@@ -195,8 +192,7 @@ namespace Orleans.Journaling
         void ApplyAdd(T item);
         void ApplyClear();
         void ApplyRemove(T item);
-        void ApplySnapshotItem(T item);
-        void ApplySnapshotStart(int count);
+        void Reset(int capacityHint);
     }
 
     public partial interface IDurableSet<T> : System.Collections.Generic.ISet<T>, System.Collections.Generic.ICollection<T>, System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable, System.Collections.Generic.IReadOnlyCollection<T>, System.Collections.Generic.IReadOnlySet<T>

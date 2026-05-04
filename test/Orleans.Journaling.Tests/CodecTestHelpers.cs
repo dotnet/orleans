@@ -99,22 +99,20 @@ public sealed class RecordingDictionaryOperationHandler<TKey, TValue> : IDurable
 
     public List<KeyValuePair<TKey, TValue>> SnapshotItems { get; } = [];
 
-    public void ApplySet(TKey key, TValue value) => Commands.Add($"set:{key}:{value}");
+    public void ApplySet(TKey key, TValue value)
+    {
+        Commands.Add($"set:{key}:{value}");
+        SnapshotItems.Add(new(key, value));
+    }
 
     public void ApplyRemove(TKey key) => Commands.Add($"remove:{key}");
 
     public void ApplyClear() => Commands.Add("clear");
 
-    public void ApplySnapshotStart(int count)
+    public void Reset(int capacityHint)
     {
-        Commands.Add($"snapshot:{count}");
+        Commands.Add($"reset:{capacityHint}");
         SnapshotItems.Clear();
-    }
-
-    public void ApplySnapshotItem(TKey key, TValue value)
-    {
-        Commands.Add($"snapshot-item:{key}:{value}");
-        SnapshotItems.Add(new(key, value));
     }
 }
 
@@ -132,9 +130,7 @@ public sealed class RecordingListOperationHandler<T> : IDurableListOperationHand
 
     public void ApplyClear() => Commands.Add("clear");
 
-    public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-
-    public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+    public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
 }
 
 public sealed class RecordingQueueOperationHandler<T> : IDurableQueueOperationHandler<T>
@@ -147,9 +143,7 @@ public sealed class RecordingQueueOperationHandler<T> : IDurableQueueOperationHa
 
     public void ApplyClear() => Commands.Add("clear");
 
-    public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-
-    public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+    public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
 }
 
 public sealed class RecordingSetOperationHandler<T> : IDurableSetOperationHandler<T>
@@ -162,9 +156,7 @@ public sealed class RecordingSetOperationHandler<T> : IDurableSetOperationHandle
 
     public void ApplyClear() => Commands.Add("clear");
 
-    public void ApplySnapshotStart(int count) => Commands.Add($"snapshot:{count}");
-
-    public void ApplySnapshotItem(T item) => Commands.Add($"snapshot-item:{item}");
+    public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
 }
 
 public sealed class RecordingValueOperationHandler<T> : IDurableValueOperationHandler<T>
