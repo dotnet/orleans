@@ -1,0 +1,5 @@
+# Use in-place speculative execution for transactional journaling
+
+Transactional journaling will use in-place speculative execution with abort-by-recovery as the primary implementation model: transactional durable operations are written as ordinary log entries bracketed by transaction control entries, mutate live durable state machines on the fast path, and aborted regions are omitted by reset/replay. We chose this over nested prepared log bytes and copy-on-write replicas because transaction aborts are expected to be rare, method-bracketed transaction scheduling must already isolate uncommitted state, and the commit path should preserve journaling's existing write-then-apply behavior and low steady-state overhead.
+
+The consequence is that transactional journaling must include a transaction-aware replay filter and a scheduler gate that blocks unrelated requests while speculative state is visible. The nested-log design remains a conservative fallback/reference design, but it is not the primary implementation target.

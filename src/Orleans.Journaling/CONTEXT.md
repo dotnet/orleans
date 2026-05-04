@@ -13,7 +13,7 @@ The logical item inside a **Log Extent**, consisting of a state machine id and o
 _Avoid_: Record
 
 **Control Log Entry**:
-A reserved future concept for non-state-machine journal metadata if a concrete need emerges.
+A **Log Entry** with a **Runtime State Machine Id** whose payload carries journaling infrastructure metadata instead of an application **Durable Operation**.
 _Avoid_: Physical boundary marker
 
 **Log Entry Writer**:
@@ -60,6 +60,18 @@ _Avoid_: Unknown stream
 A state machine id in the reserved range 0-7, used by Orleans runtime journaling infrastructure. Application state machine ids begin at 8.
 _Avoid_: User-reserved id
 
+**Transactional Journaled Grain**:
+A durable grain mode whose normal requests are method-bracketed transactions over all durable state machines in the grain log.
+_Avoid_: Explicit transactional state wrapper
+
+**In-place Speculative Execution**:
+A transactional journaling mode where uncommitted **Durable Operations** mutate live durable state machines and isolation depends on non-interleaved request execution.
+_Avoid_: Copy-on-write transaction state
+
+**Abort-by-Recovery**:
+A transaction abort strategy which resets durable state machines and replays stored **Log Entries** while omitting the aborted transaction region.
+_Avoid_: Per-operation undo
+
 ## Relationships
 
 - A **Log Extent** contains one or more **Log Entries**.
@@ -68,6 +80,7 @@ _Avoid_: User-reserved id
 - A physical format can frame each **Log Entry** directly in an ordered byte stream without adding a **Log Extent** envelope.
 - A **Log Entry** belongs to exactly one durable state machine.
 - A **Log Entry** with a **Runtime State Machine Id** belongs to Orleans journaling infrastructure, not user code.
+- A **Control Log Entry** is still framed and ordered like any other **Log Entry**; its meaning is owned by the manager for that **Runtime State Machine Id**.
 - **Log Format** readers parse physical framing and dispatch ids and payloads; they do not interpret runtime id semantics.
 - A **Log Entry** contains exactly one **Durable Operation** payload.
 - A **Log Format** owns physical log byte framing but does not by itself define a full **Codec Family**.
@@ -94,11 +107,15 @@ _Avoid_: User-reserved id
 - The **JSONL Log Format** is newline-delimited by **Log Entry** and is not the strict zero-allocation performance target.
 - A **Retired State Machine** can temporarily retain copied **Log Entries** so its data is preserved across recovery and compaction.
 - Retired preservation stores the state machine id plus durable operation payload bytes, not exact physical extent bytes. JSONL may re-emit a fresh line during compaction.
+- **In-place Speculative Execution** keeps the commit path close to normal journaling: write the **Log Entry**, mutate live state, and rely on scheduling to hide uncommitted state.
+- **Abort-by-Recovery** treats transaction abort as a replay concern, not as a **Durable Operation** undo concern.
+- A **Transactional Journaled Grain** uses call-chain reentrancy for same-transaction callbacks but rejects application-level interleaving by default.
+- A read-only request on a **Transactional Journaled Grain** must not append **Durable Operations**.
 
 ## Example dialogue
 
-> **Dev:** "When a durable list adds an item, do we allocate an Add command and then write it?"
-> **Domain expert:** "No — the list writes one **Log Entry** directly into the current **Log Extent**, and the encoded **Durable Operation** is the add."
+> **Dev:** "When a durable list adds an item in a transaction, do we build a copy-on-write list first?"
+> **Domain expert:** "No — a **Transactional Journaled Grain** uses **In-place Speculative Execution** for the fast path: the list writes the same **Log Entry** shape and mutates live state, while ordinary non-interleaved execution prevents unrelated requests from observing it."
 
 ## Flagged ambiguities
 
@@ -114,7 +131,10 @@ _Avoid_: User-reserved id
 - The **Log Format** key is not persisted in journal data; storage provider configuration must remain consistent with stored bytes.
 - Format selection delegates receive the grain type only, not the full `IGrainContext` or `GrainId`.
 - `LogExtentBuilder` and `IStateMachineLogExtentCodec` are retired from built-in paths; do not describe new designs in terms of builders or post-hoc extent codecs.
-- If future metadata needs a journal-level entry, model it explicitly as a **Control Log Entry**, not as a hidden physical boundary marker.
+- Journal-level metadata is modeled explicitly as a **Control Log Entry**, not as a hidden physical boundary marker.
 - State machine ids 0-7 are reserved for runtime/control use; do not allocate them to application durable state machines.
 - The manager, not the physical reader, owns reserved-id semantics.
 - MessagePack journaling is closed-generic and AOT-friendly; it must not fall back to generalized runtime `Type` dispatch.
+- Transaction abort in journaling means **Abort-by-Recovery**, not per-state-machine undo or disposal of a pending **Log Entry** writer.
+- Interleaving in a **Transactional Journaled Grain** means same-transaction call-chain reentrancy, not arbitrary `[Reentrant]`, `[MayInterleave]`, or user `[AlwaysInterleave]` execution.
+- `[ReadOnly]` on a **Transactional Journaled Grain** means durable writes fail; it is not an upgradeable transaction hint.

@@ -1,0 +1,5 @@
+# Use call-chain reentrancy for transactional journaling
+
+Transactional journaled grains will rely on ordinary Orleans non-interleaved request execution plus call-chain reentrancy for same-transaction callbacks instead of introducing a new activation request scheduler or inbox abstraction in the first design. Method bracketing will enter a `RequestContext.AllowCallChainReentrancy()` scope for the transaction, allowing callbacks carrying the same reentrancy id to re-enter while unrelated requests remain blocked by existing activation scheduling.
+
+To preserve ACID isolation with in-place speculative execution, application-level interleaving is rejected by default on transactional journaled grains: `[Reentrant]`, `[MayInterleave]`, and user methods marked `[AlwaysInterleave]` are incompatible unless a future unsafe opt-in explicitly gives up isolation. Orleans transaction protocol extension calls remain interleavable because they are system calls marked `[AlwaysInterleave]` and `[Transaction(TransactionOption.Suppress)]`.
