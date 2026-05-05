@@ -47,7 +47,7 @@ public readonly struct LogReadBuffer
 
         if (count == 0)
         {
-            return ReadOnlySpan<byte>.Empty;
+            return [];
         }
 
         var requested = destination[..count];
