@@ -49,11 +49,11 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         ClusterMembershipService clusterMembershipService,
         IInternalGrainFactory grainFactory,
         ILogger<DirectoryMembershipService> logger,
-        int partitionsPerSilo = 1,
-        Func<SiloAddress, int, uint[]>? getRingBoundaries = null)
+        int partitionsPerSilo,
+        Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
         _partitionsPerSilo = partitionsPerSilo;
-        _getRingBoundaries = getRingBoundaries ?? DirectoryMembershipSnapshot.DefaultGetRingBoundaries;
+        _getRingBoundaries = getRingBoundaries;
         _viewUpdates = new(
             DirectoryMembershipSnapshot.Default,
             (previous, proposed) => proposed.Version >= previous.Version,
