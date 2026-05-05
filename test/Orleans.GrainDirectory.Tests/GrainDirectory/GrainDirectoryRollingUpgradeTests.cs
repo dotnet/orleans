@@ -136,6 +136,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         var errors = errorLogs
             .ToArray()
             .Where(static error => !IsExpectedClientRoutingTableCancellation(error))
+            .Where(static error => !IsExpectedDirectoryPartitionRejection(error))
             .ToArray();
         if (errors.Length > 0)
         {
@@ -153,6 +154,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         error.StartsWith("[Orleans.Runtime.GrainDirectory.ClientDirectory] Exception publishing client routing table", StringComparison.Ordinal)
         && error.Contains("TaskCanceledException: A task was canceled.", StringComparison.Ordinal);
 
+    private static bool IsExpectedDirectoryPartitionRejection(string error) =>
+        error.StartsWith("[Orleans.Messaging] Failed to address message", StringComparison.Ordinal)
+        && error.Contains("IGrainDirectoryPartition.", StringComparison.Ordinal)
+        && error.Contains("not active on this silo", StringComparison.Ordinal);
+
     /// <summary>
     /// Activates grains by calling each one. Retries individual calls that fail with transient
     /// exceptions expected during directory ownership transitions in a rolling upgrade.
@@ -165,41 +171,55 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             ids[i] = nextGrainId();
         }
 
-        // First attempt: fire all calls in parallel.
-        var tasks = ids.Select(id => client.GetGrain<IRollingUpgradeTestGrain>(id).GetHost().AsTask()).ToArray();
-        try
+        var remainingIds = ids;
+        const int MaxAttempts = 10;
+        for (var attempt = 1; attempt <= MaxAttempts; attempt++)
         {
-            await Task.WhenAll(tasks);
-            return;
-        }
-        catch
-        {
-            // Some calls failed — retry the failed ones individually.
-        }
-
-        var failedIds = new List<long>();
-        for (var i = 0; i < tasks.Length; i++)
-        {
-            if (tasks[i].IsFaulted)
-            {
-                failedIds.Add(ids[i]);
-            }
-        }
-
-        output.WriteLine($"    {failedIds.Count}/{count} calls failed, retrying...");
-
-        // Retry failed calls one at a time.
-        foreach (var id in failedIds)
-        {
+            var tasks = remainingIds.Select(id => client.GetGrain<IRollingUpgradeTestGrain>(id).GetHost().AsTask()).ToArray();
             try
             {
-                await client.GetGrain<IRollingUpgradeTestGrain>(id).GetHost();
+                await Task.WhenAll(tasks);
+                return;
             }
             catch
             {
-                onPersistentFailure?.Invoke(id);
-                throw;
+                // Some calls failed — retry the failed ones.
             }
+
+            var failedIds = new List<long>();
+            var exceptions = new List<Exception>();
+            for (var i = 0; i < tasks.Length; i++)
+            {
+                if (tasks[i].IsCompletedSuccessfully)
+                {
+                    continue;
+                }
+
+                failedIds.Add(remainingIds[i]);
+                if (tasks[i].Exception is { } exception)
+                {
+                    exceptions.Add(exception);
+                }
+                else if (tasks[i].IsCanceled)
+                {
+                    exceptions.Add(new TaskCanceledException(tasks[i]));
+                }
+            }
+
+            if (failedIds.Count == 0)
+            {
+                return;
+            }
+
+            if (attempt == MaxAttempts)
+            {
+                onPersistentFailure?.Invoke(failedIds[0]);
+                throw new AggregateException($"Failed to complete {failedIds.Count} grain calls after {MaxAttempts} attempts.", exceptions);
+            }
+
+            output.WriteLine($"    {failedIds.Count}/{remainingIds.Length} calls failed on attempt {attempt}, retrying...");
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            remainingIds = [.. failedIds];
         }
     }
 

@@ -31,29 +31,29 @@ internal sealed class LocalGrainDirectoryPartitionCompatibility : SystemTarget, 
 {
     private readonly LocalGrainDirectory _directory;
 
-    internal LocalGrainDirectoryPartitionCompatibility(LocalGrainDirectory directory, SystemTargetShared shared)
-        : base(GrainDirectoryPartition.CreateGrainId(shared.SiloAddress, 0), shared)
+    internal LocalGrainDirectoryPartitionCompatibility(LocalGrainDirectory directory, SystemTargetShared shared, int partitionIndex)
+        : base(GrainDirectoryPartition.CreateGrainId(shared.SiloAddress, partitionIndex), shared)
     {
         _directory = directory;
         shared.ActivationDirectory.RecordNewTarget(this);
     }
 
-    public async ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
+    public ValueTask<DirectoryResult<GrainAddress>> RegisterAsync(MembershipVersion version, GrainAddress address, GrainAddress? currentRegistration)
     {
-        var result = await _directory.RegisterAsync(address, currentRegistration, hopCount: 1);
-        return DirectoryResult.FromResult(result.Address!, version);
+        var result = _directory.DirectoryPartition.AddSingleActivation(address, currentRegistration);
+        return new(DirectoryResult.FromResult(result.Address!, version));
     }
 
-    public async ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(MembershipVersion version, GrainId grainId)
+    public ValueTask<DirectoryResult<GrainAddress?>> LookupAsync(MembershipVersion version, GrainId grainId)
     {
-        var result = await _directory.LookupAsync(grainId, hopCount: 1);
-        return DirectoryResult.FromResult(result.Address, version);
+        var result = _directory.DirectoryPartition.LookUpActivation(grainId);
+        return new(DirectoryResult.FromResult<GrainAddress?>(result.Address, version));
     }
 
-    public async ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address)
+    public ValueTask<DirectoryResult<bool>> DeregisterAsync(MembershipVersion version, GrainAddress address)
     {
-        await _directory.UnregisterAsync(address, UnregistrationCause.Force, hopCount: 1);
-        return DirectoryResult.FromResult(true, version);
+        _directory.DirectoryPartition.RemoveActivation(address.GrainId, address.ActivationId, UnregistrationCause.Force);
+        return new(DirectoryResult.FromResult(true, version));
     }
 
     public ValueTask<GrainDirectoryPartitionSnapshot?> GetSnapshotAsync(MembershipVersion version, MembershipVersion rangeVersion, RingRange range)
