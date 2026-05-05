@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
+using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Configuration.Internal;
@@ -162,7 +163,13 @@ namespace Orleans.Hosting
             }
 
             // Distributed Grain Directory
-            services.TryAddSingleton<DirectoryMembershipService>();
+            services.AddOptions<GrainDirectoryOptions>();
+            services.TryAddSingleton(static sp => new DirectoryMembershipService(
+                sp.GetRequiredService<ClusterMembershipService>(),
+                sp.GetRequiredService<IInternalGrainFactory>(),
+                sp.GetRequiredService<ILogger<DirectoryMembershipService>>(),
+                sp.GetRequiredService<IOptions<GrainDirectoryOptions>>().Value.PartitionsPerSilo,
+                DirectoryMembershipSnapshot.DefaultGetRingBoundaries));
             if (!services.Contains(DirectoryDescriptor))
             {
                 services.Add(DirectoryDescriptor);
