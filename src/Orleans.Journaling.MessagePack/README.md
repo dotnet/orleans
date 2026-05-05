@@ -4,7 +4,7 @@
 
 Microsoft Orleans Journaling for MessagePack provides a MessagePack-based storage format for Orleans.Journaling durable state machines. Use this package to serialize durable dictionary, list, queue, set, value, state, and task completion source log entries as MessagePack records.
 
-This package configures the physical log format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the MessagePack log format and MessagePack durable-entry codec providers which durable state machines use to encode and recover their own operations.
+This package provides the physical log format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the MessagePack log format and MessagePack durable-entry codec providers which durable state machines use to encode and recover their own operations.
 
 ## Getting Started
 
@@ -32,7 +32,7 @@ var builder = Host.CreateApplicationBuilder(args)
             {
                 options.LogFormatKey = MessagePackJournalingExtensions.LogFormatKey;
             })
-            .UseMessagePackCodec(options =>
+            .UseMessagePackJournalingFormat(options =>
             {
                 options.SerializerOptions = MessagePackSerializerOptions.Standard;
             });
@@ -41,7 +41,7 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.Build().RunAsync();
 ```
 
-If you use a different Journaling storage provider, configure it to use the `MessagePackJournalingExtensions.LogFormatKey` format key and call `UseMessagePackCodec(...)` after registering that provider.
+If you use a different Journaling storage provider, configure it to use the `MessagePackJournalingExtensions.LogFormatKey` format key and call `UseMessagePackJournalingFormat(...)` after registering that provider.
 
 ## Value payloads and Native AOT
 
@@ -49,7 +49,7 @@ MessagePack durable entry codecs use the configured `MessagePackSerializerOption
 
 ## Storage format
 
-`UseMessagePackCodec()` stores physical log data as repeated standalone MessagePack entry arrays with no surrounding extent envelope:
+The MessagePack journaling format stores physical log data as repeated standalone MessagePack entry arrays with no surrounding extent envelope:
 
 ```text
 entry := [streamId, payload]

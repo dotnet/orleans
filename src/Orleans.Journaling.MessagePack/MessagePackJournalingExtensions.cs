@@ -5,7 +5,7 @@ using Orleans.Hosting;
 namespace Orleans.Journaling.MessagePack;
 
 /// <summary>
-/// Extension methods for configuring MessagePack-based serialization for Orleans.Journaling.
+/// Extension methods for configuring the MessagePack Orleans.Journaling format.
 /// </summary>
 public static class MessagePackJournalingExtensions
 {
@@ -15,22 +15,22 @@ public static class MessagePackJournalingExtensions
     public const string LogFormatKey = "messagepack";
 
     /// <summary>
-    /// Configures Orleans.Journaling to use MessagePack for durable log entry serialization.
+    /// Configures this silo with the MessagePack Orleans.Journaling format family.
     /// </summary>
-    public static ISiloBuilder UseMessagePackCodec(this ISiloBuilder builder)
-        => UseMessagePackCodecCore(builder, configure: null);
+    public static ISiloBuilder UseMessagePackJournalingFormat(this ISiloBuilder builder)
+        => UseMessagePackJournalingFormatCore(builder, configure: null);
 
     /// <summary>
-    /// Configures Orleans.Journaling to use MessagePack for durable log entry serialization.
+    /// Configures this silo with the MessagePack Orleans.Journaling format family.
     /// </summary>
-    public static ISiloBuilder UseMessagePackCodec(this ISiloBuilder builder, Action<MessagePackJournalingOptions> configure)
+    public static ISiloBuilder UseMessagePackJournalingFormat(this ISiloBuilder builder, Action<MessagePackJournalingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
 
-        return UseMessagePackCodecCore(builder, configure);
+        return UseMessagePackJournalingFormatCore(builder, configure);
     }
 
-    private static ISiloBuilder UseMessagePackCodecCore(ISiloBuilder builder, Action<MessagePackJournalingOptions>? configure)
+    private static ISiloBuilder UseMessagePackJournalingFormatCore(ISiloBuilder builder, Action<MessagePackJournalingOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(builder);
 

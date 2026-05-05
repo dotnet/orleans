@@ -33,7 +33,7 @@ public sealed class ProtobufJournalingOptions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddLogStorage().UseProtobufCodec(options =>
+    /// builder.AddLogStorage().UseProtobufJournalingFormat(options =>
     /// {
     ///     options.AddMessageParser(MyMessage.Parser);
     /// });

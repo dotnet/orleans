@@ -88,11 +88,11 @@ public sealed class MessagePackOperationCodecAdditionalTests
     }
 
     [Fact]
-    public void UseMessagePackCodec_RegistersEveryFormatFamilyProviderByKey()
+    public void UseMessagePackJournalingFormat_RegistersEveryFormatFamilyProviderByKey()
     {
         var builder = new TestSiloBuilder();
 
-        builder.UseMessagePackCodec();
+        builder.UseMessagePackJournalingFormat();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<MessagePackLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(MessagePackJournalingExtensions.LogFormatKey));

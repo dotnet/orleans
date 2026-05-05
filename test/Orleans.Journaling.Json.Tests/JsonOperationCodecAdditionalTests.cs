@@ -58,11 +58,11 @@ public sealed class JsonOperationCodecAdditionalTests
     }
 
     [Fact]
-    public void UseJsonCodec_RegistersEveryFormatFamilyProviderByKey()
+    public void UseJsonJournalingFormat_RegistersEveryFormatFamilyProviderByKey()
     {
         var builder = new TestSiloBuilder();
 
-        builder.UseJsonCodec(JsonCodecTestJsonContext.Default);
+        builder.UseJsonJournalingFormat(JsonCodecTestJsonContext.Default);
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));

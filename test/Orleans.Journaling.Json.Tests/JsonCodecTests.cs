@@ -36,10 +36,10 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void UseJsonCodec_TypeInfoResolverOverload_RegistersPayloadMetadata()
+    public void UseJsonJournalingFormat_TypeInfoResolverOverload_RegistersPayloadMetadata()
     {
         var builder = new TestSiloBuilder();
-        builder.UseJsonCodec(JsonCodecTestJsonContext.Default);
+        builder.UseJsonJournalingFormat(JsonCodecTestJsonContext.Default);
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
         var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey).GetCodec<JsonCodecTestValue>();

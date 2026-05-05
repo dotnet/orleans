@@ -3,7 +3,7 @@
 ## Introduction
 Microsoft Orleans Journaling for Protocol Buffers provides a Protocol Buffers-based storage format for Orleans.Journaling durable state machines. Use this package to serialize durable dictionary, list, queue, set, value, state, and task completion source log entries directly as protobuf records.
 
-This package configures the physical log format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the protobuf log format and protobuf durable-entry codec providers which durable state machines use to encode and recover their own operations.
+This package provides the physical log format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the protobuf log format and protobuf durable-entry codec providers which durable state machines use to encode and recover their own operations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -29,7 +29,7 @@ var builder = Host.CreateApplicationBuilder(args)
             {
                 options.LogFormatKey = ProtobufJournalingExtensions.LogFormatKey;
             })
-            .UseProtobufCodec(options =>
+            .UseProtobufJournalingFormat(options =>
             {
                 options.AddMessageParser(StringValue.Parser);
             });
@@ -38,7 +38,7 @@ var builder = Host.CreateApplicationBuilder(args)
 await builder.Build().RunAsync();
 ```
 
-If you use a different Journaling storage provider, configure it to use the `ProtobufJournalingExtensions.LogFormatKey` format key and call `UseProtobufCodec(...)` after registering that provider.
+If you use a different Journaling storage provider, configure it to use the `ProtobufJournalingExtensions.LogFormatKey` format key and call `UseProtobufJournalingFormat(...)` after registering that provider.
 
 ## Value payloads and Native AOT
 
@@ -52,7 +52,7 @@ siloBuilder
     {
         options.LogFormatKey = ProtobufJournalingExtensions.LogFormatKey;
     })
-    .UseProtobufCodec(options =>
+    .UseProtobufJournalingFormat(options =>
     {
         options.AddMessageParser(MyJournaledMessage.Parser);
     });
@@ -62,7 +62,7 @@ Other value types can fall back to a configured `ILogValueCodec<T>` compatibilit
 
 ## Storage format
 
-`UseProtobufCodec()` stores physical log data as repeated length-delimited `LogEntry` messages with no surrounding extent envelope:
+The protobuf journaling format stores physical log data as repeated length-delimited `LogEntry` messages with no surrounding extent envelope:
 
 ```protobuf
 message LogEntry {

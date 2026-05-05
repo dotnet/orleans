@@ -6,7 +6,7 @@ using Orleans.Hosting;
 namespace Orleans.Journaling.Protobuf;
 
 /// <summary>
-/// Extension methods for configuring Protocol Buffers-based serialization for Orleans.Journaling.
+/// Extension methods for configuring the Protocol Buffers Orleans.Journaling format.
 /// </summary>
 public static class ProtobufJournalingExtensions
 {
@@ -16,7 +16,7 @@ public static class ProtobufJournalingExtensions
     public const string LogFormatKey = "protobuf";
 
     /// <summary>
-    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log entry serialization.
+    /// Configures this silo with the Protocol Buffers Orleans.Journaling format family.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <returns>The silo builder for chaining.</returns>
@@ -36,14 +36,14 @@ public static class ProtobufJournalingExtensions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddLogStorage().UseProtobufCodec();
+    /// builder.AddLogStorage().UseProtobufJournalingFormat();
     /// </code>
     /// </example>
-    public static ISiloBuilder UseProtobufCodec(this ISiloBuilder builder)
-        => UseProtobufCodecCore(builder, configure: null);
+    public static ISiloBuilder UseProtobufJournalingFormat(this ISiloBuilder builder)
+        => UseProtobufJournalingFormatCore(builder, configure: null);
 
     /// <summary>
-    /// Configures Orleans.Journaling to use Google Protocol Buffers wire format for log entry serialization.
+    /// Configures this silo with the Protocol Buffers Orleans.Journaling format family.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">A delegate used to configure protobuf journaling options.</param>
@@ -55,20 +55,20 @@ public static class ProtobufJournalingExtensions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddLogStorage().UseProtobufCodec(options =>
+    /// builder.AddLogStorage().UseProtobufJournalingFormat(options =>
     /// {
     ///     options.AddMessageParser(MyMessage.Parser);
     /// });
     /// </code>
     /// </example>
-    public static ISiloBuilder UseProtobufCodec(this ISiloBuilder builder, Action<ProtobufJournalingOptions> configure)
+    public static ISiloBuilder UseProtobufJournalingFormat(this ISiloBuilder builder, Action<ProtobufJournalingOptions> configure)
     {
         ArgumentNullException.ThrowIfNull(configure);
 
-        return UseProtobufCodecCore(builder, configure);
+        return UseProtobufJournalingFormatCore(builder, configure);
     }
 
-    private static ISiloBuilder UseProtobufCodecCore(ISiloBuilder builder, Action<ProtobufJournalingOptions>? configure)
+    private static ISiloBuilder UseProtobufJournalingFormatCore(ISiloBuilder builder, Action<ProtobufJournalingOptions>? configure)
     {
         ArgumentNullException.ThrowIfNull(builder);
 
@@ -185,7 +185,7 @@ internal sealed class ProtobufOperationCodecProvider(IServiceProvider servicePro
         {
             return new InvalidOperationException(
                 $"Protocol Buffers journaling does not have a native parser or fallback codec for message type '{typeName}'. "
-                + $"Register the generated parser with UseProtobufCodec(options => options.AddMessageParser({typeof(T).Name}.Parser)) "
+                + $"Register the generated parser with UseProtobufJournalingFormat(options => options.AddMessageParser({typeof(T).Name}.Parser)) "
                 + $"or register {nameof(ILogValueCodec<T>)}.");
         }
 
