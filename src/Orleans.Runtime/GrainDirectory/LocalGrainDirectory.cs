@@ -42,6 +42,8 @@ namespace Orleans.Runtime.GrainDirectory
 
         public RemoteGrainDirectory RemoteGrainDirectory { get; }
         public RemoteGrainDirectory CacheValidator { get; }
+        internal LocalGrainDirectoryClientCompatibility? DistributedGrainDirectoryClientCompatibility { get; }
+        internal ImmutableArray<LocalGrainDirectoryPartitionCompatibility> DistributedGrainDirectoryPartitionCompatibilities { get; }
 
         internal GrainDirectoryHandoffManager HandoffManager { get; }
 
@@ -74,8 +76,25 @@ namespace Orleans.Runtime.GrainDirectory
             DirectoryPartition = grainDirectoryPartitionFactory();
             HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
 
-            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared);
-            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared);
+            // When DistributedGrainDirectory is active, it registers its own IRemoteGrainDirectory system targets.
+            // In that case, create the RemoteGrainDirectory objects (still needed for WorkItemGroup scheduling)
+            // but skip registering them as system targets to avoid conflicts.
+            var distributedDirectoryActive = serviceProvider.GetService<DistributedGrainDirectory>() is not null;
+            RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
+            CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
+            DistributedGrainDirectoryClientCompatibility = distributedDirectoryActive ? null : new LocalGrainDirectoryClientCompatibility(this, systemTargetShared);
+            if (!distributedDirectoryActive)
+            {
+                var partitionsPerSilo = grainDirectoryOptions.Value.PartitionsPerSilo;
+                ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1, nameof(GrainDirectoryOptions.PartitionsPerSilo));
+                var compatibilityPartitions = ImmutableArray.CreateBuilder<LocalGrainDirectoryPartitionCompatibility>(partitionsPerSilo);
+                for (var partitionIndex = 0; partitionIndex < partitionsPerSilo; partitionIndex++)
+                {
+                    compatibilityPartitions.Add(new LocalGrainDirectoryPartitionCompatibility(this, systemTargetShared, partitionIndex));
+                }
+
+                DistributedGrainDirectoryPartitionCompatibilities = compatibilityPartitions.MoveToImmutable();
+            }
 
             // add myself to the list of members
             AddServer(MyAddress);

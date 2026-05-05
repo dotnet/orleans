@@ -47,6 +47,19 @@ namespace Orleans.Configuration
         public const int DEFAULT_CACHE_SIZE = 1_000_000;
 
         /// <summary>
+        /// Gets or sets the number of directory partitions per silo.
+        /// </summary>
+        /// <remarks>
+        /// This option only applies when using the <see cref="DistributedGrainDirectory"/>.
+        /// </remarks>
+        public int PartitionsPerSilo { get; set; } = DEFAULT_PARTITIONS_PER_SILO;
+
+        /// <summary>
+        /// The default value for <see cref="PartitionsPerSilo"/>.
+        /// </summary>
+        public const int DEFAULT_PARTITIONS_PER_SILO = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+
+        /// <summary>
         /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.
         /// </summary>
         [Obsolete("InitialCacheTTL is deprecated and will be removed in a future version.")]
