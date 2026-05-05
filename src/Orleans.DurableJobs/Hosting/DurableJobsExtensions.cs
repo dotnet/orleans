@@ -67,7 +67,7 @@ public static class DurableJobsExtensions
     /// </remarks>
     /// <param name="services">The service collection.</param>
     /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
-    internal static IServiceCollection UseInMemoryDurableJobs(this IServiceCollection services)
+    public static IServiceCollection UseInMemoryDurableJobs(this IServiceCollection services)
     {
         services.AddSingleton<InMemoryJobShardManager>(sp =>
         {

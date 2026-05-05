@@ -4,6 +4,8 @@ using Azure.Core;
 
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.Cosmos;
+#elif ADVANCED_REMINDERS_COSMOS
+namespace Orleans.AdvancedReminders.Cosmos;
 #elif ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.Cosmos;
 #elif ORLEANS_REMINDERS

@@ -14,6 +14,8 @@ using Amazon.Runtime.CredentialManagement;
 #nullable disable
 #if CLUSTERING_DYNAMODB
 namespace Orleans.Clustering.DynamoDB
+#elif ADVANCED_REMINDERS_DYNAMODB
+namespace Orleans.AdvancedReminders.DynamoDB
 #elif PERSISTENCE_DYNAMODB
 namespace Orleans.Persistence.DynamoDB
 #elif REMINDERS_DYNAMODB
