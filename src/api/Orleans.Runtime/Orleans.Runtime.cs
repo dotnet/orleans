@@ -170,6 +170,7 @@ namespace Orleans.Configuration
     {
         public const int DEFAULT_CACHE_SIZE = 1000000;
         public const CachingStrategyType DEFAULT_CACHING_STRATEGY = 1;
+        public const int DEFAULT_PARTITIONS_PER_SILO = 30;
         [System.Obsolete("DEFAULT_INITIAL_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_INITIAL_CACHE_TTL;
         [System.Obsolete("DEFAULT_MAXIMUM_CACHE_TTL is deprecated and will be removed in a future version.")]
@@ -190,6 +191,8 @@ namespace Orleans.Configuration
         public System.TimeSpan LazyDeregistrationDelay { get { throw null; } set { } }
 
         public System.TimeSpan MaximumCacheTTL { get { throw null; } set { } }
+
+        public int PartitionsPerSilo { get { throw null; } set { } }
 
         public enum CachingStrategyType
         {

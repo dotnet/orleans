@@ -14,7 +14,7 @@ namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class DirectoryMembershipSnapshot
 {
-    internal const int PartitionsPerSilo = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+    internal const int PartitionsPerSilo = GrainDirectoryOptions.DEFAULT_PARTITIONS_PER_SILO;
 
     /// <summary>
     /// The default hash function for directory ring boundaries, matching the <see cref="LocalGrainDirectory"/> partitioning scheme.
