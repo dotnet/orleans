@@ -259,6 +259,7 @@ namespace Orleans
     [AttributeUsage(
         AttributeTargets.Field
         | AttributeTargets.Property
+        | AttributeTargets.Parameter
         | AttributeTargets.Class
         | AttributeTargets.Struct
         | AttributeTargets.Enum
