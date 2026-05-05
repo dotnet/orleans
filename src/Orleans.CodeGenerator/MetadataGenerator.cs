@@ -110,6 +110,24 @@ namespace Orleans.CodeGenerator
                     ArgumentList(SeparatedList(new[] { Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(type.Alias))), Argument(TypeOfExpression(type.Type)) })))));
             }
 
+            var registeredProvidersAccess = configParam.Member("RegisteredProviders");
+            foreach (var provider in MetadataModel.RegisteredProviders)
+            {
+                // Use indexer assignment to avoid duplicate key exceptions when multiple assemblies register the same provider.
+                var key = TupleExpression(SeparatedList(new ArgumentSyntax[]
+                {
+                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Target))),
+                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Kind))),
+                    Argument(LiteralExpression(SyntaxKind.StringLiteralExpression, Literal(provider.Name)))
+                }));
+                body.Add(ExpressionStatement(
+                    AssignmentExpression(
+                        SyntaxKind.SimpleAssignmentExpression,
+                        ElementAccessExpression(registeredProvidersAccess)
+                            .AddArgumentListArguments(Argument(key)),
+                        TypeOfExpression(provider.Type))));
+            }
+
             AddCompoundTypeAliases(configParam, body);
 
             var configType = _codeGenerator.LibraryTypes.TypeManifestOptions;
