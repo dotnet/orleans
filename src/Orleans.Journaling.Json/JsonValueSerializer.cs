@@ -45,7 +45,7 @@ internal sealed class JsonValueSerializer<T>
         => new(
             $"JSON journaling requires System.Text.Json metadata for journaled payload type '{ValueType.FullName}'. "
             + "Add the type to a source-generated JsonSerializerContext using [JsonSerializable(typeof(...))] and register the context "
-            + $"with UseJsonCodec(MyJournalJsonContext.Default), {nameof(JsonJournalingOptions)}.{nameof(JsonJournalingOptions.AddTypeInfoResolver)}, "
+            + $"with UseJsonJournalingFormat(MyJournalJsonContext.Default), {nameof(JsonJournalingOptions)}.{nameof(JsonJournalingOptions.AddTypeInfoResolver)}, "
             + $"or {nameof(JsonJournalingOptions)}.{nameof(JsonJournalingOptions.SerializerOptions)}.{nameof(JsonSerializerOptions.TypeInfoResolver)}.",
             innerException);
 }

@@ -27,9 +27,9 @@ namespace Orleans.Journaling.MessagePack
     {
         public const string LogFormatKey = "messagepack";
 
-        public static Hosting.ISiloBuilder UseMessagePackCodec(this Hosting.ISiloBuilder builder, System.Action<MessagePackJournalingOptions> configure) { throw null; }
+        public static Hosting.ISiloBuilder UseMessagePackJournalingFormat(this Hosting.ISiloBuilder builder, System.Action<MessagePackJournalingOptions> configure) { throw null; }
 
-        public static Hosting.ISiloBuilder UseMessagePackCodec(this Hosting.ISiloBuilder builder) { throw null; }
+        public static Hosting.ISiloBuilder UseMessagePackJournalingFormat(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
     public sealed partial class MessagePackJournalingOptions

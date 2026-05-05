@@ -35,7 +35,7 @@ public class ProtobufValueConverterTests
     public void ProtobufCodecProvider_RegisteredMessageParser_UsesNativePayload()
     {
         var builder = new TestSiloBuilder();
-        builder.UseProtobufCodec(options => options.AddMessageParser(StringValue.Parser));
+        builder.UseProtobufJournalingFormat(options => options.AddMessageParser(StringValue.Parser));
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(ProtobufJournalingExtensions.LogFormatKey));
         var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey).GetCodec<StringValue>();
@@ -54,7 +54,7 @@ public class ProtobufValueConverterTests
         var builder = new TestSiloBuilder();
         var fallbackCodec = new StringValueFallbackCodec();
         builder.Services.AddSingleton<ILogValueCodec<StringValue>>(fallbackCodec);
-        builder.UseProtobufCodec();
+        builder.UseProtobufJournalingFormat();
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey).GetCodec<StringValue>();
 
@@ -72,7 +72,7 @@ public class ProtobufValueConverterTests
     public void ProtobufCodecProvider_UnregisteredMessageWithoutFallback_ThrowsHelpfulMessage()
     {
         var builder = new TestSiloBuilder();
-        builder.UseProtobufCodec();
+        builder.UseProtobufJournalingFormat();
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var provider = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey);
 
@@ -85,7 +85,7 @@ public class ProtobufValueConverterTests
     public void ProtobufCodecProvider_UnsupportedTypeWithoutFallback_ThrowsHelpfulMessage()
     {
         var builder = new TestSiloBuilder();
-        builder.UseProtobufCodec();
+        builder.UseProtobufJournalingFormat();
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var provider = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(ProtobufJournalingExtensions.LogFormatKey);
 

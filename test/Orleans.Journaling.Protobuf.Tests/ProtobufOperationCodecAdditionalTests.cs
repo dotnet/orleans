@@ -103,11 +103,11 @@ public sealed class ProtobufOperationCodecAdditionalTests
     }
 
     [Fact]
-    public void UseProtobufCodec_RegistersEveryFormatFamilyProviderByKey()
+    public void UseProtobufJournalingFormat_RegistersEveryFormatFamilyProviderByKey()
     {
         var builder = new TestSiloBuilder();
 
-        builder.UseProtobufCodec();
+        builder.UseProtobufJournalingFormat();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<ProtobufLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(ProtobufJournalingExtensions.LogFormatKey));
@@ -132,7 +132,7 @@ public sealed class ProtobufOperationCodecAdditionalTests
     public void OperationCodecProvider_CachesPerClosedGenericCodecType()
     {
         var builder = new TestSiloBuilder();
-        builder.UseProtobufCodec();
+        builder.UseProtobufJournalingFormat();
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var provider = serviceProvider.GetRequiredService<ProtobufOperationCodecProvider>();
 

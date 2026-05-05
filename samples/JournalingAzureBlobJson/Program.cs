@@ -63,7 +63,7 @@ internal static class Program
                     options.GetBlobName = _ => settings.BlobName;
                     options.LogFormatKey = JsonJournalingExtensions.LogFormatKey;
                 })
-                .UseJsonCodec(JournalingSampleJsonContext.Default);
+                .UseJsonJournalingFormat(JournalingSampleJsonContext.Default);
         });
 
         using var host = builder.Build();

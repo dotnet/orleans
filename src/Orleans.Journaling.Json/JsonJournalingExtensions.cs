@@ -33,7 +33,7 @@ public sealed class JsonJournalingOptions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddLogStorage().UseJsonCodec(options =>
+    /// builder.AddLogStorage().UseJsonJournalingFormat(options =>
     /// {
     ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
     /// });
@@ -49,7 +49,7 @@ public sealed class JsonJournalingOptions
 }
 
 /// <summary>
-/// Extension methods for configuring JSON Lines-based serialization for Orleans.Journaling.
+/// Extension methods for configuring the JSON Lines Orleans.Journaling format.
 /// </summary>
 public static class JsonJournalingExtensions
 {
@@ -59,25 +59,25 @@ public static class JsonJournalingExtensions
     public const string LogFormatKey = "json";
 
     /// <summary>
-    /// Configures Orleans.Journaling to use JSON Lines for physical log segments and System.Text.Json for durable log entries.
+    /// Configures this silo with the JSON Lines Orleans.Journaling format family.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="configure">Optional delegate to configure <see cref="JsonJournalingOptions"/>.</param>
     /// <returns>The silo builder for chaining.</returns>
     /// <example>
     /// <code>
-    /// builder.AddLogStorage().UseJsonCodec();
+    /// builder.AddLogStorage().UseJsonJournalingFormat();
     ///
-    /// builder.AddLogStorage().UseJsonCodec(MyJournalJsonContext.Default);
+    /// builder.AddLogStorage().UseJsonJournalingFormat(MyJournalJsonContext.Default);
     ///
-    /// builder.AddLogStorage().UseJsonCodec(options =>
+    /// builder.AddLogStorage().UseJsonJournalingFormat(options =>
     /// {
     ///     options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
     ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
     /// });
     /// </code>
     /// </example>
-    public static ISiloBuilder UseJsonCodec(this ISiloBuilder builder, Action<JsonJournalingOptions>? configure = null)
+    public static ISiloBuilder UseJsonJournalingFormat(this ISiloBuilder builder, Action<JsonJournalingOptions>? configure = null)
     {
         var options = new JsonJournalingOptions();
         configure?.Invoke(options);
@@ -86,7 +86,7 @@ public static class JsonJournalingExtensions
         // JsonSerializerOptions singleton that could collide with other components.
         var jsonOptions = options.SerializerOptions;
 
-        // Replace the default segment and operation codec providers with JSON implementations.
+        // Register the JSON log format and operation codec providers.
         builder.Services
             .AddJournalingFormatFamily(LogFormatKey)
             .AddLogFormat<JsonLinesLogFormat>()
@@ -96,7 +96,7 @@ public static class JsonJournalingExtensions
     }
 
     /// <summary>
-    /// Configures Orleans.Journaling to use JSON Lines and registers source-generated metadata for journaled payload values.
+    /// Configures this silo with the JSON Lines Orleans.Journaling format family and registers source-generated metadata for journaled payload values.
     /// </summary>
     /// <param name="builder">The silo builder.</param>
     /// <param name="typeInfoResolver">The resolver, typically a generated <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> instance.</param>
@@ -107,14 +107,14 @@ public static class JsonJournalingExtensions
     /// </remarks>
     /// <example>
     /// <code>
-    /// builder.AddLogStorage().UseJsonCodec(MyJournalJsonContext.Default);
+    /// builder.AddLogStorage().UseJsonJournalingFormat(MyJournalJsonContext.Default);
     /// </code>
     /// </example>
-    public static ISiloBuilder UseJsonCodec(this ISiloBuilder builder, IJsonTypeInfoResolver typeInfoResolver)
+    public static ISiloBuilder UseJsonJournalingFormat(this ISiloBuilder builder, IJsonTypeInfoResolver typeInfoResolver)
     {
         ArgumentNullException.ThrowIfNull(typeInfoResolver);
 
-        return builder.UseJsonCodec(options => options.AddTypeInfoResolver(typeInfoResolver));
+        return builder.UseJsonJournalingFormat(options => options.AddTypeInfoResolver(typeInfoResolver));
     }
 }
 

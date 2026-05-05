@@ -17,11 +17,11 @@ public sealed class MessagePackCodecTests
     private static readonly MessagePackSerializerOptions Options = MessagePackSerializerOptions.Standard;
 
     [Fact]
-    public void UseMessagePackCodec_RegistersFormatFamilyByKey()
+    public void UseMessagePackJournalingFormat_RegistersFormatFamilyByKey()
     {
         var builder = new TestSiloBuilder();
 
-        builder.UseMessagePackCodec();
+        builder.UseMessagePackJournalingFormat();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<MessagePackLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(MessagePackJournalingExtensions.LogFormatKey));
