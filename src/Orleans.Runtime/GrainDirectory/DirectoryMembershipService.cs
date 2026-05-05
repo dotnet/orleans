@@ -52,6 +52,7 @@ internal sealed partial class DirectoryMembershipService : IAsyncDisposable
         int partitionsPerSilo,
         Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
+        ArgumentOutOfRangeException.ThrowIfLessThan(partitionsPerSilo, 1);
         _partitionsPerSilo = partitionsPerSilo;
         _getRingBoundaries = getRingBoundaries;
         _viewUpdates = new(
