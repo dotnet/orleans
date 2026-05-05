@@ -2,27 +2,37 @@ using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
-using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Codecs;
-using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine
+internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachine, IDurableStateOperationHandler<T>
 {
-    private const byte VersionByte = 0;
-    private readonly SerializerSessionPool _serializerSessionPool;
-    private readonly IFieldCodec<T> _codec;
+    private readonly IDurableStateOperationCodec<T> _codec;
     private readonly IStateMachineManager _manager;
     private T? _value;
     private ulong _version;
+    private ulong _pendingVersion;
+    private PendingWriteKind _pendingWrite;
+    private bool _hasState;
+    private bool _clearRequested;
 
-    public DurableState([ServiceKey] string key, IStateMachineManager manager, IFieldCodec<T> codec, SerializerSessionPool serializerSessionPool)
+    public DurableState(
+        [ServiceKey] string key,
+        IStateMachineManager manager,
+        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        IServiceProvider serviceProvider)
+    {
+        ArgumentNullException.ThrowIfNullOrEmpty(key);
+        _codec = LogFormatServices.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
+        manager.RegisterStateMachine(key, this);
+        _manager = manager;
+    }
+
+    internal DurableState(string key, IStateMachineManager manager, IDurableStateOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
-        _serializerSessionPool = serializerSessionPool;
         manager.RegisterStateMachine(key, this);
         _manager = manager;
     }
@@ -30,83 +40,124 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     public Action? OnPersisted { get; set; }
     T IStorage<T>.State
     {
-        get => _value ??= Activator.CreateInstance<T>();
-        set => _value = value;
+        get
+        {
+            _hasState = true;
+            return _value ??= Activator.CreateInstance<T>();
+        }
+        set
+        {
+            _value = value;
+            _hasState = true;
+            _clearRequested = false;
+        }
     }
 
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
 
+    object IDurableStateMachine.OperationCodec => _codec;
+
     void IDurableStateMachine.OnWriteCompleted()
     {
-        _version++;
+        switch (_pendingWrite)
+        {
+            case PendingWriteKind.Set:
+                _version = _pendingVersion;
+                _clearRequested = false;
+                _hasState = true;
+                break;
+            case PendingWriteKind.Clear:
+                _version = 0;
+                _clearRequested = false;
+                _hasState = false;
+                break;
+        }
+
+        _pendingWrite = PendingWriteKind.None;
+        _pendingVersion = 0;
         OnPersisted?.Invoke();
     }
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage) => _value = default;
+    void IDurableStateMachine.Reset(LogStreamWriter writer)
+    {
+        _value = default;
+        _version = 0;
+        _pendingVersion = 0;
+        _pendingWrite = PendingWriteKind.None;
+        _hasState = false;
+        _clearRequested = false;
+    }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
     {
-        using var session = _serializerSessionPool.GetSession();
-        var reader = Reader.Create(logEntry, session);
-        var version = reader.ReadByte();
-        if (version != VersionByte)
-        {
-            throw new NotSupportedException($"This instance of {nameof(DurableState<T>)} supports version {(uint)VersionByte} and not version {(uint)version}.");
-        }
+        _codec.Apply(logEntry, this);
+    }
 
-        var commandType = (CommandType)reader.ReadVarUInt32();
-        switch (commandType)
+    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
+    {
+        if (_clearRequested)
         {
-            case CommandType.ClearValue:
-                ClearValue(ref reader);
-                break;
-            case CommandType.SetValue:
-                SetValue(ref reader);
-                break;
-            default:
-                throw new NotSupportedException($"Command type {commandType} is not supported");
+            WriteClear(writer);
         }
-
-        void SetValue(ref Reader<ReadOnlySequenceInput> reader)
+        else if (_hasState)
         {
-            var field = reader.ReadFieldHeader();
-            _value = _codec.ReadValue(ref reader, field);
-            _version = reader.ReadVarUInt64();
-        }
-
-        void ClearValue(ref Reader<ReadOnlySequenceInput> reader)
-        {
-            _value = default;
-            _version = 0;
+            WriteState(writer);
         }
     }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) => WriteState(logWriter);
-
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter)
+    {
+        if (_clearRequested)
+        {
+            _pendingWrite = PendingWriteKind.Clear;
+            _pendingVersion = 0;
+        }
+        else if (_hasState)
+        {
+            WriteState(snapshotWriter);
+        }
+    }
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(StateMachineStorageWriter writer)
+    private void WriteState(LogStreamWriter writer)
     {
-        writer.AppendEntry(static (self, bufferWriter) =>
-        {
-            using var session = self._serializerSessionPool.GetSession();
-            var writer = Writer.Create(bufferWriter, session);
-            writer.WriteByte(VersionByte);
-            writer.WriteVarUInt32((uint)CommandType.SetValue);
-            self._codec.WriteField(ref writer, 0, typeof(T), self._value!);
-            writer.WriteVarUInt64(self._version);
-            writer.Commit();
-        }, this);
+        var version = _version + 1;
+        _codec.WriteSet(_value!, version, writer);
+        _pendingWrite = PendingWriteKind.Set;
+        _pendingVersion = version;
+    }
+
+    private void WriteClear(LogStreamWriter writer)
+    {
+        _codec.WriteClear(writer);
+        _pendingWrite = PendingWriteKind.Clear;
+        _pendingVersion = 0;
+    }
+
+    void IDurableStateOperationHandler<T>.ApplySet(T state, ulong version)
+    {
+        _value = state;
+        _version = version;
+        _hasState = true;
+        _clearRequested = false;
+    }
+
+    void IDurableStateOperationHandler<T>.ApplyClear()
+    {
+        _value = default;
+        _version = 0;
+        _hasState = false;
+        _clearRequested = false;
     }
 
     Task IStorage.ClearStateAsync() => ((IStorage)this).ClearStateAsync(CancellationToken.None);
     async Task IStorage.ClearStateAsync(CancellationToken cancellationToken)
     {
         _value = default;
-        _version = 0;
+        _hasState = false;
+        _clearRequested = true;
         await _manager.WriteStateAsync(cancellationToken);
     }
 
@@ -115,9 +166,10 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
     Task IStorage.ReadStateAsync() => ((IStorage)this).ReadStateAsync(CancellationToken.None);
     Task IStorage.ReadStateAsync(CancellationToken cancellationToken) => Task.CompletedTask;
 
-    private enum CommandType
+    private enum PendingWriteKind
     {
-        SetValue,
-        ClearValue,
+        None,
+        Set,
+        Clear
     }
 }

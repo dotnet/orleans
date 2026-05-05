@@ -8,13 +8,13 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling
 {
-    public sealed partial class AzureAppendBlobStateMachineStorageOptions
+    public sealed partial class AzureAppendBlobLogStorageOptions
     {
         public const string DEFAULT_CONTAINER_NAME = "state";
         public const int DEFAULT_INIT_STAGE = 10000;
         public Azure.Storage.Blobs.BlobServiceClient? BlobServiceClient { get { throw null; } set { } }
 
-        public System.Func<System.IServiceProvider, AzureAppendBlobStateMachineStorageOptions, IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }
+        public System.Func<System.IServiceProvider, AzureAppendBlobLogStorageOptions, IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }
 
         public Azure.Storage.Blobs.BlobClientOptions? ClientOptions { get { throw null; } set { } }
 
@@ -23,6 +23,10 @@ namespace Orleans.Journaling
         public System.Func<Runtime.GrainId, string> GetBlobName { get { throw null; } set { } }
 
         public int InitStage { get { throw null; } set { } }
+
+        public string LogFormatKey { get { throw null; } set { } }
+
+        public System.Func<Runtime.GrainType, string>? LogFormatKeySelector { get { throw null; } set { } }
 
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 
@@ -39,9 +43,9 @@ namespace Orleans.Journaling
 
     public static partial class AzureBlobStorageHostingExtensions
     {
-        public static Hosting.ISiloBuilder AddAzureAppendBlobStateMachineStorage(this Hosting.ISiloBuilder builder, System.Action<AzureAppendBlobStateMachineStorageOptions>? configure) { throw null; }
+        public static Hosting.ISiloBuilder AddAzureAppendBlobLogStorage(this Hosting.ISiloBuilder builder, System.Action<AzureAppendBlobLogStorageOptions>? configure) { throw null; }
 
-        public static Hosting.ISiloBuilder AddAzureAppendBlobStateMachineStorage(this Hosting.ISiloBuilder builder) { throw null; }
+        public static Hosting.ISiloBuilder AddAzureAppendBlobLogStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
     public partial interface IBlobContainerFactory

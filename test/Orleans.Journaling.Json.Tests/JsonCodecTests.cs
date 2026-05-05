@@ -1,0 +1,693 @@
+using System.Buffers;
+using System.Buffers.Binary;
+using System.Text;
+using System.Text.Json;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling.Json;
+using Orleans.Journaling.Tests;
+using Orleans.Serialization.Buffers;
+using Orleans.Hosting;
+using Xunit;
+
+namespace Orleans.Journaling.Json.Tests;
+
+/// <summary>
+/// Round-trip and JSON-format tests for the direct JSON codecs.
+/// </summary>
+[TestCategory("BVT")]
+public class JsonCodecTests
+{
+    private static readonly JsonSerializerOptions Options = CreateOptions();
+
+    [Fact]
+    public void JsonDictionaryCodec_Set_RoundTrips()
+    {
+        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
+
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("alice", 42, writer));
+        var json = GetString(input);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(input, consumer);
+
+        Assert.Equal("""["set","alice",42]""", json);
+        Assert.Equal("alice", consumer.LastSetKey);
+        Assert.Equal(42, consumer.LastSetValue);
+    }
+
+    [Fact]
+    public void UseJsonJournalingFormat_TypeInfoResolverOverload_RegistersPayloadMetadata()
+    {
+        var builder = new TestSiloBuilder();
+        builder.UseJsonJournalingFormat(JsonCodecTestJsonContext.Default);
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey).GetCodec<JsonCodecTestValue>();
+
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
+        var consumer = new ValueConsumer<JsonCodecTestValue>();
+        codec.Apply(input, consumer);
+
+        Assert.Equal(new("test", 1), consumer.Value);
+    }
+
+    [Fact]
+    public void JsonDictionaryCodec_Snapshot_RoundTrips()
+    {
+        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
+        var items = new List<KeyValuePair<string, int>>
+        {
+            new("alpha", 1),
+            new("beta", 2),
+        };
+
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer));
+        var json = GetString(input);
+        var consumer = new DictionaryConsumer<string, int>();
+        codec.Apply(input, consumer);
+
+        Assert.Equal("""["snapshot",[["alpha",1],["beta",2]]]""", json);
+        Assert.Equal(items, consumer.Items);
+    }
+
+    [Fact]
+    public void JsonListCodec_Operations_RoundTrip()
+    {
+        var codec = new JsonListOperationCodec<string>(Options);
+        var consumer = new ListConsumer<string>();
+
+        Apply(codec, writer => codec.WriteAdd("one", writer), consumer);
+        Apply(codec, writer => codec.WriteSet(0, "updated", writer), consumer);
+        Apply(codec, writer => codec.WriteInsert(1, "two", writer), consumer);
+        Apply(codec, writer => codec.WriteRemoveAt(0, writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+
+        Assert.Equal(["add:one", "set:0:updated", "insert:1:two", "remove:0", "clear"], consumer.Commands);
+    }
+
+    [Fact]
+    public void JsonListCodec_Snapshot_RoundTrips()
+    {
+        var codec = new JsonListOperationCodec<string>(Options);
+        var consumer = new ListConsumer<string>();
+
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(new[] { "one", "two" }, writer)), consumer);
+
+        Assert.Equal(["reset:2", "add:one", "add:two"], consumer.Commands);
+    }
+
+    [Fact]
+    public void JsonQueueCodec_Operations_RoundTrip()
+    {
+        var codec = new JsonQueueOperationCodec<int>(Options);
+        var consumer = new QueueConsumer<int>();
+
+        Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
+        Apply(codec, writer => codec.WriteDequeue(writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(new[] { 20, 30 }, writer), consumer);
+
+        Assert.Equal(["enqueue:10", "dequeue", "clear", "reset:2", "enqueue:20", "enqueue:30"], consumer.Commands);
+    }
+
+    [Fact]
+    public void JsonSetCodec_Operations_RoundTrip()
+    {
+        var codec = new JsonSetOperationCodec<string>(Options);
+        var consumer = new SetConsumer<string>();
+
+        Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
+        Apply(codec, writer => codec.WriteRemove("a", writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        Apply(codec, writer => codec.WriteSnapshot(new[] { "b", "c" }, writer), consumer);
+
+        Assert.Equal(["add:a", "remove:a", "clear", "reset:2", "add:b", "add:c"], consumer.Commands);
+    }
+
+    [Fact]
+    public void JsonValueCodec_Set_RoundTrips()
+    {
+        var codec = new JsonValueOperationCodec<int>(Options);
+        var consumer = new ValueConsumer<int>();
+
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(42, writer)), consumer);
+
+        Assert.Equal(42, consumer.Value);
+    }
+
+    [Fact]
+    public void JsonValueCodec_CustomValue_UsesConfiguredTypeInfo()
+    {
+        var codec = new JsonValueOperationCodec<JsonCodecTestValue>(CreateOptions());
+        var consumer = new ValueConsumer<JsonCodecTestValue>();
+        var value = new JsonCodecTestValue("alpha", 3);
+
+        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(value, writer)), consumer);
+
+        Assert.Equal(value, consumer.Value);
+    }
+
+    [Fact]
+    public void JsonValueCodec_MissingMetadata_ThrowsHelpfulException()
+    {
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => new JsonValueOperationCodec<JsonCodecTestValue>(new JsonSerializerOptions()));
+
+        Assert.Contains(nameof(JsonCodecTestValue), exception.Message);
+        Assert.Contains("source-generated JsonSerializerContext", exception.Message);
+    }
+
+    [Fact]
+    public void JsonStateCodec_SetAndClear_RoundTrip()
+    {
+        var codec = new JsonStateOperationCodec<string>(Options);
+        var consumer = new StateConsumer<string>();
+
+        Apply(codec, writer => codec.WriteSet("state", 7, writer), consumer);
+        Apply(codec, writer => codec.WriteClear(writer), consumer);
+
+        Assert.Equal(["set:state:7", "clear"], consumer.Commands);
+    }
+
+    [Fact]
+    public void JsonTcsCodec_States_RoundTrip()
+    {
+        var codec = new JsonTcsOperationCodec<int>(Options);
+        var consumer = new TcsConsumer<int>();
+
+        Apply(codec, writer => codec.WritePending(writer), consumer);
+        Apply(codec, writer => codec.WriteCompleted(5, writer), consumer);
+        Apply(codec, writer => codec.WriteFaulted(new InvalidOperationException("boom"), writer), consumer);
+        Apply(codec, writer => codec.WriteCanceled(writer), consumer);
+
+        Assert.Equal(["pending", "completed:5", "faulted:boom", "canceled"], consumer.Commands);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_CreateWriter_WritesReadableRecordPerLine()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+
+        AppendValueSet(writer, 8, 42);
+        AppendValueSet(writer, 9, 43);
+
+        Assert.Equal(
+            """[8,"set",42]""" + "\n" +
+            """[9,"set",43]""" + "\n",
+            GetString(writer));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_TryAppendFormattedEntry_WritesEntryDirectly()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+
+        var accepted = writer.CreateLogStreamWriter(new LogStreamId(8)).TryAppendFormattedEntry(JsonFormattedLogEntry.Create(42, static (jsonWriter, value) =>
+        {
+            jsonWriter.WriteStringValue(JsonLogEntryCommands.Set);
+            jsonWriter.WriteNumberValue(value);
+        }));
+
+        Assert.True(accepted);
+        Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
+    }
+
+    [Fact]
+    public void JsonValueCodec_LogStreamWriterOverload_UsesFormattedEntryForJsonWriter()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+        var codec = new JsonValueOperationCodec<int>(Options);
+
+        codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
+
+        Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
+    }
+
+    [Fact]
+    public void JsonValueCodec_LogStreamWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
+    {
+        using var writer = new OrleansBinaryLogBatchWriter();
+        var codec = new JsonValueOperationCodec<int>(Options);
+
+        codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
+
+        using var committed = writer.GetCommittedBuffer();
+        var bytes = committed.ToArray();
+        var payload = """["set",42]"""u8.ToArray();
+
+        Assert.Equal((uint)(1 + payload.Length), BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0, 4)));
+        Assert.Equal(8, bytes[4]);
+        Assert.Equal(payload, bytes[5..]);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Writer_DisposeWithoutCommit_TruncatesIncompleteLine()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+
+        AppendValueSet(writer, 8, 42);
+        using (var aborted = writer.CreateLogStreamWriter(new LogStreamId(9)).BeginEntry())
+        {
+            aborted.Writer.Write("""["set",100"""u8);
+        }
+
+        AppendValueSet(writer, 10, 43);
+
+        Assert.Equal(
+            """[8,"set",42]""" + "\n" +
+            """[10,"set",43]""" + "\n",
+            GetString(writer));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Writer_Reset_ReusesBuffer()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+
+        AppendValueSet(writer, 8, 42);
+        writer.Reset();
+        AppendValueSet(writer, 9, 43);
+
+        Assert.Equal("""[9,"set",43]""" + "\n", GetString(writer));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_DoesNotDependOnRemovedBuilderTypes()
+    {
+        Assert.Null(typeof(JsonLinesLogFormat).Assembly.GetType("Orleans.Journaling.Json.JsonLinesLogExtentCodec"));
+        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.LogExtentBuilder"));
+        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.IStateMachineLogExtentCodec"));
+        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.StateMachineStorageWriter"));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_DispatchesEntries()
+    {
+        var format = new JsonLinesLogFormat();
+        var entries = Read(format, """[8,"set",42]""" + "\n");
+        var entry = Assert.Single(entries);
+        var valueCodec = new JsonValueOperationCodec<int>(Options);
+        var consumer = new ValueConsumer<int>();
+
+        valueCodec.Apply(new ReadOnlySequence<byte>(entry.Payload), consumer);
+
+        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal(42, consumer.Value);
+    }
+
+    [Theory]
+    [InlineData("\n", "blank lines")]
+    [InlineData("""{"streamId":8,"entry":["set",42]}""" + "\n", "must be a JSON array")]
+    [InlineData("null\n", "must be a JSON array")]
+    [InlineData("[]\n", "stream id")]
+    [InlineData("[8]\n", "operation command")]
+    [InlineData("""["8","set",42]""" + "\n", "unsigned integer")]
+    [InlineData("[8,null]\n", "operation command string")]
+    [InlineData("""[8,"set",42]{}""" + "\n", "invalid JSON")]
+    [InlineData("""[8,"set",42""" + "\n", "invalid JSON")]
+    public void JsonLinesLogFormat_Read_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
+    {
+        var format = new JsonLinesLogFormat();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
+
+        Assert.Contains(expectedMessage, exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_Bom_Throws()
+    {
+        var format = new JsonLinesLogFormat();
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""[8,"set",42]""" + "\n")).ToArray();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(format, bytes));
+
+        Assert.Contains("byte order marks", exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_FinalLineWithoutNewline_Throws()
+    {
+        var format = new JsonLinesLogFormat();
+        var jsonLines =
+            """[8,"set",42]""" + "\n" +
+            """[9,"set",43""";
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
+
+        Assert.Contains("must end with a newline", exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_PartialLineWaitsForNewlineWhenInputIsNotCompleted()
+    {
+        var format = new JsonLinesLogFormat();
+        var bytes = Encoding.UTF8.GetBytes("""[8,"set",42]""");
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var consumer = new RecordingLogEntrySink();
+
+        format.Read(reader, consumer);
+
+        Assert.Equal(bytes.Length, reader.Length);
+        Assert.Empty(consumer.Entries);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_NewlineAtArcBufferPageBoundary_Parses()
+    {
+        var format = new JsonLinesLogFormat();
+        var prefix = "[8,\"set\",\"";
+        var suffix = "\"]";
+        var text = new string('a', ArcBufferWriter.MinimumPageSize - Encoding.UTF8.GetByteCount(prefix + suffix));
+        var line = prefix + text + suffix;
+        Assert.Equal(ArcBufferWriter.MinimumPageSize, Encoding.UTF8.GetByteCount(line));
+        var bytes = Encoding.UTF8.GetBytes(line + "\n");
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var consumer = new RecordingLogEntrySink();
+
+        format.Read(reader, consumer);
+
+        Assert.Equal(0, reader.Length);
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal($$"""["set","{{text}}"]""", Encoding.UTF8.GetString(entry.Payload));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_MultiPagePartialLineWaitsForNewlineWhenInputIsNotCompleted()
+    {
+        var format = new JsonLinesLogFormat();
+        var prefix = "[8,\"set\",\"";
+        var suffix = "\"]";
+        var text = new string('a', ArcBufferWriter.MinimumPageSize + 8 - Encoding.UTF8.GetByteCount(prefix + suffix));
+        var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var consumer = new RecordingLogEntrySink();
+
+        format.Read(reader, consumer);
+
+        Assert.Equal(bytes.Length, reader.Length);
+        Assert.Empty(consumer.Entries);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_ParsesCrLfLines()
+    {
+        var format = new JsonLinesLogFormat();
+        var entries = Read(format, """[8,"set",42]""" + "\r\n");
+        var entry = Assert.Single(entries);
+
+        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal("""["set",42]""", Encoding.UTF8.GetString(entry.Payload));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_ActiveStateMachine_UsesJsonCodecBridge()
+    {
+        var format = new JsonLinesLogFormat();
+        var codec = new RecordingJsonLogEntryCodec();
+        var stateMachine = new RecordingStateMachine(codec);
+
+        ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine));
+
+        Assert.Same(stateMachine, codec.StateMachine);
+        Assert.Equal(42, codec.Value);
+        Assert.False(stateMachine.RawApplyCalled);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_ActiveStateMachine_ThrowsWhenCodecIsNotJsonBridge()
+    {
+        var format = new JsonLinesLogFormat();
+        var stateMachine = new RecordingStateMachine(new object());
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine)));
+
+        Assert.Contains("does not implement IJsonLogEntryCodec", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_ActiveStateMachine_ThrowsWhenCodecHandlerDoesNotMatch()
+    {
+        var format = new JsonLinesLogFormat();
+        var stateMachine = new RecordingStateMachine(new JsonValueOperationCodec<int>(Options));
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine)));
+
+        Assert.Contains("not compatible", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Read_DurableNothingIgnoresEntryWithoutJsonCodec()
+    {
+        var format = new JsonLinesLogFormat();
+        var stateMachine = new NoOpStateMachine();
+
+        ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine));
+
+        Assert.False(stateMachine.RawApplyCalled);
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_Writer_RejectsWrongFormattedEntryType()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+        var logWriter = writer.CreateLogStreamWriter(new LogStreamId(8));
+
+        var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
+
+        Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
+    }
+
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableListOperationHandler<T> consumer)
+    {
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+    }
+
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableQueueOperationHandler<T> consumer)
+    {
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+    }
+
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableSetOperationHandler<T> consumer)
+    {
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+    }
+
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableStateOperationHandler<T> consumer)
+    {
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+    }
+
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    {
+        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+    }
+
+    private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
+
+    private static string GetString(ReadOnlySequence<byte> payload) => Encoding.UTF8.GetString(payload.ToArray());
+
+    private static string GetString(ILogBatchWriter writer)
+    {
+        using var buffer = writer.GetCommittedBuffer();
+        return Encoding.UTF8.GetString(buffer.ToArray());
+    }
+
+    private static void AppendValueSet(ILogBatchWriter writer, ulong streamId, int value)
+    {
+        var codec = new JsonValueOperationCodec<int>(Options);
+        codec.WriteSet(value, writer.CreateLogStreamWriter(new LogStreamId(streamId)));
+    }
+
+    private static JsonSerializerOptions CreateOptions() => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
+
+    private static List<RecordedLogEntry> Read(JsonLinesLogFormat format, string jsonLines) => Read(format, Encoding.UTF8.GetBytes(jsonLines));
+
+    private static List<RecordedLogEntry> Read(JsonLinesLogFormat format, byte[] bytes)
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(bytes);
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
+        var consumer = new RecordingLogEntrySink();
+        format.Read(reader, consumer);
+        Assert.Equal(0, reader.Length);
+
+        return consumer.Entries;
+    }
+
+    private static void ReadOne(JsonLinesLogFormat format, string jsonLines, IStateMachineResolver resolver)
+    {
+        using var buffer = new ArcBufferWriter();
+        buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
+        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
+        format.Read(reader, resolver);
+        Assert.Equal(0, reader.Length);
+    }
+
+    private sealed record RecordedLogEntry(LogStreamId StreamId, byte[] Payload);
+
+    private sealed class RecordingLogEntrySink : IStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
+    {
+        private LogStreamId _streamId;
+
+        public List<RecordedLogEntry> Entries { get; } = [];
+
+        public IReadOnlyList<IFormattedLogEntry> FormattedEntries => [];
+
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void AddFormattedEntry(IFormattedLogEntry entry) => Entries.Add(new(_streamId, entry.Payload.ToArray()));
+
+        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
+
+        public void Reset(LogStreamWriter storage) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class SingleStateMachineResolver(IDurableStateMachine stateMachine) : IStateMachineResolver
+    {
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId) => stateMachine;
+    }
+
+    private sealed class RecordingStateMachine(object codec) : IDurableStateMachine
+    {
+        public bool RawApplyCalled { get; private set; }
+
+        public object OperationCodec => codec;
+
+        public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
+        public void Reset(LogStreamWriter storage) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class NoOpStateMachine : IDurableNothing, IDurableStateMachine
+    {
+        public bool RawApplyCalled { get; private set; }
+
+        public object OperationCodec { get; } = new();
+
+        public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
+        public void Reset(LogStreamWriter storage) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class RecordingJsonLogEntryCodec : IJsonLogEntryCodec
+    {
+        public IDurableStateMachine? StateMachine { get; private set; }
+
+        public int? Value { get; private set; }
+
+        public void Apply(JsonElement entry, IDurableStateMachine stateMachine)
+        {
+            StateMachine = stateMachine;
+            Value = entry[1].GetInt32();
+        }
+    }
+
+    private sealed class TestFormattedLogEntry : IFormattedLogEntry
+    {
+        public ReadOnlyMemory<byte> Payload => ReadOnlyMemory<byte>.Empty;
+    }
+
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull
+    {
+        public TKey? LastSetKey { get; private set; }
+        public TValue? LastSetValue { get; private set; }
+        public List<KeyValuePair<TKey, TValue>> Items { get; } = [];
+        public void ApplySet(TKey key, TValue value)
+        {
+            LastSetKey = key;
+            LastSetValue = value;
+            Items.Add(new(key, value));
+        }
+
+        public void ApplyRemove(TKey key) { }
+        public void ApplyClear() => Items.Clear();
+        public void Reset(int capacityHint) => Items.Clear();
+    }
+
+    private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyAdd(T item) => Commands.Add($"add:{item}");
+        public void ApplySet(int index, T item) => Commands.Add($"set:{index}:{item}");
+        public void ApplyInsert(int index, T item) => Commands.Add($"insert:{index}:{item}");
+        public void ApplyRemoveAt(int index) => Commands.Add($"remove:{index}");
+        public void ApplyClear() => Commands.Add("clear");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
+    }
+
+    private sealed class QueueConsumer<T> : IDurableQueueOperationHandler<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
+        public void ApplyDequeue() => Commands.Add("dequeue");
+        public void ApplyClear() => Commands.Add("clear");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
+    }
+
+    private sealed class SetConsumer<T> : IDurableSetOperationHandler<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyAdd(T item) => Commands.Add($"add:{item}");
+        public void ApplyRemove(T item) => Commands.Add($"remove:{item}");
+        public void ApplyClear() => Commands.Add("clear");
+        public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
+    }
+
+    private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>
+    {
+        public T? Value { get; private set; }
+        public void ApplySet(T value) => Value = value;
+    }
+
+    private sealed class StateConsumer<T> : IDurableStateOperationHandler<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplySet(T state, ulong version) => Commands.Add($"set:{state}:{version}");
+        public void ApplyClear() => Commands.Add("clear");
+    }
+
+    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceOperationHandler<T>
+    {
+        public List<string> Commands { get; } = [];
+        public void ApplyPending() => Commands.Add("pending");
+        public void ApplyCompleted(T value) => Commands.Add($"completed:{value}");
+        public void ApplyFaulted(Exception exception) => Commands.Add($"faulted:{exception.Message}");
+        public void ApplyCanceled() => Commands.Add("canceled");
+    }
+
+    private sealed class TestSiloBuilder : ISiloBuilder
+    {
+        public IServiceCollection Services { get; } = new ServiceCollection();
+
+        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
+    }
+}

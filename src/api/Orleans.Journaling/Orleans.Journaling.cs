@@ -49,11 +49,84 @@ namespace Orleans.Journaling
 
     public static partial class HostingExtensions
     {
-        public static Hosting.ISiloBuilder AddStateMachineStorage(this Hosting.ISiloBuilder builder) { throw null; }
+        public static Hosting.ISiloBuilder AddLogStorage(this Hosting.ISiloBuilder builder) { throw null; }
+    }
+
+    public sealed partial class JournalingFormatFamilyBuilder
+    {
+        internal JournalingFormatFamilyBuilder() { }
+
+        public string Key { get { throw null; } }
+
+        public Microsoft.Extensions.DependencyInjection.IServiceCollection Services { get { throw null; } }
+
+        public JournalingFormatFamilyBuilder AddLogFormat(ILogFormat logFormat) { throw null; }
+
+        public JournalingFormatFamilyBuilder AddLogFormat<TFormat>()
+            where TFormat : class, ILogFormat { throw null; }
+
+        public JournalingFormatFamilyBuilder AddOperationCodecProvider<TProvider>()
+            where TProvider : class, IDurableDictionaryOperationCodecProvider, IDurableListOperationCodecProvider, IDurableQueueOperationCodecProvider, IDurableSetOperationCodecProvider, IDurableValueOperationCodecProvider, IDurableStateOperationCodecProvider, IDurableTaskCompletionSourceOperationCodecProvider { throw null; }
+
+        public JournalingFormatFamilyBuilder AddOperationCodecProvider<TProvider>(System.Func<System.IServiceProvider, TProvider> factory)
+            where TProvider : class, IDurableDictionaryOperationCodecProvider, IDurableListOperationCodecProvider, IDurableQueueOperationCodecProvider, IDurableSetOperationCodecProvider, IDurableValueOperationCodecProvider, IDurableStateOperationCodecProvider, IDurableTaskCompletionSourceOperationCodecProvider { throw null; }
+    }
+
+    public static partial class JournalingFormatFamilyServiceCollectionExtensions
+    {
+        public static JournalingFormatFamilyBuilder AddJournalingFormatFamily(this Microsoft.Extensions.DependencyInjection.IServiceCollection services, string key) { throw null; }
+    }
+
+    public partial interface IDurableDictionaryOperationCodecProvider
+    {
+        IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>();
+    }
+
+    public partial interface IDurableDictionaryOperationCodec<TKey, TValue>
+    {
+        void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer);
+        void WriteClear(LogStreamWriter writer);
+        void WriteRemove(TKey key, LogStreamWriter writer);
+        void WriteSet(TKey key, TValue value, LogStreamWriter writer);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, LogStreamWriter writer);
+    }
+
+    public partial interface IDurableDictionaryOperationHandler<TKey, TValue>
+    {
+        void ApplyClear();
+        void ApplyRemove(TKey key);
+        void ApplySet(TKey key, TValue value);
+        void Reset(int capacityHint);
     }
 
     public partial interface IDurableDictionary<K, V> : System.Collections.Generic.IDictionary<K, V>, System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.IEnumerable
     {
+    }
+
+    public partial interface IDurableListOperationCodecProvider
+    {
+        IDurableListOperationCodec<T> GetCodec<T>();
+    }
+
+    public partial interface IDurableListOperationCodec<T>
+    {
+        void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer);
+        void WriteAdd(T item, LogStreamWriter writer);
+        void WriteClear(LogStreamWriter writer);
+        void WriteInsert(int index, T item, LogStreamWriter writer);
+        void WriteRemoveAt(int index, LogStreamWriter writer);
+        void WriteSet(int index, T item, LogStreamWriter writer);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer);
+    }
+
+    public partial interface IDurableListOperationHandler<T>
+    {
+        void ApplyAdd(T item);
+        void ApplyClear();
+        void ApplyInsert(int index, T item);
+        void ApplyRemoveAt(int index);
+        void ApplySet(int index, T item);
+        void Reset(int capacityHint);
     }
 
     public partial interface IDurableList<T> : System.Collections.Generic.IList<T>, System.Collections.Generic.ICollection<T>, System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable
@@ -66,6 +139,28 @@ namespace Orleans.Journaling
     {
     }
 
+    public partial interface IDurableQueueOperationCodecProvider
+    {
+        IDurableQueueOperationCodec<T> GetCodec<T>();
+    }
+
+    public partial interface IDurableQueueOperationCodec<T>
+    {
+        void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer);
+        void WriteClear(LogStreamWriter writer);
+        void WriteDequeue(LogStreamWriter writer);
+        void WriteEnqueue(T item, LogStreamWriter writer);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer);
+    }
+
+    public partial interface IDurableQueueOperationHandler<T>
+    {
+        void ApplyClear();
+        void ApplyDequeue();
+        void ApplyEnqueue(T item);
+        void Reset(int capacityHint);
+    }
+
     public partial interface IDurableQueue<T> : System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable, System.Collections.Generic.IReadOnlyCollection<T>
     {
         void Clear();
@@ -76,6 +171,28 @@ namespace Orleans.Journaling
         T Peek();
         bool TryDequeue(out T item);
         bool TryPeek(out T item);
+    }
+
+    public partial interface IDurableSetOperationCodecProvider
+    {
+        IDurableSetOperationCodec<T> GetCodec<T>();
+    }
+
+    public partial interface IDurableSetOperationCodec<T>
+    {
+        void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer);
+        void WriteAdd(T item, LogStreamWriter writer);
+        void WriteClear(LogStreamWriter writer);
+        void WriteRemove(T item, LogStreamWriter writer);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, LogStreamWriter writer);
+    }
+
+    public partial interface IDurableSetOperationHandler<T>
+    {
+        void ApplyAdd(T item);
+        void ApplyClear();
+        void ApplyRemove(T item);
+        void Reset(int capacityHint);
     }
 
     public partial interface IDurableSet<T> : System.Collections.Generic.ISet<T>, System.Collections.Generic.ICollection<T>, System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable, System.Collections.Generic.IReadOnlyCollection<T>, System.Collections.Generic.IReadOnlySet<T>
@@ -92,15 +209,57 @@ namespace Orleans.Journaling
         bool SetEquals(System.Collections.Generic.IEnumerable<T> other);
     }
 
+    public partial interface IDurableStateOperationCodecProvider
+    {
+        IDurableStateOperationCodec<T> GetCodec<T>();
+    }
+
+    public partial interface IDurableStateOperationCodec<T>
+    {
+        void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer);
+        void WriteClear(LogStreamWriter writer);
+        void WriteSet(T state, ulong version, LogStreamWriter writer);
+    }
+
+    public partial interface IDurableStateOperationHandler<T>
+    {
+        void ApplyClear();
+        void ApplySet(T state, ulong version);
+    }
+
     public partial interface IDurableStateMachine
     {
-        void AppendEntries(StateMachineStorageWriter writer);
-        void AppendSnapshot(StateMachineStorageWriter writer);
+        object OperationCodec { get; }
+
+        void AppendEntries(LogStreamWriter writer);
+        void AppendSnapshot(LogStreamWriter writer);
         void Apply(System.Buffers.ReadOnlySequence<byte> entry);
         IDurableStateMachine DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
-        void Reset(IStateMachineLogWriter storage);
+        void Reset(LogStreamWriter writer);
+    }
+
+    public partial interface IDurableTaskCompletionSourceOperationCodecProvider
+    {
+        IDurableTaskCompletionSourceOperationCodec<T> GetCodec<T>();
+    }
+
+    public partial interface IDurableTaskCompletionSourceOperationCodec<T>
+    {
+        void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer);
+        void WriteCanceled(LogStreamWriter writer);
+        void WriteCompleted(T value, LogStreamWriter writer);
+        void WriteFaulted(System.Exception exception, LogStreamWriter writer);
+        void WritePending(LogStreamWriter writer);
+    }
+
+    public partial interface IDurableTaskCompletionSourceOperationHandler<T>
+    {
+        void ApplyCanceled();
+        void ApplyCompleted(T value);
+        void ApplyFaulted(System.Exception exception);
+        void ApplyPending();
     }
 
     public partial interface IDurableTaskCompletionSource<T>
@@ -114,15 +273,68 @@ namespace Orleans.Journaling
         bool TrySetResult(T value);
     }
 
+    public partial interface IDurableValueOperationCodecProvider
+    {
+        IDurableValueOperationCodec<T> GetCodec<T>();
+    }
+
+    public partial interface IDurableValueOperationCodec<T>
+    {
+        void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer);
+        void WriteSet(T value, LogStreamWriter writer);
+    }
+
+    public partial interface IDurableValueOperationHandler<T>
+    {
+        void ApplySet(T value);
+    }
+
     public partial interface IDurableValue<T>
     {
         T? Value { get; set; }
     }
 
-    public partial interface IStateMachineLogWriter
+    public partial interface ILogValueCodec<T>
     {
-        void AppendEntries<TState>(System.Action<TState, StateMachineStorageWriter> action, TState state);
-        void AppendEntry<TState>(System.Action<TState, System.Buffers.IBufferWriter<byte>> action, TState state);
+        T Read(System.Buffers.ReadOnlySequence<byte> input, out long bytesConsumed);
+        void Write(T value, System.Buffers.IBufferWriter<byte> output);
+    }
+
+    public partial interface IFormattedLogEntry
+    {
+        System.ReadOnlyMemory<byte> Payload { get; }
+    }
+
+    public partial interface IFormattedLogEntryBuffer
+    {
+        System.Collections.Generic.IReadOnlyList<IFormattedLogEntry> FormattedEntries { get; }
+
+        void AddFormattedEntry(IFormattedLogEntry entry);
+    }
+
+    public partial interface ILogBatchWriter : System.IDisposable
+    {
+        long Length { get; }
+
+        LogStreamWriter CreateLogStreamWriter(LogStreamId streamId);
+        Serialization.Buffers.ArcBuffer GetCommittedBuffer();
+        void Reset();
+    }
+
+    public partial interface ILogFormat
+    {
+        ILogBatchWriter CreateWriter();
+        void Read(LogReadBuffer input, IStateMachineResolver resolver);
+    }
+
+    public partial interface ILogFormatKeyProvider
+    {
+        string GetLogFormatKey(Runtime.IGrainContext grainContext);
+    }
+
+    public partial interface IStateMachineResolver
+    {
+        IDurableStateMachine ResolveStateMachine(LogStreamId streamId);
     }
 
     public partial interface IStateMachineManager
@@ -134,139 +346,79 @@ namespace Orleans.Journaling
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);
     }
 
-    public partial interface IStateMachineStorage
+    public partial interface ILogStorage
     {
         bool IsCompactionRequested { get; }
 
-        System.Threading.Tasks.ValueTask AppendAsync(LogExtentBuilder value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken);
-        System.Collections.Generic.IAsyncEnumerable<LogExtent> ReadAsync(System.Threading.CancellationToken cancellationToken);
-        System.Threading.Tasks.ValueTask ReplaceAsync(LogExtentBuilder value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReadAsync(ILogStorageConsumer consumer, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
     }
 
-    public partial interface IStateMachineStorageProvider
+    public partial interface ILogStorageConsumer
     {
-        IStateMachineStorage Create(Runtime.IGrainContext grainContext);
+        void Consume(LogReadBuffer buffer);
     }
 
-    public sealed partial class LogExtent : System.IDisposable
+    public static partial class LogStorageConsumerExtensions
     {
-        public LogExtent() { }
-
-        public LogExtent(Serialization.Buffers.ArcBuffer buffer) { }
-
-        public bool IsEmpty { get { throw null; } }
-
-        public void Dispose() { }
-
-        public readonly partial struct Entry : System.IEquatable<Entry>
-        {
-            private readonly int _dummyPrimitive;
-            public Entry(StateMachineId StreamId, System.Buffers.ReadOnlySequence<byte> Payload) { }
-
-            public System.Buffers.ReadOnlySequence<byte> Payload { get { throw null; } init { } }
-
-            public StateMachineId StreamId { get { throw null; } init { } }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public readonly void Deconstruct(out StateMachineId StreamId, out System.Buffers.ReadOnlySequence<byte> Payload) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public readonly bool Equals(Entry other) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public override readonly bool Equals(object obj) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public override readonly int GetHashCode() { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public static bool operator ==(Entry left, Entry right) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public static bool operator !=(Entry left, Entry right) { throw null; }
-
-            [System.Runtime.CompilerServices.CompilerGenerated]
-            public override readonly string ToString() { throw null; }
-        }
+        public static void Complete(this ILogStorageConsumer consumer) { }
+        public static void Consume(this ILogStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, bool complete = true) { }
+        public static void Consume(this ILogStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, bool complete = true) { }
+        public static void Consume(this ILogStorageConsumer consumer, System.ReadOnlyMemory<byte> input, bool complete = true) { }
+        public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this ILogStorageConsumer consumer, System.IO.Stream input, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class LogExtentBuilder : System.IDisposable, System.Buffers.IBufferWriter<byte>
+    public partial interface ILogStorageProvider
     {
-        public LogExtentBuilder() { }
-
-        public LogExtentBuilder(Serialization.Buffers.ArcBufferWriter buffer) { }
-
-        public bool IsEmpty { get { throw null; } }
-
-        public long Length { get { throw null; } }
-
-        public void CopyTo(System.IO.Stream destination, int bufferSize) { }
-
-        public System.Threading.Tasks.ValueTask CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public StateMachineStorageWriter CreateLogWriter(StateMachineId id) { throw null; }
-
-        public void Dispose() { }
-
-        public void Reset() { }
-
-        void System.Buffers.IBufferWriter<byte>.Advance(int count) { }
-
-        System.Memory<byte> System.Buffers.IBufferWriter<byte>.GetMemory(int sizeHint) { throw null; }
-
-        System.Span<byte> System.Buffers.IBufferWriter<byte>.GetSpan(int sizeHint) { throw null; }
-
-        public byte[] ToArray() { throw null; }
-
-        public sealed partial class ReadOnlyStream : System.IO.Stream
-        {
-            public override bool CanRead { get { throw null; } }
-
-            public override bool CanSeek { get { throw null; } }
-
-            public override bool CanWrite { get { throw null; } }
-
-            public override long Length { get { throw null; } }
-
-            public override long Position { get { throw null; } set { } }
-
-            public override void CopyTo(System.IO.Stream destination, int bufferSize) { }
-
-            public override System.Threading.Tasks.Task CopyToAsync(System.IO.Stream destination, int bufferSize, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-            public override void Flush() { }
-
-            public override int Read(byte[] buffer, int offset, int count) { throw null; }
-
-            public override int Read(System.Span<byte> buffer) { throw null; }
-
-            public override System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-            public override System.Threading.Tasks.ValueTask<int> ReadAsync(System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-            public void Reset() { }
-
-            public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
-
-            public void SetBuilder(LogExtentBuilder builder) { }
-
-            public override void SetLength(long value) { }
-
-            public override void Write(byte[] buffer, int offset, int count) { }
-
-            public override void Write(System.ReadOnlySpan<byte> buffer) { }
-
-            public override System.Threading.Tasks.ValueTask WriteAsync(System.ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
-
-            public override void WriteByte(byte value) { }
-        }
+        ILogStorage Create(Runtime.IGrainContext grainContext);
     }
 
-    public readonly partial struct StateMachineId : System.IEquatable<StateMachineId>
+    public ref partial struct LogReadBuffer
+    {
+        private object _dummy;
+        private int _dummyPrimitive;
+        public LogReadBuffer(Serialization.Buffers.ArcBufferReader reader, bool isCompleted) { }
+
+        public bool IsCompleted { get { throw null; } }
+
+        public int Length { get { throw null; } }
+
+        public void Consume(System.Span<byte> destination) { }
+        public bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
+        public System.ReadOnlySpan<byte> Peek(int count, System.Span<byte> destination) { throw null; }
+        public Serialization.Buffers.ArcBuffer PeekSlice(int count) { throw null; }
+        public void Skip(int count) { }
+        public bool TryConsume(System.Span<byte> destination) { throw null; }
+        public bool TryPeek(System.Span<byte> destination) { throw null; }
+        public bool TryReadTo(out Serialization.Buffers.ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true) { throw null; }
+        public bool TrySkip(int count) { throw null; }
+    }
+
+    public sealed partial class LogEntryWriter : System.Buffers.IBufferWriter<byte>
+    {
+        internal LogEntryWriter() { }
+
+        public void Advance(int count) { }
+
+        public System.Memory<byte> GetMemory(int sizeHint = 0) { throw null; }
+
+        public System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
+
+        public void Write(System.Buffers.ReadOnlySequence<byte> value) { }
+
+        public void Write(System.ReadOnlySpan<byte> value) { }
+
+        public void WriteVarUInt32(uint value) { }
+
+        public void WriteVarUInt64(ulong value) { }
+    }
+
+    public readonly partial struct LogStreamId : System.IEquatable<LogStreamId>
     {
         private readonly int _dummyPrimitive;
-        public StateMachineId(ulong Value) { }
+        public LogStreamId(ulong Value) { }
 
         public ulong Value { get { throw null; } init { } }
 
@@ -274,7 +426,7 @@ namespace Orleans.Journaling
         public readonly void Deconstruct(out ulong Value) { throw null; }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly bool Equals(StateMachineId other) { throw null; }
+        public readonly bool Equals(LogStreamId other) { throw null; }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
         public override readonly bool Equals(object obj) { throw null; }
@@ -283,13 +435,59 @@ namespace Orleans.Journaling
         public override readonly int GetHashCode() { throw null; }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator ==(StateMachineId left, StateMachineId right) { throw null; }
+        public static bool operator ==(LogStreamId left, LogStreamId right) { throw null; }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
-        public static bool operator !=(StateMachineId left, StateMachineId right) { throw null; }
+        public static bool operator !=(LogStreamId left, LogStreamId right) { throw null; }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
         public override readonly string ToString() { throw null; }
+    }
+
+    public ref partial struct LogEntry
+    {
+        private object _dummy;
+        private int _dummyPrimitive;
+        public LogEntryWriter Writer { get { throw null; } }
+
+        public void Commit() { }
+
+        public void Dispose() { }
+    }
+
+    public abstract partial class LogBatchWriterBase : ILogBatchWriter, System.IDisposable
+    {
+        protected LogStreamId ActiveStreamId { get { throw null; } }
+
+        protected bool IsEntryActive { get { throw null; } }
+
+        public abstract long Length { get; }
+
+        protected abstract void AbortEntry(LogStreamId streamId, int entryStart);
+        protected abstract void AdvancePayload(int count);
+        protected abstract void CommitEntry(LogStreamId streamId, int entryStart);
+        public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId) { throw null; }
+
+        public abstract void Dispose();
+        public abstract Serialization.Buffers.ArcBuffer GetCommittedBuffer();
+        protected abstract int GetEntryStart(LogStreamId streamId);
+        protected abstract System.Memory<byte> GetPayloadMemory(int sizeHint);
+        protected abstract System.Span<byte> GetPayloadSpan(int sizeHint);
+        protected virtual void OnAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) { }
+        protected virtual void OnBeginEntry(LogStreamId streamId) { }
+        protected virtual bool OnTryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) { throw null; }
+
+        public abstract void Reset();
+        protected abstract void WritePayload(System.Buffers.ReadOnlySequence<byte> value);
+        protected abstract void WritePayload(System.ReadOnlySpan<byte> value);
+    }
+
+    public readonly partial struct LogStreamWriter
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public readonly LogEntry BeginEntry() { throw null; }
+        public readonly bool TryAppendFormattedEntry(IFormattedLogEntry entry) { throw null; }
     }
 
     public sealed partial class StateMachineManagerOptions
@@ -298,43 +496,31 @@ namespace Orleans.Journaling
         public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
     }
 
-    public readonly partial struct StateMachineStorageWriter
+    public sealed partial class VolatileLogStorage : ILogStorage
     {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public readonly void AppendEntry(System.ArraySegment<byte> value) { }
+        public VolatileLogStorage() { }
 
-        public readonly void AppendEntry(System.Buffers.ReadOnlySequence<byte> value) { }
-
-        public readonly void AppendEntry(byte[] value) { }
-
-        public readonly void AppendEntry(System.Memory<byte> value) { }
-
-        public readonly void AppendEntry(System.ReadOnlyMemory<byte> value) { }
-
-        public readonly void AppendEntry(System.ReadOnlySpan<byte> value) { }
-
-        public readonly void AppendEntry(System.Span<byte> value) { }
-
-        public readonly void AppendEntry<T>(System.Action<T, System.Buffers.IBufferWriter<byte>> valueWriter, T value) { }
-    }
-
-    public sealed partial class VolatileStateMachineStorage : IStateMachineStorage
-    {
         public bool IsCompactionRequested { get { throw null; } }
 
-        public System.Threading.Tasks.ValueTask AppendAsync(LogExtentBuilder segment, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> segment, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public System.Collections.Generic.IAsyncEnumerable<LogExtent> ReadAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask ReadAsync(ILogStorageConsumer consumer, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public System.Threading.Tasks.ValueTask ReplaceAsync(LogExtentBuilder snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class VolatileStateMachineStorageProvider : IStateMachineStorageProvider
+    public sealed partial class VolatileLogStorageProvider : ILogStorageProvider, ILogFormatKeyProvider
     {
-        public IStateMachineStorage Create(Runtime.IGrainContext grainContext) { throw null; }
+        public VolatileLogStorageProvider() { }
+
+        public VolatileLogStorageProvider(string logFormatKey, System.Func<Runtime.GrainType, string>? logFormatKeySelector) { }
+
+        public VolatileLogStorageProvider(string logFormatKey) { }
+
+        public ILogStorage Create(Runtime.IGrainContext grainContext) { throw null; }
+        public string GetLogFormatKey(Runtime.IGrainContext grainContext) { throw null; }
     }
 }
 

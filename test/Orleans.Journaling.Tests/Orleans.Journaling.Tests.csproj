@@ -28,4 +28,9 @@
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Protobuf.Tests" />
+  </ItemGroup>
+
 </Project>

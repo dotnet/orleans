@@ -761,11 +761,15 @@ namespace Orleans.Serialization.Buffers
 
         public readonly ArcBuffer ConsumeSlice(int count) { throw null; }
 
+        public readonly bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
+
         public readonly System.ReadOnlySpan<byte> Peek(scoped in System.Span<byte> destination) { throw null; }
 
         public readonly ArcBuffer PeekSlice(int count) { throw null; }
 
         public readonly void Skip(int count) { }
+
+        public readonly bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true) { throw null; }
     }
 
     [Immutable]

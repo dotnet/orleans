@@ -112,6 +112,31 @@ public class ArcBufferWriterTests
         Assert.Equal(randomData.Length - 6000, bufferWriter.Length);
     }
 
+    [Fact]
+    public void AsReadOnlySequence_SingleSegment_DoesNotAllocate()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, 128).Select(static i => (byte)i).ToArray();
+        buffer.Write(data);
+        using var slice = buffer.PeekSlice(data.Length);
+
+        var sequence = slice.AsReadOnlySequence();
+        Assert.True(sequence.IsSingleSegment);
+        Assert.Equal(data, sequence.FirstSpan.ToArray());
+
+        _ = slice.AsReadOnlySequence().Length;
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        var length = 0L;
+        for (var i = 0; i < 1_000; i++)
+        {
+            length += slice.AsReadOnlySequence().Length;
+        }
+
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+        Assert.Equal(0, allocated);
+        Assert.Equal(data.Length * 1_000L, length);
+    }
+
     /// <summary>
     /// Verifies that page reference counts and versions are managed correctly as slices are consumed and disposed.
     /// </summary>
@@ -732,6 +757,65 @@ public class ArcBufferWriterTests
         var reader = new ArcBufferReader(buffer);
         reader.Skip(50);
         Assert.Equal(50, reader.Length);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryReadTo_FindsDelimiterAcrossPageBoundary()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)'a', PageSize)
+            .Concat([(byte)'\n', (byte)'b'])
+            .ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.True(reader.TryReadTo(out var line, (byte)'\n'));
+        using (line)
+        {
+            Assert.Equal(PageSize, line.Length);
+            Assert.All(line.ToArray(), value => Assert.Equal((byte)'a', value));
+        }
+
+        Assert.Equal(1, reader.Length);
+        Span<byte> next = stackalloc byte[1];
+        var peeked = reader.Peek(next);
+        Assert.Equal(1, peeked.Length);
+        Assert.Equal((byte)'b', peeked[0]);
+    }
+
+    [Fact]
+    public void ArcBufferReader_TryReadTo_NotFoundDoesNotAdvance()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Range(0, PageSize + 1).Select(static i => (byte)((i % 250) + 1)).ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+
+        Assert.False(reader.TryReadTo(out var line, (byte)0));
+
+        Assert.Equal(default, line);
+        Assert.Equal(data.Length, reader.Length);
+    }
+
+    [Fact]
+    public void ArcBufferReader_IsNext_MatchesAcrossPageBoundary()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)'x', PageSize - 1)
+            .Concat([(byte)'A', (byte)'B', (byte)'C'])
+            .ToArray();
+        buffer.Write(data);
+        var reader = new ArcBufferReader(buffer);
+        reader.Skip(PageSize - 1);
+
+        Assert.True(reader.IsNext([(byte)'A', (byte)'B']));
+        Assert.Equal(3, reader.Length);
+        Assert.True(reader.IsNext([(byte)'A', (byte)'B'], advancePast: true));
+        Assert.Equal(1, reader.Length);
+        Span<byte> remaining = stackalloc byte[1];
+        var peeked = reader.Peek(remaining);
+        Assert.Equal(1, peeked.Length);
+        Assert.Equal((byte)'C', peeked[0]);
     }
 
     /// <summary>

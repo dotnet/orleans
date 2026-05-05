@@ -15,7 +15,7 @@ public interface IStateMachineManager
     ValueTask InitializeAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Registers a state machine with the manager.
+    /// Attempts to get a state machine registered with the manager.
     /// </summary>
     /// <param name="name">The state machine's stable identifier.</param>
     /// <param name="stateMachine">The state machine instance to register.</param>

@@ -63,7 +63,10 @@ public static class TokenCredentialHelper
     /// <returns>If successful, returns an access token.</returns>
     public static string GetManagedIdentityToken(string msiClientId, string audience)
     {
-        var miCredential = new ManagedIdentityCredential(msiClientId);
+        var managedIdentityId = string.IsNullOrEmpty(msiClientId)
+            ? ManagedIdentityId.SystemAssigned
+            : ManagedIdentityId.FromUserAssignedClientId(msiClientId);
+        var miCredential = new ManagedIdentityCredential(managedIdentityId);
         return miCredential.GetToken(new TokenRequestContext(new[] { $"{audience}/.default" })).Token;
     }
 }

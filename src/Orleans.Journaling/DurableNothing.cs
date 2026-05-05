@@ -15,19 +15,23 @@ public interface IDurableNothing
 /// </summary>
 internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 {
+    private static readonly object NoOpCodec = new();
+
     public DurableNothing([ServiceKey] string key, IStateMachineManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
     }
 
-    void IDurableStateMachine.Reset(IStateMachineLogWriter storage) { }
+    object IDurableStateMachine.OperationCodec => NoOpCodec;
+
+    void IDurableStateMachine.Reset(LogStreamWriter writer) { }
 
     void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) { }
 
-    void IDurableStateMachine.AppendEntries(StateMachineStorageWriter logWriter) { }
+    void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
 
-    void IDurableStateMachine.AppendSnapshot(StateMachineStorageWriter snapshotWriter) { }
+    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter) { }
 
     public IDurableStateMachine DeepCopy() => this;
 }

@@ -133,6 +133,103 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
+    /// Overwrites bytes which have already been written to this buffer without changing the writer position.
+    /// </summary>
+    /// <param name="offset">The offset into the unconsumed bytes at which to start writing.</param>
+    /// <param name="value">The bytes to write.</param>
+    public void WriteAt(int offset, ReadOnlySpan<byte> value)
+    {
+        ThrowIfDisposed();
+
+#if NET5_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(offset, Length);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(value.Length, Length - offset);
+#else
+        if (offset < 0) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be greater than or equal to 0.");
+        if (offset > Length) throw new ArgumentOutOfRangeException(nameof(offset), "Offset must be less than or equal to the unconsumed length of the buffer.");
+        if (value.Length > Length - offset) throw new ArgumentOutOfRangeException(nameof(value), "Value must fit within the unconsumed length of the buffer.");
+#endif
+
+        if (value.IsEmpty)
+        {
+            return;
+        }
+
+        var page = _readPage;
+        var pageOffset = _readIndex + offset;
+        while (pageOffset >= page.Length)
+        {
+            pageOffset -= page.Length;
+            page = page.Next!;
+            Debug.Assert(page is not null);
+        }
+
+        while (!value.IsEmpty)
+        {
+            var destination = page.AsSpan(pageOffset, page.Length - pageOffset);
+            var copyLength = Math.Min(destination.Length, value.Length);
+            value[..copyLength].CopyTo(destination);
+            value = value[copyLength..];
+
+            if (value.IsEmpty)
+            {
+                return;
+            }
+
+            page = page.Next!;
+            Debug.Assert(page is not null);
+            pageOffset = 0;
+        }
+    }
+
+    /// <summary>
+    /// Truncates this buffer to the specified unconsumed length.
+    /// </summary>
+    /// <param name="length">The new length of the unconsumed bytes.</param>
+    public void Truncate(int length)
+    {
+        ThrowIfDisposed();
+
+#if NET5_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(length, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(length, Length);
+#else
+        if (length < 0) throw new ArgumentOutOfRangeException(nameof(length), "Length must be greater than or equal to 0.");
+        if (length > Length) throw new ArgumentOutOfRangeException(nameof(length), "Length must be less than or equal to the unconsumed length of the buffer.");
+#endif
+
+        if (length == Length)
+        {
+            return;
+        }
+
+        var remaining = _readIndex + length;
+        var page = _readPage;
+        while (remaining > page.Length)
+        {
+            remaining -= page.Length;
+            page = page.Next!;
+            Debug.Assert(page is not null);
+        }
+
+        page.SetLength(remaining, page.Version);
+        var next = page.Next;
+        page.ClearNext(page.Version);
+
+        while (next is not null)
+        {
+            var current = next;
+            next = current.Next;
+            current.SetLength(0, current.Version);
+            current.Unpin(current.Version);
+        }
+
+        _writePage = _tail = page;
+        _totalLength = _readIndex + length;
+    }
+
+    /// <summary>
     /// Resets this instance, returning all memory.
     /// </summary>
     public void Reset()
@@ -228,6 +325,128 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         }
 
         return bytesCopied;
+    }
+
+    /// <summary>
+    /// Gets the contiguous unread bytes in the current read page.
+    /// </summary>
+    internal ReadOnlySpan<byte> UnreadSpan
+    {
+        get
+        {
+            ThrowIfDisposed();
+            if (Length == 0)
+            {
+                return default;
+            }
+
+            return _readPage.AsSpan(_readIndex, _readPage.Length - _readIndex);
+        }
+    }
+
+    /// <summary>
+    /// Peeks at a byte at the specified offset into the unread data.
+    /// </summary>
+    internal bool TryPeek(long offset, out byte value)
+    {
+        ThrowIfDisposed();
+
+        if (offset < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset));
+        }
+
+        if (offset >= Length)
+        {
+            value = default;
+            return false;
+        }
+
+        Debug.Assert(offset <= int.MaxValue);
+        var remainingOffset = (int)offset;
+        var current = _readPage;
+        var pageOffset = _readIndex;
+        while (current is not null)
+        {
+            var available = current.Length - pageOffset;
+            if (remainingOffset < available)
+            {
+                value = current.AsSpan(pageOffset + remainingOffset, 1)[0];
+                return true;
+            }
+
+            remainingOffset -= available;
+            current = current.Next;
+            pageOffset = 0;
+        }
+
+        value = default;
+        return false;
+    }
+
+    /// <summary>
+    /// Returns the offset of the first occurrence of <paramref name="value"/> in the unread data, or -1 if it is not found.
+    /// </summary>
+    internal int IndexOf(byte value)
+    {
+        ThrowIfDisposed();
+
+        var result = 0;
+        var remaining = Length;
+        var current = _readPage;
+        var pageOffset = _readIndex;
+        while (remaining > 0 && current is not null)
+        {
+            var span = current.AsSpan(pageOffset, Math.Min(current.Length - pageOffset, remaining));
+            var index = span.IndexOf(value);
+            if (index >= 0)
+            {
+                return result + index;
+            }
+
+            result += span.Length;
+            remaining -= span.Length;
+            current = current.Next;
+            pageOffset = 0;
+        }
+
+        return -1;
+    }
+
+    /// <summary>
+    /// Returns the offset of the first occurrence of any of <paramref name="values"/> in the unread data, or -1 if none are found.
+    /// </summary>
+    internal int IndexOfAny(ReadOnlySpan<byte> values)
+    {
+        ThrowIfDisposed();
+
+        if (values.IsEmpty)
+        {
+            return -1;
+        }
+
+        var result = 0;
+        var remaining = Length;
+        var current = _readPage;
+        var pageOffset = _readIndex;
+        while (remaining > 0 && current is not null)
+        {
+            var span = current.AsSpan(pageOffset, Math.Min(current.Length - pageOffset, remaining));
+            for (var i = 0; i < span.Length; i++)
+            {
+                if (values.IndexOf(span[i]) >= 0)
+                {
+                    return result + i;
+                }
+            }
+
+            result += span.Length;
+            remaining -= span.Length;
+            current = current.Next;
+            pageOffset = 0;
+        }
+
+        return -1;
     }
 
     /// <summary>
@@ -351,8 +570,13 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     {
         ThrowIfDisposed();
 
-        Debug.Assert(count >= 0);
-        Debug.Assert(count <= Length);
+#if NET6_0_OR_GREATER
+        ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(count, Length);
+#else
+        if (count < 0) throw new ArgumentOutOfRangeException(nameof(count), "Count must be greater than or equal to 0.");
+        if (count > Length) throw new ArgumentOutOfRangeException(nameof(count), "Count must be less than or equal to the unconsumed length of the buffer.");
+#endif
 
         _readIndex += count;
 
@@ -662,6 +886,14 @@ public sealed class ArcBufferPage
         Debug.Assert(Length <= Array.Length);
     }
 
+    internal void SetLength(int length, int token)
+    {
+        CheckValidity(token);
+        Debug.Assert(length >= 0);
+        Debug.Assert(length <= Array.Length);
+        Length = length;
+    }
+
     /// <summary>
     /// Sets the next page in the sequence.
     /// </summary>
@@ -674,6 +906,12 @@ public sealed class ArcBufferPage
         Debug.Assert(next is not null, "SetNext called with null next page");
         Debug.Assert(next != this, "SetNext called with self as next page");
         Next = next;
+    }
+
+    internal void ClearNext(int token)
+    {
+        CheckValidity(token);
+        Next = null;
     }
 
     /// <summary>
@@ -776,6 +1014,60 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     public ArcBuffer ConsumeSlice(int count) => writer.ConsumeSlice(count);
 
     /// <summary>
+    /// Reads bytes until <paramref name="delimiter"/> is found.
+    /// </summary>
+    /// <param name="slice">The bytes before the delimiter, if it was found.</param>
+    /// <param name="delimiter">The delimiter to search for.</param>
+    /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
+    /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>
+    public bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true)
+    {
+        var index = writer.IndexOf(delimiter);
+        if (index < 0)
+        {
+            slice = default;
+            return false;
+        }
+
+        slice = writer.ConsumeSlice(index);
+        if (advancePastDelimiter)
+        {
+            writer.AdvanceReader(1);
+        }
+
+        return true;
+    }
+
+    /// <summary>
+    /// Checks whether the next bytes match <paramref name="next"/>.
+    /// </summary>
+    /// <param name="next">The bytes to compare to the next bytes.</param>
+    /// <param name="advancePast">Whether to advance past the bytes if they match.</param>
+    /// <returns><see langword="true"/> if the next bytes match; otherwise, <see langword="false"/>.</returns>
+    public bool IsNext(ReadOnlySpan<byte> next, bool advancePast = false)
+    {
+        if (next.Length > writer.Length)
+        {
+            return false;
+        }
+
+        for (var i = 0; i < next.Length; i++)
+        {
+            if (!writer.TryPeek(i, out var value) || value != next[i])
+            {
+                return false;
+            }
+        }
+
+        if (advancePast)
+        {
+            writer.AdvanceReader(next.Length);
+        }
+
+        return true;
+    }
+
+    /// <summary>
     /// Consumes the amount of data present in the span.
     /// </summary>
     /// <param name="output"></param>
@@ -790,6 +1082,10 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
         writer.AdvanceReader(count);
     }
 
+    /// <summary>
+    /// Advances the reader by the specified number of bytes.
+    /// </summary>
+    /// <param name="count">The number of bytes to advance.</param>
     public void Skip(int count)
     {
         writer.AdvanceReader(count);
@@ -919,6 +1215,18 @@ public struct ArcBuffer(ArcBufferPage first, int token, int offset, int length) 
     /// </summary>
     public readonly ReadOnlySequence<byte> AsReadOnlySequence()
     {
+        if (Length == 0)
+        {
+            return ReadOnlySequence<byte>.Empty;
+        }
+
+        CheckValidity();
+
+        if (Length <= First.Length - Offset)
+        {
+            return new ReadOnlySequence<byte>(First.AsMemory(Offset, Length));
+        }
+
         var runningIndex = 0L;
         ReadOnlySequenceSegment? first = null;
         ReadOnlySequenceSegment? previous = null;

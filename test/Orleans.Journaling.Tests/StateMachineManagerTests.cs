@@ -1,19 +1,21 @@
+using System.Buffers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
 /// <summary>
-/// Tests for StateMachineManager, the core component of Orleans' journaling infrastructure.
+/// Tests for the state machine manager, the core component of Orleans' journaling infrastructure.
 /// 
-/// StateMachineManager coordinates multiple durable data structures (DurableDictionary, DurableList, etc.)
+/// The state machine manager coordinates multiple durable data structures (DurableDictionary, DurableList, etc.)
 /// within a single grain, ensuring that all state changes are atomically journaled and can be
 /// recovered together. It manages the lifecycle of state machines, handles persistence through
 /// WriteStateAsync calls, and ensures consistent recovery after failures.
 /// </summary>
 [TestCategory("BVT")]
-public class StateMachineManagerTests : StateMachineTestBase
+public class StateMachineManagerTests : JournalingTestBase
 {
     /// <summary>
     /// Tests the registration and basic operation of multiple state machines.
@@ -29,9 +31,9 @@ public class StateMachineManagerTests : StateMachineTestBase
         var codec = CodecProvider.GetCodec<int>();
 
         // Act - Register state machines
-        var dictionary = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), codec, SessionPool);
-        var list = new DurableList<string>("list1", manager, CodecProvider.GetCodec<string>(), SessionPool);
-        var queue = new DurableQueue<int>("queue1", manager, codec, SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(codec, SessionPool)));
+        var list = new DurableList<string>("list1", manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var queue = new DurableQueue<int>("queue1", manager, new OrleansBinaryQueueOperationCodec<int>(new OrleansLogValueCodec<int>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Add some data
@@ -48,6 +50,316 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal(42, queue.Peek());
     }
 
+    [Fact]
+    public async Task StateMachineManager_Initialize_UsesStreamingStorageRead()
+    {
+        var storage = new StreamingOnlyStorage();
+        var sut = CreateTestSystem(storage: storage);
+
+        await sut.Lifecycle.OnStart();
+
+        Assert.True(storage.StreamingReadCalled);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Initialize_ThrowsWhenCompletedReadLeavesData()
+    {
+        var storage = new VolatileLogStorage();
+        using (var data = CreateBuffer([1, 2, 3]))
+        {
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+        }
+
+        var sut = CreateTestSystem(storage: storage, logFormat: new NonConsumingLogFormat());
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        Assert.NotNull(exception.InnerException);
+        Assert.Contains("did not consume the completed log data", exception.InnerException.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_PreservesUnknownStateMachineEntry()
+    {
+        var storage = new VolatileLogStorage();
+        using var segment = new OrleansBinaryLogBatchWriter();
+        using (var entry = segment.CreateLogStreamWriter(new LogStreamId(99)).BeginEntry())
+        {
+            entry.Writer.Write([1, 2, 3]);
+            entry.Commit();
+        }
+
+        using var data = segment.GetCommittedBuffer();
+        await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+        var sut = CreateTestSystem(storage: storage);
+
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+    }
+
+    [Fact]
+    public async Task StateMachineManager_UnknownStateMachineCompaction_PreservesDecodedPayloadThroughFormatWriter()
+    {
+        var physicalBytes = new byte[] { 0xF0, 0x0D, 0x99 };
+        var decodedPayload = new byte[] { 1, 2, 3 };
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        using (var data = CreateBuffer(physicalBytes))
+        {
+            await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
+        }
+
+        var format = new DecodedPayloadOnlyLogFormat(new LogStreamId(99), decodedPayload);
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+
+        await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var replacement = Assert.Single(storage.Replaces);
+        Assert.NotEqual(physicalBytes, replacement);
+
+        var entries = ReadBinaryEntries(replacement);
+        var preserved = Assert.Single(entries, entry => entry.StreamId.Value == 99);
+        Assert.Equal(decodedPayload, preserved.Payload);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Contains(99UL, writer.BeganEntryIds);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_RetiredStateMachineCompaction_WritesPreservedPayloadThroughFormatOwnedEntry()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("retired", initial.Manager, CreateDictionaryCodec<string, int>());
+
+        await initial.Lifecycle.OnStart();
+        dictionary.Add("key", 7);
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.IsCompactionRequested = true;
+        var format = new TrackingLogFormat();
+        var compacting = CreateTestSystem(storage: storage, logFormat: format);
+
+        await compacting.Lifecycle.OnStart();
+        await compacting.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Contains(writer.BeganEntryIds, id => id >= 8);
+        Assert.Single(storage.Replaces);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>("retired", recovered.Manager, CreateDictionaryCodec<string, int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(7, recoveredDictionary["key"]);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DirectWrites_UseFormatOwnedCurrentSegmentWriter()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Single(storage.Appends);
+        Assert.Empty(storage.Replaces);
+        Assert.Contains(0UL, writer.CreatedLogStreamWriterIds);
+        Assert.Contains(writer.CreatedLogStreamWriterIds, id => id >= 8);
+        Assert.True(writer.GetCommittedBufferCount > 0);
+        Assert.True(writer.ResetCount > 0);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_AppendLogFlush_UsesFormatOwnedWriter()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Single(storage.Appends);
+        Assert.Contains(writer.CreatedLogStreamWriterIds, id => id >= 8);
+        Assert.True(storage.Appends[0].Length > 0);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DefaultAppend_StoresBinaryFixed32Entries()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var append = Assert.Single(storage.Appends);
+        Assert.Empty(storage.Replaces);
+        AssertContainsRuntimeAndApplicationEntries(ReadBinaryEntries(append));
+    }
+
+    [Fact]
+    public async Task StateMachineManager_AppendBufferIsBorrowedUntilStorageCompletes()
+    {
+        var storage = new DelayedBorrowingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.NotNull(storage.AppendBytesAfterYield);
+        Assert.NotEmpty(storage.AppendBytesAfterYield);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_ReplaceBufferIsBorrowedUntilStorageCompletes()
+    {
+        var storage = new DelayedBorrowingStorage { IsCompactionRequested = true };
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 42;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.NotNull(storage.ReplaceBytesAfterYield);
+        Assert.NotEmpty(storage.ReplaceBytesAfterYield);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DefaultSnapshot_StoresBinaryFixed32Entries()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var replacement = Assert.Single(storage.Replaces);
+        Assert.Empty(storage.Appends);
+        AssertContainsRuntimeAndApplicationEntries(ReadBinaryEntries(replacement));
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DeleteState_ReallocatesApplicationStreamsAboveInternalRange()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("before", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        await sut.Manager.DeleteStateAsync(CancellationToken.None);
+        dictionary.Add("after", 2);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(2, storage.Appends.Count);
+        var entries = ReadBinaryEntries(storage.Appends[^1]);
+        Assert.DoesNotContain(entries, entry => entry.StreamId.Value == 1);
+        Assert.Contains(entries, entry => entry.StreamId.Value >= 8);
+
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Single(recoveredDictionary);
+        Assert.Equal(2, recoveredDictionary["after"]);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_SnapshotFlush_ResetsPendingAppendData()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true };
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
+
+        await sut.Lifecycle.OnStart();
+        dictionary.Add("key", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var writer = Assert.Single(format.Writers);
+        Assert.Empty(storage.Appends);
+        Assert.Single(storage.Replaces);
+        Assert.True(writer.ResetCount >= 2);
+
+        var recovered = CreateTestSystem(storage: storage, logFormat: new TrackingLogFormat());
+        var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(1, recoveredDictionary["key"]);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_DirectWriteFailure_AbortsEntryBeforeMutation()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var dictionary = new DurableDictionary<int, int>("dict", sut.Manager, new ThrowingDictionarySetCodec<int, int>());
+
+        await sut.Lifecycle.OnStart();
+        var writer = Assert.Single(format.Writers);
+        var lengthBefore = writer.Length;
+
+        Assert.Throws<InvalidOperationException>(() => dictionary.Add(1, 1));
+
+        Assert.Empty(dictionary);
+        Assert.Equal(lengthBefore, writer.Length);
+
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_WriteStateAsync_DoesNotObserveActiveEntry()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var stateMachine = new ManualDirectWriteStateMachine();
+        sut.Manager.RegisterStateMachine("manual", stateMachine);
+
+        await sut.Lifecycle.OnStart();
+
+        Task writeTask = Task.CompletedTask;
+        var entry = stateMachine.BeginEntry();
+        try
+        {
+            entry.Writer.Write([1, 2, 3]);
+            writeTask = Task.Run(async () => await sut.Manager.WriteStateAsync(CancellationToken.None));
+            Thread.Sleep(100);
+
+            Assert.False(writeTask.IsCompleted);
+            Assert.Empty(storage.Appends);
+
+            entry.Commit();
+        }
+        finally
+        {
+            entry.Dispose();
+        }
+
+        await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Single(storage.Appends);
+    }
+
     /// <summary>
     /// Tests that all registered state machines are correctly recovered together.
     /// Verifies that the manager maintains consistency across multiple collections
@@ -60,8 +372,8 @@ public class StateMachineManagerTests : StateMachineTestBase
         var sut = CreateTestSystem();
 
         // Create and populate state machines
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var list = new DurableList<string>("list1", sut.Manager, CodecProvider.GetCodec<string>(), SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var list = new DurableList<string>("list1", sut.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         dictionary.Add("key1", 1);
@@ -73,8 +385,8 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Act - Create new manager with same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var recoveredList = new DurableList<string>("list1", sut2.Manager, CodecProvider.GetCodec<string>(), SessionPool);
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var recoveredList = new DurableList<string>("list1", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - State should be recovered
@@ -85,6 +397,184 @@ public class StateMachineManagerTests : StateMachineTestBase
         Assert.Equal(2, recoveredList.Count);
         Assert.Equal("item1", recoveredList[0]);
         Assert.Equal("item2", recoveredList[1]);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_UsesSelectedLogFormatRead()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", initial.Manager, CreateValueCodec<int>());
+
+        await initial.Lifecycle.OnStart();
+        value.Value = 42;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        var format = new TrackingLogFormat();
+        var recovered = CreateTestSystem(storage: storage, logFormat: format);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(42, recoveredValue.Value);
+        Assert.True(format.ReadCount > 0);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_ReadsConcatenatedLogData()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", initial.Manager, CreateValueCodec<int>());
+
+        await initial.Lifecycle.OnStart();
+        value.Value = 1;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        value.Value = 2;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        storage.ConcatenateReads = true;
+        var recovered = CreateTestSystem(storage: storage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(2, recoveredValue.Value);
+        Assert.Equal(1, storage.ReadConsumeCount);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_BuffersEntriesSplitAcrossStorageChunks()
+    {
+        var storage = new CapturingStorage();
+        var initial = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", initial.Manager, CreateValueCodec<int>());
+
+        await initial.Lifecycle.OnStart();
+        value.Value = 1;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+        value.Value = 2;
+        await initial.Manager.WriteStateAsync(CancellationToken.None);
+
+        var persistedBytes = storage.Appends.SelectMany(static segment => segment).ToArray();
+        var splitStorage = new ChunkedReadStorage(persistedBytes, chunkSize: 1);
+        var recovered = CreateTestSystem(storage: splitStorage);
+        var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
+
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Equal(2, recoveredValue.Value);
+        Assert.Equal(persistedBytes.Length, splitStorage.ReadConsumeCount);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_RejectsMalformedTrailingData()
+    {
+        byte[] bytes;
+        using (var segment = new OrleansBinaryLogBatchWriter())
+        {
+            using (var entry = segment.CreateLogStreamWriter(new LogStreamId(99)).BeginEntry())
+            {
+                entry.Writer.Write([1, 2, 3]);
+                entry.Commit();
+            }
+
+            using var committed = segment.GetCommittedBuffer();
+            bytes = [.. committed.ToArray(), 1, 2, 3];
+        }
+
+        var storage = new RawReadStorage(bytes);
+        var sut = CreateTestSystem(storage: storage);
+
+        InvalidOperationException exception;
+        try
+        {
+            exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            await sut.Lifecycle.OnStop(CancellationToken.None);
+        }
+
+        Assert.Contains("configured log format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
+        var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
+        Assert.Contains("Malformed binary log entry stream", inner.Message, StringComparison.Ordinal);
+        Assert.Contains("truncated fixed32 entry length prefix", inner.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_RecoveryRetry_ReplaysFixedStorage()
+    {
+        var validBytes = CreatePersistedValueBytes("value", 42);
+        var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]);
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.Bytes = validBytes;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.Equal(42, value.Value);
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_RecoveryRetry_PreservesUnknownStreamOnce()
+    {
+        var validBytes = CreateUnknownStreamBytes(new LogStreamId(99), [1, 2, 3]);
+        var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]) { IsCompactionRequested = true };
+        var sut = CreateTestSystem(storage: storage);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.Bytes = validBytes;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        var replacement = Assert.Single(storage.Replaces);
+        var preserved = Assert.Single(ReadBinaryEntries(replacement), entry => entry.StreamId.Value == 99);
+        Assert.Equal([1, 2, 3], preserved.Payload);
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
+    {
+        var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new LogStreamId(8), [1, 2, 3]), 1, 2, 3]);
+        var sut = CreateTestSystem(storage: storage);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+
+        storage.Bytes = [];
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        Assert.False(sut.Manager.TryGetStateMachine("stale", out _));
+        await sut.Lifecycle.OnStop(CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task StateMachineManager_Recovery_DoesNotWrapStorageReadException()
+    {
+        var storage = new ThrowingReadStorage();
+        var sut = CreateTestSystem(storage: storage);
+
+        InvalidOperationException exception;
+        try
+        {
+            exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            await sut.Lifecycle.OnStop(CancellationToken.None);
+        }
+
+        Assert.Same(storage.Exception, exception);
+        Assert.Null(exception.InnerException);
     }
 
     /// <summary>
@@ -98,7 +588,7 @@ public class StateMachineManagerTests : StateMachineTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Multiple operations with WriteState in between
@@ -121,7 +611,7 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Create new manager to verify recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - Recovery should have final state
@@ -143,9 +633,9 @@ public class StateMachineManagerTests : StateMachineTestBase
         var manager = sut.Manager;
 
         // Create multiple state machines with different types
-        var intDict = new DurableDictionary<int, string>("intDict", manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
-        var stringList = new DurableList<string>("stringList", manager, CodecProvider.GetCodec<string>(), SessionPool);
-        var personValue = new DurableValue<TestPerson>("personValue", manager, CodecProvider.GetCodec<TestPerson>(), SessionPool);
+        var intDict = new DurableDictionary<int, string>("intDict", manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var stringList = new DurableList<string>("stringList", manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var personValue = new DurableValue<TestPerson>("personValue", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansLogValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Populate all state machines
@@ -172,9 +662,9 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Create new manager to verify recovery of multiple state machines
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
-        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, CodecProvider.GetCodec<string>(), SessionPool);
-        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, CodecProvider.GetCodec<TestPerson>(), SessionPool);
+        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansLogValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All should be recovered with correct values
@@ -199,8 +689,8 @@ public class StateMachineManagerTests : StateMachineTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dict1 = new DurableDictionary<string, int>("dict1", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
-        var dict2 = new DurableDictionary<string, int>("dict2", manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+        var dict1 = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var dict2 = new DurableDictionary<string, int>("dict2", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Simulate concurrent operations on different state machines
@@ -233,7 +723,7 @@ public class StateMachineManagerTests : StateMachineTestBase
     {
         // Arrange
         var sut = CreateTestSystem();
-        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Add many items
@@ -247,7 +737,7 @@ public class StateMachineManagerTests : StateMachineTestBase
 
         // Create new manager for recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, CodecProvider.GetCodec<int>(), CodecProvider.GetCodec<string>(), SessionPool);
+        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All items should be recovered
@@ -322,7 +812,13 @@ public class StateMachineManagerTests : StateMachineTestBase
         // This is similar to step 2, but there we avoided purging due to time not being due, whereas here we avoid purging due to re-registration.
         timeProvider.Advance(period / 2);
 
+        dictToRetire3["b"] = 2;
         await TriggerCompaction(sut3.Manager, dictToKeep3);
+
+        var sut3Recovered = CreateTestSystem(storage, timeProvider);
+        var dictToRetire3Recovered = CreateTestMachine(DictToRetireKey, sut3Recovered.Manager);
+        await sut3Recovered.Lifecycle.OnStart();
+        Assert.Equal(2, dictToRetire3Recovered["b"]);
 
         // -------------- STEP 4 --------------
 
@@ -367,7 +863,7 @@ public class StateMachineManagerTests : StateMachineTestBase
         // Note: The retirement of state machines has the nice benefit of being able to reuse machine names.
 
         DurableDictionary<string, int> CreateTestMachine(string key, IStateMachineManager manager) =>
-            new(key, manager, CodecProvider.GetCodec<string>(), CodecProvider.GetCodec<int>(), SessionPool);
+            new(key, manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
 
         static async Task TriggerCompaction(IStateMachineManager manager, DurableDictionary<string, int> dict)
         {
@@ -377,5 +873,520 @@ public class StateMachineManagerTests : StateMachineTestBase
                 await manager.WriteStateAsync(CancellationToken.None);
             }
         }
+    }
+
+    private sealed class StreamingOnlyStorage : ILogStorage
+    {
+        public bool StreamingReadCalled { get; private set; }
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            StreamingReadCalled = true;
+            consumer.Complete();
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private OrleansBinaryDictionaryOperationCodec<K, V> CreateDictionaryCodec<K, V>() where K : notnull =>
+        new(new OrleansLogValueCodec<K>(CodecProvider.GetCodec<K>(), SessionPool), new OrleansLogValueCodec<V>(CodecProvider.GetCodec<V>(), SessionPool));
+
+    private OrleansBinaryValueOperationCodec<T> CreateValueCodec<T>() =>
+        new(new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
+
+    private byte[] CreatePersistedValueBytes(string name, int value)
+    {
+        using var segment = new OrleansBinaryLogBatchWriter();
+        AppendDirectorySet(segment, name, new LogStreamId(8));
+        var codec = CreateValueCodec<int>();
+        codec.WriteSet(value, segment.CreateLogStreamWriter(new LogStreamId(8)));
+
+        using var committed = segment.GetCommittedBuffer();
+        return committed.ToArray();
+    }
+
+    private byte[] CreateUnknownStreamBytes(LogStreamId streamId, ReadOnlySpan<byte> payload)
+    {
+        using var segment = new OrleansBinaryLogBatchWriter();
+        using (var entry = segment.CreateLogStreamWriter(streamId).BeginEntry())
+        {
+            entry.Writer.Write(payload);
+            entry.Commit();
+        }
+
+        using var committed = segment.GetCommittedBuffer();
+        return committed.ToArray();
+    }
+
+    private byte[] CreateNamedUnknownStreamBytes(string name, LogStreamId streamId, ReadOnlySpan<byte> payload)
+    {
+        using var segment = new OrleansBinaryLogBatchWriter();
+        AppendDirectorySet(segment, name, streamId);
+        using (var entry = segment.CreateLogStreamWriter(streamId).BeginEntry())
+        {
+            entry.Writer.Write(payload);
+            entry.Commit();
+        }
+
+        using var committed = segment.GetCommittedBuffer();
+        return committed.ToArray();
+    }
+
+    private void AppendDirectorySet(OrleansBinaryLogBatchWriter segment, string name, LogStreamId streamId)
+    {
+        var codec = CreateDictionaryCodec<string, ulong>();
+        codec.WriteSet(name, streamId.Value, segment.CreateLogStreamWriter(new LogStreamId(0)));
+    }
+
+    private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> value)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(value);
+        return writer.ConsumeSlice(writer.Length);
+    }
+
+    private static List<CapturedLogEntry> ReadBinaryEntries(ReadOnlySpan<byte> bytes)
+    {
+        using var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        var consumer = new CapturingLogEntrySink();
+        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
+        Assert.Equal(0, reader.Length);
+
+        return consumer.Entries;
+    }
+
+    private readonly record struct CapturedLogEntry(LogStreamId StreamId, byte[] Payload);
+
+    private static void AssertContainsRuntimeAndApplicationEntries(IReadOnlyCollection<CapturedLogEntry> entries)
+    {
+        Assert.Contains(entries, entry => entry.StreamId.Value == 0 && entry.Payload.Length > 0);
+        Assert.Contains(entries, entry => entry.StreamId.Value >= 8 && entry.Payload.Length > 0);
+    }
+
+    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine
+    {
+        private LogStreamId _streamId;
+
+        public List<CapturedLogEntry> Entries { get; } = [];
+
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
+
+        public void Reset(LogStreamWriter writer) { }
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class DecodedPayloadOnlyLogFormat : ILogFormat
+    {
+        private readonly LogStreamId _streamId;
+        private readonly byte[] _payload;
+        private readonly TrackingLogFormat _writerFormat = new();
+
+        public DecodedPayloadOnlyLogFormat(LogStreamId streamId, byte[] payload)
+        {
+            _streamId = streamId;
+            _payload = payload.ToArray();
+        }
+
+        public List<TrackingLogBatchWriter> Writers => _writerFormat.Writers;
+
+        public ILogBatchWriter CreateWriter() => _writerFormat.CreateWriter();
+
+        public void Read(LogReadBuffer input, IStateMachineResolver resolver)
+        {
+            if (input.Length == 0)
+            {
+                return;
+            }
+
+            var callbackPayload = _payload.ToArray();
+            var stateMachine = resolver.ResolveStateMachine(_streamId);
+            if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
+            {
+                formattedEntryBuffer.AddFormattedEntry(new TestFormattedLogEntry(callbackPayload));
+            }
+            else
+            {
+                stateMachine.Apply(new ReadOnlySequence<byte>(callbackPayload));
+            }
+
+            Array.Fill(callbackPayload, byte.MaxValue);
+            input.Skip(input.Length);
+        }
+    }
+
+    private sealed class TestFormattedLogEntry(ReadOnlyMemory<byte> payload) : IFormattedLogEntry
+    {
+        public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
+    }
+
+    private sealed class NonConsumingLogFormat : ILogFormat
+    {
+        public ILogBatchWriter CreateWriter() => throw new NotSupportedException();
+
+        public void Read(LogReadBuffer input, IStateMachineResolver resolver)
+        {
+        }
+    }
+
+    private sealed class TrackingLogFormat : ILogFormat
+    {
+        public List<TrackingLogBatchWriter> Writers { get; } = [];
+
+        public int ReadCount { get; private set; }
+
+        public ILogBatchWriter CreateWriter()
+        {
+            var writer = new TrackingLogBatchWriter();
+            Writers.Add(writer);
+            return writer;
+        }
+
+        public void Read(LogReadBuffer input, IStateMachineResolver consumer)
+        {
+            ReadCount++;
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(input, consumer);
+        }
+    }
+
+    private sealed class TrackingLogBatchWriter : ILogBatchWriter
+    {
+        private readonly OrleansBinaryLogBatchWriter _inner = new();
+
+        public List<ulong> CreatedLogStreamWriterIds { get; } = [];
+
+        public List<ulong> BeganEntryIds { get; } = [];
+
+        public int GetCommittedBufferCount { get; private set; }
+
+        public int ResetCount { get; private set; }
+
+        public long Length => _inner.Length;
+
+        public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId)
+        {
+            CreatedLogStreamWriterIds.Add(streamId.Value);
+            return new(streamId, new TrackingLogStreamWriterTarget(this));
+        }
+
+        public ArcBuffer GetCommittedBuffer()
+        {
+            GetCommittedBufferCount++;
+            return _inner.GetCommittedBuffer();
+        }
+
+        public void Reset()
+        {
+            ResetCount++;
+            _inner.Reset();
+        }
+
+        public void Dispose() => _inner.Dispose();
+
+        private sealed class TrackingLogStreamWriterTarget(TrackingLogBatchWriter owner) : ILogStreamWriterTarget
+        {
+            public LogEntryWriter BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
+            {
+                owner.BeganEntryIds.Add(streamId.Value);
+                return owner._inner.BeginEntry(streamId, completion);
+            }
+
+            public void AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+            {
+                owner.BeganEntryIds.Add(streamId.Value);
+                using var logEntry = new LogEntry(owner._inner.BeginEntry(streamId));
+                logEntry.Writer.Write(entry.Payload.Span);
+                logEntry.Commit();
+            }
+
+            public bool TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+            {
+                AppendFormattedEntry(streamId, entry);
+                return true;
+            }
+        }
+    }
+
+    private sealed class CapturingStorage : ILogStorage
+    {
+        private readonly List<byte[]> _segments = [];
+
+        public List<byte[]> Appends { get; } = [];
+
+        public List<byte[]> Replaces { get; } = [];
+
+        public bool ConcatenateReads { get; set; }
+
+        public int ReadConsumeCount { get; private set; }
+
+        public bool IsCompactionRequested { get; set; }
+
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(consumer);
+
+            if (ConcatenateReads)
+            {
+                var totalLength = 0;
+                foreach (var segment in _segments)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    totalLength += segment.Length;
+                }
+
+                if (totalLength > 0)
+                {
+                    var concatenated = new byte[totalLength];
+                    var offset = 0;
+                    foreach (var segment in _segments)
+                    {
+                        segment.CopyTo(concatenated.AsSpan(offset));
+                        offset += segment.Length;
+                    }
+
+                    ReadConsumeCount++;
+                    consumer.Consume(concatenated);
+                }
+                else
+                {
+                    consumer.Complete();
+                }
+
+                return default;
+            }
+
+            consumer.Consume(GetSegments());
+            return default;
+
+            IEnumerable<ReadOnlyMemory<byte>> GetSegments()
+            {
+                foreach (var segment in _segments)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    ReadConsumeCount++;
+                    yield return segment;
+                }
+            }
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytes = value.ToArray();
+            Replaces.Add(bytes);
+            _segments.Clear();
+            _segments.Add(bytes);
+            return default;
+        }
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytes = value.ToArray();
+            Appends.Add(bytes);
+            _segments.Add(bytes);
+            return default;
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            _segments.Clear();
+            return default;
+        }
+    }
+
+    private sealed class RawReadStorage(byte[] bytes) : ILogStorage
+    {
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(consumer);
+            cancellationToken.ThrowIfCancellationRequested();
+            consumer.Consume(bytes);
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class MutableReadStorage(byte[] bytes) : ILogStorage
+    {
+        public byte[] Bytes { get; set; } = bytes;
+
+        public List<byte[]> Replaces { get; } = [];
+
+        public bool IsCompactionRequested { get; set; }
+
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(consumer);
+            cancellationToken.ThrowIfCancellationRequested();
+            consumer.Consume(Bytes);
+            return default;
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            var bytes = value.ToArray();
+            Replaces.Add(bytes);
+            Bytes = bytes;
+            return default;
+        }
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Bytes = [.. Bytes, .. value.ToArray()];
+            return default;
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            Bytes = [];
+            return default;
+        }
+    }
+
+    private sealed class ThrowingReadStorage : ILogStorage
+    {
+        public InvalidOperationException Exception { get; } = new("Storage read failed.");
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+            => ValueTask.FromException(Exception);
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class ChunkedReadStorage(byte[] bytes, int chunkSize) : ILogStorage
+    {
+        public int ReadConsumeCount { get; private set; }
+
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(consumer);
+
+            consumer.Consume(GetChunks());
+            return default;
+
+            IEnumerable<ReadOnlyMemory<byte>> GetChunks()
+            {
+                for (var offset = 0; offset < bytes.Length; offset += chunkSize)
+                {
+                    cancellationToken.ThrowIfCancellationRequested();
+                    var length = Math.Min(chunkSize, bytes.Length - offset);
+                    ReadConsumeCount++;
+                    yield return new ReadOnlyMemory<byte>(bytes, offset, length);
+                }
+            }
+        }
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class DelayedBorrowingStorage : ILogStorage
+    {
+        public byte[]? AppendBytesAfterYield { get; private set; }
+
+        public byte[]? ReplaceBytesAfterYield { get; private set; }
+
+        public bool IsCompactionRequested { get; set; }
+
+        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            consumer.Complete();
+            return default;
+        }
+
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            ReplaceBytesAfterYield = value.ToArray();
+        }
+
+        public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            AppendBytesAfterYield = value.ToArray();
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
+    }
+
+    private sealed class ManualDirectWriteStateMachine : IDurableStateMachine
+    {
+        private LogStreamWriter _writer;
+
+        public LogEntry BeginEntry() => _writer.BeginEntry();
+
+        public object OperationCodec => this;
+
+        public void Reset(LogStreamWriter writer) => _writer = writer;
+
+        public void Apply(ReadOnlySequence<byte> logEntry) { }
+
+        public void AppendEntries(LogStreamWriter writer) { }
+
+        public void AppendSnapshot(LogStreamWriter writer) { }
+
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryOperationCodec<K, V> where K : notnull
+    {
+        public void WriteSet(K key, V value, LogStreamWriter writer)
+        {
+            using var entry = writer.BeginEntry();
+            entry.Writer.GetSpan(1)[0] = 1;
+            entry.Writer.Advance(1);
+            throw new InvalidOperationException("Expected test exception.");
+        }
+
+        public void WriteRemove(K key, LogStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, LogStreamWriter writer) => throw new NotSupportedException();
+
+        public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
     }
 }

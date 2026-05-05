@@ -1,19 +1,18 @@
+using System.Buffers;
 using Azure;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Blobs.Models;
-using System.Runtime.CompilerServices;
 using Azure.Storage.Sas;
-using Orleans.Serialization.Buffers;
 using Microsoft.Extensions.Logging;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
+internal sealed partial class AzureAppendBlobLogStorage : ILogStorage
 {
     private static readonly AppendBlobCreateOptions CreateOptions = new() { Conditions = new() { IfNoneMatch = ETag.All } };
     private readonly AppendBlobClient _client;
     private readonly ILogger<AzureAppendBlobLogStorage> _logger;
-    private readonly LogExtentBuilder.ReadOnlyStream _stream;
+    private readonly Func<AppendBlobClient, string, AppendBlobClient> _snapshotClientFactory;
     private readonly AppendBlobAppendBlockOptions _appendOptions;
     private bool _exists;
     private int _numBlocks;
@@ -21,16 +20,24 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
     public bool IsCompactionRequested => _numBlocks > 10;
 
     public AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger)
+        : this(client, logger, static (client, snapshot) => client.WithSnapshot(snapshot))
     {
+    }
+
+    internal AzureAppendBlobLogStorage(AppendBlobClient client, ILogger<AzureAppendBlobLogStorage> logger, Func<AppendBlobClient, string, AppendBlobClient> snapshotClientFactory)
+    {
+        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(snapshotClientFactory);
+
         _client = client;
         _logger = logger;
-        _stream = new();
+        _snapshotClientFactory = snapshotClientFactory;
 
         // For the first request, if we have not performed a read yet, we want to guard against clobbering an existing blob.
         _appendOptions = new AppendBlobAppendBlockOptions() { Conditions = new AppendBlobRequestConditions { IfNoneMatch = ETag.All } };
     }
 
-    public async ValueTask AppendAsync(LogExtentBuilder value, CancellationToken cancellationToken)
+    public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         if (!_exists)
         {
@@ -40,11 +47,10 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
             _exists = true;
         }
 
-        _stream.SetBuilder(value);
-        var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        LogAppend(_logger, value.Length, _client.BlobContainerName, _client.Name);
+        using var stream = new ReadOnlySequenceStream(value);
+        var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
+        LogAppend(_logger, stream.Length, _client.BlobContainerName, _client.Name);
 
-        _stream.Reset();
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.ETag;
         _numBlocks = result.Value.BlobCommittedBlockCount;
@@ -58,24 +64,26 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         // Expect no blob to have been created when we append to it.
         _appendOptions.Conditions.IfNoneMatch = ETag.All;
         _appendOptions.Conditions.IfMatch = default;
+        _exists = false;
         _numBlocks = 0;
     }
 
-    public async IAsyncEnumerable<LogExtent> ReadAsync([EnumeratorCancellation] CancellationToken cancellationToken)
+    public async ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
     {
+        ArgumentNullException.ThrowIfNull(consumer);
+
         Response<BlobDownloadStreamingResult> result;
         try
         {
-            // If the blob was not newly created, then download the blob.
             result = await _client.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
             _exists = false;
-            yield break;
+            consumer.Complete();
+            return;
         }
 
-        // If the blob has a size of zero, check for a snapshot and restore the blob from the snapshot if one exists.
         if (result.Value.Details.ContentLength == 0)
         {
             if (result.Value.Details.Metadata.TryGetValue("snapshot", out var snapshot) && snapshot is { Length: > 0 })
@@ -89,37 +97,19 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _appendOptions.Conditions.IfMatch = result.Value.Details.ETag;
         _exists = true;
 
-        // Read everything into a single log segment. We could change this to read in chunks,
-        // yielding when the stream does not return synchronously, if we wanted to support larger state machines.
-        var rawStream = result.Value.Content;
-        using var buffer = new ArcBufferWriter();
-        while (true)
-        {
-            var mem = buffer.GetMemory();
-            var bytesRead = await rawStream.ReadAsync(mem, cancellationToken);
-            if (bytesRead == 0)
-            {
-                if (buffer.Length > 0)
-                {
-                    LogRead(_logger, buffer.Length, _client.BlobContainerName, _client.Name);
-                    yield return new LogExtent(buffer.ConsumeSlice(buffer.Length));
-                }
-
-                yield break;
-            }
-
-            buffer.AdvanceWriter(bytesRead);
-        }
+        await using var rawStream = result.Value.Content;
+        var totalBytesRead = await consumer.ConsumeAsync(rawStream, cancellationToken).ConfigureAwait(false);
+        LogRead(_logger, totalBytesRead, _client.BlobContainerName, _client.Name);
     }
 
     private async Task<Response<BlobDownloadStreamingResult>> CopyFromSnapshotAsync(ETag eTag, string snapshotDetail, CancellationToken cancellationToken)
     {
         // Read snapshot and append it to the blob.
-        var snapshot = _client.WithSnapshot(snapshotDetail);
+        var snapshot = _snapshotClientFactory(_client, snapshotDetail);
         var uri = snapshot.GenerateSasUri(permissions: BlobSasPermissions.Read, expiresOn: DateTimeOffset.UtcNow.AddHours(1));
         var copyResult = await _client.SyncCopyFromUriAsync(
             uri,
-            new BlobCopyFromUriOptions { DestinationConditions = new BlobRequestConditions { IfNoneMatch = eTag } },
+            new BlobCopyFromUriOptions { DestinationConditions = new BlobRequestConditions { IfMatch = eTag } },
             cancellationToken).ConfigureAwait(false);
         if (copyResult.Value.CopyStatus is not CopyStatus.Success)
         {
@@ -131,7 +121,7 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         return result;
     }
 
-    public async ValueTask ReplaceAsync(LogExtentBuilder value, CancellationToken cancellationToken)
+    public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         // Create a snapshot of the blob for recovery purposes.
         var blobSnapshot = await _client.CreateSnapshotAsync(conditions: _appendOptions.Conditions, cancellationToken: cancellationToken).ConfigureAwait(false);
@@ -147,17 +137,16 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         _appendOptions.Conditions.IfNoneMatch = default;
 
         // Write the state machine snapshot.
-        _stream.SetBuilder(value);
-        var result = await _client.AppendBlockAsync(_stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        LogReplace(_logger, _client.BlobContainerName, _client.Name, value.Length);
+        using var stream = new ReadOnlySequenceStream(value);
+        var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
+        LogReplace(_logger, _client.BlobContainerName, _client.Name, stream.Length);
 
-        _stream.Reset();
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.ETag;
         _numBlocks = result.Value.BlobCommittedBlockCount;
 
         // Delete the blob snapshot.
-        await _client.WithSnapshot(blobSnapshot.Value.Snapshot).DeleteAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        await _snapshotClientFactory(_client, blobSnapshot.Value.Snapshot).DeleteAsync(conditions: null, cancellationToken: cancellationToken).ConfigureAwait(false);
     }
 
     [LoggerMessage(
@@ -175,4 +164,127 @@ internal sealed partial class AzureAppendBlobLogStorage : IStateMachineStorage
         Message = "Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
 
+    private sealed class ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
+    {
+        private readonly ReadOnlySequence<byte> _sequence = sequence;
+        private long _position;
+        private bool _disposed;
+
+        public override bool CanRead => !_disposed;
+
+        public override bool CanSeek => !_disposed;
+
+        public override bool CanWrite => false;
+
+        public override long Length
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _sequence.Length;
+            }
+        }
+
+        public override long Position
+        {
+            get
+            {
+                ThrowIfDisposed();
+                return _position;
+            }
+            set
+            {
+                ThrowIfDisposed();
+                if (value < 0 || value > _sequence.Length)
+                {
+                    throw new ArgumentOutOfRangeException(nameof(value));
+                }
+
+                _position = value;
+            }
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            ThrowIfDisposed();
+            if (buffer.IsEmpty)
+            {
+                return 0;
+            }
+
+            var remaining = _sequence.Length - _position;
+            if (remaining <= 0)
+            {
+                return 0;
+            }
+
+            var count = (int)Math.Min(buffer.Length, remaining);
+            _sequence.Slice(_position, count).CopyTo(buffer);
+            _position += count;
+            return count;
+        }
+
+        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            return new(Read(buffer.Span));
+        }
+
+        public override Task<int> ReadAsync(byte[] buffer, int offset, int count, CancellationToken cancellationToken)
+        {
+            if (cancellationToken.IsCancellationRequested)
+            {
+                return Task.FromCanceled<int>(cancellationToken);
+            }
+
+            return Task.FromResult(Read(buffer.AsSpan(offset, count)));
+        }
+
+        public override long Seek(long offset, SeekOrigin origin)
+        {
+            ThrowIfDisposed();
+            var position = origin switch
+            {
+                SeekOrigin.Begin => offset,
+                SeekOrigin.Current => _position + offset,
+                SeekOrigin.End => _sequence.Length + offset,
+                _ => throw new ArgumentOutOfRangeException(nameof(origin))
+            };
+
+            Position = position;
+            return _position;
+        }
+
+        public override void SetLength(long value) => throw GetReadOnlyException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw GetReadOnlyException();
+
+        public override void Write(ReadOnlySpan<byte> buffer) => throw GetReadOnlyException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing)
+            {
+                _disposed = true;
+            }
+
+            base.Dispose(disposing);
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(ReadOnlySequenceStream));
+            }
+        }
+
+        private static NotSupportedException GetReadOnlyException() => new("This stream is read-only.");
+    }
 }
