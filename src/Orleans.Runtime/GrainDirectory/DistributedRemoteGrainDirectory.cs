@@ -271,12 +271,27 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
     {
         using var cts = CreateTimeoutCts();
         await EnsureDirectoryInitializedAsync(cts.Token);
-        await _directory.UnregisterAsync(address, cts.Token);
+        await UnregisterAsync(address, cause, cts.Token);
     }
 
     public async Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount)
     {
-        await RunBatchOperationAsync(addresses, (address, cancellationToken) => _directory.UnregisterAsync(address, cancellationToken));
+        await RunBatchOperationAsync(addresses, (address, cancellationToken) => UnregisterAsync(address, cause, cancellationToken));
+    }
+
+    private Task UnregisterAsync(GrainAddress address, UnregistrationCause cause, CancellationToken cancellationToken)
+    {
+        switch (cause)
+        {
+            case UnregistrationCause.Force:
+                return _directory.UnregisterAsync(address, cancellationToken);
+            case UnregistrationCause.NonexistentActivation:
+                // LocalGrainDirectory only removes these entries after LazyDeregistrationDelay.
+                // This compatibility path does not track entry age, so preserve the conditional semantics by not force-removing the entry.
+                return Task.CompletedTask;
+            default:
+                throw new ArgumentOutOfRangeException(nameof(cause), cause, $"Deregistration cause {cause} is unknown and is not supported. This is a bug.");
+        }
     }
 
     public async Task DeleteGrainAsync(GrainId grainId, int hopCount)
