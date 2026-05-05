@@ -1,4 +1,5 @@
 using System.Collections.Immutable;
+using Orleans.Configuration;
 using Orleans.Runtime.GrainDirectory;
 using CsCheck;
 using Xunit;
@@ -32,7 +33,7 @@ public sealed class DirectoryMembershipSnapshotTests
         GenClusterMembershipSnapshot.SelectMany(snapshot =>
         {
             var activeMemberCount = snapshot.Members.Count(static member => member.Value.Status == SiloStatus.Active);
-            return Gen.Int[1, DirectoryMembershipSnapshot.PartitionsPerSilo * 2].SelectMany(partitionCount =>
+            return Gen.Int[1, GrainDirectoryOptions.DEFAULT_PARTITIONS_PER_SILO * 2].SelectMany(partitionCount =>
                 Gen.UInt.Array[partitionCount].Array[activeMemberCount].Select(hashes =>
                 {
                     var i = 0;
@@ -93,6 +94,14 @@ public sealed class DirectoryMembershipSnapshotTests
                     }
                 }
             });
+    }
+
+    [Fact]
+    public void GetRangeReturnsEmptyForPartitionMissingFromSnapshot()
+    {
+        var member = SiloAddress.New(new System.Net.IPEndPoint(System.Net.IPAddress.Loopback, 1), 1);
+
+        Assert.Equal(RingRange.Empty, DirectoryMembershipSnapshot.Default.GetRange(member, 2));
     }
 
     private static RingRange GetExpectedRange(uint[][] hashesByMember, int memberIndex, int partitionIndex)

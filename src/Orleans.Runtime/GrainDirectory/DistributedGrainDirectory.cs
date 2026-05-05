@@ -372,7 +372,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                         {
                             foreach (var partition in _partitions)
                             {
-                                tasks.Add(partition.OnSiloRemovedFromClusterAsync(change));
+                                tasks.Add(ObserveMembershipUpdateTask(partition.OnSiloRemovedFromClusterAsync(change)));
                             }
                         }
                     }
@@ -382,7 +382,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
                     foreach (var partition in _partitions)
                     {
-                        tasks.Add(partition.ProcessMembershipUpdateAsync(current));
+                        tasks.Add(ObserveMembershipUpdateTask(partition.ProcessMembershipUpdateAsync(current)));
                     }
 
                     var deltaSize = currentRanges.SizePercent - previousRanges.SizePercent;
@@ -405,6 +405,18 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
 
         await Task.WhenAll(tasks).SuppressThrowing();
+    }
+
+    private async Task ObserveMembershipUpdateTask(Task task)
+    {
+        try
+        {
+            await task;
+        }
+        catch (Exception exception) when (!_stoppedCts.IsCancellationRequested)
+        {
+            LogErrorProcessingMembershipUpdates(exception);
+        }
     }
 
     SiloAddress? ITestHooks.GetPrimaryForGrain(GrainId grainId)

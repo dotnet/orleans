@@ -7,15 +7,12 @@ using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
 using Microsoft.CodeAnalysis;
-using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
 
 namespace Orleans.Runtime.GrainDirectory;
 
 internal sealed class DirectoryMembershipSnapshot
 {
-    internal const int PartitionsPerSilo = GrainDirectoryOptions.DEFAULT_PARTITIONS_PER_SILO;
-
     /// <summary>
     /// The default hash function for directory ring boundaries, matching the <see cref="LocalGrainDirectory"/> partitioning scheme.
     /// </summary>
@@ -33,16 +30,6 @@ internal sealed class DirectoryMembershipSnapshot
     private readonly RingRangeCollection[] _rangesByMember;
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
-
-    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory)
-        : this(snapshot, grainFactory, PartitionsPerSilo, DefaultGetRingBoundaries)
-    {
-    }
-
-    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, int, uint[]> getRingBoundaries)
-        : this(snapshot, grainFactory, PartitionsPerSilo, getRingBoundaries)
-    {
-    }
 
     internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionCount, Func<SiloAddress, int, uint[]> getRingBoundaries)
     {
@@ -159,7 +146,10 @@ internal sealed class DirectoryMembershipSnapshot
     public RingRange GetRange(SiloAddress address, int partitionIndex)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionIndex, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(partitionIndex, PartitionCount - 1);
+        if (partitionIndex >= PartitionCount)
+        {
+            return RingRange.Empty;
+        }
 
         var memberIndex = TryGetMemberIndex(address);
         if (memberIndex < 0)
