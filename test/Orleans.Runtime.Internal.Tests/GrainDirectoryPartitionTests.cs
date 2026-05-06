@@ -1,5 +1,6 @@
 using System.Collections.Immutable;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Logging.Abstractions;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Runtime;
@@ -28,20 +29,20 @@ namespace UnitTests;
 /// This is essential for maintaining Orleans' single activation guarantee.
 /// </summary>
 [TestCategory("BVT"), TestCategory("GrainDirectory")]
-public class GrainDirectoryPartitionTests
+public class LocalGrainDirectoryPartitionTests
 {
     private readonly LocalGrainDirectoryPartition _target;
     private readonly MockSiloStatusOracle _siloStatusOracle;
     private static readonly SiloAddress LocalSiloAddress =  SiloAddress.FromParsableString("127.0.0.1:11111@123");
     private static readonly SiloAddress OtherSiloAddress =  SiloAddress.FromParsableString("127.0.0.2:11111@456");
 
-    public GrainDirectoryPartitionTests()
+    public LocalGrainDirectoryPartitionTests()
     {
         _siloStatusOracle = new MockSiloStatusOracle();
         _target = new LocalGrainDirectoryPartition(
             _siloStatusOracle,
             Options.Create(new GrainDirectoryOptions()),
-            new LoggerFactory());
+            NullLogger<LocalGrainDirectoryPartition>.Instance);
     }
 
     /// <summary>
