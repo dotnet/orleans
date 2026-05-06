@@ -1,5 +1,7 @@
 using System.Collections.Concurrent;
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Journaling.Json;
 using Orleans.TestingHost;
 using Xunit;
 
@@ -20,6 +22,7 @@ public class IntegrationTestFixture : IAsyncLifetime
         builder.ConfigureSilo((options, siloBuilder) =>
         {
             siloBuilder.AddLogStorage();
+            siloBuilder.UseJsonJournalingFormat(JournalingTestsJsonContext.Default);
             siloBuilder.Services.AddSingleton<ILogStorageProvider>(storageProvider);
         });
         ConfigureTestCluster(builder);
@@ -43,3 +46,11 @@ public class IntegrationTestFixture : IAsyncLifetime
         }
     }
 }
+
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(ulong))]
+[JsonSerializable(typeof(TestDurableGrainState))]
+[JsonSerializable(typeof(TestPerson))]
+internal sealed partial class JournalingTestsJsonContext : JsonSerializerContext;

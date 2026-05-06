@@ -194,7 +194,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_DefaultAppend_StoresBinaryFixed32Entries()
+    public async Task StateMachineManager_BinaryAppend_StoresBinaryFixed32Entries()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -240,7 +240,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_DefaultSnapshot_StoresBinaryFixed32Entries()
+    public async Task StateMachineManager_BinarySnapshot_StoresBinaryFixed32Entries()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);

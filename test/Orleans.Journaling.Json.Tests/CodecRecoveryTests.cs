@@ -195,7 +195,15 @@ public class CodecRecoveryTests : JournalingTestBase
 
         var logStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
-        var manager = new LogStateMachineManager(storage, LoggerFactory.CreateLogger<LogStateMachineManager>(), Microsoft.Extensions.Options.Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new JsonLinesLogFormat());
+        var manager = new LogStateMachineManager(
+            storage,
+            LoggerFactory.CreateLogger<LogStateMachineManager>(),
+            Microsoft.Extensions.Options.Options.Create(ManagerOptions),
+            logStreamIdsCodec,
+            retirementTrackerCodec,
+            TimeProvider.System,
+            new JsonLinesLogFormat(),
+            JsonJournalingExtensions.LogFormatKey);
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

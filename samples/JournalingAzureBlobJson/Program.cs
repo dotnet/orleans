@@ -61,7 +61,6 @@ internal static class Program
                     options.BlobServiceClient = blobServiceClient;
                     options.ContainerName = settings.ContainerName;
                     options.GetBlobName = _ => settings.BlobName;
-                    options.LogFormatKey = JsonJournalingExtensions.LogFormatKey;
                 })
                 .UseJsonJournalingFormat(JournalingSampleJsonContext.Default);
         });

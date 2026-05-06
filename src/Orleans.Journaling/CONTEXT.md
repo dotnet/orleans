@@ -89,6 +89,7 @@ _Avoid_: Per-operation undo
 - The storage provider can choose a **Log Format** key from the grain type; the manager resolves the keyed **Log Format** service from that key.
 - A **Log Format** key selects the cohesive **Codec Family**: physical log format, durable operation codecs, and value codecs.
 - A grain has one active **Log Format** key. All runtime and user durable state machines managed by that grain's manager must use that same key.
+- JSONL is the default built-in **Log Format** key for new storage-provider configurations; Orleans binary remains available only when a provider explicitly selects its key.
 - Durable state machine services are unkeyed within a grain and resolve codecs using the grain's active **Log Format** key.
 - **Log Format** keys are separate from storage provider names or storage identity.
 - Malformed recovery data is a hard failure. The next recovery attempt resets volatile state and replays from storage.

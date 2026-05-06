@@ -2,6 +2,7 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage;
 using Azure.Core;
+using Orleans.Journaling.Json;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
@@ -11,7 +12,7 @@ namespace Orleans.Journaling;
 /// </summary>
 public sealed class AzureAppendBlobLogStorageOptions
 {
-    private const string DefaultLogFormatKey = "orleans-binary";
+    private const string DefaultLogFormatKey = JsonJournalingExtensions.LogFormatKey;
     private BlobServiceClient? _blobServiceClient;
 
     /// <summary>

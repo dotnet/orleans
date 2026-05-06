@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using Orleans.Journaling.Json;
 
 namespace Orleans.Journaling;
 
@@ -9,7 +10,7 @@ public sealed class VolatileLogStorageProvider : ILogStorageProvider, ILogFormat
     private readonly Func<GrainType, string>? _logFormatKeySelector;
     private readonly ConcurrentDictionary<GrainId, VolatileLogStorage> _storage = new();
 
-    public VolatileLogStorageProvider() : this(OrleansBinaryLogFormat.LogFormatKey)
+    public VolatileLogStorageProvider() : this(JsonJournalingExtensions.LogFormatKey)
     {
     }
 

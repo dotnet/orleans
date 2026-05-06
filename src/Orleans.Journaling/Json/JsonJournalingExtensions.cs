@@ -79,6 +79,8 @@ public static class JsonJournalingExtensions
     /// </example>
     public static ISiloBuilder UseJsonJournalingFormat(this ISiloBuilder builder, Action<JsonJournalingOptions>? configure = null)
     {
+        ArgumentNullException.ThrowIfNull(builder);
+
         var options = new JsonJournalingOptions();
         configure?.Invoke(options);
 
@@ -86,11 +88,7 @@ public static class JsonJournalingExtensions
         // JsonSerializerOptions singleton that could collide with other components.
         var jsonOptions = options.SerializerOptions;
 
-        // Register the JSON log format and operation codec providers.
-        builder.Services
-            .AddJournalingFormatFamily(LogFormatKey)
-            .AddLogFormat<JsonLinesLogFormat>()
-            .AddOperationCodecProvider<JsonOperationCodecProvider>(_ => new JsonOperationCodecProvider(jsonOptions));
+        builder.Services.AddJsonJournalingFormat(jsonOptions, tryAdd: false);
 
         return builder;
     }
@@ -115,6 +113,22 @@ public static class JsonJournalingExtensions
         ArgumentNullException.ThrowIfNull(typeInfoResolver);
 
         return builder.UseJsonJournalingFormat(options => options.AddTypeInfoResolver(typeInfoResolver));
+    }
+
+    internal static IServiceCollection AddJsonJournalingFormat(this IServiceCollection services, JsonSerializerOptions jsonOptions, bool tryAdd)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentNullException.ThrowIfNull(jsonOptions);
+
+        var family = tryAdd
+            ? services.TryAddJournalingFormatFamily(LogFormatKey)
+            : services.AddJournalingFormatFamily(LogFormatKey);
+
+        family
+            .AddLogFormat<JsonLinesLogFormat>()
+            .AddOperationCodecProvider<JsonOperationCodecProvider>(_ => new JsonOperationCodecProvider(jsonOptions));
+
+        return services;
     }
 }
 

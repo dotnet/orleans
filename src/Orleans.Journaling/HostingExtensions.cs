@@ -1,6 +1,7 @@
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration;
+using Orleans.Journaling.Json;
 
 namespace Orleans.Journaling;
 
@@ -15,6 +16,9 @@ public static class HostingExtensions
 
         // Register the default data codec (Orleans IFieldCodec adapter).
         builder.Services.TryAddSingleton(typeof(ILogValueCodec<>), typeof(OrleansLogValueCodec<>));
+
+        // Register JSON as the default format family and keep Orleans binary available for existing data.
+        builder.Services.AddJsonJournalingFormat(new JsonJournalingOptions().SerializerOptions, tryAdd: true);
         builder.Services
             .TryAddJournalingFormatFamily(OrleansBinaryLogFormat.LogFormatKey)
             .AddLogFormat(OrleansBinaryLogFormat.Instance)
@@ -40,6 +44,6 @@ public static class HostingExtensions
             logFormatKeyProvider = storageProvider;
         }
 
-        return logFormatKeyProvider?.GetLogFormatKey(grainContext) ?? OrleansBinaryLogFormat.LogFormatKey;
+        return logFormatKeyProvider?.GetLogFormatKey(grainContext) ?? JsonJournalingExtensions.LogFormatKey;
     }
 }

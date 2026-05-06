@@ -19,7 +19,6 @@
 
   <ItemGroup>
     <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling\Orleans.Journaling.csproj" />
-    <ProjectReference Include="$(SourceRoot)src\Orleans.Journaling.Json\Orleans.Journaling.Json.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Server\Orleans.Server.csproj" />
     <ProjectReference Include="$(SourceRoot)src\Orleans.Sdk\Orleans.Sdk.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Orleans.Journaling.Tests\Orleans.Journaling.Tests.csproj" />

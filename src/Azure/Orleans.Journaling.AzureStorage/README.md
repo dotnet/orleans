@@ -15,10 +15,19 @@ dotnet add package Microsoft.Orleans.Journaling.AzureStorage
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Orleans.Journaling.Json;
+using System.Text.Json.Serialization;
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyGrainNamespace;
+
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(ulong))]
+internal partial class JournalJsonContext : JsonSerializerContext;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -29,7 +38,9 @@ var builder = Host.CreateApplicationBuilder(args)
             .AddAzureAppendBlobLogStorage(optionsBuilder =>
             {
                 optionsBuilder.Configure((options, serviceProvider) => options.BlobServiceClient = serviceProvider.GetRequiredService<BlobServiceClient>());
-            });
+            })
+            // JSON Lines is the default journaling format. Register metadata for all journaled payload types.
+            .UseJsonJournalingFormat(JournalJsonContext.Default);
     });
 
 var host = await builder.StartAsync();

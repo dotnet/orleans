@@ -1,15 +1,15 @@
-# Microsoft Orleans Journaling for System.Text.Json
+# Microsoft Orleans Journaling
 
 ## Introduction
-Microsoft Orleans Journaling for System.Text.Json provides a JSON Lines-based storage format for Orleans.Journaling durable state machines. Use this package to serialize durable dictionary, list, queue, set, value, state, and task completion source log entries directly as JSON records.
+Microsoft Orleans Journaling persists durable state machine changes as ordered log data which can be replayed to recover in-memory durable collections and values.
 
-This package provides the physical log format and durable entry format used by Orleans.Journaling. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: this package supplies the JSON Lines log format and the JSON durable-entry codec providers which durable state machines use to encode and recover their own operations.
+The package includes a JSON Lines-based storage format powered by System.Text.Json and uses it by default. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: Microsoft.Orleans.Journaling supplies the log format and durable-entry codec providers which durable state machines use to encode and recover their own operations.
 
 ## Getting Started
 To use this package, install it via NuGet:
 
 ```shell
-dotnet add package Microsoft.Orleans.Journaling.Json
+dotnet add package Microsoft.Orleans.Journaling
 ```
 
 ## Example - Configuring JSON journaling
@@ -32,10 +32,7 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobLogStorage(options =>
-            {
-                options.LogFormatKey = JsonJournalingExtensions.LogFormatKey;
-            })
+            .AddAzureAppendBlobLogStorage()
             .UseJsonJournalingFormat(JournalJsonContext.Default);
     });
 
@@ -46,10 +43,7 @@ If you need to customize `JsonSerializerOptions`, add the generated context thro
 
 ```csharp
 siloBuilder
-    .AddAzureAppendBlobLogStorage(options =>
-    {
-        options.LogFormatKey = JsonJournalingExtensions.LogFormatKey;
-    })
+    .AddAzureAppendBlobLogStorage()
     .UseJsonJournalingFormat(options =>
     {
         options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;
@@ -57,7 +51,7 @@ siloBuilder
     });
 ```
 
-If you use a different Journaling storage provider, configure it to use the `JsonJournalingExtensions.LogFormatKey` format key and call `UseJsonJournalingFormat(...)` after registering that provider.
+JSON Lines is the default format key for built-in Journaling storage providers. If a provider is configured to use a different format, configure it to use `JsonJournalingExtensions.LogFormatKey` and call `UseJsonJournalingFormat(...)` after registering that provider.
 
 ## Example - Using durable state machines
 ```csharp
@@ -84,7 +78,7 @@ public sealed class ShoppingCartGrain(
 }
 ```
 
-All durable state machine types use the configured JSON codec automatically. `JsonJournalingOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command and property names are fixed by the storage format, so serializer naming policies only affect user payload values.
+All durable state machine types use the configured JSON codec automatically. `JsonJournalingOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
 
 For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalingOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalingFormat(JournalJsonContext.Default)` overload is the recommended low-friction path. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
@@ -100,7 +94,7 @@ Each record contains the state machine id and the durable entry payload:
 
 The `entry` object is the durable state machine command. It is nested so storage metadata such as `streamId` cannot collide with durable command fields such as `cmd`, `key`, `value`, `items`, or `version`. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
-The configured journaling codec must match the data already stored for a grain. This package does not automatically migrate existing binary, protobuf, or older binary-framed JSON journaling data to JSON Lines.
+The configured journaling format must match the data already stored for a grain. Switching formats over existing data is a migration concern outside this package.
 
 ## Documentation
 For more comprehensive documentation, please refer to:
