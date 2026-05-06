@@ -771,6 +771,26 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         }
     }
 
+    async ValueTask IGrainDirectoryTestHooks.RecoverAndCheckIntegrityAsync()
+    {
+        GrainRuntime.CheckRuntimeContext(this);
+
+        while (true)
+        {
+            var current = CurrentView;
+            await WaitForRange(RingRange.Full, current.Version);
+            if (!ReferenceEquals(current, CurrentView))
+            {
+                continue;
+            }
+
+            await RecoverPartitionRange(current, _currentRange);
+            break;
+        }
+
+        await ((IGrainDirectoryTestHooks)this).CheckIntegrityAsync();
+    }
+
     private sealed record class PartitionSnapshotState(
         MembershipVersion DirectoryMembershipVersion,
         List<GrainAddress> GrainAddresses,

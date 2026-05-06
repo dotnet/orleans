@@ -38,4 +38,7 @@ internal interface IGrainDirectoryTestHooks : ISystemTarget
 {
     [Alias("CheckIntegrityAsync")]
     ValueTask CheckIntegrityAsync();
+
+    [Alias("RecoverAndCheckIntegrityAsync")]
+    ValueTask RecoverAndCheckIntegrityAsync();
 }
