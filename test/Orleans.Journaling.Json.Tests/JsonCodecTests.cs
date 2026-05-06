@@ -97,6 +97,18 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonListCodec_Snapshot_ThrowsWhenCollectionCountDoesNotMatchEnumeration()
+    {
+        var codec = new JsonListOperationCodec<string>(Options);
+
+        var tooManyItems = new MiscountedReadOnlyCollection<string>(1, ["one", "two"]);
+        var tooFewItems = new MiscountedReadOnlyCollection<string>(2, ["one"]);
+
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooManyItems, writer)));
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooFewItems, writer)));
+    }
+
+    [Fact]
     public void JsonQueueCodec_Operations_RoundTrip()
     {
         var codec = new JsonQueueOperationCodec<int>(Options);
@@ -224,6 +236,35 @@ public class JsonCodecTests
         codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
 
         Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
+    }
+
+    [Fact]
+    public void JsonListCodec_LogStreamWriterOverload_WritesAddDirectlyForJsonWriter()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+        var codec = new JsonListOperationCodec<string>(Options);
+
+        codec.WriteAdd("one", writer.CreateLogStreamWriter(new LogStreamId(8)));
+
+        Assert.Equal("""[8,"add","one"]""" + "\n", GetString(writer));
+    }
+
+    [Fact]
+    public void JsonLinesLogFormat_TryAppendFormattedEntry_RollsBackWhenJsonWriteThrows()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+        var codec = new JsonListOperationCodec<ThrowingJsonValue>(Options);
+
+        AppendValueSet(writer, 8, 42);
+        Assert.Throws<InvalidOperationException>(() => codec.WriteAdd(new("bad"), writer.CreateLogStreamWriter(new LogStreamId(9))));
+        AppendValueSet(writer, 10, 43);
+
+        Assert.Equal(
+            """[8,"set",42]""" + "\n" +
+            """[10,"set",43]""" + "\n",
+            GetString(writer));
     }
 
     [Fact]

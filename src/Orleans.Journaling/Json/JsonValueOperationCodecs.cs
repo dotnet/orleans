@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Orleans.Journaling.Json;
 
@@ -9,7 +10,7 @@ namespace Orleans.Journaling.Json;
 public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = null)
     : IDurableValueOperationCodec<T>, IJsonLogEntryCodec
 {
-    private readonly JsonValueSerializer<T> _valueSerializer = new(options);
+    private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
     public void WriteSet(T value, LogStreamWriter writer) => Write(writer, CreateSetOperation(value));
@@ -19,7 +20,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         return new()
         {
             Command = JsonLogEntryCommands.Set,
-            Value = _valueSerializer.SerializeToElement(value)
+            Value = JsonSerializer.SerializeToElement(value, _valueTypeInfo)
         };
     }
 
@@ -41,7 +42,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         switch (operation.Command)
         {
             case JsonLogEntryCommands.Set:
-                consumer.ApplySet(_valueSerializer.Deserialize(operation.Value.GetValueOrDefault())!);
+                consumer.ApplySet(operation.Value.GetValueOrDefault().Deserialize(_valueTypeInfo)!);
                 break;
             default:
                 throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
@@ -64,22 +65,8 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         JsonOperationCodecWriter.Write(
             writer,
             operation,
-            static (jsonWriter, operation) => JsonValueOperationConverter.WriteArrayElements(jsonWriter, operation),
-            static (output, operation) => WriteBytes(output, operation));
+            static (jsonWriter, operation) => JsonValueOperationConverter.WriteArrayElements(jsonWriter, operation));
     }
-
-    private static void Write(IBufferWriter<byte> output, JsonValueOperation operation)
-    {
-        using var writer = new Utf8JsonWriter(output);
-        WriteJson(writer, operation);
-    }
-
-    private static void WriteJson(Utf8JsonWriter writer, JsonValueOperation operation)
-    {
-        JsonSerializer.Serialize(writer, operation, JsonOperationCodecsJsonContext.Default.JsonValueOperation);
-    }
-
-    private static void WriteBytes(IBufferWriter<byte> output, JsonValueOperation operation) => Write(output, operation);
 }
 
 /// <summary>
@@ -88,7 +75,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
 public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = null)
     : IDurableStateOperationCodec<T>, IJsonLogEntryCodec
 {
-    private readonly JsonValueSerializer<T> _stateSerializer = new(options);
+    private readonly JsonTypeInfo<T> _stateTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
     public void WriteSet(T state, ulong version, LogStreamWriter writer) => Write(writer, CreateSetOperation(state, version));
@@ -98,7 +85,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         return new()
         {
             Command = JsonLogEntryCommands.Set,
-            State = _stateSerializer.SerializeToElement(state),
+            State = JsonSerializer.SerializeToElement(state, _stateTypeInfo),
             Version = version
         };
     }
@@ -127,7 +114,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         {
             case JsonLogEntryCommands.Set:
                 consumer.ApplySet(
-                    _stateSerializer.Deserialize(operation.State.GetValueOrDefault())!,
+                    operation.State.GetValueOrDefault().Deserialize(_stateTypeInfo)!,
                     operation.Version.GetValueOrDefault());
                 break;
             case JsonLogEntryCommands.Clear:
@@ -154,22 +141,8 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         JsonOperationCodecWriter.Write(
             writer,
             operation,
-            static (jsonWriter, operation) => JsonStateOperationConverter.WriteArrayElements(jsonWriter, operation),
-            static (output, operation) => WriteBytes(output, operation));
+            static (jsonWriter, operation) => JsonStateOperationConverter.WriteArrayElements(jsonWriter, operation));
     }
-
-    private static void Write(IBufferWriter<byte> output, JsonStateOperation operation)
-    {
-        using var writer = new Utf8JsonWriter(output);
-        WriteJson(writer, operation);
-    }
-
-    private static void WriteJson(Utf8JsonWriter writer, JsonStateOperation operation)
-    {
-        JsonSerializer.Serialize(writer, operation, JsonOperationCodecsJsonContext.Default.JsonStateOperation);
-    }
-
-    private static void WriteBytes(IBufferWriter<byte> output, JsonStateOperation operation) => Write(output, operation);
 }
 
 /// <summary>
@@ -178,7 +151,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
 public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = null)
     : IDurableTaskCompletionSourceOperationCodec<T>, IJsonLogEntryCodec
 {
-    private readonly JsonValueSerializer<T> _valueSerializer = new(options);
+    private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
     public void WritePending(LogStreamWriter writer) => Write(writer, CreatePendingOperation());
@@ -193,7 +166,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         return new()
         {
             Command = JsonLogEntryCommands.Completed,
-            Value = _valueSerializer.SerializeToElement(value)
+            Value = JsonSerializer.SerializeToElement(value, _valueTypeInfo)
         };
     }
 
@@ -235,7 +208,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
                 consumer.ApplyPending();
                 break;
             case JsonLogEntryCommands.Completed:
-                consumer.ApplyCompleted(_valueSerializer.Deserialize(operation.Value.GetValueOrDefault())!);
+                consumer.ApplyCompleted(operation.Value.GetValueOrDefault().Deserialize(_valueTypeInfo)!);
                 break;
             case JsonLogEntryCommands.Faulted:
                 consumer.ApplyFaulted(new Exception(operation.Message));
@@ -264,20 +237,6 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         JsonOperationCodecWriter.Write(
             writer,
             operation,
-            static (jsonWriter, operation) => JsonTaskCompletionSourceOperationConverter.WriteArrayElements(jsonWriter, operation),
-            static (output, operation) => WriteBytes(output, operation));
+            static (jsonWriter, operation) => JsonTaskCompletionSourceOperationConverter.WriteArrayElements(jsonWriter, operation));
     }
-
-    private static void Write(IBufferWriter<byte> output, JsonTaskCompletionSourceOperation operation)
-    {
-        using var writer = new Utf8JsonWriter(output);
-        WriteJson(writer, operation);
-    }
-
-    private static void WriteJson(Utf8JsonWriter writer, JsonTaskCompletionSourceOperation operation)
-    {
-        JsonSerializer.Serialize(writer, operation, JsonOperationCodecsJsonContext.Default.JsonTaskCompletionSourceOperation);
-    }
-
-    private static void WriteBytes(IBufferWriter<byte> output, JsonTaskCompletionSourceOperation operation) => Write(output, operation);
 }

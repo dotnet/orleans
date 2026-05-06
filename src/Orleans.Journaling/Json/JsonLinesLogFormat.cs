@@ -267,27 +267,45 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
         private static void WriteLogEntry(LogStreamId streamId, ReadOnlySequence<byte> payload, ArcBufferWriter buffer)
         {
+            var entryStart = buffer.Length;
             using var payloadDocument = JsonDocument.Parse(payload);
             if (payloadDocument.RootElement.ValueKind is not JsonValueKind.Array)
             {
                 throw new InvalidOperationException("The JSON Lines log entry payload must be a JSON operation array.");
             }
 
-            using var jsonWriter = new Utf8JsonWriter(buffer);
-            WriteLogEntry(jsonWriter, streamId, payloadDocument.RootElement);
-            jsonWriter.Flush();
-            buffer.Write("\n"u8);
+            try
+            {
+                using var jsonWriter = new Utf8JsonWriter(buffer);
+                WriteLogEntry(jsonWriter, streamId, payloadDocument.RootElement);
+                jsonWriter.Flush();
+                buffer.Write("\n"u8);
+            }
+            catch
+            {
+                buffer.Truncate(entryStart);
+                throw;
+            }
         }
 
         private static void WriteLogEntry(LogStreamId streamId, JsonFormattedLogEntry entry, ArcBufferWriter buffer)
         {
-            using var jsonWriter = new Utf8JsonWriter(buffer);
-            jsonWriter.WriteStartArray();
-            jsonWriter.WriteNumberValue(streamId.Value);
-            entry.WriteArrayElementsTo(jsonWriter);
-            jsonWriter.WriteEndArray();
-            jsonWriter.Flush();
-            buffer.Write("\n"u8);
+            var entryStart = buffer.Length;
+            try
+            {
+                using var jsonWriter = new Utf8JsonWriter(buffer);
+                jsonWriter.WriteStartArray();
+                jsonWriter.WriteNumberValue(streamId.Value);
+                entry.WriteArrayElementsTo(jsonWriter);
+                jsonWriter.WriteEndArray();
+                jsonWriter.Flush();
+                buffer.Write("\n"u8);
+            }
+            catch
+            {
+                buffer.Truncate(entryStart);
+                throw;
+            }
         }
 
         private static void WriteLogEntry(Utf8JsonWriter writer, LogStreamId streamId, JsonElement entry)

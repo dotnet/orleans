@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Text.Json;
 
 namespace Orleans.Journaling.Json;
@@ -8,16 +7,21 @@ internal static class JsonOperationCodecWriter
     public static void Write<TArg>(
         LogStreamWriter writer,
         TArg argument,
-        Action<Utf8JsonWriter, TArg> writeJsonArrayElements,
-        Action<IBufferWriter<byte>, TArg> writeBytes)
+        Action<Utf8JsonWriter, TArg> writeJsonArrayElements)
     {
-        if (writer.TryAppendFormattedEntry(JsonFormattedLogEntry.Create(argument, writeJsonArrayElements)))
+        var formattedEntry = JsonFormattedLogEntry.Create(argument, writeJsonArrayElements);
+        if (writer.TryAppendFormattedEntry(formattedEntry))
         {
             return;
         }
 
         using var entry = writer.BeginEntry();
-        writeBytes(entry.Writer, argument);
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
         entry.Commit();
     }
 }
