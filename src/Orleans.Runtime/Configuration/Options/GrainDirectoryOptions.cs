@@ -57,7 +57,7 @@ namespace Orleans.Configuration
         /// <summary>
         /// The default value for <see cref="PartitionsPerSilo"/>.
         /// </summary>
-        public const int DEFAULT_PARTITIONS_PER_SILO = ConsistentRingOptions.DEFAULT_NUM_VIRTUAL_RING_BUCKETS;
+        public const int DEFAULT_PARTITIONS_PER_SILO = 1;
 
         /// <summary>
         /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.

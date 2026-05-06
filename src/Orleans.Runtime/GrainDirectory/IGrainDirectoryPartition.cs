@@ -41,4 +41,7 @@ internal interface IGrainDirectoryTestHooks : ISystemTarget
 
     [Alias("RecoverAndCheckIntegrityAsync")]
     ValueTask RecoverAndCheckIntegrityAsync();
+
+    [Alias("CheckActivationsAsync")]
+    ValueTask<Immutable<List<GrainId>>> CheckActivationsAsync(Immutable<List<GrainAddress>> activations);
 }

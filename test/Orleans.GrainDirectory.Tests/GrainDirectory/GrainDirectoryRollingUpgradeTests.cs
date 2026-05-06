@@ -5,6 +5,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Orleans;
+using Orleans.Concurrency;
 using Orleans.GrainDirectory;
 using Orleans.Hosting;
 using Orleans.Runtime;
@@ -161,7 +162,8 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
     {
         output.WriteLine($"  Validating grain directory integrity {stage}...");
 
-        var integrityChecks = new List<Task>();
+        var activations = GetDirectoryActivations(cluster);
+        var distributedPartitions = new List<IGrainDirectoryTestHooks>();
         foreach (var silo in cluster.Silos)
         {
             var membershipService = silo.ServiceProvider.GetService<DirectoryMembershipService>();
@@ -174,17 +176,108 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             {
                 var replica = cluster.InternalClient.GetSystemTarget<IGrainDirectoryTestHooks>(
                     GrainDirectoryPartition.CreateGrainId(silo.SiloAddress, partitionIndex).GrainId);
-                integrityChecks.Add(replica.RecoverAndCheckIntegrityAsync().AsTask());
+                distributedPartitions.Add(replica);
             }
         }
 
-        await Task.WhenAll(integrityChecks);
-        foreach (var task in integrityChecks)
+        if (distributedPartitions.Count == 0)
+        {
+            await CheckActivationRegistrationsWithLocalDirectoryAsync(activations, stage);
+        }
+        else
+        {
+            var integrityChecks = distributedPartitions.Select(static partition => partition.RecoverAndCheckIntegrityAsync().AsTask()).ToArray();
+            await Task.WhenAll(integrityChecks);
+            foreach (var task in integrityChecks)
+            {
+                await task;
+            }
+
+            var activationAddresses = activations.Select(static activation => activation.Address).ToList().AsImmutable();
+            var activationChecks = distributedPartitions.Select(partition => partition.CheckActivationsAsync(activationAddresses).AsTask()).ToArray();
+            await Task.WhenAll(activationChecks);
+            var distributedCheckedGrains = new HashSet<GrainId>();
+            foreach (var task in activationChecks)
+            {
+                foreach (var grainId in (await task).Value)
+                {
+                    Assert.True(distributedCheckedGrains.Add(grainId), $"Grain '{grainId}' was checked by multiple distributed directory partitions during '{stage}'.");
+                }
+            }
+
+            var localActivationChecks = new List<Task>();
+            foreach (var activation in activations)
+            {
+                if (distributedCheckedGrains.Contains(activation.Address.GrainId))
+                {
+                    continue;
+                }
+
+                var grainLocator = activation.Silo.ServiceProvider.GetRequiredService<GrainLocator>();
+                localActivationChecks.Add(CheckActivationRegistrationAsync(grainLocator, activation.Address, activation.Silo.SiloAddress, stage));
+            }
+
+            await Task.WhenAll(localActivationChecks);
+            foreach (var task in localActivationChecks)
+            {
+                await task;
+            }
+        }
+
+        output.WriteLine($"  Validated {activations.Count} activations and {distributedPartitions.Count} DistributedGrainDirectory partitions {stage}.");
+    }
+
+    private static List<(InProcessSiloHandle Silo, GrainAddress Address)> GetDirectoryActivations(InProcessTestCluster cluster)
+    {
+        var result = new List<(InProcessSiloHandle Silo, GrainAddress Address)>();
+        foreach (var silo in cluster.Silos)
+        {
+            var activations = silo.ServiceProvider.GetRequiredService<ActivationDirectory>();
+            foreach (var (_, activation) in activations)
+            {
+                if (activation is ActivationData { IsValid: false } || !UsesGrainDirectory(activation))
+                {
+                    continue;
+                }
+
+                result.Add((silo, activation.Address));
+            }
+        }
+
+        return result;
+    }
+
+    private static bool UsesGrainDirectory(IGrainContext activation)
+    {
+        if (activation is ActivationData activationData)
+        {
+            return activationData.IsUsingGrainDirectory;
+        }
+
+        return activation is not SystemTarget && activation.GetComponent<PlacementStrategy>() is { IsUsingGrainDirectory: true };
+    }
+
+    private static async Task CheckActivationRegistrationsWithLocalDirectoryAsync(List<(InProcessSiloHandle Silo, GrainAddress Address)> activations, string stage)
+    {
+        var activationChecks = activations.Select(activation =>
+        {
+            var grainLocator = activation.Silo.ServiceProvider.GetRequiredService<GrainLocator>();
+            return CheckActivationRegistrationAsync(grainLocator, activation.Address, activation.Silo.SiloAddress, stage);
+        }).ToArray();
+
+        await Task.WhenAll(activationChecks);
+        foreach (var task in activationChecks)
         {
             await task;
         }
+    }
 
-        output.WriteLine($"  Validated {integrityChecks.Count} DistributedGrainDirectory partitions against ActivationDirectory {stage}.");
+    private static async Task CheckActivationRegistrationAsync(GrainLocator grainLocator, GrainAddress activationAddress, SiloAddress siloAddress, string stage)
+    {
+        var registeredAddress = await grainLocator.Lookup(activationAddress.GrainId);
+        Assert.True(
+            activationAddress.Matches(registeredAddress),
+            $"Activation '{activationAddress.ToFullString()}' on silo '{siloAddress}' did not have a matching directory registration during '{stage}'. Registered address: '{registeredAddress?.ToFullString() ?? "<null>"}'.");
     }
 
     private static bool IsExpectedClientRoutingTableCancellation(string error) =>

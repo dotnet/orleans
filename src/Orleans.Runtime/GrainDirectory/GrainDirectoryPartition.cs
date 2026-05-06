@@ -791,6 +791,57 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         await ((IGrainDirectoryTestHooks)this).CheckIntegrityAsync();
     }
 
+    async ValueTask<Immutable<List<GrainId>>> IGrainDirectoryTestHooks.CheckActivationsAsync(Immutable<List<GrainAddress>> activations)
+    {
+        GrainRuntime.CheckRuntimeContext(this);
+        var current = CurrentView;
+
+        await WaitForRange(RingRange.Full, current.Version);
+        var tcs = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
+        _rangeLocks.Add((RingRange.Full, current.Version, tcs));
+        try
+        {
+            List<GrainId> checkedGrains = [];
+            foreach (var activation in activations.Value)
+            {
+                if (!IsOwner(current, activation.GrainId))
+                {
+                    continue;
+                }
+
+                checkedGrains.Add(activation.GrainId);
+                if (_directory.TryGetValue(activation.GrainId, out var existingEntry))
+                {
+                    if (!existingEntry.Equals(activation))
+                    {
+                        LogErrorIntegrityViolation(_logger, activation, existingEntry);
+                        Debug.Fail($"Integrity violation: activation '{activation}' does not match existing directory entry '{existingEntry}'.");
+                    }
+                }
+                else
+                {
+                    LogErrorIntegrityViolation(_logger, activation);
+                    Debug.Fail($"Integrity violation: activation '{activation}' not found in directory.");
+                }
+            }
+
+            return checkedGrains.AsImmutable();
+        }
+        finally
+        {
+            if (ShutdownToken.IsCancellationRequested)
+            {
+                tcs.SetCanceled(ShutdownToken);
+            }
+            else
+            {
+                tcs.SetResult();
+            }
+
+            _rangeLocks.Remove((RingRange.Full, current.Version, tcs));
+        }
+    }
+
     private sealed record class PartitionSnapshotState(
         MembershipVersion DirectoryMembershipVersion,
         List<GrainAddress> GrainAddresses,
