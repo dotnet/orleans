@@ -89,11 +89,11 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
 
                 for (var i = 0; i < oldSilos.Count; i++)
                 {
-                    await ValidateDistributedDirectoryIntegrityAsync(cluster, $"before adding distributed silo {i + 1}/{oldSilos.Count}");
+                    await ValidateDirectoryIntegrityAsync(cluster, $"before adding distributed silo {i + 1}/{oldSilos.Count}");
                     var newSilo = await cluster.StartAdditionalSiloAsync();
                     output.WriteLine($"  Started new silo: {newSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync();
-                    await ValidateDistributedDirectoryIntegrityAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
+                    await ValidateDirectoryIntegrityAsync(cluster, $"after adding distributed silo {i + 1}/{oldSilos.Count}");
                     await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
                 }
 
@@ -106,18 +106,18 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
                 foreach (var oldSilo in oldSilos.OrderBy(static s => s.InstanceNumber == 0 ? 1 : 0))
                 {
                     transitionIndex++;
-                    await ValidateDistributedDirectoryIntegrityAsync(cluster, $"before removing local silo {transitionIndex}/{oldSilos.Count}");
+                    await ValidateDirectoryIntegrityAsync(cluster, $"before removing local silo {transitionIndex}/{oldSilos.Count}");
                     await cluster.StopSiloAsync(oldSilo);
                     output.WriteLine($"  Stopped old silo: {oldSilo.SiloAddress}");
                     await cluster.WaitForLivenessToStabilizeAsync();
-                    await ValidateDistributedDirectoryIntegrityAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
+                    await ValidateDirectoryIntegrityAsync(cluster, $"after removing local silo {transitionIndex}/{oldSilos.Count}");
                     await DriveLoad(client, nextGrainId, count: 100, id => failingGrainKey = id);
                 }
 
                 // Phase 4: Final verification on the fully-upgraded cluster — must succeed without retries.
                 output.WriteLine("Phase 4: Verifying fully-upgraded DistributedGrainDirectory cluster...");
                 await DriveLoad(client, nextGrainId, count: 200, id => failingGrainKey = id);
-                await ValidateDistributedDirectoryIntegrityAsync(cluster, "after final verification");
+                await ValidateDirectoryIntegrityAsync(cluster, "after final verification");
             }
             catch
             {
@@ -157,9 +157,9 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
         Assert.Empty(errors);
     }
 
-    private async Task ValidateDistributedDirectoryIntegrityAsync(InProcessTestCluster cluster, string stage)
+    private async Task ValidateDirectoryIntegrityAsync(InProcessTestCluster cluster, string stage)
     {
-        output.WriteLine($"  Validating DistributedGrainDirectory integrity {stage}...");
+        output.WriteLine($"  Validating grain directory integrity {stage}...");
 
         var integrityChecks = new List<Task>();
         foreach (var silo in cluster.Silos)
@@ -184,7 +184,7 @@ public sealed class GrainDirectoryRollingUpgradeTests(ITestOutputHelper output)
             await task;
         }
 
-        output.WriteLine($"  Validated {integrityChecks.Count} DistributedGrainDirectory partitions {stage}.");
+        output.WriteLine($"  Validated {integrityChecks.Count} DistributedGrainDirectory partitions against ActivationDirectory {stage}.");
     }
 
     private static bool IsExpectedClientRoutingTableCancellation(string error) =>

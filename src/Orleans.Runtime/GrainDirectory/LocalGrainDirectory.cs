@@ -82,7 +82,7 @@ namespace Orleans.Runtime.GrainDirectory
             var distributedDirectoryActive = serviceProvider.GetService<DistributedGrainDirectory>() is not null;
             RemoteGrainDirectory = new RemoteGrainDirectory(this, Constants.DirectoryServiceType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
             CacheValidator = new RemoteGrainDirectory(this, Constants.DirectoryCacheValidatorType, systemTargetShared, registerAsSystemTarget: !distributedDirectoryActive);
-            DistributedGrainDirectoryClientCompatibility = distributedDirectoryActive ? null : new LocalGrainDirectoryClientCompatibility(this, systemTargetShared);
+            DistributedGrainDirectoryClientCompatibility = distributedDirectoryActive ? null : new LocalGrainDirectoryClientCompatibility(systemTargetShared);
             if (!distributedDirectoryActive)
             {
                 var partitionsPerSilo = grainDirectoryOptions.Value.PartitionsPerSilo;

@@ -272,24 +272,24 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
 
         return new(result.AsImmutable());
+    }
 
-        static IGrainDirectory? GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
+    internal static IGrainDirectory? GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
+    {
+        if (grainContext is ActivationData activationData)
         {
-            if (grainContext is ActivationData activationData)
-            {
-                return activationData.Shared.GrainDirectory;
-            }
-            else if (grainContext is SystemTarget systemTarget)
-            {
-                return null;
-            }
-            else if (grainContext.GetComponent<PlacementStrategy>() is { IsUsingGrainDirectory: true })
-            {
-                return grainDirectoryResolver.Resolve(grainContext.GrainId.Type);
-            }
-
+            return activationData.Shared.GrainDirectory;
+        }
+        else if (grainContext is SystemTarget)
+        {
             return null;
         }
+        else if (grainContext.GetComponent<PlacementStrategy>() is { IsUsingGrainDirectory: true })
+        {
+            return grainDirectoryResolver.Resolve(grainContext.GrainId.Type);
+        }
+
+        return null;
     }
 
     internal ValueTask<DirectoryMembershipSnapshot> RefreshViewAsync(MembershipVersion version, CancellationToken cancellationToken) => _membershipService.RefreshViewAsync(version, cancellationToken);
