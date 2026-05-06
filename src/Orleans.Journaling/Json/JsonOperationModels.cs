@@ -3,7 +3,7 @@ using System.Text.Json.Serialization;
 
 namespace Orleans.Journaling.Json;
 
-[JsonSourceGenerationOptions(WriteIndented = false)]
+[JsonSourceGenerationOptions(WriteIndented = false, UseStringEnumConverter = true, PropertyNamingPolicy = JsonKnownNamingPolicy.CamelCase)]
 [JsonSerializable(typeof(JsonElement))]
 [JsonSerializable(typeof(JsonDictionaryOperation))]
 [JsonSerializable(typeof(JsonDictionarySnapshotItem))]

@@ -3,15 +3,10 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace Orleans.Journaling.Json;
 
-internal sealed class JsonValueSerializer<T>
+internal sealed class JsonValueSerializer<T>(JsonSerializerOptions? options)
 {
     private static readonly Type ValueType = typeof(T);
-    private readonly JsonTypeInfo<T> _typeInfo;
-
-    public JsonValueSerializer(JsonSerializerOptions? options)
-    {
-        _typeInfo = GetTypeInfo(options ?? JsonSerializerOptions.Default);
-    }
+    private readonly JsonTypeInfo<T> _typeInfo = GetTypeInfo(options ?? JsonSerializerOptions.Default);
 
     public void Serialize(Utf8JsonWriter writer, T value) => JsonSerializer.Serialize(writer, value, _typeInfo);
 
