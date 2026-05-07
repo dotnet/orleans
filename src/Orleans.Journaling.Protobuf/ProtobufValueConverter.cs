@@ -6,10 +6,6 @@ namespace Orleans.Journaling.Protobuf;
 /// <summary>
 /// Converts values of type <typeparamref name="T"/> to length-delimited protobuf payloads.
 /// </summary>
-/// <remarks>
-/// Payload bodies begin with a one-byte marker: <c>0</c> for <see langword="null"/> and <c>1</c> for a
-/// non-null value encoded by a native protobuf value codec or the configured <see cref="ILogValueCodec{T}"/>.
-/// </remarks>
 public sealed class ProtobufValueConverter<T>
 {
     private readonly ILogValueCodec<T>? _fallbackCodec;

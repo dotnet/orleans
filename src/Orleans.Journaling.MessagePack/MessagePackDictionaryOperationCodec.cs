@@ -75,38 +75,64 @@ public sealed class MessagePackDictionaryOperationCodec<TKey, TValue>(MessagePac
 
     public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var reader = new MessagePackOperationReader(input);
-        switch (reader.Command)
+        var reader = new MessagePackReader(input);
+        var itemCount = reader.ReadArrayHeader();
+        if (itemCount == 0)
+        {
+            throw new InvalidOperationException("Malformed MessagePack log entry: missing command.");
+        }
+
+        var command = reader.ReadInt32();
+        switch (command)
         {
             case SetCommand:
-                reader.RequireOperandCount(2);
+                RequireItemCount(itemCount, 3, command);
                 consumer.ApplySet(
-                    reader.ReadValue<TKey>(options),
-                    reader.ReadValue<TValue>(options));
+                    MessagePackCodecHelpers.ReadValue<TKey>(ref reader, options),
+                    MessagePackCodecHelpers.ReadValue<TValue>(ref reader, options));
                 break;
             case RemoveCommand:
-                reader.RequireOperandCount(1);
-                consumer.ApplyRemove(reader.ReadValue<TKey>(options));
+                RequireItemCount(itemCount, 2, command);
+                consumer.ApplyRemove(MessagePackCodecHelpers.ReadValue<TKey>(ref reader, options));
                 break;
             case ClearCommand:
-                reader.RequireOperandCount(0);
+                RequireItemCount(itemCount, 1, command);
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                var count = reader.ReadSnapshotCount(2, "Malformed MessagePack dictionary snapshot: key/value item count is not balanced.");
+                if (itemCount < 2)
+                {
+                    throw new InvalidOperationException("Malformed MessagePack log entry: missing snapshot count.");
+                }
+
+                var count = reader.ReadInt32();
+                MessagePackCodecHelpers.RequireSnapshotCount(count, (itemCount - 2) / 2, command);
+                if ((itemCount - 2) % 2 != 0)
+                {
+                    throw new InvalidOperationException("Malformed MessagePack dictionary snapshot: key/value item count is not balanced.");
+                }
+
                 consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
                     consumer.ApplySet(
-                        reader.ReadValue<TKey>(options),
-                        reader.ReadValue<TValue>(options));
+                        MessagePackCodecHelpers.ReadValue<TKey>(ref reader, options),
+                        MessagePackCodecHelpers.ReadValue<TValue>(ref reader, options));
                 }
 
                 break;
             default:
-                throw new NotSupportedException($"Command type {reader.Command} is not supported");
+                throw new NotSupportedException($"Command type {command} is not supported");
         }
 
-        reader.EnsureEnd();
+        MessagePackCodecHelpers.RequireNoTrailingData(ref reader);
+    }
+
+    private static void RequireItemCount(int actual, int expected, int command)
+    {
+        if (actual != expected)
+        {
+            throw new InvalidOperationException($"Malformed MessagePack log entry: command {command} expected {expected} item(s), found {actual}.");
+        }
     }
 }

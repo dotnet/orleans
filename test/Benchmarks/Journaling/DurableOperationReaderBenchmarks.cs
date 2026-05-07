@@ -1,12 +1,7 @@
 using System.Buffers;
 using System.Buffers.Binary;
 using BenchmarkDotNet.Attributes;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Orleans.Hosting;
 using Orleans.Journaling;
-using Orleans.Journaling.MessagePack;
-using Orleans.Journaling.Protobuf;
 using Orleans.Serialization.Buffers;
 
 namespace Benchmarks.Journaling;
@@ -27,9 +22,8 @@ public class DurableOperationReaderBenchmarks
     private EncodedLogData _snapshotOperation;
     private ArcBufferWriter _readBuffer;
     private ListReplayConsumer _consumer;
-    private IDisposable _services;
 
-    [Params(CodecFamily.OrleansBinary, CodecFamily.MessagePack, CodecFamily.Protobuf)]
+    [Params(CodecFamily.OrleansBinary)]
     public CodecFamily Family { get; set; }
 
     [GlobalSetup]
@@ -38,7 +32,6 @@ public class DurableOperationReaderBenchmarks
         var codecFamily = CreateCodecFamily(Family);
         _logFormat = codecFamily.LogFormat;
         _codec = codecFamily.Codec;
-        _services = codecFamily.Services;
         _readBuffer = new ArcBufferWriter();
         _consumer = new ListReplayConsumer(ListLogStreamId, _codec, SnapshotItemCount);
         _smallOperations = CreateSmallOperations(_logFormat, _codec);
@@ -54,7 +47,6 @@ public class DurableOperationReaderBenchmarks
         _snapshotOperation?.Dispose();
         _smallOperations?.Dispose();
         _readBuffer?.Dispose();
-        _services?.Dispose();
     }
 
     [Benchmark(OperationsPerInvoke = SmallOperationCount)]
@@ -119,36 +111,20 @@ public class DurableOperationReaderBenchmarks
         {
             CodecFamily.OrleansBinary => new CodecFamilyServices(
                 OrleansBinaryLogFormat.Instance,
-                new OrleansBinaryListOperationCodec<int>(RawInt32LogValueCodec.Instance),
-                services: null),
-            CodecFamily.MessagePack => CreateRegisteredCodecFamily(MessagePackJournalingExtensions.LogFormatKey, static builder => builder.UseMessagePackJournalingFormat()),
-            CodecFamily.Protobuf => CreateRegisteredCodecFamily(ProtobufJournalingExtensions.LogFormatKey, static builder => builder.UseProtobufJournalingFormat()),
+                new OrleansBinaryListOperationCodec<int>(RawInt32LogValueCodec.Instance)),
             _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unsupported journaling codec family.")
         };
     }
 
-    private static CodecFamilyServices CreateRegisteredCodecFamily(string logFormatKey, Action<ISiloBuilder> configure)
-    {
-        var builder = new BenchmarkSiloBuilder();
-        configure(builder);
-        var services = builder.Services.BuildServiceProvider();
-        var logFormat = services.GetRequiredKeyedService<ILogFormat>(logFormatKey);
-        var codec = services.GetRequiredKeyedService<IDurableListOperationCodecProvider>(logFormatKey).GetCodec<int>();
-        return new CodecFamilyServices(logFormat, codec, services);
-    }
-
     public enum CodecFamily
     {
-        OrleansBinary,
-        MessagePack,
-        Protobuf
+        OrleansBinary
     }
 
-    private sealed class CodecFamilyServices(ILogFormat logFormat, IDurableListOperationCodec<int> codec, IDisposable services)
+    private sealed class CodecFamilyServices(ILogFormat logFormat, IDurableListOperationCodec<int> codec)
     {
         public ILogFormat LogFormat { get; } = logFormat;
         public IDurableListOperationCodec<int> Codec { get; } = codec;
-        public IDisposable Services { get; } = services;
     }
 
     private sealed class EncodedLogData : IDisposable
@@ -251,13 +227,6 @@ public class DurableOperationReaderBenchmarks
             _items.EnsureCapacity(capacityHint);
             _checksum = 0;
         }
-    }
-
-    private sealed class BenchmarkSiloBuilder : ISiloBuilder
-    {
-        public IServiceCollection Services { get; } = new ServiceCollection();
-
-        public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
     private sealed class RawInt32LogValueCodec : ILogValueCodec<int>

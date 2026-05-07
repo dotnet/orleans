@@ -130,7 +130,7 @@ internal sealed class ProtobufLogFormat : ILogFormat
             using var payload = _payload.PeekSlice(payloadLength);
             var message = new ProtobufLogEntry();
             message.StreamId.Add(streamId.Value);
-            message.Payload.Add(WrapPayload(payload));
+            message.Payload.Add(UnsafeByteOperations.UnsafeWrap(payload.AsReadOnlySequence().ToArray()));
             var messageLength = message.CalculateSize();
             ProtobufWire.WriteVarUInt32(_buffer, checked((uint)messageLength));
             message.WriteTo(_buffer);
@@ -175,25 +175,12 @@ internal sealed class ProtobufLogFormat : ILogFormat
                 ProtobufWire.ComputeVarUInt32Size((PayloadFieldNumber << 3) | ProtobufWire.WireTypeLengthDelimited) +
                 ProtobufWire.ComputeVarUInt32Size((uint)payloadLength) +
                 payloadLength);
-
-        private static ByteString WrapPayload(ArcBuffer payload)
-        {
-            var payloadSequence = payload.AsReadOnlySequence();
-            if (payloadSequence.IsSingleSegment)
-            {
-                return UnsafeByteOperations.UnsafeWrap(payloadSequence.First);
-            }
-
-            return UnsafeByteOperations.UnsafeWrap(payloadSequence.ToArray());
-        }
     }
 
     private sealed class ProtobufFormattedLogEntry : IFormattedLogEntry
     {
         public ProtobufFormattedLogEntry(ReadOnlySequence<byte> payload)
         {
-            // Retired state machines retain formatted entries after the read buffer is released;
-            // this format-specific type also prevents cross-codec-family replay.
             Payload = payload.ToArray();
         }
 

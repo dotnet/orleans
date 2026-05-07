@@ -8,8 +8,6 @@ namespace Orleans.Journaling.Protobuf;
 
 internal interface IProtobufValueCodec<T>
 {
-    // Internal analogue to value metadata: it encodes the non-null payload body behind ProtobufValueConverter<T>.
-    // MessageParser<T> is adapted to this interface only for generated protobuf message value types.
     int Measure(T value);
 
     void Write(T value, IBufferWriter<byte> output);
