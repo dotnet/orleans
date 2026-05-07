@@ -97,7 +97,7 @@ namespace NonSilo.Tests.Membership
                 new ConnectionManager(
                     Options.Create(new ConnectionOptions()),
                     null,
-                    new NetworkingTrace(this.loggerFactory)));
+                    this.loggerFactory.CreateLogger<ConnectionManager>()));
             ((ILifecycleParticipant<ISiloLifecycle>)this.clusterHealthMonitor).Participate(this.lifecycle);
 
             this.remoteSiloProber = Substitute.For<IRemoteSiloProber>();
