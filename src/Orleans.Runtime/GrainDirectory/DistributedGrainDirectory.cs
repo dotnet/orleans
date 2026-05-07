@@ -207,7 +207,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         return await GetRegisteredActivations(membershipVersion, range, false);
     }
 
-    public async ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
+    public ValueTask<Immutable<List<GrainAddress>>> GetRegisteredActivations(MembershipVersion membershipVersion, RingRange range, bool isValidation)
     {
         if (!isValidation)
         {
@@ -222,10 +222,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
         }
 
         List<GrainAddress> result = [];
-        List<Task> deactivationTasks = [];
+        var skippedActivationCount = 0;
         var stopwatch = CoarseStopwatch.StartNew();
-        using var cts = new CancellationTokenSource();
-        cts.Cancel();
 
         foreach (var (grainId, activation) in _localActivations)
         {
@@ -241,22 +239,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 if (address.MembershipVersion == MembershipVersion.MinValue
                     || activation is ActivationData activationData && !activationData.IsValid)
                 {
-                    // Validation does not require that the grain is deactivated, skip it instead.
-                    //if (isValidation) continue;
-
-                    try
-                    {
-                        // This activation has not completed registration or is not currently active.
-                        // Abort the activation with a pre-canceled cancellation token so that it skips directory deregistration.
-                        // TODO: Expand validity check to non-ActivationData activations.
-                        // Warning: deactivating activation '{Activation}' due to failure of a directory range owner.
-                        activation.Deactivate(new DeactivationReason(DeactivationReasonCode.DirectoryFailure, "This activation's directory partition was salvaged while registration status was in-doubt."), cts.Token);
-                        deactivationTasks.Add(activation.Deactivated);
-                    }
-                    catch (Exception exception)
-                    {
-                        LogWarningFailedToDeactivateActivation(_logger, exception, activation);
-                    }
+                    // Do not wait for activation deactivation from directory recovery. Activation shutdown
+                    // can itself perform directory operations which depend on this recovery completing.
+                    ++skippedActivationCount;
+                    continue;
                 }
                 else
                 {
@@ -270,14 +256,12 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             }
         }
 
-        await Task.WhenAll(deactivationTasks);
-
         if (!isValidation)
         {
-            LogDebugSubmittingRegisteredActivations(_logger, result.Count, range, membershipVersion, deactivationTasks.Count, stopwatch.ElapsedMilliseconds);
+            LogDebugSubmittingRegisteredActivations(_logger, result.Count, range, membershipVersion, skippedActivationCount, stopwatch.ElapsedMilliseconds);
         }
 
-        return result.AsImmutable();
+        return new(result.AsImmutable());
 
         static IGrainDirectory? GetGrainDirectory(IGrainContext grainContext, GrainDirectoryResolver grainDirectoryResolver)
         {
@@ -448,12 +432,6 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     private static partial void LogDebugCollectingRegisteredActivations(ILogger logger, RingRange range, MembershipVersion membershipVersion);
 
     [LoggerMessage(
-        Level = LogLevel.Warning,
-        Message = "Failed to deactivate activation {Activation}"
-    )]
-    private static partial void LogWarningFailedToDeactivateActivation(ILogger logger, Exception exception, IGrainContext activation);
-
-    [LoggerMessage(
         Level = LogLevel.Trace,
         Message = "Sending activation '{Activation}' for recovery because its in the requested range {Range} (version {Version})."
     )]
@@ -461,9 +439,9 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Deactivated {DeactivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms"
+        Message = "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Skipped {SkippedActivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms"
     )]
-    private static partial void LogDebugSubmittingRegisteredActivations(ILogger logger, int count, RingRange range, MembershipVersion membershipVersion, int deactivationCount, long elapsedMilliseconds);
+    private static partial void LogDebugSubmittingRegisteredActivations(ILogger logger, int count, RingRange range, MembershipVersion membershipVersion, int skippedActivationCount, long elapsedMilliseconds);
 
     [LoggerMessage(
         Level = LogLevel.Trace,
