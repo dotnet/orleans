@@ -6,7 +6,7 @@ namespace Orleans.Journaling;
 /// Binary codec for durable persistent state log entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryStateOperationCodec<T>(
-    ILogValueCodec<T> codec) : IDurableStateOperationCodec<T>
+    ILogValueCodec<T> codec) : IDurableStateOperationCodec<T>, IOrleansBinaryLogEntryCodec
 {
     private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
@@ -53,6 +53,9 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
                 throw new NotSupportedException($"Command type {command} is not supported");
         }
     }
+
+    void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
+        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableStateOperationHandler<T>>(stateMachine, this));
 
     private void ApplySetValue(ref OrleansBinaryOperationReader reader, IDurableStateOperationHandler<T> consumer)
     {

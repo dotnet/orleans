@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -106,7 +105,7 @@ internal sealed partial class LogStateMachineManager : IStateMachineManager, ISt
                     stateMachine.Reset(CreateLogStreamWriter(new(_logStreamDirectory[name])));
                     foreach (var entry in vessel.FormattedEntries)
                     {
-                        stateMachine.Apply(new ReadOnlySequence<byte>(entry.Payload));
+                        entry.Apply(stateMachine);
                     }
 
                     var id = _logStreamDirectory[name];
@@ -747,8 +746,6 @@ internal sealed partial class LogStateMachineManager : IStateMachineManager, ISt
             _storage = writer;
         }
 
-        void IDurableStateMachine.Apply(ReadOnlySequence<byte> entry) => _codec.Apply(entry, this);
-
         void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
 
         void IDurableStateMachine.AppendSnapshot(LogStreamWriter writer) => _codec.WriteSnapshot(_ids, writer);
@@ -828,12 +825,6 @@ internal sealed partial class LogStateMachineManager : IStateMachineManager, ISt
         }
 
         void IDurableStateMachine.Reset(LogStreamWriter writer) => _formattedEntries.Clear();
-        void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
-        {
-            throw new InvalidOperationException(
-                "Retired state machines can only buffer formatted entries supplied by the active log format.");
-        }
-
         void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
         IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
     }

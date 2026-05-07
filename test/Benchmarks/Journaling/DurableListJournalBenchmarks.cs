@@ -183,11 +183,6 @@ public class DurableListJournalBenchmarks
             return this;
         }
 
-        public void Apply(ReadOnlySequence<byte> payload)
-        {
-            codec.Apply(payload, this);
-        }
-
         void IDurableStateMachine.Reset(LogStreamWriter storage) => Reset();
         void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
         void IDurableStateMachine.AppendSnapshot(LogStreamWriter writer) { }

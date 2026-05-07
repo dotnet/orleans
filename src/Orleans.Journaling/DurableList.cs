@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections;
 using System.Collections.ObjectModel;
 using System.Diagnostics;
@@ -65,11 +64,6 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     {
         _items.Clear();
         _storage = writer;
-    }
-
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
-    {
-        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

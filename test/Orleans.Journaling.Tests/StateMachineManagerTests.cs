@@ -972,7 +972,12 @@ public class StateMachineManagerTests : JournalingTestBase
         Assert.Contains(entries, entry => entry.StreamId.Value >= 8 && entry.Payload.Length > 0);
     }
 
-    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine
+    private interface ITestLogEntryCodec
+    {
+        void Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine);
+    }
+
+    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine, ITestLogEntryCodec, IOrleansBinaryLogEntryCodec
     {
         private LogStreamId _streamId;
 
@@ -986,7 +991,9 @@ public class StateMachineManagerTests : JournalingTestBase
             return this;
         }
 
-        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
+        void ITestLogEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
+
+        void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
 
         public void Reset(LogStreamWriter writer) { }
         public void AppendEntries(LogStreamWriter writer) { }
@@ -1018,14 +1025,15 @@ public class StateMachineManagerTests : JournalingTestBase
             }
 
             var callbackPayload = _payload.ToArray();
+            var formattedEntry = new TestFormattedLogEntry(callbackPayload);
             var stateMachine = resolver.ResolveStateMachine(_streamId);
             if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
             {
-                formattedEntryBuffer.AddFormattedEntry(new TestFormattedLogEntry(callbackPayload));
+                formattedEntryBuffer.AddFormattedEntry(formattedEntry);
             }
             else
             {
-                stateMachine.Apply(new ReadOnlySequence<byte>(callbackPayload));
+                formattedEntry.Apply(stateMachine);
             }
 
             Array.Fill(callbackPayload, byte.MaxValue);
@@ -1036,6 +1044,22 @@ public class StateMachineManagerTests : JournalingTestBase
     private sealed class TestFormattedLogEntry(ReadOnlyMemory<byte> payload) : IFormattedLogEntry
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
+
+        public void Apply(IDurableStateMachine stateMachine)
+        {
+            if (stateMachine is IDurableNothing)
+            {
+                return;
+            }
+
+            if (stateMachine.OperationCodec is not ITestLogEntryCodec codec)
+            {
+                throw new InvalidOperationException(
+                    $"State machine '{stateMachine.GetType().FullName}' is not compatible with test log entry codec.");
+            }
+
+            codec.Apply(new ReadOnlySequence<byte>(Payload), stateMachine);
+        }
     }
 
     private sealed class NonConsumingLogFormat : ILogFormat
@@ -1361,8 +1385,6 @@ public class StateMachineManagerTests : JournalingTestBase
         public object OperationCodec => this;
 
         public void Reset(LogStreamWriter writer) => _writer = writer;
-
-        public void Apply(ReadOnlySequence<byte> logEntry) { }
 
         public void AppendEntries(LogStreamWriter writer) { }
 

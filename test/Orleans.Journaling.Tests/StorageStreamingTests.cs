@@ -293,7 +293,7 @@ public sealed class StorageStreamingTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine
+    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine, IOrleansBinaryLogEntryCodec
     {
         private LogStreamId _streamId;
 
@@ -307,7 +307,7 @@ public sealed class StorageStreamingTests
             return this;
         }
 
-        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
+        void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
 
         public void Reset(LogStreamWriter writer) { }
         public void AppendEntries(LogStreamWriter writer) { }

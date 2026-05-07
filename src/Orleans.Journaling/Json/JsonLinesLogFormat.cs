@@ -322,6 +322,27 @@ internal abstract class JsonFormattedLogEntry : IFormattedLogEntry
 
     public abstract void WriteArrayElementsTo(Utf8JsonWriter writer);
 
+    public void Apply(IDurableStateMachine stateMachine)
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        if (stateMachine is IDurableNothing)
+        {
+            return;
+        }
+
+        var operationCodec = stateMachine.OperationCodec;
+        if (operationCodec is not IJsonLogEntryCodec jsonCodec)
+        {
+            var codecType = operationCodec?.GetType().FullName ?? "<null>";
+            throw new InvalidOperationException(
+                $"The JSON log entry resolved to state machine '{stateMachine.GetType().FullName}', " +
+                $"but its codec '{codecType}' does not implement IJsonLogEntryCodec.");
+        }
+
+        var reader = new JsonOperationReader(new ReadOnlySequence<byte>(Payload));
+        jsonCodec.Apply(ref reader, stateMachine);
+    }
+
     private byte[] SerializePayload()
     {
         var buffer = new ArrayBufferWriter<byte>();

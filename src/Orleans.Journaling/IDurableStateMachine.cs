@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace Orleans.Journaling;
 
 /// <summary>
@@ -22,16 +20,10 @@ public interface IDurableStateMachine
     void Reset(LogStreamWriter writer);
 
     /// <summary>
-    /// Called during recovery to apply the provided log entry or snapshot.
-    /// </summary>
-    /// <param name="entry">The log entry or snapshot.</param>
-    void Apply(ReadOnlySequence<byte> entry);
-
-    /// <summary>
     /// Notifies the state machine that all prior log entries and snapshots have been applied.
     /// </summary>
     /// <remarks>
-    /// The state machine should not expect any additional <see cref="Apply"/> calls after this method is called,
+    /// The state machine should not expect any additional recovery entries after this method is called,
     /// unless <see cref="Reset"/> is called to reset the state machine to its initial state.
     /// This method will be called before any <see cref="AppendEntries"/> or <see cref="AppendSnapshot"/> calls.
     /// </remarks>

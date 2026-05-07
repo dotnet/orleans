@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -52,11 +51,6 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IDurableStateMachine, 
     {
         _items.Clear();
         _storage = writer;
-    }
-
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
-    {
-        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

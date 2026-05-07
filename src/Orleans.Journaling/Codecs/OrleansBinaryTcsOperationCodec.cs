@@ -11,7 +11,7 @@ namespace Orleans.Journaling;
 /// </remarks>
 internal sealed class OrleansBinaryTcsOperationCodec<T>(
     ILogValueCodec<T> codec,
-    ILogValueCodec<Exception> exceptionCodec) : IDurableTaskCompletionSourceOperationCodec<T>
+    ILogValueCodec<Exception> exceptionCodec) : IDurableTaskCompletionSourceOperationCodec<T>, IOrleansBinaryLogEntryCodec
 {
     private const byte FormatVersion = 0;
 
@@ -88,6 +88,9 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
                 throw new NotSupportedException($"Unsupported status: {status}");
         }
     }
+
+    void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
+        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableTaskCompletionSourceOperationHandler<T>>(stateMachine, this));
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
     {

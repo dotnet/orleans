@@ -12,4 +12,10 @@ internal sealed class OrleansBinaryFormattedLogEntry : IFormattedLogEntry
     }
 
     public ReadOnlyMemory<byte> Payload { get; }
+
+    public void Apply(IDurableStateMachine stateMachine)
+    {
+        ArgumentNullException.ThrowIfNull(stateMachine);
+        OrleansBinaryLogReader.ApplyEntry(new ReadOnlySequence<byte>(Payload), stateMachine);
+    }
 }

@@ -176,8 +176,6 @@ public class DurableOperationReaderBenchmarks
             _checksum = 0;
         }
 
-        public void Apply(ReadOnlySequence<byte> payload) => codec.Apply(payload, this);
-
         void IDurableStateMachine.Reset(LogStreamWriter storage) => ResetForReplay();
 
         void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

@@ -81,7 +81,6 @@ public sealed class OrleansBinaryLogBatchWriterTests
 
         ReadAll(data, bufferingConsumer);
 
-        Assert.False(bufferingConsumer.RawApplyCalled);
         Assert.Collection(
             bufferingConsumer.Entries,
             entry => Assert.Equal([0xAA, 0xBB], entry.Payload),
@@ -106,6 +105,19 @@ public sealed class OrleansBinaryLogBatchWriterTests
                 Assert.Equal(8UL, entry.StreamId);
                 Assert.Equal([0xCC], entry.Payload);
             });
+    }
+
+    [Fact]
+    public void BinaryFormattedLogEntry_Apply_UsesOperationCodec()
+    {
+        var entry = new OrleansBinaryFormattedLogEntry(new ReadOnlySequence<byte>(new byte[] { 0xAA, 0xBB }));
+        var consumer = new CollectingConsumer();
+
+        entry.Apply(consumer);
+
+        var applied = Assert.Single(consumer.Entries);
+        Assert.Equal(0UL, applied.StreamId);
+        Assert.Equal([0xAA, 0xBB], applied.Payload);
     }
 
     [Fact]
@@ -368,7 +380,7 @@ public sealed class OrleansBinaryLogBatchWriterTests
         return (length, streamId, payload);
     }
 
-    private sealed class CollectingConsumer : IStateMachineResolver, IDurableStateMachine
+    private sealed class CollectingConsumer : IStateMachineResolver, IDurableStateMachine, IOrleansBinaryLogEntryCodec
     {
         private LogStreamId _streamId;
 
@@ -382,7 +394,7 @@ public sealed class OrleansBinaryLogBatchWriterTests
             return this;
         }
 
-        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add((_streamId.Value, payload.ToArray()));
+        void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add((_streamId.Value, payload.ToArray()));
 
         public void Reset(LogStreamWriter writer) { }
         public void AppendEntries(LogStreamWriter writer) { }
@@ -396,8 +408,6 @@ public sealed class OrleansBinaryLogBatchWriterTests
         private LogStreamId _streamId;
 
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
-
-        public bool RawApplyCalled { get; private set; }
 
         public IReadOnlyList<IFormattedLogEntry> FormattedEntries => _formattedEntries;
 
@@ -413,12 +423,6 @@ public sealed class OrleansBinaryLogBatchWriterTests
         {
             _formattedEntries.Add(entry);
             Entries.Add((_streamId.Value, entry.Payload.ToArray()));
-        }
-
-        public void Apply(ReadOnlySequence<byte> payload)
-        {
-            RawApplyCalled = true;
-            Entries.Add((_streamId.Value, payload.ToArray()));
         }
 
         public void Reset(LogStreamWriter writer) => _formattedEntries.Clear();
@@ -437,5 +441,7 @@ public sealed class OrleansBinaryLogBatchWriterTests
     private sealed class TestFormattedLogEntry : IFormattedLogEntry
     {
         public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
+
+        public void Apply(IDurableStateMachine stateMachine) => throw new NotSupportedException();
     }
 }

@@ -233,7 +233,6 @@ namespace Orleans.Journaling
 
         void AppendEntries(LogStreamWriter writer);
         void AppendSnapshot(LogStreamWriter writer);
-        void Apply(System.Buffers.ReadOnlySequence<byte> entry);
         IDurableStateMachine DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
@@ -303,6 +302,7 @@ namespace Orleans.Journaling
     public partial interface IFormattedLogEntry
     {
         System.ReadOnlyMemory<byte> Payload { get; }
+        void Apply(IDurableStateMachine stateMachine);
     }
 
     public partial interface IFormattedLogEntryBuffer

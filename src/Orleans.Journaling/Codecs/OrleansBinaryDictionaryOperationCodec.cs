@@ -7,7 +7,7 @@ namespace Orleans.Journaling;
 /// </summary>
 internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     ILogValueCodec<TKey> keyCodec,
-    ILogValueCodec<TValue> valueCodec) : IDurableDictionaryOperationCodec<TKey, TValue> where TKey : notnull
+    ILogValueCodec<TValue> valueCodec) : IDurableDictionaryOperationCodec<TKey, TValue>, IOrleansBinaryLogEntryCodec where TKey : notnull
 {
     private const byte FormatVersion = 0;
     private const uint SetCommand = 0;
@@ -95,6 +95,9 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
                 throw new NotSupportedException($"Command type {command} is not supported");
         }
     }
+
+    void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
+        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableDictionaryOperationHandler<TKey, TValue>>(stateMachine, this));
 
     private void ApplySet(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {

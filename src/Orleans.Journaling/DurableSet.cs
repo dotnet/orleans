@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Collections;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
@@ -54,11 +53,6 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
     {
         _items.Clear();
         _storage = writer;
-    }
-
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
-    {
-        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

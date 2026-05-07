@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
@@ -87,11 +86,6 @@ internal sealed class DurableState<T> : IPersistentState<T>, IDurableStateMachin
         _pendingWrite = PendingWriteKind.None;
         _hasState = false;
         _clearRequested = false;
-    }
-
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
-    {
-        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

@@ -1,4 +1,3 @@
-using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
@@ -26,8 +25,6 @@ internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
     object IDurableStateMachine.OperationCodec => NoOpCodec;
 
     void IDurableStateMachine.Reset(LogStreamWriter writer) { }
-
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry) { }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
 

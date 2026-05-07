@@ -81,12 +81,35 @@ internal static class OrleansBinaryLogReader
         {
             formattedEntryBuffer.AddFormattedEntry(new OrleansBinaryFormattedLogEntry(payload));
         }
-        else
+        else if (stateMachine is not IDurableNothing)
         {
-            stateMachine.Apply(payload);
+            ApplyEntry(payload, stateMachine, streamId.Value);
         }
 
         return true;
+    }
+
+    internal static void ApplyEntry(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) =>
+        ApplyEntry(payload, stateMachine, streamId: null);
+
+    private static void ApplyEntry(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine, ulong? streamId)
+    {
+        if (stateMachine is IDurableNothing)
+        {
+            return;
+        }
+
+        var operationCodec = stateMachine.OperationCodec;
+        if (operationCodec is not IOrleansBinaryLogEntryCodec binaryCodec)
+        {
+            var streamDescription = streamId is { } value ? $" for stream {value}" : "";
+            var codecType = operationCodec?.GetType().FullName ?? "<null>";
+            throw new InvalidOperationException(
+                $"The Orleans binary log entry{streamDescription} resolved to state machine " +
+                $"'{stateMachine.GetType().FullName}', but its codec '{codecType}' does not implement IOrleansBinaryLogEntryCodec.");
+        }
+
+        binaryCodec.Apply(payload, stateMachine);
     }
 }
 

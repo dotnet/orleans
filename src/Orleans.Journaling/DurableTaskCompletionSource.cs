@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
@@ -133,11 +132,6 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
             _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
 
-    }
-
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
-    {
-        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

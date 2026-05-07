@@ -553,7 +553,6 @@ public class JsonCodecTests
 
         Assert.Same(stateMachine, codec.StateMachine);
         Assert.Equal(42, codec.Value);
-        Assert.False(stateMachine.RawApplyCalled);
     }
 
     [Fact]
@@ -587,8 +586,39 @@ public class JsonCodecTests
         var stateMachine = new NoOpStateMachine();
 
         ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine));
+    }
 
-        Assert.False(stateMachine.RawApplyCalled);
+    [Fact]
+    public void JsonFormattedLogEntry_Apply_UsesOperationCodec()
+    {
+        var entry = JsonFormattedLogEntry.Create(
+            42,
+            static (writer, value) =>
+            {
+                writer.WriteStringValue(JsonLogEntryCommands.Set);
+                writer.WriteNumberValue(value);
+            });
+        var codec = new RecordingJsonLogEntryCodec();
+        var stateMachine = new RecordingStateMachine(codec);
+
+        entry.Apply(stateMachine);
+
+        Assert.Same(stateMachine, codec.StateMachine);
+        Assert.Equal(42, codec.Value);
+    }
+
+    [Fact]
+    public void JsonFormattedLogEntry_Apply_DurableNothingIgnoresEntryWithoutJsonCodec()
+    {
+        var entry = JsonFormattedLogEntry.Create(
+            42,
+            static (writer, value) =>
+            {
+                writer.WriteStringValue(JsonLogEntryCommands.Set);
+                writer.WriteNumberValue(value);
+            });
+
+        entry.Apply(new NoOpStateMachine());
     }
 
     [Fact]
@@ -725,8 +755,6 @@ public class JsonCodecTests
 
         public void AddFormattedEntry(IFormattedLogEntry entry) => Entries.Add(new(_streamId, entry.Payload.ToArray()));
 
-        public void Apply(ReadOnlySequence<byte> payload) => Entries.Add(new(_streamId, payload.ToArray()));
-
         public void Reset(LogStreamWriter storage) { }
         public void AppendEntries(LogStreamWriter writer) { }
         public void AppendSnapshot(LogStreamWriter writer) { }
@@ -740,11 +768,8 @@ public class JsonCodecTests
 
     private sealed class RecordingStateMachine(object codec) : IDurableStateMachine
     {
-        public bool RawApplyCalled { get; private set; }
-
         public object OperationCodec => codec;
 
-        public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
         public void Reset(LogStreamWriter storage) { }
         public void AppendEntries(LogStreamWriter writer) { }
         public void AppendSnapshot(LogStreamWriter writer) { }
@@ -753,11 +778,8 @@ public class JsonCodecTests
 
     private sealed class NoOpStateMachine : IDurableNothing, IDurableStateMachine
     {
-        public bool RawApplyCalled { get; private set; }
-
         public object OperationCodec { get; } = new();
 
-        public void Apply(ReadOnlySequence<byte> entry) => RawApplyCalled = true;
         public void Reset(LogStreamWriter storage) { }
         public void AppendEntries(LogStreamWriter writer) { }
         public void AppendSnapshot(LogStreamWriter writer) { }
@@ -781,6 +803,8 @@ public class JsonCodecTests
     private sealed class TestFormattedLogEntry : IFormattedLogEntry
     {
         public ReadOnlyMemory<byte> Payload => ReadOnlyMemory<byte>.Empty;
+
+        public void Apply(IDurableStateMachine stateMachine) => throw new NotSupportedException();
     }
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull

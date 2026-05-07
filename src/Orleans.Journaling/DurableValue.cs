@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
@@ -59,11 +58,6 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     void IDurableStateMachine.Reset(LogStreamWriter writer)
     {
         _value = default;
-    }
-
-    void IDurableStateMachine.Apply(ReadOnlySequence<byte> logEntry)
-    {
-        _codec.Apply(logEntry, this);
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

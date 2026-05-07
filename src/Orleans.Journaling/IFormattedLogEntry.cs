@@ -9,6 +9,12 @@ public interface IFormattedLogEntry
     /// Gets the durable operation payload bytes for the formatted entry.
     /// </summary>
     ReadOnlyMemory<byte> Payload { get; }
+
+    /// <summary>
+    /// Applies this entry to <paramref name="stateMachine"/>.
+    /// </summary>
+    /// <param name="stateMachine">The target state machine.</param>
+    void Apply(IDurableStateMachine stateMachine);
 }
 
 /// <summary>
