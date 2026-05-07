@@ -257,7 +257,7 @@ namespace NonSilo.Tests.Membership
             // Register a test connection and simulate recent message activity.
             var testConnection = CreateTestConnection(this.loggerFactory);
             canaryConnectionManager.OnConnected(targetSilo, testConnection);
-            SimulateMessageReceived(testConnection);
+            testConnection.SimulateMessageReceived();
 
             // Drive enough probe failures to normally trigger a vote.
             for (var i = 0; i < clusterMembershipOptions.NumMissedProbesLimit + 1; i++)
@@ -268,7 +268,7 @@ namespace NonSilo.Tests.Membership
                 }
 
                 // Keep re-stamping the canary so it stays fresh.
-                SimulateMessageReceived(testConnection);
+                testConnection.SimulateMessageReceived();
                 await Task.Delay(50);
             }
 
@@ -338,7 +338,7 @@ namespace NonSilo.Tests.Membership
             // Register a test connection and simulate recent message activity.
             var testConnection = CreateTestConnection(this.loggerFactory);
             canaryConnectionManager.OnConnected(targetSilo, testConnection);
-            SimulateMessageReceived(testConnection);
+            testConnection.SimulateMessageReceived();
 
             // Drive enough probe failures to trigger a vote.
             for (var i = 0; i < clusterMembershipOptions.NumMissedProbesLimit + 1; i++)
@@ -348,7 +348,7 @@ namespace NonSilo.Tests.Membership
                     timer.Completion.TrySetResult(true);
                 }
 
-                SimulateMessageReceived(testConnection);
+                testConnection.SimulateMessageReceived();
                 await Task.Delay(50);
             }
 
@@ -868,19 +868,9 @@ namespace NonSilo.Tests.Membership
         }
 
         /// <summary>
-        /// Simulates message activity on a connection by setting the last-message-received timestamp
-        /// via reflection (the field is updated via Volatile.Write in production code on the I/O path).
-        /// </summary>
-        private static void SimulateMessageReceived(Connection connection)
-        {
-            var field = typeof(Connection).GetField("_lastMessageReceivedTimestamp", System.Reflection.BindingFlags.NonPublic | System.Reflection.BindingFlags.Instance)!;
-            field.SetValue(connection, CoarseStopwatch.StartNew());
-        }
-
-        /// <summary>
         /// Creates a minimal test <see cref="Connection"/> suitable for registering with <see cref="ConnectionManager"/>.
         /// </summary>
-        private Connection CreateTestConnection(ILoggerFactory loggerFactory)
+        private TestConnection CreateTestConnection(ILoggerFactory loggerFactory)
         {
             var features = new Microsoft.AspNetCore.Http.Features.FeatureCollection();
             var context = Substitute.For<ConnectionContext>();
@@ -907,6 +897,7 @@ namespace NonSilo.Tests.Membership
             protected override void RecordMessageSend(Message msg, int numTotalBytes, int headerBytes) { }
             protected override void OnSendMessageFailure(Message message, string error) { }
             protected override void RetryMessage(Message msg, Exception ex = null) { }
+            public void SimulateMessageReceived() => MarkMessageReceived();
         }
     }
 }

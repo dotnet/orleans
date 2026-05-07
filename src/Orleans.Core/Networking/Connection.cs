@@ -88,6 +88,8 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        protected void MarkMessageReceived() => _lastMessageReceivedTimestamp.Restart();
+
         public static void ConfigureBuilder(ConnectionBuilder builder) => builder.Run(OnConnectedDelegate);
 
         /// <summary>
@@ -302,7 +304,7 @@ namespace Orleans.Runtime.Messaging
                     if (buffer.Length > prevBufferLength)
                     {
                         prevBufferLength = buffer.Length;
-                        _lastMessageReceivedTimestamp.Restart();
+                        MarkMessageReceived();
                     }
 
                     if (buffer.Length >= requiredBytes)
