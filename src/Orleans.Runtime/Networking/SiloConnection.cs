@@ -308,6 +308,12 @@ namespace Orleans.Runtime.Messaging
             }
         }
 
+        public override void ReceiveMessage(Message message, IMessageReceiverCache cache)
+        {
+            message.TargetSilo ??= this.RemoteSiloAddress;
+            base.ReceiveMessage(message, cache);
+        }
+
         [LoggerMessage(
             Level = LogLevel.Trace,
             Message = "Forwarding message {MessageId} from {SendingSilo} to silo {TargetSilo}"

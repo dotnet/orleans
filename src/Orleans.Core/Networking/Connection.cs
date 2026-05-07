@@ -515,7 +515,7 @@ namespace Orleans.Runtime.Messaging
             return true;
         }
 
-        void IMessageReceiver.ReceiveMessage(Message message, IMessageReceiverCache cache)
+        public virtual void ReceiveMessage(Message message, IMessageReceiverCache cache)
         {
             if (!IsValid)
             {
