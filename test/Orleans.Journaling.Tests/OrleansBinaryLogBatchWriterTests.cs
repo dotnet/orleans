@@ -71,6 +71,44 @@ public sealed class OrleansBinaryLogBatchWriterTests
     }
 
     [Fact]
+    public void BinaryFormat_Read_BuffersFormattedEntriesForRetiredStateMachines()
+    {
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(8)), [0xCC]);
+        using var data = buffer.GetCommittedBuffer();
+        var bufferingConsumer = new BufferingConsumer();
+
+        ReadAll(data, bufferingConsumer);
+
+        Assert.False(bufferingConsumer.RawApplyCalled);
+        Assert.Collection(
+            bufferingConsumer.Entries,
+            entry => Assert.Equal([0xAA, 0xBB], entry.Payload),
+            entry => Assert.Equal([0xCC], entry.Payload));
+
+        using var replay = new OrleansBinaryLogBatchWriter();
+        bufferingConsumer.AppendSnapshot(replay.CreateLogStreamWriter(new LogStreamId(8)));
+        using var replayed = replay.GetCommittedBuffer();
+        var activeConsumer = new CollectingConsumer();
+
+        ReadAll(replayed, activeConsumer);
+
+        Assert.Collection(
+            activeConsumer.Entries,
+            entry =>
+            {
+                Assert.Equal(8UL, entry.StreamId);
+                Assert.Equal([0xAA, 0xBB], entry.Payload);
+            },
+            entry =>
+            {
+                Assert.Equal(8UL, entry.StreamId);
+                Assert.Equal([0xCC], entry.Payload);
+            });
+    }
+
+    [Fact]
     public void BinaryFormat_Read_HandlesSegmentedFrames()
     {
         using var buffer = new OrleansBinaryLogBatchWriter();
@@ -349,6 +387,50 @@ public sealed class OrleansBinaryLogBatchWriterTests
         public void Reset(LogStreamWriter writer) { }
         public void AppendEntries(LogStreamWriter writer) { }
         public void AppendSnapshot(LogStreamWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class BufferingConsumer : IStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
+    {
+        private readonly List<IFormattedLogEntry> _formattedEntries = [];
+        private LogStreamId _streamId;
+
+        public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
+
+        public bool RawApplyCalled { get; private set; }
+
+        public IReadOnlyList<IFormattedLogEntry> FormattedEntries => _formattedEntries;
+
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void AddFormattedEntry(IFormattedLogEntry entry)
+        {
+            _formattedEntries.Add(entry);
+            Entries.Add((_streamId.Value, entry.Payload.ToArray()));
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload)
+        {
+            RawApplyCalled = true;
+            Entries.Add((_streamId.Value, payload.ToArray()));
+        }
+
+        public void Reset(LogStreamWriter writer) => _formattedEntries.Clear();
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer)
+        {
+            foreach (var entry in _formattedEntries)
+            {
+                writer.AppendFormattedEntry(entry);
+            }
+        }
+
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 

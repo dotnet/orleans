@@ -100,64 +100,43 @@ public sealed class MessagePackListOperationCodec<T>(MessagePackSerializerOption
 
     public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer)
     {
-        var reader = new MessagePackReader(input);
-        var itemCount = reader.ReadArrayHeader();
-        if (itemCount == 0)
-        {
-            throw new InvalidOperationException("Malformed MessagePack log entry: missing command.");
-        }
-
-        var command = reader.ReadInt32();
-        switch (command)
+        var reader = new MessagePackOperationReader(input);
+        switch (reader.Command)
         {
             case AddCommand:
-                RequireItemCount(itemCount, 2, command);
-                consumer.ApplyAdd(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                reader.RequireOperandCount(1);
+                consumer.ApplyAdd(reader.ReadValue<T>(options));
                 break;
             case SetCommand:
-                RequireItemCount(itemCount, 3, command);
-                consumer.ApplySet(reader.ReadInt32(), MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                reader.RequireOperandCount(2);
+                consumer.ApplySet(reader.ReadInt32(), reader.ReadValue<T>(options));
                 break;
             case InsertCommand:
-                RequireItemCount(itemCount, 3, command);
-                consumer.ApplyInsert(reader.ReadInt32(), MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                reader.RequireOperandCount(2);
+                consumer.ApplyInsert(reader.ReadInt32(), reader.ReadValue<T>(options));
                 break;
             case RemoveAtCommand:
-                RequireItemCount(itemCount, 2, command);
+                reader.RequireOperandCount(1);
                 consumer.ApplyRemoveAt(reader.ReadInt32());
                 break;
             case ClearCommand:
-                RequireItemCount(itemCount, 1, command);
+                reader.RequireOperandCount(0);
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                if (itemCount < 2)
-                {
-                    throw new InvalidOperationException("Malformed MessagePack log entry: missing snapshot count.");
-                }
-
-                var count = reader.ReadInt32();
-                MessagePackCodecHelpers.RequireSnapshotCount(count, itemCount - 2, command);
+                var count = reader.ReadSnapshotCount(valuesPerItem: 1);
                 consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplyAdd(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                    consumer.ApplyAdd(reader.ReadValue<T>(options));
                 }
 
                 break;
             default:
-                throw new NotSupportedException($"Command type {command} is not supported");
+                throw new NotSupportedException($"Command type {reader.Command} is not supported");
         }
 
-        MessagePackCodecHelpers.RequireNoTrailingData(ref reader);
-    }
-
-    private static void RequireItemCount(int actual, int expected, int command)
-    {
-        if (actual != expected)
-        {
-            throw new InvalidOperationException($"Malformed MessagePack log entry: command {command} expected {expected} item(s), found {actual}.");
-        }
+        reader.EnsureEnd();
     }
 }
 
@@ -213,48 +192,35 @@ public sealed class MessagePackQueueOperationCodec<T>(MessagePackSerializerOptio
 
     public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer)
     {
-        var reader = new MessagePackReader(input);
-        var itemCount = reader.ReadArrayHeader();
-        if (itemCount == 0)
-        {
-            throw new InvalidOperationException("Malformed MessagePack log entry: missing command.");
-        }
-
-        var command = reader.ReadInt32();
-        switch (command)
+        var reader = new MessagePackOperationReader(input);
+        switch (reader.Command)
         {
             case EnqueueCommand:
-                RequireItemCount(itemCount, 2, command);
-                consumer.ApplyEnqueue(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                reader.RequireOperandCount(1);
+                consumer.ApplyEnqueue(reader.ReadValue<T>(options));
                 break;
             case DequeueCommand:
-                RequireItemCount(itemCount, 1, command);
+                reader.RequireOperandCount(0);
                 consumer.ApplyDequeue();
                 break;
             case ClearCommand:
-                RequireItemCount(itemCount, 1, command);
+                reader.RequireOperandCount(0);
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                if (itemCount < 2)
-                {
-                    throw new InvalidOperationException("Malformed MessagePack log entry: missing snapshot count.");
-                }
-
-                var count = reader.ReadInt32();
-                MessagePackCodecHelpers.RequireSnapshotCount(count, itemCount - 2, command);
+                var count = reader.ReadSnapshotCount(valuesPerItem: 1);
                 consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplyEnqueue(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                    consumer.ApplyEnqueue(reader.ReadValue<T>(options));
                 }
 
                 break;
             default:
-                throw new NotSupportedException($"Command type {command} is not supported");
+                throw new NotSupportedException($"Command type {reader.Command} is not supported");
         }
 
-        MessagePackCodecHelpers.RequireNoTrailingData(ref reader);
+        reader.EnsureEnd();
     }
 
     private static void WriteCommand(int command, IBufferWriter<byte> output)
@@ -265,13 +231,6 @@ public sealed class MessagePackQueueOperationCodec<T>(MessagePackSerializerOptio
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    private static void RequireItemCount(int actual, int expected, int command)
-    {
-        if (actual != expected)
-        {
-            throw new InvalidOperationException($"Malformed MessagePack log entry: command {command} expected {expected} item(s), found {actual}.");
-        }
-    }
 }
 
 /// <summary>
@@ -317,48 +276,35 @@ public sealed class MessagePackSetOperationCodec<T>(MessagePackSerializerOptions
 
     public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer)
     {
-        var reader = new MessagePackReader(input);
-        var itemCount = reader.ReadArrayHeader();
-        if (itemCount == 0)
-        {
-            throw new InvalidOperationException("Malformed MessagePack log entry: missing command.");
-        }
-
-        var command = reader.ReadInt32();
-        switch (command)
+        var reader = new MessagePackOperationReader(input);
+        switch (reader.Command)
         {
             case AddCommand:
-                RequireItemCount(itemCount, 2, command);
-                consumer.ApplyAdd(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                reader.RequireOperandCount(1);
+                consumer.ApplyAdd(reader.ReadValue<T>(options));
                 break;
             case RemoveCommand:
-                RequireItemCount(itemCount, 2, command);
-                consumer.ApplyRemove(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                reader.RequireOperandCount(1);
+                consumer.ApplyRemove(reader.ReadValue<T>(options));
                 break;
             case ClearCommand:
-                RequireItemCount(itemCount, 1, command);
+                reader.RequireOperandCount(0);
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                if (itemCount < 2)
-                {
-                    throw new InvalidOperationException("Malformed MessagePack log entry: missing snapshot count.");
-                }
-
-                var count = reader.ReadInt32();
-                MessagePackCodecHelpers.RequireSnapshotCount(count, itemCount - 2, command);
+                var count = reader.ReadSnapshotCount(valuesPerItem: 1);
                 consumer.Reset(count);
                 for (var i = 0; i < count; i++)
                 {
-                    consumer.ApplyAdd(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                    consumer.ApplyAdd(reader.ReadValue<T>(options));
                 }
 
                 break;
             default:
-                throw new NotSupportedException($"Command type {command} is not supported");
+                throw new NotSupportedException($"Command type {reader.Command} is not supported");
         }
 
-        MessagePackCodecHelpers.RequireNoTrailingData(ref reader);
+        reader.EnsureEnd();
     }
 
     private void WriteItemCommand(int command, T item, IBufferWriter<byte> output)
@@ -378,11 +324,4 @@ public sealed class MessagePackSetOperationCodec<T>(MessagePackSerializerOptions
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    private static void RequireItemCount(int actual, int expected, int command)
-    {
-        if (actual != expected)
-        {
-            throw new InvalidOperationException($"Malformed MessagePack log entry: command {command} expected {expected} item(s), found {actual}.");
-        }
-    }
 }

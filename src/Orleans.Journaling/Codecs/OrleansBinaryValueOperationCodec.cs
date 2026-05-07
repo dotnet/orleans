@@ -25,16 +25,15 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        ReadVersionByte(ref reader);
-
-        var command = VarIntHelper.ReadVarUInt32(ref reader);
-        var remaining = input.Slice(reader.Consumed);
+        var reader = new OrleansBinaryOperationReader(input);
+        var command = reader.ReadCommand();
 
         switch (command)
         {
             case SetValueCommand:
-                consumer.ApplySet(codec.Read(remaining, out _));
+                var value = reader.ReadValue("value", codec);
+                reader.EnsureEnd();
+                consumer.ApplySet(value);
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
@@ -48,11 +47,4 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
         output.Advance(1);
     }
 
-    private static void ReadVersionByte(ref SequenceReader<byte> reader)
-    {
-        if (!reader.TryRead(out var version) || version != FormatVersion)
-        {
-            throw new NotSupportedException($"Unsupported format version: {version}");
-        }
-    }
 }

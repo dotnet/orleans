@@ -96,65 +96,59 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        ReadVersionByte(ref reader);
-
-        var command = VarIntHelper.ReadVarUInt32(ref reader);
-        var remaining = input.Slice(reader.Consumed);
+        var reader = new OrleansBinaryOperationReader(input);
+        var command = reader.ReadCommand();
 
         switch (command)
         {
             case AddCommand:
-                consumer.ApplyAdd(codec.Read(remaining, out _));
+                var item = reader.ReadValue("item", codec);
+                reader.EnsureEnd();
+                consumer.ApplyAdd(item);
                 break;
             case SetCommand:
-                ApplyIndexAndItem(remaining, consumer.ApplySet);
+                ApplyIndexAndItem(ref reader, consumer.ApplySet);
                 break;
             case InsertCommand:
-                ApplyIndexAndItem(remaining, consumer.ApplyInsert);
+                ApplyIndexAndItem(ref reader, consumer.ApplyInsert);
                 break;
             case RemoveCommand:
-                consumer.ApplyRemoveAt(ReadIndex(remaining));
+                var index = reader.ReadListIndex();
+                reader.EnsureEnd();
+                consumer.ApplyRemoveAt(index);
                 break;
             case ClearCommand:
+                reader.EnsureEnd();
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                ApplySnapshot(remaining, consumer);
+                ApplySnapshot(ref reader, consumer);
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
         }
     }
 
-    private void ApplyIndexAndItem(ReadOnlySequence<byte> remaining, Action<int, T> apply)
+    private void ApplyIndexAndItem(ref OrleansBinaryOperationReader reader, Action<int, T> apply)
     {
-        var reader = new SequenceReader<byte>(remaining);
-        var index = CollectionCodecHelpers.ReadListIndex(ref reader);
-        remaining = remaining.Slice(reader.Consumed);
-        var item = codec.Read(remaining, out _);
+        var index = reader.ReadListIndex();
+        var item = reader.ReadValue("item", codec);
+        reader.EnsureEnd();
         apply(index, item);
     }
 
-    private static int ReadIndex(ReadOnlySequence<byte> remaining)
+    private void ApplySnapshot(ref OrleansBinaryOperationReader reader, IDurableListOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(remaining);
-        return CollectionCodecHelpers.ReadListIndex(ref reader);
-    }
-
-    private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableListOperationHandler<T> consumer)
-    {
-        var reader = new SequenceReader<byte>(remaining);
-        var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
-        remaining = remaining.Slice(reader.Consumed);
+        var count = reader.ReadSnapshotCount();
 
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            var item = codec.Read(remaining, out var consumed);
-            remaining = remaining.Slice(consumed);
+            var item = reader.ReadValue("item", codec);
             consumer.ApplyAdd(item);
         }
+
+        reader.EnsureEnd();
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
@@ -164,11 +158,4 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         output.Advance(1);
     }
 
-    private static void ReadVersionByte(ref SequenceReader<byte> reader)
-    {
-        if (!reader.TryRead(out var version) || version != FormatVersion)
-        {
-            throw new NotSupportedException($"Unsupported format version: {version}");
-        }
-    }
 }

@@ -69,44 +69,44 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        ReadVersionByte(ref reader);
-
-        var command = VarIntHelper.ReadVarUInt32(ref reader);
-        var remaining = input.Slice(reader.Consumed);
+        var reader = new OrleansBinaryOperationReader(input);
+        var command = reader.ReadCommand();
 
         switch (command)
         {
             case EnqueueCommand:
-                consumer.ApplyEnqueue(codec.Read(remaining, out _));
+                var item = reader.ReadValue("item", codec);
+                reader.EnsureEnd();
+                consumer.ApplyEnqueue(item);
                 break;
             case DequeueCommand:
+                reader.EnsureEnd();
                 consumer.ApplyDequeue();
                 break;
             case ClearCommand:
+                reader.EnsureEnd();
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                ApplySnapshot(remaining, consumer);
+                ApplySnapshot(ref reader, consumer);
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
         }
     }
 
-    private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableQueueOperationHandler<T> consumer)
+    private void ApplySnapshot(ref OrleansBinaryOperationReader reader, IDurableQueueOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(remaining);
-        var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
-        remaining = remaining.Slice(reader.Consumed);
+        var count = reader.ReadSnapshotCount();
 
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            var item = codec.Read(remaining, out var consumed);
-            remaining = remaining.Slice(consumed);
+            var item = reader.ReadValue("item", codec);
             consumer.ApplyEnqueue(item);
         }
+
+        reader.EnsureEnd();
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
@@ -116,11 +116,4 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         output.Advance(1);
     }
 
-    private static void ReadVersionByte(ref SequenceReader<byte> reader)
-    {
-        if (!reader.TryRead(out var version) || version != FormatVersion)
-        {
-            throw new NotSupportedException($"Unsupported format version: {version}");
-        }
-    }
 }

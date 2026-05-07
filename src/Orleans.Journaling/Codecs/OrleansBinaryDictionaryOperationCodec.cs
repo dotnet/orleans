@@ -73,60 +73,57 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        ReadVersionByte(ref reader);
-
-        var command = VarIntHelper.ReadVarUInt32(ref reader);
-        var remaining = input.Slice(reader.Consumed);
+        var reader = new OrleansBinaryOperationReader(input);
+        var command = reader.ReadCommand();
 
         switch (command)
         {
             case SetCommand:
-                ApplySet(remaining, consumer);
+                ApplySet(ref reader, consumer);
                 break;
             case RemoveCommand:
-                ApplyRemove(remaining, consumer);
+                ApplyRemove(ref reader, consumer);
                 break;
             case ClearCommand:
+                reader.EnsureEnd();
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
-                ApplySnapshot(remaining, consumer);
+                ApplySnapshot(ref reader, consumer);
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
         }
     }
 
-    private void ApplySet(ReadOnlySequence<byte> remaining, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void ApplySet(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var key = keyCodec.Read(remaining, out var consumed);
-        remaining = remaining.Slice(consumed);
-        var value = valueCodec.Read(remaining, out _);
+        var key = reader.ReadValue("key", keyCodec);
+        var value = reader.ReadValue("value", valueCodec);
+        reader.EnsureEnd();
         consumer.ApplySet(key, value);
     }
 
-    private void ApplyRemove(ReadOnlySequence<byte> remaining, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void ApplyRemove(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var key = keyCodec.Read(remaining, out _);
+        var key = reader.ReadValue("key", keyCodec);
+        reader.EnsureEnd();
         consumer.ApplyRemove(key);
     }
 
-    private void ApplySnapshot(ReadOnlySequence<byte> remaining, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void ApplySnapshot(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var reader = new SequenceReader<byte>(remaining);
-        var count = CollectionCodecHelpers.ReadSnapshotCount(ref reader);
-        remaining = remaining.Slice(reader.Consumed);
+        var count = reader.ReadSnapshotCount();
 
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            var key = keyCodec.Read(remaining, out var consumed);
-            remaining = remaining.Slice(consumed);
-            var value = valueCodec.Read(remaining, out consumed);
-            remaining = remaining.Slice(consumed);
+            var key = reader.ReadValue("key", keyCodec);
+            var value = reader.ReadValue("value", valueCodec);
             consumer.ApplySet(key, value);
         }
+
+        reader.EnsureEnd();
     }
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
@@ -136,11 +133,4 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         output.Advance(1);
     }
 
-    private static void ReadVersionByte(ref SequenceReader<byte> reader)
-    {
-        if (!reader.TryRead(out var version) || version != FormatVersion)
-        {
-            throw new NotSupportedException($"Unsupported format version: {version}");
-        }
-    }
 }

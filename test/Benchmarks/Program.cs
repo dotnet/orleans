@@ -331,7 +331,10 @@ internal class Program
             },
         ["Journaling"] = args =>
         {
-            _ = BenchmarkSwitcher.FromTypes([typeof(DurableListJournalBenchmarks)]).Run(args);
+            _ = BenchmarkSwitcher.FromTypes([
+                typeof(DurableListJournalBenchmarks),
+                typeof(DurableOperationReaderBenchmarks)
+            ]).Run(args);
         },
         ["suite"] = args =>
         {

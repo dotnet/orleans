@@ -24,18 +24,18 @@ public sealed class MessagePackValueOperationCodec<T>(MessagePackSerializerOptio
 
     public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer)
     {
-        var reader = new MessagePackReader(input);
-        var command = MessagePackCodecHelpers.ReadCommand(ref reader, expectedItemCount: 2);
-        switch (command)
+        var reader = new MessagePackOperationReader(input);
+        reader.RequireOperandCount(1);
+        switch (reader.Command)
         {
             case SetCommand:
-                consumer.ApplySet(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                consumer.ApplySet(reader.ReadValue<T>(options));
                 break;
             default:
-                throw new NotSupportedException($"Command type {command} is not supported");
+                throw new NotSupportedException($"Command type {reader.Command} is not supported");
         }
 
-        MessagePackCodecHelpers.RequireNoTrailingData(ref reader);
+        reader.EnsureEnd();
     }
 }
 
@@ -73,37 +73,22 @@ public sealed class MessagePackStateOperationCodec<T>(MessagePackSerializerOptio
 
     public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer)
     {
-        var reader = new MessagePackReader(input);
-        var itemCount = reader.ReadArrayHeader();
-        if (itemCount == 0)
-        {
-            throw new InvalidOperationException("Malformed MessagePack log entry: missing command.");
-        }
-
-        var command = reader.ReadInt32();
-        switch (command)
+        var reader = new MessagePackOperationReader(input);
+        switch (reader.Command)
         {
             case SetCommand:
-                RequireItemCount(itemCount, 3, command);
-                consumer.ApplySet(MessagePackCodecHelpers.ReadValue<T>(ref reader, options), reader.ReadUInt64());
+                reader.RequireOperandCount(2);
+                consumer.ApplySet(reader.ReadValue<T>(options), reader.ReadUInt64());
                 break;
             case ClearCommand:
-                RequireItemCount(itemCount, 1, command);
+                reader.RequireOperandCount(0);
                 consumer.ApplyClear();
                 break;
             default:
-                throw new NotSupportedException($"Command type {command} is not supported");
+                throw new NotSupportedException($"Command type {reader.Command} is not supported");
         }
 
-        MessagePackCodecHelpers.RequireNoTrailingData(ref reader);
-    }
-
-    private static void RequireItemCount(int actual, int expected, int command)
-    {
-        if (actual != expected)
-        {
-            throw new InvalidOperationException($"Malformed MessagePack log entry: command {command} expected {expected} item(s), found {actual}.");
-        }
+        reader.EnsureEnd();
     }
 }
 
@@ -149,37 +134,30 @@ public sealed class MessagePackTcsOperationCodec<T>(MessagePackSerializerOptions
 
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var reader = new MessagePackReader(input);
-        var itemCount = reader.ReadArrayHeader();
-        if (itemCount == 0)
-        {
-            throw new InvalidOperationException("Malformed MessagePack log entry: missing command.");
-        }
-
-        var command = reader.ReadInt32();
-        switch (command)
+        var reader = new MessagePackOperationReader(input);
+        switch (reader.Command)
         {
             case PendingCommand:
-                RequireItemCount(itemCount, 1, command);
+                reader.RequireOperandCount(0);
                 consumer.ApplyPending();
                 break;
             case CompletedCommand:
-                RequireItemCount(itemCount, 2, command);
-                consumer.ApplyCompleted(MessagePackCodecHelpers.ReadValue<T>(ref reader, options));
+                reader.RequireOperandCount(1);
+                consumer.ApplyCompleted(reader.ReadValue<T>(options));
                 break;
             case FaultedCommand:
-                RequireItemCount(itemCount, 2, command);
+                reader.RequireOperandCount(1);
                 consumer.ApplyFaulted(new Exception(reader.ReadString()));
                 break;
             case CanceledCommand:
-                RequireItemCount(itemCount, 1, command);
+                reader.RequireOperandCount(0);
                 consumer.ApplyCanceled();
                 break;
             default:
-                throw new NotSupportedException($"Command type {command} is not supported");
+                throw new NotSupportedException($"Command type {reader.Command} is not supported");
         }
 
-        MessagePackCodecHelpers.RequireNoTrailingData(ref reader);
+        reader.EnsureEnd();
     }
 
     private static void WriteCommand(int command, IBufferWriter<byte> output)
@@ -190,11 +168,4 @@ public sealed class MessagePackTcsOperationCodec<T>(MessagePackSerializerOptions
         MessagePackCodecHelpers.Flush(ref writer);
     }
 
-    private static void RequireItemCount(int actual, int expected, int command)
-    {
-        if (actual != expected)
-        {
-            throw new InvalidOperationException($"Malformed MessagePack log entry: command {command} expected {expected} item(s), found {actual}.");
-        }
-    }
 }

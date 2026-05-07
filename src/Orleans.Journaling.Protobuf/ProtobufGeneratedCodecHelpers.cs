@@ -6,6 +6,9 @@ namespace Orleans.Journaling.Protobuf;
 
 internal static class ProtobufGeneratedCodecHelpers
 {
+    // Protobuf operation reads intentionally go through generated Protobuf*Operation messages. Google.Protobuf exposes
+    // MessageParser<T>.ParseFrom(ReadOnlySequence<byte>) for generated messages, but no public JsonOperationReader-like
+    // ref/streaming reader over arbitrary generated-message fields without hand-parsing tags.
     public static T Parse<T>(ReadOnlySequence<byte> input, MessageParser<T> parser, string entryKind)
         where T : IMessage<T>
     {

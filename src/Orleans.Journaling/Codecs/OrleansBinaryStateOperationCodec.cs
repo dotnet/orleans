@@ -37,18 +37,16 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        ReadVersionByte(ref reader);
-
-        var command = VarIntHelper.ReadVarUInt32(ref reader);
-        var remaining = input.Slice(reader.Consumed);
+        var reader = new OrleansBinaryOperationReader(input);
+        var command = reader.ReadCommand();
 
         switch (command)
         {
             case SetValueCommand:
-                ApplySetValue(remaining, consumer);
+                ApplySetValue(ref reader, consumer);
                 break;
             case ClearValueCommand:
+                reader.EnsureEnd();
                 consumer.ApplyClear();
                 break;
             default:
@@ -56,12 +54,11 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
         }
     }
 
-    private void ApplySetValue(ReadOnlySequence<byte> remaining, IDurableStateOperationHandler<T> consumer)
+    private void ApplySetValue(ref OrleansBinaryOperationReader reader, IDurableStateOperationHandler<T> consumer)
     {
-        var state = codec.Read(remaining, out var consumed);
-        remaining = remaining.Slice(consumed);
-        var reader = new SequenceReader<byte>(remaining);
-        var version = VarIntHelper.ReadVarUInt64(ref reader);
+        var state = reader.ReadValue("state", codec);
+        var version = reader.ReadVarUInt64();
+        reader.EnsureEnd();
         consumer.ApplySet(state, version);
     }
 
@@ -72,11 +69,4 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
         output.Advance(1);
     }
 
-    private static void ReadVersionByte(ref SequenceReader<byte> reader)
-    {
-        if (!reader.TryRead(out var version) || version != FormatVersion)
-        {
-            throw new NotSupportedException($"Unsupported format version: {version}");
-        }
-    }
 }

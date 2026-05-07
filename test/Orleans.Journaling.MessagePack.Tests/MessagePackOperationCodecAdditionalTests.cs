@@ -51,6 +51,33 @@ public sealed class MessagePackOperationCodecAdditionalTests
     }
 
     [Fact]
+    public void OperationReader_RejectsMissingCommand()
+    {
+        var codec = new MessagePackValueOperationCodec<int>(Options);
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(ArrayHeaderOnly(0), new RecordingValueOperationHandler<int>()));
+
+        Assert.Contains("missing command", exception.Message);
+    }
+
+    [Fact]
+    public void OperationCodecs_RejectOperandCountMismatches()
+    {
+        var missingValue = Assert.Throws<InvalidOperationException>(
+            () => new MessagePackValueOperationCodec<int>(Options).Apply(CommandOnly(0), new RecordingValueOperationHandler<int>()));
+        Assert.Contains("expected 2 item(s), found 1", missingValue.Message);
+
+        var extraQueueOperand = Assert.Throws<InvalidOperationException>(
+            () => new MessagePackQueueOperationCodec<int>(Options).Apply(CommandAndNil(1), new RecordingQueueOperationHandler<int>()));
+        Assert.Contains("expected 1 item(s), found 2", extraQueueOperand.Message);
+
+        var missingVersion = Assert.Throws<InvalidOperationException>(
+            () => new MessagePackStateOperationCodec<string>(Options).Apply(CommandAndValue(0, "state"), new RecordingStateOperationHandler<string>()));
+        Assert.Contains("expected 3 item(s), found 2", missingVersion.Message);
+    }
+
+    [Fact]
     public void ValueCodec_RejectsTrailingData()
     {
         var codec = new MessagePackValueOperationCodec<int>(Options);
@@ -65,6 +92,30 @@ public sealed class MessagePackOperationCodecAdditionalTests
             () => codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), new RecordingValueOperationHandler<int>()));
 
         Assert.Contains("trailing data", exception.Message);
+    }
+
+    [Fact]
+    public void OperationCodecs_RejectTrailingDataAcrossFamilies()
+    {
+        var listCodec = new MessagePackListOperationCodec<int>(Options);
+        AssertTrailingDataRejected(() => listCodec.Apply(
+            WithTrailingNil(CodecTestHelpers.WriteEntry(writer => listCodec.WriteRemoveAt(0, writer))),
+            new RecordingListOperationHandler<int>()));
+
+        var dictionaryCodec = new MessagePackDictionaryOperationCodec<string, int>(Options);
+        AssertTrailingDataRejected(() => dictionaryCodec.Apply(
+            WithTrailingNil(CodecTestHelpers.WriteEntry(writer => dictionaryCodec.WriteSet("key", 1, writer))),
+            new RecordingDictionaryOperationHandler<string, int>()));
+
+        var setCodec = new MessagePackSetOperationCodec<string>(Options);
+        AssertTrailingDataRejected(() => setCodec.Apply(
+            WithTrailingNil(CodecTestHelpers.WriteEntry(writer => setCodec.WriteSnapshot(["item"], writer))),
+            new RecordingSetOperationHandler<string>()));
+
+        var tcsCodec = new MessagePackTcsOperationCodec<int>(Options);
+        AssertTrailingDataRejected(() => tcsCodec.Apply(
+            WithTrailingNil(CodecTestHelpers.WriteEntry(writer => tcsCodec.WritePending(writer))),
+            new RecordingTaskCompletionSourceOperationHandler<int>()));
     }
 
     [Fact]
@@ -85,6 +136,25 @@ public sealed class MessagePackOperationCodecAdditionalTests
             () => codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), new RecordingDictionaryOperationHandler<string, int>()));
 
         Assert.Contains("key/value item count", exception.Message);
+    }
+
+    [Fact]
+    public void OperationCodecs_PreserveMessagePackWirePayloads()
+    {
+        var valueCodec = new MessagePackValueOperationCodec<int>(Options);
+        Assert.Equal(
+            [0x92, 0x00, 0x2A],
+            CodecTestHelpers.WriteEntry(writer => valueCodec.WriteSet(42, writer)).ToArray());
+
+        var listCodec = new MessagePackListOperationCodec<int>(Options);
+        Assert.Equal(
+            [0x94, 0x05, 0x02, 0x01, 0x02],
+            CodecTestHelpers.WriteEntry(writer => listCodec.WriteSnapshot([1, 2], writer)).ToArray());
+
+        var dictionaryCodec = new MessagePackDictionaryOperationCodec<string, int>(Options);
+        Assert.Equal(
+            [0x93, 0x00, 0xA1, 0x61, 0x01],
+            CodecTestHelpers.WriteEntry(writer => dictionaryCodec.WriteSet("a", 1, writer)).ToArray());
     }
 
     [Fact]
@@ -156,6 +226,42 @@ public sealed class MessagePackOperationCodecAdditionalTests
         writer.WriteNil();
         writer.Flush();
         return CodecTestHelpers.Sequence(buffer.WrittenMemory);
+    }
+
+    private static ReadOnlySequence<byte> CommandAndValue<T>(int command, T value)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        var writer = new MessagePackWriter(buffer);
+        writer.WriteArrayHeader(2);
+        writer.Write(command);
+        MessagePackSerializer.Serialize(ref writer, value, Options);
+        writer.Flush();
+        return CodecTestHelpers.Sequence(buffer.WrittenMemory);
+    }
+
+    private static ReadOnlySequence<byte> ArrayHeaderOnly(int itemCount)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        var writer = new MessagePackWriter(buffer);
+        writer.WriteArrayHeader(itemCount);
+        writer.Flush();
+        return CodecTestHelpers.Sequence(buffer.WrittenMemory);
+    }
+
+    private static ReadOnlySequence<byte> WithTrailingNil(ReadOnlySequence<byte> payload)
+    {
+        var buffer = new ArrayBufferWriter<byte>();
+        buffer.Write(payload.ToArray());
+        var writer = new MessagePackWriter(buffer);
+        writer.WriteNil();
+        writer.Flush();
+        return CodecTestHelpers.Sequence(buffer.WrittenMemory);
+    }
+
+    private static void AssertTrailingDataRejected(Action action)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(action);
+        Assert.Contains("trailing data", exception.Message);
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

@@ -13,6 +13,10 @@ namespace Orleans.Journaling.Protobuf;
 /// when their generated <see cref="MessageParser{T}"/> is registered explicitly. Other unregistered
 /// values fall back to <see cref="ILogValueCodec{T}"/>.
 /// </para>
+/// <para>
+/// <see cref="MessageParser{T}"/> is metadata for generated message values only. Durable operation
+/// entries are read as generated Protobuf operation messages rather than through a streaming field reader.
+/// </para>
 /// </remarks>
 public sealed class ProtobufJournalingOptions
 {
@@ -29,6 +33,10 @@ public sealed class ProtobufJournalingOptions
     /// Registering a parser lets journaling encode <typeparamref name="T"/> values directly as protobuf
     /// message payloads without reflection. If a parser is not registered, values of this type use the
     /// configured <see cref="ILogValueCodec{T}"/> fallback.
+    /// </para>
+    /// <para>
+    /// This registration does not provide operation-level streaming metadata; protobuf operation entries
+    /// continue to use the generated Protobuf operation message parsers.
     /// </para>
     /// </remarks>
     /// <example>

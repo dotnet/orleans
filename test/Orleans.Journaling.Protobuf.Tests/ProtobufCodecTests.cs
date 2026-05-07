@@ -250,6 +250,50 @@ public class ProtobufCodecTests
     }
 
     [Fact]
+    public void ProtobufLogFormat_WritesMultiSegmentPayloads()
+    {
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        var payload = CreatePayload(ArcBufferWriter.MinimumPageSize + 7);
+
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(42)), payload);
+        using var data = writer.GetCommittedBuffer();
+        var consumer = new CollectingConsumer();
+
+        ReadAll(format, data, consumer);
+
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal((ulong)42, entry.StreamId);
+        Assert.Equal(payload, entry.Payload);
+    }
+
+    [Fact]
+    public void ProtobufLogFormat_SingleSegmentPayloadWrite_DoesNotAllocatePayloadCopy()
+    {
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        var payload = CreatePayload(ArcBufferWriter.MinimumPageSize / 2);
+
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(1)), payload);
+        using (writer.GetCommittedBuffer())
+        {
+        }
+
+        writer.Reset();
+        GC.Collect();
+        GC.WaitForPendingFinalizers();
+        GC.Collect();
+
+        var allocatedBefore = GC.GetAllocatedBytesForCurrentThread();
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(42)), payload);
+        var allocated = GC.GetAllocatedBytesForCurrentThread() - allocatedBefore;
+
+        Assert.True(
+            allocated < payload.Length,
+            $"Expected single-segment protobuf payload write to avoid allocating a {payload.Length}-byte payload copy, allocated {allocated} bytes.");
+    }
+
+    [Fact]
     public void ProtobufLogFormat_Read_ParsesConcatenatedEntries()
     {
         var format = new ProtobufLogFormat();
@@ -271,6 +315,45 @@ public class ProtobufCodecTests
             entry =>
             {
                 Assert.Equal((ulong)300, entry.StreamId);
+                Assert.Equal([0xCC], entry.Payload);
+            });
+    }
+
+    [Fact]
+    public void ProtobufLogFormat_Read_BuffersFormattedEntriesForRetiredStateMachines()
+    {
+        var format = new ProtobufLogFormat();
+        using var writer = format.CreateWriter();
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(8)), [0xAA, 0xBB]);
+        AppendEntry(writer.CreateLogStreamWriter(new LogStreamId(8)), [0xCC]);
+        using var data = writer.GetCommittedBuffer();
+        var bufferingConsumer = new BufferingConsumer();
+
+        ReadAll(format, data, bufferingConsumer);
+
+        Assert.False(bufferingConsumer.RawApplyCalled);
+        Assert.Collection(
+            bufferingConsumer.Entries,
+            entry => Assert.Equal([0xAA, 0xBB], entry.Payload),
+            entry => Assert.Equal([0xCC], entry.Payload));
+
+        using var replayWriter = format.CreateWriter();
+        bufferingConsumer.AppendSnapshot(replayWriter.CreateLogStreamWriter(new LogStreamId(8)));
+        using var replayed = replayWriter.GetCommittedBuffer();
+        var activeConsumer = new CollectingConsumer();
+
+        ReadAll(format, replayed, activeConsumer);
+
+        Assert.Collection(
+            activeConsumer.Entries,
+            entry =>
+            {
+                Assert.Equal(8UL, entry.StreamId);
+                Assert.Equal([0xAA, 0xBB], entry.Payload);
+            },
+            entry =>
+            {
+                Assert.Equal(8UL, entry.StreamId);
                 Assert.Equal([0xCC], entry.Payload);
             });
     }
@@ -394,6 +477,17 @@ public class ProtobufCodecTests
             : new ProtobufValueConverter<T>(new OrleansLogValueCodec<T>(_codecProvider.GetCodec<T>(), _sessionPool));
 
     private static ReadOnlySequence<byte> Sequence(byte[] bytes) => new(bytes);
+
+    private static byte[] CreatePayload(int length)
+    {
+        var result = new byte[length];
+        for (var i = 0; i < result.Length; i++)
+        {
+            result[i] = (byte)i;
+        }
+
+        return result;
+    }
 
     private static void AppendEntry(LogStreamWriter writer, ReadOnlySpan<byte> payload)
     {
@@ -535,6 +629,50 @@ public class ProtobufCodecTests
         public void Reset(LogStreamWriter storage) { }
         public void AppendEntries(LogStreamWriter writer) { }
         public void AppendSnapshot(LogStreamWriter writer) { }
+        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+    }
+
+    private sealed class BufferingConsumer : IStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
+    {
+        private readonly List<IFormattedLogEntry> _formattedEntries = [];
+        private LogStreamId _streamId;
+
+        public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
+
+        public bool RawApplyCalled { get; private set; }
+
+        public IReadOnlyList<IFormattedLogEntry> FormattedEntries => _formattedEntries;
+
+        object IDurableStateMachine.OperationCodec => this;
+
+        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        {
+            _streamId = streamId;
+            return this;
+        }
+
+        public void AddFormattedEntry(IFormattedLogEntry entry)
+        {
+            _formattedEntries.Add(entry);
+            Entries.Add((_streamId.Value, entry.Payload.ToArray()));
+        }
+
+        public void Apply(ReadOnlySequence<byte> payload)
+        {
+            RawApplyCalled = true;
+            Entries.Add((_streamId.Value, payload.ToArray()));
+        }
+
+        public void Reset(LogStreamWriter storage) => _formattedEntries.Clear();
+        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendSnapshot(LogStreamWriter writer)
+        {
+            foreach (var entry in _formattedEntries)
+            {
+                writer.AppendFormattedEntry(entry);
+            }
+        }
+
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 

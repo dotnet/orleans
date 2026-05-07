@@ -60,29 +60,28 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var reader = new SequenceReader<byte>(input);
-        ReadVersionByte(ref reader);
-
-        if (!reader.TryRead(out var statusByte))
-        {
-            throw new InvalidOperationException("Insufficient data while reading status byte.");
-        }
-
-        var remaining = input.Slice(reader.Consumed);
+        var reader = new OrleansBinaryOperationReader(input);
+        var statusByte = reader.ReadByte("status byte");
         var status = (DurableTaskCompletionSourceStatus)statusByte;
 
         switch (status)
         {
             case DurableTaskCompletionSourceStatus.Pending:
+                reader.EnsureEnd();
                 consumer.ApplyPending();
                 break;
             case DurableTaskCompletionSourceStatus.Completed:
-                consumer.ApplyCompleted(codec.Read(remaining, out _));
+                var value = reader.ReadValue("value", codec);
+                reader.EnsureEnd();
+                consumer.ApplyCompleted(value);
                 break;
             case DurableTaskCompletionSourceStatus.Faulted:
-                consumer.ApplyFaulted(exceptionCodec.Read(remaining, out _));
+                var exception = reader.ReadValue("exception", exceptionCodec);
+                reader.EnsureEnd();
+                consumer.ApplyFaulted(exception);
                 break;
             case DurableTaskCompletionSourceStatus.Canceled:
+                reader.EnsureEnd();
                 consumer.ApplyCanceled();
                 break;
             default:
@@ -104,11 +103,4 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         output.Advance(1);
     }
 
-    private static void ReadVersionByte(ref SequenceReader<byte> reader)
-    {
-        if (!reader.TryRead(out var version) || version != FormatVersion)
-        {
-            throw new NotSupportedException($"Unsupported format version: {version}");
-        }
-    }
 }

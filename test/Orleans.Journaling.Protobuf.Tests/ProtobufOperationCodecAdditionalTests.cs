@@ -80,6 +80,24 @@ public sealed class ProtobufOperationCodecAdditionalTests
     }
 
     [Fact]
+    public void DictionaryCodec_RejectsUnbalancedSnapshotKeyValues()
+    {
+        var codec = new ProtobufDictionaryOperationCodec<string, int>(Native<string>(), Native<int>());
+        var buffer = CodecTestHelpers.Write(writer =>
+        {
+            writer.Write(new byte[] { 8, 3, 32, 2 });
+            WriteLengthDelimited(writer, fieldTag: 18, Native<string>().ToBytes("alpha"));
+            WriteLengthDelimited(writer, fieldTag: 26, Native<int>().ToBytes(1));
+            WriteLengthDelimited(writer, fieldTag: 26, Native<int>().ToBytes(2));
+        });
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(CodecTestHelpers.Sequence(buffer.WrittenMemory), new RecordingDictionaryOperationHandler<string, int>()));
+
+        Assert.Contains("declared 2 snapshot item(s) but contained 1", exception.Message);
+    }
+
+    [Fact]
     public void NativeValueConverter_RoundTripsScalarEdges()
     {
         AssertNativeRoundTrip(int.MinValue);
@@ -171,6 +189,15 @@ public sealed class ProtobufOperationCodecAdditionalTests
         var result = converter.FromBytes(new ReadOnlySequence<byte>(converter.ToBytes(value)));
 
         Assert.Equal(value, result);
+    }
+
+    private static void WriteLengthDelimited(IBufferWriter<byte> writer, byte fieldTag, ReadOnlyMemory<byte> value)
+    {
+        var prefix = writer.GetSpan(2);
+        prefix[0] = fieldTag;
+        prefix[1] = checked((byte)value.Length);
+        writer.Advance(2);
+        writer.Write(value.Span);
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder
