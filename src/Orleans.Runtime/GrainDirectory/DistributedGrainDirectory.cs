@@ -75,6 +75,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
     // precise by also tracking the sets of ranges which need to be recovered, but that complicates things somewhat since it would require tracking the ranges
     // for each recovery version.
     private long _recoveryMembershipVersion;
+    internal long RecoveryMembershipVersion => Volatile.Read(ref _recoveryMembershipVersion);
     private Task _runTask = Task.CompletedTask;
     private ActivationDirectory _localActivations;
     private GrainDirectoryResolver? _grainDirectoryResolver;
@@ -237,10 +238,8 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 }
 
                 if (address.MembershipVersion == MembershipVersion.MinValue
-                    || activation is ActivationData activationData && !activationData.IsValid)
+                    || activation is ActivationData { State: ActivationState.Deactivating or ActivationState.Invalid })
                 {
-                    // Do not wait for activation deactivation from directory recovery. Activation shutdown
-                    // can itself perform directory operations which depend on this recovery completing.
                     ++skippedActivationCount;
                     continue;
                 }
@@ -439,7 +438,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Skipped {SkippedActivationCount} in-doubt registrations. Took {ElapsedMilliseconds}ms"
+        Message = "Submitting {Count} registered activations for range {Range} at version {MembershipVersion}. Skipped {SkippedActivationCount} unregistered or terminating activations. Took {ElapsedMilliseconds}ms"
     )]
     private static partial void LogDebugSubmittingRegisteredActivations(ILogger logger, int count, RingRange range, MembershipVersion membershipVersion, int skippedActivationCount, long elapsedMilliseconds);
 

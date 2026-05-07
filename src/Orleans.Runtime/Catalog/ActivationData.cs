@@ -12,6 +12,7 @@ using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -1657,6 +1658,7 @@ internal sealed partial class ActivationData :
                     registerSpan?.SetTag(ActivityTagKeys.DirectoryPreviousRegistrationPresent,
                         PreviousRegistration is not null);
                     var previousRegistration = PreviousRegistration;
+                    var verifiedRecoveryMembershipVersion = 0L;
                     
                     try
                     {
@@ -1669,6 +1671,23 @@ internal sealed partial class ActivationData :
                             if (Address.Matches(result))
                             {
                                 Address = result;
+
+                                // If DGD recovery advanced while this registration was being committed, re-register
+                                // against the recovered view before this activation can become valid.
+                                if (_shared.GrainDirectory is DistributedGrainDirectory distributedGrainDirectory)
+                                {
+                                    var recoveryMembershipVersion = distributedGrainDirectory.RecoveryMembershipVersion;
+                                    if (recoveryMembershipVersion > verifiedRecoveryMembershipVersion
+                                        && recoveryMembershipVersion > result.MembershipVersion.Value)
+                                    {
+                                        verifiedRecoveryMembershipVersion = recoveryMembershipVersion;
+                                        previousRegistration = result;
+                                        _activationActivity?.AddEvent(new ActivityEvent("directory-register-retry-recovery"));
+                                        registerSpan?.AddEvent(new ActivityEvent("retry-recovery"));
+                                        continue;
+                                    }
+                                }
+
                                 success = true;
                                 _activationActivity?.AddEvent(new ActivityEvent("directory-register-success"));
                                 registerSpan?.AddEvent(new ActivityEvent("success"));
