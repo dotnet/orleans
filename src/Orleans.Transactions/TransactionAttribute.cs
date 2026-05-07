@@ -334,6 +334,8 @@ namespace Orleans
 
         public Exception GetException() => _response.Exception;
 
+        public override string ToString() => _response?.ToString() ?? "[null]";
+
         public override void Dispose()
         {
             TransactionInfo = null;

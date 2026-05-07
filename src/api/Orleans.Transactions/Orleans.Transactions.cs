@@ -120,6 +120,8 @@ namespace Orleans
         public System.Exception GetException() { throw null; }
 
         public override T GetResult<T>() { throw null; }
+
+        public override string ToString() { throw null; }
     }
 
     [SerializerTransparent]
