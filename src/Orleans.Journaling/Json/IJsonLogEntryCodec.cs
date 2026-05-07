@@ -1,8 +1,6 @@
-using System.Text.Json;
-
 namespace Orleans.Journaling.Json;
 
 internal interface IJsonLogEntryCodec
 {
-    void Apply(JsonElement entry, IDurableStateMachine stateMachine);
+    void Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine);
 }

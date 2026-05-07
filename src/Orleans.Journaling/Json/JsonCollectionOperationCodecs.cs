@@ -40,47 +40,55 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer)
     {
-        var reader = new Utf8JsonReader(input);
-        var operation = JsonSerializer.Deserialize(ref reader, JsonOperationCodecsJsonContext.Default.JsonListOperation);
-        Apply(operation, consumer);
+        Apply(JsonOperationEntry.Parse(input), consumer);
     }
 
-    internal void Apply(JsonElement root, IDurableListOperationHandler<T> consumer) => Apply(root.Deserialize(JsonOperationCodecsJsonContext.Default.JsonListOperation), consumer);
-
-    private void Apply(JsonListOperation operation, IDurableListOperationHandler<T> consumer)
+    private void Apply(JsonOperationEntry operation, IDurableListOperationHandler<T> consumer)
     {
-        switch (operation.Command)
+        var command = operation.ReadCommand();
+        switch (command)
         {
             case JsonLogEntryCommands.Add:
-                consumer.ApplyAdd(operation.Item.GetValueOrDefault().Deserialize(_itemTypeInfo)!);
+                consumer.ApplyAdd(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                operation.EnsureEnd(2);
                 break;
             case JsonLogEntryCommands.Set:
-                consumer.ApplySet(operation.Index.GetValueOrDefault(), operation.Item.GetValueOrDefault().Deserialize(_itemTypeInfo)!);
+                consumer.ApplySet(
+                    operation.ReadInt32(1, JsonLogEntryFields.Index),
+                    operation.Deserialize(2, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                operation.EnsureEnd(3);
                 break;
             case JsonLogEntryCommands.Insert:
-                consumer.ApplyInsert(operation.Index.GetValueOrDefault(), operation.Item.GetValueOrDefault().Deserialize(_itemTypeInfo)!);
+                consumer.ApplyInsert(
+                    operation.ReadInt32(1, JsonLogEntryFields.Index),
+                    operation.Deserialize(2, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                operation.EnsureEnd(3);
                 break;
             case JsonLogEntryCommands.RemoveAt:
-                consumer.ApplyRemoveAt(operation.Index.GetValueOrDefault());
+                consumer.ApplyRemoveAt(operation.ReadInt32(1, JsonLogEntryFields.Index));
+                operation.EnsureEnd(2);
                 break;
             case JsonLogEntryCommands.Clear:
+                operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = operation.Items ?? [];
-                consumer.Reset(items.Length);
-                foreach (var item in items)
+                var items = operation.ReadArrayElement(1, JsonLogEntryFields.Items);
+                consumer.Reset(items.GetArrayLength());
+                foreach (var item in items.EnumerateArray())
                 {
                     consumer.ApplyAdd(item.Deserialize(_itemTypeInfo)!);
                 }
 
+                operation.EnsureEnd(2);
                 break;
             default:
-                throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
+                operation.EnsureEnd(1);
+                throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableListOperationHandler<T> consumer)
         {
@@ -203,41 +211,43 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer)
     {
-        var reader = new Utf8JsonReader(input);
-        var operation = JsonSerializer.Deserialize(ref reader, JsonOperationCodecsJsonContext.Default.JsonQueueOperation);
-        Apply(operation, consumer);
+        Apply(JsonOperationEntry.Parse(input), consumer);
     }
 
-    internal void Apply(JsonElement root, IDurableQueueOperationHandler<T> consumer) => Apply(root.Deserialize(JsonOperationCodecsJsonContext.Default.JsonQueueOperation), consumer);
-
-    private void Apply(JsonQueueOperation operation, IDurableQueueOperationHandler<T> consumer)
+    private void Apply(JsonOperationEntry operation, IDurableQueueOperationHandler<T> consumer)
     {
-        switch (operation.Command)
+        var command = operation.ReadCommand();
+        switch (command)
         {
             case JsonLogEntryCommands.Enqueue:
-                consumer.ApplyEnqueue(operation.Item.GetValueOrDefault().Deserialize(_itemTypeInfo)!);
+                consumer.ApplyEnqueue(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                operation.EnsureEnd(2);
                 break;
             case JsonLogEntryCommands.Dequeue:
+                operation.EnsureEnd(1);
                 consumer.ApplyDequeue();
                 break;
             case JsonLogEntryCommands.Clear:
+                operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = operation.Items ?? [];
-                consumer.Reset(items.Length);
-                foreach (var item in items)
+                var items = operation.ReadArrayElement(1, JsonLogEntryFields.Items);
+                consumer.Reset(items.GetArrayLength());
+                foreach (var item in items.EnumerateArray())
                 {
                     consumer.ApplyEnqueue(item.Deserialize(_itemTypeInfo)!);
                 }
 
+                operation.EnsureEnd(2);
                 break;
             default:
-                throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
+                operation.EnsureEnd(1);
+                throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableQueueOperationHandler<T> consumer)
         {
@@ -325,41 +335,43 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer)
     {
-        var reader = new Utf8JsonReader(input);
-        var operation = JsonSerializer.Deserialize(ref reader, JsonOperationCodecsJsonContext.Default.JsonSetOperation);
-        Apply(operation, consumer);
+        Apply(JsonOperationEntry.Parse(input), consumer);
     }
 
-    internal void Apply(JsonElement root, IDurableSetOperationHandler<T> consumer) => Apply(root.Deserialize(JsonOperationCodecsJsonContext.Default.JsonSetOperation), consumer);
-
-    private void Apply(JsonSetOperation operation, IDurableSetOperationHandler<T> consumer)
+    private void Apply(JsonOperationEntry operation, IDurableSetOperationHandler<T> consumer)
     {
-        switch (operation.Command)
+        var command = operation.ReadCommand();
+        switch (command)
         {
             case JsonLogEntryCommands.Add:
-                consumer.ApplyAdd(operation.Item.GetValueOrDefault().Deserialize(_itemTypeInfo)!);
+                consumer.ApplyAdd(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                operation.EnsureEnd(2);
                 break;
             case JsonLogEntryCommands.Remove:
-                consumer.ApplyRemove(operation.Item.GetValueOrDefault().Deserialize(_itemTypeInfo)!);
+                consumer.ApplyRemove(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                operation.EnsureEnd(2);
                 break;
             case JsonLogEntryCommands.Clear:
+                operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = operation.Items ?? [];
-                consumer.Reset(items.Length);
-                foreach (var item in items)
+                var items = operation.ReadArrayElement(1, JsonLogEntryFields.Items);
+                consumer.Reset(items.GetArrayLength());
+                foreach (var item in items.EnumerateArray())
                 {
                     consumer.ApplyAdd(item.Deserialize(_itemTypeInfo)!);
                 }
 
+                operation.EnsureEnd(2);
                 break;
             default:
-                throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
+                operation.EnsureEnd(1);
+                throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableSetOperationHandler<T> consumer)
         {

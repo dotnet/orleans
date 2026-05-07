@@ -24,29 +24,25 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer)
     {
-        var reader = new Utf8JsonReader(input);
-        var operation = JsonSerializer.Deserialize(ref reader, JsonOperationCodecsJsonContext.Default.JsonValueOperation);
-        Apply(operation, consumer);
+        Apply(JsonOperationEntry.Parse(input), consumer);
     }
 
-    internal void Apply(JsonElement root, IDurableValueOperationHandler<T> consumer)
+    private void Apply(JsonOperationEntry operation, IDurableValueOperationHandler<T> consumer)
     {
-        Apply(root.Deserialize(JsonOperationCodecsJsonContext.Default.JsonValueOperation), consumer);
-    }
-
-    private void Apply(JsonValueOperation operation, IDurableValueOperationHandler<T> consumer)
-    {
-        switch (operation.Command)
+        var command = operation.ReadCommand();
+        switch (command)
         {
             case JsonLogEntryCommands.Set:
-                consumer.ApplySet(operation.Value.GetValueOrDefault().Deserialize(_valueTypeInfo)!);
+                consumer.ApplySet(operation.Deserialize(1, JsonLogEntryFields.Value, _valueTypeInfo)!);
+                operation.EnsureEnd(2);
                 break;
             default:
-                throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
+                operation.EnsureEnd(1);
+                throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableValueOperationHandler<T> consumer)
         {
@@ -90,34 +86,31 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer)
     {
-        var reader = new Utf8JsonReader(input);
-        var operation = JsonSerializer.Deserialize(ref reader, JsonOperationCodecsJsonContext.Default.JsonStateOperation);
-        Apply(operation, consumer);
+        Apply(JsonOperationEntry.Parse(input), consumer);
     }
 
-    internal void Apply(JsonElement root, IDurableStateOperationHandler<T> consumer)
+    private void Apply(JsonOperationEntry operation, IDurableStateOperationHandler<T> consumer)
     {
-        Apply(root.Deserialize(JsonOperationCodecsJsonContext.Default.JsonStateOperation), consumer);
-    }
-
-    private void Apply(JsonStateOperation operation, IDurableStateOperationHandler<T> consumer)
-    {
-        switch (operation.Command)
+        var command = operation.ReadCommand();
+        switch (command)
         {
             case JsonLogEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.State.GetValueOrDefault().Deserialize(_stateTypeInfo)!,
-                    operation.Version.GetValueOrDefault());
+                    operation.Deserialize(1, JsonLogEntryFields.State, _stateTypeInfo)!,
+                    operation.ReadUInt64(2, JsonLogEntryFields.Version));
+                operation.EnsureEnd(3);
                 break;
             case JsonLogEntryCommands.Clear:
+                operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
             default:
-                throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
+                operation.EnsureEnd(1);
+                throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableStateOperationHandler<T> consumer)
         {
@@ -186,38 +179,37 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var reader = new Utf8JsonReader(input);
-        var operation = JsonSerializer.Deserialize(ref reader, JsonOperationCodecsJsonContext.Default.JsonTaskCompletionSourceOperation);
-        Apply(operation, consumer);
+        Apply(JsonOperationEntry.Parse(input), consumer);
     }
 
-    internal void Apply(JsonElement root, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private void Apply(JsonOperationEntry operation, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        Apply(root.Deserialize(JsonOperationCodecsJsonContext.Default.JsonTaskCompletionSourceOperation), consumer);
-    }
-
-    private void Apply(JsonTaskCompletionSourceOperation operation, IDurableTaskCompletionSourceOperationHandler<T> consumer)
-    {
-        switch (operation.Command)
+        var command = operation.ReadCommand();
+        switch (command)
         {
             case JsonLogEntryCommands.Pending:
+                operation.EnsureEnd(1);
                 consumer.ApplyPending();
                 break;
             case JsonLogEntryCommands.Completed:
-                consumer.ApplyCompleted(operation.Value.GetValueOrDefault().Deserialize(_valueTypeInfo)!);
+                consumer.ApplyCompleted(operation.Deserialize(1, JsonLogEntryFields.Value, _valueTypeInfo)!);
+                operation.EnsureEnd(2);
                 break;
             case JsonLogEntryCommands.Faulted:
-                consumer.ApplyFaulted(new Exception(operation.Message));
+                consumer.ApplyFaulted(new Exception(operation.ReadString(1, JsonLogEntryFields.Message)));
+                operation.EnsureEnd(2);
                 break;
             case JsonLogEntryCommands.Canceled:
+                operation.EnsureEnd(1);
                 consumer.ApplyCanceled();
                 break;
             default:
-                throw new NotSupportedException($"Command type '{operation.Command}' is not supported");
+                operation.EnsureEnd(1);
+                throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableTaskCompletionSourceOperationHandler<T> consumer)
         {

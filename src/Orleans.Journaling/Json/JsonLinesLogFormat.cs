@@ -64,17 +64,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
 
     private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateMachineResolver resolver)
     {
-        JsonElement logEntry;
-
-        try
-        {
-            using var document = JsonDocument.Parse(line);
-            logEntry = document.RootElement.Clone();
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: invalid JSON log entry. {exception.Message}", exception);
-        }
+        var logEntry = ParseLogEntry(line, offset);
 
         if (logEntry.ValueKind is not JsonValueKind.Array)
         {
@@ -103,7 +93,7 @@ internal sealed class JsonLinesLogFormat : ILogFormat
             throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: element 1 must be an operation command string.");
         }
 
-        var entry = CreateOperationEntry(logEntry);
+        var entry = new JsonOperationEntry(logEntry, offset: 1, length - 1);
         var stream = new LogStreamId(streamId);
         var stateMachine = resolver.ResolveStateMachine(stream);
         if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
@@ -120,13 +110,27 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         ApplyJsonEntry(stream, stateMachine, entry);
     }
 
-    private static void ApplyJsonEntry(LogStreamId streamId, IDurableStateMachine stateMachine, JsonElement entry)
+    private static JsonElement ParseLogEntry(ReadOnlySequence<byte> line, long offset)
     {
-        if (entry.ValueKind is not JsonValueKind.Array)
+        var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
+        try
         {
-            throw new InvalidOperationException($"Malformed JSON Lines log segment for stream {streamId.Value}: operation entry must be a JSON array.");
-        }
+            var result = JsonElement.ParseValue(ref reader);
+            if (reader.Read())
+            {
+                throw new JsonException("Additional JSON content was found after the log entry.");
+            }
 
+            return result;
+        }
+        catch (JsonException exception)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines log segment at byte offset {offset}: invalid JSON log entry. {exception.Message}", exception);
+        }
+    }
+
+    private static void ApplyJsonEntry(LogStreamId streamId, IDurableStateMachine stateMachine, JsonOperationEntry entry)
+    {
         var operationCodec = stateMachine.OperationCodec;
         if (operationCodec is not IJsonLogEntryCodec jsonCodec)
         {
@@ -137,25 +141,6 @@ internal sealed class JsonLinesLogFormat : ILogFormat
         }
 
         jsonCodec.Apply(entry, stateMachine);
-    }
-
-    private static JsonElement CreateOperationEntry(JsonElement logEntry)
-    {
-        var buffer = new ArrayBufferWriter<byte>();
-        using (var writer = new Utf8JsonWriter(buffer))
-        {
-            writer.WriteStartArray();
-            var length = logEntry.GetArrayLength();
-            for (var i = 1; i < length; i++)
-            {
-                logEntry[i].WriteTo(writer);
-            }
-
-            writer.WriteEndArray();
-        }
-
-        using var document = JsonDocument.Parse(buffer.WrittenMemory);
-        return document.RootElement.Clone();
     }
 
     private static bool EndsWith(ReadOnlySequence<byte> input, byte value)
@@ -328,6 +313,8 @@ internal abstract class JsonFormattedLogEntry : IFormattedLogEntry
 
     public static JsonFormattedLogEntry Create(JsonElement payload) => new JsonElementFormattedLogEntry(payload);
 
+    public static JsonFormattedLogEntry Create(JsonOperationEntry payload) => new JsonOperationEntryFormattedLogEntry(payload);
+
     public static JsonFormattedLogEntry Create<TArg>(TArg argument, Action<Utf8JsonWriter, TArg> writeArrayElementsTo)
     {
         ArgumentNullException.ThrowIfNull(writeArrayElementsTo);
@@ -372,6 +359,13 @@ internal abstract class JsonFormattedLogEntry : IFormattedLogEntry
                 element.WriteTo(writer);
             }
         }
+    }
+
+    private sealed class JsonOperationEntryFormattedLogEntry(JsonOperationEntry entry) : JsonFormattedLogEntry
+    {
+        public override void WriteTo(Utf8JsonWriter writer) => entry.WriteTo(writer);
+
+        public override void WriteArrayElementsTo(Utf8JsonWriter writer) => entry.WriteArrayElementsTo(writer);
     }
 }
 

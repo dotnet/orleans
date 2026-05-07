@@ -770,7 +770,7 @@ public class JsonCodecTests
 
         public int? Value { get; private set; }
 
-        public void Apply(JsonElement entry, IDurableStateMachine stateMachine)
+        public void Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
         {
             StateMachine = stateMachine;
             Value = entry[1].GetInt32();
