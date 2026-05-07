@@ -24,12 +24,13 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer)
     {
-        Apply(JsonOperationEntry.Parse(input), consumer);
+        var operation = new JsonOperationReader(input);
+        Apply(ref operation, consumer);
     }
 
-    private void Apply(JsonOperationEntry operation, IDurableValueOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IDurableValueOperationHandler<T> consumer)
     {
-        var command = operation.ReadCommand();
+        var command = operation.Command;
         switch (command)
         {
             case JsonLogEntryCommands.Set:
@@ -42,7 +43,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableValueOperationHandler<T> consumer)
         {
@@ -50,7 +51,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
                 $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
-        Apply(entry, consumer);
+        Apply(ref reader, consumer);
     }
 
     private readonly struct SetOperation(JsonTypeInfo<T> typeInfo, T value)
@@ -86,12 +87,13 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer)
     {
-        Apply(JsonOperationEntry.Parse(input), consumer);
+        var operation = new JsonOperationReader(input);
+        Apply(ref operation, consumer);
     }
 
-    private void Apply(JsonOperationEntry operation, IDurableStateOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IDurableStateOperationHandler<T> consumer)
     {
-        var command = operation.ReadCommand();
+        var command = operation.Command;
         switch (command)
         {
             case JsonLogEntryCommands.Set:
@@ -110,7 +112,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableStateOperationHandler<T> consumer)
         {
@@ -118,7 +120,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
                 $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
-        Apply(entry, consumer);
+        Apply(ref reader, consumer);
     }
 
     private static void WriteCommand(LogStreamWriter writer, string command)
@@ -179,12 +181,13 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        Apply(JsonOperationEntry.Parse(input), consumer);
+        var operation = new JsonOperationReader(input);
+        Apply(ref operation, consumer);
     }
 
-    private void Apply(JsonOperationEntry operation, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var command = operation.ReadCommand();
+        var command = operation.Command;
         switch (command)
         {
             case JsonLogEntryCommands.Pending:
@@ -209,7 +212,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableTaskCompletionSourceOperationHandler<T> consumer)
         {
@@ -217,7 +220,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
                 $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
-        Apply(entry, consumer);
+        Apply(ref reader, consumer);
     }
 
     private static void WriteCommand(LogStreamWriter writer, string command)

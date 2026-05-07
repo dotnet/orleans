@@ -770,10 +770,11 @@ public class JsonCodecTests
 
         public int? Value { get; private set; }
 
-        public void Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+        public void Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
         {
             StateMachine = stateMachine;
-            Value = entry[1].GetInt32();
+            Value = reader.Deserialize(1, JsonLogEntryFields.Value, JsonCodecTestJsonContext.Default.Int32);
+            reader.EnsureEnd(2);
         }
     }
 

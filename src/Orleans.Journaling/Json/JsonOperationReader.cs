@@ -1,0 +1,231 @@
+using System.Buffers;
+using System.Text.Json;
+using System.Text.Json.Serialization.Metadata;
+
+namespace Orleans.Journaling.Json;
+
+internal ref struct JsonOperationReader
+{
+    private Utf8JsonReader _reader;
+    private int _nextIndex;
+
+    public JsonOperationReader(ReadOnlySequence<byte> input)
+    {
+        _reader = new Utf8JsonReader(input, isFinalBlock: true, state: default);
+        _nextIndex = 0;
+        if (!_reader.Read() || _reader.TokenType is not JsonTokenType.StartArray)
+        {
+            throw new JsonException("A JSON journal operation must be an array.");
+        }
+
+        Command = ReadCommandCore();
+    }
+
+    public JsonOperationReader(ref Utf8JsonReader reader)
+    {
+        _reader = reader;
+        _nextIndex = 0;
+        Command = ReadCommandCore();
+    }
+
+    public string? Command { get; }
+
+    public T? Deserialize<T>(int index, string operandName, JsonTypeInfo<T> typeInfo)
+    {
+        ReadOperand(index, operandName);
+        return JsonSerializer.Deserialize(ref _reader, typeInfo);
+    }
+
+    public T? DeserializeCurrent<T>(JsonTypeInfo<T> typeInfo) => JsonSerializer.Deserialize(ref _reader, typeInfo);
+
+    public int ReadInt32(int index, string operandName)
+    {
+        ReadOperand(index, operandName);
+        if (!_reader.TryGetInt32(out var value))
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' must be a 32-bit integer.");
+        }
+
+        return value;
+    }
+
+    public ulong ReadUInt64(int index, string operandName)
+    {
+        ReadOperand(index, operandName);
+        if (!_reader.TryGetUInt64(out var value))
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' must be an unsigned integer.");
+        }
+
+        return value;
+    }
+
+    public string? ReadString(int index, string operandName)
+    {
+        ReadOperand(index, operandName);
+        if (_reader.TokenType is JsonTokenType.Null)
+        {
+            return null;
+        }
+
+        if (_reader.TokenType is not JsonTokenType.String)
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' must be a string.");
+        }
+
+        return _reader.GetString();
+    }
+
+    public int StartArray(int index, string operandName)
+    {
+        ReadOperand(index, operandName);
+        if (_reader.TokenType is not JsonTokenType.StartArray)
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' must be an array.");
+        }
+
+        return CountCurrentArray(operandName);
+    }
+
+    public bool ReadArrayItem(string operandName)
+    {
+        if (!_reader.Read())
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' array is incomplete.");
+        }
+
+        return _reader.TokenType is not JsonTokenType.EndArray;
+    }
+
+    public (TFirst? First, TSecond? Second) ReadCurrentPair<TFirst, TSecond>(
+        string operandName,
+        JsonTypeInfo<TFirst> firstTypeInfo,
+        JsonTypeInfo<TSecond> secondTypeInfo)
+    {
+        if (_reader.TokenType is not JsonTokenType.StartArray)
+        {
+            throw new JsonException("JSON dictionary snapshot items must be [key,value] arrays.");
+        }
+
+        if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
+        {
+            throw new JsonException($"JSON journal operation is missing operand '{JsonLogEntryFields.Key}'.");
+        }
+
+        var first = JsonSerializer.Deserialize(ref _reader, firstTypeInfo);
+        if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
+        {
+            throw new JsonException($"JSON journal operation is missing operand '{JsonLogEntryFields.Value}'.");
+        }
+
+        var second = JsonSerializer.Deserialize(ref _reader, secondTypeInfo);
+        if (!_reader.Read())
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' array is incomplete.");
+        }
+
+        if (_reader.TokenType is not JsonTokenType.EndArray)
+        {
+            throw new JsonException("JSON journal operation contains unexpected extra elements.");
+        }
+
+        return (first, second);
+    }
+
+    public void EnsureEnd(int nextIndex)
+    {
+        if (nextIndex != _nextIndex)
+        {
+            throw new InvalidOperationException("JSON journal operation operands must be read in order.");
+        }
+
+        if (!_reader.Read())
+        {
+            throw new JsonException("JSON journal operation array is incomplete.");
+        }
+
+        if (_reader.TokenType is not JsonTokenType.EndArray)
+        {
+            throw new JsonException("JSON journal operation contains unexpected extra elements.");
+        }
+
+        if (_reader.Read())
+        {
+            throw new JsonException("Additional JSON content was found after the log entry.");
+        }
+    }
+
+    public void SkipToEnd()
+    {
+        while (_reader.Read())
+        {
+            if (_reader.TokenType is JsonTokenType.EndArray)
+            {
+                if (_reader.Read())
+                {
+                    throw new JsonException("Additional JSON content was found after the log entry.");
+                }
+
+                return;
+            }
+
+            _reader.Skip();
+        }
+
+        throw new JsonException("JSON journal operation array is incomplete.");
+    }
+
+    private string? ReadCommandCore()
+    {
+        if (!_reader.Read())
+        {
+            throw new JsonException("A JSON journal operation array is incomplete.");
+        }
+
+        if (_reader.TokenType is JsonTokenType.EndArray)
+        {
+            throw new JsonException("A JSON journal operation array must include an operation command string.");
+        }
+
+        if (_reader.TokenType is not JsonTokenType.String)
+        {
+            throw new JsonException("The first JSON journal operation element must be an operation command string.");
+        }
+
+        _nextIndex = 1;
+        return _reader.GetString();
+    }
+
+    private void ReadOperand(int index, string operandName)
+    {
+        if (index != _nextIndex)
+        {
+            throw new InvalidOperationException("JSON journal operation operands must be read in order.");
+        }
+
+        if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
+        {
+            throw new JsonException($"JSON journal operation is missing operand '{operandName}'.");
+        }
+
+        _nextIndex++;
+    }
+
+    private int CountCurrentArray(string operandName)
+    {
+        var reader = _reader;
+        var count = 0;
+        while (reader.Read())
+        {
+            if (reader.TokenType is JsonTokenType.EndArray)
+            {
+                return count;
+            }
+
+            count++;
+            reader.Skip();
+        }
+
+        throw new JsonException($"JSON journal operation operand '{operandName}' array is incomplete.");
+    }
+}

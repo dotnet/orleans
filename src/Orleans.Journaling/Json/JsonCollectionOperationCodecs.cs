@@ -40,12 +40,13 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer)
     {
-        Apply(JsonOperationEntry.Parse(input), consumer);
+        var operation = new JsonOperationReader(input);
+        Apply(ref operation, consumer);
     }
 
-    private void Apply(JsonOperationEntry operation, IDurableListOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IDurableListOperationHandler<T> consumer)
     {
-        var command = operation.ReadCommand();
+        var command = operation.Command;
         switch (command)
         {
             case JsonLogEntryCommands.Add:
@@ -73,11 +74,11 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = operation.ReadArrayElement(1, JsonLogEntryFields.Items);
-                consumer.Reset(items.GetArrayLength());
-                foreach (var item in items.EnumerateArray())
+                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+                consumer.Reset(count);
+                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
                 {
-                    consumer.ApplyAdd(item.Deserialize(_itemTypeInfo)!);
+                    consumer.ApplyAdd(operation.DeserializeCurrent(_itemTypeInfo)!);
                 }
 
                 operation.EnsureEnd(2);
@@ -88,7 +89,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableListOperationHandler<T> consumer)
         {
@@ -96,7 +97,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
                 $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
-        Apply(entry, consumer);
+        Apply(ref reader, consumer);
     }
 
     private void WriteItem(LogStreamWriter writer, string command, T item)
@@ -211,12 +212,13 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer)
     {
-        Apply(JsonOperationEntry.Parse(input), consumer);
+        var operation = new JsonOperationReader(input);
+        Apply(ref operation, consumer);
     }
 
-    private void Apply(JsonOperationEntry operation, IDurableQueueOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IDurableQueueOperationHandler<T> consumer)
     {
-        var command = operation.ReadCommand();
+        var command = operation.Command;
         switch (command)
         {
             case JsonLogEntryCommands.Enqueue:
@@ -232,11 +234,11 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = operation.ReadArrayElement(1, JsonLogEntryFields.Items);
-                consumer.Reset(items.GetArrayLength());
-                foreach (var item in items.EnumerateArray())
+                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+                consumer.Reset(count);
+                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
                 {
-                    consumer.ApplyEnqueue(item.Deserialize(_itemTypeInfo)!);
+                    consumer.ApplyEnqueue(operation.DeserializeCurrent(_itemTypeInfo)!);
                 }
 
                 operation.EnsureEnd(2);
@@ -247,7 +249,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableQueueOperationHandler<T> consumer)
         {
@@ -255,7 +257,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
                 $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
-        Apply(entry, consumer);
+        Apply(ref reader, consumer);
     }
 
     private void WriteItem(LogStreamWriter writer, string command, T item)
@@ -335,12 +337,13 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer)
     {
-        Apply(JsonOperationEntry.Parse(input), consumer);
+        var operation = new JsonOperationReader(input);
+        Apply(ref operation, consumer);
     }
 
-    private void Apply(JsonOperationEntry operation, IDurableSetOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IDurableSetOperationHandler<T> consumer)
     {
-        var command = operation.ReadCommand();
+        var command = operation.Command;
         switch (command)
         {
             case JsonLogEntryCommands.Add:
@@ -356,11 +359,11 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = operation.ReadArrayElement(1, JsonLogEntryFields.Items);
-                consumer.Reset(items.GetArrayLength());
-                foreach (var item in items.EnumerateArray())
+                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+                consumer.Reset(count);
+                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
                 {
-                    consumer.ApplyAdd(item.Deserialize(_itemTypeInfo)!);
+                    consumer.ApplyAdd(operation.DeserializeCurrent(_itemTypeInfo)!);
                 }
 
                 operation.EnsureEnd(2);
@@ -371,7 +374,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableSetOperationHandler<T> consumer)
         {
@@ -379,7 +382,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
                 $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
-        Apply(entry, consumer);
+        Apply(ref reader, consumer);
     }
 
     private void WriteItem(LogStreamWriter writer, string command, T item)

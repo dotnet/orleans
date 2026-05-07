@@ -60,12 +60,13 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        Apply(JsonOperationEntry.Parse(input), consumer);
+        var operation = new JsonOperationReader(input);
+        Apply(ref operation, consumer);
     }
 
-    private void Apply(JsonOperationEntry operation, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void Apply(ref JsonOperationReader operation, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var command = operation.ReadCommand();
+        var command = operation.Command;
         switch (command)
         {
             case JsonLogEntryCommands.Set:
@@ -83,20 +84,12 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
                 consumer.ApplyClear();
                 break;
             case JsonLogEntryCommands.Snapshot:
-                var items = operation.ReadArrayElement(1, JsonLogEntryFields.Items);
-                consumer.Reset(items.GetArrayLength());
-                foreach (var item in items.EnumerateArray())
+                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+                consumer.Reset(count);
+                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
                 {
-                    if (item.ValueKind is not JsonValueKind.Array)
-                    {
-                        throw new JsonException("JSON dictionary snapshot items must be [key,value] arrays.");
-                    }
-
-                    var entry = new JsonOperationEntry(item);
-                    consumer.ApplySet(
-                        entry.Deserialize(0, JsonLogEntryFields.Key, _keyTypeInfo)!,
-                        entry.Deserialize(1, JsonLogEntryFields.Value, _valueTypeInfo)!);
-                    entry.EnsureEnd(2);
+                    var (key, value) = operation.ReadCurrentPair(JsonLogEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
+                    consumer.ApplySet(key!, value!);
                 }
 
                 operation.EnsureEnd(2);
@@ -107,7 +100,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         }
     }
 
-    void IJsonLogEntryCodec.Apply(JsonOperationEntry entry, IDurableStateMachine stateMachine)
+    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableDictionaryOperationHandler<TKey, TValue> consumer)
         {
@@ -115,7 +108,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
                 $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
-        Apply(entry, consumer);
+        Apply(ref reader, consumer);
     }
 
     private readonly struct SetOperation(JsonTypeInfo<TKey> keyTypeInfo, JsonTypeInfo<TValue> valueTypeInfo, TKey key, TValue value)
