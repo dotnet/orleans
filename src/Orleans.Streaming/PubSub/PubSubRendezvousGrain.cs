@@ -13,6 +13,7 @@ using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
 using Orleans.Streams.Core;
+using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 
 namespace Orleans.Streams
 {
@@ -114,6 +115,7 @@ namespace Orleans.Streams
                 State.Producers.Add(publisherState);
                 LogPubSubCounts("RegisterProducer {0}", streamProducer);
                 await WriteStateAsync();
+                StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
                 StreamInstruments.PubSubProducersTotal.Add(1);
             }
             catch (Exception exc)
@@ -141,6 +143,7 @@ namespace Orleans.Streams
                         ? ClearStateAsync() //State contains no producers or consumers, remove it from storage
                         : WriteStateAsync();
                     await updateStorageTask;
+                    StreamingEvents.EmitProducerUnregistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
                 }
                 StreamInstruments.PubSubProducersTotal.Add(-numRemoved);
             }
@@ -181,6 +184,7 @@ namespace Orleans.Streams
 
                 LogPubSubCounts("RegisterConsumer {0}", streamConsumer);
                 await WriteStateAsync();
+                StreamingEvents.EmitSubscriptionRegistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, GrainContext.Address.SiloAddress);
                 StreamInstruments.PubSubConsumersTotal.Add(1);
             }
             catch (Exception exc)
@@ -272,6 +276,7 @@ namespace Orleans.Streams
                     if (numRemoved != 0)
                     {
                         await WriteStateAsync();
+                        StreamingEvents.EmitSubscriptionUnregistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, GrainContext.Address.SiloAddress);
                     }
                     await NotifyProducersOfRemovedSubscription(subscriptionId, streamId);
                 }

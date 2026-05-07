@@ -150,7 +150,7 @@ namespace Orleans.Configuration
                 AzureBlobUtils.ValidateContainerName(options.ContainerName);
                 AzureBlobUtils.ValidateBlobName(this.name);
             }
-            catch(ArgumentException e)
+            catch (ArgumentException e)
             {
                 throw new OrleansConfigurationException(
                     $"Configuration for AzureBlobStorageOptions {name} is invalid. {nameof(this.options.ContainerName)} is not valid", e);

@@ -17,7 +17,7 @@ using Orleans.Serialization.Invocation;
 #nullable disable
 namespace Orleans.Runtime.Messaging
 {
-    internal abstract partial class Connection
+    internal abstract partial class Connection : IMessageReceiver
     {
         private static readonly Func<ConnectionContext, Task> OnConnectedDelegate = context => OnConnectedAsync(context);
         private static readonly Action<object> OnConnectionClosedDelegate = state => ((Connection)state).OnTransportConnectionClosed();
@@ -65,7 +65,7 @@ namespace Orleans.Runtime.Messaging
         public virtual EndPoint RemoteEndPoint { get; }
         public virtual EndPoint LocalEndPoint { get; }
         protected ConnectionContext Context { get; }
-        protected NetworkingTrace Log => this.shared.NetworkingTrace;
+        protected ILogger Log => this.shared.Logger;
         protected MessagingTrace MessagingTrace => this.shared.MessagingTrace;
         protected abstract ConnectionDirection ConnectionDirection { get; }
         protected MessageFactory MessageFactory => this.shared.MessageFactory;
@@ -320,6 +320,7 @@ namespace Orleans.Runtime.Messaging
                                 if (requiredBytes == 0)
                                 {
                                     Debug.Assert(message is not null);
+                                    message.MessageReceiver = this;
                                     RecordMessageReceive(message, bodyLength + headerLength, headerLength);
                                     var handler = MessageHandlerPool.Get();
                                     handler.Set(message, this);
@@ -536,6 +537,18 @@ namespace Orleans.Runtime.Messaging
             }
 
             return true;
+        }
+
+        public virtual void ReceiveMessage(Message message, IMessageReceiverCache cache)
+        {
+            if (!IsValid)
+            {
+                cache.MessageReceiver = null;
+                RetryMessage(message);
+                return;
+            }
+
+            Send(message);
         }
 
         private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>

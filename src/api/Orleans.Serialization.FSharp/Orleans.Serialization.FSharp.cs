@@ -280,7 +280,7 @@ namespace Orleans.Serialization
 
 namespace OrleansCodeGen.Orleans.Serialization
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FSharpListSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FSharpListSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.FSharpListSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -298,7 +298,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FSharpMapSurrogate<TKey, TValue> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -316,7 +316,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FSharpRefSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FSharpRefSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.FSharpRefSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -334,7 +334,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_FSharpSetSurrogate<T> : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Serialization.FSharpSetSurrogate<T>>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IValueSerializer<global::Orleans.Serialization.FSharpSetSurrogate<T>>, global::Orleans.Serialization.Serializers.IValueSerializer
@@ -352,7 +352,7 @@ namespace OrleansCodeGen.Orleans.Serialization
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FSharpListSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.FSharpListSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -362,7 +362,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public global::Orleans.Serialization.FSharpListSurrogate<T> DeepCopy(global::Orleans.Serialization.FSharpListSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FSharpMapSurrogate<TKey, TValue> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.FSharpMapSurrogate<TKey, TValue>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -372,7 +372,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public global::Orleans.Serialization.FSharpMapSurrogate<TKey, TValue> DeepCopy(global::Orleans.Serialization.FSharpMapSurrogate<TKey, TValue> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FSharpRefSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.FSharpRefSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier
@@ -382,7 +382,7 @@ namespace OrleansCodeGen.Orleans.Serialization
         public global::Orleans.Serialization.FSharpRefSurrogate<T> DeepCopy(global::Orleans.Serialization.FSharpRefSurrogate<T> result, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_FSharpSetSurrogate<T> : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.Serialization.FSharpSetSurrogate<T>>, global::Orleans.Serialization.Cloning.IDeepCopier

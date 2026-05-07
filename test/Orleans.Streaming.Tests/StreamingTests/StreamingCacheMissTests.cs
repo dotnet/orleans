@@ -1,6 +1,7 @@
 using Orleans.Runtime;
 using Orleans.Streams;
 using Orleans.Streams.Filtering;
+using Orleans.TestingHost.Utils;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -59,12 +60,15 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public virtual async Task PreviousEventEvictedFromCacheTest()
         {
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
             var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
             var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            var streamId = StreamId.Create(nameof(IImplicitSubscriptionCounterGrain), key);
 
             // We need multiple streams, so at least another one will be handled by the same PullingAgent than "stream"
             // This ensures cache pressure and increases likelihood of eviction
@@ -81,13 +85,13 @@ namespace Tester.StreamingTests
 
             // Wait for cache expiration time to pass
             // Then send events to other streams to trigger cache cleaning/eviction
-            await Task.Delay(TimeSpan.FromSeconds(6));
-            otherStreams.ForEach(s => s.OnNextAsync(interestingData));
+            await Task.Delay(DataMaxAgeInCache + TimeSpan.FromSeconds(1));
+            await Task.WhenAll(otherStreams.Select(s => s.OnNextAsync(interestingData)));
 
             // Should be delivered
             await stream.OnNextAsync(interestingData);
-
-            await Task.Delay(5_000);
+            await observer.WaitForItemDeliveryCountAsync(streamId, 2, StreamProviderName, cts.Token);
+            await WaitForEventCounterAsync(grain, 2);
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(2, await grain.GetEventCounter());
@@ -103,12 +107,15 @@ namespace Tester.StreamingTests
         [SkippableFact]
         public virtual async Task PreviousEventEvictedFromCacheWithFilterTest()
         {
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
             var streamProvider = this.Client.GetStreamProvider(StreamProviderName);
 
             // Tested stream and corresponding grain
             var key = Guid.NewGuid();
             var stream = streamProvider.GetStream<byte[]>(nameof(IImplicitSubscriptionCounterGrain), key);
             var grain = this.Client.GetGrain<IImplicitSubscriptionCounterGrain>(key);
+            var streamId = StreamId.Create(nameof(IImplicitSubscriptionCounterGrain), key);
 
             // We need multiple streams, so at least another one will be handled by the same PullingAgent than "stream"
             // This ensures cache pressure and increases likelihood of eviction
@@ -129,16 +136,33 @@ namespace Tester.StreamingTests
 
             // Wait for cache expiration and trigger eviction with more filtered events
             // This tests that filtered events in cache don't affect delivery guarantees
-            await Task.Delay(TimeSpan.FromSeconds(6));
-            otherStreams.ForEach(s => s.OnNextAsync(skippedData));
+            await Task.Delay(DataMaxAgeInCache + TimeSpan.FromSeconds(1));
+            await Task.WhenAll(otherStreams.Select(s => s.OnNextAsync(skippedData)));
 
             // Should be delivered
             await stream.OnNextAsync(interestingData);
-
-            await Task.Delay(1000);
+            await observer.WaitForItemDeliveryCountAsync(streamId, 1, StreamProviderName, cts.Token);
+            await WaitForEventCounterAsync(grain, 1);
 
             Assert.Equal(0, await grain.GetErrorCounter());
             Assert.Equal(1, await grain.GetEventCounter());
+        }
+
+        private static Task WaitForEventCounterAsync(IImplicitSubscriptionCounterGrain grain, int expected)
+        {
+            return TestingUtils.WaitUntilAsync(
+                async lastTry =>
+                {
+                    var actual = await grain.GetEventCounter();
+                    if (lastTry)
+                    {
+                        Assert.Equal(expected, actual);
+                    }
+
+                    return actual == expected;
+                },
+                TimeSpan.FromSeconds(30),
+                delayOnFail: TimeSpan.FromMilliseconds(100));
         }
     }
 }

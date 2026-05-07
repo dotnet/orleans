@@ -336,7 +336,23 @@ namespace Orleans.Runtime.Membership
 
         public Task CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            throw new NotImplementedException();
+            return UsingZookeeper(async zk =>
+            {
+                var childrenResult = await zk.getChildrenAsync("/");
+                var rows = await Task.WhenAll(
+                    childrenResult.Children.Select(child => GetRow(zk, SiloAddress.FromParsableString(child))));
+
+                foreach (var (entry, _) in rows)
+                {
+                    if (entry.Status != SiloStatus.Active
+                        && Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks) < beforeDate.Ticks)
+                    {
+                        await ZKUtil.deleteRecursiveAsync(zk, ConvertToRowPath(entry.SiloAddress));
+                    }
+                }
+
+                return true;
+            }, this.deploymentConnectionString, this.watcher);
         }
 
         [LoggerMessage(

@@ -22,6 +22,10 @@
     <PackageReference Include="Grpc.Tools" />
   </ItemGroup>
 
+  <ItemGroup Condition="'$(TargetFramework)' != 'netcoreapp3.1'">
+    <PackageReference Include="Verify.Xunit" />
+  </ItemGroup>
+
   <ItemGroup Condition="'$(TargetFramework)' == 'netcoreapp3.1'">
     <PackageReference Update="CsCheck" VersionOverride="2.14.1"/>
     <PackageReference Update="Microsoft.NET.Test.Sdk" VersionOverride="17.11.1"/>

@@ -46,7 +46,7 @@ namespace UnitTests.Streaming
             }
         }
 
-        public static readonly string STREAM_PROVIDER_NAME = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+        public static readonly string STREAM_PROVIDER_NAME = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
         private readonly ITestOutputHelper output;
         private readonly Fixture fixture;
         protected TestCluster HostedCluster => this.fixture.HostedCluster;

@@ -7,6 +7,11 @@
 
   <ItemGroup>
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
+    <PackageReference Include="NSubstitute" />
+    <PackageReference Include="NSubstitute.Analyzers.CSharp">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
   </ItemGroup>
 
   <ItemGroup>
@@ -18,6 +23,7 @@
     <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
     <InternalsVisibleTo Include="Orleans.AWS.Tests" />
     <InternalsVisibleTo Include="Orleans.Azure.Tests" />
+    <InternalsVisibleTo Include="Orleans.Redis.Tests" />
     <InternalsVisibleTo Include="Orleans.Streaming.NATS.Tests" />
   </ItemGroup>
 </Project>

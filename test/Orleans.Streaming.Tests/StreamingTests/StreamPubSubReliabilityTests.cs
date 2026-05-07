@@ -31,7 +31,7 @@ namespace UnitTests.StreamingTests
         {
             public void Configure(ISiloBuilder hostBuilder)
             {
-                hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME)
+                hostBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME)
                     .AddMemoryGrainStorage("MemoryStore", op => op.NumStorageGrains = 1)
                     .ConfigureServices(services =>
                     {
@@ -45,7 +45,7 @@ namespace UnitTests.StreamingTests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
-                clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.SMS_STREAM_PROVIDER_NAME);
+                clientBuilder.AddMemoryStreams<DefaultMemoryMessageBodySerializer>(StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME);
             }
         }
 
@@ -62,7 +62,7 @@ namespace UnitTests.StreamingTests
         public StreamPubSubReliabilityTests(Fixture fixture)
         {
             StreamId = Guid.NewGuid();
-            StreamProviderName = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+            StreamProviderName = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
             StreamNamespace = StreamTestsConstants.StreamLifecycleTestsNamespace;
             this.HostedCluster = fixture.HostedCluster;
             _fixture = fixture;
@@ -108,6 +108,8 @@ namespace UnitTests.StreamingTests
 
         private async Task Test_PubSub_Stream(string streamProviderName, Guid streamId)
         {
+            using var observer = StreamingDiagnosticObserver.Create();
+
             // Consumer
             IStreamLifecycleConsumerGrain consumer = this.GrainFactory.GetGrain<IStreamLifecycleConsumerGrain>(Guid.NewGuid());
             await consumer.BecomeConsumer(streamId, this.StreamNamespace, streamProviderName);
@@ -130,10 +132,13 @@ namespace UnitTests.StreamingTests
             // Unsubscribe
             await consumer.ClearGrain();
 
+            // Wait for subscription removal to propagate
+            var rxStreamId = Orleans.Runtime.StreamId.Create(this.StreamNamespace, streamId);
+            using var subCts = new CancellationTokenSource(TimeSpan.FromSeconds(5));
+            await observer.WaitForSubscriptionRemovedAsync(rxStreamId, streamProviderName, subCts.Token);
+
             // Send one more message
             await producer.SendItem(2);
-
-            await Task.Delay(300);
 
             int received2 = await consumer.GetReceivedCount();
 

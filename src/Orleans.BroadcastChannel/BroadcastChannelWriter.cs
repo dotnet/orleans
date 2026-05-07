@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.BroadcastChannel.Diagnostics;
 using Orleans.BroadcastChannel.SubscriberTable;
 using Orleans.Runtime;
 
@@ -59,6 +60,8 @@ namespace Orleans.BroadcastChannel
             }
 
             LogDebugPublishingItem(_logger, item, subscribers.Count);
+
+            BroadcastChannelEvents.EmitItemPublished(_channelId.ProviderName, _channelId.ChannelId, subscribers.Count);
 
             if (_fireAndForgetDelivery)
             {

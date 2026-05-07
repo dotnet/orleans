@@ -349,7 +349,7 @@ namespace Orleans.Runtime.MembershipService
                         var task = await Task.WhenAny(gracePeriod, this.BecomeShuttingDown());
                         if (ReferenceEquals(task, gracePeriod))
                         {
-                            this.log.LogWarning("Graceful shutdown aborted: starting ungraceful shutdown");
+                            LogWarningGracefulShutdownAborted(this.log);
                             await Task.Run(() => this.BecomeStopping());
                         }
                         else
@@ -515,5 +515,11 @@ namespace Orleans.Runtime.MembershipService
             Message = "Failure updating status to Dead"
         )]
         private partial void LogErrorFailureUpdatingStatusToDead(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Graceful shutdown aborted: starting ungraceful shutdown"
+        )]
+        private static partial void LogWarningGracefulShutdownAborted(ILogger logger);
     }
 }

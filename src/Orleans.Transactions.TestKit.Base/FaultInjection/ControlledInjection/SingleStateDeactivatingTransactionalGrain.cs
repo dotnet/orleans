@@ -21,7 +21,7 @@ namespace Orleans.Transactions.TestKit
         Task Deactivate();
     }
 
-    public class SingleStateFaultInjectionTransactionalGrain : Grain, IFaultInjectionTransactionTestGrain
+    public partial class SingleStateFaultInjectionTransactionalGrain : Grain, IFaultInjectionTransactionTestGrain
     {
         private readonly IFaultInjectionTransactionalState<GrainData> data;
         private readonly ILoggerFactory loggerFactory;
@@ -39,7 +39,7 @@ namespace Orleans.Transactions.TestKit
         public override Task OnActivateAsync(CancellationToken cancellationToken)
         {
             this.logger = this.loggerFactory.CreateLogger(this.GetGrainId().ToString());
-            this.logger.LogInformation("GrainId {GrainId}", this.GetPrimaryKey());
+            LogInformationGrainId(this.logger, this.GetPrimaryKey());
 
             return base.OnActivateAsync(cancellationToken);
         }
@@ -48,7 +48,7 @@ namespace Orleans.Transactions.TestKit
         {
             return this.data.PerformUpdate(d =>
             {
-                this.logger.LogInformation("Setting value {NewValue}.", newValue);
+                LogInformationSettingValue(this.logger, newValue);
                 d.Value = newValue;
             });
         }
@@ -67,7 +67,7 @@ namespace Orleans.Transactions.TestKit
            
             return this.data.PerformUpdate(d =>
             {
-                this.logger.LogInformation("Adding {NumberToAdd} to value {Value}.", numberToAdd, d.Value);
+                LogInformationAddingValue(this.logger, numberToAdd, d.Value);
                 d.Value += numberToAdd;
             });
         }
@@ -82,5 +82,23 @@ namespace Orleans.Transactions.TestKit
             this.DeactivateOnIdle();
             return Task.CompletedTask;
         }
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "GrainId {GrainId}"
+        )]
+        private static partial void LogInformationGrainId(ILogger logger, Guid grainId);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Setting value {NewValue}."
+        )]
+        private static partial void LogInformationSettingValue(ILogger logger, int newValue);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Adding {NumberToAdd} to value {Value}."
+        )]
+        private static partial void LogInformationAddingValue(ILogger logger, int numberToAdd, int value);
     }
 }

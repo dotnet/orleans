@@ -8,6 +8,7 @@ using System.Threading.Channels;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Core.Diagnostics;
 using Orleans.Configuration;
 using Orleans.Internal;
 using Orleans.Runtime.Utilities;
@@ -478,6 +479,7 @@ namespace Orleans.Runtime.MembershipService
                 this.LogMissedIAmAlives(table);
 
                 LogDebugProcessTableUpdateWithTable(this.log, caller, new(table));
+                MembershipEvents.EmitViewChanged(this.snapshot, this.myAddress);
             }
         }
 

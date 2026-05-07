@@ -85,7 +85,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: fatalErrorHandler,
                 gossiper: membershipGossiper,
                 log: _loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(_loggerFactory),
+                timerFactory: new AsyncTimerFactory(_loggerFactory, TimeProvider.System),
                 lifecycle);
 
             _probeResults = Channel.CreateBounded<ProbeResult>(new BoundedChannelOptions(1) { FullMode = BoundedChannelFullMode.Wait });

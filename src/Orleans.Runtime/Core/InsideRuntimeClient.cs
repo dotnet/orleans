@@ -140,6 +140,7 @@ namespace Orleans.Runtime
                 message.SendingSilo = MySilo;
 
             IGrainContext sendingActivation = RuntimeContext.Current;
+            message.MessageReceiver = sendingActivation ?? HostedClient;
 
             if (sendingActivation == null)
             {
@@ -155,11 +156,13 @@ namespace Orleans.Runtime
             var targetGrainId = target.GrainId;
             message.TargetGrain = targetGrainId;
             SharedCallbackData sharedData;
+            IMessageReceiverCache targetCache = target;
             if (SystemTargetGrainId.TryParse(targetGrainId, out var systemTargetGrainId))
             {
                 message.TargetSilo = systemTargetGrainId.GetSiloAddress();
                 message.IsSystemMessage = true;
                 sharedData = this.systemSharedCallbackData;
+                targetCache = null;
             }
             else
             {
@@ -187,12 +190,20 @@ namespace Orleans.Runtime
             }
 
             this.messagingTrace.OnSendRequest(message);
-            this.MessageCenter.AddressAndSendMessage(message);
+
+            if (targetCache?.MessageReceiver is IMessageReceiver receiver)
+            {
+                receiver.ReceiveMessage(message, targetCache);
+            }
+            else
+            {
+                this.MessageCenter.AddressAndSendMessage(message, targetCache);
+            }
         }
 
         public void SendResponse(Message request, Response response)
         {
-            OrleansInsideRuntimeClientEvent.Log.SendResponse(request);
+            OrleansInsideRuntimeClientEvent.Instance.SendResponse(request);
 
             // Don't process messages that have already timed out
             if (request.IsExpired)
@@ -383,14 +394,14 @@ namespace Orleans.Runtime
 
         public void ReceiveResponse(Message message)
         {
-            OrleansInsideRuntimeClientEvent.Log.ReceiveResponse(message);
+            OrleansInsideRuntimeClientEvent.Instance.ReceiveResponse(message);
             if (message.Result is Message.ResponseTypes.Rejection)
             {
                 if (!message.TargetSilo.Matches(this.MySilo))
                 {
                     // gatewayed message - gateway back to sender
                     LogTraceNoCallbackForRejection(this.logger, message);
-                    this.MessageCenter.AddressAndSendMessage(message);
+                    this.MessageCenter.AddressAndSendMessage(message, targetCache: null);
                     return;
                 }
 
@@ -448,7 +459,7 @@ namespace Orleans.Runtime
                     if (status.Diagnostics != null && status.Diagnostics.Count > 0 && logger.IsEnabled(LogLevel.Debug))
                     {
                         var diagnosticsString = string.Join("\n", status.Diagnostics);
-                        this.logger.LogDebug("Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}", message, diagnosticsString);
+                        LogDebugReceivedStatusUpdateUnknownRequest(this.logger, message, diagnosticsString);
                     }
                 }
 
@@ -638,9 +649,9 @@ namespace Orleans.Runtime
         private static partial void LogInformationReceivedStatusUpdate(ILogger logger, Message requestMessage, IEnumerable<string> diagnostics);
 
         [LoggerMessage(
-            Level = LogLevel.Information,
+            Level = LogLevel.Debug,
             Message = "Received status update for unknown request. Message: {StatusMessage}. Status: {Diagnostics}")]
-        private static partial void LogInformationReceivedStatusUpdateUnknownRequest(ILogger logger, Message statusMessage, IEnumerable<string> diagnostics);
+        private static partial void LogDebugReceivedStatusUpdateUnknownRequest(ILogger logger, Message statusMessage, string diagnostics);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

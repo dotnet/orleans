@@ -87,17 +87,17 @@ namespace Orleans.Runtime.MembershipService
 
         public void CleanupDefunctSiloEntries(DateTimeOffset beforeDate)
         {
-            var removedEnties = new List<SiloAddress>();
-            foreach (var (key, (value, etag)) in siloTable)
+            var removedEntries = new List<SiloAddress>();
+            foreach (var (key, (value, _)) in siloTable)
             {
-                if (value.Status == SiloStatus.Dead
+                if (value.Status != SiloStatus.Active
                     && new DateTime(Math.Max(value.IAmAliveTime.Ticks, value.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
                 {
-                    removedEnties.Add(key);
+                    removedEntries.Add(key);
                 }
             }
 
-            foreach (var removedEntry in removedEnties)
+            foreach (var removedEntry in removedEntries)
             {
                 siloTable.Remove(removedEntry);
             }

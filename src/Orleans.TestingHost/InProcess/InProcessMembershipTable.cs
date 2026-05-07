@@ -173,11 +173,10 @@ internal sealed class InProcessMembershipTable(string clusterId) : IMembershipTa
                 var entries = _table.Values.ToList();
                 foreach (var (entry, _) in entries)
                 {
-                    if (entry.Status == SiloStatus.Dead
+                    if (entry.Status != SiloStatus.Active
                         && new DateTime(Math.Max(entry.IAmAliveTime.Ticks, entry.StartTime.Ticks), DateTimeKind.Utc) < beforeDate)
                     {
                         _table.Remove(entry.SiloAddress, out _);
-                        continue;
                     }
                 }
             }

@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Buffers.Binary;
+using System.Collections.Generic;
 using System.IO.Pipelines;
 using System.Net;
 using Microsoft.Extensions.DependencyInjection;
@@ -145,6 +146,40 @@ namespace UnitTests.Serialization
             var (requiredBytes, _, _) = this.messageSerializer.TryRead(ref reader, out var deserializedMessage);
             Assert.Equal(0, requiredBytes);
             return deserializedMessage;
+        }
+
+        [Theory, TestCategory("Functional"), TestCategory("Serialization")]
+        [InlineData(0, 0)]
+        [InlineData(1, 1)]
+        [InlineData(1024, 1024)]
+        [InlineData(1025, 1024)]
+        [InlineData(2048, 1024)]
+        public void Message_RequestContextInitialCapacity_IsBounded(int size, int expected)
+        {
+            Assert.Equal(expected, MessageSerializer.GetRequestContextInitialCapacity(size));
+        }
+
+        [Fact, TestCategory("Functional"), TestCategory("Serialization")]
+        public void Message_RequestContextBeyondInitialCapacity_RoundTrips()
+        {
+            const int entryCount = 2048;
+            var requestContext = new Dictionary<string, object>(entryCount);
+            for (var i = 0; i < entryCount; i++)
+            {
+                requestContext[$"key-{i}"] = i;
+            }
+
+            var message = this.messageFactory.CreateMessage(null, InvokeMethodOptions.None);
+            message.RequestContextData = requestContext;
+
+            var deserializedMessage = RoundTripMessage(message);
+
+            Assert.NotNull(deserializedMessage.RequestContextData);
+            Assert.Equal(entryCount, deserializedMessage.RequestContextData.Count);
+            for (var i = 0; i < entryCount; i++)
+            {
+                Assert.Equal(i, deserializedMessage.RequestContextData[$"key-{i}"]);
+            }
         }
 
         [Fact, TestCategory("BVT")]

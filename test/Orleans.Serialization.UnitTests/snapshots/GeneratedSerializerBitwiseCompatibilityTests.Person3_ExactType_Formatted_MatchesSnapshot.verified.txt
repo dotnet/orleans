@@ -1,0 +1,4 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 9b) ["redborine"]
+0x000D  [#3 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 10b) ["Aquaricorn"]
+0x0019 }

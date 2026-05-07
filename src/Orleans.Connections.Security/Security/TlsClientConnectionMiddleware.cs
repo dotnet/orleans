@@ -11,7 +11,7 @@ using Microsoft.Extensions.Logging;
 #nullable disable
 namespace Orleans.Connections.Security
 {
-    internal class TlsClientConnectionMiddleware
+    internal partial class TlsClientConnectionMiddleware
     {
         private readonly ConnectionDelegate _next;
         private readonly TlsOptions _options;
@@ -143,13 +143,19 @@ namespace Orleans.Connections.Security
                 }
                 catch (OperationCanceledException ex)
                 {
-                    _logger?.LogWarning(2, ex, "Authentication timed out");
+                    if (_logger is { } logger)
+                    {
+                        LogWarningAuthenticationTimedOut(logger, ex);
+                    }
                     await sslStream.DisposeAsync();
                     return;
                 }
                 catch (Exception ex)
                 {
-                    _logger?.LogWarning(1, ex, "Authentication failed");
+                    if (_logger is { } logger)
+                    {
+                        LogWarningAuthenticationFailed(logger, ex);
+                    }
                     await sslStream.DisposeAsync();
                     return;
                 }
@@ -238,5 +244,19 @@ namespace Orleans.Connections.Security
 
             return certificate as X509Certificate2 ?? new X509Certificate2(certificate);
         }
+
+        [LoggerMessage(
+            EventId = 2,
+            Level = LogLevel.Warning,
+            Message = "Authentication timed out"
+        )]
+        private static partial void LogWarningAuthenticationTimedOut(ILogger logger, Exception exception);
+
+        [LoggerMessage(
+            EventId = 1,
+            Level = LogLevel.Warning,
+            Message = "Authentication failed"
+        )]
+        private static partial void LogWarningAuthenticationFailed(ILogger logger, Exception exception);
     }
 }

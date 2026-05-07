@@ -169,14 +169,14 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
             return true;
         }
 
-        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
-        {
-            return false;
-        }
-
         if (IsNativelySupportedType(type))
         {
             return true;
+        }
+
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
         }
 
         foreach (var selector in _serializableTypeSelectors)
@@ -245,14 +245,14 @@ public class JsonCodec : IGeneralizedCodec, IGeneralizedCopier, ITypeFilter
     /// <inheritdoc/>
     bool IGeneralizedCopier.IsSupportedType(Type type)
     {
-        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
-        {
-            return false;
-        }
-
         if (IsNativelySupportedType(type))
         {
             return true;
+        }
+
+        if (CommonCodecTypeFilter.IsAbstractOrFrameworkType(type))
+        {
+            return false;
         }
 
         foreach (var selector in _copyableTypeSelectors)

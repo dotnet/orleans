@@ -1,5 +1,5 @@
 using Orleans.Streams;
-using Orleans.TestingHost.Utils;
+using Orleans.Runtime;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
@@ -24,6 +24,8 @@ namespace UnitTests.StreamingTests
         {
             const int ExpectedConsumed = 30;
             Guid streamGuid = Guid.NewGuid();
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(Timeout);
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
             IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
@@ -32,7 +34,8 @@ namespace UnitTests.StreamingTests
                 await stream.OnNextAsync(i.ToString());
             }
             var consumer = this.fixture.GrainFactory.GetGrain<IStreamBatchingTestConsumerGrain>(streamGuid);
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(consumer, ExpectedConsumed, 2, lastTry), Timeout);
+            await observer.WaitForItemDeliveryCountAsync(StreamId.Create(StreamBatchingTestConst.BatchingNameSpace, streamGuid), ExpectedConsumed, StreamBatchingTestConst.ProviderName, cts.Token);
+            await AssertCountersAsync(consumer, ExpectedConsumed, 2);
         }
 
         [SkippableFact, TestCategory("Functional"), TestCategory("Streaming")]
@@ -42,6 +45,8 @@ namespace UnitTests.StreamingTests
             const int ItemsPerBatch = 10;
             const int ExpectedConsumed = BatchesSent * ItemsPerBatch;
             Guid streamGuid = Guid.NewGuid();
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(Timeout);
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
             IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.NonBatchingNameSpace, streamGuid);
@@ -50,7 +55,8 @@ namespace UnitTests.StreamingTests
                 await stream.OnNextBatchAsync(Enumerable.Range(i, ItemsPerBatch).Select(v => v.ToString()));
             }
             var consumer = this.fixture.GrainFactory.GetGrain<IStreamBatchingTestConsumerGrain>(streamGuid);
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(consumer, ExpectedConsumed, 1, lastTry), Timeout);
+            await observer.WaitForItemDeliveryCountAsync(StreamId.Create(StreamBatchingTestConst.NonBatchingNameSpace, streamGuid), ExpectedConsumed, StreamBatchingTestConst.ProviderName, cts.Token);
+            await AssertCountersAsync(consumer, ExpectedConsumed, 1);
         }
 
         [SkippableFact(Skip = "https://github.com/dotnet/orleans/issues/5632"), TestCategory("Functional"), TestCategory("Streaming")]
@@ -60,6 +66,8 @@ namespace UnitTests.StreamingTests
             const int ItemsPerBatch = 10;
             const int ExpectedConsumed = BatchesSent * ItemsPerBatch;
             Guid streamGuid = Guid.NewGuid();
+            using var observer = StreamingDiagnosticObserver.Create();
+            using var cts = new CancellationTokenSource(Timeout);
 
             IStreamProvider provider = this.fixture.Client.GetStreamProvider(StreamBatchingTestConst.ProviderName);
             IAsyncStream<string> stream = provider.GetStream<string>(StreamBatchingTestConst.BatchingNameSpace, streamGuid);
@@ -68,23 +76,16 @@ namespace UnitTests.StreamingTests
                 await stream.OnNextBatchAsync(Enumerable.Range(i, ItemsPerBatch).Select(v => v.ToString()));
             }
             var consumer = this.fixture.GrainFactory.GetGrain<IStreamBatchingTestConsumerGrain>(streamGuid);
-            await TestingUtils.WaitUntilAsync(lastTry => CheckCounters(consumer, ExpectedConsumed, ItemsPerBatch, lastTry), Timeout);
+            await observer.WaitForItemDeliveryCountAsync(StreamId.Create(StreamBatchingTestConst.BatchingNameSpace, streamGuid), ExpectedConsumed, StreamBatchingTestConst.ProviderName, cts.Token);
+            await AssertCountersAsync(consumer, ExpectedConsumed, ItemsPerBatch);
         }
 
-        private async Task<bool> CheckCounters(IStreamBatchingTestConsumerGrain consumer, int expectedConsumed, int minBatchSize, bool assertIsTrue)
+        private async Task AssertCountersAsync(IStreamBatchingTestConsumerGrain consumer, int expectedConsumed, int minBatchSize)
         {
             ConsumptionReport report = await consumer.GetConsumptionReport();
             this.output.WriteLine($"Report - Consumed: {report.Consumed}, MaxBatchSize: {report.MaxBatchSize}");
-            if (assertIsTrue)
-            {
-                Assert.Equal(expectedConsumed, report.Consumed);
-                Assert.True(report.MaxBatchSize >= minBatchSize);
-                return true;
-            }
-            else
-            {
-                return report.Consumed == expectedConsumed && report.MaxBatchSize >= minBatchSize;
-            }
+            Assert.Equal(expectedConsumed, report.Consumed);
+            Assert.True(report.MaxBatchSize >= minBatchSize);
         }
     }
 }

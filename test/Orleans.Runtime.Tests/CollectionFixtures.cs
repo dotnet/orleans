@@ -31,4 +31,17 @@ namespace Tester
             TestUtils.CheckForAzureStorage();
         }
     }
+
+    /// <summary>
+    /// Base test cluster fixture for Azure-based integration tests using <see cref="InProcessTestCluster"/>.
+    /// Ensures Azure Storage connectivity is available before running tests.
+    /// </summary>
+    public abstract class BaseInProcessAzureTestClusterFixture : BaseInProcessTestClusterFixture
+    {
+        protected override void CheckPreconditionsOrThrow()
+        {
+            base.CheckPreconditionsOrThrow();
+            TestUtils.CheckForAzureStorage();
+        }
+    }
 }

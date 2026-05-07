@@ -110,3 +110,63 @@ public struct BufferSliceReaderInput
     [DoesNotReturn]
     private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
 }
+
+/// <summary>
+/// Input type for <see cref="Reader{TInput}"/> to support <see cref="ArcBuffer"/> buffers.
+/// </summary>
+/// <remarks>
+/// Initializes a new instance of the <see cref="ArcBufferReaderInput"/> type.
+/// </remarks>
+/// <param name="slice">The underlying buffer.</param>
+public struct ArcBufferReaderInput(in ArcBuffer slice)
+{
+    private readonly ArcBuffer _slice = slice;
+    private ArcBufferPage _page = slice.First;
+    private int _position;
+
+    internal readonly ArcBufferPage First => _slice.First;
+    internal readonly int Position => _position;
+    internal readonly int Offset => _slice.Offset;
+    internal readonly int Length => _slice.Length;
+    internal long PreviousBuffersSize;
+
+    internal readonly ArcBufferReaderInput ForkFrom(int position)
+    {
+        // Rely on the outer buffer being pinned.
+        var sliced = _slice.UnsafeSlice(position, Length - position);
+        return new ArcBufferReaderInput(in sliced);
+    }
+
+    internal ReadOnlySpan<byte> GetNext()
+    {
+        Debug.Assert(_position <= Length);
+        if (_page is not null)
+        {
+            if (_page == First)
+            {
+                Debug.Assert(_position == 0);
+                var offset = Offset;
+                var length = Math.Min(Length, _page.Length - offset);
+                _position += length;
+                var result = _page.AsSpan(offset, length);
+                _page = _page.Next;
+                return result;
+            }
+
+            if (_position != Length)
+            {
+                var length = Math.Min(Length - _position, _page.Length);
+                _position += length;
+                var result = _page.AsSpan(0, length);
+                _page = _page.Next;
+                return result;
+            }
+        }
+
+        ThrowInsufficientData();
+        return default;
+    }
+
+    [DoesNotReturn]
+    private static void ThrowInsufficientData() => throw new InvalidOperationException("Insufficient data present in buffer.");
+}

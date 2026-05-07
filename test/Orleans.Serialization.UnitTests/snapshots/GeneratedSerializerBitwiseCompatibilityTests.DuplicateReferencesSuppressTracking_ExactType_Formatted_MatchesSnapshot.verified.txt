@@ -1,0 +1,11 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 VarInt Id: 0 SchemaType: Expected] Value: 2 (0x2)
+0x004A  [#3 TagDelimited Id: 1 SchemaType: Encoded RuntimeType: MySuppressReferenceTrackingValue (name: Encoded "TypeName "MySuppressReferenceTrackingValue,Orleans.Serialization.UnitTests" (hash C5763E99)" (MySuppressReferenceTrackingValue,Orleans.Serialization.UnitTests))] Value: {
+0x004B   [#4 VarInt Id: 0 SchemaType: Expected] Value: 2 (0x2)
+0x004D   - End of base type fields -
+0x004E  }
+0x0050  [#5 TagDelimited Id: 1 SchemaType: Referenced RuntimeType: MySuppressReferenceTrackingValue (name: Referenced 1 (MySuppressReferenceTrackingValue,Orleans.Serialization.UnitTests))] Value: {
+0x0051   [#6 VarInt Id: 0 SchemaType: Expected] Value: 2 (0x2)
+0x0053   - End of base type fields -
+0x0054  }
+0x0055 }

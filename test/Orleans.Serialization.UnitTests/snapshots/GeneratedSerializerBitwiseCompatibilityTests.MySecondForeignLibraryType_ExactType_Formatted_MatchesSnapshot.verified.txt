@@ -1,0 +1,8 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 LengthPrefixed Id: 0 SchemaType: Expected] Value: (length: 9b) ["surrogate"]
+0x000D  [#3 Fixed32 Id: 1 SchemaType: Expected] Value: 0x422A0000
+0x0012  [#4 TagDelimited Id: 2 SchemaType: Expected] Value: {
+0x0013   [#5 Fixed64 Id: 0 SchemaType: Expected] Value: 0x8DC0B3F7ABFC080
+0x001C   [#6 Fixed64 Id: 1 SchemaType: Expected] Value: 0 (0x0)
+0x0025  }
+0x0026 }

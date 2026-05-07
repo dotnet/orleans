@@ -1,0 +1,7 @@
+0x0001 [#1 TagDelimited Id: 0 SchemaType: Expected] Value: {
+0x0002  [#2 VarInt Id: 0 SchemaType: Expected] Value: 2 (0x2)
+0x0031  [#3 TagDelimited Id: 1 SchemaType: Encoded RuntimeType: MyValue (name: Encoded "TypeName "MyValue,Orleans.Serialization.UnitTests" (hash 6D7C32C3)" (MyValue,Orleans.Serialization.UnitTests))] Value: {
+0x0032   [#4 VarInt Id: 0 SchemaType: Expected] Value: 2 (0x2)
+0x0034  }
+0x0036  [#5 Reference Id: 1 SchemaType: Referenced RuntimeType: MyValue (name: Referenced 1 (MyValue,Orleans.Serialization.UnitTests)) Reference: 3 (Position: 0x31, Field: [TagDelimited, IdDelta:1, SchemaType:Encoded, RuntimeType:MyValue])]
+0x0038 }

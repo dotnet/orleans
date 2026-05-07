@@ -99,6 +99,82 @@ namespace UnitTests.Directory
         }
 
         [Fact]
+        public async Task StopDoesNotDisposeRegisteredCustomCache()
+        {
+            var cache = new DisposableGrainDirectoryCache();
+            var grainDirectory = Substitute.For<IGrainDirectory>();
+            var services = new ServiceCollection()
+                .AddSingleton<IGrainDirectoryCache>(cache)
+                .AddGrainDirectory(GrainDirectoryAttribute.DEFAULT_GRAIN_DIRECTORY, (sp, name) => grainDirectory)
+                .BuildServiceProvider();
+            var grainDirectoryResolver = new GrainDirectoryResolver(
+                services,
+                new GrainPropertiesResolver(new NoOpClusterManifestProvider()),
+                Array.Empty<IGrainDirectoryResolver>());
+            var lifecycle = new SiloLifecycleSubject(this.loggerFactory.CreateLogger<SiloLifecycleSubject>());
+            var membershipService = new MockClusterMembershipService();
+            var grainLocator = new CachedGrainLocator(
+                services,
+                grainDirectoryResolver,
+                membershipService.Target,
+                Options.Create(new GrainDirectoryOptions()));
+
+            grainLocator.Participate(lifecycle);
+
+            await lifecycle.OnStart();
+            await lifecycle.OnStop();
+
+            Assert.False(cache.Disposed);
+            Assert.False(cache.AsyncDisposed);
+        }
+
+        [Fact]
+        public async Task LocalGrainDirectoryStopDoesNotDisposeRegisteredCustomCache()
+        {
+            var cache = new DisposableGrainDirectoryCache();
+            var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+            var localSilo = SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11111), 123);
+            localSiloDetails.SiloAddress.Returns(localSilo);
+            localSiloDetails.GatewayAddress.Returns(localSilo);
+            localSiloDetails.DnsHostName.Returns("localhost");
+            localSiloDetails.Name.Returns("TestSilo");
+            localSiloDetails.ClusterId.Returns("TestCluster");
+            var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
+            var grainFactory = Substitute.For<IInternalGrainFactory>();
+            var services = new ServiceCollection()
+                .AddSingleton<IGrainDirectoryCache>(cache)
+                .BuildServiceProvider();
+            Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
+                siloStatusOracle,
+                Options.Create(new GrainDirectoryOptions()),
+                this.loggerFactory);
+            var systemTargetShared = new SystemTargetShared(
+                runtimeClient: null!,
+                localSiloDetails: localSiloDetails,
+                loggerFactory: this.loggerFactory,
+                schedulingOptions: Options.Create(new SchedulingOptions()),
+                grainReferenceActivator: null,
+                timerRegistry: null,
+                activations: new ActivationDirectory());
+            var localGrainDirectory = new LocalGrainDirectory(
+                serviceProvider: services,
+                siloDetails: localSiloDetails,
+                siloStatusOracle: siloStatusOracle,
+                grainFactory: grainFactory,
+                grainDirectoryPartitionFactory: partitionFactory,
+                developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
+                grainDirectoryOptions: Options.Create(new GrainDirectoryOptions { CachingStrategy = GrainDirectoryOptions.CachingStrategyType.Custom }),
+                loggerFactory: this.loggerFactory,
+                systemTargetShared: systemTargetShared);
+
+            await localGrainDirectory.StopAsync();
+
+            Assert.False(cache.Disposed);
+            Assert.False(cache.AsyncDisposed);
+            Assert.Equal(1, cache.ClearCount);
+        }
+
+        [Fact]
         public async Task RegisterWhenOtherEntryExists()
         {
             var expectedSilo = GenerateSiloAddress();
@@ -530,6 +606,53 @@ namespace UnitTests.Directory
                 yield return this.Current;
                 await Task.Delay(100);
                 yield break;
+            }
+        }
+
+        private sealed class DisposableGrainDirectoryCache : IGrainDirectoryCache, IDisposable, IAsyncDisposable
+        {
+            private readonly Dictionary<GrainId, (GrainAddress Address, int Version)> entries = new();
+
+            public bool Disposed { get; private set; }
+
+            public bool AsyncDisposed { get; private set; }
+
+            public int ClearCount { get; private set; }
+
+            public IEnumerable<(GrainAddress ActivationAddress, int Version)> KeyValues => this.entries.Values.Select(entry => (entry.Address, entry.Version));
+
+            public void AddOrUpdate(GrainAddress value, int version) => this.entries[value.GrainId] = (value, version);
+
+            public bool Remove(GrainId key) => this.entries.Remove(key);
+
+            public bool Remove(GrainAddress key) => this.entries.Remove(key.GrainId);
+
+            public void Clear()
+            {
+                ++this.ClearCount;
+                this.entries.Clear();
+            }
+
+            public bool LookUp(GrainId key, out GrainAddress result, out int version)
+            {
+                if (this.entries.TryGetValue(key, out var entry))
+                {
+                    result = entry.Address;
+                    version = entry.Version;
+                    return true;
+                }
+
+                result = default;
+                version = default;
+                return false;
+            }
+
+            public void Dispose() => this.Disposed = true;
+
+            public ValueTask DisposeAsync()
+            {
+                this.AsyncDisposed = true;
+                return default;
             }
         }
     }

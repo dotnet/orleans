@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Concurrent;
 using System.Threading.Tasks;
+using Orleans.BroadcastChannel.Diagnostics;
 using Orleans.Runtime;
 
 #nullable disable
@@ -16,6 +17,7 @@ namespace Orleans.BroadcastChannel
     {
         private readonly ConcurrentDictionary<InternalChannelId, ICallback> _handlers = new();
         private readonly IOnBroadcastChannelSubscribed _subscriptionObserver;
+        private readonly GrainId _grainId;
         private readonly AsyncLock _lock = new AsyncLock();
 
         private interface ICallback
@@ -50,7 +52,9 @@ namespace Orleans.BroadcastChannel
 
         public BroadcastChannelConsumerExtension(IGrainContextAccessor grainContextAccessor)
         {
-            _subscriptionObserver = grainContextAccessor.GrainContext?.GrainInstance as IOnBroadcastChannelSubscribed;
+            var grainContext = grainContextAccessor.GrainContext;
+            _subscriptionObserver = grainContext?.GrainInstance as IOnBroadcastChannelSubscribed;
+            _grainId = grainContext?.GrainId ?? default;
             if (_subscriptionObserver == null)
             {
                 throw new ArgumentException($"The grain doesn't implement interface {nameof(IOnBroadcastChannelSubscribed)}");
@@ -72,6 +76,7 @@ namespace Orleans.BroadcastChannel
             if (callback != default)
             {
                 await callback.OnPublished(item);
+                BroadcastChannelEvents.EmitItemDelivered(streamId.ProviderName, streamId.ChannelId, _grainId);
             }
         }
 

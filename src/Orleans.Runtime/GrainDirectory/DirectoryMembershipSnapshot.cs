@@ -6,7 +6,6 @@ using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Runtime.CompilerServices;
-using System.Runtime.InteropServices;
 using Microsoft.CodeAnalysis;
 using Orleans.Configuration;
 using Orleans.Runtime.Utilities;
@@ -21,12 +20,21 @@ internal sealed class DirectoryMembershipSnapshot
     private readonly ImmutableArray<ImmutableArray<IGrainDirectoryPartition>> _partitionsByMember;
     private readonly ImmutableArray<ImmutableArray<RingRange>> _rangesByMemberPartition;
 
-    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory) : this(snapshot, grainFactory, static (silo, count) => silo.GetUniformHashCodes(count))
+    public DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory)
+        : this(snapshot, grainFactory, PartitionsPerSilo, static (silo, count) => silo.GetUniformHashCodes(count))
     {
     }
 
     internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, Func<SiloAddress, int, uint[]> getRingBoundaries)
+        : this(snapshot, grainFactory, PartitionsPerSilo, getRingBoundaries)
     {
+    }
+
+    internal DirectoryMembershipSnapshot(ClusterMembershipSnapshot snapshot, IInternalGrainFactory grainFactory, int partitionCount, Func<SiloAddress, int, uint[]> getRingBoundaries)
+    {
+        ArgumentOutOfRangeException.ThrowIfLessThan(partitionCount, 1);
+        PartitionCount = partitionCount;
+
         var sortedActiveMembers = ImmutableArray.CreateBuilder<SiloAddress>(snapshot.Members.Count(static m => m.Value.Status == SiloStatus.Active));
         foreach (var member in snapshot.Members)
         {
@@ -38,16 +46,15 @@ internal sealed class DirectoryMembershipSnapshot
         }
 
         sortedActiveMembers.Sort(static (left, right) => left.CompareTo(right));
-        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(PartitionsPerSilo * sortedActiveMembers.Count);
+        var hashIndexPairs = ImmutableArray.CreateBuilder<(uint Hash, int MemberIndex, int PartitionIndex)>(partitionCount * sortedActiveMembers.Count);
         var memberPartitions = ImmutableArray.CreateBuilder<ImmutableArray<IGrainDirectoryPartition>>();
         for (var memberIndex = 0; memberIndex < sortedActiveMembers.Count; memberIndex++)
         {
             var activeMember = sortedActiveMembers[memberIndex];
-            var hashCodes = getRingBoundaries(activeMember, PartitionsPerSilo).ToList();
-            hashCodes.Sort();
-            Debug.Assert(hashCodes.Count == PartitionsPerSilo);
-            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(PartitionsPerSilo);
-            for (var partitionIndex = 0; partitionIndex < hashCodes.Count; partitionIndex++)
+            var hashCodes = getRingBoundaries(activeMember, partitionCount);
+            Debug.Assert(hashCodes.Length == partitionCount);
+            var partitionReferences = ImmutableArray.CreateBuilder<IGrainDirectoryPartition>(partitionCount);
+            for (var partitionIndex = 0; partitionIndex < hashCodes.Length; partitionIndex++)
             {
                 var hashCode = hashCodes[partitionIndex];
                 hashIndexPairs.Add((hashCode, memberIndex, partitionIndex));
@@ -76,32 +83,7 @@ internal sealed class DirectoryMembershipSnapshot
             return left.MemberIndex.CompareTo(right.MemberIndex);
         });
 
-        Dictionary<int, ImmutableArray<RingRange>.Builder> rangesByMemberPartitionBuilders = [];
-        for (var i = 0; i < hashIndexPairs.Count; i++)
-        {
-            var (_, memberIndex, _) = hashIndexPairs[i];
-            ref var builder = ref CollectionsMarshal.GetValueRefOrAddDefault(rangesByMemberPartitionBuilders, memberIndex, out _);
-            builder ??= ImmutableArray.CreateBuilder<RingRange>(PartitionsPerSilo);
-            var (entryStart, _, _) = hashIndexPairs[i];
-            var (nextStart, _, _) = hashIndexPairs[(i + 1) % hashIndexPairs.Count];
-            var range = (entryStart == nextStart) switch
-            {
-                true when hashIndexPairs.Count == 1 => RingRange.Full,
-                true => RingRange.Empty,
-                _ => RingRange.Create(entryStart, nextStart)
-            };
-            builder.Add(range);
-        }
-
-        var rangesByMemberPartition = ImmutableArray.CreateBuilder<ImmutableArray<RingRange>>(sortedActiveMembers.Count);
-        for (var i = 0; i < sortedActiveMembers.Count; i++)
-        {
-            rangesByMemberPartition.Add(rangesByMemberPartitionBuilders[i].ToImmutable());
-        }
-
-        _rangesByMemberPartition = rangesByMemberPartition.ToImmutable();
-
-        // Remove empty ranges.
+        // Remove empty ranges caused by hash collisions.
         if (hashIndexPairs.Count > 1)
         {
             for (var i = 1; i < hashIndexPairs.Count;)
@@ -118,9 +100,35 @@ internal sealed class DirectoryMembershipSnapshot
         }
 
         _ringBoundaries = hashIndexPairs.ToImmutable();
-
         Members = sortedActiveMembers.ToImmutable();
 
+        var rangesByMemberPartitionBuilders = new RingRange[sortedActiveMembers.Count][];
+        for (var i = 0; i < sortedActiveMembers.Count; i++)
+        {
+            rangesByMemberPartitionBuilders[i] = new RingRange[partitionCount];
+        }
+
+        var rangesByMemberPartition = ImmutableArray.CreateBuilder<ImmutableArray<RingRange>>(sortedActiveMembers.Count);
+        for (var i = 0; i < hashIndexPairs.Count; i++)
+        {
+            var (entryStart, memberIndex, partitionIndex) = hashIndexPairs[i];
+            var (nextStart, _, _) = hashIndexPairs[(i + 1) % hashIndexPairs.Count];
+            var range = (entryStart == nextStart) switch
+            {
+                true when hashIndexPairs.Count == 1 => RingRange.Full,
+                true => RingRange.Empty,
+                _ => RingRange.Create(entryStart, nextStart)
+            };
+
+            rangesByMemberPartitionBuilders[memberIndex][partitionIndex] = range;
+        }
+
+        for (var i = 0; i < sortedActiveMembers.Count; i++)
+        {
+            rangesByMemberPartition.Add(ImmutableArray.CreateRange(rangesByMemberPartitionBuilders[i]));
+        }
+
+        _rangesByMemberPartition = rangesByMemberPartition.ToImmutable();
         _rangesByMember = new RingRangeCollection[Members.Length];
         ClusterMembershipSnapshot = snapshot;
     }
@@ -130,12 +138,14 @@ internal sealed class DirectoryMembershipSnapshot
 
     public MembershipVersion Version => ClusterMembershipSnapshot.Version;
 
+    internal int PartitionCount { get; }
+
     public ImmutableArray<SiloAddress> Members { get; }
 
     public RingRange GetRange(SiloAddress address, int partitionIndex)
     {
         ArgumentOutOfRangeException.ThrowIfLessThan(partitionIndex, 0);
-        ArgumentOutOfRangeException.ThrowIfGreaterThan(partitionIndex, PartitionsPerSilo - 1);
+        ArgumentOutOfRangeException.ThrowIfGreaterThan(partitionIndex, PartitionCount - 1);
 
         var memberIndex = TryGetMemberIndex(address);
         if (memberIndex < 0)

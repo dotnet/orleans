@@ -107,6 +107,15 @@ namespace Orleans.Serialization.UnitTests
             var deserializedObject = RoundTripThroughUntypedSerializer(jsonObject, out _);
             Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(jsonObject), Newtonsoft.Json.JsonConvert.SerializeObject(deserializedObject));
         }
+
+        [Fact]
+        public void CanSerializeNativeJsonBaseTypes()
+        {
+            JToken original = JToken.Parse("{\"foo\":\"bar\",\"items\":[1,true,\"three\"]}");
+            var result = RoundTripThroughCodec(original);
+
+            Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(original), Newtonsoft.Json.JsonConvert.SerializeObject(result));
+        }
     }
 
     [Trait("Category", "BVT")]
@@ -145,6 +154,16 @@ namespace Orleans.Serialization.UnitTests
 
             var deserializedObject = copier.Copy(jsonObject);
             Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(jsonObject), Newtonsoft.Json.JsonConvert.SerializeObject(deserializedObject));
+        }
+
+        [Fact]
+        public void CanCopyNativeJsonBaseTypes()
+        {
+            JToken original = JToken.Parse("{\"foo\":\"bar\",\"items\":[1,true,\"three\"]}");
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<JToken>>();
+            var result = copier.Copy(original);
+
+            Assert.Equal(Newtonsoft.Json.JsonConvert.SerializeObject(original), Newtonsoft.Json.JsonConvert.SerializeObject(result));
         }
     }
 }

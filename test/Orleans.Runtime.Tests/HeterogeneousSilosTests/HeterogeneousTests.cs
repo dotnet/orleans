@@ -1,3 +1,4 @@
+using System.Diagnostics;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
@@ -137,6 +138,52 @@ namespace Tester.HeterogeneousSilosTests
             await g.GetCallStats();
         }
 
+        /// <summary>
+        /// Waits until the grain factory can resolve an implementation for <typeparamref name="T"/>,
+        /// or until <paramref name="timeout"/> elapses.
+        /// </summary>
+        private async Task WaitForGrainTypeAvailable<T>(TimeSpan timeout) where T : IGrainWithIntegerKey
+        {
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed < timeout)
+            {
+                try
+                {
+                    this.cluster.GrainFactory.GetGrain<T>(0);
+                    return;
+                }
+                catch (ArgumentException)
+                {
+                    // Not yet available; keep polling.
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+            }
+        }
+
+        /// <summary>
+        /// Waits until the grain factory can no longer resolve an implementation for <typeparamref name="T"/>
+        /// (i.e., the type has become unavailable), or until <paramref name="timeout"/> elapses.
+        /// </summary>
+        private async Task WaitForGrainTypeUnavailable<T>(TimeSpan timeout) where T : IGrainWithIntegerKey
+        {
+            var sw = Stopwatch.StartNew();
+            while (sw.Elapsed < timeout)
+            {
+                try
+                {
+                    this.cluster.GrainFactory.GetGrain<T>(0);
+                }
+                catch (ArgumentException)
+                {
+                    // The type is no longer available.
+                    return;
+                }
+
+                await Task.Delay(TimeSpan.FromMilliseconds(500));
+            }
+        }
+
         private async Task MergeGrainResolverTestsImpl<T>(Type defaultPlacementStrategy, bool restartClient, Func<IGrain, Task> func, params Type[] blackListedTypes)
             where T : IGrainWithIntegerKey
         {
@@ -160,7 +207,7 @@ namespace Tester.HeterogeneousSilosTests
             }
             else
             {
-                await Task.Delay(ClientRefreshDelay.Multiply(3));
+                await WaitForGrainTypeAvailable<T>(TimeSpan.FromSeconds(30));
             }
 
             for (var i = 0; i < 5; i++)
@@ -182,7 +229,7 @@ namespace Tester.HeterogeneousSilosTests
             }
             else
             {
-                await Task.Delay(ClientRefreshDelay.Multiply(3));
+                await WaitForGrainTypeUnavailable<T>(TimeSpan.FromSeconds(30));
             }
 
             // Should fail

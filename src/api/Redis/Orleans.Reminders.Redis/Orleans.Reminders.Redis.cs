@@ -55,7 +55,7 @@ namespace Orleans.Reminders.Redis
 
 namespace OrleansCodeGen.Orleans.Reminders.Redis
 {
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Codec_RedisRemindersException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Reminders.Redis.RedisRemindersException>, global::Orleans.Serialization.Codecs.IFieldCodec, global::Orleans.Serialization.Serializers.IBaseCodec<global::Orleans.Reminders.Redis.RedisRemindersException>, global::Orleans.Serialization.Serializers.IBaseCodec
@@ -73,7 +73,7 @@ namespace OrleansCodeGen.Orleans.Reminders.Redis
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "9.0.0.0")]
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_RedisRemindersException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Reminders.Redis.RedisRemindersException, System.Exception>

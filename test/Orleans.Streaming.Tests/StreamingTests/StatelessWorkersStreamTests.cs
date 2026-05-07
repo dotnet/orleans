@@ -44,7 +44,7 @@ namespace UnitTests.StreamingTests
             }
         }
 
-        private const string StreamProvider = StreamTestsConstants.SMS_STREAM_PROVIDER_NAME;
+        private const string StreamProvider = StreamTestsConstants.MEMORY_STREAM_PROVIDER_NAME;
 
         public StatelessWorkersStreamTests(Fixture fixture)
         {

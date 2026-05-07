@@ -2,23 +2,25 @@ using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Collections.Immutable;
+using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime;
 
 internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDisposable, IActivationLifecycleObserver
 {
     private static readonly object CollectIdleWorkersSentinel = new();
-    private readonly GrainTypeSharedContext _shared;
+    private readonly StatelessWorkerGrainTypeSharedContext _shared;
     private readonly IGrainContextActivator _innerActivator;
-    private readonly int _maxWorkers;
     private readonly List<ActivationData> _workers = [];
     private readonly ConcurrentQueue<(WorkItemType Type, object State)> _workItems = new();
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = false };
+    private readonly TaskCompletionSource _disposalTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
 #pragma warning disable IDE0052 // Remove unread private members
     /// <summary>
@@ -30,44 +32,36 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     private readonly Task _messageLoopTask;
 #pragma warning restore IDE0052 // Remove unread private members
 
-    private GrainReference? _grainReference;
+    private bool _terminated;
 
     // Idle worker removal fields
     private Timer? _inspectionTimer;
-    private double _previousError = 0d;
-    private double _integralTerm = 0d;
-    private int _detectedIdleCyclesCount = 0;
-    private readonly int _minIdleCyclesBeforeRemoval;
-    private readonly bool _isIdleWorkerRemovalStrategy;
+    private double _previousError;
+    private double _integralTerm;
+    private int _detectedIdleCyclesCount;
 
     public StatelessWorkerGrainContext(
         GrainAddress address,
-        GrainTypeSharedContext sharedContext,
+        StatelessWorkerGrainTypeSharedContext sharedContext,
         IGrainContextActivator innerActivator)
     {
         Address = address;
         _shared = sharedContext;
         _innerActivator = innerActivator;
 
-        var strategy = (StatelessWorkerPlacement)_shared.PlacementStrategy;
-        var options = _shared.StatelessWorkerOptions;
-
-        _isIdleWorkerRemovalStrategy = strategy.RemoveIdleWorkers && options.RemoveIdleWorkers;
-        if (_isIdleWorkerRemovalStrategy)
+        if (_shared.RemoveIdleWorkers)
         {
-            _minIdleCyclesBeforeRemoval = options.MinIdleCyclesBeforeRemoval > 0 ? options.MinIdleCyclesBeforeRemoval : 1;
             _inspectionTimer = new Timer(
                 static state => ((StatelessWorkerGrainContext)state!).EnqueueWorkItem(WorkItemType.CollectIdleWorkers, CollectIdleWorkersSentinel),
                 this,
-                options.IdleWorkersInspectionPeriod,
-                options.IdleWorkersInspectionPeriod);
+                _shared.IdleWorkersInspectionPeriod,
+                _shared.IdleWorkersInspectionPeriod);
         }
 
-        _maxWorkers = strategy.MaxLocal;
         _messageLoopTask = Task.Run(RunMessageLoop);
     }
 
-    public GrainReference GrainReference => _grainReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
+    public GrainReference GrainReference => field ??= _shared.Shared.GrainReferenceActivator.CreateReference(GrainId, default);
 
     public GrainId GrainId => Address.GrainId;
 
@@ -83,7 +77,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public IWorkItemScheduler Scheduler => throw new NotImplementedException();
 
-    public PlacementStrategy PlacementStrategy => _shared.PlacementStrategy;
+    public PlacementStrategy PlacementStrategy => _shared.Shared.PlacementStrategy;
 
     public Task Deactivated
     {
@@ -104,9 +98,8 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public async ValueTask DisposeAsync()
     {
-        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-        EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
-        await completion.Task;
+        EnqueueWorkItem(WorkItemType.DisposeAsync, DisposeAsyncWorkItemState.Instance);
+        await _disposalTask.Task;
     }
 
     private void EnqueueWorkItem(WorkItemType type, object state)
@@ -120,7 +113,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     public object? GetComponent(Type componentType)
     {
         if (componentType.IsAssignableFrom(GetType())) return this;
-        return _shared.GetComponent(componentType);
+        return _shared.Shared.GetComponent(componentType);
     }
 
     public void SetComponent<TComponent>(TComponent? instance) where TComponent : class
@@ -130,7 +123,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             throw new ArgumentException($"Cannot set a component of type '{typeof(TComponent)}' on a {nameof(StatelessWorkerGrainContext)}");
         }
 
-        _shared.SetComponent(instance);
+        _shared.Shared.SetComponent(instance);
     }
 
     public object? GetTarget() => throw new NotImplementedException();
@@ -162,8 +155,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
                             }
                         case WorkItemType.DisposeAsync:
                             {
-                                var state = (DisposeAsyncWorkItemState)workItem.State;
-                                _ = DisposeAsyncInternal(state.Completion);
+                                _ = DisposeAsyncInternal();
                                 break;
                             }
                         case WorkItemType.OnDestroyActivation:
@@ -173,22 +165,14 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
                                 if (_workers.Count == 0)
                                 {
-                                    // When the last worker is destroyed, we can consider the stateless worker grain activation to be destroyed as well
-                                    _shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+                                    Debug.Assert(!_terminated, "OnDestroyActivation should only terminate the context once.");
+                                    _terminated = true;
+                                    _shared.Shared.InternalRuntime.Catalog.UnregisterMessageTarget(this);
+                                    StatelessWorkerEvents.EmitContextTerminated(this, _workers.Count);
 
-                                    if (_isIdleWorkerRemovalStrategy)
+                                    if (_shared.RemoveIdleWorkers)
                                     {
-                                        var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                                        EnqueueWorkItem(WorkItemType.DisposeAsync, new DisposeAsyncWorkItemState(completion));
-
-                                        // DO NOT await this as it would deadlock the work loop!
-                                        _ = completion.Task.ContinueWith(t =>
-                                        {
-                                            if (t.Exception is { } ex)
-                                            {
-                                                LogErrorInMessageLoop(_shared.Logger, ex);
-                                            }
-                                        }, CancellationToken.None, TaskContinuationOptions.OnlyOnFaulted, TaskScheduler.Current);
+                                        EnqueueWorkItem(WorkItemType.DisposeAsync, DisposeAsyncWorkItemState.Instance);
                                     }
                                 }
                                 break;
@@ -205,7 +189,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             }
             catch (Exception exception)
             {
-                LogErrorInMessageLoop(_shared.Logger, exception);
+                LogErrorInMessageLoop(_shared.Shared.Logger, exception);
             }
         }
     }
@@ -233,7 +217,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
         _detectedIdleCyclesCount = controlSignal < 0 ? ++_detectedIdleCyclesCount : 0;
 
-        if (_detectedIdleCyclesCount >= _minIdleCyclesBeforeRemoval)
+        if (_detectedIdleCyclesCount >= _shared.MinIdleCyclesBeforeRemoval)
         {
             var inactiveWorkers = _workers.Where(w => w.IsInactive).ToImmutableArray();
             if (inactiveWorkers.Length > 0)
@@ -251,6 +235,12 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     private void ReceiveMessageInternal(object message)
     {
+        if (_terminated)
+        {
+            ForwardToReplacementContext((Message)message);
+            return;
+        }
+
         try
         {
             ActivationData? worker = null;
@@ -288,7 +278,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
                 if (worker is null)
                 {
-                    if (_workers.Count >= _maxWorkers)
+                    if (_workers.Count >= _shared.MaxLocalWorkers)
                     {
                         // Pick the one with the lowest waiting count
                         worker = minimumWaitingCountWorker;
@@ -303,7 +293,7 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         }
         catch (Exception exception) when (message is Message msg)
         {
-            _shared.InternalRuntime.MessageCenter.RejectMessage(
+            _shared.Shared.InternalRuntime.MessageCenter.RejectMessage(
                 msg,
                 Message.RejectionTypes.Transient,
                 exception,
@@ -311,8 +301,24 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         }
     }
 
+    private void ForwardToReplacementContext(Message message)
+    {
+        // The catalog cannot return this context because we set _terminated before
+        // unregistering it, and a terminated context is never re-registered.
+        // Therefore the replacement is always a fresh context for the same grain id.
+        Debug.Assert(_terminated);
+        var replacement = _shared.Shared.InternalRuntime.Catalog.GetOrCreateActivation(
+            GrainId,
+            message.RequestContextData ?? [],
+            rehydrationContext: null);
+        Debug.Assert(!ReferenceEquals(replacement, this), "Catalog must not resolve to a terminated stateless worker context.");
+        StatelessWorkerEvents.EmitMessageForwarded(this, replacement, message);
+        replacement.ReceiveMessage(message);
+    }
+
     private ActivationData CreateWorker(object? message)
     {
+        Debug.Assert(!_terminated, "CreateWorker must not be called on a terminated stateless worker context.");
         var address = GrainAddress.GetAddress(Address.SiloAddress, Address.GrainId, ActivationId.NewId());
         var newWorker = (ActivationData)_innerActivator.CreateContext(address);
 
@@ -321,10 +327,11 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
         // If this is a new worker and there is a message in scope, try to get the request context and activate the worker
         var requestContext = (message as Message)?.RequestContextData ?? [];
-        var cancellation = new CancellationTokenSource(_shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
+        var cancellation = new CancellationTokenSource(_shared.Shared.InternalRuntime.CollectionOptions.Value.ActivationTimeout);
 
         newWorker.Activate(requestContext, cancellation.Token);
         _workers.Add(newWorker);
+        StatelessWorkerEvents.EmitWorkerCreated(this, newWorker, _workers.Count);
 
         return newWorker;
     }
@@ -356,18 +363,17 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
         }
     }
 
-    private async Task DisposeAsyncInternal(TaskCompletionSource completion)
+    private async Task DisposeAsyncInternal()
     {
-        if (_inspectionTimer != null)
-        {
-            await _inspectionTimer.DisposeAsync().AsTask()
-                .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
-
-            _inspectionTimer = null;
-        }
-
         try
         {
+            if (_inspectionTimer is { } inspectionTimer)
+            {
+                _inspectionTimer = null;
+                await inspectionTimer.DisposeAsync().AsTask()
+                    .ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing | ConfigureAwaitOptions.ContinueOnCapturedContext);
+            }
+
             var tasks = new List<Task>(_workers.Count);
             var deactivationReason = new DeactivationReason(DeactivationReasonCode.RuntimeRequested, "Stateless worker grain context is being disposed.");
             foreach (var worker in _workers)
@@ -384,11 +390,12 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
             }
 
             await Task.WhenAll(tasks);
-            completion.TrySetResult();
+            _disposalTask.TrySetResult();
         }
         catch (Exception exception)
         {
-            completion.TrySetException(exception);
+            LogErrorInDisposeAsync(_shared.Shared.Logger, exception);
+            _disposalTask.TrySetException(exception);
         }
     }
 
@@ -421,11 +428,17 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
     private record ActivateWorkItemState(Dictionary<string, object>? RequestContext, CancellationToken CancellationToken);
     private record DeactivateWorkItemState(DeactivationReason DeactivationReason, CancellationToken CancellationToken);
     private record DeactivatedTaskWorkItemState(TaskCompletionSource Completion);
-    private record DisposeAsyncWorkItemState(TaskCompletionSource Completion);
+    private record DisposeAsyncWorkItemState { public static readonly DisposeAsyncWorkItemState Instance = new(); }
 
     [LoggerMessage(
         Level = LogLevel.Error,
-        Message = "Error in stateless worker message loop"
+        Message = "Error in stateless worker message loop."
     )]
     private static partial void LogErrorInMessageLoop(ILogger logger, Exception exception);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Error disposing stateless worker."
+    )]
+    private static partial void LogErrorInDisposeAsync(ILogger logger, Exception exception);
 }

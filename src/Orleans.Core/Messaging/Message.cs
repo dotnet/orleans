@@ -7,10 +7,11 @@ using System.Threading;
 namespace Orleans.Runtime
 {
     [Id(101)]
-    internal sealed class Message : ISpanFormattable
+    internal sealed class Message : ISpanFormattable, IMessageReceiverCache
     {
         public const int LENGTH_HEADER_SIZE = 8;
         public const int LENGTH_META_HEADER = 4;
+        internal const int MaxCacheInvalidationHeaderEntries = 16;
 
         [NonSerialized]
         private short _retryCount;
@@ -266,6 +267,10 @@ namespace Orleans.Runtime
             }
         }
 
+        // This is the receiver of the REPLY to this message
+        [field: NonSerialized]
+        public object? MessageReceiver { get; set; }
+
         public bool IsExpirableMessage()
         {
             GrainId id = TargetGrain;
@@ -278,15 +283,16 @@ namespace Orleans.Runtime
         internal void AddToCacheInvalidationHeader(GrainAddress invalidAddress, GrainAddress? validAddress)
         {
             var grainAddressCacheUpdate = new GrainAddressCacheUpdate(invalidAddress, validAddress);
-            if (_cacheInvalidationHeader is null)
+            var cacheInvalidationHeader = _cacheInvalidationHeader;
+            if (cacheInvalidationHeader is null)
             {
                 var newList = new List<GrainAddressCacheUpdate> { grainAddressCacheUpdate };
-                if (Interlocked.CompareExchange(ref _cacheInvalidationHeader, newList, null) is not null)
+                if (Interlocked.CompareExchange(ref _cacheInvalidationHeader, newList, null) is { } existingCacheInvalidationHeader)
                 {
                     // Another thread initialized it, add to the existing list
-                    lock (_cacheInvalidationHeader)
+                    lock (existingCacheInvalidationHeader)
                     {
-                        _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                        AddCacheInvalidationHeaderEntry(existingCacheInvalidationHeader, grainAddressCacheUpdate);
                     }
                 }
                 else
@@ -296,11 +302,34 @@ namespace Orleans.Runtime
             }
             else
             {
-                lock (_cacheInvalidationHeader)
+                lock (cacheInvalidationHeader)
                 {
-                    _cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+                    AddCacheInvalidationHeaderEntry(cacheInvalidationHeader, grainAddressCacheUpdate);
                 }
             }
+        }
+
+        private static void AddCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainAddressCacheUpdate grainAddressCacheUpdate)
+        {
+            if (cacheInvalidationHeader.Count >= MaxCacheInvalidationHeaderEntries || ContainsCacheInvalidationHeaderEntry(cacheInvalidationHeader, grainAddressCacheUpdate.GrainId))
+            {
+                return;
+            }
+
+            cacheInvalidationHeader.Add(grainAddressCacheUpdate);
+        }
+
+        private static bool ContainsCacheInvalidationHeaderEntry(List<GrainAddressCacheUpdate> cacheInvalidationHeader, GrainId grainId)
+        {
+            foreach (var entry in cacheInvalidationHeader)
+            {
+                if (entry.GrainId.Equals(grainId))
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
 
         public override string ToString() => $"{this}";

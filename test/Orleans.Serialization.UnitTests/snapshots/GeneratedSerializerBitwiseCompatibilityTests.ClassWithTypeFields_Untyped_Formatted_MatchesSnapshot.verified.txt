@@ -1,0 +1,10 @@
+0x005A [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: Orleans.Serialization.UnitTests.ClassWithTypeFields (name: Encoded "TypeName "Orleans.Serialization.UnitTests.ClassWithTypeFields,Orleans.Serialization.UnitTests" (hash 8B2A54D6)" (Orleans.Serialization.UnitTests.ClassWithTypeFields,Orleans.Serialization.UnitTests))] Value: {
+0x005B  [#2 TagDelimited Id: 1 SchemaType: Expected] Value: {
+0x005C   [#3 VarInt Id: 0 SchemaType: Expected] Value: 16 (0x10)
+0x005E   [#4 LengthPrefixed Id: 1 SchemaType: Expected] Value: (length: 39b) ["MyValue,Orleans.Serialization.UnitTests"]
+0x0087  }
+0x00B5  [#5 TagDelimited Id: 2 SchemaType: Encoded RuntimeType: MyValue (name: Encoded "TypeName "MyValue,Orleans.Serialization.UnitTests" (hash 6D7C32C3)" (MyValue,Orleans.Serialization.UnitTests))] Value: {
+0x00B6   [#6 VarInt Id: 0 SchemaType: Expected] Value: 84 (0x54)
+0x00B8  }
+0x00B9  [#7 Reference Id: 3 SchemaType: Expected Reference: 2 (Position: 0x5B, Field: [TagDelimited, IdDelta:1, SchemaType:Expected])]
+0x00BB }

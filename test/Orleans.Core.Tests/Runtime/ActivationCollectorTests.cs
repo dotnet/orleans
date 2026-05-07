@@ -65,6 +65,40 @@ namespace UnitTests.Runtime
             });
         }
 
+        [Fact, TestCategory("Activation")]
+        public void TryRescheduleCollection_DoesNotThrow_WhenCollectionTicketIsMaxValue()
+        {
+            // Simulate an activation whose collection ticket sits in the DateTime.MaxValue bucket.
+            // That state arises when ScanStale reschedules an activation with
+            // KeepAliveUntil = DateTime.MaxValue (from DelayDeactivation(Timeout.InfiniteTimeSpan))
+            // and MakeTicketFromDateTime clamps the overflowed timestamp to DateTime.MaxValue
+            // (see MakeTicketFromDateTime_MaxValue).
+            //
+            // Cancelling the keep-alive via DelayDeactivation(TimeSpan.Zero) drives
+            // ActivationData into TryRescheduleCollection, which must be able to move the
+            // activation out of the MaxValue bucket without throwing.
+            var activation = Substitute.For<ICollectibleGrainContext, IActivationWorkingSetMember>();
+            activation.CollectionAgeLimit.Returns(TimeSpan.FromMinutes(5));
+            activation.IsValid.Returns(true);
+            activation.IsExemptFromCollection.Returns(false);
+
+            var now = timeProvider.GetUtcNow().UtcDateTime;
+            var farFuture = DateTime.MaxValue - now;
+            collector.ScheduleCollection(activation, farFuture, now);
+            Assert.Equal(DateTime.MaxValue, activation.CollectionTicket);
+
+            var rescheduled = false;
+            var exception = Record.Exception(() =>
+            {
+                rescheduled = collector.TryRescheduleCollection(activation);
+            });
+
+            Assert.Null(exception);
+            Assert.True(rescheduled);
+            Assert.NotEqual(default, activation.CollectionTicket);
+            Assert.NotEqual(DateTime.MaxValue, activation.CollectionTicket);
+        }
+
         [Theory, TestCategory("MemoryBasedDeactivations")]
         [InlineData(80.0, 70.0, 1000, 150, 100, true, 82)] // Over threshold, need to deactivate
         [InlineData(80.0, 70.0, 1000, 250, 100, false, 0)] // Below threshold, no deactivation

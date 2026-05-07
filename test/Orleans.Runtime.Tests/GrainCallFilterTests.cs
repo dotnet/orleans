@@ -142,7 +142,7 @@ namespace UnitTests.General
 
                             await ctx.Invoke();
                         })
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("SMSProvider")
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemoryStreamProvider")
                         .AddMemoryGrainStorageAsDefault()
                         .AddMemoryGrainStorage("PubSubStore");
                 }
@@ -206,7 +206,7 @@ namespace UnitTests.General
                                 result["result"] = "intercepted!";
                             }
                         })
-                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("SMSProvider");
+                        .AddMemoryStreams<DefaultMemoryMessageBodySerializer>("MemoryStreamProvider");
 
                     // Demonstrates retry logic in outgoing filters
                     // This filter retries failed calls by modifying the argument
@@ -318,7 +318,7 @@ namespace UnitTests.General
         [Fact]
         public async Task GrainCallFilter_Incoming_Stream_Test()
         {
-            var streamProvider = this.fixture.Client.GetStreamProvider("SMSProvider");
+            var streamProvider = this.fixture.Client.GetStreamProvider("MemoryStreamProvider");
             var id = Guid.NewGuid();
             var stream = streamProvider.GetStream<int>("InterceptedStream", id);
             var grain = this.fixture.GrainFactory.GetGrain<IStreamInterceptionGrain>(id);

@@ -61,13 +61,11 @@ namespace Orleans.Configuration
         /// <summary>
         /// Gets or sets the maximum time, in seconds, to keep a cache entry before revalidating.
         /// </summary>
-        [Obsolete("MaximumCacheTTL is deprecated and will be removed in a future version.")]
         public TimeSpan MaximumCacheTTL { get; set; } = DEFAULT_MAXIMUM_CACHE_TTL;
 
         /// <summary>
         /// The default value for <see cref="MaximumCacheTTL"/>.
         /// </summary>
-        [Obsolete("DEFAULT_MAXIMUM_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly TimeSpan DEFAULT_MAXIMUM_CACHE_TTL = TimeSpan.FromSeconds(240);
 
         /// <summary>

@@ -22,7 +22,7 @@ namespace UnitTests.Grains
         {
             logger.LogInformation("OnActivateAsync");
 
-            var streamProvider = this.GetStreamProvider("SMSProvider");
+            var streamProvider = this.GetStreamProvider("MemoryStreamProvider");
             redStream = streamProvider.GetStream<int>("red", this.GetPrimaryKey());
             blueStream = streamProvider.GetStream<int>("blue", this.GetPrimaryKey());
 

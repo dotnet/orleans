@@ -722,7 +722,7 @@ namespace NonSilo.Tests.Membership
                 fatalErrorHandler: this.fatalErrorHandler,
                 gossiper: this.membershipGossiper,
                 log: this.loggerFactory.CreateLogger<MembershipTableManager>(),
-                timerFactory: new AsyncTimerFactory(this.loggerFactory),
+                timerFactory: new AsyncTimerFactory(this.loggerFactory, TimeProvider.System),
                 this.lifecycle);
 
             ((ILifecycleParticipant<ISiloLifecycle>)manager).Participate(this.lifecycle);

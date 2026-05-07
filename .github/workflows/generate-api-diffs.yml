@@ -13,9 +13,9 @@ jobs:
   generate-and-pr:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@93cb6efe18208431cddfb8368fd83d5badbf9bfd # v5
       - name: Setup .NET
-        uses: actions/setup-dotnet@v4
+        uses: actions/setup-dotnet@c2fa09f4bde5ebb9d1777cf28262a3eb3db3ced7 # v5
         with:
           global-json-file: global.json
 
@@ -30,7 +30,7 @@ jobs:
         continue-on-error: true
 
       - name: Create or update pull request
-        uses: dotnet/actions-create-pull-request@e8d799aa1f8b17f324f9513832811b0a62f1e0b1
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
           branch: update-api-diffs

@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Placement;
 using Orleans.Placement.Rebalancing;
+using Orleans.Runtime.Diagnostics;
 
 
 namespace Orleans.Runtime.Placement.Rebalancing;
@@ -248,10 +249,16 @@ internal sealed partial class ActivationRebalancerWorker(
         }
 
         _rebalancingCycle++;
+        var cycleNumber = _rebalancingCycle;
+        var activationsMigrated = 0;
+        var cycleStopwatch = ValueStopwatch.StartNew();
+        ActivationRebalancerEvents.EmitCycleStart(localSiloDetails.SiloAddress, cycleNumber);
 
         if (_stagnantCycles >= _options.MaxStagnantCycles)
         {
             LogMaxStagnantCyclesReached(_stagnantCycles);
+            cycleStopwatch.Stop();
+            ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, _entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: false);
             StopSession(StopReason.SessionStagnated);
 
             return;
@@ -270,6 +277,8 @@ internal sealed partial class ActivationRebalancerWorker(
         {
             // The deviation from maximum is practically considered "0" i.e: we've reached maximum.
             LogMaxEntropyDeviationReached(entropyDeviation, currentEntropy, maximumEntropy, allowedDeviation);
+            cycleStopwatch.Stop();
+            ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: true);
             StopSession(StopReason.SessionCompleted);
 
             return;
@@ -294,6 +303,8 @@ internal sealed partial class ActivationRebalancerWorker(
 
             _stagnantCycles++;
             _previousEntropy = currentEntropy;
+            cycleStopwatch.Stop();
+            ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: false);
 
             return;
         }
@@ -351,6 +362,7 @@ internal sealed partial class ActivationRebalancerWorker(
                 .GetSystemTarget<ISiloControl>(Constants.SiloControlType, highSilo)
                 .MigrateRandomActivations(lowSilo, delta));
 
+            activationsMigrated += delta;
             UpdateStatistics(lowSilo, highSilo, delta);
             LogSiloMigrations(delta, lowSilo, lowCount, lowCount + delta, highSilo, highCount, highCount - delta);
         }
@@ -362,6 +374,8 @@ internal sealed partial class ActivationRebalancerWorker(
 
         LogCycleOutcome(_rebalancingCycle, _stagnantCycles, _previousEntropy, currentEntropy, maximumEntropy, entropyDeviation);
         _previousEntropy = currentEntropy;
+        cycleStopwatch.Stop();
+        ActivationRebalancerEvents.EmitCycleStop(localSiloDetails.SiloAddress, cycleNumber, activationsMigrated, entropyDeviation, cycleStopwatch.Elapsed, sessionCompleted: false);
     }
 
     private void UpdateStatistics(SiloAddress lowSilo, SiloAddress highSilo, int delta)
@@ -484,11 +498,14 @@ internal sealed partial class ActivationRebalancerWorker(
             Period = _options.SessionCyclePeriod
         });
 
+        ActivationRebalancerEvents.EmitSessionStart(localSiloDetails.SiloAddress);
         LogSessionStarted();
     }
 
     private void StopSession(StopReason reason, TimeSpan? duration = null)
     {
+        var hadSession = _sessionTimer is not null;
+        var totalCycles = _rebalancingCycle;
         _previousEntropy = 0;
         _rebalancingCycle = 0;
         _stagnantCycles = 0;
@@ -531,6 +548,11 @@ internal sealed partial class ActivationRebalancerWorker(
         }
 
         LogSessionStopped();
+
+        if (hadSession)
+        {
+            ActivationRebalancerEvents.EmitSessionStop(localSiloDetails.SiloAddress, reason.ToString(), totalCycles);
+        }
     }
 
     private void SuspendFor(TimeSpan duration)

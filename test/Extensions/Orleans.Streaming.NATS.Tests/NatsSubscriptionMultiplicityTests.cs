@@ -26,7 +26,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
             throw new SkipException("Nats Server is not available");
         }
 
-        this.natsConnection = new NatsConnection();
+        this.natsConnection = NatsTestConstants.CreateConnection();
         this.natsContext = new NatsJSContext(this.natsConnection);
     }
 
@@ -49,6 +49,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
                 .AddNatsStreams(NatsStreamProviderName, options =>
                 {
                     options.StreamName = TestStreamName;
+                    options.NatsClientOptions = NatsTestConstants.NatsClientOptions;
                 })
                 .AddMemoryGrainStorage("PubSubStore", opt => opt.NumStorageGrains = 1);
         }
@@ -62,6 +63,7 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
                 .AddNatsStreams(NatsStreamProviderName, options =>
                 {
                     options.StreamName = TestStreamName;
+                    options.NatsClientOptions = NatsTestConstants.NatsClientOptions;
                 });
         }
     }
@@ -142,10 +144,10 @@ public class NatsSubscriptionMultiplicityTests : TestClusterPerTest
     }
 
     [SkippableFact, TestCategory("NATS")]
-    public async Task NatsTwoIntermitentStreamTest()
+    public async Task NatsTwoIntermittentStreamTest()
     {
-        logger.LogInformation("************************ NatsTwoIntermitentStreamTest *********************************");
-        await runner.TwoIntermitentStreamTest(Guid.NewGuid());
+        logger.LogInformation("************************ NatsTwoIntermittentStreamTest *********************************");
+        await runner.TwoIntermittentStreamTest(Guid.NewGuid());
     }
 
     [SkippableFact, TestCategory("NATS")]

@@ -5,7 +5,14 @@ using Orleans.Caching;
 #nullable disable
 namespace Orleans.Runtime.GrainDirectory;
 
-internal sealed class LruGrainDirectoryCache(int maxCacheSize) : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>(capacity: maxCacheSize), IGrainDirectoryCache
+internal sealed class LruGrainDirectoryCache(
+    int maxCacheSize,
+    TimeSpan maxCacheTTL,
+    TimeProvider timeProvider) : ConcurrentLruCache<GrainId, (GrainAddress ActivationAddress, int Version)>(
+        capacity: maxCacheSize,
+        comparer: null,
+        timeToLive: maxCacheTTL,
+        timeProvider: timeProvider), IGrainDirectoryCache
 {
     private static readonly Func<(GrainAddress Address, int Version), GrainAddress, bool> ActivationAddressesMatch = (value, state) => GrainAddress.MatchesGrainIdAndSilo(state, value.Address);
 

@@ -19,17 +19,21 @@ namespace Orleans.Streams
         [Id(2)]
         public bool StreamRegistered { get; set; }
 
+        // Not serialized - runtime-only in-flight registration tracking.
+        [NonSerialized]
+        public Task RegistrationTask;
+
         public StreamConsumerCollection(DateTime now)
         {
             queueData = new Dictionary<GuidId, StreamConsumerData>();
             lastActivityTime = now;
         }
 
-        public StreamConsumerData AddConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData)
+        public StreamConsumerData AddConsumer(GuidId subscriptionId, QualifiedStreamId streamId, IStreamConsumerExtension streamConsumer, string filterData, DateTime now)
         {
             var consumerData = new StreamConsumerData(subscriptionId, streamId, streamConsumer, filterData);
             queueData.Add(subscriptionId, consumerData);
-            lastActivityTime = DateTime.UtcNow;
+            lastActivityTime = now;
             return consumerData;
         }
 

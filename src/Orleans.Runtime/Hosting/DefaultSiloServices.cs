@@ -262,6 +262,7 @@ namespace Orleans.Hosting
 
             // Grain activation
             services.AddSingleton<PlacementService>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PlacementService>();
             services.AddSingleton<Catalog>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, Catalog>();
             services.AddSingleton<GrainContextActivator>();
@@ -413,7 +414,6 @@ namespace Orleans.Hosting
                 sp,
                 sp.GetRequiredService<IOptions<SiloMessagingOptions>>().Value));
             services.TryAddSingleton<ConnectionFactory, SiloConnectionFactory>();
-            services.AddSingleton<NetworkingTrace>();
             services.AddSingleton<RuntimeMessagingTrace>();
             services.AddFromExisting<MessagingTrace, RuntimeMessagingTrace>();
 

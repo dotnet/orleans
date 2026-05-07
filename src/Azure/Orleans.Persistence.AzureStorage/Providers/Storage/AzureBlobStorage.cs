@@ -1,7 +1,7 @@
+#nullable enable
 using System;
+using System.Buffers;
 using System.Diagnostics;
-using System.Threading;
-using System.Threading.Tasks;
 using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
@@ -10,7 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Providers.Azure;
-using Orleans.Runtime;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Serializers;
 using LogLevel = Microsoft.Extensions.Logging.LogLevel;
 
@@ -57,20 +57,11 @@ namespace Orleans.Storage
             {
                 var blob = container.GetBlobClient(blobName);
 
-                var response = await blob.DownloadContentAsync();
-                grainState.ETag = response.Value.Details.ETag.ToString();
-                var contents = response.Value.Content;
-                T? loadedState;
-                if (contents is null || contents.IsEmpty)
+                T? loadedState = this.grainStorageSerializer switch
                 {
-                    loadedState = default;
-                    LogTraceBlobEmptyReading(grainType, grainId, grainState.ETag, blobName, container.Name);
-                }
-                else
-                {
-                    loadedState = this.ConvertFromStorageFormat<T>(contents);
-                    LogTraceDataRead(grainType, grainId, grainState.ETag, blobName, container.Name);
-                }
+                    IGrainStorageStreamingSerializer serializer => await ReadStateWithStreamAsync(serializer, blob, grainType, grainId, grainState, blobName, container.Name),
+                    _ => await ReadStateWithPooledBufferAsync<T>(blob, grainType, grainId, grainState, blobName, container.Name),
+                };
 
                 grainState.State = loadedState ?? CreateInstance<T>();
                 grainState.RecordExists = loadedState is not null;
@@ -114,11 +105,17 @@ namespace Orleans.Storage
             {
                 LogTraceWriting(grainType, grainId, grainState.ETag, blobName, container.Name);
 
-                var contents = ConvertToStorageFormat(grainState.State);
-
                 var blob = container.GetBlobClient(blobName);
 
-                await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
+                if (this.grainStorageSerializer is IGrainStorageStreamingSerializer serializer)
+                {
+                    await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, "application/octet-stream", blob);
+                }
+                else
+                {
+                    var contents = ConvertToStorageFormat(grainState.State);
+                    await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, "application/octet-stream", blob);
+                }
 
                 LogTraceDataWritten(grainType, grainId, grainState.ETag, blobName, container.Name);
             }
@@ -199,8 +196,7 @@ namespace Orleans.Storage
                     static state => state.blob.UploadAsync(state.contents, state.options),
                     (blob, contents, options),
                     blob,
-                    grainState.ETag)
-                        .ConfigureAwait(false);
+                    grainState.ETag).ConfigureAwait(false);
 
                 grainState.ETag = result.Value.ETag.ToString();
                 grainState.RecordExists = true;
@@ -210,9 +206,117 @@ namespace Orleans.Storage
                 // if the container does not exist, create it, and make another attempt
                 LogTraceContainerNotFound(grainType, grainId, grainState.ETag, blob.Name, container.Name);
                 await container.CreateIfNotExistsAsync().ConfigureAwait(false);
-
                 await WriteStateAndCreateContainerIfNotExists(grainType, grainId, grainState, contents, mimeType, blob).ConfigureAwait(false);
             }
+        }
+
+        private async Task WriteStateBufferedStreamAndCreateContainerIfNotExists<T>(IGrainStorageStreamingSerializer serializer, string grainType, GrainId grainId, IGrainState<T> grainState, string mimeType, BlobClient blob)
+        {
+            var container = this.blobContainerFactory.GetBlobContainerClient(grainId);
+
+            try
+            {
+                var conditions = string.IsNullOrEmpty(grainState.ETag)
+                    ? new BlobRequestConditions { IfNoneMatch = ETag.All }
+                    : new BlobRequestConditions { IfMatch = new ETag(grainState.ETag) };
+
+                var options = new BlobUploadOptions
+                {
+                    HttpHeaders = new BlobHttpHeaders { ContentType = mimeType },
+                    Conditions = conditions,
+                };
+
+                var result = await DoOptimisticUpdate(
+                    static state => state.self.UploadSerializedStateBufferedAsync(state.serializer, state.blob, state.options, state.value),
+                    (self: this, serializer, blob, options, value: grainState.State),
+                    blob,
+                    grainState.ETag).ConfigureAwait(false);
+
+                grainState.ETag = result.Value.ETag.ToString();
+                grainState.RecordExists = true;
+            }
+            catch (RequestFailedException exception) when (exception.IsContainerNotFound())
+            {
+                // if the container does not exist, create it, and make another attempt
+                LogTraceContainerNotFound(grainType, grainId, grainState.ETag, blob.Name, container.Name);
+                await container.CreateIfNotExistsAsync().ConfigureAwait(false);
+                await WriteStateBufferedStreamAndCreateContainerIfNotExists(serializer, grainType, grainId, grainState, mimeType, blob).ConfigureAwait(false);
+            }
+        }
+
+        private async Task<Response<BlobContentInfo>> UploadSerializedStateBufferedAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, BlobUploadOptions options, T value)
+        {
+            var bufferStream = PooledBufferStream.Rent();
+            try
+            {
+                await serializer.SerializeAsync(value, bufferStream).ConfigureAwait(false);
+                bufferStream.Position = 0;
+                return await blob.UploadAsync(bufferStream, options).ConfigureAwait(false);
+            }
+            finally
+            {
+                PooledBufferStream.Return(bufferStream);
+            }
+        }
+
+        private async Task<T?> ReadStateWithStreamAsync<T>(IGrainStorageStreamingSerializer serializer, BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
+        {
+            var response = await blob.DownloadStreamingAsync();
+            var eTag = response.Value.Details.ETag.ToString();
+            var contentLength = response.Value.Details.ContentLength;
+
+            if (contentLength <= 0)
+            {
+                LogTraceBlobEmptyReading(grainType, grainId, eTag, blobName, containerName);
+                grainState.ETag = eTag;
+                return default;
+            }
+
+            await using var content = response.Value.Content;
+            var loadedState = await serializer.DeserializeAsync<T>(content).ConfigureAwait(false);
+            LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
+            grainState.ETag = eTag;
+            return loadedState;
+        }
+
+        private async Task<T?> ReadStateWithPooledBufferAsync<T>(BlobClient blob, string grainType, GrainId grainId, IGrainState<T> grainState, string blobName, string containerName)
+        {
+            var response = await blob.DownloadStreamingAsync();
+            var eTag = response.Value.Details.ETag.ToString();
+            var contentLength = response.Value.Details.ContentLength;
+
+            if (contentLength <= 0)
+            {
+                LogTraceBlobEmptyReading(grainType, grainId, eTag, blobName, containerName);
+                grainState.ETag = eTag;
+                return default;
+            }
+
+            await using var content = response.Value.Content;
+            T? loadedState;
+            if (contentLength <= int.MaxValue)
+            {
+                var buffer = ArrayPool<byte>.Shared.Rent((int)contentLength);
+                try
+                {
+                    var memory = buffer.AsMemory(0, (int)contentLength);
+                    await content.ReadExactlyAsync(memory);
+                    loadedState = this.ConvertFromStorageFormat<T>(new BinaryData(memory));
+                }
+                finally
+                {
+                    ArrayPool<byte>.Shared.Return(buffer);
+                }
+            }
+            else
+            {
+                loadedState = this.ConvertFromStorageFormat<T>(new BinaryData(content));
+                LogWarningLargePayloadFallback(contentLength, grainType, grainId, eTag, blobName, containerName);
+            }
+
+            LogTraceDataRead(grainType, grainId, eTag, blobName, containerName);
+            grainState.ETag = eTag;
+            return loadedState;
         }
 
         private static async Task<TResult> DoOptimisticUpdate<TState, TResult>(Func<TState, Task<TResult>> updateOperation, TState state, BlobClient blob, string currentETag)
@@ -292,6 +396,13 @@ namespace Orleans.Storage
             Message = "Read: GrainType={GrainType} GrainId={GrainId} ETag={ETag} from BlobName={BlobName} in Container={ContainerName}"
         )]
         private partial void LogTraceDataRead(string grainType, GrainId grainId, string? eTag, string blobName, string containerName);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            EventId = (int)AzureProviderErrorCode.AzureBlobProvider_LargePayloadFallback,
+            Message = "ContentLength={ContentLength} exceeds max array size; falling back to DownloadContentAsync. GrainType={GrainType} GrainId={GrainId} ETag={ETag} BlobName={BlobName} in Container={ContainerName}"
+        )]
+        private partial void LogWarningLargePayloadFallback(long contentLength, string grainType, GrainId grainId, string? eTag, string blobName, string containerName);
 
         [LoggerMessage(
             Level = LogLevel.Error,

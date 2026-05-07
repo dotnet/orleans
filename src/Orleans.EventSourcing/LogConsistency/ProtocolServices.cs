@@ -10,7 +10,7 @@ namespace Orleans.Runtime.LogConsistency
     /// This class allows access to these services to providers that cannot see runtime-internals.
     /// It also stores grain-specific information like the grain reference, and caches
     /// </summary>
-    internal class ProtocolServices : ILogConsistencyProtocolServices
+    internal partial class ProtocolServices : ILogConsistencyProtocolServices
     {
         private readonly ILogger log;
         private readonly DeepCopier deepCopier;
@@ -36,11 +36,14 @@ namespace Orleans.Runtime.LogConsistency
 
         public void ProtocolError(string msg, bool throwexception)
         {
-            log.LogError(
-                (int)(throwexception ? ErrorCode.LogConsistency_ProtocolFatalError : ErrorCode.LogConsistency_ProtocolError),
-                "{GrainId} Protocol Error: {Message}",
-                grainContext.GrainId,
-                msg);
+            if (throwexception)
+            {
+                LogErrorProtocolFatal(log, grainContext.GrainId, msg);
+            }
+            else
+            {
+                LogErrorProtocol(log, grainContext.GrainId, msg);
+            }
 
             if (!throwexception)
                 return;
@@ -50,23 +53,12 @@ namespace Orleans.Runtime.LogConsistency
 
         public void CaughtException(string where, Exception e)
         {
-            log.LogError(
-                (int)ErrorCode.LogConsistency_CaughtException,
-                e,
-               "{GrainId} exception caught at {Location}",
-               grainContext.GrainId,
-               where);
+            LogErrorCaughtException(log, e, grainContext.GrainId, where);
         }
 
         public void CaughtUserCodeException(string callback, string where, Exception e)
         {
-            log.LogWarning(
-                (int)ErrorCode.LogConsistency_UserCodeException,
-                e,
-                "{GrainId} exception caught in user code for {Callback}, called from {Location}",
-                grainContext.GrainId,
-                callback,
-                where);
+            LogWarningCaughtUserCodeException(log, e, grainContext.GrainId, callback, where);
         }
 
         public void Log(LogLevel level, string format, params object[] args)
@@ -77,6 +69,34 @@ namespace Orleans.Runtime.LogConsistency
                 log.Log(level, 0, msg, null, (m, exc) => $"{m}");
             }
         }
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.LogConsistency_ProtocolError,
+            Level = LogLevel.Error,
+            Message = "{GrainId} Protocol Error: {Message}"
+        )]
+        private static partial void LogErrorProtocol(ILogger logger, GrainId grainId, string message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.LogConsistency_ProtocolFatalError,
+            Level = LogLevel.Error,
+            Message = "{GrainId} Protocol Error: {Message}"
+        )]
+        private static partial void LogErrorProtocolFatal(ILogger logger, GrainId grainId, string message);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.LogConsistency_CaughtException,
+            Level = LogLevel.Error,
+            Message = "{GrainId} exception caught at {Location}"
+        )]
+        private static partial void LogErrorCaughtException(ILogger logger, Exception exception, GrainId grainId, string location);
+
+        [LoggerMessage(
+            EventId = (int)ErrorCode.LogConsistency_UserCodeException,
+            Level = LogLevel.Warning,
+            Message = "{GrainId} exception caught in user code for {Callback}, called from {Location}"
+        )]
+        private static partial void LogWarningCaughtUserCodeException(ILogger logger, Exception exception, GrainId grainId, string callback, string location);
     }
 
 }
