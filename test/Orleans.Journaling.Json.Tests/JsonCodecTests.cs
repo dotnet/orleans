@@ -25,12 +25,10 @@ public class JsonCodecTests
     {
         var codec = new JsonDictionaryOperationCodec<string, int>(Options);
 
-        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("alice", 42, writer));
-        var json = GetString(input);
+        var input = AssertPayload("""["set","alice",42]""", writer => codec.WriteSet("alice", 42, writer));
         var consumer = new DictionaryConsumer<string, int>();
         codec.Apply(input, consumer);
 
-        Assert.Equal("""["set","alice",42]""", json);
         Assert.Equal("alice", consumer.LastSetKey);
         Assert.Equal(42, consumer.LastSetValue);
     }
@@ -61,13 +59,20 @@ public class JsonCodecTests
             new("beta", 2),
         };
 
-        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer));
-        var json = GetString(input);
+        var input = AssertPayload("""["snapshot",[["alpha",1],["beta",2]]]""", writer => codec.WriteSnapshot(items, writer));
         var consumer = new DictionaryConsumer<string, int>();
         codec.Apply(input, consumer);
 
-        Assert.Equal("""["snapshot",[["alpha",1],["beta",2]]]""", json);
         Assert.Equal(items, consumer.Items);
+    }
+
+    [Fact]
+    public void JsonDictionaryCodec_RemoveAndClear_WriteExpectedPayloads()
+    {
+        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
+
+        AssertPayload("""["remove","alice"]""", writer => codec.WriteRemove("alice", writer));
+        AssertPayload("""["clear"]""", writer => codec.WriteClear(writer));
     }
 
     [Fact]
@@ -109,15 +114,55 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonQueueCodec_Snapshot_ThrowsWhenCollectionCountDoesNotMatchEnumeration()
+    {
+        var codec = new JsonQueueOperationCodec<string>(Options);
+
+        var tooManyItems = new MiscountedReadOnlyCollection<string>(1, ["one", "two"]);
+        var tooFewItems = new MiscountedReadOnlyCollection<string>(2, ["one"]);
+
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooManyItems, writer)));
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooFewItems, writer)));
+    }
+
+    [Fact]
+    public void JsonSetCodec_Snapshot_ThrowsWhenCollectionCountDoesNotMatchEnumeration()
+    {
+        var codec = new JsonSetOperationCodec<string>(Options);
+
+        var tooManyItems = new MiscountedReadOnlyCollection<string>(1, ["one", "two"]);
+        var tooFewItems = new MiscountedReadOnlyCollection<string>(2, ["one"]);
+
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooManyItems, writer)));
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooFewItems, writer)));
+    }
+
+    [Fact]
+    public void JsonDictionaryCodec_Snapshot_ThrowsWhenCollectionCountDoesNotMatchEnumeration()
+    {
+        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
+
+        var tooManyItems = new MiscountedReadOnlyCollection<KeyValuePair<string, int>>(
+            1,
+            [new("one", 1), new("two", 2)]);
+        var tooFewItems = new MiscountedReadOnlyCollection<KeyValuePair<string, int>>(
+            2,
+            [new("one", 1)]);
+
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooManyItems, writer)));
+        Assert.Throws<InvalidOperationException>(() => CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(tooFewItems, writer)));
+    }
+
+    [Fact]
     public void JsonQueueCodec_Operations_RoundTrip()
     {
         var codec = new JsonQueueOperationCodec<int>(Options);
         var consumer = new QueueConsumer<int>();
 
-        Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
-        Apply(codec, writer => codec.WriteDequeue(writer), consumer);
-        Apply(codec, writer => codec.WriteClear(writer), consumer);
-        Apply(codec, writer => codec.WriteSnapshot(new[] { 20, 30 }, writer), consumer);
+        codec.Apply(AssertPayload("""["enqueue",10]""", writer => codec.WriteEnqueue(10, writer)), consumer);
+        codec.Apply(AssertPayload("""["dequeue"]""", writer => codec.WriteDequeue(writer)), consumer);
+        codec.Apply(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer)), consumer);
+        codec.Apply(AssertPayload("""["snapshot",[20,30]]""", writer => codec.WriteSnapshot(new[] { 20, 30 }, writer)), consumer);
 
         Assert.Equal(["enqueue:10", "dequeue", "clear", "reset:2", "enqueue:20", "enqueue:30"], consumer.Commands);
     }
@@ -128,10 +173,10 @@ public class JsonCodecTests
         var codec = new JsonSetOperationCodec<string>(Options);
         var consumer = new SetConsumer<string>();
 
-        Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
-        Apply(codec, writer => codec.WriteRemove("a", writer), consumer);
-        Apply(codec, writer => codec.WriteClear(writer), consumer);
-        Apply(codec, writer => codec.WriteSnapshot(new[] { "b", "c" }, writer), consumer);
+        codec.Apply(AssertPayload("""["add","a"]""", writer => codec.WriteAdd("a", writer)), consumer);
+        codec.Apply(AssertPayload("""["remove","a"]""", writer => codec.WriteRemove("a", writer)), consumer);
+        codec.Apply(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer)), consumer);
+        codec.Apply(AssertPayload("""["snapshot",["b","c"]]""", writer => codec.WriteSnapshot(new[] { "b", "c" }, writer)), consumer);
 
         Assert.Equal(["add:a", "remove:a", "clear", "reset:2", "add:b", "add:c"], consumer.Commands);
     }
@@ -142,7 +187,7 @@ public class JsonCodecTests
         var codec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
 
-        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(42, writer)), consumer);
+        codec.Apply(AssertPayload("""["set",42]""", writer => codec.WriteSet(42, writer)), consumer);
 
         Assert.Equal(42, consumer.Value);
     }
@@ -175,8 +220,8 @@ public class JsonCodecTests
         var codec = new JsonStateOperationCodec<string>(Options);
         var consumer = new StateConsumer<string>();
 
-        Apply(codec, writer => codec.WriteSet("state", 7, writer), consumer);
-        Apply(codec, writer => codec.WriteClear(writer), consumer);
+        codec.Apply(AssertPayload("""["set","state",7]""", writer => codec.WriteSet("state", 7, writer)), consumer);
+        codec.Apply(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer)), consumer);
 
         Assert.Equal(["set:state:7", "clear"], consumer.Commands);
     }
@@ -187,10 +232,10 @@ public class JsonCodecTests
         var codec = new JsonTcsOperationCodec<int>(Options);
         var consumer = new TcsConsumer<int>();
 
-        Apply(codec, writer => codec.WritePending(writer), consumer);
-        Apply(codec, writer => codec.WriteCompleted(5, writer), consumer);
-        Apply(codec, writer => codec.WriteFaulted(new InvalidOperationException("boom"), writer), consumer);
-        Apply(codec, writer => codec.WriteCanceled(writer), consumer);
+        codec.Apply(AssertPayload("""["pending"]""", writer => codec.WritePending(writer)), consumer);
+        codec.Apply(AssertPayload("""["completed",5]""", writer => codec.WriteCompleted(5, writer)), consumer);
+        codec.Apply(AssertPayload("""["faulted","boom"]""", writer => codec.WriteFaulted(new InvalidOperationException("boom"), writer)), consumer);
+        codec.Apply(AssertPayload("""["canceled"]""", writer => codec.WriteCanceled(writer)), consumer);
 
         Assert.Equal(["pending", "completed:5", "faulted:boom", "canceled"], consumer.Commands);
     }
@@ -251,6 +296,25 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonOperationCodecs_LogStreamWriterOverload_WriteDirectJsonLinesForOperationFamilies()
+    {
+        var format = new JsonLinesLogFormat();
+        using var writer = format.CreateWriter();
+
+        new JsonQueueOperationCodec<int>(Options).WriteEnqueue(10, writer.CreateLogStreamWriter(new LogStreamId(11)));
+        new JsonSetOperationCodec<string>(Options).WriteAdd("a", writer.CreateLogStreamWriter(new LogStreamId(12)));
+        new JsonDictionaryOperationCodec<string, int>(Options).WriteSet("alice", 42, writer.CreateLogStreamWriter(new LogStreamId(13)));
+        new JsonTcsOperationCodec<int>(Options).WriteCompleted(5, writer.CreateLogStreamWriter(new LogStreamId(14)));
+
+        Assert.Equal(
+            """[11,"enqueue",10]""" + "\n" +
+            """[12,"add","a"]""" + "\n" +
+            """[13,"set","alice",42]""" + "\n" +
+            """[14,"completed",5]""" + "\n",
+            GetString(writer));
+    }
+
+    [Fact]
     public void JsonLinesLogFormat_TryAppendFormattedEntry_RollsBackWhenJsonWriteThrows()
     {
         var format = new JsonLinesLogFormat();
@@ -282,6 +346,31 @@ public class JsonCodecTests
         Assert.Equal((uint)(1 + payload.Length), BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0, 4)));
         Assert.Equal(8, bytes[4]);
         Assert.Equal(payload, bytes[5..]);
+    }
+
+    [Fact]
+    public void JsonOperationCodecWriter_FallbackPath_AbortsEntryWhenJsonWriteThrows()
+    {
+        using var writer = new OrleansBinaryLogBatchWriter();
+        var valueCodec = new JsonValueOperationCodec<int>(Options);
+        var throwingCodec = new JsonValueOperationCodec<ThrowingJsonValue>(Options);
+
+        valueCodec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
+        Assert.Throws<InvalidOperationException>(() => throwingCodec.WriteSet(new("bad"), writer.CreateLogStreamWriter(new LogStreamId(9))));
+        valueCodec.WriteSet(43, writer.CreateLogStreamWriter(new LogStreamId(10)));
+
+        Assert.Collection(
+            ReadBinaryEntries(writer),
+            entry =>
+            {
+                Assert.Equal((ulong)8, entry.StreamId.Value);
+                Assert.Equal("""["set",42]""", Encoding.UTF8.GetString(entry.Payload));
+            },
+            entry =>
+            {
+                Assert.Equal((ulong)10, entry.StreamId.Value);
+                Assert.Equal("""["set",43]""", Encoding.UTF8.GetString(entry.Payload));
+            });
     }
 
     [Fact]
@@ -539,6 +628,13 @@ public class JsonCodecTests
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
+    private static ReadOnlySequence<byte> AssertPayload(string expectedJson, Action<LogStreamWriter> write)
+    {
+        var payload = CodecTestHelpers.WriteEntry(write);
+        Assert.Equal(expectedJson, GetString(payload));
+        return payload;
+    }
+
     private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
 
     private static string GetString(ReadOnlySequence<byte> payload) => Encoding.UTF8.GetString(payload.ToArray());
@@ -569,6 +665,35 @@ public class JsonCodecTests
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
+    }
+
+    private static List<RecordedLogEntry> ReadBinaryEntries(OrleansBinaryLogBatchWriter writer)
+    {
+        using var buffer = writer.GetCommittedBuffer();
+        var remaining = buffer.AsReadOnlySequence();
+        var entries = new List<RecordedLogEntry>();
+        var offset = 0L;
+
+        while (!remaining.IsEmpty)
+        {
+            if (!OrleansBinaryLogEntryFrameReader.TryReadEntry(
+                ref remaining,
+                offset,
+                isCompleted: true,
+                out var streamId,
+                out var payload,
+                out var frameLength,
+                out _))
+            {
+                break;
+            }
+
+            entries.Add(new(streamId, payload.ToArray()));
+            remaining = remaining.Slice(frameLength);
+            offset += frameLength;
+        }
+
+        return entries;
     }
 
     private static void ReadOne(JsonLinesLogFormat format, string jsonLines, IStateMachineResolver resolver)

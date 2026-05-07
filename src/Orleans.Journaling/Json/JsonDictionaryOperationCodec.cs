@@ -20,61 +20,41 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     private readonly JsonTypeInfo<TValue> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TValue>(options);
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, LogStreamWriter writer) => Write(writer, CreateSetOperation(key, value));
-
-    private JsonDictionaryOperation CreateSetOperation(TKey key, TValue value)
+    public void WriteSet(TKey key, TValue value, LogStreamWriter writer)
     {
-        return new()
-        {
-            Command = JsonLogEntryCommands.Set,
-            Key = JsonSerializer.SerializeToElement(key, _keyTypeInfo),
-            Value = JsonSerializer.SerializeToElement(value, _valueTypeInfo)
-        };
+        JsonOperationCodecWriter.Write(
+            writer,
+            new SetOperation(_keyTypeInfo, _valueTypeInfo, key, value),
+            static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
     /// <inheritdoc/>
-    public void WriteRemove(TKey key, LogStreamWriter writer) => Write(writer, CreateRemoveOperation(key));
-
-    private JsonDictionaryOperation CreateRemoveOperation(TKey key)
+    public void WriteRemove(TKey key, LogStreamWriter writer)
     {
-        return new()
-        {
-            Command = JsonLogEntryCommands.Remove,
-            Key = JsonSerializer.SerializeToElement(key, _keyTypeInfo)
-        };
+        JsonOperationCodecWriter.Write(
+            writer,
+            new RemoveOperation(_keyTypeInfo, key),
+            static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
-
-    private static JsonDictionaryOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
+    public void WriteClear(LogStreamWriter writer)
+    {
+        JsonOperationCodecWriter.Write(
+            writer,
+            JsonLogEntryCommands.Clear,
+            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
+    }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
 
-        Write(writer, CreateSnapshotOperation(items));
-    }
-
-    private JsonDictionaryOperation CreateSnapshotOperation(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items)
-    {
-        var snapshotItems = new JsonDictionarySnapshotItem[items.Count];
-        var index = 0;
-        foreach (var (key, value) in items)
-        {
-            snapshotItems[index++] = new()
-            {
-                Key = JsonSerializer.SerializeToElement(key, _keyTypeInfo),
-                Value = JsonSerializer.SerializeToElement(value, _valueTypeInfo)
-            };
-        }
-
-        return new()
-        {
-            Command = JsonLogEntryCommands.Snapshot,
-            Items = snapshotItems
-        };
+        JsonOperationCodecWriter.Write(
+            writer,
+            new SnapshotOperation(_keyTypeInfo, _valueTypeInfo, items),
+            static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
     /// <inheritdoc/>
@@ -118,14 +98,6 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         }
     }
 
-    private static void Write(LogStreamWriter writer, JsonDictionaryOperation operation)
-    {
-        JsonOperationCodecWriter.Write(
-            writer,
-            operation,
-            static (jsonWriter, operation) => JsonDictionaryOperationConverter.WriteArrayElements(jsonWriter, operation));
-    }
-
     void IJsonLogEntryCodec.Apply(JsonElement entry, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableDictionaryOperationHandler<TKey, TValue> consumer)
@@ -135,5 +107,51 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         }
 
         Apply(entry, consumer);
+    }
+
+    private readonly struct SetOperation(JsonTypeInfo<TKey> keyTypeInfo, JsonTypeInfo<TValue> valueTypeInfo, TKey key, TValue value)
+    {
+        public void Write(Utf8JsonWriter writer)
+        {
+            writer.WriteStringValue(JsonLogEntryCommands.Set);
+            JsonSerializer.Serialize(writer, key, keyTypeInfo);
+            JsonSerializer.Serialize(writer, value, valueTypeInfo);
+        }
+    }
+
+    private readonly struct RemoveOperation(JsonTypeInfo<TKey> keyTypeInfo, TKey key)
+    {
+        public void Write(Utf8JsonWriter writer)
+        {
+            writer.WriteStringValue(JsonLogEntryCommands.Remove);
+            JsonSerializer.Serialize(writer, key, keyTypeInfo);
+        }
+    }
+
+    private readonly struct SnapshotOperation(
+        JsonTypeInfo<TKey> keyTypeInfo,
+        JsonTypeInfo<TValue> valueTypeInfo,
+        IReadOnlyCollection<KeyValuePair<TKey, TValue>> items)
+    {
+        public void Write(Utf8JsonWriter writer)
+        {
+            var count = CollectionCodecHelpers.GetSnapshotCount(items);
+
+            writer.WriteStringValue(JsonLogEntryCommands.Snapshot);
+            writer.WriteStartArray();
+            var written = 0;
+            foreach (var (key, value) in items)
+            {
+                CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+                writer.WriteStartArray();
+                JsonSerializer.Serialize(writer, key, keyTypeInfo);
+                JsonSerializer.Serialize(writer, value, valueTypeInfo);
+                writer.WriteEndArray();
+                written++;
+            }
+
+            CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+            writer.WriteEndArray();
+        }
     }
 }

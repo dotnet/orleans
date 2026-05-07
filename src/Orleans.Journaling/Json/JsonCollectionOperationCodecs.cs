@@ -182,48 +182,22 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteEnqueue(T item, LogStreamWriter writer) => Write(writer, CreateEnqueueOperation(item));
-
-    private JsonQueueOperation CreateEnqueueOperation(T item)
-    {
-        return new()
-        {
-            Command = JsonLogEntryCommands.Enqueue,
-            Item = JsonSerializer.SerializeToElement(item, _itemTypeInfo)
-        };
-    }
+    public void WriteEnqueue(T item, LogStreamWriter writer) => WriteItem(writer, JsonLogEntryCommands.Enqueue, item);
 
     /// <inheritdoc/>
-    public void WriteDequeue(LogStreamWriter writer) => Write(writer, CreateDequeueOperation());
-
-    private static JsonQueueOperation CreateDequeueOperation() => new() { Command = JsonLogEntryCommands.Dequeue };
+    public void WriteDequeue(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Dequeue);
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
-
-    private static JsonQueueOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
+    public void WriteClear(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Clear);
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
-        Write(writer, CreateSnapshotOperation(items));
-    }
-
-    private JsonQueueOperation CreateSnapshotOperation(IReadOnlyCollection<T> items)
-    {
-        var snapshotItems = new JsonElement[items.Count];
-        var index = 0;
-        foreach (var item in items)
-        {
-            snapshotItems[index++] = JsonSerializer.SerializeToElement(item, _itemTypeInfo);
-        }
-
-        return new()
-        {
-            Command = JsonLogEntryCommands.Snapshot,
-            Items = snapshotItems
-        };
+        JsonOperationCodecWriter.Write(
+            writer,
+            new SnapshotOperation(_itemTypeInfo, items),
+            static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
     /// <inheritdoc/>
@@ -274,14 +248,51 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         Apply(entry, consumer);
     }
 
-    private static void Write(LogStreamWriter writer, JsonQueueOperation operation)
+    private void WriteItem(LogStreamWriter writer, string command, T item)
     {
         JsonOperationCodecWriter.Write(
             writer,
-            operation,
-            static (jsonWriter, operation) => JsonQueueOperationConverter.WriteArrayElements(jsonWriter, operation));
+            new ItemOperation(_itemTypeInfo, command, item),
+            static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
+    private static void WriteCommand(LogStreamWriter writer, string command)
+    {
+        JsonOperationCodecWriter.Write(
+            writer,
+            command,
+            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
+    }
+
+    private readonly struct ItemOperation(JsonTypeInfo<T> typeInfo, string command, T item)
+    {
+        public void Write(Utf8JsonWriter writer)
+        {
+            writer.WriteStringValue(command);
+            JsonSerializer.Serialize(writer, item, typeInfo);
+        }
+    }
+
+    private readonly struct SnapshotOperation(JsonTypeInfo<T> typeInfo, IReadOnlyCollection<T> items)
+    {
+        public void Write(Utf8JsonWriter writer)
+        {
+            var count = CollectionCodecHelpers.GetSnapshotCount(items);
+
+            writer.WriteStringValue(JsonLogEntryCommands.Snapshot);
+            writer.WriteStartArray();
+            var written = 0;
+            foreach (var item in items)
+            {
+                CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+                JsonSerializer.Serialize(writer, item, typeInfo);
+                written++;
+            }
+
+            CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+            writer.WriteEndArray();
+        }
+    }
 }
 
 /// <summary>
@@ -293,55 +304,22 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, LogStreamWriter writer) => Write(writer, CreateAddOperation(item));
-
-    private JsonSetOperation CreateAddOperation(T item)
-    {
-        return new()
-        {
-            Command = JsonLogEntryCommands.Add,
-            Item = JsonSerializer.SerializeToElement(item, _itemTypeInfo)
-        };
-    }
+    public void WriteAdd(T item, LogStreamWriter writer) => WriteItem(writer, JsonLogEntryCommands.Add, item);
 
     /// <inheritdoc/>
-    public void WriteRemove(T item, LogStreamWriter writer) => Write(writer, CreateRemoveOperation(item));
-
-    private JsonSetOperation CreateRemoveOperation(T item)
-    {
-        return new()
-        {
-            Command = JsonLogEntryCommands.Remove,
-            Item = JsonSerializer.SerializeToElement(item, _itemTypeInfo)
-        };
-    }
+    public void WriteRemove(T item, LogStreamWriter writer) => WriteItem(writer, JsonLogEntryCommands.Remove, item);
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) => Write(writer, CreateClearOperation());
-
-    private static JsonSetOperation CreateClearOperation() => new() { Command = JsonLogEntryCommands.Clear };
+    public void WriteClear(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Clear);
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
-        Write(writer, CreateSnapshotOperation(items));
-    }
-
-    private JsonSetOperation CreateSnapshotOperation(IReadOnlyCollection<T> items)
-    {
-        var snapshotItems = new JsonElement[items.Count];
-        var index = 0;
-        foreach (var item in items)
-        {
-            snapshotItems[index++] = JsonSerializer.SerializeToElement(item, _itemTypeInfo);
-        }
-
-        return new()
-        {
-            Command = JsonLogEntryCommands.Snapshot,
-            Items = snapshotItems
-        };
+        JsonOperationCodecWriter.Write(
+            writer,
+            new SnapshotOperation(_itemTypeInfo, items),
+            static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
     /// <inheritdoc/>
@@ -392,11 +370,49 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         Apply(entry, consumer);
     }
 
-    private static void Write(LogStreamWriter writer, JsonSetOperation operation)
+    private void WriteItem(LogStreamWriter writer, string command, T item)
     {
         JsonOperationCodecWriter.Write(
             writer,
-            operation,
-            static (jsonWriter, operation) => JsonSetOperationConverter.WriteArrayElements(jsonWriter, operation));
+            new ItemOperation(_itemTypeInfo, command, item),
+            static (jsonWriter, operation) => operation.Write(jsonWriter));
+    }
+
+    private static void WriteCommand(LogStreamWriter writer, string command)
+    {
+        JsonOperationCodecWriter.Write(
+            writer,
+            command,
+            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
+    }
+
+    private readonly struct ItemOperation(JsonTypeInfo<T> typeInfo, string command, T item)
+    {
+        public void Write(Utf8JsonWriter writer)
+        {
+            writer.WriteStringValue(command);
+            JsonSerializer.Serialize(writer, item, typeInfo);
+        }
+    }
+
+    private readonly struct SnapshotOperation(JsonTypeInfo<T> typeInfo, IReadOnlyCollection<T> items)
+    {
+        public void Write(Utf8JsonWriter writer)
+        {
+            var count = CollectionCodecHelpers.GetSnapshotCount(items);
+
+            writer.WriteStringValue(JsonLogEntryCommands.Snapshot);
+            writer.WriteStartArray();
+            var written = 0;
+            foreach (var item in items)
+            {
+                CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+                JsonSerializer.Serialize(writer, item, typeInfo);
+                written++;
+            }
+
+            CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+            writer.WriteEndArray();
+        }
     }
 }

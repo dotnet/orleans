@@ -124,27 +124,7 @@ internal sealed class JsonDictionaryOperationConverter : JsonConverter<JsonDicti
 
     public override void Write(Utf8JsonWriter writer, JsonDictionaryOperation value, JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-        WriteArrayElements(writer, value);
-        writer.WriteEndArray();
-    }
-
-    internal static void WriteArrayElements(Utf8JsonWriter writer, JsonDictionaryOperation operation)
-    {
-        writer.WriteStringValue(operation.Command);
-        switch (operation.Command)
-        {
-            case JsonLogEntryCommands.Set:
-                JsonOperationArrayCodec.WriteElement(writer, operation.Key);
-                JsonOperationArrayCodec.WriteElement(writer, operation.Value);
-                break;
-            case JsonLogEntryCommands.Remove:
-                JsonOperationArrayCodec.WriteElement(writer, operation.Key);
-                break;
-            case JsonLogEntryCommands.Snapshot:
-                JsonOperationArrayCodec.WriteDictionarySnapshotItems(writer, operation.Items);
-                break;
-        }
+        throw new NotSupportedException("JSON journal operation models are read-only; write operation entries directly to the buffer writer.");
     }
 }
 
@@ -182,31 +162,7 @@ internal sealed class JsonListOperationConverter : JsonConverter<JsonListOperati
 
     public override void Write(Utf8JsonWriter writer, JsonListOperation value, JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-        WriteArrayElements(writer, value);
-        writer.WriteEndArray();
-    }
-
-    internal static void WriteArrayElements(Utf8JsonWriter writer, JsonListOperation operation)
-    {
-        writer.WriteStringValue(operation.Command);
-        switch (operation.Command)
-        {
-            case JsonLogEntryCommands.Add:
-                JsonOperationArrayCodec.WriteElement(writer, operation.Item);
-                break;
-            case JsonLogEntryCommands.Set:
-            case JsonLogEntryCommands.Insert:
-                writer.WriteNumberValue(operation.Index.GetValueOrDefault());
-                JsonOperationArrayCodec.WriteElement(writer, operation.Item);
-                break;
-            case JsonLogEntryCommands.RemoveAt:
-                writer.WriteNumberValue(operation.Index.GetValueOrDefault());
-                break;
-            case JsonLogEntryCommands.Snapshot:
-                JsonOperationArrayCodec.WriteElementArray(writer, operation.Items);
-                break;
-        }
+        throw new NotSupportedException("JSON journal operation models are read-only; write operation entries directly to the buffer writer.");
     }
 }
 
@@ -237,23 +193,7 @@ internal sealed class JsonQueueOperationConverter : JsonConverter<JsonQueueOpera
 
     public override void Write(Utf8JsonWriter writer, JsonQueueOperation value, JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-        WriteArrayElements(writer, value);
-        writer.WriteEndArray();
-    }
-
-    internal static void WriteArrayElements(Utf8JsonWriter writer, JsonQueueOperation operation)
-    {
-        writer.WriteStringValue(operation.Command);
-        switch (operation.Command)
-        {
-            case JsonLogEntryCommands.Enqueue:
-                JsonOperationArrayCodec.WriteElement(writer, operation.Item);
-                break;
-            case JsonLogEntryCommands.Snapshot:
-                JsonOperationArrayCodec.WriteElementArray(writer, operation.Items);
-                break;
-        }
+        throw new NotSupportedException("JSON journal operation models are read-only; write operation entries directly to the buffer writer.");
     }
 }
 
@@ -284,24 +224,7 @@ internal sealed class JsonSetOperationConverter : JsonConverter<JsonSetOperation
 
     public override void Write(Utf8JsonWriter writer, JsonSetOperation value, JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-        WriteArrayElements(writer, value);
-        writer.WriteEndArray();
-    }
-
-    internal static void WriteArrayElements(Utf8JsonWriter writer, JsonSetOperation operation)
-    {
-        writer.WriteStringValue(operation.Command);
-        switch (operation.Command)
-        {
-            case JsonLogEntryCommands.Add:
-            case JsonLogEntryCommands.Remove:
-                JsonOperationArrayCodec.WriteElement(writer, operation.Item);
-                break;
-            case JsonLogEntryCommands.Snapshot:
-                JsonOperationArrayCodec.WriteElementArray(writer, operation.Items);
-                break;
-        }
+        throw new NotSupportedException("JSON journal operation models are read-only; write operation entries directly to the buffer writer.");
     }
 }
 
@@ -327,18 +250,7 @@ internal sealed class JsonValueOperationConverter : JsonConverter<JsonValueOpera
 
     public override void Write(Utf8JsonWriter writer, JsonValueOperation value, JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-        WriteArrayElements(writer, value);
-        writer.WriteEndArray();
-    }
-
-    internal static void WriteArrayElements(Utf8JsonWriter writer, JsonValueOperation operation)
-    {
-        writer.WriteStringValue(operation.Command);
-        if (operation.Command == JsonLogEntryCommands.Set)
-        {
-            JsonOperationArrayCodec.WriteElement(writer, operation.Value);
-        }
+        throw new NotSupportedException("JSON journal operation models are read-only; write operation entries directly to the buffer writer.");
     }
 }
 
@@ -366,19 +278,7 @@ internal sealed class JsonStateOperationConverter : JsonConverter<JsonStateOpera
 
     public override void Write(Utf8JsonWriter writer, JsonStateOperation value, JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-        WriteArrayElements(writer, value);
-        writer.WriteEndArray();
-    }
-
-    internal static void WriteArrayElements(Utf8JsonWriter writer, JsonStateOperation operation)
-    {
-        writer.WriteStringValue(operation.Command);
-        if (operation.Command == JsonLogEntryCommands.Set)
-        {
-            JsonOperationArrayCodec.WriteElement(writer, operation.State);
-            writer.WriteNumberValue(operation.Version.GetValueOrDefault());
-        }
+        throw new NotSupportedException("JSON journal operation models are read-only; write operation entries directly to the buffer writer.");
     }
 }
 
@@ -409,23 +309,7 @@ internal sealed class JsonTaskCompletionSourceOperationConverter : JsonConverter
 
     public override void Write(Utf8JsonWriter writer, JsonTaskCompletionSourceOperation value, JsonSerializerOptions options)
     {
-        writer.WriteStartArray();
-        WriteArrayElements(writer, value);
-        writer.WriteEndArray();
-    }
-
-    internal static void WriteArrayElements(Utf8JsonWriter writer, JsonTaskCompletionSourceOperation operation)
-    {
-        writer.WriteStringValue(operation.Command);
-        switch (operation.Command)
-        {
-            case JsonLogEntryCommands.Completed:
-                JsonOperationArrayCodec.WriteElement(writer, operation.Value);
-                break;
-            case JsonLogEntryCommands.Faulted:
-                writer.WriteStringValue(operation.Message);
-                break;
-        }
+        throw new NotSupportedException("JSON journal operation models are read-only; write operation entries directly to the buffer writer.");
     }
 }
 
@@ -591,46 +475,4 @@ internal static class JsonOperationArrayCodec
         }
     }
 
-    public static void WriteElement(Utf8JsonWriter writer, JsonElement? element)
-    {
-        if (element is { } value)
-        {
-            value.WriteTo(writer);
-        }
-        else
-        {
-            writer.WriteNullValue();
-        }
-    }
-
-    public static void WriteElementArray(Utf8JsonWriter writer, JsonElement[]? items)
-    {
-        writer.WriteStartArray();
-        if (items is not null)
-        {
-            foreach (var item in items)
-            {
-                item.WriteTo(writer);
-            }
-        }
-
-        writer.WriteEndArray();
-    }
-
-    public static void WriteDictionarySnapshotItems(Utf8JsonWriter writer, JsonDictionarySnapshotItem[]? items)
-    {
-        writer.WriteStartArray();
-        if (items is not null)
-        {
-            foreach (var item in items)
-            {
-                writer.WriteStartArray();
-                item.Key.WriteTo(writer);
-                item.Value.WriteTo(writer);
-                writer.WriteEndArray();
-            }
-        }
-
-        writer.WriteEndArray();
-    }
 }
