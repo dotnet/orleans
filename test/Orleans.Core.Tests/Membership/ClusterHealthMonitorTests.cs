@@ -79,7 +79,7 @@ namespace NonSilo.Tests.Membership
             this.connectionManager = new ConnectionManager(
                 Options.Create(new ConnectionOptions()),
                 null,
-                new NetworkingTrace(this.loggerFactory));
+                this.loggerFactory.CreateLogger<ConnectionManager>());
         }
 
         /// <summary>
@@ -232,7 +232,7 @@ namespace NonSilo.Tests.Membership
             var canaryConnectionManager = new ConnectionManager(
                 Options.Create(new ConnectionOptions()),
                 null,
-                new NetworkingTrace(this.loggerFactory));
+                this.loggerFactory.CreateLogger<ConnectionManager>());
 
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions, canaryConnectionManager);
 
@@ -314,7 +314,7 @@ namespace NonSilo.Tests.Membership
             var canaryConnectionManager = new ConnectionManager(
                 Options.Create(new ConnectionOptions()),
                 null,
-                new NetworkingTrace(this.loggerFactory));
+                this.loggerFactory.CreateLogger<ConnectionManager>());
 
             var testRig = CreateClusterHealthMonitorTestRig(clusterMembershipOptions, canaryConnectionManager);
 
@@ -881,7 +881,7 @@ namespace NonSilo.Tests.Membership
                 Substitute.For<IServiceProvider>(),
                 null,
                 messagingTrace,
-                new NetworkingTrace(loggerFactory),
+                loggerFactory.CreateLogger<Connection>(),
                 new NoOpMessageStatisticsSink());
             return new TestConnection(context, middleware, shared);
         }
