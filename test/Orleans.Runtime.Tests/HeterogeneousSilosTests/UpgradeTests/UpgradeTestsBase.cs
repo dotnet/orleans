@@ -194,6 +194,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 this.builder = new TestClusterBuilder(1);
                 builder.CreateSiloAsync = StandaloneSiloHandle.Create;
                 TestDefaultConfiguration.ConfigureTestCluster(this.builder);
+                UseDhtGrainDirectory(builder);
                 builder.AddSiloBuilderConfigurator<VersionGrainsSiloBuilderConfigurator>();
                 builder.AddClientBuilderConfigurator<VersionGrainsClientConfigurator>();
                 builder.Properties[nameof(SiloCount)] = this.SiloCount.ToString();
@@ -234,6 +235,20 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             this.siloIdx++;
 
             return silo;
+        }
+
+        private static void UseDhtGrainDirectory(TestClusterBuilder builder)
+        {
+            // These standalone versioning tests are not exercising the experimental distributed grain directory,
+            // whose handoff can outlive membership stabilization.
+            var distributedGrainDirectoryConfigurator = typeof(TestClusterBuilder).Assembly
+                .GetType("Orleans.TestingHost.ConfigureDistributedGrainDirectory")?
+                .AssemblyQualifiedName;
+
+            if (distributedGrainDirectoryConfigurator is not null)
+            {
+                builder.Options.SiloBuilderConfiguratorTypes.Remove(distributedGrainDirectoryConfigurator);
+            }
         }
 
         protected async Task StopSilo(SiloHandle handle)
@@ -288,6 +303,8 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
         {
             public void Configure(IConfiguration configuration, IClientBuilder clientBuilder)
             {
+                clientBuilder.Configure<ConnectionOptions>(
+                    options => options.OpenConnectionTimeout = TimeSpan.FromSeconds(30));
                 clientBuilder.Configure<GatewayOptions>(options => options.PreferredGatewayIndex = 0);
             }
         }

@@ -13,6 +13,10 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
     [TestCategory("Versioning"), TestCategory("ExcludeXAML"), TestCategory("SlowBVT")]
     public class RuntimeStrategyChangeTests : UpgradeTestsBase
     {
+        private const int ReadinessProbeGrainId = 10_000;
+        private static readonly TimeSpan ReadinessRetryDelay = TimeSpan.FromMilliseconds(250);
+        private static readonly TimeSpan ReadinessTimeout = TimeSpan.FromMinutes(2);
+
         protected override Type VersionSelectorStrategy => typeof(LatestVersion);
         protected override Type CompatibilityStrategy => typeof(AllVersionsCompatible);
 
@@ -146,6 +150,7 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
             Assert.Equal(1, await grainV1.GetVersion());
 
             await StartSiloV2();
+            await WaitForVersionedGrainCallsToUseV2();
 
             // Change default to minimum version
             await ManagementGrain.SetSelectorStrategy(MinimumVersion.Singleton);
@@ -172,6 +177,36 @@ namespace Tester.HeterogeneousSilosTests.UpgradeTests
                 var grain = Client.GetGrain<IVersionUpgradeTestGrain>(i);
                 Assert.Equal(2, await grain.GetVersion());
             }
+        }
+
+        private async Task WaitForVersionedGrainCallsToUseV2()
+        {
+            var probe = Client.GetGrain<IVersionUpgradeTestGrain>(ReadinessProbeGrainId);
+            Exception lastException = null;
+            var timeoutAt = DateTime.UtcNow + ReadinessTimeout;
+            int? lastVersion = null;
+
+            while (DateTime.UtcNow < timeoutAt)
+            {
+                try
+                {
+                    lastVersion = await probe.GetVersion();
+                    if (lastVersion == 2)
+                    {
+                        return;
+                    }
+                }
+                catch (TimeoutException exception)
+                {
+                    lastException = exception;
+                }
+
+                await Task.Delay(ReadinessRetryDelay);
+            }
+
+            throw new TimeoutException(
+                $"Timed out waiting for V2 grain calls to succeed after the second silo started. Last observed version: {lastVersion}.",
+                lastException);
         }
     }
 }
