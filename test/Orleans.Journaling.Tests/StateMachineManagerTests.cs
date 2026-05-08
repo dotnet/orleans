@@ -91,10 +91,15 @@ public class StateMachineManagerTests : JournalingTestBase
         }
 
         using var data = segment.GetCommittedBuffer();
+        var originalBytes = data.ToArray();
         await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         var sut = CreateTestSystem(storage: storage);
 
         await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var segmentBytes = Assert.Single(storage.Segments);
+        Assert.Equal(originalBytes, segmentBytes);
     }
 
     [Fact]
@@ -349,6 +354,31 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateMachineManager_DirectWriteFailure_DoesNotPersistPartialEntry()
+    {
+        var storage = new CapturingStorage();
+        var format = new TrackingLogFormat();
+        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var codec = new ToggleThrowingDictionarySetCodec<int, int>(CreateDictionaryCodec<int, int>());
+        var dictionary = new DurableDictionary<int, int>("dict", sut.Manager, codec);
+
+        await sut.Lifecycle.OnStart();
+        codec.ThrowOnSet = true;
+        Assert.Throws<InvalidOperationException>(() => dictionary.Add(1, 1));
+
+        codec.ThrowOnSet = false;
+        dictionary.Add(1, 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystem(storage: storage, logFormat: new TrackingLogFormat());
+        var recoveredDictionary = new DurableDictionary<int, int>("dict", recovered.Manager, CreateDictionaryCodec<int, int>());
+        await recovered.Lifecycle.OnStart();
+
+        Assert.Single(recoveredDictionary);
+        Assert.Equal(1, recoveredDictionary[1]);
+    }
+
+    [Fact]
     public async Task StateMachineManager_WriteStateAsync_DoesNotObserveActiveEntry()
     {
         var storage = new CapturingStorage();
@@ -360,24 +390,32 @@ public class StateMachineManagerTests : JournalingTestBase
         await sut.Lifecycle.OnStart();
 
         Task writeTask = Task.CompletedTask;
+        using var writeStarted = new ManualResetEventSlim();
         var entry = stateMachine.BeginEntry();
         try
         {
             entry.Writer.Write([1, 2, 3]);
-            writeTask = Task.Run(async () => await sut.Manager.WriteStateAsync(CancellationToken.None));
-            Thread.Sleep(100);
+            writeTask = Task.Run(async () =>
+            {
+                writeStarted.Set();
+                await sut.Manager.WriteStateAsync(CancellationToken.None);
+            });
+            Assert.True(writeStarted.Wait(TimeSpan.FromSeconds(10)));
 
             Assert.False(writeTask.IsCompleted);
             Assert.Empty(storage.Appends);
 
+            stateMachine.MarkEntryClosing();
             entry.Commit();
         }
         finally
         {
+            stateMachine.MarkEntryClosing();
             entry.Dispose();
         }
 
         await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.False(stateMachine.AppendEntriesObservedOpenEntry);
         Assert.Single(storage.Appends);
     }
 
@@ -1400,14 +1438,26 @@ public class StateMachineManagerTests : JournalingTestBase
     private sealed class ManualDirectWriteStateMachine : IDurableStateMachine
     {
         private LogStreamWriter _writer;
+        private bool _entryOpen;
 
-        public LogEntry BeginEntry() => _writer.BeginEntry();
+        public bool AppendEntriesObservedOpenEntry { get; private set; }
+
+        public LogEntry BeginEntry()
+        {
+            _entryOpen = true;
+            return _writer.BeginEntry();
+        }
+
+        public void MarkEntryClosing() => _entryOpen = false;
 
         public object OperationCodec => this;
 
         public void Reset(LogStreamWriter writer) => _writer = writer;
 
-        public void AppendEntries(LogStreamWriter writer) { }
+        public void AppendEntries(LogStreamWriter writer)
+        {
+            AppendEntriesObservedOpenEntry |= _entryOpen;
+        }
 
         public void AppendSnapshot(LogStreamWriter writer) { }
 
@@ -1431,5 +1481,33 @@ public class StateMachineManagerTests : JournalingTestBase
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
+    }
+
+    private sealed class ToggleThrowingDictionarySetCodec<K, V>(IDurableDictionaryOperationCodec<K, V> inner) : IDurableDictionaryOperationCodec<K, V>
+        where K : notnull
+    {
+        public bool ThrowOnSet { get; set; }
+
+        public void WriteSet(K key, V value, LogStreamWriter writer)
+        {
+            if (!ThrowOnSet)
+            {
+                inner.WriteSet(key, value, writer);
+                return;
+            }
+
+            using var entry = writer.BeginEntry();
+            entry.Writer.GetSpan(1)[0] = 1;
+            entry.Writer.Advance(1);
+            throw new InvalidOperationException("Expected test exception.");
+        }
+
+        public void WriteRemove(K key, LogStreamWriter writer) => inner.WriteRemove(key, writer);
+
+        public void WriteClear(LogStreamWriter writer) => inner.WriteClear(writer);
+
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, LogStreamWriter writer) => inner.WriteSnapshot(items, writer);
+
+        public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => inner.Apply(input, consumer);
     }
 }

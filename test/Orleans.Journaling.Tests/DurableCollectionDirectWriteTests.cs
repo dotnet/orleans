@@ -34,6 +34,21 @@ public sealed class DurableCollectionDirectWriteTests
     }
 
     [Fact]
+    public void Queue_Clear_DoesNotMutateWhenEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var queue = new DurableQueue<int>("queue", new TestLogManager(writer), new ThrowingQueueCodec<int>(throwOnClear: true));
+        ((IDurableQueueOperationHandler<int>)queue).ApplyEnqueue(1);
+        ((IDurableQueueOperationHandler<int>)queue).ApplyEnqueue(2);
+
+        Assert.Throws<InvalidOperationException>(queue.Clear);
+
+        Assert.Equal(2, queue.Count);
+        Assert.Equal(1, queue.Peek());
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
     public void Set_Add_DoesNotMutateWhenEncodingFails()
     {
         var writer = new TestLogStreamWriter();
@@ -59,6 +74,20 @@ public sealed class DurableCollectionDirectWriteTests
     }
 
     [Fact]
+    public void Set_Clear_DoesNotMutateWhenEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var set = new DurableSet<int>("set", new TestLogManager(writer), new ThrowingSetCodec<int>(throwOnClear: true));
+        ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
+        ((IDurableSetOperationHandler<int>)set).ApplyAdd(2);
+
+        Assert.Throws<InvalidOperationException>(set.Clear);
+
+        Assert.True(set.SetEquals([1, 2]));
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
     public void Set_IntersectWith_DoesNotMutateWhenSnapshotEncodingFails()
     {
         var writer = new TestLogStreamWriter();
@@ -70,6 +99,20 @@ public sealed class DurableCollectionDirectWriteTests
 
         Assert.Contains(1, (IEnumerable<int>)set);
         Assert.Contains(2, (IEnumerable<int>)set);
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
+    public void Set_SymmetricExceptWith_DoesNotMutateWhenSnapshotEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var set = new DurableSet<int>("set", new TestLogManager(writer), new ThrowingSetCodec<int>(throwOnSnapshot: true));
+        ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
+        ((IDurableSetOperationHandler<int>)set).ApplyAdd(2);
+
+        Assert.Throws<InvalidOperationException>(() => set.SymmetricExceptWith([2, 3]));
+
+        Assert.True(set.SetEquals([1, 2]));
         Assert.Equal(0, writer.Length);
     }
 
@@ -108,6 +151,22 @@ public sealed class DurableCollectionDirectWriteTests
         Assert.Throws<InvalidOperationException>(() => dictionary.Remove(1));
 
         Assert.Contains(1, dictionary.Keys);
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
+    public void Dictionary_Clear_DoesNotMutateWhenEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var dictionary = new DurableDictionary<int, int>("dictionary", new TestLogManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnClear: true));
+        ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
+        ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(2, 2);
+
+        Assert.Throws<InvalidOperationException>(dictionary.Clear);
+
+        Assert.Equal(2, dictionary.Count);
+        Assert.Equal(1, dictionary[1]);
+        Assert.Equal(2, dictionary[2]);
         Assert.Equal(0, writer.Length);
     }
 
@@ -163,7 +222,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteDequeue(LogStreamWriter writer) => WriteCommittedByte(writer);
     }
 
-    private sealed class ThrowingQueueCodec<T>(bool throwOnEnqueue = false, bool throwOnDequeue = false) : TestQueueCodec<T>
+    private sealed class ThrowingQueueCodec<T>(bool throwOnEnqueue = false, bool throwOnDequeue = false, bool throwOnClear = false) : TestQueueCodec<T>
     {
         public override void WriteEnqueue(T item, LogStreamWriter writer)
         {
@@ -188,6 +247,18 @@ public sealed class DurableCollectionDirectWriteTests
 
             entry.Commit();
         }
+
+        public override void WriteClear(LogStreamWriter writer)
+        {
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
+            if (throwOnClear)
+            {
+                throw new InvalidOperationException("Expected test exception.");
+            }
+
+            entry.Commit();
+        }
     }
 
     private abstract class TestQueueCodec<T> : IDurableQueueOperationCodec<T>
@@ -196,7 +267,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public virtual void WriteDequeue(LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) => throw new NotSupportedException();
 
@@ -210,7 +281,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteRemove(T item, LogStreamWriter writer) => WriteCommittedByte(writer);
     }
 
-    private sealed class ThrowingSetCodec<T>(bool throwOnAdd = false, bool throwOnRemove = false, bool throwOnSnapshot = false) : TestSetCodec<T>
+    private sealed class ThrowingSetCodec<T>(bool throwOnAdd = false, bool throwOnRemove = false, bool throwOnClear = false, bool throwOnSnapshot = false) : TestSetCodec<T>
     {
         public override void WriteAdd(T item, LogStreamWriter writer)
         {
@@ -229,6 +300,18 @@ public sealed class DurableCollectionDirectWriteTests
             using var entry = writer.BeginEntry();
             WriteByte(entry.Writer);
             if (throwOnRemove)
+            {
+                throw new InvalidOperationException("Expected test exception.");
+            }
+
+            entry.Commit();
+        }
+
+        public override void WriteClear(LogStreamWriter writer)
+        {
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
+            if (throwOnClear)
             {
                 throw new InvalidOperationException("Expected test exception.");
             }
@@ -255,7 +338,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public virtual void WriteRemove(T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
         public virtual void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) => throw new NotSupportedException();
 
@@ -269,7 +352,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteRemove(TKey key, LogStreamWriter writer) => WriteCommittedByte(writer);
     }
 
-    private sealed class ThrowingDictionaryCodec<TKey, TValue>(bool throwOnSet = false, bool throwOnRemove = false) : TestDictionaryCodec<TKey, TValue> where TKey : notnull
+    private sealed class ThrowingDictionaryCodec<TKey, TValue>(bool throwOnSet = false, bool throwOnRemove = false, bool throwOnClear = false) : TestDictionaryCodec<TKey, TValue> where TKey : notnull
     {
         public override void WriteSet(TKey key, TValue value, LogStreamWriter writer)
         {
@@ -294,6 +377,18 @@ public sealed class DurableCollectionDirectWriteTests
 
             entry.Commit();
         }
+
+        public override void WriteClear(LogStreamWriter writer)
+        {
+            using var entry = writer.BeginEntry();
+            WriteByte(entry.Writer);
+            if (throwOnClear)
+            {
+                throw new InvalidOperationException("Expected test exception.");
+            }
+
+            entry.Commit();
+        }
     }
 
     private abstract class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue> where TKey : notnull
@@ -302,7 +397,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public virtual void WriteRemove(TKey key, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) => throw new NotSupportedException();
 

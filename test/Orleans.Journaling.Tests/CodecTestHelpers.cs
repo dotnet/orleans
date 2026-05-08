@@ -1,5 +1,7 @@
 using System.Buffers;
 using System.Collections;
+using Microsoft.Extensions.DependencyInjection;
+using Xunit;
 
 namespace Orleans.Journaling.Tests;
 
@@ -64,6 +66,27 @@ public static class CodecTestHelpers
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
         entry.Commit();
+    }
+
+    public static void AssertCodecProviderRegistrations(IServiceProvider serviceProvider, string logFormatKey, object expectedProvider, bool expectDefaultProvider)
+    {
+        AssertCodecProvider<IDurableDictionaryOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableListOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableQueueOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableSetOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableValueOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableStateOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+    }
+
+    private static void AssertCodecProvider<TProvider>(IServiceProvider serviceProvider, string logFormatKey, object expectedProvider, bool expectDefaultProvider)
+        where TProvider : class
+    {
+        Assert.Same(expectedProvider, serviceProvider.GetRequiredKeyedService<TProvider>(logFormatKey));
+        if (expectDefaultProvider)
+        {
+            Assert.Same(expectedProvider, serviceProvider.GetRequiredService<TProvider>());
+        }
     }
 
     private sealed class BufferSegment : ReadOnlySequenceSegment<byte>

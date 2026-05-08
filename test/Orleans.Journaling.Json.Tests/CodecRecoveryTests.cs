@@ -1,11 +1,12 @@
-using Microsoft.Extensions.Logging;
+using System.Buffers;
+using System.Text;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using Orleans.Core;
 using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
 using Orleans.Serialization;
-using System.Text;
 using Xunit;
 
 namespace Orleans.Journaling.Json.Tests;
@@ -188,6 +189,52 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Equal(17, await tcs2.Task);
     }
 
+    [Fact]
+    public async Task Recovery_BinaryLogWithJsonFormat_ThrowsFormatKeyError()
+    {
+        var storage = new VolatileLogStorage();
+        var sut = CreateTestSystem(storage);
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, CreateBinaryDictionaryCodec<string, int>());
+        await sut.Lifecycle.OnStart();
+        dict.Add("alpha", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystemWithJsonCodec(storage);
+        _ = new DurableDictionary<string, int>("dict", recovered.Manager, new JsonDictionaryOperationCodec<string, int>(CreateJsonOptions()));
+
+        _ = await AssertRecoveryFailsAsync(recovered.Lifecycle, JsonJournalingExtensions.LogFormatKey);
+    }
+
+    [Fact]
+    public async Task Recovery_JsonLogWithBinaryFormat_ThrowsFormatKeyError()
+    {
+        var storage = CreateJsonStorage();
+        var jsonOptions = CreateJsonOptions();
+        var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new JsonDictionaryOperationCodec<string, int>(jsonOptions));
+        await sut.Lifecycle.OnStart();
+        dict.Add("alpha", 1);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        var recovered = CreateTestSystem(storage);
+        _ = new DurableDictionary<string, int>("dict", recovered.Manager, CreateBinaryDictionaryCodec<string, int>());
+
+        _ = await AssertRecoveryFailsAsync(recovered.Lifecycle, OrleansBinaryLogFormat.LogFormatKey);
+    }
+
+    [Theory]
+    [InlineData("[8,\"set\",42]\n[\"8\",\"set\",43]\n", "unsigned integer stream id")]
+    [InlineData("[8,\"set\",42]\n[9,\"set\",43]{}\n", "invalid JSON log entry")]
+    public async Task JsonRecovery_MalformedLog_ThrowsFormatKeyError(string jsonLines, string expectedInnerMessage)
+    {
+        var storage = await CreateJsonStorageWithSegment(jsonLines);
+        var sut = CreateTestSystemWithJsonCodec(storage);
+
+        var exception = await AssertRecoveryFailsAsync(sut.Lifecycle, JsonJournalingExtensions.LogFormatKey);
+
+        Assert.Contains(expectedInnerMessage, exception.InnerException!.Message, StringComparison.Ordinal);
+    }
+
     internal (IStateMachineManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(ILogStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
         storage ??= CreateJsonStorage();
@@ -213,6 +260,37 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
+
+    private OrleansBinaryDictionaryOperationCodec<TKey, TValue> CreateBinaryDictionaryCodec<TKey, TValue>()
+        where TKey : notnull
+        => new(ValueCodec<TKey>(), ValueCodec<TValue>());
+
+    private ILogValueCodec<T> ValueCodec<T>() => new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+
+    private static async Task<VolatileLogStorage> CreateJsonStorageWithSegment(string jsonLines)
+    {
+        var storage = CreateJsonStorage();
+        await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), CancellationToken.None);
+        return storage;
+    }
+
+    private static async Task<InvalidOperationException> AssertRecoveryFailsAsync(ILifecycleSubject lifecycle, string logFormatKey)
+    {
+        InvalidOperationException exception;
+        try
+        {
+            exception = await Assert.ThrowsAsync<InvalidOperationException>(
+                () => lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
+        }
+        finally
+        {
+            await lifecycle.OnStop(CancellationToken.None);
+        }
+
+        Assert.Contains($"configured log format key '{logFormatKey}'", exception.Message, StringComparison.Ordinal);
+        Assert.NotNull(exception.InnerException);
+        return exception;
+    }
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 

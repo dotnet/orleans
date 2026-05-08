@@ -404,15 +404,6 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_DoesNotDependOnRemovedBuilderTypes()
-    {
-        Assert.Null(typeof(JsonLinesLogFormat).Assembly.GetType("Orleans.Journaling.Json.JsonLinesLogExtentCodec"));
-        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.LogExtentBuilder"));
-        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.IStateMachineLogExtentCodec"));
-        Assert.Null(typeof(ILogFormat).Assembly.GetType("Orleans.Journaling.StateMachineStorageWriter"));
-    }
-
-    [Fact]
     public void JsonLinesLogFormat_Read_DispatchesEntries()
     {
         var format = new JsonLinesLogFormat();

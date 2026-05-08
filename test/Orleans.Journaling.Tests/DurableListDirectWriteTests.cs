@@ -11,20 +11,67 @@ public sealed class DurableListDirectWriteTests
     public void Add_DoesNotMutateWhenEncodingFails()
     {
         var writer = new TestLogStreamWriter();
-        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingAddCodec<int>());
+        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnAdd: true));
 
-        var thrown = false;
-        try
-        {
-            list.Add(1);
-        }
-        catch (InvalidOperationException)
-        {
-            thrown = true;
-        }
+        Assert.Throws<InvalidOperationException>(() => list.Add(1));
 
-        Assert.True(thrown);
         Assert.Empty(list);
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
+    public void Set_DoesNotMutateWhenEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnSet: true));
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
+
+        Assert.Throws<InvalidOperationException>(() => list[0] = 10);
+
+        Assert.Equal([1, 2], list);
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
+    public void Insert_DoesNotMutateWhenEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnInsert: true));
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
+
+        Assert.Throws<InvalidOperationException>(() => list.Insert(1, 10));
+
+        Assert.Equal([1, 2], list);
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
+    public void RemoveAt_DoesNotMutateWhenEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnRemoveAt: true));
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
+
+        Assert.Throws<InvalidOperationException>(() => list.RemoveAt(0));
+
+        Assert.Equal([1, 2], list);
+        Assert.Equal(0, writer.Length);
+    }
+
+    [Fact]
+    public void Clear_DoesNotMutateWhenEncodingFails()
+    {
+        var writer = new TestLogStreamWriter();
+        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnClear: true));
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
+        ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
+
+        Assert.Throws<InvalidOperationException>(list.Clear);
+
+        Assert.Equal([1, 2], list);
         Assert.Equal(0, writer.Length);
     }
 
@@ -67,13 +114,36 @@ public sealed class DurableListDirectWriteTests
         public LogStreamWriter CreateWriter() => _buffer.CreateLogStreamWriter(new LogStreamId(1));
     }
 
-    private sealed class ThrowingAddCodec<T> : TestListCodec<T>
+    private sealed class ThrowingListCodec<T>(
+        bool throwOnAdd = false,
+        bool throwOnSet = false,
+        bool throwOnInsert = false,
+        bool throwOnRemoveAt = false,
+        bool throwOnClear = false) : TestListCodec<T>
     {
         public override void WriteAdd(T item, LogStreamWriter writer)
         {
-            using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
-            throw new InvalidOperationException("Expected test exception.");
+            WriteOrThrow(writer, throwOnAdd);
+        }
+
+        public override void WriteSet(int index, T item, LogStreamWriter writer)
+        {
+            WriteOrThrow(writer, throwOnSet);
+        }
+
+        public override void WriteInsert(int index, T item, LogStreamWriter writer)
+        {
+            WriteOrThrow(writer, throwOnInsert);
+        }
+
+        public override void WriteRemoveAt(int index, LogStreamWriter writer)
+        {
+            WriteOrThrow(writer, throwOnRemoveAt);
+        }
+
+        public override void WriteClear(LogStreamWriter writer)
+        {
+            WriteOrThrow(writer, throwOnClear);
         }
     }
 
@@ -89,19 +159,31 @@ public sealed class DurableListDirectWriteTests
 
     private abstract class TestListCodec<T> : IDurableListOperationCodec<T>
     {
-        public abstract void WriteAdd(T item, LogStreamWriter writer);
+        public virtual void WriteAdd(T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSet(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteSet(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteInsert(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteInsert(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteRemoveAt(int index, LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteRemoveAt(int index, LogStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) => throw new NotSupportedException();
+    }
+
+    private static void WriteOrThrow(LogStreamWriter writer, bool shouldThrow)
+    {
+        using var entry = writer.BeginEntry();
+        WriteByte(entry.Writer);
+        if (shouldThrow)
+        {
+            throw new InvalidOperationException("Expected test exception.");
+        }
+
+        entry.Commit();
     }
 
     private static void WriteByte(IBufferWriter<byte> output)
