@@ -258,15 +258,15 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
         GrainRuntime.CheckRuntimeContext(this);
 
         // We need to detect the shutdown type:
-        // If it was ShuttingDown/Stopping, it surrendered its ownership gracefully.
+        // If it was ShuttingDown, it surrendered its ownership gracefully.
         // If it was Active (or Joining) and suddenly became Dead, it crashed.
 
-        var isGracefulShutdown = previousStatus is SiloStatus.ShuttingDown or SiloStatus.Stopping;
+        var isGracefulShutdown = previousStatus is SiloStatus.ShuttingDown;
 
         if (!isGracefulShutdown && _leaseHoldDuration > TimeSpan.Zero)
         {
             // Instead of just deleting, we mark it as tombstoned.
-            // This prevents a new activation on a healthy silo from registering 
+            // This prevents a new activation on a healthy silo from registering
             // until we are sure the dead silo has actually stopped processing.
 
             var expiration = _timeProvider.GetUtcNow().UtcDateTime.Add(_leaseHoldDuration);
@@ -507,7 +507,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 // Wait for previous versions to be unlocked before proceeding.
                 await WaitForRange(addedRange, previous.Version);
 
-                // Proceed to recovery (fetching from other silos), 
+                // Proceed to recovery (fetching from other silos),
                 // but register calls will now be blocked by range lease holds.
                 await RecoverPartitionRange(current, addedRange);
 
