@@ -225,11 +225,13 @@ public class GrainDirectoryLeaseTests
 
             // After the lease expires, all registrations should complete.
             TimeProvider.Advance(LeaseHoldDuration);
-            await Task.WhenAll(task1, task2, task3);
+            var registrations = await Task.WhenAll(task1, task2, task3);
 
-            Assert.Equal(primary.SiloAddress, await grain1.GetAddress());
-            Assert.Equal(primary.SiloAddress, await grain2.GetAddress());
-            Assert.Equal(primary.SiloAddress, await grain3.GetAddress());
+            Assert.All(registrations, registration =>
+            {
+                Assert.NotNull(registration);
+                Assert.Equal(primary.SiloAddress, registration.SiloAddress);
+            });
         }
         finally
         {
