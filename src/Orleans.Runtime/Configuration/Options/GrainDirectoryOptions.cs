@@ -45,6 +45,19 @@ public class GrainDirectoryOptions
     public const int DEFAULT_CACHE_SIZE = 1_000_000;
 
     /// <summary>
+    /// Gets or sets the number of directory partitions per silo.
+    /// </summary>
+    /// <remarks>
+    /// This option only applies when using the <see cref="DistributedGrainDirectory"/>.
+    /// </remarks>
+    public int PartitionsPerSilo { get; set; } = DEFAULT_PARTITIONS_PER_SILO;
+
+    /// <summary>
+    /// The default value for <see cref="PartitionsPerSilo"/>.
+    /// </summary>
+    public const int DEFAULT_PARTITIONS_PER_SILO = 1;
+
+    /// <summary>
     /// Gets or sets the initial (minimum) time, in seconds, to keep a cache entry before revalidating.
     /// </summary>
     [Obsolete("InitialCacheTTL is deprecated and will be removed in a future version.")]
@@ -59,13 +72,11 @@ public class GrainDirectoryOptions
     /// <summary>
     /// Gets or sets the maximum time, in seconds, to keep a cache entry before revalidating.
     /// </summary>
-    [Obsolete("MaximumCacheTTL is deprecated and will be removed in a future version.")]
     public TimeSpan MaximumCacheTTL { get; set; } = DEFAULT_MAXIMUM_CACHE_TTL;
 
     /// <summary>
     /// The default value for <see cref="MaximumCacheTTL"/>.
     /// </summary>
-    [Obsolete("DEFAULT_MAXIMUM_CACHE_TTL is deprecated and will be removed in a future version.")]
     public static readonly TimeSpan DEFAULT_MAXIMUM_CACHE_TTL = TimeSpan.FromSeconds(240);
 
     /// <summary>
@@ -82,7 +93,7 @@ public class GrainDirectoryOptions
 
     /// <summary>
     /// Gets or sets the time span between when we have added an entry for an activation to the grain directory and when we are allowed
-    /// to conditionally remove that entry. 
+    /// to conditionally remove that entry.
     /// Conditional deregistration is used for lazy clean-up of activations whose prompt deregistration failed for some reason (e.g., message failure).
     /// This should always be at least one minute, since we compare the times on the directory partition, so message delays and clcks skues have
     /// to be allowed.
