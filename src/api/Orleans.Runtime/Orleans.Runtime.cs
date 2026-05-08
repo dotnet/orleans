@@ -687,6 +687,11 @@ namespace Orleans.Runtime
         bool IsCandidateForRemoval(bool wouldRemove);
     }
 
+    public partial interface IGrainActivationWorkingSetMember : IActivationWorkingSetMember
+    {
+        GrainId GrainId { get; }
+    }
+
     public partial interface IActivationWorkingSetObserver
     {
         void OnActive(IActivationWorkingSetMember member);
