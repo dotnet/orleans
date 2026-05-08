@@ -9,6 +9,7 @@ using Orleans.Concurrency;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
@@ -107,7 +108,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
 
         _leaseHoldDuration = directoryOptions.Value.SafetyLeaseHoldDuration switch
         {
-            null => 2 * membershipOptions.Value.ProbeTimeout * membershipOptions.Value.NumMissedProbesLimit,
+            null => membershipOptions.Value.ProbeTimeout * membershipOptions.Value.NumMissedProbesLimit,
             TimeSpan duration when duration >= TimeSpan.Zero => duration,
             _ => throw new InvalidOperationException("Lease hold duration must be non-negative.")
         };
@@ -264,7 +265,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                     continue;
                 }
 
-                await Task.Delay(delay, cancellationToken);
+                await Task.Delay(delay, _timeProvider, cancellationToken);
                 delay *= 1.5;
                 continue;
             }
@@ -273,6 +274,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             {
                 // A safety lease hold is active for this grain or range.
                 // Wait for the suggested duration before retrying.
+                GrainDirectoryEvents.EmitOperationDelayedByLeaseHold(Silo, grainId, operation, invokeResult.RetryAfterDelay);
                 await Task.Delay(invokeResult.RetryAfterDelay, _timeProvider, cancellationToken);
                 continue;
             }
@@ -542,7 +544,7 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
             period = TimeSpan.FromMinutes(1);
         }
 
-        using var timer = new PeriodicTimer(period);
+        using var timer = new PeriodicTimer(period, _timeProvider);
 
         try
         {
