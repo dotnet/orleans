@@ -4,10 +4,12 @@ using System.Globalization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Configuration;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.GrainDirectory;
 using Orleans.Serialization;
 using Orleans.Storage;
 using Orleans.TestingHost;
+using Orleans.TestingHost.Diagnostics;
 using Xunit;
 using Xunit.Abstractions;
 
@@ -27,6 +29,8 @@ internal class MyDirectoryTestGrain : Grain, IMyDirectoryTestGrain
 [TestCategory("Stress"), TestCategory("Directory")]
 public sealed class GrainDirectoryResilienceTests
 {
+    private static readonly TimeSpan DirectoryMigrationTimeout = TimeSpan.FromMinutes(1);
+
     /// <summary>
     /// Cluster chaos test: tests directory functionality & integrity while starting/stopping/killing silos frequently.
     /// </summary>
@@ -155,12 +159,17 @@ public sealed class GrainDirectoryResilienceTests
     [Fact]
     public async Task JoiningSilo_DoesNotLeaveStaleEntriesOnPreviousOwner()
     {
+        using var directoryEvents = new DiagnosticEventCollector(GrainDirectoryEvents.ListenerName);
         var testClusterBuilder = new TestClusterBuilder(1);
         testClusterBuilder.AddSiloBuilderConfigurator<SiloBuilderConfigurator>();
         var testCluster = testClusterBuilder.Build();
         await testCluster.DeployAsync();
         var log = testCluster.ServiceProvider.GetRequiredService<ILogger<GrainDirectoryResilienceTests>>();
         var client = ((InProcessSiloHandle)testCluster.Primary).SiloHost.Services.GetRequiredService<IGrainFactory>();
+        var previousDirectoryView = await WaitForDirectoryViewAsync(
+            ((InProcessSiloHandle)testCluster.Primary).ServiceProvider.GetRequiredService<DirectoryMembershipService>(),
+            view => view.Members.Contains(testCluster.Primary.SiloAddress),
+            "initial directory membership view");
         const int CallsPerIteration = 100;
         var nextGrainId = 0L;
 
@@ -189,11 +198,12 @@ public sealed class GrainDirectoryResilienceTests
                 var newSilo = await testCluster.StartAdditionalSiloAsync();
                 log.LogInformation("Started '{Silo}'.", newSilo.SiloAddress);
 
-                for (var i = 0; i < 5; i++)
-                {
-                    await Task.Delay(TimeSpan.FromSeconds(2));
-                    await CheckIntegrityAsync(testCluster, client);
-                }
+                var currentDirectoryView = await WaitForDirectoryViewAsync(
+                    ((InProcessSiloHandle)newSilo).ServiceProvider.GetRequiredService<DirectoryMembershipService>(),
+                    view => view.Members.Contains(newSilo.SiloAddress),
+                    $"directory membership view containing '{newSilo.SiloAddress}'");
+                await WaitForDirectoryMigrationAsync(directoryEvents, previousDirectoryView, currentDirectoryView);
+                await CheckIntegrityAsync(testCluster, client);
             }
             finally
             {
@@ -226,6 +236,93 @@ public sealed class GrainDirectoryResilienceTests
         await Task.WhenAll(integrityChecks);
     }
 
+    private static async Task<DirectoryMembershipSnapshot> WaitForDirectoryViewAsync(
+        DirectoryMembershipService directoryMembershipService,
+        Func<DirectoryMembershipSnapshot, bool> predicate,
+        string description)
+    {
+        using var cts = new CancellationTokenSource(DirectoryMigrationTimeout);
+        try
+        {
+            await foreach (var view in directoryMembershipService.ViewUpdates.WithCancellation(cts.Token))
+            {
+                if (predicate(view))
+                {
+                    return view;
+                }
+            }
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+            throw new TimeoutException($"Timed out waiting for {description} after {DirectoryMigrationTimeout}.");
+        }
+
+        throw new TimeoutException($"Timed out waiting for {description} after {DirectoryMigrationTimeout}.");
+    }
+
+    private static async Task WaitForDirectoryMigrationAsync(
+        DiagnosticEventCollector directoryEvents,
+        DirectoryMembershipSnapshot previousView,
+        DirectoryMembershipSnapshot currentView)
+    {
+        var expectedOperations = GetExpectedRangeOperations(previousView, currentView).ToArray();
+        Assert.NotEmpty(expectedOperations);
+
+        await Task.WhenAll(expectedOperations.Select(operation => WaitForRangeOperationCompletedAsync(directoryEvents, operation)));
+    }
+
+    private static IEnumerable<ExpectedRangeOperation> GetExpectedRangeOperations(
+        DirectoryMembershipSnapshot previousView,
+        DirectoryMembershipSnapshot currentView)
+    {
+        var partitionCount = Math.Max(previousView.PartitionCount, currentView.PartitionCount);
+        foreach (var member in previousView.Members.Concat(currentView.Members).Distinct())
+        {
+            for (var partitionIndex = 0; partitionIndex < partitionCount; partitionIndex++)
+            {
+                var previousRange = previousView.GetRange(member, partitionIndex);
+                var currentRange = currentView.GetRange(member, partitionIndex);
+                var removedRange = previousRange.Difference(currentRange).SingleOrDefault();
+                if (!removedRange.IsEmpty)
+                {
+                    yield return new(
+                        member,
+                        partitionIndex,
+                        currentView.Version,
+                        removedRange,
+                        GrainDirectoryEvents.ReleaseOperationName);
+                }
+
+                var addedRange = currentRange.Difference(previousRange).SingleOrDefault();
+                if (!addedRange.IsEmpty)
+                {
+                    yield return new(
+                        member,
+                        partitionIndex,
+                        currentView.Version,
+                        addedRange,
+                        GrainDirectoryEvents.AcquireOperationName);
+                }
+            }
+        }
+    }
+
+    private static async Task WaitForRangeOperationCompletedAsync(
+        DiagnosticEventCollector directoryEvents,
+        ExpectedRangeOperation expectedOperation)
+    {
+        await directoryEvents.WaitForEventAsync(
+            nameof(GrainDirectoryEvents.RangeOperationCompleted),
+            evt => evt.Payload is GrainDirectoryEvents.RangeOperationCompleted completed
+                && !completed.Canceled
+                && completed.SiloAddress.Equals(expectedOperation.SiloAddress)
+                && completed.PartitionIndex == expectedOperation.PartitionIndex
+                && completed.Version == expectedOperation.Version
+                && completed.Range.Equals(expectedOperation.Range)
+                && string.Equals(completed.OperationName, expectedOperation.OperationName, StringComparison.Ordinal),
+            DirectoryMigrationTimeout);
+    }
+
     private static async Task RunPingBatchAsync(IGrainFactory client, ILogger log, long idBase, int callsPerIteration)
     {
         var tasks = Enumerable.Range(0, callsPerIteration).Select(i => client.GetGrain<IMyDirectoryTestGrain>(idBase + i).Ping().AsTask()).ToList();
@@ -255,5 +352,12 @@ public sealed class GrainDirectoryResilienceTests
 #pragma warning restore ORLEANSEXP003 // Type is for evaluation purposes only and is subject to change or removal in future updates. Suppress this diagnostic to proceed.
         }
     }
+
+    private readonly record struct ExpectedRangeOperation(
+        SiloAddress SiloAddress,
+        int PartitionIndex,
+        MembershipVersion Version,
+        RingRange Range,
+        string OperationName);
 }
 
