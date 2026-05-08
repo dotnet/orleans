@@ -352,7 +352,10 @@ internal sealed partial class DistributedGrainDirectory : SystemTarget, IGrainDi
                 await this.RunOrQueueTask(async () => await task.WaitAsync(cancellationToken).SuppressThrowing());
             }
 
-            // No need to wait on the cleanup task since it does not have any external effects.
+            if (_leaseCleanupTask is { } cleanupTask)
+            {
+                await cleanupTask.WaitAsync(cancellationToken).SuppressThrowing();
+            }
         }
 
         async Task OnShuttingDown(CancellationToken token)
