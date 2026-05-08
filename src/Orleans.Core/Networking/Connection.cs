@@ -398,46 +398,6 @@ namespace Orleans.Runtime.Messaging
             Send(message);
         }
 
-        private sealed class MessageHandlerPoolPolicy : PooledObjectPolicy<MessageHandler>
-        {
-            public override MessageHandler Create() => new MessageHandler();
-
-            public override bool Return(MessageHandler obj)
-            {
-                obj.Reset();
-                return true;
-            }
-        }
-
-        private sealed class MessageHandler : IThreadPoolWorkItem
-        {
-            private Message message;
-            private Connection connection;
-
-            public void Set(Message m, Connection c)
-            {
-                this.message = m;
-                this.connection = c;
-            }
-
-            public void Execute()
-            {
-                this.connection.OnReceivedMessage(this.message);
-                MessageHandlerPool.Return(this);
-            }
-
-            public void Reset()
-            {
-                this.message = null;
-                this.connection = null;
-            }
-        }
-
-        private readonly struct EndPointLogValue(EndPoint endPoint)
-        {
-            public override string ToString() => endPoint?.ToString() ?? "(never connected)";
-        }
-
         [LoggerMessage(
             Level = LogLevel.Information,
             Message = "Closing connection {Connection}"
