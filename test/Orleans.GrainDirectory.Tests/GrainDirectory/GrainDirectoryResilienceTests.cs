@@ -282,26 +282,30 @@ public sealed class GrainDirectoryResilienceTests
             {
                 var previousRange = previousView.GetRange(member, partitionIndex);
                 var currentRange = currentView.GetRange(member, partitionIndex);
-                var removedRange = previousRange.Difference(currentRange).SingleOrDefault();
-                if (!removedRange.IsEmpty)
+                foreach (var removedRange in previousRange.Difference(currentRange))
                 {
-                    yield return new(
-                        member,
-                        partitionIndex,
-                        currentView.Version,
-                        removedRange,
-                        GrainDirectoryEvents.ReleaseOperationName);
+                    if (!removedRange.IsEmpty)
+                    {
+                        yield return new(
+                            member,
+                            partitionIndex,
+                            currentView.Version,
+                            removedRange,
+                            GrainDirectoryEvents.ReleaseOperationName);
+                    }
                 }
 
-                var addedRange = currentRange.Difference(previousRange).SingleOrDefault();
-                if (!addedRange.IsEmpty)
+                foreach (var addedRange in currentRange.Difference(previousRange))
                 {
-                    yield return new(
-                        member,
-                        partitionIndex,
-                        currentView.Version,
-                        addedRange,
-                        GrainDirectoryEvents.AcquireOperationName);
+                    if (!addedRange.IsEmpty)
+                    {
+                        yield return new(
+                            member,
+                            partitionIndex,
+                            currentView.Version,
+                            addedRange,
+                            GrainDirectoryEvents.AcquireOperationName);
+                    }
                 }
             }
         }
