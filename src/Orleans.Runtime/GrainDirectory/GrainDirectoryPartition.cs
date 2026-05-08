@@ -5,6 +5,7 @@ using Microsoft.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orleans.Concurrency;
 using Orleans.Internal;
+using Orleans.Runtime.Diagnostics;
 using Orleans.Runtime.Scheduler;
 using Orleans.Runtime.Utilities;
 
@@ -48,8 +49,8 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     private RingRange _currentRange;
 
     private readonly TimeSpan _leaseHoldDuration;
-    private readonly List<(RingRange Range, DateTime Expiration)> _rangeLeaseHolds = [];
-    private readonly Dictionary<SiloAddress, DateTime> _siloLeaseHolds = [];
+    private readonly List<(RingRange Range, DateTimeOffset Expiration)> _rangeLeaseHolds = [];
+    private readonly Dictionary<SiloAddress, DateTimeOffset> _siloLeaseHolds = [];
 
     /// <param name="partitionIndex">The index of this partition on this silo. Each silo hosts a fixed number of dynamically sized partitions.</param>
     public GrainDirectoryPartition(
@@ -269,11 +270,12 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
             // This prevents a new activation on a healthy silo from registering
             // until we are sure the dead silo has actually stopped processing.
 
-            var expiration = _timeProvider.GetUtcNow().UtcDateTime.Add(_leaseHoldDuration);
+            var expiration = _timeProvider.GetUtcNow().Add(_leaseHoldDuration);
 
             _siloLeaseHolds[change.SiloAddress] = expiration;
 
             LogDebugLeaseHoldForSilo(_logger, change.SiloAddress, expiration);
+            GrainDirectoryEvents.EmitSiloLeaseHoldCreated(_id, change.SiloAddress, expiration);
         }
         else
         {
@@ -499,9 +501,10 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 if (_leaseHoldDuration > TimeSpan.Zero)
                 {
                     // We pessimistically assume if snapshot transfer failed, then safety is needed.
-                    var expiration = _timeProvider.GetUtcNow().UtcDateTime.Add(_leaseHoldDuration);
+                    var expiration = _timeProvider.GetUtcNow().Add(_leaseHoldDuration);
                     _rangeLeaseHolds.Add((addedRange, expiration));
                     LogWarningLeaseHoldForRange(_logger, addedRange, expiration);
+                    GrainDirectoryEvents.EmitRangeLeaseHoldCreated(_id, addedRange, expiration);
                 }
 
                 // Wait for previous versions to be unlocked before proceeding.
@@ -809,7 +812,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 await _owner.RefreshViewAsync(default, CancellationToken.None);
                 if (_owner.ClusterMembershipSnapshot.Version == clusterMembershipSnapshot.Version)
                 {
-                    await Task.Delay(TimeSpan.FromMilliseconds(100));
+                    await Task.Delay(TimeSpan.FromMilliseconds(100), _timeProvider, ShutdownToken).SuppressThrowing();
                 }
 
                 clusterMembershipSnapshot = _owner.ClusterMembershipSnapshot;
@@ -974,7 +977,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
         try
         {
-            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+            var utcNow = _timeProvider.GetUtcNow();
 
             if (_rangeLeaseHolds.Count > 0)
             {
@@ -990,7 +993,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
                 var expiredSilos = _siloLeaseHolds
                     .Where(kvp => utcNow >= kvp.Value)
                     .Select(kvp => kvp.Key)
-                    .ToList();
+                    .ToHashSet();
 
                 if (expiredSilos.Count > 0)
                 {
@@ -999,14 +1002,20 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
 
                     var removedCount = 0;
 
+                    List<GrainId> grainsToRemove = [];
                     foreach (var kvp in _directory)
                     {
                         if (expiredSilos.Contains(kvp.Value.SiloAddress!))
                         {
-                            if (_directory.Remove(kvp.Key))
-                            {
-                                removedCount++;
-                            }
+                            grainsToRemove.Add(kvp.Key);
+                        }
+                    }
+
+                    foreach (var grainId in grainsToRemove)
+                    {
+                        if (_directory.Remove(grainId))
+                        {
+                            removedCount++;
                         }
                     }
 
@@ -1033,7 +1042,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
     [LoggerMessage(
       Level = LogLevel.Debug,
       Message = "Placed lease hold on dead silo {SiloAddress} until {Expiration}.")]
-    private static partial void LogDebugLeaseHoldForSilo(ILogger logger, SiloAddress siloAddress, DateTime expiration);
+    private static partial void LogDebugLeaseHoldForSilo(ILogger logger, SiloAddress siloAddress, DateTimeOffset expiration);
 
     [LoggerMessage(
       Level = LogLevel.Debug,
@@ -1044,7 +1053,7 @@ internal sealed partial class GrainDirectoryPartition : SystemTarget, IGrainDire
       Level = LogLevel.Warning,
       Message = "Grains in the range {Range} have been put under a lease until {Expiration}."
     )]
-    private static partial void LogWarningLeaseHoldForRange(ILogger logger, RingRange range, DateTime expiration);
+    private static partial void LogWarningLeaseHoldForRange(ILogger logger, RingRange range, DateTimeOffset expiration);
 
 
     [LoggerMessage(

@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Extensions.Logging;
+using Orleans.Runtime.Diagnostics;
 
 namespace Orleans.Runtime.GrainDirectory;
 
@@ -21,7 +22,7 @@ internal sealed partial class GrainDirectoryPartition
 
         if (_leaseHoldDuration > TimeSpan.Zero)
         {
-            var utcNow = _timeProvider.GetUtcNow().UtcDateTime;
+            var utcNow = _timeProvider.GetUtcNow();
             var rangeHash = address.GrainId.GetUniformHashCode();
 
             // Range lease holds
@@ -39,7 +40,9 @@ internal sealed partial class GrainDirectoryPartition
                 // If it is still active, does it block this request?
                 if (lockedRange.Contains(rangeHash))
                 {
-                    return DirectoryResult.RetryAfter<GrainAddress>(expiration - utcNow);
+                    var retryAfter = expiration - utcNow;
+                    GrainDirectoryEvents.EmitRegistrationBlockedByRangeLease(_id, address.GrainId, lockedRange, expiration, retryAfter);
+                    return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
                 }
             }
 
@@ -53,7 +56,9 @@ internal sealed partial class GrainDirectoryPartition
                     // otherwise it's a new activation trying to "steal" the id while the lease is active, so we reject it!
                     if (currentRegistration is null || !existingActivation.Matches(currentRegistration))
                     {
-                        return DirectoryResult.RetryAfter<GrainAddress>(expiration - utcNow);
+                        var retryAfter = expiration - utcNow;
+                        GrainDirectoryEvents.EmitRegistrationBlockedBySiloLease(_id, address.GrainId, existingActivation.SiloAddress!, expiration, retryAfter);
+                        return DirectoryResult.RetryAfter<GrainAddress>(retryAfter);
                     }
                 }
             }
