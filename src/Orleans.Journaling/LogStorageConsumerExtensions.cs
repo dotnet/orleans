@@ -96,7 +96,6 @@ public static class LogStorageConsumerExtensions
         if (complete)
         {
             ConsumeBuffer(consumer, buffer, isCompleted: true);
-            return;
         }
 
         if (buffer.Length > 0)
@@ -126,6 +125,11 @@ public static class LogStorageConsumerExtensions
             if (bytesRead == 0)
             {
                 ConsumeBuffer(consumer, buffer, isCompleted: true);
+                if (buffer.Length > 0)
+                {
+                    throw new InvalidOperationException("The log storage consumer did not consume all supplied log data.");
+                }
+
                 return totalBytesRead;
             }
 

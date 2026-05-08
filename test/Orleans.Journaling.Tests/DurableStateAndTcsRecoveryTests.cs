@@ -72,6 +72,28 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         Assert.Equal("0", recoveredStorage.Etag);
     }
 
+    [Fact]
+    public async Task DurableTaskCompletionSource_DeleteState_ResetsToPending()
+    {
+        var sut = CreateTestSystem();
+        var tcs = new DurableTaskCompletionSource<int>(
+            "tcs",
+            sut.Manager,
+            new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>()),
+            Copier<int>(),
+            Copier<Exception>());
+        await sut.Lifecycle.OnStart();
+        Assert.True(tcs.TrySetResult(17));
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        Assert.Equal(17, await tcs.Task);
+
+        await sut.Manager.DeleteStateAsync(CancellationToken.None);
+
+        Assert.Equal(DurableTaskCompletionSourceStatus.Pending, tcs.State.Status);
+        Assert.False(tcs.Task.IsCompleted);
+        Assert.True(tcs.TrySetResult(18));
+    }
+
     private ILogValueCodec<T> ValueCodec<T>() => new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();

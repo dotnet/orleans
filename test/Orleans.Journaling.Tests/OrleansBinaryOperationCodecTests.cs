@@ -150,6 +150,17 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     [Fact]
+    public void Codecs_RejectTruncatedFormatVersion()
+    {
+        var codec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>());
+
+        var exception = Assert.Throws<InvalidOperationException>(
+            () => codec.Apply(CodecTestHelpers.Sequence(Array.Empty<byte>()), new RecordingValueOperationHandler<int>()));
+
+        Assert.Contains("format version", exception.Message);
+    }
+
+    [Fact]
     public void Codecs_RejectUnsupportedCommand()
     {
         var codec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>());
@@ -313,6 +324,34 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
         Assert.Same(((IDurableValueOperationCodecProvider)provider).GetCodec<int>(), ((IDurableValueOperationCodecProvider)provider).GetCodec<int>());
         Assert.Same(((IDurableStateOperationCodecProvider)provider).GetCodec<int>(), ((IDurableStateOperationCodecProvider)provider).GetCodec<int>());
         Assert.Same(((IDurableTaskCompletionSourceOperationCodecProvider)provider).GetCodec<int>(), ((IDurableTaskCompletionSourceOperationCodecProvider)provider).GetCodec<int>());
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x10 })]
+    [InlineData(new byte[] { 0xFF, 0xFF, 0xFF, 0xFF, 0xFF })]
+    public void VarIntHelper_RejectsMalformedUInt32(byte[] bytes)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            var reader = new SequenceReader<byte>(CodecTestHelpers.Sequence(bytes));
+            VarIntHelper.ReadVarUInt32(ref reader);
+        });
+
+        Assert.Contains("Malformed variable-length integer", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x02 })]
+    [InlineData(new byte[] { 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80 })]
+    public void VarIntHelper_RejectsMalformedUInt64(byte[] bytes)
+    {
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            var reader = new SequenceReader<byte>(CodecTestHelpers.Sequence(bytes));
+            VarIntHelper.ReadVarUInt64(ref reader);
+        });
+
+        Assert.Contains("Malformed variable-length integer", exception.Message, StringComparison.Ordinal);
     }
 
     private ILogValueCodec<T> ValueCodec<T>() => new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);

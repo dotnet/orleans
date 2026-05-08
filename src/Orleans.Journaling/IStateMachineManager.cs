@@ -15,17 +15,17 @@ public interface IStateMachineManager
     ValueTask InitializeAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Attempts to get a state machine registered with the manager.
+    /// Registers a state machine with the manager.
     /// </summary>
     /// <param name="name">The state machine's stable identifier.</param>
     /// <param name="stateMachine">The state machine instance to register.</param>
     void RegisterStateMachine(string name, IDurableStateMachine stateMachine);
 
     /// <summary>
-    /// Registers a state machine with the manager.
+    /// Attempts to get a state machine registered with the manager.
     /// </summary>
     /// <param name="name">The state machine's stable identifier.</param>
-    /// <param name="stateMachine">The state machine instance to register.</param>
+    /// <param name="stateMachine">The state machine instance, if one is registered for <paramref name="name"/>.</param>
     bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine? stateMachine);
 
     /// <summary>

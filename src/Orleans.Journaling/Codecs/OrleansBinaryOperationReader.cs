@@ -51,7 +51,12 @@ internal ref struct OrleansBinaryOperationReader
 
     private void ReadVersion()
     {
-        if (!_reader.TryRead(out var version) || version != FormatVersion)
+        if (!_reader.TryRead(out var version))
+        {
+            throw new InvalidOperationException("Insufficient data while reading binary journal operation format version.");
+        }
+
+        if (version != FormatVersion)
         {
             throw new NotSupportedException($"Unsupported format version: {version}");
         }

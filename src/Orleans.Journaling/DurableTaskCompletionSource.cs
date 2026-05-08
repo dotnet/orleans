@@ -126,12 +126,15 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IDurableStateMachine.Reset(LogStreamWriter writer)
     {
+        _status = DurableTaskCompletionSourceStatus.Pending;
+        _value = default;
+        _exception = null;
+
         // Reset the task completion source if necessary.
         if (_completion.Task.IsCompleted)
         {
             _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
         }
-
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

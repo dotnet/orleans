@@ -58,6 +58,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     void IDurableStateMachine.Reset(LogStreamWriter writer)
     {
         _value = default;
+        _isDirty = false;
     }
 
     void IDurableStateMachine.AppendEntries(LogStreamWriter writer)

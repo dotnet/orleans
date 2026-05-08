@@ -284,6 +284,27 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateMachineManager_DeleteState_ClearsDurableValueDirtyFlag()
+    {
+        var storage = new CapturingStorage();
+        var sut = CreateTestSystem(storage: storage);
+        var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        value.Value = 1;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+        value.Value = 2;
+
+        await sut.Manager.DeleteStateAsync(CancellationToken.None);
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(2, storage.Appends.Count);
+        var postDeleteEntries = ReadBinaryEntries(storage.Appends[^1]);
+        Assert.Contains(postDeleteEntries, entry => entry.StreamId.Value == 0);
+        Assert.DoesNotContain(postDeleteEntries, entry => entry.StreamId.Value >= 8);
+    }
+
+    [Fact]
     public async Task StateMachineManager_SnapshotFlush_ResetsPendingAppendData()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };

@@ -72,12 +72,6 @@ internal sealed class OrleansBinaryLogBatchWriter : IDisposable, ILogEntryWriter
         return _buffer.PeekSlice(_buffer.Length);
     }
 
-    public ReadOnlySequence<byte> AsReadOnlySequence()
-    {
-        using var buffer = PeekSlice();
-        return buffer.AsReadOnlySequence();
-    }
-
     public Stream AsReadOnlyStream() => new ReadOnlyStream(PeekSlice());
 
     public void Reset()

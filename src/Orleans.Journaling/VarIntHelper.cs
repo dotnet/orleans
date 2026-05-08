@@ -65,28 +65,30 @@ internal static class VarIntHelper
     public static uint ReadVarUInt32(ref SequenceReader<byte> reader)
     {
         const int maxBytes = 5; // ceil(32 / 7)
+        const byte maxFinalBytePayload = 0x0F;
         uint result = 0;
-        var shift = 0;
-        byte b;
-        var count = 0;
-        do
+        for (var index = 0; index < maxBytes; index++)
         {
-            if (!reader.TryRead(out b))
+            if (!reader.TryRead(out var b))
             {
                 ThrowInsufficientData();
             }
 
-            result |= (uint)(b & 0x7F) << shift;
-            shift += 7;
-
-            if (++count > maxBytes)
+            var payload = b & 0x7F;
+            if (index == maxBytes - 1 && (payload > maxFinalBytePayload || (b & 0x80) != 0))
             {
                 ThrowOverflow();
             }
-        }
-        while ((b & 0x80) != 0);
 
-        return result;
+            result |= (uint)payload << (index * 7);
+            if ((b & 0x80) == 0)
+            {
+                return result;
+            }
+        }
+
+        ThrowOverflow();
+        return default;
     }
 
     /// <summary>
@@ -97,33 +99,35 @@ internal static class VarIntHelper
     public static ulong ReadVarUInt64(ref SequenceReader<byte> reader)
     {
         const int maxBytes = 10; // ceil(64 / 7)
+        const byte maxFinalBytePayload = 0x01;
         ulong result = 0;
-        var shift = 0;
-        byte b;
-        var count = 0;
-        do
+        for (var index = 0; index < maxBytes; index++)
         {
-            if (!reader.TryRead(out b))
+            if (!reader.TryRead(out var b))
             {
                 ThrowInsufficientData();
             }
 
-            result |= (ulong)(b & 0x7F) << shift;
-            shift += 7;
-
-            if (++count > maxBytes)
+            var payload = b & 0x7F;
+            if (index == maxBytes - 1 && (payload > maxFinalBytePayload || (b & 0x80) != 0))
             {
                 ThrowOverflow();
             }
-        }
-        while ((b & 0x80) != 0);
 
-        return result;
+            result |= (ulong)payload << (index * 7);
+            if ((b & 0x80) == 0)
+            {
+                return result;
+            }
+        }
+
+        ThrowOverflow();
+        return default;
     }
 
     private static void ThrowInsufficientData() =>
         throw new InvalidOperationException("Insufficient data while reading a variable-length integer.");
 
     private static void ThrowOverflow() =>
-        throw new InvalidOperationException("Malformed variable-length integer: too many bytes.");
+        throw new InvalidOperationException("Malformed variable-length integer: value exceeds the supported range.");
 }

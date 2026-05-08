@@ -32,7 +32,8 @@ public sealed class OrleansBinaryLogBatchWriterTests
         AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(1)), [10]);
         AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(300)), [20, 21]);
 
-        var reader = new SequenceReader<byte>(buffer.AsReadOnlySequence());
+        using var data = buffer.PeekSlice();
+        var reader = new SequenceReader<byte>(data.AsReadOnlySequence());
         var firstEntry = ReadEntry(ref reader);
         var secondEntry = ReadEntry(ref reader);
 
@@ -254,7 +255,8 @@ public sealed class OrleansBinaryLogBatchWriterTests
         second.Writer.Write([2]);
         second.Commit();
 
-        var reader = new SequenceReader<byte>(buffer.AsReadOnlySequence());
+        using var data = buffer.PeekSlice();
+        var reader = new SequenceReader<byte>(data.AsReadOnlySequence());
         var entry = ReadEntry(ref reader);
 
         Assert.Equal(2UL, entry.StreamId);

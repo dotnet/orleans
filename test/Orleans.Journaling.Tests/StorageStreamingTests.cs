@@ -122,6 +122,28 @@ public sealed class StorageStreamingTests
     }
 
     [Fact]
+    public void MemoryConsumerHelper_RejectsUnconsumedDataWhenCompleted()
+    {
+        var consumer = new LeavingLogStorageConsumer();
+
+        var exception = Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }));
+
+        Assert.Contains("did not consume all supplied log data", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task StreamConsumerHelper_RejectsUnconsumedDataWhenCompleted()
+    {
+        var stream = new ChunkedReadStream([1], chunkSize: 1);
+        var consumer = new LeavingLogStorageConsumer();
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            async () => await consumer.ConsumeAsync(stream, CancellationToken.None));
+
+        Assert.Contains("did not consume all supplied log data", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
     public void BinaryFormatRead_RejectsTruncatedFixed32Frame()
     {
         using var writer = CreateWriter([10, 0, 0, 0, 1, 2]);
