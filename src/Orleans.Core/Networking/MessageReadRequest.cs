@@ -102,6 +102,7 @@ namespace Orleans.Runtime.Messaging
             try
             {
                 messageSerializer.ReadHeaders(this, out message);
+                message.MessageReceiver = connection;
 
                 // Body deserialization is more likely to fail than header deserialization.
                 // Separating the two allows for these kinds of errors to be propagated back to the caller.
