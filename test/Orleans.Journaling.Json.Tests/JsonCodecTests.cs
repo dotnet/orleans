@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Buffers.Binary;
 using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
@@ -334,24 +333,22 @@ public class JsonCodecTests
     [Fact]
     public void JsonValueCodec_LogStreamWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
     {
-        using var writer = new OrleansBinaryLogBatchWriter();
+        using var writer = new CapturingNonJsonLogWriter();
         var codec = new JsonValueOperationCodec<int>(Options);
 
         codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
 
-        using var committed = writer.GetCommittedBuffer();
-        var bytes = committed.ToArray();
         var payload = """["set",42]"""u8.ToArray();
+        var entry = Assert.Single(writer.Entries);
 
-        Assert.Equal((uint)(1 + payload.Length), BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0, 4)));
-        Assert.Equal(8, bytes[4]);
-        Assert.Equal(payload, bytes[5..]);
+        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal(payload, entry.Payload);
     }
 
     [Fact]
     public void JsonOperationCodecWriter_FallbackPath_AbortsEntryWhenJsonWriteThrows()
     {
-        using var writer = new OrleansBinaryLogBatchWriter();
+        using var writer = new CapturingNonJsonLogWriter();
         var valueCodec = new JsonValueOperationCodec<int>(Options);
         var throwingCodec = new JsonValueOperationCodec<ThrowingJsonValue>(Options);
 
@@ -360,7 +357,7 @@ public class JsonCodecTests
         valueCodec.WriteSet(43, writer.CreateLogStreamWriter(new LogStreamId(10)));
 
         Assert.Collection(
-            ReadBinaryEntries(writer),
+            writer.Entries,
             entry =>
             {
                 Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -697,35 +694,6 @@ public class JsonCodecTests
         return consumer.Entries;
     }
 
-    private static List<RecordedLogEntry> ReadBinaryEntries(OrleansBinaryLogBatchWriter writer)
-    {
-        using var buffer = writer.GetCommittedBuffer();
-        var remaining = buffer.AsReadOnlySequence();
-        var entries = new List<RecordedLogEntry>();
-        var offset = 0L;
-
-        while (!remaining.IsEmpty)
-        {
-            if (!OrleansBinaryLogEntryFrameReader.TryReadEntry(
-                ref remaining,
-                offset,
-                isCompleted: true,
-                out var streamId,
-                out var payload,
-                out var frameLength,
-                out _))
-            {
-                break;
-            }
-
-            entries.Add(new(streamId, payload.ToArray()));
-            remaining = remaining.Slice(frameLength);
-            offset += frameLength;
-        }
-
-        return entries;
-    }
-
     private static void ReadOne(JsonLinesLogFormat format, string jsonLines, IStateMachineResolver resolver)
     {
         using var buffer = new ArcBufferWriter();
@@ -736,6 +704,56 @@ public class JsonCodecTests
     }
 
     private sealed record RecordedLogEntry(LogStreamId StreamId, byte[] Payload);
+
+    private sealed class CapturingNonJsonLogWriter : ILogStreamWriterTarget, ILogEntryWriterTarget, IDisposable
+    {
+        private readonly ArcBufferWriter _payload = new();
+        private readonly LogEntryWriter _entryWriter = new();
+        private LogStreamId _streamId;
+
+        public List<RecordedLogEntry> Entries { get; } = [];
+
+        public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId) => new(streamId, this);
+
+        public void Advance(int count) => _payload.AdvanceWriter(count);
+
+        public Memory<byte> GetMemory(int sizeHint = 0) => _payload.GetMemory(sizeHint);
+
+        public Span<byte> GetSpan(int sizeHint = 0) => _payload.GetSpan(sizeHint);
+
+        public void Write(ReadOnlySpan<byte> value) => _payload.Write(value);
+
+        public void Write(ReadOnlySequence<byte> value) => _payload.Write(value);
+
+        public void CommitEntry(int entryStart)
+        {
+            using var payload = _payload.PeekSlice(_payload.Length);
+            Entries.Add(new(_streamId, payload.ToArray()));
+            _payload.Reset();
+        }
+
+        public void AbortEntry(int entryStart) => _payload.Reset();
+
+        public void Dispose() => _payload.Dispose();
+
+        LogEntryWriter ILogStreamWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
+        {
+            if (_entryWriter.IsActive)
+            {
+                throw new InvalidOperationException("The test writer already has an active entry.");
+            }
+
+            _streamId = streamId;
+            _payload.Reset();
+            _entryWriter.Initialize(this, Entries.Count, completion);
+            return _entryWriter;
+        }
+
+        void ILogStreamWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
+            throw new InvalidOperationException("This test writer does not accept formatted entries.");
+
+        bool ILogStreamWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) => false;
+    }
 
     private sealed class RecordingLogEntrySink : IStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
     {
