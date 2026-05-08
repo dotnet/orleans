@@ -144,9 +144,9 @@ public sealed class StorageStreamingTests
     }
 
     [Fact]
-    public void BinaryFormatRead_RejectsTruncatedFixed32Frame()
+    public void BinaryFormatRead_RejectsTruncatedVarUIntFrame()
     {
-        using var writer = CreateWriter([10, 0, 0, 0, 1, 2]);
+        using var writer = CreateWriter([0x15, 1, 2]);
         var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingLogEntrySink();
 
@@ -160,13 +160,13 @@ public sealed class StorageStreamingTests
     [Fact]
     public void BinaryFormatRead_WaitsForIncompleteFrameWhenInputIsNotCompleted()
     {
-        using var writer = CreateWriter([10, 0, 0, 0, 1, 2]);
+        using var writer = CreateWriter([0x15, 1, 2]);
         var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: false);
         var consumer = new CapturingLogEntrySink();
 
         ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
 
-        Assert.Equal(6, reader.Length);
+        Assert.Equal(3, reader.Length);
         Assert.Empty(consumer.Entries);
     }
 

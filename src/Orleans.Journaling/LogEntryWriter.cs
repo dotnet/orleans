@@ -40,12 +40,12 @@ public sealed class LogEntryWriter : IBufferWriter<byte>
     public void Write(ReadOnlySequence<byte> value) => GetTarget().Write(value);
 
     /// <summary>
-    /// Writes a LEB128-encoded unsigned 32-bit integer to the current log entry.
+    /// Writes an Orleans.Serialization-encoded unsigned 32-bit integer to the current log entry.
     /// </summary>
     public void WriteVarUInt32(uint value) => VarIntHelper.WriteVarUInt32(this, value);
 
     /// <summary>
-    /// Writes a LEB128-encoded unsigned 64-bit integer to the current log entry.
+    /// Writes an Orleans.Serialization-encoded unsigned 64-bit integer to the current log entry.
     /// </summary>
     public void WriteVarUInt64(ulong value) => VarIntHelper.WriteVarUInt64(this, value);
 

@@ -1,39 +1,44 @@
 using System.Buffers;
-using System.Buffers.Binary;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
 internal sealed class OrleansBinaryLogBatchWriter : IDisposable, ILogEntryWriterTarget, ILogBatchWriter, ILogStreamWriterTarget
 {
-    private const int LengthPrefixSize = sizeof(uint);
     private readonly ArcBufferWriter _buffer = new();
+    private readonly ArcBufferWriter _entryBuffer = new();
     private readonly LogEntryWriter _entryWriter = new();
 
-    public int Length => _buffer.Length;
+    public int Length
+    {
+        get
+        {
+            var length = _buffer.Length;
+            if (_entryWriter.IsActive)
+            {
+                var bodyLength = checked((uint)_entryBuffer.Length);
+                length = checked(length + VarIntHelper.GetVarUInt32ByteCount(bodyLength) + _entryBuffer.Length);
+            }
 
-    long ILogBatchWriter.Length => _buffer.Length;
+            return length;
+        }
+    }
 
-    public bool IsEmpty => _buffer.Length == 0;
+    long ILogBatchWriter.Length => Length;
+
+    public bool IsEmpty => Length == 0;
 
     public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId) => new(streamId, this);
 
-    public void Advance(int count) => _buffer.AdvanceWriter(count);
+    public void Advance(int count) => GetWriteBuffer().AdvanceWriter(count);
 
-    public Memory<byte> GetMemory(int sizeHint = 0) => _buffer.GetMemory(sizeHint);
+    public Memory<byte> GetMemory(int sizeHint = 0) => GetWriteBuffer().GetMemory(sizeHint);
 
-    public Span<byte> GetSpan(int sizeHint = 0) => _buffer.GetSpan(sizeHint);
+    public Span<byte> GetSpan(int sizeHint = 0) => GetWriteBuffer().GetSpan(sizeHint);
 
-    public void Write(ReadOnlySpan<byte> value) => _buffer.Write(value);
+    public void Write(ReadOnlySpan<byte> value) => GetWriteBuffer().Write(value);
 
-    public void Write(ReadOnlySequence<byte> value) => _buffer.Write(value);
-
-    public void WriteUInt32LittleEndianAt(int offset, uint value)
-    {
-        Span<byte> bytes = stackalloc byte[sizeof(uint)];
-        BinaryPrimitives.WriteUInt32LittleEndian(bytes, value);
-        _buffer.WriteAt(offset, bytes);
-    }
+    public void Write(ReadOnlySequence<byte> value) => GetWriteBuffer().Write(value);
 
     public LogEntryWriter BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion = null)
     {
@@ -43,22 +48,27 @@ internal sealed class OrleansBinaryLogBatchWriter : IDisposable, ILogEntryWriter
         }
 
         var entryStart = Length;
-        Span<byte> lengthPrefix = stackalloc byte[LengthPrefixSize];
-        Write(lengthPrefix);
-        VarIntHelper.WriteVarUInt64(this, streamId.Value);
+        _entryBuffer.Reset();
+        VarIntHelper.WriteVarUInt64(_entryBuffer, streamId.Value);
         _entryWriter.Initialize(this, entryStart, completion);
         return _entryWriter;
     }
 
-    public void Truncate(int length) => _buffer.Truncate(length);
-
     public void CommitEntry(int entryStart)
     {
-        var length = checked((uint)(Length - entryStart - LengthPrefixSize));
-        WriteUInt32LittleEndianAt(entryStart, length);
+        ValidateEntryStart(entryStart);
+        var length = checked((uint)_entryBuffer.Length);
+        VarIntHelper.WriteVarUInt32(_buffer, length);
+        using var body = _entryBuffer.PeekSlice(_entryBuffer.Length);
+        _buffer.Write(body.AsReadOnlySequence());
+        _entryBuffer.Reset();
     }
 
-    public void AbortEntry(int entryStart) => Truncate(entryStart);
+    public void AbortEntry(int entryStart)
+    {
+        ValidateEntryStart(entryStart);
+        _entryBuffer.Reset();
+    }
 
     public ArcBuffer PeekSlice() => _buffer.PeekSlice(_buffer.Length);
 
@@ -82,9 +92,14 @@ internal sealed class OrleansBinaryLogBatchWriter : IDisposable, ILogEntryWriter
         }
 
         _buffer.Reset();
+        _entryBuffer.Reset();
     }
 
-    public void Dispose() => _buffer.Dispose();
+    public void Dispose()
+    {
+        _entryBuffer.Dispose();
+        _buffer.Dispose();
+    }
 
     LogEntryWriter ILogStreamWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion) => BeginEntry(streamId, completion);
 
@@ -114,6 +129,16 @@ internal sealed class OrleansBinaryLogBatchWriter : IDisposable, ILogEntryWriter
         logEntry.Writer.Write(binaryEntry.Payload.Span);
         logEntry.Commit();
         return true;
+    }
+
+    private ArcBufferWriter GetWriteBuffer() => _entryWriter.IsActive ? _entryBuffer : _buffer;
+
+    private void ValidateEntryStart(int entryStart)
+    {
+        if (entryStart != _buffer.Length)
+        {
+            throw new InvalidOperationException("The log entry start does not match the active entry.");
+        }
     }
 
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream

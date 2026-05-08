@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Buffers.Binary;
 using Orleans.Serialization.Buffers;
 using Xunit;
 
@@ -9,7 +8,7 @@ namespace Orleans.Journaling.Tests;
 public sealed class OrleansBinaryLogBatchWriterTests
 {
     [Fact]
-    public void Commit_WritesFixed32FramedEntry()
+    public void Commit_WritesLegacyVarUIntFramedEntry()
     {
         using var buffer = new OrleansBinaryLogBatchWriter();
 
@@ -18,10 +17,7 @@ public sealed class OrleansBinaryLogBatchWriterTests
         entry.Commit();
 
         var bytes = ToArray(buffer);
-        Assert.Equal(8, bytes.Length);
-        Assert.Equal(4U, BinaryPrimitives.ReadUInt32LittleEndian(bytes));
-        Assert.Equal(42, bytes[4]);
-        Assert.Equal([1, 2, 3], bytes[5..]);
+        Assert.Equal([0x09, 0x55, 1, 2, 3], bytes);
     }
 
     [Fact]
@@ -279,21 +275,23 @@ public sealed class OrleansBinaryLogBatchWriterTests
     }
 
     [Fact]
-    public void Commit_BackpatchesLengthAcrossSegments()
+    public void Commit_WritesVariableLengthFrameAcrossSegments()
     {
         using var buffer = new OrleansBinaryLogBatchWriter();
-        buffer.Write(new byte[ArcBufferWriter.MinimumPageSize - 2]);
+        var payload = Enumerable.Repeat((byte)42, ArcBufferWriter.MinimumPageSize).ToArray();
 
         using var entry = buffer.CreateLogStreamWriter(new LogStreamId(1)).BeginEntry();
-        entry.Writer.Write([42]);
+        entry.Writer.Write(payload);
         entry.Commit();
 
-        var bytes = ToArray(buffer);
-        var offset = ArcBufferWriter.MinimumPageSize - 2;
+        using var data = buffer.PeekSlice();
+        var reader = new SequenceReader<byte>(data.AsReadOnlySequence());
+        var written = ReadEntry(ref reader);
 
-        Assert.Equal(2U, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset, 4)));
-        Assert.Equal(1, bytes[offset + 4]);
-        Assert.Equal(42, bytes[offset + 5]);
+        Assert.Equal((uint)payload.Length + 1, written.Length);
+        Assert.Equal(1UL, written.StreamId);
+        Assert.Equal(payload, written.Payload.ToArray());
+        Assert.True(reader.End);
     }
 
     [Fact]
@@ -310,20 +308,18 @@ public sealed class OrleansBinaryLogBatchWriterTests
         Assert.Equal(expected.Length, stream.Read(actual));
         Assert.Equal(expected, actual);
 
-        stream.Position = 4;
-        Assert.Equal(7, stream.ReadByte());
+        stream.Position = 1;
+        Assert.Equal(0x0F, stream.ReadByte());
     }
 
     [Theory]
-    [InlineData(new byte[] { 1, 2, 3 }, "truncated fixed32 entry length prefix")]
-    [InlineData(new byte[] { 0, 0, 0, 0 }, "zero-length entries")]
-    [InlineData(new byte[] { 5, 0, 0, 0, 1, 2 }, "exceeds remaining input bytes")]
-    [InlineData(new byte[] { 1, 0, 0, 0, 0x80 }, "truncated varuint64 state-machine id")]
-    [InlineData(new byte[] { 1, 0, 0, 0, 1 }, "missing operation payload")]
+    [InlineData(new byte[] { 0x02 }, "truncated varuint32 entry length prefix")]
+    [InlineData(new byte[] { 0x01 }, "zero-length entries")]
+    [InlineData(new byte[] { 0x0B, 1, 2 }, "exceeds remaining input bytes")]
+    [InlineData(new byte[] { 0x03, 0x00 }, "truncated varuint64 state-machine id")]
     [InlineData(
-        new byte[] { 11, 0, 0, 0, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0 },
+        new byte[] { 0x05, 0x00, 0x00 },
         "malformed varuint64 state-machine id")]
-    [InlineData(new byte[] { 255, 255, 255, 255 }, "exceeds remaining input bytes")]
     public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
         using var data = CreateWriter(bytes);
@@ -368,11 +364,7 @@ public sealed class OrleansBinaryLogBatchWriterTests
 
     private static (uint Length, ulong StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)
     {
-        Span<byte> lengthBytes = stackalloc byte[sizeof(uint)];
-        Assert.True(reader.TryCopyTo(lengthBytes));
-        reader.Advance(sizeof(uint));
-
-        var length = BinaryPrimitives.ReadUInt32LittleEndian(lengthBytes);
+        var length = VarIntHelper.ReadVarUInt32(ref reader);
         var entry = reader.Sequence.Slice(reader.Consumed, length);
         var entryReader = new SequenceReader<byte>(entry);
         var streamId = VarIntHelper.ReadVarUInt64(ref entryReader);

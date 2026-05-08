@@ -194,7 +194,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_BinaryAppend_StoresBinaryFixed32Entries()
+    public async Task StateMachineManager_BinaryAppend_StoresBinaryVarUIntEntries()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -240,7 +240,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_BinarySnapshot_StoresBinaryFixed32Entries()
+    public async Task StateMachineManager_BinarySnapshot_StoresBinaryVarUIntEntries()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
@@ -501,7 +501,7 @@ public class StateMachineManagerTests : JournalingTestBase
             }
 
             using var committed = segment.GetCommittedBuffer();
-            bytes = [.. committed.ToArray(), 1, 2, 3];
+            bytes = [.. committed.ToArray(), 0x02];
         }
 
         var storage = new RawReadStorage(bytes);
@@ -521,7 +521,7 @@ public class StateMachineManagerTests : JournalingTestBase
         Assert.Contains("configured log format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
         var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("Malformed binary log entry stream", inner.Message, StringComparison.Ordinal);
-        Assert.Contains("truncated fixed32 entry length prefix", inner.Message, StringComparison.Ordinal);
+        Assert.Contains("truncated varuint32 entry length prefix", inner.Message, StringComparison.Ordinal);
     }
 
     [Fact]
