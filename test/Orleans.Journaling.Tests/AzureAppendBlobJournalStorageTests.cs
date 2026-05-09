@@ -395,6 +395,6 @@ public sealed class AzureAppendBlobJournalStorageTests
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
 
-        public void Read(JournalReadBuffer input, IStateMachineResolver resolver) => throw new NotSupportedException();
+        public void Read(JournalReadBuffer input, IStateResolver resolver) => throw new NotSupportedException();
     }
 }

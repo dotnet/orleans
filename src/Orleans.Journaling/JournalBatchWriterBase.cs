@@ -4,7 +4,7 @@ using Orleans.Serialization.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Base class for format-owned state machine journal batch writers.
+/// Base class for format-owned state journal batch writers.
 /// </summary>
 /// <remarks>
 /// Derived classes own the physical framing and committed buffer. This base class only
@@ -51,7 +51,7 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     /// <summary>
     /// Called before an entry scope becomes active.
     /// </summary>
-    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="streamId">The durable state id.</param>
     protected virtual void OnBeginEntry(JournalStreamId streamId)
     {
     }
@@ -59,7 +59,7 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     /// <summary>
     /// Gets the format-owned entry start marker used to validate completion.
     /// </summary>
-    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="streamId">The durable state id.</param>
     /// <returns>The entry start marker.</returns>
     protected abstract int GetEntryStart(JournalStreamId streamId);
 
@@ -96,9 +96,9 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     protected abstract void WritePayload(ReadOnlySequence<byte> value);
 
     /// <summary>
-    /// Appends a format-owned entry for retired or unknown state-machine preservation.
+    /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>
-    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="streamId">The durable state id.</param>
     /// <param name="entry">The format-owned entry.</param>
     protected virtual void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
     {
@@ -109,7 +109,7 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     /// <summary>
     /// Attempts to append a format-owned entry without first converting it to payload bytes.
     /// </summary>
-    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="streamId">The durable state id.</param>
     /// <param name="entry">The format-owned entry.</param>
     /// <returns><see langword="true"/> if <paramref name="entry"/> was appended; otherwise, <see langword="false"/>.</returns>
     protected virtual bool OnTryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) => false;
@@ -117,14 +117,14 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     /// <summary>
     /// Commits the active entry.
     /// </summary>
-    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="streamId">The durable state id.</param>
     /// <param name="entryStart">The entry start marker returned by <see cref="GetEntryStart"/>.</param>
     protected abstract void CommitEntry(JournalStreamId streamId, int entryStart);
 
     /// <summary>
     /// Aborts the active entry.
     /// </summary>
-    /// <param name="streamId">The durable state machine id.</param>
+    /// <param name="streamId">The durable state id.</param>
     /// <param name="entryStart">The entry start marker returned by <see cref="GetEntryStart"/>.</param>
     protected abstract void AbortEntry(JournalStreamId streamId, int entryStart);
 

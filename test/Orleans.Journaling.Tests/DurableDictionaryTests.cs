@@ -17,7 +17,7 @@ public class DurableDictionaryTests : JournalingTestBase
     /// <summary>
     /// Tests basic dictionary operations including add, update, remove, and indexer access.
     /// Verifies that the DurableDictionary behaves like a standard dictionary while
-    /// persisting state changes through the state machine manager.
+    /// persisting state changes through the state manager.
     /// </summary>
     [Fact]
     public async Task DurableDictionary_BasicOperations_Test()

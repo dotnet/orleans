@@ -3,13 +3,13 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Provides serialization and deserialization of values for use in durable state machine journal entries.
+/// Provides serialization and deserialization of values for use in durable state journal entries.
 /// </summary>
 /// <typeparam name="T">The type of value to serialize and deserialize.</typeparam>
 /// <remarks>
 /// <para>
 /// This interface is the primary extension point for customizing how values are serialized
-/// in durable state machines. Unlike <c>IFieldCodec&lt;T&gt;</c> from Orleans.Serialization,
+/// in durable states. Unlike <c>IFieldCodec&lt;T&gt;</c> from Orleans.Serialization,
 /// this interface does not require serializer sessions or field headers — it is a simple
 /// bytes-in/bytes-out contract.
 /// </para>

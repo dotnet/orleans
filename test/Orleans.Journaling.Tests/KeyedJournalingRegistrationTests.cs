@@ -34,8 +34,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             expectDefaultProvider: true);
 
         Assert.Same(OrleansBinaryJournalFormat.Instance, serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
-        Assert.Equal(".bin", OrleansBinaryJournalFormat.Instance.FileExtension);
-        Assert.Equal("application/vnd.microsoft.orleans.journal+binary", OrleansBinaryJournalFormat.Instance.MimeType);
+        Assert.Equal(".obs", OrleansBinaryJournalFormat.Instance.FileExtension);
+        Assert.Equal("application/octet-stream", OrleansBinaryJournalFormat.Instance.MimeType);
         CodecTestHelpers.AssertCodecProviderRegistrations(
             serviceProvider,
             OrleansBinaryJournalFormat.JournalFormatKey,
@@ -44,14 +44,14 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     }
 
     [Fact]
-    public void StateMachineManager_MissingKeyedFormat_ThrowsClearConfigurationError()
+    public void StateManager_MissingKeyedFormat_ThrowsClearConfigurationError()
     {
         using var serviceProvider = new ServiceCollection().BuildServiceProvider();
         var storage = new VolatileJournalStorage();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => new JournalStateMachineManager(
+        var exception = Assert.Throws<InvalidOperationException>(() => new JournaledStateManager(
             storage,
-            LoggerFactory.CreateLogger<JournalStateMachineManager>(),
+            LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
             TimeProvider.System,
             serviceProvider,
@@ -72,7 +72,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IJournalStorage>(_ => storage);
         services.AddKeyedScoped<string>(JournalFormatServices.JournalFormatKeyServiceKey, (_, _) => CustomFormatKey);
-        services.AddScoped<IStateMachineManager, JournalStateMachineManager>();
+        services.AddScoped<IStateManager, JournaledStateManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, new TestJournalFormat());
         services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(CustomFormatKey, new TestDictionaryCodecProvider());
@@ -101,7 +101,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
 
-        public void Read(JournalReadBuffer input, IStateMachineResolver resolver) => throw new NotSupportedException();
+        public void Read(JournalReadBuffer input, IStateResolver resolver) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodecProvider : IDurableDictionaryOperationCodecProvider

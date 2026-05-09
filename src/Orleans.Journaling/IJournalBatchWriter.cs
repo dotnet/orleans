@@ -3,7 +3,7 @@ using Orleans.Serialization.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Writes a mutable batch of physical state machine journal entries.
+/// Writes a mutable batch of physical state journal entries.
 /// </summary>
 /// <remarks>
 /// The batch writer is caller-owned and may be reused after a successful append or replace
@@ -19,8 +19,8 @@ public interface IJournalBatchWriter : IDisposable
     /// <summary>
     /// Creates a writer for entries belonging to <paramref name="streamId"/>.
     /// </summary>
-    /// <param name="streamId">The durable state machine id.</param>
-    /// <returns>A journal stream writer for the specified state machine.</returns>
+    /// <param name="streamId">The durable state id.</param>
+    /// <returns>A journal stream writer for the specified state.</returns>
     JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId);
 
     /// <summary>

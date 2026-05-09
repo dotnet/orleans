@@ -149,7 +149,7 @@ public class DurableOperationReaderBenchmarks
     private sealed class ListReplayConsumer(
         JournalStreamId expectedStreamId,
         IDurableListOperationCodec<int> codec,
-        int capacity) : IStateMachineResolver, IDurableStateMachine, IDurableListOperationHandler<int>
+        int capacity) : IStateResolver, IJournaledState, IDurableListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
         private long _checksum;
@@ -158,9 +158,9 @@ public class DurableOperationReaderBenchmarks
 
         public long Result => _checksum ^ _items.Count;
 
-        object IDurableStateMachine.OperationCodec => codec;
+        object IJournaledState.OperationCodec => codec;
 
-        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
+        public IJournaledState ResolveState(JournalStreamId streamId)
         {
             if (streamId != expectedStreamId)
             {
@@ -176,17 +176,17 @@ public class DurableOperationReaderBenchmarks
             _checksum = 0;
         }
 
-        void IDurableStateMachine.Reset(JournalStreamWriter storage) => ResetForReplay();
+        void IJournaledState.Reset(JournalStreamWriter storage) => ResetForReplay();
 
-        void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
+        void IJournaledState.AppendEntries(JournalStreamWriter writer)
         {
         }
 
-        void IDurableStateMachine.AppendSnapshot(JournalStreamWriter writer)
+        void IJournaledState.AppendSnapshot(JournalStreamWriter writer)
         {
         }
 
-        IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
+        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
         public void ApplyAdd(int item)
         {

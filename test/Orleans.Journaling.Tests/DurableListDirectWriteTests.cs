@@ -88,15 +88,15 @@ public sealed class DurableListDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestJournalManager(TestJournalStreamWriter writer) : IStateMachineManager
+    private sealed class TestJournalManager(TestJournalStreamWriter writer) : IStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
-        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) => stateMachine.Reset(writer.CreateWriter());
+        public void RegisterState(string name, IJournaledState state) => state.Reset(writer.CreateWriter());
 
-        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine? stateMachine)
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state)
         {
-            stateMachine = null;
+            state = null;
             return false;
         }
 

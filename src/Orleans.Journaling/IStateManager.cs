@@ -3,30 +3,30 @@ using System.Diagnostics.CodeAnalysis;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Manages the state machines for a given grain.
+/// Manages the states for a given grain.
 /// </summary>
-public interface IStateMachineManager
+public interface IStateManager
 {
     /// <summary>
-    /// Initializes the state machine manager.
+    /// Initializes the state manager.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
     ValueTask InitializeAsync(CancellationToken cancellationToken);
 
     /// <summary>
-    /// Registers a state machine with the manager.
+    /// Registers a state with the manager.
     /// </summary>
-    /// <param name="name">The state machine's stable identifier.</param>
-    /// <param name="stateMachine">The state machine instance to register.</param>
-    void RegisterStateMachine(string name, IDurableStateMachine stateMachine);
+    /// <param name="name">The state's stable identifier.</param>
+    /// <param name="state">The state instance to register.</param>
+    void RegisterState(string name, IJournaledState state);
 
     /// <summary>
-    /// Attempts to get a state machine registered with the manager.
+    /// Attempts to get a state registered with the manager.
     /// </summary>
-    /// <param name="name">The state machine's stable identifier.</param>
-    /// <param name="stateMachine">The state machine instance, if one is registered for <paramref name="name"/>.</param>
-    bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine? stateMachine);
+    /// <param name="name">The state's stable identifier.</param>
+    /// <param name="state">The state instance, if one is registered for <paramref name="name"/>.</param>
+    bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state);
 
     /// <summary>
     /// Prepares and persists an update to the journal.

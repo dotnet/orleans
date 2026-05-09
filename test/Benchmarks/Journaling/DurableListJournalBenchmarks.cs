@@ -17,7 +17,7 @@ public class DurableListJournalBenchmarks
     private IDurableListOperationCodec<int> _codec;
     private IJournalFormat _journalFormat;
     private DurableList<int> _list;
-    private IDurableStateMachine _stateMachine;
+    private IJournaledState _state;
     private OrleansBinaryJournalBatchWriter _writeBuffer;
     private OrleansBinaryJournalBatchWriter _encodedJournalStreamWriter;
     private ArcBuffer _encodedJournalData;
@@ -31,7 +31,7 @@ public class DurableListJournalBenchmarks
         _journalFormat = OrleansBinaryJournalFormat.Instance;
         _writeBuffer = new OrleansBinaryJournalBatchWriter();
         _list = new DurableList<int>("list", new BenchmarkJournalManager(_writeBuffer, ListJournalStreamId), _codec);
-        _stateMachine = _list;
+        _state = _list;
         _recoveryConsumer = new RecoveryConsumer(ListJournalStreamId, _codec, OperationsPerInvocation);
 
         WarmWritePathCapacity();
@@ -83,7 +83,7 @@ public class DurableListJournalBenchmarks
     private void ResetWritePath()
     {
         _writeBuffer.Reset();
-        _stateMachine.Reset(_writeBuffer.CreateJournalStreamWriter(ListJournalStreamId));
+        _state.Reset(_writeBuffer.CreateJournalStreamWriter(ListJournalStreamId));
     }
 
     private ArcBuffer CreateEncodedJournalData()
@@ -143,15 +143,15 @@ public class DurableListJournalBenchmarks
         }
     }
 
-    private sealed class BenchmarkJournalManager(OrleansBinaryJournalBatchWriter buffer, JournalStreamId streamId) : IStateMachineManager
+    private sealed class BenchmarkJournalManager(OrleansBinaryJournalBatchWriter buffer, JournalStreamId streamId) : IStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
-        public void RegisterStateMachine(string name, IDurableStateMachine stateMachine) => stateMachine.Reset(buffer.CreateJournalStreamWriter(streamId));
+        public void RegisterState(string name, IJournaledState state) => state.Reset(buffer.CreateJournalStreamWriter(streamId));
 
-        public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine stateMachine)
+        public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState state)
         {
-            stateMachine = null!;
+            state = null!;
             return false;
         }
 
@@ -163,7 +163,7 @@ public class DurableListJournalBenchmarks
     private sealed class RecoveryConsumer(
         JournalStreamId expectedStreamId,
         IDurableListOperationCodec<int> codec,
-        int capacity) : IStateMachineResolver, IDurableStateMachine, IDurableListOperationHandler<int>
+        int capacity) : IStateResolver, IJournaledState, IDurableListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -171,9 +171,9 @@ public class DurableListJournalBenchmarks
 
         public void Reset() => _items.Clear();
 
-        object IDurableStateMachine.OperationCodec => codec;
+        object IJournaledState.OperationCodec => codec;
 
-        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
+        public IJournaledState ResolveState(JournalStreamId streamId)
         {
             if (streamId != expectedStreamId)
             {
@@ -183,10 +183,10 @@ public class DurableListJournalBenchmarks
             return this;
         }
 
-        void IDurableStateMachine.Reset(JournalStreamWriter storage) => Reset();
-        void IDurableStateMachine.AppendEntries(JournalStreamWriter writer) { }
-        void IDurableStateMachine.AppendSnapshot(JournalStreamWriter writer) { }
-        IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
+        void IJournaledState.Reset(JournalStreamWriter storage) => Reset();
+        void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
+        void IJournaledState.AppendSnapshot(JournalStreamWriter writer) { }
+        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
         public void ApplyAdd(int item) => _items.Add(item);
 

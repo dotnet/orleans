@@ -15,7 +15,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IDurableStateMachine, IDurableTaskCompletionSourceOperationHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IDurableTaskCompletionSourceOperationHandler<T>
 {
     private readonly IDurableTaskCompletionSourceOperationCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -28,7 +28,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
-        IStateMachineManager manager,
+        IStateManager manager,
         [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
@@ -38,12 +38,12 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = JournalFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
         _copier = copier;
         _exceptionCopier = exceptionCopier;
-        manager.RegisterStateMachine(key, this);
+        manager.RegisterState(key, this);
     }
 
     internal DurableTaskCompletionSource(
         string key,
-        IStateMachineManager manager,
+        IStateManager manager,
         IDurableTaskCompletionSourceOperationCodec<T> codec,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
@@ -52,7 +52,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _codec = codec;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
-        manager.RegisterStateMachine(key, this);
+        manager.RegisterState(key, this);
     }
 
     public bool TrySetResult(T value)
@@ -101,7 +101,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
-    object IDurableStateMachine.OperationCodec => _codec;
+    object IJournaledState.OperationCodec => _codec;
 
     private void OnValuePersisted()
     {
@@ -121,10 +121,10 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
-    void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
+    void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
+    void IJournaledState.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(JournalStreamWriter writer)
+    void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;
@@ -137,7 +137,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
+    void IJournaledState.AppendEntries(JournalStreamWriter writer)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -145,7 +145,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
 
     private void WriteState(JournalStreamWriter writer)
     {
@@ -181,7 +181,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     void IDurableTaskCompletionSourceOperationHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
 
-    public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
+    public IJournaledState DeepCopy() => throw new NotImplementedException();
 }
 
 [GenerateSerializer]

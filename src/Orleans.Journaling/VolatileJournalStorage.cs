@@ -17,7 +17,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class.
     /// </summary>
-    /// <param name="journalFormatKey">The default state machine journal format key.</param>
+    /// <param name="journalFormatKey">The default state journal format key.</param>
     public VolatileJournalStorageProvider(string journalFormatKey) : this(journalFormatKey, journalFormatKeySelector: null)
     {
     }
@@ -25,7 +25,7 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class.
     /// </summary>
-    /// <param name="journalFormatKey">The default state machine journal format key.</param>
+    /// <param name="journalFormatKey">The default state journal format key.</param>
     /// <param name="journalFormatKeySelector">An optional selector for choosing the journal format key by grain type.</param>
     public VolatileJournalStorageProvider(string journalFormatKey, Func<GrainType, string>? journalFormatKeySelector)
     {

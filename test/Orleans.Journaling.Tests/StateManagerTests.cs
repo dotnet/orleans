@@ -7,30 +7,30 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 /// <summary>
-/// Tests for the state machine manager, the core component of Orleans' journaling infrastructure.
+/// Tests for the state manager, the core component of Orleans' journaling infrastructure.
 /// 
-/// The state machine manager coordinates multiple durable data structures (DurableDictionary, DurableList, etc.)
+/// The state manager coordinates multiple durable data structures (DurableDictionary, DurableList, etc.)
 /// within a single grain, ensuring that all state changes are atomically journaled and can be
-/// recovered together. It manages the lifecycle of state machines, handles persistence through
+/// recovered together. It manages the lifecycle of states, handles persistence through
 /// WriteStateAsync calls, and ensures consistent recovery after failures.
 /// </summary>
 [TestCategory("BVT")]
-public class StateMachineManagerTests : JournalingTestBase
+public class StateManagerTests : JournalingTestBase
 {
     /// <summary>
-    /// Tests the registration and basic operation of multiple state machines.
+    /// Tests the registration and basic operation of multiple states.
     /// Verifies that different types of durable collections can be registered
     /// with the manager and operate independently.
     /// </summary>
     [Fact]
-    public async Task StateMachineManager_RegisterStateMachine_Test()
+    public async Task StateManager_RegisterState_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
 
-        // Act - Register state machines
+        // Act - Register states
         var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(codec, SessionPool)));
         var list = new DurableList<string>("list1", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         var queue = new DurableQueue<int>("queue1", manager, new OrleansBinaryQueueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool)));
@@ -51,7 +51,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Initialize_UsesStreamingStorageRead()
+    public async Task StateManager_Initialize_UsesStreamingStorageRead()
     {
         var storage = new StreamingOnlyStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -62,7 +62,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Initialize_ThrowsWhenCompletedReadLeavesData()
+    public async Task StateManager_Initialize_ThrowsWhenCompletedReadLeavesData()
     {
         var storage = new VolatileJournalStorage();
         using (var data = CreateBuffer([1, 2, 3]))
@@ -80,7 +80,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_PreservesUnknownStateMachineEntry()
+    public async Task StateManager_Recovery_PreservesUnknownStateEntry()
     {
         var storage = new VolatileJournalStorage();
         using var segment = new OrleansBinaryJournalBatchWriter();
@@ -103,7 +103,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_UnknownStateMachineCompaction_PreservesDecodedPayloadThroughFormatWriter()
+    public async Task StateManager_UnknownStateCompaction_PreservesDecodedPayloadThroughFormatWriter()
     {
         var physicalBytes = new byte[] { 0xF0, 0x0D, 0x99 };
         var decodedPayload = new byte[] { 1, 2, 3 };
@@ -131,7 +131,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_RetiredStateMachineCompaction_WritesPreservedPayloadThroughFormatOwnedEntry()
+    public async Task StateManager_RetiredStateCompaction_WritesPreservedPayloadThroughFormatOwnedEntry()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -160,7 +160,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_DirectWrites_UseFormatOwnedCurrentSegmentWriter()
+    public async Task StateManager_DirectWrites_UseFormatOwnedCurrentSegmentWriter()
     {
         var storage = new CapturingStorage();
         var format = new TrackingJournalFormat();
@@ -181,7 +181,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_AppendJournalFlush_UsesFormatOwnedWriter()
+    public async Task StateManager_AppendJournalFlush_UsesFormatOwnedWriter()
     {
         var storage = new CapturingStorage();
         var format = new TrackingJournalFormat();
@@ -199,7 +199,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_BinaryAppend_StoresBinaryVarUIntEntries()
+    public async Task StateManager_BinaryAppend_StoresBinaryVarUIntEntries()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -215,7 +215,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_AppendBufferIsBorrowedUntilStorageCompletes()
+    public async Task StateManager_AppendBufferIsBorrowedUntilStorageCompletes()
     {
         var storage = new DelayedBorrowingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -230,7 +230,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_ReplaceBufferIsBorrowedUntilStorageCompletes()
+    public async Task StateManager_ReplaceBufferIsBorrowedUntilStorageCompletes()
     {
         var storage = new DelayedBorrowingStorage { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
@@ -245,7 +245,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_BinarySnapshot_StoresBinaryVarUIntEntries()
+    public async Task StateManager_BinarySnapshot_StoresBinaryVarUIntEntries()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
@@ -261,7 +261,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_DeleteState_ReallocatesApplicationStreamsAboveInternalRange()
+    public async Task StateManager_DeleteState_ReallocatesApplicationStreamsAboveInternalRange()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -289,7 +289,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_DeleteState_ClearsDurableValueDirtyFlag()
+    public async Task StateManager_DeleteState_ClearsDurableValueDirtyFlag()
     {
         var storage = new CapturingStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -310,7 +310,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_SnapshotFlush_ResetsPendingAppendData()
+    public async Task StateManager_SnapshotFlush_ResetsPendingAppendData()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
         var format = new TrackingJournalFormat();
@@ -334,7 +334,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_DirectWriteFailure_AbortsEntryBeforeMutation()
+    public async Task StateManager_DirectWriteFailure_AbortsEntryBeforeMutation()
     {
         var storage = new CapturingStorage();
         var format = new TrackingJournalFormat();
@@ -354,7 +354,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_DirectWriteFailure_DoesNotPersistPartialEntry()
+    public async Task StateManager_DirectWriteFailure_DoesNotPersistPartialEntry()
     {
         var storage = new CapturingStorage();
         var format = new TrackingJournalFormat();
@@ -379,19 +379,19 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_WriteStateAsync_DoesNotObserveActiveEntry()
+    public async Task StateManager_WriteStateAsync_DoesNotObserveActiveEntry()
     {
         var storage = new CapturingStorage();
         var format = new TrackingJournalFormat();
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
-        var stateMachine = new ManualDirectWriteStateMachine();
-        sut.Manager.RegisterStateMachine("manual", stateMachine);
+        var state = new ManualDirectWriteState();
+        sut.Manager.RegisterState("manual", state);
 
         await sut.Lifecycle.OnStart();
 
         Task writeTask = Task.CompletedTask;
         using var writeStarted = new ManualResetEventSlim();
-        var entry = stateMachine.BeginEntry();
+        var entry = state.BeginEntry();
         try
         {
             entry.Writer.Write([1, 2, 3]);
@@ -405,32 +405,32 @@ public class StateMachineManagerTests : JournalingTestBase
             Assert.False(writeTask.IsCompleted);
             Assert.Empty(storage.Appends);
 
-            stateMachine.MarkEntryClosing();
+            state.MarkEntryClosing();
             entry.Commit();
         }
         finally
         {
-            stateMachine.MarkEntryClosing();
+            state.MarkEntryClosing();
             entry.Dispose();
         }
 
         await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.False(stateMachine.AppendEntriesObservedOpenEntry);
+        Assert.False(state.AppendEntriesObservedOpenEntry);
         Assert.Single(storage.Appends);
     }
 
     /// <summary>
-    /// Tests that all registered state machines are correctly recovered together.
+    /// Tests that all registered states are correctly recovered together.
     /// Verifies that the manager maintains consistency across multiple collections
     /// during recovery from persisted state.
     /// </summary>
     [Fact]
-    public async Task StateMachineManager_StateRecovery_Test()
+    public async Task StateManager_StateRecovery_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
 
-        // Create and populate state machines
+        // Create and populate states
         var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         var list = new DurableList<string>("list1", sut.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut.Lifecycle.OnStart();
@@ -459,7 +459,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_UsesSelectedJournalFormatRead()
+    public async Task StateManager_Recovery_UsesSelectedJournalFormatRead()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -480,7 +480,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_ReadsConcatenatedJournalData()
+    public async Task StateManager_Recovery_ReadsConcatenatedJournalData()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -503,7 +503,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_BuffersEntriesSplitAcrossStorageChunks()
+    public async Task StateManager_Recovery_BuffersEntriesSplitAcrossStorageChunks()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -527,7 +527,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_RejectsMalformedTrailingData()
+    public async Task StateManager_Recovery_RejectsMalformedTrailingData()
     {
         byte[] bytes;
         using (var segment = new OrleansBinaryJournalBatchWriter())
@@ -563,7 +563,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_RecoveryRetry_ReplaysFixedStorage()
+    public async Task StateManager_RecoveryRetry_ReplaysFixedStorage()
     {
         var validBytes = CreatePersistedValueBytes("value", 42);
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]);
@@ -581,7 +581,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_RecoveryRetry_PreservesUnknownStreamOnce()
+    public async Task StateManager_RecoveryRetry_PreservesUnknownStreamOnce()
     {
         var validBytes = CreateUnknownStreamBytes(new JournalStreamId(99), [1, 2, 3]);
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]) { IsCompactionRequested = true };
@@ -600,7 +600,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
+    public async Task StateManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
     {
         var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new JournalStreamId(8), [1, 2, 3]), 1, 2, 3]);
         var sut = CreateTestSystem(storage: storage);
@@ -611,12 +611,12 @@ public class StateMachineManagerTests : JournalingTestBase
         storage.Bytes = [];
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
-        Assert.False(sut.Manager.TryGetStateMachine("stale", out _));
+        Assert.False(sut.Manager.TryGetState("stale", out _));
         await sut.Lifecycle.OnStop(CancellationToken.None);
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_DoesNotWrapStorageReadException()
+    public async Task StateManager_Recovery_DoesNotWrapStorageReadException()
     {
         var storage = new ThrowingReadStorage();
         var sut = CreateTestSystem(storage: storage);
@@ -642,7 +642,7 @@ public class StateMachineManagerTests : JournalingTestBase
     /// and that the final state is correctly recovered.
     /// </summary>
     [Fact]
-    public async Task StateMachineManager_MultipleWriteStates_Test()
+    public async Task StateManager_MultipleWriteStates_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -680,24 +680,24 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     /// <summary>
-    /// Tests managing multiple state machines of different types simultaneously.
+    /// Tests managing multiple states of different types simultaneously.
     /// Verifies that the manager correctly handles diverse data structures
     /// (dictionaries with different key/value types, lists, values) in a single grain.
     /// </summary>
     [Fact]
-    public async Task StateMachineManager_MultipleStateMachines_Test()
+    public async Task StateManager_MultipleStates_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
 
-        // Create multiple state machines with different types
+        // Create multiple states with different types
         var intDict = new DurableDictionary<int, string>("intDict", manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         var stringList = new DurableList<string>("stringList", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         var personValue = new DurableValue<TestPerson>("personValue", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
-        // Act - Populate all state machines
+        // Act - Populate all states
         intDict.Add(1, "one");
         intDict.Add(2, "two");
 
@@ -719,7 +719,7 @@ public class StateMachineManagerTests : JournalingTestBase
         Assert.Equal(100, personValue.Value.Id);
         Assert.Equal("Test Person", personValue.Value.Name);
 
-        // Create new manager to verify recovery of multiple state machines
+        // Create new manager to verify recovery of multiple states
         var sut2 = CreateTestSystem(storage: sut.Storage);
         var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
@@ -739,11 +739,11 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     /// <summary>
-    /// Tests that multiple state machines can operate independently without interference.
-    /// Verifies namespace isolation between different state machines with similar keys.
+    /// Tests that multiple states can operate independently without interference.
+    /// Verifies namespace isolation between different states with similar keys.
     /// </summary>
     [Fact]
-    public async Task StateMachineManager_Concurrency_Test()
+    public async Task StateManager_Concurrency_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -752,7 +752,7 @@ public class StateMachineManagerTests : JournalingTestBase
         var dict2 = new DurableDictionary<string, int>("dict2", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
-        // Act - Simulate concurrent operations on different state machines
+        // Act - Simulate concurrent operations on different states
         dict1.Add("key1", 1);
         dict2.Add("key1", 100);
 
@@ -761,7 +761,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         await manager.WriteStateAsync(CancellationToken.None);
 
-        // Assert - Both state machines should have their correct values
+        // Assert - Both states should have their correct values
         Assert.Equal(2, dict1.Count);
         Assert.Equal(2, dict2.Count);
 
@@ -774,11 +774,11 @@ public class StateMachineManagerTests : JournalingTestBase
 
     /// <summary>
     /// Stress test for state recovery with large amounts of data.
-    /// Verifies that the journaling system can handle and recover state machines
+    /// Verifies that the journaling system can handle and recover states
     /// containing thousands of entries without data loss or corruption.
     /// </summary>
     [Fact]
-    public async Task StateMachineManager_LargeStateRecovery_Test()
+    public async Task StateManager_LargeStateRecovery_Test()
     {
         // Arrange
         var sut = CreateTestSystem();
@@ -808,11 +808,11 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     /// <summary>
-    /// Tests the full lifecycle of a retired state machine. It is preserved and also reintroduced through an
+    /// Tests the full lifecycle of a retired state. It is preserved and also reintroduced through an
     /// early compaction, but purged eventually after its grace period expires on later compactions.
     /// </summary>
     [Fact]
-    public async Task StateMachineManager_AutoRetiringStateMachines()
+    public async Task StateManager_AutoRetiringStates()
     {
         const string DictToKeepKey = "dictToKeep";
         const string DictToRetireKey = "dictToRetire";
@@ -826,8 +826,8 @@ public class StateMachineManagerTests : JournalingTestBase
         // We begin with 2 dictionaries, one of which we will retire by means of not registering it in the manager.
         // This would be in the real-world developers removing it from the grain's ctor as a dependency.
         var sut1 = CreateTestSystem(storage, timeProvider);
-        var dictToKeep1 = CreateTestMachine(DictToKeepKey, sut1.Manager);
-        var dictToRetire2 = CreateTestMachine(DictToRetireKey, sut1.Manager);
+        var dictToKeep1 = CreateTestState(DictToKeepKey, sut1.Manager);
+        var dictToRetire2 = CreateTestState(DictToRetireKey, sut1.Manager);
 
         await sut1.Lifecycle.OnStart();
 
@@ -840,7 +840,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         // This time, we only register the dictionary we want to keep, this marks dictToRetire as retired.
         var sut2 = CreateTestSystem(storage, timeProvider);
-        var dictToKeep2 = CreateTestMachine(DictToKeepKey, sut2.Manager);
+        var dictToKeep2 = CreateTestState(DictToKeepKey, sut2.Manager);
 
         await sut2.Lifecycle.OnStart();
         
@@ -857,8 +857,8 @@ public class StateMachineManagerTests : JournalingTestBase
 
         // Verify that the retired dictionary was NOT purged by this compaction, as only half the time has passed.
         var sut3 = CreateTestSystem(storage, timeProvider);
-        var dictToKeep3 = CreateTestMachine(DictToKeepKey, sut3.Manager);
-        var dictToRetire3 = CreateTestMachine(DictToRetireKey, sut3.Manager);
+        var dictToKeep3 = CreateTestState(DictToKeepKey, sut3.Manager);
+        var dictToRetire3 = CreateTestState(DictToRetireKey, sut3.Manager);
 
         await sut3.Lifecycle.OnStart();
 
@@ -875,7 +875,7 @@ public class StateMachineManagerTests : JournalingTestBase
         await TriggerCompaction(sut3.Manager, dictToKeep3);
 
         var sut3Recovered = CreateTestSystem(storage, timeProvider);
-        var dictToRetire3Recovered = CreateTestMachine(DictToRetireKey, sut3Recovered.Manager);
+        var dictToRetire3Recovered = CreateTestState(DictToRetireKey, sut3Recovered.Manager);
         await sut3Recovered.Lifecycle.OnStart();
         Assert.Equal(2, dictToRetire3Recovered["b"]);
 
@@ -884,7 +884,7 @@ public class StateMachineManagerTests : JournalingTestBase
         // Because of re-registration is step 3 (to test it was not purged), this means dictToRetire has been removed from the tracker.
         // Again as in step 2, we only register the dictionary we want to keep, this marks dictToRetire as retired.
         var sut4 = CreateTestSystem(storage, timeProvider);
-        var dictToKeep4 = CreateTestMachine(DictToKeepKey, sut4.Manager);
+        var dictToKeep4 = CreateTestState(DictToKeepKey, sut4.Manager);
 
         await sut4.Lifecycle.OnStart();
 
@@ -905,26 +905,26 @@ public class StateMachineManagerTests : JournalingTestBase
         // At this point, the manager has performed a snapshot, so it should have purged the dictToRetire data.
         // By registering both dictionaries again, we should see what state remains after the snapshot.
         var sut5 = CreateTestSystem(storage, timeProvider);
-        var dictToKeep5 = CreateTestMachine(DictToKeepKey, sut5.Manager);
-        var dictToRetire5 = CreateTestMachine(DictToRetireKey, sut5.Manager);
+        var dictToKeep5 = CreateTestState(DictToKeepKey, sut5.Manager);
+        var dictToRetire5 = CreateTestState(DictToRetireKey, sut5.Manager);
 
         await sut5.Lifecycle.OnStart();
         Assert.Equal(10, dictToKeep5["a"]);
 
         // The retired dictionary should now be empty because its state was purged during the compaction.
         // Note that this is a new version of dictToRetire, since the original was removed. Idea here is
-        // that if we can register a new dictToRetire (with the same key), it means that the machine itself
-        // has been removed but also the data, otherwise a previous machine would have had at least one
+        // that if we can register a new dictToRetire (with the same key), it means that the state itself
+        // has been removed but also the data, otherwise a previous state would have had at least one
         // entry i.e. ["b", 1].
 
         Assert.Empty(dictToRetire5);
 
-        // Note: The retirement of state machines has the nice benefit of being able to reuse machine names.
+        // Note: The retirement of states has the nice benefit of being able to reuse state names.
 
-        DurableDictionary<string, int> CreateTestMachine(string key, IStateMachineManager manager) =>
+        DurableDictionary<string, int> CreateTestState(string key, IStateManager manager) =>
             new(key, manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
 
-        static async Task TriggerCompaction(IStateMachineManager manager, DurableDictionary<string, int> dict)
+        static async Task TriggerCompaction(IStateManager manager, DurableDictionary<string, int> dict)
         {
             for (var i = 0; i < 11; i++)
             {
@@ -1033,31 +1033,31 @@ public class StateMachineManagerTests : JournalingTestBase
 
     private interface ITestJournalEntryCodec
     {
-        void Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine);
+        void Apply(ReadOnlySequence<byte> payload, IJournaledState state);
     }
 
-    private sealed class CapturingJournalEntrySink : IStateMachineResolver, IDurableStateMachine, ITestJournalEntryCodec, IOrleansBinaryJournalEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, ITestJournalEntryCodec, IOrleansBinaryJournalEntryCodec
     {
         private JournalStreamId _streamId;
 
         public List<CapturedJournalEntry> Entries { get; } = [];
 
-        object IDurableStateMachine.OperationCodec => this;
+        object IJournaledState.OperationCodec => this;
 
-        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
+        public IJournaledState ResolveState(JournalStreamId streamId)
         {
             _streamId = streamId;
             return this;
         }
 
-        void ITestJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
+        void ITestJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add(new(_streamId, payload.ToArray()));
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }
         public void AppendSnapshot(JournalStreamWriter writer) { }
-        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class DecodedPayloadOnlyJournalFormat : IJournalFormat
@@ -1080,7 +1080,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public IJournalBatchWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public void Read(JournalReadBuffer input, IStateMachineResolver resolver)
+        public void Read(JournalReadBuffer input, IStateResolver resolver)
         {
             if (input.Length == 0)
             {
@@ -1089,14 +1089,14 @@ public class StateMachineManagerTests : JournalingTestBase
 
             var callbackPayload = _payload.ToArray();
             var formattedEntry = new TestFormattedJournalEntry(callbackPayload);
-            var stateMachine = resolver.ResolveStateMachine(_streamId);
-            if (stateMachine is IFormattedJournalEntryBuffer formattedEntryBuffer)
+            var state = resolver.ResolveState(_streamId);
+            if (state is IFormattedJournalEntryBuffer formattedEntryBuffer)
             {
                 formattedEntryBuffer.AddFormattedEntry(formattedEntry);
             }
             else
             {
-                formattedEntry.Apply(stateMachine);
+                formattedEntry.Apply(state);
             }
 
             Array.Fill(callbackPayload, byte.MaxValue);
@@ -1108,20 +1108,20 @@ public class StateMachineManagerTests : JournalingTestBase
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
 
-        public void Apply(IDurableStateMachine stateMachine)
+        public void Apply(IJournaledState state)
         {
-            if (stateMachine is IDurableNothing)
+            if (state is IDurableNothing)
             {
                 return;
             }
 
-            if (stateMachine.OperationCodec is not ITestJournalEntryCodec codec)
+            if (state.OperationCodec is not ITestJournalEntryCodec codec)
             {
                 throw new InvalidOperationException(
-                    $"State machine '{stateMachine.GetType().FullName}' is not compatible with test journal entry codec.");
+                    $"State '{state.GetType().FullName}' is not compatible with test journal entry codec.");
             }
 
-            codec.Apply(new ReadOnlySequence<byte>(Payload), stateMachine);
+            codec.Apply(new ReadOnlySequence<byte>(Payload), state);
         }
     }
 
@@ -1133,7 +1133,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
 
-        public void Read(JournalReadBuffer input, IStateMachineResolver resolver)
+        public void Read(JournalReadBuffer input, IStateResolver resolver)
         {
         }
     }
@@ -1155,7 +1155,7 @@ public class StateMachineManagerTests : JournalingTestBase
             return writer;
         }
 
-        public void Read(JournalReadBuffer input, IStateMachineResolver consumer)
+        public void Read(JournalReadBuffer input, IStateResolver consumer)
         {
             ReadCount++;
             ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(input, consumer);
@@ -1447,7 +1447,7 @@ public class StateMachineManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class ManualDirectWriteStateMachine : IDurableStateMachine
+    private sealed class ManualDirectWriteState : IJournaledState
     {
         private JournalStreamWriter _writer;
         private bool _entryOpen;
@@ -1473,7 +1473,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public void AppendSnapshot(JournalStreamWriter writer) { }
 
-        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryOperationCodec<K, V> where K : notnull

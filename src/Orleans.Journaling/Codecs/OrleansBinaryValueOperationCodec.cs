@@ -13,7 +13,7 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteSet(T value, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(value, output));
+        JournalOperationWriter.Write(writer, output => WriteSetPayload(value, output));
 
     private void WriteSetPayload(T value, IBufferWriter<byte> output)
     {
@@ -40,8 +40,8 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
         }
     }
 
-    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
-        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableValueOperationHandler<T>>(stateMachine, this));
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
+        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableValueOperationHandler<T>>(state, this));
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
     {

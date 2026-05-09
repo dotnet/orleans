@@ -4,19 +4,19 @@ namespace Orleans.Journaling;
 
 internal interface IOrleansBinaryJournalEntryCodec
 {
-    void Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine);
+    void Apply(ReadOnlySequence<byte> input, IJournaledState state);
 }
 
 internal static class DurableOperationHandler
 {
-    public static THandler GetRequiredHandler<THandler>(IDurableStateMachine stateMachine, object codec)
+    public static THandler GetRequiredHandler<THandler>(IJournaledState state, object codec)
     {
-        if (stateMachine is THandler handler)
+        if (state is THandler handler)
         {
             return handler;
         }
 
         throw new InvalidOperationException(
-            $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{codec.GetType().FullName}'.");
+            $"State '{state.GetType().FullName}' is not compatible with codec '{codec.GetType().FullName}'.");
     }
 }

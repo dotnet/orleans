@@ -18,7 +18,7 @@ public abstract class JournalingTestBase
     protected readonly SerializerSessionPool SessionPool;
     protected readonly ICodecProvider CodecProvider;
     protected readonly ILoggerFactory LoggerFactory;
-    protected readonly StateMachineManagerOptions ManagerOptions = new();
+    protected readonly StateManagerOptions ManagerOptions = new();
 
     protected JournalingTestBase()
     {
@@ -44,19 +44,19 @@ public abstract class JournalingTestBase
     /// <summary>
     /// Creates a journal manager with in-memory storage
     /// </summary>
-    internal (IStateMachineManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle)
+    internal (IStateManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle)
         CreateTestSystem(IJournalStorage? storage = null, TimeProvider? provider = null, IJournalFormat? journalFormat = null, string? journalFormatKey = null)
     {
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
 
-        var logger = LoggerFactory.CreateLogger<JournalStateMachineManager>();
+        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
         var stringCodec = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
         var uint64Codec = new OrleansJournalValueCodec<ulong>(CodecProvider.GetCodec<ulong>(), SessionPool);
         var dateTimeCodec = new OrleansJournalValueCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
         var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager = new JournalStateMachineManager(storage, logger, Options.Create(ManagerOptions), journalStreamIdsCodec, retirementTrackerCodec, provider, journalFormat, journalFormatKey);
+        var manager = new JournaledStateManager(storage, logger, Options.Create(ManagerOptions), journalStreamIdsCodec, retirementTrackerCodec, provider, journalFormat, journalFormatKey);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

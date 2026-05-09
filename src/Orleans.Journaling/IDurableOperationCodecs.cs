@@ -334,7 +334,7 @@ public interface IDurableTaskCompletionSourceOperationHandler<T>
     void ApplyCanceled();
 }
 
-internal static class DurableOperationCodecWriter
+internal static class JournalOperationWriter
 {
     public static void Write(JournalStreamWriter writer, Action<JournalEntryWriter> write)
     {

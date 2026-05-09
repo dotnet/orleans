@@ -17,7 +17,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
 
     /// <inheritdoc/>
     public void WriteSet(TKey key, TValue value, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(key, value, output));
+        JournalOperationWriter.Write(writer, output => WriteSetPayload(key, value, output));
 
     private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
     {
@@ -29,7 +29,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
 
     /// <inheritdoc/>
     public void WriteRemove(TKey key, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteRemovePayload(key, output));
+        JournalOperationWriter.Write(writer, output => WriteRemovePayload(key, output));
 
     private void WriteRemovePayload(TKey key, IBufferWriter<byte> output)
     {
@@ -40,7 +40,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, WriteClearPayload);
+        JournalOperationWriter.Write(writer, WriteClearPayload);
 
     private static void WriteClearPayload(IBufferWriter<byte> output)
     {
@@ -50,7 +50,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+        JournalOperationWriter.Write(writer, output => WriteSnapshotPayload(items, output));
 
     private void WriteSnapshotPayload(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
@@ -96,8 +96,8 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
     }
 
-    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
-        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableDictionaryOperationHandler<TKey, TValue>>(stateMachine, this));
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
+        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableDictionaryOperationHandler<TKey, TValue>>(state, this));
 
     private void ApplySet(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {

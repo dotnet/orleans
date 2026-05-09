@@ -16,7 +16,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public IJournalBatchWriter CreateWriter() => new JsonLinesJournalBatchWriter();
 
-    public void Read(JournalReadBuffer input, IStateMachineResolver resolver)
+    public void Read(JournalReadBuffer input, IStateResolver resolver)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -25,7 +25,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         }
     }
 
-    private static bool TryReadLine(JournalReadBuffer input, IStateMachineResolver resolver)
+    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver)
     {
         if (input.Length == 0)
         {
@@ -66,7 +66,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateMachineResolver resolver)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver)
     {
         var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
         try
@@ -88,21 +88,21 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             var entry = new JsonOperationReader(ref reader);
             var stream = new JournalStreamId(streamId);
-            var stateMachine = resolver.ResolveStateMachine(stream);
-            if (stateMachine is IFormattedJournalEntryBuffer formattedEntryBuffer)
+            var state = resolver.ResolveState(stream);
+            if (state is IFormattedJournalEntryBuffer formattedEntryBuffer)
             {
                 var journalEntry = ParseJournalEntry(line, offset);
                 formattedEntryBuffer.AddFormattedEntry(JsonFormattedJournalEntry.Create(new JsonOperationEntry(journalEntry, offset: 1, journalEntry.GetArrayLength() - 1)));
                 return;
             }
 
-            if (stateMachine is IDurableNothing)
+            if (state is IDurableNothing)
             {
                 entry.SkipToEnd();
                 return;
             }
 
-            ApplyJsonEntry(stream, stateMachine, ref entry);
+            ApplyJsonEntry(stream, state, ref entry);
         }
         catch (JsonException exception)
         {
@@ -129,19 +129,19 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         }
     }
 
-    private static void ApplyJsonEntry(JournalStreamId streamId, IDurableStateMachine stateMachine, ref JsonOperationReader entry)
+    private static void ApplyJsonEntry(JournalStreamId streamId, IJournaledState state, ref JsonOperationReader entry)
     {
-        var operationCodec = stateMachine.OperationCodec;
+        var operationCodec = state.OperationCodec;
         if (operationCodec is not IJsonJournalEntryCodec jsonCodec)
         {
             entry.SkipToEnd();
             var codecType = operationCodec?.GetType().FullName ?? "<null>";
             throw new InvalidOperationException(
-                $"The JSON journal entry for stream {streamId.Value} resolved to state machine " +
-                $"'{stateMachine.GetType().FullName}', but its codec '{codecType}' does not implement IJsonJournalEntryCodec.");
+                $"The JSON journal entry for stream {streamId.Value} resolved to state " +
+                $"'{state.GetType().FullName}', but its codec '{codecType}' does not implement IJsonJournalEntryCodec.");
         }
 
-        jsonCodec.Apply(ref entry, stateMachine);
+        jsonCodec.Apply(ref entry, state);
     }
 
     private static bool EndsWith(ReadOnlySequence<byte> input, byte value)
@@ -326,25 +326,25 @@ internal abstract class JsonFormattedJournalEntry : IFormattedJournalEntry
 
     public abstract void WriteArrayElementsTo(Utf8JsonWriter writer);
 
-    public void Apply(IDurableStateMachine stateMachine)
+    public void Apply(IJournaledState state)
     {
-        ArgumentNullException.ThrowIfNull(stateMachine);
-        if (stateMachine is IDurableNothing)
+        ArgumentNullException.ThrowIfNull(state);
+        if (state is IDurableNothing)
         {
             return;
         }
 
-        var operationCodec = stateMachine.OperationCodec;
+        var operationCodec = state.OperationCodec;
         if (operationCodec is not IJsonJournalEntryCodec jsonCodec)
         {
             var codecType = operationCodec?.GetType().FullName ?? "<null>";
             throw new InvalidOperationException(
-                $"The JSON journal entry resolved to state machine '{stateMachine.GetType().FullName}', " +
+                $"The JSON journal entry resolved to state '{state.GetType().FullName}', " +
                 $"but its codec '{codecType}' does not implement IJsonJournalEntryCodec.");
         }
 
         var reader = new JsonOperationReader(new ReadOnlySequence<byte>(Payload));
-        jsonCodec.Apply(ref reader, stateMachine);
+        jsonCodec.Apply(ref reader, state);
     }
 
     private byte[] SerializePayload()

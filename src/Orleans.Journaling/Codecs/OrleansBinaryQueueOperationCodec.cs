@@ -16,7 +16,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteEnqueue(T item, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteEnqueuePayload(item, output));
+        JournalOperationWriter.Write(writer, output => WriteEnqueuePayload(item, output));
 
     private void WriteEnqueuePayload(T item, IBufferWriter<byte> output)
     {
@@ -27,7 +27,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteDequeue(JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, WriteDequeuePayload);
+        JournalOperationWriter.Write(writer, WriteDequeuePayload);
 
     private static void WriteDequeuePayload(IBufferWriter<byte> output)
     {
@@ -37,7 +37,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, WriteClearPayload);
+        JournalOperationWriter.Write(writer, WriteClearPayload);
 
     private static void WriteClearPayload(IBufferWriter<byte> output)
     {
@@ -47,7 +47,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+        JournalOperationWriter.Write(writer, output => WriteSnapshotPayload(items, output));
 
     private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
@@ -95,8 +95,8 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         }
     }
 
-    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
-        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableQueueOperationHandler<T>>(stateMachine, this));
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
+        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableQueueOperationHandler<T>>(state, this));
 
     private void ApplySnapshot(ref OrleansBinaryOperationReader reader, IDurableQueueOperationHandler<T> consumer)
     {

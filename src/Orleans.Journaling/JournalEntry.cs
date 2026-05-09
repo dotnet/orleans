@@ -3,7 +3,7 @@ using System.Diagnostics.CodeAnalysis;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Represents the lexical write scope for one state machine journal entry.
+/// Represents the lexical write scope for one state journal entry.
 /// </summary>
 /// <remarks>
 /// Call <see cref="Commit"/> after successfully writing the entry payload. If the scope is

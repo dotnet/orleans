@@ -9,7 +9,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournalStateMachineManager : IStateMachineManager, IStateMachineResolver, IJournalStreamWriterTarget, IJournalEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class JournaledStateManager : IStateManager, IStateResolver, IJournalStreamWriterTarget, IJournalEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationJournalStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -17,18 +17,18 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 #else
     private readonly object _lock = new();
 #endif
-    private readonly Dictionary<string, IDurableStateMachine> _stateMachines = new(StringComparer.Ordinal);
-    private readonly Dictionary<ulong, IDurableStateMachine> _stateMachinesMap = [];
+    private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
+    private readonly Dictionary<ulong, IJournaledState> _statesMap = [];
     private readonly IJournalStorage _storage;
     private readonly IJournalFormat _journalFormat;
     private readonly string _journalFormatKey;
-    private readonly ILogger<JournalStateMachineManager> _logger;
+    private readonly ILogger<JournaledStateManager> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
-    private readonly StateMachineDirectory _journalStreamDirectory;
-    private readonly RetiredStateMachineTracker _retirementTracker;
+    private readonly StateDirectory _journalStreamDirectory;
+    private readonly RetiredStateTracker _retirementTracker;
     private readonly TimeSpan _retirementGracePeriod;
     private Task? _workLoop;
     private ManagerState _state;
@@ -36,10 +36,10 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
     private ulong _nextJournalStreamId = MinApplicationJournalStreamId;
     private IJournalBatchWriter? _currentJournalBatchWriter;
 
-    public JournalStateMachineManager(
+    public JournaledStateManager(
         IJournalStorage storage,
-        ILogger<JournalStateMachineManager> logger,
-        IOptions<StateMachineManagerOptions> options,
+        ILogger<JournaledStateManager> logger,
+        IOptions<StateManagerOptions> options,
         TimeProvider timeProvider,
         IServiceProvider serviceProvider,
         [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey)
@@ -52,21 +52,21 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
-        // The list of known state machines is itself stored as a durable state machine with the implicit id 0.
-        // This allows us to recover the list of state machines ids without having to store it separately.
-        _journalStreamDirectory = new StateMachineDirectory(this, dictionaryCodecProvider.GetCodec<string, ulong>());
-        _stateMachinesMap[StateMachineDirectory.Id] = _journalStreamDirectory;
+        // The list of known states is itself stored as a durable state with the implicit id 0.
+        // This allows us to recover the list of states ids without having to store it separately.
+        _journalStreamDirectory = new StateDirectory(this, dictionaryCodecProvider.GetCodec<string, ulong>());
+        _statesMap[StateDirectory.Id] = _journalStreamDirectory;
 
-        // The retirement tracker is a special internal state machine with a fixed id.
+        // The retirement tracker is a special internal state with a fixed id.
         // It is not stored in _journalStreamDirectory and does not participate in the general name->id mapping.
-        _retirementTracker = new RetiredStateMachineTracker(this, dictionaryCodecProvider.GetCodec<string, DateTime>());
-        _stateMachinesMap[RetiredStateMachineTracker.Id] = _retirementTracker;
+        _retirementTracker = new RetiredStateTracker(this, dictionaryCodecProvider.GetCodec<string, DateTime>());
+        _statesMap[RetiredStateTracker.Id] = _retirementTracker;
     }
 
-    internal JournalStateMachineManager(
+    internal JournaledStateManager(
         IJournalStorage storage,
-        ILogger<JournalStateMachineManager> logger,
-        IOptions<StateMachineManagerOptions> options,
+        ILogger<JournaledStateManager> logger,
+        IOptions<StateManagerOptions> options,
         IDurableDictionaryOperationCodec<string, ulong> journalStreamIdsCodec,
         IDurableDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
         TimeProvider timeProvider,
@@ -80,50 +80,50 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
-        _journalStreamDirectory = new StateMachineDirectory(this, journalStreamIdsCodec);
-        _stateMachinesMap[StateMachineDirectory.Id] = _journalStreamDirectory;
+        _journalStreamDirectory = new StateDirectory(this, journalStreamIdsCodec);
+        _statesMap[StateDirectory.Id] = _journalStreamDirectory;
 
-        _retirementTracker = new RetiredStateMachineTracker(this, retirementTrackerCodec);
-        _stateMachinesMap[RetiredStateMachineTracker.Id] = _retirementTracker;
+        _retirementTracker = new RetiredStateTracker(this, retirementTrackerCodec);
+        _statesMap[RetiredStateTracker.Id] = _retirementTracker;
     }
 
-    public void RegisterStateMachine(string name, IDurableStateMachine stateMachine)
+    public void RegisterState(string name, IJournaledState state)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(name);
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
         lock (_lock)
         {
-            if (_stateMachines.TryGetValue(name, out var machine))
+            if (_states.TryGetValue(name, out var existing))
             {
-                if (machine is RetiredStateMachine vessel)
+                if (existing is RetiredState vessel)
                 {
-                    // If the existing machine is a vessel for a retired one, it means the machine was loaded from a previous
-                    // journal during recovery but has not been re-registered. We effectively are "staging" the resurrection of the machine.
+                    // If the existing state is a vessel for a retired one, it means the state was loaded from a previous
+                    // journal during recovery but has not been re-registered. We effectively are "staging" the resurrection of the state.
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
-                    // We also make sure to apply any buffered data that could have occured while the vessel took this machine's place.
-                    stateMachine.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
+                    // We also make sure to apply any buffered data that could have occured while the vessel took this state's place.
+                    state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
                     foreach (var entry in vessel.FormattedEntries)
                     {
-                        entry.Apply(stateMachine);
+                        entry.Apply(state);
                     }
 
                     var id = _journalStreamDirectory[name];
-                    _stateMachines[name] = stateMachine;
-                    _stateMachinesMap[id] = stateMachine;
+                    _states[name] = state;
+                    _statesMap[id] = state;
                 }
                 else
                 {
-                    // A real state machine is already registered with this name, this must be a developer error.
-                    throw new ArgumentException($"A state machine with the key '{name}' has already been registered.");
+                    // A real state is already registered with this name, this must be a developer error.
+                    throw new ArgumentException($"A state with the key '{name}' has already been registered.");
                 }
             }
             else
             {
-                _stateMachines.Add(name, stateMachine);
+                _states.Add(name, state);
             }
 
-            _workQueue.Enqueue(new WorkItem(WorkItemType.RegisterStateMachine, completion: null)
+            _workQueue.Enqueue(new WorkItem(WorkItemType.RegisterState, completion: null)
             {
                 Context = name
             });
@@ -160,7 +160,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
     private async Task WorkLoop()
     {
         var cancellationToken = _shutdownCancellation.Token;
-        using var cancellationRegistration = cancellationToken.Register(state => ((JournalStateMachineManager)state!)._workSignal.Signal(), this);
+        using var cancellationRegistration = cancellationToken.Register(state => ((JournaledStateManager)state!)._workSignal.Signal(), this);
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var needsRecovery = true;
         while (true)
@@ -190,7 +190,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
                     try
                     {
-                        // Note that the implementation of each command is inlined to avoid allocating unnecessary async state machines.
+                        // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         if (workItem.Type is WorkItemType.AppendJournal or WorkItemType.WriteSnapshot)
                         {
@@ -210,25 +210,25 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
                                     if (_retirementTracker.Count > 0)
                                     {
-                                        RetireOrResurectStateMachines();
+                                        RetireOrResurectStates();
                                     }
                                 }
 
                                 var currentJournalBatchWriter = GetOrCreateCurrentJournalBatchWriter();
 
-                                // The map of state machine ids is itself stored as a durable state machine with the id 0.
-                                // This must be stored first, since it includes the identities of all other state machines, which are needed when replaying the journal.
-                                // If we removed retired machines, this snapshot will persist that change.
-                                AppendUpdatesOrSnapshotStateMachine(currentJournalBatchWriter, isSnapshot, StateMachineDirectory.Id, _journalStreamDirectory);
+                                // The map of state ids is itself stored as a durable state with the id 0.
+                                // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
+                                // If we removed retired states, this snapshot will persist that change.
+                                AppendUpdatesOrSnapshotState(currentJournalBatchWriter, isSnapshot, StateDirectory.Id, _journalStreamDirectory);
 
-                                foreach (var (id, stateMachine) in _stateMachinesMap)
+                                foreach (var (id, state) in _statesMap)
                                 {
-                                    if (id is 0 || stateMachine is null)
+                                    if (id is 0 || state is null)
                                     {
                                         continue;
                                     }
 
-                                    AppendUpdatesOrSnapshotStateMachine(currentJournalBatchWriter, isSnapshot, id, stateMachine);
+                                    AppendUpdatesOrSnapshotState(currentJournalBatchWriter, isSnapshot, id, state);
                                 }
 
                                 committedBuffer = currentJournalBatchWriter.GetCommittedBuffer();
@@ -269,7 +269,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
                                     }
                                 }
 
-                                // Notify all state machines that the operation completed.
+                                // Notify all states that the operation completed.
                                 lock (_lock)
                                 {
                                     if (_currentJournalBatchWriter is null)
@@ -282,9 +282,9 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
                                         journalBatchWriter.Dispose();
                                     }
 
-                                    foreach (var stateMachine in _stateMachines.Values)
+                                    foreach (var state in _states.Values)
                                     {
-                                        stateMachine.OnWriteCompleted();
+                                        state.OnWriteCompleted();
                                     }
                                 }
                             }
@@ -296,13 +296,13 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
                             lock (_lock)
                             {
-                                // Reset the state machine id collection.
+                                // Reset the state id collection.
                                 _journalStreamDirectory.ResetVolatileState();
 
-                                // Allocate new state machine ids for each state machine.
-                                // Doing so will trigger a reset, since _journalStreamDirectory will bind the state machine in question.
+                                // Allocate new state ids for each state.
+                                // Doing so will trigger a reset, since _journalStreamDirectory will bind the state in question.
                                 _nextJournalStreamId = MinApplicationJournalStreamId;
-                                foreach (var (name, stateMachine) in _stateMachines)
+                                foreach (var (name, state) in _states)
                                 {
                                     var id = _nextJournalStreamId++;
                                     _journalStreamDirectory.Set(name, id);
@@ -316,19 +316,19 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
                                 _state = ManagerState.Ready;
                             }
                         }
-                        else if (workItem.Type is WorkItemType.RegisterStateMachine)
+                        else if (workItem.Type is WorkItemType.RegisterState)
                         {
                             lock (_lock)
                             {
                                 if (_state is not ManagerState.Unknown)
                                 {
-                                    throw new NotSupportedException("Registering a state machine after activation is not supported.");
+                                    throw new NotSupportedException("Registering a state after activation is not supported.");
                                 }
 
                                 var name = (string)workItem.Context!;
                                 if (!_journalStreamDirectory.ContainsKey(name))
                                 {
-                                    // Doing so will trigger a reset, since _journalStreamDirectory will bind the state machine in question.
+                                    // Doing so will trigger a reset, since _journalStreamDirectory will bind the state in question.
                                     _journalStreamDirectory.Set(name, _nextJournalStreamId++);
                                 }
                             }
@@ -372,32 +372,32 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         }
     }
 
-    private void RetireOrResurectStateMachines()
+    private void RetireOrResurectStates()
     {
         foreach (var (name, timestamp) in _retirementTracker)
         {
             var isDuetime = _timeProvider.GetUtcNow().UtcDateTime - timestamp >= _retirementGracePeriod;
             if (isDuetime && _journalStreamDirectory.TryGetValue(name, out var id))
             {
-                var stateMachine = _stateMachines[name];
+                var state = _states[name];
 
-                Debug.Assert(stateMachine is not null);
+                Debug.Assert(state is not null);
 
-                if (stateMachine is RetiredStateMachine)
+                if (state is RetiredState)
                 {
-                    LogRemovingRetiredStateMachine(_logger, name);
+                    LogRemovingRetiredState(_logger, name);
 
-                    // Since we are permanently removing this state machine, we will clean it up by reseting it.
-                    stateMachine.Reset(CreateJournalStreamWriter(new(id)));
+                    // Since we are permanently removing this state, we will clean it up by reseting it.
+                    state.Reset(CreateJournalStreamWriter(new(id)));
 
-                    _stateMachinesMap.Remove(id);
+                    _statesMap.Remove(id);
                     // We remove these from memory only, since the snapshot will persist these changes.
                     _journalStreamDirectory.ApplyRemove(name);
                     _retirementTracker.ApplyRemove(name);
                 }
                 else
                 {
-                    LogRetiredStateMachineComebackDetected(_logger, name);
+                    LogRetiredStateComebackDetected(_logger, name);
                     // We remove the tracker from memory only, since the snapshot will persist the change.
                     _retirementTracker.ApplyRemove(name);
                 }
@@ -409,16 +409,16 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
 
-    private static void AppendUpdatesOrSnapshotStateMachine(IJournalBatchWriter journalBatchWriter, bool isSnapshot, ulong id, IDurableStateMachine stateMachine)
+    private static void AppendUpdatesOrSnapshotState(IJournalBatchWriter journalBatchWriter, bool isSnapshot, ulong id, IJournaledState state)
     {
         var writer = journalBatchWriter.CreateJournalStreamWriter(new(id));
         if (isSnapshot)
         {
-            stateMachine.AppendSnapshot(writer);
+            state.AppendSnapshot(writer);
         }
         else
         {
-            stateMachine.AppendEntries(writer);
+            state.AppendEntries(writer);
         }
     }
 
@@ -448,16 +448,16 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
         lock (_lock)
         {
-            foreach ((var name, var stateMachine) in _stateMachines)
+            foreach ((var name, var state) in _states)
             {
-                stateMachine.OnRecoveryCompleted();
+                state.OnRecoveryCompleted();
 
-                if (stateMachine is RetiredStateMachine)
+                if (state is RetiredState)
                 {
                     // We can use TryAdd since recovery has finished.
                     if (_retirementTracker.TryAdd(name, _timeProvider.GetUtcNow().UtcDateTime))
                     {
-                        LogRetiredStateMachineDetected(_logger, name);
+                        LogRetiredStateDetected(_logger, name);
                     }
                 }
             }
@@ -467,15 +467,15 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
     private void ResetForRecovery()
     {
         _currentJournalBatchWriter?.Reset();
-        _stateMachinesMap.Clear();
-        _stateMachinesMap[StateMachineDirectory.Id] = _journalStreamDirectory;
-        _stateMachinesMap[RetiredStateMachineTracker.Id] = _retirementTracker;
+        _statesMap.Clear();
+        _statesMap[StateDirectory.Id] = _journalStreamDirectory;
+        _statesMap[RetiredStateTracker.Id] = _retirementTracker;
         _nextJournalStreamId = MinApplicationJournalStreamId;
 
         List<string>? retiredNames = null;
-        foreach (var (name, stateMachine) in _stateMachines)
+        foreach (var (name, state) in _states)
         {
-            if (stateMachine is RetiredStateMachine)
+            if (state is RetiredState)
             {
                 (retiredNames ??= []).Add(name);
             }
@@ -485,7 +485,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         {
             foreach (var name in retiredNames)
             {
-                _stateMachines.Remove(name);
+                _states.Remove(name);
             }
         }
 
@@ -493,15 +493,15 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         _retirementTracker.ResetVolatileState();
     }
 
-    IDurableStateMachine IStateMachineResolver.ResolveStateMachine(JournalStreamId streamId)
+    IJournaledState IStateResolver.ResolveState(JournalStreamId streamId)
     {
-        if (!_stateMachinesMap.TryGetValue(streamId.Value, out var stateMachine))
+        if (!_statesMap.TryGetValue(streamId.Value, out var state))
         {
-            stateMachine = new RetiredStateMachine(streamId);
-            _stateMachinesMap[streamId.Value] = stateMachine;
+            state = new RetiredState(streamId);
+            _statesMap[streamId.Value] = state;
         }
 
-        return stateMachine;
+        return state;
     }
 
     private void ProcessRecoveryBuffer(JournalReadBuffer buffer)
@@ -572,7 +572,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         }
     }
 
-    private void BindStateMachine(string name, ulong id)
+    private void BindState(string name, ulong id)
     {
         lock (_lock)
         {
@@ -581,25 +581,25 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
                 _nextJournalStreamId = id + 1;
             }
 
-            if (_stateMachines.TryGetValue(name, out var stateMachine))
+            if (_states.TryGetValue(name, out var state))
             {
-                _stateMachinesMap[id] = stateMachine;
-                stateMachine.Reset(CreateJournalStreamWriter(new(id)));
+                _statesMap[id] = state;
+                state.Reset(CreateJournalStreamWriter(new(id)));
             }
             else
             {
-                var vessel = new RetiredStateMachine(new(id));
+                var vessel = new RetiredState(new(id));
 
                 // We must not make the vessel self-register with the manager, since it will
                 // result in a late-registration after the manager is 'ready'. Instead we add it inline here.
 
-                _stateMachines.Add(name, vessel);
-                _stateMachinesMap[id] = vessel;
+                _states.Add(name, vessel);
+                _statesMap[id] = vessel;
             }
         }
     }
 
-    public bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine? stateMachine) => _stateMachines.TryGetValue(name, out stateMachine);
+    public bool TryGetState(string name, [NotNullWhen(true)] out IJournaledState? state) => _states.TryGetValue(name, out state);
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
@@ -697,7 +697,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         AppendJournal,
         WriteSnapshot,
         DeleteState,
-        RegisterStateMachine
+        RegisterState
     }
 
     private enum ManagerState
@@ -706,25 +706,25 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         Ready
     }
 
-    private sealed class RecoveryJournalStorageConsumer(JournalStateMachineManager manager) : IJournalStorageConsumer
+    private sealed class RecoveryJournalStorageConsumer(JournaledStateManager manager) : IJournalStorageConsumer
     {
         public void Consume(JournalReadBuffer buffer) => manager.ProcessRecoveryBuffer(buffer);
     }
 
-    private sealed class StateMachineDirectory(
-        JournalStateMachineManager manager,
-        IDurableDictionaryOperationCodec<string, ulong> codec) : IDurableStateMachine, IDurableDictionaryOperationHandler<string, ulong>
+    private sealed class StateDirectory(
+        JournaledStateManager manager,
+        IDurableDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDurableDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
-        private readonly JournalStateMachineManager _manager = manager;
+        private readonly JournaledStateManager _manager = manager;
         private readonly IDurableDictionaryOperationCodec<string, ulong> _codec = codec;
         private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
         private JournalStreamWriter _storage;
 
         public ulong this[string name] => _ids[name];
 
-        object IDurableStateMachine.OperationCodec => _codec;
+        object IJournaledState.OperationCodec => _codec;
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
@@ -738,19 +738,19 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
         public bool ApplyRemove(string name) => _ids.Remove(name);
 
-        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_manager.CreateJournalStreamWriter(new(Id)));
+        public void ResetVolatileState() => ((IJournaledState)this).Reset(_manager.CreateJournalStreamWriter(new(Id)));
 
-        void IDurableStateMachine.Reset(JournalStreamWriter writer)
+        void IJournaledState.Reset(JournalStreamWriter writer)
         {
             _ids.Clear();
             _storage = writer;
         }
 
-        void IDurableStateMachine.AppendEntries(JournalStreamWriter writer) { }
+        void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
 
-        void IDurableStateMachine.AppendSnapshot(JournalStreamWriter writer) => _codec.WriteSnapshot(_ids, writer);
+        void IJournaledState.AppendSnapshot(JournalStreamWriter writer) => _codec.WriteSnapshot(_ids, writer);
 
-        IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
+        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
         void IDurableDictionaryOperationHandler<string, ulong>.ApplySet(string key, ulong value) => ApplySet(key, value);
 
@@ -767,7 +767,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
         private void ApplySet(string name, ulong id)
         {
             _ids[name] = id;
-            _manager.BindStateMachine(name, id);
+            _manager.BindState(name, id);
         }
 
         private JournalStreamWriter GetStorage()
@@ -778,28 +778,28 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
     }
 
     /// <summary>
-    /// Used to track state machines that are not registered via user-code anymore, until time-based purging has elapsed.
+    /// Used to track states that are not registered via user-code anymore, until time-based purging has elapsed.
     /// </summary>
-    /// <remarks>Resurrecting of retired machines is supported.</remarks>
-    private sealed class RetiredStateMachineTracker(
-        JournalStateMachineManager manager, IDurableDictionaryOperationCodec<string, DateTime> codec)
+    /// <remarks>Resurrecting of retired states is supported.</remarks>
+    private sealed class RetiredStateTracker(
+        JournaledStateManager manager, IDurableDictionaryOperationCodec<string, DateTime> codec)
             : DurableDictionary<string, DateTime>(codec)
     {
         public const int Id = 1;
 
         private readonly JournalStreamWriter _journalWriter = manager.CreateJournalStreamWriter(new(Id));
 
-        public void ResetVolatileState() => ((IDurableStateMachine)this).Reset(_journalWriter);
+        public void ResetVolatileState() => ((IJournaledState)this).Reset(_journalWriter);
 
         protected override JournalStreamWriter GetStorage() => _journalWriter;
     }
 
     /// <summary>
-    /// Used to keep retired machines into a purgatory state until time-based purging or if a comeback occurs.
+    /// Used to keep retired states into a purgatory state until time-based purging or if a comeback occurs.
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
-    [DebuggerDisplay("RetiredStateMachine Id = {StreamId.Value}")]
-    private sealed class RetiredStateMachine(JournalStreamId streamId) : IDurableStateMachine, IFormattedJournalEntryBuffer
+    [DebuggerDisplay("RetiredState Id = {StreamId.Value}")]
+    private sealed class RetiredState(JournalStreamId streamId) : IJournaledState, IFormattedJournalEntryBuffer
     {
         private static readonly object NoOpCodec = new();
         private readonly List<IFormattedJournalEntry> _formattedEntries = [];
@@ -808,7 +808,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
         public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
 
-        object IDurableStateMachine.OperationCodec => NoOpCodec;
+        object IJournaledState.OperationCodec => NoOpCodec;
 
         public void AddFormattedEntry(IFormattedJournalEntry entry)
         {
@@ -816,7 +816,7 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
             _formattedEntries.Add(entry);
         }
 
-        void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter)
+        void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
         {
             foreach (var entry in _formattedEntries)
             {
@@ -824,9 +824,9 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
             }
         }
 
-        void IDurableStateMachine.Reset(JournalStreamWriter writer) => _formattedEntries.Clear();
-        void IDurableStateMachine.AppendEntries(JournalStreamWriter writer) { }
-        IDurableStateMachine IDurableStateMachine.DeepCopy() => throw new NotSupportedException();
+        void IJournaledState.Reset(JournalStreamWriter writer) => _formattedEntries.Clear();
+        void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
+        IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
     }
 
     [LoggerMessage(
@@ -836,17 +836,17 @@ internal sealed partial class JournalStateMachineManager : IStateMachineManager,
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "State machine \"{Name}\" was not found. I have substituted a placeholder for graceful time-based retirement.")]
-    private static partial void LogRetiredStateMachineDetected(ILogger logger, string name);
+        Message = "State \"{Name}\" was not found. I have substituted a placeholder for graceful time-based retirement.")]
+    private static partial void LogRetiredStateDetected(ILogger logger, string name);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "State machine \"{Name}\" was previously retired (but not removed), and has hence been re-introduced. " +
+        Message = "State \"{Name}\" was previously retired (but not removed), and has hence been re-introduced. " +
                   "There is still time left before its permanent removal, so I will resurrect it.")]
-    private static partial void LogRetiredStateMachineComebackDetected(ILogger logger, string name);
+    private static partial void LogRetiredStateComebackDetected(ILogger logger, string name);
 
     [LoggerMessage(
         Level = LogLevel.Information,
-        Message = "Removing retired state machine \"{Name}\" and its data. Operation will be durably persisted shortly after compaction has finalized.")]
-    private static partial void LogRemovingRetiredStateMachine(ILogger logger, string name);
+        Message = "Removing retired state \"{Name}\" and its data. Operation will be durably persisted shortly after compaction has finalized.")]
+    private static partial void LogRemovingRetiredState(ILogger logger, string name);
 }

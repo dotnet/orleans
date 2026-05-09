@@ -1,7 +1,7 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Writes journal entries for one state machine into the current journal batch.
+/// Writes journal entries for one state into the current journal batch.
 /// </summary>
 /// <remarks>
 /// This type does not write to storage directly. Entries are buffered by the owning
@@ -19,7 +19,7 @@ public readonly struct JournalStreamWriter
     }
 
     /// <summary>
-    /// Begins writing one journal entry for this writer's state machine.
+    /// Begins writing one journal entry for this writer's state.
     /// </summary>
     /// <returns>A lexical entry scope. Dispose the returned value to abort the entry if <see cref="JournalEntry.Commit"/> is not called.</returns>
     public JournalEntry BeginEntry() => BeginEntry(completion: null);
@@ -31,7 +31,7 @@ public readonly struct JournalStreamWriter
     internal JournalEntryWriter BeginEntryWriter(IJournalEntryWriterCompletion? completion) => GetTarget().BeginEntry(_id, completion);
 
     /// <summary>
-    /// Appends a format-owned entry for retired or unknown state-machine preservation.
+    /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>
     /// <param name="entry">The format-owned entry.</param>
     internal void AppendFormattedEntry(IFormattedJournalEntry entry) => GetTarget().AppendFormattedEntry(_id, entry);
@@ -47,7 +47,7 @@ public readonly struct JournalStreamWriter
     {
         if (_target is null)
         {
-            throw new InvalidOperationException("The state machine journal stream writer is not initialized.");
+            throw new InvalidOperationException("The state journal stream writer is not initialized.");
         }
 
         return _target;

@@ -11,10 +11,10 @@ public interface IFormattedJournalEntry
     ReadOnlyMemory<byte> Payload { get; }
 
     /// <summary>
-    /// Applies this entry to <paramref name="stateMachine"/>.
+    /// Applies this entry to <paramref name="state"/>.
     /// </summary>
-    /// <param name="stateMachine">The target state machine.</param>
-    void Apply(IDurableStateMachine stateMachine);
+    /// <param name="state">The target state.</param>
+    void Apply(IJournaledState state);
 }
 
 /// <summary>

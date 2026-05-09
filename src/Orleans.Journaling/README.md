@@ -1,9 +1,9 @@
 # Microsoft Orleans Journaling
 
 ## Introduction
-Microsoft Orleans Journaling persists durable state machine changes as ordered journal data which can be replayed to recover in-memory durable collections and values.
+Microsoft Orleans Journaling persists durable state changes as ordered journal data which can be replayed to recover in-memory durable collections and values.
 
-The package includes a JSON Lines-based storage format powered by System.Text.Json and uses it by default. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: Microsoft.Orleans.Journaling supplies the journal format and durable-entry codec providers which durable state machines use to encode and recover their own operations.
+The package includes a JSON Lines-based storage format powered by System.Text.Json and uses it by default. Pair it with a Journaling storage provider such as Microsoft.Orleans.Journaling.AzureStorage. The storage provider remains independent of the serialization format: Microsoft.Orleans.Journaling supplies the journal format and durable-entry codec providers which durable states use to encode and recover their own operations.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -53,7 +53,7 @@ siloBuilder
 
 JSON Lines is the default format key for built-in Journaling storage providers. If a provider is configured to use a different format, configure it to use `JsonJournalExtensions.JournalFormatKey` and call `UseJsonJournalFormat(...)` after registering that provider.
 
-## Example - Using durable state machines
+## Example - Using durable states
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Journaling;
@@ -78,7 +78,7 @@ public sealed class ShoppingCartGrain(
 }
 ```
 
-All durable state machine types use the configured JSON codec automatically. `JsonJournalOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
+All durable state types use the configured JSON codec automatically. `JsonJournalOptions` exposes the `JsonSerializerOptions` instance used for entry payloads. Journaling command names and record shape are fixed by the storage format, so serializer naming policies only affect user payload values.
 
 For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `SerializerOptions.TypeInfoResolverChain`, or `JsonJournalOptions.AddTypeInfoResolver(...)` with source-generated metadata for every journaled key, value, and state type. The `UseJsonJournalFormat(JournalJsonContext.Default)` overload is the recommended low-friction path. If metadata is unavailable, the JSON durable entry codecs fail with a configuration error instead of falling back to reflection-based serialization.
 
@@ -86,7 +86,7 @@ For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `Se
 
 The JSON journaling format stores journal entries as true JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON array per journal entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings. Storage providers which use format metadata should write JSON journals with the `.jsonl` file extension and `application/jsonl` MIME type.
 
-Each record contains the state machine id as element 0, followed by the durable operation payload:
+Each record contains the state id as element 0, followed by the durable operation payload:
 
 ```json
 [8,"set","alpha",1]

@@ -152,7 +152,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         _appendOptions.Conditions.IfMatch = createResult.Value.ETag;
         _appendOptions.Conditions.IfNoneMatch = default;
 
-        // Write the state machine snapshot.
+        // Write the state snapshot.
         using var stream = new ReadOnlySequenceStream(value);
         var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
         LogReplace(_logger, _client.BlobContainerName, _client.Name, stream.Length);

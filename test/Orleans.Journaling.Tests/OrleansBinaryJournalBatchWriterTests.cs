@@ -68,7 +68,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     }
 
     [Fact]
-    public void BinaryFormat_Read_BuffersFormattedEntriesForRetiredStateMachines()
+    public void BinaryFormat_Read_BuffersFormattedEntriesForRetiredStates()
     {
         using var buffer = new OrleansBinaryJournalBatchWriter();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [0xAA, 0xBB]);
@@ -316,10 +316,10 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [InlineData(new byte[] { 0x02 }, "truncated varuint32 entry length prefix")]
     [InlineData(new byte[] { 0x01 }, "zero-length entries")]
     [InlineData(new byte[] { 0x0B, 1, 2 }, "exceeds remaining input bytes")]
-    [InlineData(new byte[] { 0x03, 0x00 }, "truncated varuint64 state-machine id")]
+    [InlineData(new byte[] { 0x03, 0x00 }, "truncated varuint64 state id")]
     [InlineData(
         new byte[] { 0x05, 0x00, 0x00 },
-        "malformed varuint64 state-machine id")]
+        "malformed varuint64 state id")]
     public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
         using var data = CreateWriter(bytes);
@@ -371,7 +371,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         return writer;
     }
 
-    private static void ReadAll(ArcBuffer data, IStateMachineResolver consumer)
+    private static void ReadAll(ArcBuffer data, IStateResolver consumer)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
@@ -392,29 +392,29 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         return (length, streamId, payload);
     }
 
-    private sealed class CollectingConsumer : IStateMachineResolver, IDurableStateMachine, IOrleansBinaryJournalEntryCodec
+    private sealed class CollectingConsumer : IStateResolver, IJournaledState, IOrleansBinaryJournalEntryCodec
     {
         private JournalStreamId _streamId;
 
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        object IDurableStateMachine.OperationCodec => this;
+        object IJournaledState.OperationCodec => this;
 
-        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
+        public IJournaledState ResolveState(JournalStreamId streamId)
         {
             _streamId = streamId;
             return this;
         }
 
-        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add((_streamId.Value, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add((_streamId.Value, payload.ToArray()));
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }
         public void AppendSnapshot(JournalStreamWriter writer) { }
-        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class BufferingConsumer : IStateMachineResolver, IDurableStateMachine, IFormattedJournalEntryBuffer
+    private sealed class BufferingConsumer : IStateResolver, IJournaledState, IFormattedJournalEntryBuffer
     {
         private readonly List<IFormattedJournalEntry> _formattedEntries = [];
         private JournalStreamId _streamId;
@@ -423,9 +423,9 @@ public sealed class OrleansBinaryJournalBatchWriterTests
 
         public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
 
-        object IDurableStateMachine.OperationCodec => this;
+        object IJournaledState.OperationCodec => this;
 
-        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
+        public IJournaledState ResolveState(JournalStreamId streamId)
         {
             _streamId = streamId;
             return this;
@@ -447,13 +447,13 @@ public sealed class OrleansBinaryJournalBatchWriterTests
             }
         }
 
-        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class TestFormattedJournalEntry : IFormattedJournalEntry
     {
         public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
 
-        public void Apply(IDurableStateMachine stateMachine) => throw new NotSupportedException();
+        public void Apply(IJournaledState state) => throw new NotSupportedException();
     }
 }

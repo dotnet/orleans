@@ -9,10 +9,10 @@ public static class HostingExtensions
 {
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
-        builder.Services.AddOptions<StateMachineManagerOptions>();
+        builder.Services.AddOptions<StateManagerOptions>();
         builder.Services.TryAddKeyedScoped<string>(JournalFormatServices.JournalFormatKeyServiceKey, static (sp, _) => GetJournalFormatKey(sp));
         builder.Services.TryAddScoped<IJournalStorage>(sp => sp.GetRequiredService<IJournalStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
-        builder.Services.TryAddScoped<IStateMachineManager, JournalStateMachineManager>();
+        builder.Services.TryAddScoped<IStateManager, JournaledStateManager>();
 
         // Register the default data codec (Orleans IFieldCodec adapter).
         builder.Services.TryAddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));

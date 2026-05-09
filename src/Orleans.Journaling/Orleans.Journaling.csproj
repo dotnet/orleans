@@ -3,8 +3,8 @@
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Journaling</PackageId>
     <Title>Microsoft Orleans Journaling</Title>
-    <Description>Extensible persistence for grains based on replicated state machines, including a default System.Text.Json journal format.</Description>
-    <PackageTags>$(PackageTags) Persistence State Machines JSON</PackageTags>
+    <Description>Extensible persistence for grains based on replicated states, including a default System.Text.Json journal format.</Description>
+    <PackageTags>$(PackageTags) Persistence States JSON</PackageTags>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <Nullable>enable</Nullable>

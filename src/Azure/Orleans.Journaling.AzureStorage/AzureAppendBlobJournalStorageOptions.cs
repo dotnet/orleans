@@ -8,7 +8,7 @@ using Orleans.Runtime;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Options for configuring the Azure Append Blob state machine storage provider.
+/// Options for configuring the Azure Append Blob state storage provider.
 /// </summary>
 public sealed class AzureAppendBlobJournalStorageOptions
 {
@@ -16,7 +16,7 @@ public sealed class AzureAppendBlobJournalStorageOptions
     private BlobServiceClient? _blobServiceClient;
 
     /// <summary>
-    /// Container name where state machine state is stored.
+    /// Container name where state state is stored.
     /// </summary>
     public string ContainerName { get; set; } = DEFAULT_CONTAINER_NAME;
     public const string DEFAULT_CONTAINER_NAME = "state";
@@ -29,7 +29,7 @@ public sealed class AzureAppendBlobJournalStorageOptions
     private static readonly Func<GrainId, string> DefaultGetBlobName = static grainId => grainId.ToString();
 
     /// <summary>
-    /// Gets or sets the default state machine journal format key.
+    /// Gets or sets the default state journal format key.
     /// </summary>
     public string JournalFormatKey { get; set; } = DefaultJournalFormatKey;
 

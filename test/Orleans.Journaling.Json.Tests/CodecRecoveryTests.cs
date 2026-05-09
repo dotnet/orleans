@@ -235,16 +235,16 @@ public class CodecRecoveryTests : JournalingTestBase
         Assert.Contains(expectedInnerMessage, exception.InnerException!.Message, StringComparison.Ordinal);
     }
 
-    internal (IStateMachineManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(IJournalStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
+    internal (IStateManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(IJournalStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
         storage ??= CreateJsonStorage();
         jsonOptions ??= CreateJsonOptions();
 
         var journalStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
-        var manager = new JournalStateMachineManager(
+        var manager = new JournaledStateManager(
             storage,
-            LoggerFactory.CreateLogger<JournalStateMachineManager>(),
+            LoggerFactory.CreateLogger<JournaledStateManager>(),
             Microsoft.Extensions.Options.Options.Create(ManagerOptions),
             journalStreamIdsCodec,
             retirementTrackerCodec,

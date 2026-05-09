@@ -11,7 +11,7 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableStateMachine, IDurableDictionaryOperationHandler<K, V> where K : notnull
+internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDurableDictionaryOperationHandler<K, V> where K : notnull
 {
     private readonly IDurableDictionaryOperationCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
@@ -24,19 +24,19 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     public DurableDictionary(
         [ServiceKey] string key,
-        IStateMachineManager manager,
+        IStateManager manager,
         [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider)
         : this(JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<K, V>())
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        manager.RegisterStateMachine(key, this);
+        manager.RegisterState(key, this);
     }
 
-    internal DurableDictionary(string key, IStateMachineManager manager, IDurableDictionaryOperationCodec<K, V> codec) : this(codec)
+    internal DurableDictionary(string key, IStateManager manager, IDurableDictionaryOperationCodec<K, V> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        manager.RegisterStateMachine(key, this);
+        manager.RegisterState(key, this);
     }
 
     public V this[K key]
@@ -58,20 +58,20 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
 
-    object IDurableStateMachine.OperationCodec => _codec;
+    object IJournaledState.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(JournalStreamWriter writer)
+    void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _storage = writer;
     }
 
-    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
+    void IJournaledState.AppendEntries(JournalStreamWriter writer)
     {
-        // This state machine implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
+        // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter)
+    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -133,7 +133,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         return _storage;
     }
 
-    public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
+    public IJournaledState DeepCopy() => throw new NotImplementedException();
     public void Add(K key, V value)
     {
         if (_items.ContainsKey(key))

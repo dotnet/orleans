@@ -10,13 +10,13 @@ namespace Orleans.Journaling
 {
     public abstract partial class DurableGrain : Grain, IGrainBase
     {
-        protected IStateMachineManager StateMachineManager { get { throw null; } }
+        protected IStateManager StateManager { get { throw null; } }
 
-        protected TStateMachine GetOrCreateStateMachine<TStateMachine>(string name)
-            where TStateMachine : class, IDurableStateMachine { throw null; }
+        protected TState GetOrCreateState<TState>(string name)
+            where TState : class, IJournaledState { throw null; }
 
-        protected TStateMachine GetOrCreateStateMachine<TState, TStateMachine>(string name, System.Func<TState, TStateMachine> createStateMachine, TState state)
-            where TStateMachine : class, IDurableStateMachine { throw null; }
+        protected TState GetOrCreateState<TArg, TState>(string name, System.Func<TArg, TState> createState, TArg arg)
+            where TState : class, IJournaledState { throw null; }
 
         protected System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
@@ -202,13 +202,13 @@ namespace Orleans.Journaling
         void ApplySet(T state, ulong version);
     }
 
-    public partial interface IDurableStateMachine
+    public partial interface IJournaledState
     {
         object OperationCodec { get; }
 
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
-        IDurableStateMachine DeepCopy();
+        IJournaledState DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
         void Reset(JournalStreamWriter writer);
@@ -277,7 +277,7 @@ namespace Orleans.Journaling
     public partial interface IFormattedJournalEntry
     {
         System.ReadOnlyMemory<byte> Payload { get; }
-        void Apply(IDurableStateMachine stateMachine);
+        void Apply(IJournaledState state);
     }
 
     public partial interface IFormattedJournalEntryBuffer
@@ -301,7 +301,7 @@ namespace Orleans.Journaling
         string FileExtension { get { throw null; } }
         string? MimeType { get { throw null; } }
         IJournalBatchWriter CreateWriter();
-        void Read(JournalReadBuffer input, IStateMachineResolver resolver);
+        void Read(JournalReadBuffer input, IStateResolver resolver);
     }
 
     public partial interface IJournalFormatKeyProvider
@@ -309,17 +309,17 @@ namespace Orleans.Journaling
         string GetJournalFormatKey(Runtime.IGrainContext grainContext);
     }
 
-    public partial interface IStateMachineResolver
+    public partial interface IStateResolver
     {
-        IDurableStateMachine ResolveStateMachine(JournalStreamId streamId);
+        IJournaledState ResolveState(JournalStreamId streamId);
     }
 
-    public partial interface IStateMachineManager
+    public partial interface IStateManager
     {
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
-        void RegisterStateMachine(string name, IDurableStateMachine stateMachine);
-        bool TryGetStateMachine(string name, out IDurableStateMachine? stateMachine);
+        void RegisterState(string name, IJournaledState state);
+        bool TryGetState(string name, out IJournaledState? state);
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);
     }
 
@@ -467,7 +467,7 @@ namespace Orleans.Journaling
         public readonly bool TryAppendFormattedEntry(IFormattedJournalEntry entry) { throw null; }
     }
 
-    public sealed partial class StateMachineManagerOptions
+    public sealed partial class StateManagerOptions
     {
         public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
         public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }

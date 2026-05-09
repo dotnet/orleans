@@ -100,12 +100,12 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         }
     }
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (stateMachine is not IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+        if (state is not IDurableDictionaryOperationHandler<TKey, TValue> consumer)
         {
             throw new InvalidOperationException(
-                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
         Apply(ref reader, consumer);

@@ -315,26 +315,26 @@ public sealed class StorageStreamingTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private sealed class CapturingJournalEntrySink : IStateMachineResolver, IDurableStateMachine, IOrleansBinaryJournalEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, IOrleansBinaryJournalEntryCodec
     {
         private JournalStreamId _streamId;
 
         public List<(JournalStreamId StreamId, byte[] Payload)> Entries { get; } = [];
 
-        object IDurableStateMachine.OperationCodec => this;
+        object IJournaledState.OperationCodec => this;
 
-        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
+        public IJournaledState ResolveState(JournalStreamId streamId)
         {
             _streamId = streamId;
             return this;
         }
 
-        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add(new(_streamId, payload.ToArray()));
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }
         public void AppendSnapshot(JournalStreamWriter writer) { }
-        public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
+        public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
 }

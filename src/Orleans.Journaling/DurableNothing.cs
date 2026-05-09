@@ -12,23 +12,23 @@ public interface IDurableNothing
 /// <summary>
 /// A durable object which does nothing, used for retiring other durable types.
 /// </summary>
-internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
+internal sealed class DurableNothing : IDurableNothing, IJournaledState
 {
     private static readonly object NoOpCodec = new();
 
-    public DurableNothing([ServiceKey] string key, IStateMachineManager manager)
+    public DurableNothing([ServiceKey] string key, IStateManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        manager.RegisterStateMachine(key, this);
+        manager.RegisterState(key, this);
     }
 
-    object IDurableStateMachine.OperationCodec => NoOpCodec;
+    object IJournaledState.OperationCodec => NoOpCodec;
 
-    void IDurableStateMachine.Reset(JournalStreamWriter writer) { }
+    void IJournaledState.Reset(JournalStreamWriter writer) { }
 
-    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer) { }
+    void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
 
-    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter) { }
+    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter) { }
 
-    public IDurableStateMachine DeepCopy() => this;
+    public IJournaledState DeepCopy() => this;
 }

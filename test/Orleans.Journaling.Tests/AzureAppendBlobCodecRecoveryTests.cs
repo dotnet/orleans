@@ -62,7 +62,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     {
         var grainId = GrainId.Create("journaling-codec-recovery", Guid.NewGuid().ToString("N"));
         var storage = _storageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
-        var first = CreateStateMachines(storage);
+        var first = CreateStates(storage);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await first.Manager.InitializeAsync(cts.Token);
 
@@ -80,7 +80,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         await first.Manager.WriteStateAsync(cts.Token);
 
         var recoveredStorage = _storageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
-        var recovered = CreateStateMachines(recoveredStorage);
+        var recovered = CreateStates(recoveredStorage);
         await recovered.Manager.InitializeAsync(cts.Token);
 
         Assert.Equal(2, recovered.Dictionary.Count);
@@ -98,10 +98,10 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         Assert.Equal(17, await recovered.Tcs.Task);
     }
 
-    private DurableStateMachines CreateStateMachines(IJournalStorage storage)
+    private DurableStates CreateStates(IJournalStorage storage)
     {
         var manager = CreateManager(storage);
-        return new DurableStateMachines(
+        return new DurableStates(
             manager,
             new DurableDictionary<string, int>("dict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>())),
             new DurableList<string>("list", manager, new OrleansBinaryListOperationCodec<string>(ValueCodec<string>())),
@@ -117,10 +117,10 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
                 Copier<Exception>()));
     }
 
-    private JournalStateMachineManager CreateManager(IJournalStorage storage)
+    private JournaledStateManager CreateManager(IJournalStorage storage)
         => new(
             storage,
-            LoggerFactory.CreateLogger<JournalStateMachineManager>(),
+            LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
             new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>()),
             new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>()),
@@ -130,8 +130,8 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
-    private sealed record DurableStateMachines(
-        JournalStateMachineManager Manager,
+    private sealed record DurableStates(
+        JournaledStateManager Manager,
         DurableDictionary<string, int> Dictionary,
         DurableList<string> List,
         DurableQueue<string> Queue,

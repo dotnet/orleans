@@ -89,12 +89,12 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         }
     }
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (stateMachine is not IDurableListOperationHandler<T> consumer)
+        if (state is not IDurableListOperationHandler<T> consumer)
         {
             throw new InvalidOperationException(
-                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
         Apply(ref reader, consumer);
@@ -249,12 +249,12 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (stateMachine is not IDurableQueueOperationHandler<T> consumer)
+        if (state is not IDurableQueueOperationHandler<T> consumer)
         {
             throw new InvalidOperationException(
-                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
         Apply(ref reader, consumer);
@@ -374,12 +374,12 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         }
     }
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (stateMachine is not IDurableSetOperationHandler<T> consumer)
+        if (state is not IDurableSetOperationHandler<T> consumer)
         {
             throw new InvalidOperationException(
-                $"State machine '{stateMachine.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
+                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
         }
 
         Apply(ref reader, consumer);

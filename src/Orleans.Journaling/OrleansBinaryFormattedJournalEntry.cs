@@ -6,16 +6,16 @@ internal sealed class OrleansBinaryFormattedJournalEntry : IFormattedJournalEntr
 {
     public OrleansBinaryFormattedJournalEntry(ReadOnlySequence<byte> payload)
     {
-        // Retired state machines retain formatted entries after the read buffer is released;
+        // Retired states retain formatted entries after the read buffer is released;
         // this format-specific type also prevents cross-codec-family replay.
         Payload = payload.ToArray();
     }
 
     public ReadOnlyMemory<byte> Payload { get; }
 
-    public void Apply(IDurableStateMachine stateMachine)
+    public void Apply(IJournaledState state)
     {
-        ArgumentNullException.ThrowIfNull(stateMachine);
-        OrleansBinaryJournalReader.ApplyEntry(new ReadOnlySequence<byte>(Payload), stateMachine);
+        ArgumentNullException.ThrowIfNull(state);
+        OrleansBinaryJournalReader.ApplyEntry(new ReadOnlySequence<byte>(Payload), state);
     }
 }

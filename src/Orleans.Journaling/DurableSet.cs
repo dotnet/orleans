@@ -20,7 +20,7 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDurableSetOperationHandler<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableSetOperationHandler<T>
 {
     private readonly IDurableSetOperationCodec<T> _codec;
     private readonly HashSet<T> _items = [];
@@ -28,39 +28,39 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     public DurableSet(
         [ServiceKey] string key,
-        IStateMachineManager manager,
+        IStateManager manager,
         [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
-        manager.RegisterStateMachine(key, this);
+        manager.RegisterState(key, this);
     }
 
-    internal DurableSet(string key, IStateMachineManager manager, IDurableSetOperationCodec<T> codec)
+    internal DurableSet(string key, IStateManager manager, IDurableSetOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
-        manager.RegisterStateMachine(key, this);
+        manager.RegisterState(key, this);
     }
 
     public int Count => _items.Count;
     public bool IsReadOnly => false;
 
-    object IDurableStateMachine.OperationCodec => _codec;
+    object IJournaledState.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(JournalStreamWriter writer)
+    void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _storage = writer;
     }
 
-    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
+    void IJournaledState.AppendEntries(JournalStreamWriter writer)
     {
-        // This state machine implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
+        // This state implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter)
+    void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -123,7 +123,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         return _storage;
     }
 
-    public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
+    public IJournaledState DeepCopy() => throw new NotImplementedException();
     public void ExceptWith(IEnumerable<T> other)
     {
         foreach (var item in other)

@@ -17,7 +17,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WritePending(JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, WritePendingPayload);
+        JournalOperationWriter.Write(writer, WritePendingPayload);
 
     private static void WritePendingPayload(IBufferWriter<byte> output)
     {
@@ -27,7 +27,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteCompleted(T value, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteCompletedPayload(value, output));
+        JournalOperationWriter.Write(writer, output => WriteCompletedPayload(value, output));
 
     private void WriteCompletedPayload(T value, IBufferWriter<byte> output)
     {
@@ -38,7 +38,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteFaulted(Exception exception, JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, output => WriteFaultedPayload(exception, output));
+        JournalOperationWriter.Write(writer, output => WriteFaultedPayload(exception, output));
 
     private void WriteFaultedPayload(Exception exception, IBufferWriter<byte> output)
     {
@@ -49,7 +49,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
 
     /// <inheritdoc/>
     public void WriteCanceled(JournalStreamWriter writer) =>
-        DurableOperationCodecWriter.Write(writer, WriteCanceledPayload);
+        JournalOperationWriter.Write(writer, WriteCanceledPayload);
 
     private static void WriteCanceledPayload(IBufferWriter<byte> output)
     {
@@ -89,8 +89,8 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         }
     }
 
-    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
-        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableTaskCompletionSourceOperationHandler<T>>(stateMachine, this));
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
+        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableTaskCompletionSourceOperationHandler<T>>(state, this));
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
     {
