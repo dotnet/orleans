@@ -13,13 +13,13 @@ public class DurableOperationReaderBenchmarks
     private const int SmallOperationCount = 4_096;
     private const int SmallItemCount = SmallOperationCount / 2;
     private const int SnapshotItemCount = 16_384;
-    private static readonly LogStreamId ListLogStreamId = new(8);
+    private static readonly JournalStreamId ListJournalStreamId = new(8);
     private static readonly int[] SnapshotItems = Enumerable.Range(0, SnapshotItemCount).ToArray();
 
-    private ILogFormat _logFormat;
+    private IJournalFormat _journalFormat;
     private IDurableListOperationCodec<int> _codec;
-    private EncodedLogData _smallOperations;
-    private EncodedLogData _snapshotOperation;
+    private EncodedJournalData _smallOperations;
+    private EncodedJournalData _snapshotOperation;
     private ArcBufferWriter _readBuffer;
     private ListReplayConsumer _consumer;
 
@@ -30,15 +30,15 @@ public class DurableOperationReaderBenchmarks
     public void GlobalSetup()
     {
         var codecFamily = CreateCodecFamily(Family);
-        _logFormat = codecFamily.LogFormat;
+        _journalFormat = codecFamily.JournalFormat;
         _codec = codecFamily.Codec;
         _readBuffer = new ArcBufferWriter();
-        _consumer = new ListReplayConsumer(ListLogStreamId, _codec, SnapshotItemCount);
-        _smallOperations = CreateSmallOperations(_logFormat, _codec);
-        _snapshotOperation = CreateSnapshotOperation(_logFormat, _codec);
+        _consumer = new ListReplayConsumer(ListJournalStreamId, _codec, SnapshotItemCount);
+        _smallOperations = CreateSmallOperations(_journalFormat, _codec);
+        _snapshotOperation = CreateSnapshotOperation(_journalFormat, _codec);
 
-        ValidateEncodedLogData(_smallOperations, SmallItemCount);
-        ValidateEncodedLogData(_snapshotOperation, SnapshotItemCount);
+        ValidateEncodedJournalData(_smallOperations, SmallItemCount);
+        ValidateEncodedJournalData(_snapshotOperation, SnapshotItemCount);
     }
 
     [GlobalCleanup]
@@ -63,16 +63,16 @@ public class DurableOperationReaderBenchmarks
         return _consumer.Result;
     }
 
-    private void Replay(EncodedLogData data)
+    private void Replay(EncodedJournalData data)
     {
         _consumer.ResetForReplay();
         _readBuffer.Reset();
         _readBuffer.Write(data.Buffer.AsReadOnlySequence());
-        var reader = new LogReadBuffer(new ArcBufferReader(_readBuffer), isCompleted: true);
-        _logFormat.Read(reader, _consumer);
+        var reader = new JournalReadBuffer(new ArcBufferReader(_readBuffer), isCompleted: true);
+        _journalFormat.Read(reader, _consumer);
     }
 
-    private void ValidateEncodedLogData(EncodedLogData data, int expectedCount)
+    private void ValidateEncodedJournalData(EncodedJournalData data, int expectedCount)
     {
         Replay(data);
         if (_consumer.Count != expectedCount)
@@ -81,10 +81,10 @@ public class DurableOperationReaderBenchmarks
         }
     }
 
-    private static EncodedLogData CreateSmallOperations(ILogFormat logFormat, IDurableListOperationCodec<int> codec)
+    private static EncodedJournalData CreateSmallOperations(IJournalFormat journalFormat, IDurableListOperationCodec<int> codec)
     {
-        var writer = logFormat.CreateWriter();
-        var streamWriter = writer.CreateLogStreamWriter(ListLogStreamId);
+        var writer = journalFormat.CreateWriter();
+        var streamWriter = writer.CreateJournalStreamWriter(ListJournalStreamId);
         for (var i = 0; i < SmallItemCount; i++)
         {
             codec.WriteAdd(i, streamWriter);
@@ -95,14 +95,14 @@ public class DurableOperationReaderBenchmarks
             codec.WriteSet(i, -i, streamWriter);
         }
 
-        return new EncodedLogData(writer);
+        return new EncodedJournalData(writer);
     }
 
-    private static EncodedLogData CreateSnapshotOperation(ILogFormat logFormat, IDurableListOperationCodec<int> codec)
+    private static EncodedJournalData CreateSnapshotOperation(IJournalFormat journalFormat, IDurableListOperationCodec<int> codec)
     {
-        var writer = logFormat.CreateWriter();
-        codec.WriteSnapshot(SnapshotItems, writer.CreateLogStreamWriter(ListLogStreamId));
-        return new EncodedLogData(writer);
+        var writer = journalFormat.CreateWriter();
+        codec.WriteSnapshot(SnapshotItems, writer.CreateJournalStreamWriter(ListJournalStreamId));
+        return new EncodedJournalData(writer);
     }
 
     private static CodecFamilyServices CreateCodecFamily(CodecFamily family)
@@ -110,8 +110,8 @@ public class DurableOperationReaderBenchmarks
         return family switch
         {
             CodecFamily.OrleansBinary => new CodecFamilyServices(
-                OrleansBinaryLogFormat.Instance,
-                new OrleansBinaryListOperationCodec<int>(RawInt32LogValueCodec.Instance)),
+                OrleansBinaryJournalFormat.Instance,
+                new OrleansBinaryListOperationCodec<int>(RawInt32JournalValueCodec.Instance)),
             _ => throw new ArgumentOutOfRangeException(nameof(family), family, "Unsupported journaling codec family.")
         };
     }
@@ -121,17 +121,17 @@ public class DurableOperationReaderBenchmarks
         OrleansBinary
     }
 
-    private sealed class CodecFamilyServices(ILogFormat logFormat, IDurableListOperationCodec<int> codec)
+    private sealed class CodecFamilyServices(IJournalFormat journalFormat, IDurableListOperationCodec<int> codec)
     {
-        public ILogFormat LogFormat { get; } = logFormat;
+        public IJournalFormat JournalFormat { get; } = journalFormat;
         public IDurableListOperationCodec<int> Codec { get; } = codec;
     }
 
-    private sealed class EncodedLogData : IDisposable
+    private sealed class EncodedJournalData : IDisposable
     {
-        private readonly ILogBatchWriter _writer;
+        private readonly IJournalBatchWriter _writer;
 
-        public EncodedLogData(ILogBatchWriter writer)
+        public EncodedJournalData(IJournalBatchWriter writer)
         {
             _writer = writer;
             Buffer = writer.GetCommittedBuffer();
@@ -147,7 +147,7 @@ public class DurableOperationReaderBenchmarks
     }
 
     private sealed class ListReplayConsumer(
-        LogStreamId expectedStreamId,
+        JournalStreamId expectedStreamId,
         IDurableListOperationCodec<int> codec,
         int capacity) : IStateMachineResolver, IDurableStateMachine, IDurableListOperationHandler<int>
     {
@@ -160,11 +160,11 @@ public class DurableOperationReaderBenchmarks
 
         object IDurableStateMachine.OperationCodec => codec;
 
-        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
         {
             if (streamId != expectedStreamId)
             {
-                throw new InvalidOperationException($"The benchmark log data contained unexpected stream id {streamId.Value}.");
+                throw new InvalidOperationException($"The benchmark journal data contained unexpected stream id {streamId.Value}.");
             }
 
             return this;
@@ -176,13 +176,13 @@ public class DurableOperationReaderBenchmarks
             _checksum = 0;
         }
 
-        void IDurableStateMachine.Reset(LogStreamWriter storage) => ResetForReplay();
+        void IDurableStateMachine.Reset(JournalStreamWriter storage) => ResetForReplay();
 
-        void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
+        void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
         {
         }
 
-        void IDurableStateMachine.AppendSnapshot(LogStreamWriter writer)
+        void IDurableStateMachine.AppendSnapshot(JournalStreamWriter writer)
         {
         }
 
@@ -227,9 +227,9 @@ public class DurableOperationReaderBenchmarks
         }
     }
 
-    private sealed class RawInt32LogValueCodec : ILogValueCodec<int>
+    private sealed class RawInt32JournalValueCodec : IJournalValueCodec<int>
     {
-        public static RawInt32LogValueCodec Instance { get; } = new();
+        public static RawInt32JournalValueCodec Instance { get; } = new();
 
         public void Write(int value, IBufferWriter<byte> output)
         {

@@ -5,15 +5,15 @@ using System.Text.Json.Serialization.Metadata;
 namespace Orleans.Journaling.Json;
 
 /// <summary>
-/// JSON codec for durable value log entries.
+/// JSON codec for durable value journal entries.
 /// </summary>
 public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableValueOperationCodec<T>, IJsonLogEntryCodec
+    : IDurableValueOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteSet(T value, LogStreamWriter writer)
+    public void WriteSet(T value, JournalStreamWriter writer)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -33,8 +33,8 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         var command = operation.Command;
         switch (command)
         {
-            case JsonLogEntryCommands.Set:
-                consumer.ApplySet(operation.Deserialize(1, JsonLogEntryFields.Value, _valueTypeInfo)!);
+            case JsonJournalEntryCommands.Set:
+                consumer.ApplySet(operation.Deserialize(1, JsonJournalEntryFields.Value, _valueTypeInfo)!);
                 operation.EnsureEnd(2);
                 break;
             default:
@@ -43,7 +43,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableValueOperationHandler<T> consumer)
         {
@@ -58,22 +58,22 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     {
         public void Write(Utf8JsonWriter writer)
         {
-            writer.WriteStringValue(JsonLogEntryCommands.Set);
+            writer.WriteStringValue(JsonJournalEntryCommands.Set);
             JsonSerializer.Serialize(writer, value, typeInfo);
         }
     }
 }
 
 /// <summary>
-/// JSON codec for durable persistent state log entries.
+/// JSON codec for durable persistent state journal entries.
 /// </summary>
 public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableStateOperationCodec<T>, IJsonLogEntryCodec
+    : IDurableStateOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _stateTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteSet(T state, ulong version, LogStreamWriter writer)
+    public void WriteSet(T state, ulong version, JournalStreamWriter writer)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -82,7 +82,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     }
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Clear);
+    public void WriteClear(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Clear);
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer)
@@ -96,13 +96,13 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         var command = operation.Command;
         switch (command)
         {
-            case JsonLogEntryCommands.Set:
+            case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.Deserialize(1, JsonLogEntryFields.State, _stateTypeInfo)!,
-                    operation.ReadUInt64(2, JsonLogEntryFields.Version));
+                    operation.Deserialize(1, JsonJournalEntryFields.State, _stateTypeInfo)!,
+                    operation.ReadUInt64(2, JsonJournalEntryFields.Version));
                 operation.EnsureEnd(3);
                 break;
-            case JsonLogEntryCommands.Clear:
+            case JsonJournalEntryCommands.Clear:
                 operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
@@ -112,7 +112,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableStateOperationHandler<T> consumer)
         {
@@ -123,7 +123,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         Apply(ref reader, consumer);
     }
 
-    private static void WriteCommand(LogStreamWriter writer, string command)
+    private static void WriteCommand(JournalStreamWriter writer, string command)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -135,7 +135,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     {
         public void Write(Utf8JsonWriter writer)
         {
-            writer.WriteStringValue(JsonLogEntryCommands.Set);
+            writer.WriteStringValue(JsonJournalEntryCommands.Set);
             JsonSerializer.Serialize(writer, state, typeInfo);
             writer.WriteNumberValue(version);
         }
@@ -143,18 +143,18 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
 }
 
 /// <summary>
-/// JSON codec for durable task completion source log entries.
+/// JSON codec for durable task completion source journal entries.
 /// </summary>
 public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableTaskCompletionSourceOperationCodec<T>, IJsonLogEntryCodec
+    : IDurableTaskCompletionSourceOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WritePending(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Pending);
+    public void WritePending(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Pending);
 
     /// <inheritdoc/>
-    public void WriteCompleted(T value, LogStreamWriter writer)
+    public void WriteCompleted(T value, JournalStreamWriter writer)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -163,20 +163,20 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     }
 
     /// <inheritdoc/>
-    public void WriteFaulted(Exception exception, LogStreamWriter writer)
+    public void WriteFaulted(Exception exception, JournalStreamWriter writer)
     {
         JsonOperationCodecWriter.Write(
             writer,
             exception.Message,
             static (jsonWriter, message) =>
             {
-                jsonWriter.WriteStringValue(JsonLogEntryCommands.Faulted);
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Faulted);
                 jsonWriter.WriteStringValue(message);
             });
     }
 
     /// <inheritdoc/>
-    public void WriteCanceled(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Canceled);
+    public void WriteCanceled(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Canceled);
 
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
@@ -190,19 +190,19 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         var command = operation.Command;
         switch (command)
         {
-            case JsonLogEntryCommands.Pending:
+            case JsonJournalEntryCommands.Pending:
                 operation.EnsureEnd(1);
                 consumer.ApplyPending();
                 break;
-            case JsonLogEntryCommands.Completed:
-                consumer.ApplyCompleted(operation.Deserialize(1, JsonLogEntryFields.Value, _valueTypeInfo)!);
+            case JsonJournalEntryCommands.Completed:
+                consumer.ApplyCompleted(operation.Deserialize(1, JsonJournalEntryFields.Value, _valueTypeInfo)!);
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Faulted:
-                consumer.ApplyFaulted(new Exception(operation.ReadString(1, JsonLogEntryFields.Message)));
+            case JsonJournalEntryCommands.Faulted:
+                consumer.ApplyFaulted(new Exception(operation.ReadString(1, JsonJournalEntryFields.Message)));
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Canceled:
+            case JsonJournalEntryCommands.Canceled:
                 operation.EnsureEnd(1);
                 consumer.ApplyCanceled();
                 break;
@@ -212,7 +212,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         }
     }
 
-    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableTaskCompletionSourceOperationHandler<T> consumer)
         {
@@ -223,7 +223,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         Apply(ref reader, consumer);
     }
 
-    private static void WriteCommand(LogStreamWriter writer, string command)
+    private static void WriteCommand(JournalStreamWriter writer, string command)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -235,7 +235,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     {
         public void Write(Utf8JsonWriter writer)
         {
-            writer.WriteStringValue(JsonLogEntryCommands.Completed);
+            writer.WriteStringValue(JsonJournalEntryCommands.Completed);
             JsonSerializer.Serialize(writer, value, typeInfo);
         }
     }

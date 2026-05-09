@@ -19,11 +19,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     public DurableValue(
         [ServiceKey] string key,
         IStateMachineManager manager,
-        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
+        _codec = JournalFormatServices.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
@@ -55,13 +55,13 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(LogStreamWriter writer)
+    void IDurableStateMachine.Reset(JournalStreamWriter writer)
     {
         _value = default;
         _isDirty = false;
     }
 
-    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
+    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
     {
         if (_isDirty)
         {
@@ -70,11 +70,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IDurableStateMachine, 
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
 
     public IDurableStateMachine DeepCopy() => throw new NotImplementedException();
 
-    private void WriteState(LogStreamWriter writer)
+    private void WriteState(JournalStreamWriter writer)
     {
         _codec.WriteSet(_value!, writer);
     }

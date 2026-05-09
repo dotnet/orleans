@@ -13,8 +13,8 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureAppendBlobLogStorage();
-        var optionsBuilder = builder.Services.AddOptions<AzureAppendBlobLogStorageOptions>();
+        builder.AddAzureAppendBlobJournalStorage();
+        var optionsBuilder = builder.Services.AddOptions<AzureAppendBlobJournalStorageOptions>();
         optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
             var containerName = configurationSection["ContainerName"];
@@ -23,10 +23,10 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
                 options.ContainerName = containerName;
             }
 
-            var logFormatKey = configurationSection[nameof(AzureAppendBlobLogStorageOptions.LogFormatKey)];
-            if (!string.IsNullOrWhiteSpace(logFormatKey))
+            var journalFormatKey = configurationSection[nameof(AzureAppendBlobJournalStorageOptions.JournalFormatKey)];
+            if (!string.IsNullOrWhiteSpace(journalFormatKey))
             {
-                options.LogFormatKey = logFormatKey;
+                options.JournalFormatKey = journalFormatKey;
             }
 
             var serviceKey = configurationSection["ServiceKey"];

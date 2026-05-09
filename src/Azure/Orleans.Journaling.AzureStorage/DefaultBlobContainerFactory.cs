@@ -10,7 +10,7 @@ namespace Orleans.Journaling;
 /// Initializes a new instance of the <see cref="DefaultBlobContainerFactory"/> class.
 /// </remarks>
 /// <param name="options">The blob storage options</param>
-internal sealed class DefaultBlobContainerFactory(AzureAppendBlobLogStorageOptions options) : IBlobContainerFactory
+internal sealed class DefaultBlobContainerFactory(AzureAppendBlobJournalStorageOptions options) : IBlobContainerFactory
 {
     private BlobContainerClient _defaultContainer = null!;
 

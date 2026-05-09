@@ -3,11 +3,11 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for durable dictionary log entries, preserving the legacy Orleans binary wire format.
+/// Binary codec for durable dictionary journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
-    ILogValueCodec<TKey> keyCodec,
-    ILogValueCodec<TValue> valueCodec) : IDurableDictionaryOperationCodec<TKey, TValue>, IOrleansBinaryLogEntryCodec where TKey : notnull
+    IJournalValueCodec<TKey> keyCodec,
+    IJournalValueCodec<TValue> valueCodec) : IDurableDictionaryOperationCodec<TKey, TValue>, IOrleansBinaryJournalEntryCodec where TKey : notnull
 {
     private const byte FormatVersion = 0;
     private const uint SetCommand = 0;
@@ -16,7 +16,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, LogStreamWriter writer) =>
+    public void WriteSet(TKey key, TValue value, JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(key, value, output));
 
     private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
@@ -28,7 +28,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteRemove(TKey key, LogStreamWriter writer) =>
+    public void WriteRemove(TKey key, JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, output => WriteRemovePayload(key, output));
 
     private void WriteRemovePayload(TKey key, IBufferWriter<byte> output)
@@ -39,7 +39,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) =>
+    public void WriteClear(JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, WriteClearPayload);
 
     private static void WriteClearPayload(IBufferWriter<byte> output)
@@ -49,7 +49,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) =>
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, output => WriteSnapshotPayload(items, output));
 
     private void WriteSnapshotPayload(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
@@ -96,7 +96,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
     }
 
-    void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
         Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableDictionaryOperationHandler<TKey, TValue>>(stateMachine, this));
 
     private void ApplySet(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)

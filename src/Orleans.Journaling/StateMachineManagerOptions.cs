@@ -10,7 +10,7 @@ public sealed class StateMachineManagerOptions
     /// a <see cref="IDurableStateMachine"/> if its not registered in the manager anymore.
     /// </summary>
     /// <remarks>
-    /// <para>The act of retirement removes this state machine from the log.</para>
+    /// <para>The act of retirement removes this state machine from the journal.</para>
     /// <para>If the state machine is reintroduced (within the grace period), than it will not be removed by the manager.</para>
     /// <para>
     /// This value represents the <b>minimum</b> time the fate of the state machine will be postponed.

@@ -18,16 +18,16 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 {
     private readonly IDurableListOperationCodec<T> _codec;
     private readonly List<T> _items = [];
-    private LogStreamWriter _storage;
+    private JournalStreamWriter _storage;
 
     public DurableList(
         [ServiceKey] string key,
         IStateMachineManager manager,
-        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableListOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
+        _codec = JournalFormatServices.GetRequiredKeyedService<IDurableListOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
@@ -60,18 +60,18 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(LogStreamWriter writer)
+    void IDurableStateMachine.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _storage = writer;
     }
 
-    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
+    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
     {
-        // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
+        // This state machine implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -147,7 +147,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IDurableStateMachine, ID
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
 
-    private LogStreamWriter GetStorage()
+    private JournalStreamWriter GetStorage()
     {
         Debug.Assert(_storage.IsInitialized);
         return _storage;

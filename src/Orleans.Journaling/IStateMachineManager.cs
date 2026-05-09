@@ -29,7 +29,7 @@ public interface IStateMachineManager
     bool TryGetStateMachine(string name, [NotNullWhen(true)] out IDurableStateMachine? stateMachine);
 
     /// <summary>
-    /// Prepares and persists an update to the log.
+    /// Prepares and persists an update to the journal.
     /// </summary>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>

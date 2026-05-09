@@ -5,30 +5,30 @@ using System.Text.Json.Serialization.Metadata;
 namespace Orleans.Journaling.Json;
 
 /// <summary>
-/// JSON codec for durable list log entries.
+/// JSON codec for durable list journal entries.
 /// </summary>
 public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableListOperationCodec<T>, IJsonLogEntryCodec
+    : IDurableListOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, LogStreamWriter writer) => WriteItem(writer, JsonLogEntryCommands.Add, item);
+    public void WriteAdd(T item, JournalStreamWriter writer) => WriteItem(writer, JsonJournalEntryCommands.Add, item);
 
     /// <inheritdoc/>
-    public void WriteSet(int index, T item, LogStreamWriter writer) => WriteIndexedItem(writer, JsonLogEntryCommands.Set, index, item);
+    public void WriteSet(int index, T item, JournalStreamWriter writer) => WriteIndexedItem(writer, JsonJournalEntryCommands.Set, index, item);
 
     /// <inheritdoc/>
-    public void WriteInsert(int index, T item, LogStreamWriter writer) => WriteIndexedItem(writer, JsonLogEntryCommands.Insert, index, item);
+    public void WriteInsert(int index, T item, JournalStreamWriter writer) => WriteIndexedItem(writer, JsonJournalEntryCommands.Insert, index, item);
 
     /// <inheritdoc/>
-    public void WriteRemoveAt(int index, LogStreamWriter writer) => WriteIndex(writer, JsonLogEntryCommands.RemoveAt, index);
+    public void WriteRemoveAt(int index, JournalStreamWriter writer) => WriteIndex(writer, JsonJournalEntryCommands.RemoveAt, index);
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Clear);
+    public void WriteClear(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Clear);
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
         JsonOperationCodecWriter.Write(
@@ -49,34 +49,34 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         var command = operation.Command;
         switch (command)
         {
-            case JsonLogEntryCommands.Add:
-                consumer.ApplyAdd(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+            case JsonJournalEntryCommands.Add:
+                consumer.ApplyAdd(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Set:
+            case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.ReadInt32(1, JsonLogEntryFields.Index),
-                    operation.Deserialize(2, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                    operation.ReadInt32(1, JsonJournalEntryFields.Index),
+                    operation.Deserialize(2, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 operation.EnsureEnd(3);
                 break;
-            case JsonLogEntryCommands.Insert:
+            case JsonJournalEntryCommands.Insert:
                 consumer.ApplyInsert(
-                    operation.ReadInt32(1, JsonLogEntryFields.Index),
-                    operation.Deserialize(2, JsonLogEntryFields.Item, _itemTypeInfo)!);
+                    operation.ReadInt32(1, JsonJournalEntryFields.Index),
+                    operation.Deserialize(2, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 operation.EnsureEnd(3);
                 break;
-            case JsonLogEntryCommands.RemoveAt:
-                consumer.ApplyRemoveAt(operation.ReadInt32(1, JsonLogEntryFields.Index));
+            case JsonJournalEntryCommands.RemoveAt:
+                consumer.ApplyRemoveAt(operation.ReadInt32(1, JsonJournalEntryFields.Index));
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Clear:
+            case JsonJournalEntryCommands.Clear:
                 operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
-            case JsonLogEntryCommands.Snapshot:
-                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+            case JsonJournalEntryCommands.Snapshot:
+                var count = operation.StartArray(1, JsonJournalEntryFields.Items);
                 consumer.Reset(count);
-                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
+                while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
                     consumer.ApplyAdd(operation.DeserializeCurrent(_itemTypeInfo)!);
                 }
@@ -89,7 +89,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         }
     }
 
-    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableListOperationHandler<T> consumer)
         {
@@ -100,7 +100,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         Apply(ref reader, consumer);
     }
 
-    private void WriteItem(LogStreamWriter writer, string command, T item)
+    private void WriteItem(JournalStreamWriter writer, string command, T item)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -108,7 +108,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
             static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
-    private void WriteIndexedItem(LogStreamWriter writer, string command, int index, T item)
+    private void WriteIndexedItem(JournalStreamWriter writer, string command, int index, T item)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -116,7 +116,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
             static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
-    private static void WriteIndex(LogStreamWriter writer, string command, int index)
+    private static void WriteIndex(JournalStreamWriter writer, string command, int index)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -124,7 +124,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
             static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
-    private static void WriteCommand(LogStreamWriter writer, string command)
+    private static void WriteCommand(JournalStreamWriter writer, string command)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -166,7 +166,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         {
             var count = CollectionCodecHelpers.GetSnapshotCount(items);
 
-            writer.WriteStringValue(JsonLogEntryCommands.Snapshot);
+            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
             writer.WriteStartArray();
             var written = 0;
             foreach (var item in items)
@@ -183,24 +183,24 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
 }
 
 /// <summary>
-/// JSON codec for durable queue log entries.
+/// JSON codec for durable queue journal entries.
 /// </summary>
 public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableQueueOperationCodec<T>, IJsonLogEntryCodec
+    : IDurableQueueOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteEnqueue(T item, LogStreamWriter writer) => WriteItem(writer, JsonLogEntryCommands.Enqueue, item);
+    public void WriteEnqueue(T item, JournalStreamWriter writer) => WriteItem(writer, JsonJournalEntryCommands.Enqueue, item);
 
     /// <inheritdoc/>
-    public void WriteDequeue(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Dequeue);
+    public void WriteDequeue(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Dequeue);
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Clear);
+    public void WriteClear(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Clear);
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
         JsonOperationCodecWriter.Write(
@@ -221,22 +221,22 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         var command = operation.Command;
         switch (command)
         {
-            case JsonLogEntryCommands.Enqueue:
-                consumer.ApplyEnqueue(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+            case JsonJournalEntryCommands.Enqueue:
+                consumer.ApplyEnqueue(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Dequeue:
+            case JsonJournalEntryCommands.Dequeue:
                 operation.EnsureEnd(1);
                 consumer.ApplyDequeue();
                 break;
-            case JsonLogEntryCommands.Clear:
+            case JsonJournalEntryCommands.Clear:
                 operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
-            case JsonLogEntryCommands.Snapshot:
-                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+            case JsonJournalEntryCommands.Snapshot:
+                var count = operation.StartArray(1, JsonJournalEntryFields.Items);
                 consumer.Reset(count);
-                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
+                while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
                     consumer.ApplyEnqueue(operation.DeserializeCurrent(_itemTypeInfo)!);
                 }
@@ -249,7 +249,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableQueueOperationHandler<T> consumer)
         {
@@ -260,7 +260,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         Apply(ref reader, consumer);
     }
 
-    private void WriteItem(LogStreamWriter writer, string command, T item)
+    private void WriteItem(JournalStreamWriter writer, string command, T item)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -268,7 +268,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
             static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
-    private static void WriteCommand(LogStreamWriter writer, string command)
+    private static void WriteCommand(JournalStreamWriter writer, string command)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -291,7 +291,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         {
             var count = CollectionCodecHelpers.GetSnapshotCount(items);
 
-            writer.WriteStringValue(JsonLogEntryCommands.Snapshot);
+            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
             writer.WriteStartArray();
             var written = 0;
             foreach (var item in items)
@@ -308,24 +308,24 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
 }
 
 /// <summary>
-/// JSON codec for durable set log entries.
+/// JSON codec for durable set journal entries.
 /// </summary>
 public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableSetOperationCodec<T>, IJsonLogEntryCodec
+    : IDurableSetOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, LogStreamWriter writer) => WriteItem(writer, JsonLogEntryCommands.Add, item);
+    public void WriteAdd(T item, JournalStreamWriter writer) => WriteItem(writer, JsonJournalEntryCommands.Add, item);
 
     /// <inheritdoc/>
-    public void WriteRemove(T item, LogStreamWriter writer) => WriteItem(writer, JsonLogEntryCommands.Remove, item);
+    public void WriteRemove(T item, JournalStreamWriter writer) => WriteItem(writer, JsonJournalEntryCommands.Remove, item);
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) => WriteCommand(writer, JsonLogEntryCommands.Clear);
+    public void WriteClear(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Clear);
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
         JsonOperationCodecWriter.Write(
@@ -346,22 +346,22 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         var command = operation.Command;
         switch (command)
         {
-            case JsonLogEntryCommands.Add:
-                consumer.ApplyAdd(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+            case JsonJournalEntryCommands.Add:
+                consumer.ApplyAdd(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Remove:
-                consumer.ApplyRemove(operation.Deserialize(1, JsonLogEntryFields.Item, _itemTypeInfo)!);
+            case JsonJournalEntryCommands.Remove:
+                consumer.ApplyRemove(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Clear:
+            case JsonJournalEntryCommands.Clear:
                 operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
-            case JsonLogEntryCommands.Snapshot:
-                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+            case JsonJournalEntryCommands.Snapshot:
+                var count = operation.StartArray(1, JsonJournalEntryFields.Items);
                 consumer.Reset(count);
-                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
+                while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
                     consumer.ApplyAdd(operation.DeserializeCurrent(_itemTypeInfo)!);
                 }
@@ -374,7 +374,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         }
     }
 
-    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableSetOperationHandler<T> consumer)
         {
@@ -385,7 +385,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         Apply(ref reader, consumer);
     }
 
-    private void WriteItem(LogStreamWriter writer, string command, T item)
+    private void WriteItem(JournalStreamWriter writer, string command, T item)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -393,7 +393,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
             static (jsonWriter, operation) => operation.Write(jsonWriter));
     }
 
-    private static void WriteCommand(LogStreamWriter writer, string command)
+    private static void WriteCommand(JournalStreamWriter writer, string command)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -416,7 +416,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         {
             var count = CollectionCodecHelpers.GetSnapshotCount(items);
 
-            writer.WriteStringValue(JsonLogEntryCommands.Snapshot);
+            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
             writer.WriteStartArray();
             var written = 0;
             foreach (var item in items)

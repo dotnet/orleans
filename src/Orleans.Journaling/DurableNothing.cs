@@ -24,11 +24,11 @@ internal sealed class DurableNothing : IDurableNothing, IDurableStateMachine
 
     object IDurableStateMachine.OperationCodec => NoOpCodec;
 
-    void IDurableStateMachine.Reset(LogStreamWriter writer) { }
+    void IDurableStateMachine.Reset(JournalStreamWriter writer) { }
 
-    void IDurableStateMachine.AppendEntries(LogStreamWriter writer) { }
+    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer) { }
 
-    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter) { }
+    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter) { }
 
     public IDurableStateMachine DeepCopy() => this;
 }

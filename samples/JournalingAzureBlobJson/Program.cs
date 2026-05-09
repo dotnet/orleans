@@ -56,13 +56,13 @@ internal static class Program
                     options.ServiceId = "journaling-azure-blob-json-sample";
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                .AddAzureAppendBlobLogStorage(options =>
+                .AddAzureAppendBlobJournalStorage(options =>
                 {
                     options.BlobServiceClient = blobServiceClient;
                     options.ContainerName = settings.ContainerName;
                     options.GetBlobName = _ => settings.BlobName;
                 })
-                .UseJsonJournalingFormat(JournalingSampleJsonContext.Default);
+                .UseJsonJournalFormat(JournalingSampleJsonContext.Default);
         });
 
         using var host = builder.Build();

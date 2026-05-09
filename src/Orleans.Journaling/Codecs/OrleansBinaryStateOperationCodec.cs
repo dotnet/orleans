@@ -3,17 +3,17 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for durable persistent state log entries, preserving the legacy Orleans binary wire format.
+/// Binary codec for durable persistent state journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryStateOperationCodec<T>(
-    ILogValueCodec<T> codec) : IDurableStateOperationCodec<T>, IOrleansBinaryLogEntryCodec
+    IJournalValueCodec<T> codec) : IDurableStateOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
     private const uint ClearValueCommand = 1;
 
     /// <inheritdoc/>
-    public void WriteSet(T state, ulong version, LogStreamWriter writer) =>
+    public void WriteSet(T state, ulong version, JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(state, version, output));
 
     private void WriteSetPayload(T state, ulong version, IBufferWriter<byte> output)
@@ -25,7 +25,7 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer) =>
+    public void WriteClear(JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, WriteClearPayload);
 
     private static void WriteClearPayload(IBufferWriter<byte> output)
@@ -54,7 +54,7 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
         }
     }
 
-    void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
         Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableStateOperationHandler<T>>(stateMachine, this));
 
     private void ApplySetValue(ref OrleansBinaryOperationReader reader, IDurableStateOperationHandler<T> consumer)

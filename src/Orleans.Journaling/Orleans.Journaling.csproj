@@ -1,9 +1,9 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Journaling</PackageId>
     <Title>Microsoft Orleans Journaling</Title>
-    <Description>Extensible persistence for grains based on replicated state machines, including a default System.Text.Json log format.</Description>
+    <Description>Extensible persistence for grains based on replicated state machines, including a default System.Text.Json journal format.</Description>
     <PackageTags>$(PackageTags) Persistence State Machines JSON</PackageTags>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>

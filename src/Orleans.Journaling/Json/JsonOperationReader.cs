@@ -109,13 +109,13 @@ internal ref struct JsonOperationReader
 
         if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
         {
-            throw new JsonException($"JSON journal operation is missing operand '{JsonLogEntryFields.Key}'.");
+            throw new JsonException($"JSON journal operation is missing operand '{JsonJournalEntryFields.Key}'.");
         }
 
         var first = JsonSerializer.Deserialize(ref _reader, firstTypeInfo);
         if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
         {
-            throw new JsonException($"JSON journal operation is missing operand '{JsonLogEntryFields.Value}'.");
+            throw new JsonException($"JSON journal operation is missing operand '{JsonJournalEntryFields.Value}'.");
         }
 
         var second = JsonSerializer.Deserialize(ref _reader, secondTypeInfo);
@@ -151,7 +151,7 @@ internal ref struct JsonOperationReader
 
         if (_reader.Read())
         {
-            throw new JsonException("Additional JSON content was found after the log entry.");
+            throw new JsonException("Additional JSON content was found after the journal entry.");
         }
     }
 
@@ -163,7 +163,7 @@ internal ref struct JsonOperationReader
             {
                 if (_reader.Read())
                 {
-                    throw new JsonException("Additional JSON content was found after the log entry.");
+                    throw new JsonException("Additional JSON content was found after the journal entry.");
                 }
 
                 return;

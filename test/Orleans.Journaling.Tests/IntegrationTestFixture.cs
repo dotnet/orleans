@@ -18,12 +18,12 @@ public class IntegrationTestFixture : IAsyncLifetime
     public IntegrationTestFixture()
     {
         var builder = new InProcessTestClusterBuilder();
-        var storageProvider = new VolatileLogStorageProvider();
+        var storageProvider = new VolatileJournalStorageProvider();
         builder.ConfigureSilo((options, siloBuilder) =>
         {
-            siloBuilder.AddLogStorage();
-            siloBuilder.UseJsonJournalingFormat(JournalingTestsJsonContext.Default);
-            siloBuilder.Services.AddSingleton<ILogStorageProvider>(storageProvider);
+            siloBuilder.AddJournalStorage();
+            siloBuilder.UseJsonJournalFormat(JournalingTestsJsonContext.Default);
+            siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
         });
         ConfigureTestCluster(builder);
         Cluster = builder.Build();

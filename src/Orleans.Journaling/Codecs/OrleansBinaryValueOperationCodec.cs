@@ -3,16 +3,16 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for durable value log entries, preserving the legacy Orleans binary wire format.
+/// Binary codec for durable value journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryValueOperationCodec<T>(
-    ILogValueCodec<T> codec) : IDurableValueOperationCodec<T>, IOrleansBinaryLogEntryCodec
+    IJournalValueCodec<T> codec) : IDurableValueOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
 
     /// <inheritdoc/>
-    public void WriteSet(T value, LogStreamWriter writer) =>
+    public void WriteSet(T value, JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, output => WriteSetPayload(value, output));
 
     private void WriteSetPayload(T value, IBufferWriter<byte> output)
@@ -40,7 +40,7 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
         }
     }
 
-    void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
         Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableValueOperationHandler<T>>(stateMachine, this));
 
     private static void WriteVersionByte(IBufferWriter<byte> output)

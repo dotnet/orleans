@@ -34,7 +34,7 @@ internal ref struct OrleansBinaryOperationReader
 
     public ulong ReadVarUInt64() => VarIntHelper.ReadVarUInt64(ref _reader);
 
-    public T ReadValue<T>(string operandName, ILogValueCodec<T> codec)
+    public T ReadValue<T>(string operandName, IJournalValueCodec<T> codec)
     {
         var value = codec.Read(_input.Slice(_reader.Consumed), out var bytesConsumed);
         Advance(bytesConsumed, operandName);

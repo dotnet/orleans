@@ -7,22 +7,19 @@ namespace Orleans.Journaling;
 
 public static class HostingExtensions
 {
-    public static ISiloBuilder AddLogStorage(this ISiloBuilder builder)
+    public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<StateMachineManagerOptions>();
-        builder.Services.TryAddKeyedScoped<string>(LogFormatServices.LogFormatKeyServiceKey, static (sp, _) => GetLogFormatKey(sp));
-        builder.Services.TryAddScoped<ILogStorage>(sp => sp.GetRequiredService<ILogStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
-        builder.Services.TryAddScoped<IStateMachineManager, LogStateMachineManager>();
+        builder.Services.TryAddKeyedScoped<string>(JournalFormatServices.JournalFormatKeyServiceKey, static (sp, _) => GetJournalFormatKey(sp));
+        builder.Services.TryAddScoped<IJournalStorage>(sp => sp.GetRequiredService<IJournalStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
+        builder.Services.TryAddScoped<IStateMachineManager, JournalStateMachineManager>();
 
         // Register the default data codec (Orleans IFieldCodec adapter).
-        builder.Services.TryAddSingleton(typeof(ILogValueCodec<>), typeof(OrleansLogValueCodec<>));
+        builder.Services.TryAddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
 
         // Register JSON as the default format family and keep Orleans binary available for existing data.
-        builder.Services.AddJsonJournalingFormat(new JsonJournalingOptions().SerializerOptions, tryAdd: true);
-        builder.Services
-            .TryAddJournalingFormatFamily(OrleansBinaryLogFormat.LogFormatKey)
-            .AddLogFormat(OrleansBinaryLogFormat.Instance)
-            .AddOperationCodecProvider<OrleansBinaryOperationCodecProvider>();
+        builder.Services.AddJsonJournalFormat(new JsonJournalOptions().SerializerOptions, tryAdd: true);
+        TryAddOrleansBinaryJournalingFormat(builder.Services);
 
         builder.Services.TryAddKeyedScoped(typeof(IDurableDictionary<,>), KeyedService.AnyKey, typeof(DurableDictionary<,>));
         builder.Services.TryAddKeyedScoped(typeof(IDurableList<>), KeyedService.AnyKey, typeof(DurableList<>));
@@ -35,15 +32,39 @@ public static class HostingExtensions
         return builder;
     }
 
-    private static string GetLogFormatKey(IServiceProvider serviceProvider)
+    private static void TryAddOrleansBinaryJournalingFormat(IServiceCollection services)
+    {
+        var key = JournalFormatServices.ValidateJournalFormatKey(OrleansBinaryJournalFormat.JournalFormatKey);
+
+        services.TryAddKeyedSingleton<IJournalFormat>(key, OrleansBinaryJournalFormat.Instance);
+        services.TryAddSingleton<IJournalFormat>(OrleansBinaryJournalFormat.Instance);
+
+        services.TryAddSingleton<OrleansBinaryOperationCodecProvider>();
+        services.TryAddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddKeyedSingleton<IDurableListOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddKeyedSingleton<IDurableQueueOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddKeyedSingleton<IDurableSetOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddKeyedSingleton<IDurableValueOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddKeyedSingleton<IDurableStateOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddSingleton<IDurableSetOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddSingleton<IDurableValueOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddSingleton<IDurableStateOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+    }
+
+    private static string GetJournalFormatKey(IServiceProvider serviceProvider)
     {
         var grainContext = serviceProvider.GetRequiredService<IGrainContext>();
-        var logFormatKeyProvider = serviceProvider.GetService<ILogFormatKeyProvider>();
-        if (logFormatKeyProvider is null && serviceProvider.GetService<ILogStorageProvider>() is ILogFormatKeyProvider storageProvider)
+        var journalFormatKeyProvider = serviceProvider.GetService<IJournalFormatKeyProvider>();
+        if (journalFormatKeyProvider is null && serviceProvider.GetService<IJournalStorageProvider>() is IJournalFormatKeyProvider storageProvider)
         {
-            logFormatKeyProvider = storageProvider;
+            journalFormatKeyProvider = storageProvider;
         }
 
-        return logFormatKeyProvider?.GetLogFormatKey(grainContext) ?? JsonJournalingExtensions.LogFormatKey;
+        return journalFormatKeyProvider?.GetJournalFormatKey(grainContext) ?? JsonJournalExtensions.JournalFormatKey;
     }
 }

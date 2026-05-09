@@ -29,13 +29,13 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         IStateMachineManager manager,
-        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
+        _codec = JournalFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterStateMachine(key, this);
@@ -124,7 +124,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     void IDurableStateMachine.OnRecoveryCompleted() => OnValuePersisted();
     void IDurableStateMachine.OnWriteCompleted() => OnValuePersisted();
 
-    void IDurableStateMachine.Reset(LogStreamWriter writer)
+    void IDurableStateMachine.Reset(JournalStreamWriter writer)
     {
         _status = DurableTaskCompletionSourceStatus.Pending;
         _value = default;
@@ -137,7 +137,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
+    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
     {
         if (_status is not DurableTaskCompletionSourceStatus.Pending)
         {
@@ -145,9 +145,9 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter) => WriteState(snapshotWriter);
+    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter) => WriteState(snapshotWriter);
 
-    private void WriteState(LogStreamWriter writer)
+    private void WriteState(JournalStreamWriter writer)
     {
         switch (_status)
         {

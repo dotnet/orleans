@@ -8,7 +8,7 @@ namespace Orleans.Journaling.Tests;
 /// 
 /// DurableGrain is a base class that provides automatic state persistence using Orleans' journaling
 /// infrastructure. It ensures that grain state survives grain deactivations, node failures, and
-/// system restarts by journaling all state modifications to a durable log.
+/// system restarts by journaling all state modifications to a durable journal.
 /// 
 /// These tests verify:
 /// - State persistence across grain activations

@@ -14,13 +14,13 @@ public static class CodecTestHelpers
         return buffer;
     }
 
-    public static ReadOnlySequence<byte> WriteEntry(Action<LogStreamWriter> write)
+    public static ReadOnlySequence<byte> WriteEntry(Action<JournalStreamWriter> write)
     {
-        using var batch = new OrleansBinaryLogBatchWriter();
-        write(batch.CreateLogStreamWriter(new LogStreamId(1)));
+        using var batch = new OrleansBinaryJournalBatchWriter();
+        write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
         using var committed = batch.PeekSlice();
         var remaining = committed.AsReadOnlySequence();
-        if (!OrleansBinaryLogEntryFrameReader.TryReadEntry(
+        if (!OrleansBinaryJournalEntryFrameReader.TryReadEntry(
             ref remaining,
             offset: 0,
             isCompleted: true,
@@ -29,7 +29,7 @@ public static class CodecTestHelpers
             out _,
             out _))
         {
-            throw new InvalidOperationException("The test log entry was not fully written.");
+            throw new InvalidOperationException("The test journal entry was not fully written.");
         }
 
         return Sequence(payload.ToArray());
@@ -61,28 +61,28 @@ public static class CodecTestHelpers
         return new ReadOnlySequence<byte>(first!, 0, last!, last!.Memory.Length);
     }
 
-    public static void AppendEntry(LogStreamWriter writer, ReadOnlySpan<byte> payload)
+    public static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
         entry.Commit();
     }
 
-    public static void AssertCodecProviderRegistrations(IServiceProvider serviceProvider, string logFormatKey, object expectedProvider, bool expectDefaultProvider)
+    public static void AssertCodecProviderRegistrations(IServiceProvider serviceProvider, string journalFormatKey, object expectedProvider, bool expectDefaultProvider)
     {
-        AssertCodecProvider<IDurableDictionaryOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableListOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableQueueOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableSetOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableValueOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableStateOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, logFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableDictionaryOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableListOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableQueueOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableSetOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableValueOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableStateOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
+        AssertCodecProvider<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
     }
 
-    private static void AssertCodecProvider<TProvider>(IServiceProvider serviceProvider, string logFormatKey, object expectedProvider, bool expectDefaultProvider)
+    private static void AssertCodecProvider<TProvider>(IServiceProvider serviceProvider, string journalFormatKey, object expectedProvider, bool expectDefaultProvider)
         where TProvider : class
     {
-        Assert.Same(expectedProvider, serviceProvider.GetRequiredKeyedService<TProvider>(logFormatKey));
+        Assert.Same(expectedProvider, serviceProvider.GetRequiredKeyedService<TProvider>(journalFormatKey));
         if (expectDefaultProvider)
         {
             Assert.Same(expectedProvider, serviceProvider.GetRequiredService<TProvider>());

@@ -3,20 +3,20 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Binary codec for durable task completion source log entries, preserving the legacy Orleans binary wire format.
+/// Binary codec for durable task completion source journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 /// <remarks>
 /// Unlike other durable type codecs, the TCS format uses a status byte instead of a
 /// VarUInt32 command discriminator after the version byte.
 /// </remarks>
 internal sealed class OrleansBinaryTcsOperationCodec<T>(
-    ILogValueCodec<T> codec,
-    ILogValueCodec<Exception> exceptionCodec) : IDurableTaskCompletionSourceOperationCodec<T>, IOrleansBinaryLogEntryCodec
+    IJournalValueCodec<T> codec,
+    IJournalValueCodec<Exception> exceptionCodec) : IDurableTaskCompletionSourceOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
 
     /// <inheritdoc/>
-    public void WritePending(LogStreamWriter writer) =>
+    public void WritePending(JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, WritePendingPayload);
 
     private static void WritePendingPayload(IBufferWriter<byte> output)
@@ -26,7 +26,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteCompleted(T value, LogStreamWriter writer) =>
+    public void WriteCompleted(T value, JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, output => WriteCompletedPayload(value, output));
 
     private void WriteCompletedPayload(T value, IBufferWriter<byte> output)
@@ -37,7 +37,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteFaulted(Exception exception, LogStreamWriter writer) =>
+    public void WriteFaulted(Exception exception, JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, output => WriteFaultedPayload(exception, output));
 
     private void WriteFaultedPayload(Exception exception, IBufferWriter<byte> output)
@@ -48,7 +48,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteCanceled(LogStreamWriter writer) =>
+    public void WriteCanceled(JournalStreamWriter writer) =>
         DurableOperationCodecWriter.Write(writer, WriteCanceledPayload);
 
     private static void WriteCanceledPayload(IBufferWriter<byte> output)
@@ -89,7 +89,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         }
     }
 
-    void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
+    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IDurableStateMachine stateMachine) =>
         Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableTaskCompletionSourceOperationHandler<T>>(stateMachine, this));
 
     private static void WriteVersionByte(IBufferWriter<byte> output)

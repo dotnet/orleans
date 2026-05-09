@@ -33,13 +33,13 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void UseJsonJournalingFormat_TypeInfoResolverOverload_RegistersPayloadMetadata()
+    public void UseJsonJournalFormat_TypeInfoResolverOverload_RegistersPayloadMetadata()
     {
         var builder = new TestSiloBuilder();
-        builder.UseJsonJournalingFormat(JsonCodecTestJsonContext.Default);
+        builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalingExtensions.LogFormatKey).GetCodec<JsonCodecTestValue>();
+        Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalExtensions.JournalFormatKey).GetCodec<JsonCodecTestValue>();
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
         var consumer = new ValueConsumer<JsonCodecTestValue>();
@@ -240,9 +240,9 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_CreateWriter_WritesReadableRecordPerLine()
+    public void JsonLinesJournalFormat_CreateWriter_WritesReadableRecordPerLine()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
 
         AppendValueSet(writer, 8, 42);
@@ -255,14 +255,14 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_TryAppendFormattedEntry_WritesEntryDirectly()
+    public void JsonLinesJournalFormat_TryAppendFormattedEntry_WritesEntryDirectly()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
 
-        var accepted = writer.CreateLogStreamWriter(new LogStreamId(8)).TryAppendFormattedEntry(JsonFormattedLogEntry.Create(42, static (jsonWriter, value) =>
+        var accepted = writer.CreateJournalStreamWriter(new JournalStreamId(8)).TryAppendFormattedEntry(JsonFormattedJournalEntry.Create(42, static (jsonWriter, value) =>
         {
-            jsonWriter.WriteStringValue(JsonLogEntryCommands.Set);
+            jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
             jsonWriter.WriteNumberValue(value);
         }));
 
@@ -271,39 +271,39 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonValueCodec_LogStreamWriterOverload_UsesFormattedEntryForJsonWriter()
+    public void JsonValueCodec_JournalStreamWriterOverload_UsesFormattedEntryForJsonWriter()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var codec = new JsonValueOperationCodec<int>(Options);
 
-        codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
+        codec.WriteSet(42, writer.CreateJournalStreamWriter(new JournalStreamId(8)));
 
         Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
     }
 
     [Fact]
-    public void JsonListCodec_LogStreamWriterOverload_WritesAddDirectlyForJsonWriter()
+    public void JsonListCodec_JournalStreamWriterOverload_WritesAddDirectlyForJsonWriter()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var codec = new JsonListOperationCodec<string>(Options);
 
-        codec.WriteAdd("one", writer.CreateLogStreamWriter(new LogStreamId(8)));
+        codec.WriteAdd("one", writer.CreateJournalStreamWriter(new JournalStreamId(8)));
 
         Assert.Equal("""[8,"add","one"]""" + "\n", GetString(writer));
     }
 
     [Fact]
-    public void JsonOperationCodecs_LogStreamWriterOverload_WriteDirectJsonLinesForOperationFamilies()
+    public void JsonOperationCodecs_JournalStreamWriterOverload_WriteDirectJsonLinesForOperationFamilies()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
 
-        new JsonQueueOperationCodec<int>(Options).WriteEnqueue(10, writer.CreateLogStreamWriter(new LogStreamId(11)));
-        new JsonSetOperationCodec<string>(Options).WriteAdd("a", writer.CreateLogStreamWriter(new LogStreamId(12)));
-        new JsonDictionaryOperationCodec<string, int>(Options).WriteSet("alice", 42, writer.CreateLogStreamWriter(new LogStreamId(13)));
-        new JsonTcsOperationCodec<int>(Options).WriteCompleted(5, writer.CreateLogStreamWriter(new LogStreamId(14)));
+        new JsonQueueOperationCodec<int>(Options).WriteEnqueue(10, writer.CreateJournalStreamWriter(new JournalStreamId(11)));
+        new JsonSetOperationCodec<string>(Options).WriteAdd("a", writer.CreateJournalStreamWriter(new JournalStreamId(12)));
+        new JsonDictionaryOperationCodec<string, int>(Options).WriteSet("alice", 42, writer.CreateJournalStreamWriter(new JournalStreamId(13)));
+        new JsonTcsOperationCodec<int>(Options).WriteCompleted(5, writer.CreateJournalStreamWriter(new JournalStreamId(14)));
 
         Assert.Equal(
             """[11,"enqueue",10]""" + "\n" +
@@ -314,14 +314,14 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_TryAppendFormattedEntry_RollsBackWhenJsonWriteThrows()
+    public void JsonLinesJournalFormat_TryAppendFormattedEntry_RollsBackWhenJsonWriteThrows()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var codec = new JsonListOperationCodec<ThrowingJsonValue>(Options);
 
         AppendValueSet(writer, 8, 42);
-        Assert.Throws<InvalidOperationException>(() => codec.WriteAdd(new("bad"), writer.CreateLogStreamWriter(new LogStreamId(9))));
+        Assert.Throws<InvalidOperationException>(() => codec.WriteAdd(new("bad"), writer.CreateJournalStreamWriter(new JournalStreamId(9))));
         AppendValueSet(writer, 10, 43);
 
         Assert.Equal(
@@ -331,12 +331,12 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonValueCodec_LogStreamWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
+    public void JsonValueCodec_JournalStreamWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
     {
-        using var writer = new CapturingNonJsonLogWriter();
+        using var writer = new CapturingNonJsonJournalWriter();
         var codec = new JsonValueOperationCodec<int>(Options);
 
-        codec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
+        codec.WriteSet(42, writer.CreateJournalStreamWriter(new JournalStreamId(8)));
 
         var payload = """["set",42]"""u8.ToArray();
         var entry = Assert.Single(writer.Entries);
@@ -348,13 +348,13 @@ public class JsonCodecTests
     [Fact]
     public void JsonOperationCodecWriter_FallbackPath_AbortsEntryWhenJsonWriteThrows()
     {
-        using var writer = new CapturingNonJsonLogWriter();
+        using var writer = new CapturingNonJsonJournalWriter();
         var valueCodec = new JsonValueOperationCodec<int>(Options);
         var throwingCodec = new JsonValueOperationCodec<ThrowingJsonValue>(Options);
 
-        valueCodec.WriteSet(42, writer.CreateLogStreamWriter(new LogStreamId(8)));
-        Assert.Throws<InvalidOperationException>(() => throwingCodec.WriteSet(new("bad"), writer.CreateLogStreamWriter(new LogStreamId(9))));
-        valueCodec.WriteSet(43, writer.CreateLogStreamWriter(new LogStreamId(10)));
+        valueCodec.WriteSet(42, writer.CreateJournalStreamWriter(new JournalStreamId(8)));
+        Assert.Throws<InvalidOperationException>(() => throwingCodec.WriteSet(new("bad"), writer.CreateJournalStreamWriter(new JournalStreamId(9))));
+        valueCodec.WriteSet(43, writer.CreateJournalStreamWriter(new JournalStreamId(10)));
 
         Assert.Collection(
             writer.Entries,
@@ -371,13 +371,13 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Writer_DisposeWithoutCommit_TruncatesIncompleteLine()
+    public void JsonLinesJournalFormat_Writer_DisposeWithoutCommit_TruncatesIncompleteLine()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
 
         AppendValueSet(writer, 8, 42);
-        using (var aborted = writer.CreateLogStreamWriter(new LogStreamId(9)).BeginEntry())
+        using (var aborted = writer.CreateJournalStreamWriter(new JournalStreamId(9)).BeginEntry())
         {
             aborted.Writer.Write("""["set",100"""u8);
         }
@@ -391,9 +391,9 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Writer_Reset_ReusesBuffer()
+    public void JsonLinesJournalFormat_Writer_Reset_ReusesBuffer()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
 
         AppendValueSet(writer, 8, 42);
@@ -404,9 +404,9 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_DispatchesEntries()
+    public void JsonLinesJournalFormat_Read_DispatchesEntries()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var entries = Read(format, """[8,"set",42]""" + "\n");
         var entry = Assert.Single(entries);
         var valueCodec = new JsonValueOperationCodec<int>(Options);
@@ -428,9 +428,9 @@ public class JsonCodecTests
     [InlineData("[8,null]\n", "operation command string")]
     [InlineData("""[8,"set",42]{}""" + "\n", "invalid JSON")]
     [InlineData("""[8,"set",42""" + "\n", "invalid JSON")]
-    public void JsonLinesLogFormat_Read_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
+    public void JsonLinesJournalFormat_Read_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
 
@@ -438,9 +438,9 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_Bom_Throws()
+    public void JsonLinesJournalFormat_Read_Bom_Throws()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""[8,"set",42]""" + "\n")).ToArray();
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, bytes));
@@ -449,9 +449,9 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_FinalLineWithoutNewline_Throws()
+    public void JsonLinesJournalFormat_Read_FinalLineWithoutNewline_Throws()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var jsonLines =
             """[8,"set",42]""" + "\n" +
             """[9,"set",43""";
@@ -462,14 +462,14 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_PartialLineWaitsForNewlineWhenInputIsNotCompleted()
+    public void JsonLinesJournalFormat_Read_PartialLineWaitsForNewlineWhenInputIsNotCompleted()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var bytes = Encoding.UTF8.GetBytes("""[8,"set",42]""");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
-        var consumer = new RecordingLogEntrySink();
+        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var consumer = new RecordingJournalEntrySink();
 
         format.Read(reader, consumer);
 
@@ -478,9 +478,9 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_NewlineAtArcBufferPageBoundary_Parses()
+    public void JsonLinesJournalFormat_Read_NewlineAtArcBufferPageBoundary_Parses()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var prefix = "[8,\"set\",\"";
         var suffix = "\"]";
         var text = new string('a', ArcBufferWriter.MinimumPageSize - Encoding.UTF8.GetByteCount(prefix + suffix));
@@ -489,8 +489,8 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes(line + "\n");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
-        var consumer = new RecordingLogEntrySink();
+        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var consumer = new RecordingJournalEntrySink();
 
         format.Read(reader, consumer);
 
@@ -501,17 +501,17 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_MultiPagePartialLineWaitsForNewlineWhenInputIsNotCompleted()
+    public void JsonLinesJournalFormat_Read_MultiPagePartialLineWaitsForNewlineWhenInputIsNotCompleted()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var prefix = "[8,\"set\",\"";
         var suffix = "\"]";
         var text = new string('a', ArcBufferWriter.MinimumPageSize + 8 - Encoding.UTF8.GetByteCount(prefix + suffix));
         var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
-        var consumer = new RecordingLogEntrySink();
+        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var consumer = new RecordingJournalEntrySink();
 
         format.Read(reader, consumer);
 
@@ -520,9 +520,9 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_ParsesCrLfLines()
+    public void JsonLinesJournalFormat_Read_ParsesCrLfLines()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var entries = Read(format, """[8,"set",42]""" + "\r\n");
         var entry = Assert.Single(entries);
 
@@ -531,10 +531,10 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_ActiveStateMachine_UsesJsonCodecBridge()
+    public void JsonLinesJournalFormat_Read_ActiveStateMachine_UsesJsonCodecBridge()
     {
-        var format = new JsonLinesLogFormat();
-        var codec = new RecordingJsonLogEntryCodec();
+        var format = new JsonLinesJournalFormat();
+        var codec = new RecordingJsonJournalEntryCodec();
         var stateMachine = new RecordingStateMachine(codec);
 
         ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine));
@@ -544,21 +544,21 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_ActiveStateMachine_ThrowsWhenCodecIsNotJsonBridge()
+    public void JsonLinesJournalFormat_Read_ActiveStateMachine_ThrowsWhenCodecIsNotJsonBridge()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var stateMachine = new RecordingStateMachine(new object());
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
             ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine)));
 
-        Assert.Contains("does not implement IJsonLogEntryCodec", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("does not implement IJsonJournalEntryCodec", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_ActiveStateMachine_ThrowsWhenCodecHandlerDoesNotMatch()
+    public void JsonLinesJournalFormat_Read_ActiveStateMachine_ThrowsWhenCodecHandlerDoesNotMatch()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var stateMachine = new RecordingStateMachine(new JsonValueOperationCodec<int>(Options));
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
@@ -568,25 +568,25 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Read_DurableNothingIgnoresEntryWithoutJsonCodec()
+    public void JsonLinesJournalFormat_Read_DurableNothingIgnoresEntryWithoutJsonCodec()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         var stateMachine = new NoOpStateMachine();
 
         ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateMachineResolver(stateMachine));
     }
 
     [Fact]
-    public void JsonFormattedLogEntry_Apply_UsesOperationCodec()
+    public void JsonFormattedJournalEntry_Apply_UsesOperationCodec()
     {
-        var entry = JsonFormattedLogEntry.Create(
+        var entry = JsonFormattedJournalEntry.Create(
             42,
             static (writer, value) =>
             {
-                writer.WriteStringValue(JsonLogEntryCommands.Set);
+                writer.WriteStringValue(JsonJournalEntryCommands.Set);
                 writer.WriteNumberValue(value);
             });
-        var codec = new RecordingJsonLogEntryCodec();
+        var codec = new RecordingJsonJournalEntryCodec();
         var stateMachine = new RecordingStateMachine(codec);
 
         entry.Apply(stateMachine);
@@ -596,13 +596,13 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonFormattedLogEntry_Apply_DurableNothingIgnoresEntryWithoutJsonCodec()
+    public void JsonFormattedJournalEntry_Apply_DurableNothingIgnoresEntryWithoutJsonCodec()
     {
-        var entry = JsonFormattedLogEntry.Create(
+        var entry = JsonFormattedJournalEntry.Create(
             42,
             static (writer, value) =>
             {
-                writer.WriteStringValue(JsonLogEntryCommands.Set);
+                writer.WriteStringValue(JsonJournalEntryCommands.Set);
                 writer.WriteNumberValue(value);
             });
 
@@ -610,43 +610,43 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesLogFormat_Writer_RejectsWrongFormattedEntryType()
+    public void JsonLinesJournalFormat_Writer_RejectsWrongFormattedEntryType()
     {
-        var format = new JsonLinesLogFormat();
+        var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
-        var logWriter = writer.CreateLogStreamWriter(new LogStreamId(8));
+        var journalWriter = writer.CreateJournalStreamWriter(new JournalStreamId(8));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => logWriter.AppendFormattedEntry(new TestFormattedLogEntry()));
+        var exception = Assert.Throws<InvalidOperationException>(() => journalWriter.AppendFormattedEntry(new TestFormattedJournalEntry()));
 
         Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
     }
 
-    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableListOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableListOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableQueueOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableQueueOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableSetOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableSetOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableStateOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableStateOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<LogStreamWriter> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static ReadOnlySequence<byte> AssertPayload(string expectedJson, Action<LogStreamWriter> write)
+    private static ReadOnlySequence<byte> AssertPayload(string expectedJson, Action<JournalStreamWriter> write)
     {
         var payload = CodecTestHelpers.WriteEntry(write);
         Assert.Equal(expectedJson, GetString(payload));
@@ -657,54 +657,54 @@ public class JsonCodecTests
 
     private static string GetString(ReadOnlySequence<byte> payload) => Encoding.UTF8.GetString(payload.ToArray());
 
-    private static string GetString(ILogBatchWriter writer)
+    private static string GetString(IJournalBatchWriter writer)
     {
         using var buffer = writer.GetCommittedBuffer();
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private static void AppendValueSet(ILogBatchWriter writer, ulong streamId, int value)
+    private static void AppendValueSet(IJournalBatchWriter writer, ulong streamId, int value)
     {
         var codec = new JsonValueOperationCodec<int>(Options);
-        codec.WriteSet(value, writer.CreateLogStreamWriter(new LogStreamId(streamId)));
+        codec.WriteSet(value, writer.CreateJournalStreamWriter(new JournalStreamId(streamId)));
     }
 
     private static JsonSerializerOptions CreateOptions() => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
 
-    private static List<RecordedLogEntry> Read(JsonLinesLogFormat format, string jsonLines) => Read(format, Encoding.UTF8.GetBytes(jsonLines));
+    private static List<RecordedJournalEntry> Read(JsonLinesJournalFormat format, string jsonLines) => Read(format, Encoding.UTF8.GetBytes(jsonLines));
 
-    private static List<RecordedLogEntry> Read(JsonLinesLogFormat format, byte[] bytes)
+    private static List<RecordedJournalEntry> Read(JsonLinesJournalFormat format, byte[] bytes)
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
-        var consumer = new RecordingLogEntrySink();
+        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
+        var consumer = new RecordingJournalEntrySink();
         format.Read(reader, consumer);
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
     }
 
-    private static void ReadOne(JsonLinesLogFormat format, string jsonLines, IStateMachineResolver resolver)
+    private static void ReadOne(JsonLinesJournalFormat format, string jsonLines, IStateMachineResolver resolver)
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
-        var reader = new LogReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
+        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
         format.Read(reader, resolver);
         Assert.Equal(0, reader.Length);
     }
 
-    private sealed record RecordedLogEntry(LogStreamId StreamId, byte[] Payload);
+    private sealed record RecordedJournalEntry(JournalStreamId StreamId, byte[] Payload);
 
-    private sealed class CapturingNonJsonLogWriter : ILogStreamWriterTarget, ILogEntryWriterTarget, IDisposable
+    private sealed class CapturingNonJsonJournalWriter : IJournalStreamWriterTarget, IJournalEntryWriterTarget, IDisposable
     {
         private readonly ArcBufferWriter _payload = new();
-        private readonly LogEntryWriter _entryWriter = new();
-        private LogStreamId _streamId;
+        private readonly JournalEntryWriter _entryWriter = new();
+        private JournalStreamId _streamId;
 
-        public List<RecordedLogEntry> Entries { get; } = [];
+        public List<RecordedJournalEntry> Entries { get; } = [];
 
-        public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId) => new(streamId, this);
+        public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
 
         public void Advance(int count) => _payload.AdvanceWriter(count);
 
@@ -727,7 +727,7 @@ public class JsonCodecTests
 
         public void Dispose() => _payload.Dispose();
 
-        LogEntryWriter ILogStreamWriterTarget.BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
+        JournalEntryWriter IJournalStreamWriterTarget.BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion)
         {
             if (_entryWriter.IsActive)
             {
@@ -740,48 +740,48 @@ public class JsonCodecTests
             return _entryWriter;
         }
 
-        void ILogStreamWriterTarget.AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) =>
+        void IJournalStreamWriterTarget.AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) =>
             throw new InvalidOperationException("This test writer does not accept formatted entries.");
 
-        bool ILogStreamWriterTarget.TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry) => false;
+        bool IJournalStreamWriterTarget.TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) => false;
     }
 
-    private sealed class RecordingLogEntrySink : IStateMachineResolver, IDurableStateMachine, IFormattedLogEntryBuffer
+    private sealed class RecordingJournalEntrySink : IStateMachineResolver, IDurableStateMachine, IFormattedJournalEntryBuffer
     {
-        private LogStreamId _streamId;
+        private JournalStreamId _streamId;
 
-        public List<RecordedLogEntry> Entries { get; } = [];
+        public List<RecordedJournalEntry> Entries { get; } = [];
 
-        public IReadOnlyList<IFormattedLogEntry> FormattedEntries => [];
+        public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => [];
 
         object IDurableStateMachine.OperationCodec => this;
 
-        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
         {
             _streamId = streamId;
             return this;
         }
 
-        public void AddFormattedEntry(IFormattedLogEntry entry) => Entries.Add(new(_streamId, entry.Payload.ToArray()));
+        public void AddFormattedEntry(IFormattedJournalEntry entry) => Entries.Add(new(_streamId, entry.Payload.ToArray()));
 
-        public void Reset(LogStreamWriter storage) { }
-        public void AppendEntries(LogStreamWriter writer) { }
-        public void AppendSnapshot(LogStreamWriter writer) { }
+        public void Reset(JournalStreamWriter storage) { }
+        public void AppendEntries(JournalStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class SingleStateMachineResolver(IDurableStateMachine stateMachine) : IStateMachineResolver
     {
-        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId) => stateMachine;
+        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId) => stateMachine;
     }
 
     private sealed class RecordingStateMachine(object codec) : IDurableStateMachine
     {
         public object OperationCodec => codec;
 
-        public void Reset(LogStreamWriter storage) { }
-        public void AppendEntries(LogStreamWriter writer) { }
-        public void AppendSnapshot(LogStreamWriter writer) { }
+        public void Reset(JournalStreamWriter storage) { }
+        public void AppendEntries(JournalStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
@@ -789,13 +789,13 @@ public class JsonCodecTests
     {
         public object OperationCodec { get; } = new();
 
-        public void Reset(LogStreamWriter storage) { }
-        public void AppendEntries(LogStreamWriter writer) { }
-        public void AppendSnapshot(LogStreamWriter writer) { }
+        public void Reset(JournalStreamWriter storage) { }
+        public void AppendEntries(JournalStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class RecordingJsonLogEntryCodec : IJsonLogEntryCodec
+    private sealed class RecordingJsonJournalEntryCodec : IJsonJournalEntryCodec
     {
         public IDurableStateMachine? StateMachine { get; private set; }
 
@@ -804,12 +804,12 @@ public class JsonCodecTests
         public void Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
         {
             StateMachine = stateMachine;
-            Value = reader.Deserialize(1, JsonLogEntryFields.Value, JsonCodecTestJsonContext.Default.Int32);
+            Value = reader.Deserialize(1, JsonJournalEntryFields.Value, JsonCodecTestJsonContext.Default.Int32);
             reader.EnsureEnd(2);
         }
     }
 
-    private sealed class TestFormattedLogEntry : IFormattedLogEntry
+    private sealed class TestFormattedJournalEntry : IFormattedJournalEntry
     {
         public ReadOnlyMemory<byte> Payload => ReadOnlyMemory<byte>.Empty;
 

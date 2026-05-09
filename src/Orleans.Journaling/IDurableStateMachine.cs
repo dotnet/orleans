@@ -17,10 +17,10 @@ public interface IDurableStateMachine
     /// If the state machine has any volatile state, it must be cleared by this method.
     /// This method can be called at any point in the state machine's lifetime, including during recovery.
     /// </remarks>
-    void Reset(LogStreamWriter writer);
+    void Reset(JournalStreamWriter writer);
 
     /// <summary>
-    /// Notifies the state machine that all prior log entries and snapshots have been applied.
+    /// Notifies the state machine that all prior journal entries and snapshots have been applied.
     /// </summary>
     /// <remarks>
     /// The state machine should not expect any additional recovery entries after this method is called,
@@ -30,19 +30,19 @@ public interface IDurableStateMachine
     void OnRecoveryCompleted() { }
 
     /// <summary>
-    /// Writes pending state changes to the log.
+    /// Writes pending state changes to the journal.
     /// </summary>
-    /// <param name="writer">The log stream writer.</param>
-    void AppendEntries(LogStreamWriter writer);
+    /// <param name="writer">The journal stream writer.</param>
+    void AppendEntries(JournalStreamWriter writer);
 
     /// <summary>
     /// Writes a snapshot of the state machine to the provided writer.
     /// </summary>
-    /// <param name="writer">The log stream writer.</param>
-    void AppendSnapshot(LogStreamWriter writer);
+    /// <param name="writer">The journal stream writer.</param>
+    void AppendSnapshot(JournalStreamWriter writer);
 
     /// <summary>
-    /// Notifies the state machine that all prior log entries and snapshots which it has written have been written to stable storage.
+    /// Notifies the state machine that all prior journal entries and snapshots which it has written have been written to stable storage.
     /// </summary>
     void OnWriteCompleted() { }
 

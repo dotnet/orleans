@@ -3,7 +3,7 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Provides the format-specific codec for durable dictionary log entries.
+/// Provides the format-specific codec for durable dictionary journal entries.
 /// </summary>
 public interface IDurableDictionaryOperationCodecProvider
 {
@@ -14,7 +14,7 @@ public interface IDurableDictionaryOperationCodecProvider
 }
 
 /// <summary>
-/// Provides the format-specific codec for durable list log entries.
+/// Provides the format-specific codec for durable list journal entries.
 /// </summary>
 public interface IDurableListOperationCodecProvider
 {
@@ -25,7 +25,7 @@ public interface IDurableListOperationCodecProvider
 }
 
 /// <summary>
-/// Provides the format-specific codec for durable queue log entries.
+/// Provides the format-specific codec for durable queue journal entries.
 /// </summary>
 public interface IDurableQueueOperationCodecProvider
 {
@@ -36,7 +36,7 @@ public interface IDurableQueueOperationCodecProvider
 }
 
 /// <summary>
-/// Provides the format-specific codec for durable set log entries.
+/// Provides the format-specific codec for durable set journal entries.
 /// </summary>
 public interface IDurableSetOperationCodecProvider
 {
@@ -47,7 +47,7 @@ public interface IDurableSetOperationCodecProvider
 }
 
 /// <summary>
-/// Provides the format-specific codec for durable value log entries.
+/// Provides the format-specific codec for durable value journal entries.
 /// </summary>
 public interface IDurableValueOperationCodecProvider
 {
@@ -58,7 +58,7 @@ public interface IDurableValueOperationCodecProvider
 }
 
 /// <summary>
-/// Provides the format-specific codec for durable persistent state log entries.
+/// Provides the format-specific codec for durable persistent state journal entries.
 /// </summary>
 public interface IDurableStateOperationCodecProvider
 {
@@ -69,7 +69,7 @@ public interface IDurableStateOperationCodecProvider
 }
 
 /// <summary>
-/// Provides the format-specific codec for durable task completion source log entries.
+/// Provides the format-specific codec for durable task completion source journal entries.
 /// </summary>
 public interface IDurableTaskCompletionSourceOperationCodecProvider
 {
@@ -85,16 +85,16 @@ public interface IDurableTaskCompletionSourceOperationCodecProvider
 public interface IDurableDictionaryOperationCodec<TKey, TValue> where TKey : notnull
 {
     /// <summary>Writes a set command.</summary>
-    void WriteSet(TKey key, TValue value, LogStreamWriter writer);
+    void WriteSet(TKey key, TValue value, JournalStreamWriter writer);
 
     /// <summary>Writes a remove command.</summary>
-    void WriteRemove(TKey key, LogStreamWriter writer);
+    void WriteRemove(TKey key, JournalStreamWriter writer);
 
     /// <summary>Writes a clear command.</summary>
-    void WriteClear(LogStreamWriter writer);
+    void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
-    void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer);
+    void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer);
@@ -106,22 +106,22 @@ public interface IDurableDictionaryOperationCodec<TKey, TValue> where TKey : not
 public interface IDurableListOperationCodec<T>
 {
     /// <summary>Writes an add command.</summary>
-    void WriteAdd(T item, LogStreamWriter writer);
+    void WriteAdd(T item, JournalStreamWriter writer);
 
     /// <summary>Writes a set command.</summary>
-    void WriteSet(int index, T item, LogStreamWriter writer);
+    void WriteSet(int index, T item, JournalStreamWriter writer);
 
     /// <summary>Writes an insert command.</summary>
-    void WriteInsert(int index, T item, LogStreamWriter writer);
+    void WriteInsert(int index, T item, JournalStreamWriter writer);
 
     /// <summary>Writes a remove-at command.</summary>
-    void WriteRemoveAt(int index, LogStreamWriter writer);
+    void WriteRemoveAt(int index, JournalStreamWriter writer);
 
     /// <summary>Writes a clear command.</summary>
-    void WriteClear(LogStreamWriter writer);
+    void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
-    void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer);
+    void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer);
@@ -133,16 +133,16 @@ public interface IDurableListOperationCodec<T>
 public interface IDurableQueueOperationCodec<T>
 {
     /// <summary>Writes an enqueue command.</summary>
-    void WriteEnqueue(T item, LogStreamWriter writer);
+    void WriteEnqueue(T item, JournalStreamWriter writer);
 
     /// <summary>Writes a dequeue command.</summary>
-    void WriteDequeue(LogStreamWriter writer);
+    void WriteDequeue(JournalStreamWriter writer);
 
     /// <summary>Writes a clear command.</summary>
-    void WriteClear(LogStreamWriter writer);
+    void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
-    void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer);
+    void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer);
@@ -154,16 +154,16 @@ public interface IDurableQueueOperationCodec<T>
 public interface IDurableSetOperationCodec<T>
 {
     /// <summary>Writes an add command.</summary>
-    void WriteAdd(T item, LogStreamWriter writer);
+    void WriteAdd(T item, JournalStreamWriter writer);
 
     /// <summary>Writes a remove command.</summary>
-    void WriteRemove(T item, LogStreamWriter writer);
+    void WriteRemove(T item, JournalStreamWriter writer);
 
     /// <summary>Writes a clear command.</summary>
-    void WriteClear(LogStreamWriter writer);
+    void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Writes a snapshot command, deriving the item count from <paramref name="items"/>.</summary>
-    void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer);
+    void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer);
@@ -175,7 +175,7 @@ public interface IDurableSetOperationCodec<T>
 public interface IDurableValueOperationCodec<T>
 {
     /// <summary>Writes a set command.</summary>
-    void WriteSet(T value, LogStreamWriter writer);
+    void WriteSet(T value, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer);
@@ -187,10 +187,10 @@ public interface IDurableValueOperationCodec<T>
 public interface IDurableStateOperationCodec<T>
 {
     /// <summary>Writes a set command.</summary>
-    void WriteSet(T state, ulong version, LogStreamWriter writer);
+    void WriteSet(T state, ulong version, JournalStreamWriter writer);
 
     /// <summary>Writes a clear command.</summary>
-    void WriteClear(LogStreamWriter writer);
+    void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer);
@@ -202,16 +202,16 @@ public interface IDurableStateOperationCodec<T>
 public interface IDurableTaskCompletionSourceOperationCodec<T>
 {
     /// <summary>Writes a pending command.</summary>
-    void WritePending(LogStreamWriter writer);
+    void WritePending(JournalStreamWriter writer);
 
     /// <summary>Writes a completed command.</summary>
-    void WriteCompleted(T value, LogStreamWriter writer);
+    void WriteCompleted(T value, JournalStreamWriter writer);
 
     /// <summary>Writes a faulted command.</summary>
-    void WriteFaulted(Exception exception, LogStreamWriter writer);
+    void WriteFaulted(Exception exception, JournalStreamWriter writer);
 
     /// <summary>Writes a canceled command.</summary>
-    void WriteCanceled(LogStreamWriter writer);
+    void WriteCanceled(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
     void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer);
@@ -336,7 +336,7 @@ public interface IDurableTaskCompletionSourceOperationHandler<T>
 
 internal static class DurableOperationCodecWriter
 {
-    public static void Write(LogStreamWriter writer, Action<LogEntryWriter> write)
+    public static void Write(JournalStreamWriter writer, Action<JournalEntryWriter> write)
     {
         using var entry = writer.BeginEntry();
         write(entry.Writer);

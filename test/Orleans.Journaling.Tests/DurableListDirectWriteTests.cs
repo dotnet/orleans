@@ -10,8 +10,8 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Add_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogStreamWriter();
-        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnAdd: true));
+        var writer = new TestJournalStreamWriter();
+        var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnAdd: true));
 
         Assert.Throws<InvalidOperationException>(() => list.Add(1));
 
@@ -22,8 +22,8 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Set_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogStreamWriter();
-        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnSet: true));
+        var writer = new TestJournalStreamWriter();
+        var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnSet: true));
         ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
         ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
 
@@ -36,8 +36,8 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Insert_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogStreamWriter();
-        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnInsert: true));
+        var writer = new TestJournalStreamWriter();
+        var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnInsert: true));
         ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
         ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
 
@@ -50,8 +50,8 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void RemoveAt_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogStreamWriter();
-        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnRemoveAt: true));
+        var writer = new TestJournalStreamWriter();
+        var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnRemoveAt: true));
         ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
         ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
 
@@ -64,8 +64,8 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Clear_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestLogStreamWriter();
-        var list = new DurableList<int>("list", new TestLogManager(writer), new ThrowingListCodec<int>(throwOnClear: true));
+        var writer = new TestJournalStreamWriter();
+        var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnClear: true));
         ((IDurableListOperationHandler<int>)list).ApplyAdd(1);
         ((IDurableListOperationHandler<int>)list).ApplyAdd(2);
 
@@ -78,8 +78,8 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Add_UsesDirectEntryWriter()
     {
-        var writer = new TestLogStreamWriter();
-        var list = new DurableList<int>("list", new TestLogManager(writer), new DirectAddCodec<int>());
+        var writer = new TestJournalStreamWriter();
+        var list = new DurableList<int>("list", new TestJournalManager(writer), new DirectAddCodec<int>());
 
         list.Add(1);
 
@@ -88,7 +88,7 @@ public sealed class DurableListDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestLogManager(TestLogStreamWriter writer) : IStateMachineManager
+    private sealed class TestJournalManager(TestJournalStreamWriter writer) : IStateMachineManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
@@ -105,13 +105,13 @@ public sealed class DurableListDirectWriteTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class TestLogStreamWriter
+    private sealed class TestJournalStreamWriter
     {
-        private readonly OrleansBinaryLogBatchWriter _buffer = new();
+        private readonly OrleansBinaryJournalBatchWriter _buffer = new();
 
         public long Length => _buffer.Length;
 
-        public LogStreamWriter CreateWriter() => _buffer.CreateLogStreamWriter(new LogStreamId(1));
+        public JournalStreamWriter CreateWriter() => _buffer.CreateJournalStreamWriter(new JournalStreamId(1));
     }
 
     private sealed class ThrowingListCodec<T>(
@@ -121,27 +121,27 @@ public sealed class DurableListDirectWriteTests
         bool throwOnRemoveAt = false,
         bool throwOnClear = false) : TestListCodec<T>
     {
-        public override void WriteAdd(T item, LogStreamWriter writer)
+        public override void WriteAdd(T item, JournalStreamWriter writer)
         {
             WriteOrThrow(writer, throwOnAdd);
         }
 
-        public override void WriteSet(int index, T item, LogStreamWriter writer)
+        public override void WriteSet(int index, T item, JournalStreamWriter writer)
         {
             WriteOrThrow(writer, throwOnSet);
         }
 
-        public override void WriteInsert(int index, T item, LogStreamWriter writer)
+        public override void WriteInsert(int index, T item, JournalStreamWriter writer)
         {
             WriteOrThrow(writer, throwOnInsert);
         }
 
-        public override void WriteRemoveAt(int index, LogStreamWriter writer)
+        public override void WriteRemoveAt(int index, JournalStreamWriter writer)
         {
             WriteOrThrow(writer, throwOnRemoveAt);
         }
 
-        public override void WriteClear(LogStreamWriter writer)
+        public override void WriteClear(JournalStreamWriter writer)
         {
             WriteOrThrow(writer, throwOnClear);
         }
@@ -149,7 +149,7 @@ public sealed class DurableListDirectWriteTests
 
     private sealed class DirectAddCodec<T> : TestListCodec<T>
     {
-        public override void WriteAdd(T item, LogStreamWriter writer)
+        public override void WriteAdd(T item, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
             WriteByte(entry.Writer);
@@ -159,22 +159,22 @@ public sealed class DurableListDirectWriteTests
 
     private abstract class TestListCodec<T> : IDurableListOperationCodec<T>
     {
-        public virtual void WriteAdd(T item, LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteAdd(T item, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteSet(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteSet(int index, T item, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteInsert(int index, T item, LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteInsert(int index, T item, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteRemoveAt(int index, LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteRemoveAt(int index, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public virtual void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+        public virtual void WriteClear(JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<T> items, LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
-    private static void WriteOrThrow(LogStreamWriter writer, bool shouldThrow)
+    private static void WriteOrThrow(JournalStreamWriter writer, bool shouldThrow)
     {
         using var entry = writer.BeginEntry();
         WriteByte(entry.Writer);

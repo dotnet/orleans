@@ -28,8 +28,8 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Write phase
         var sut = CreateTestSystem(storage);
-        var keyCodec = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec = new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var keyCodec = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var valueCodec = new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
         var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec));
         await sut.Lifecycle.OnStart();
 
@@ -40,8 +40,8 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Recovery phase — new manager, same storage
         var sut2 = CreateTestSystem(storage);
-        var keyCodec2 = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec2 = new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var keyCodec2 = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var valueCodec2 = new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
         var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec2, valueCodec2));
         await sut2.Lifecycle.OnStart();
 
@@ -69,12 +69,12 @@ public class CodecRecoveryTests : JournalingTestBase
         dict.Add("alpha", 1);
         dict.Add("beta", 2);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
-        var log = Encoding.UTF8.GetString(storage.Segments.Single());
+        var journal = Encoding.UTF8.GetString(storage.Segments.Single());
         Assert.Equal(
             """[0,"set","dict",8]""" + "\n" +
             """[8,"set","alpha",1]""" + "\n" +
             """[8,"set","beta",2]""" + "\n",
-            log);
+            journal);
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
@@ -190,9 +190,9 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task Recovery_BinaryLogWithJsonFormat_ThrowsFormatKeyError()
+    public async Task Recovery_BinaryJournalWithJsonFormat_ThrowsFormatKeyError()
     {
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
         var sut = CreateTestSystem(storage);
         var dict = new DurableDictionary<string, int>("dict", sut.Manager, CreateBinaryDictionaryCodec<string, int>());
         await sut.Lifecycle.OnStart();
@@ -202,11 +202,11 @@ public class CodecRecoveryTests : JournalingTestBase
         var recovered = CreateTestSystemWithJsonCodec(storage);
         _ = new DurableDictionary<string, int>("dict", recovered.Manager, new JsonDictionaryOperationCodec<string, int>(CreateJsonOptions()));
 
-        _ = await AssertRecoveryFailsAsync(recovered.Lifecycle, JsonJournalingExtensions.LogFormatKey);
+        _ = await AssertRecoveryFailsAsync(recovered.Lifecycle, JsonJournalExtensions.JournalFormatKey);
     }
 
     [Fact]
-    public async Task Recovery_JsonLogWithBinaryFormat_ThrowsFormatKeyError()
+    public async Task Recovery_JsonJournalWithBinaryFormat_ThrowsFormatKeyError()
     {
         var storage = CreateJsonStorage();
         var jsonOptions = CreateJsonOptions();
@@ -219,44 +219,44 @@ public class CodecRecoveryTests : JournalingTestBase
         var recovered = CreateTestSystem(storage);
         _ = new DurableDictionary<string, int>("dict", recovered.Manager, CreateBinaryDictionaryCodec<string, int>());
 
-        _ = await AssertRecoveryFailsAsync(recovered.Lifecycle, OrleansBinaryLogFormat.LogFormatKey);
+        _ = await AssertRecoveryFailsAsync(recovered.Lifecycle, OrleansBinaryJournalFormat.JournalFormatKey);
     }
 
     [Theory]
     [InlineData("[8,\"set\",42]\n[\"8\",\"set\",43]\n", "unsigned integer stream id")]
-    [InlineData("[8,\"set\",42]\n[9,\"set\",43]{}\n", "invalid JSON log entry")]
-    public async Task JsonRecovery_MalformedLog_ThrowsFormatKeyError(string jsonLines, string expectedInnerMessage)
+    [InlineData("[8,\"set\",42]\n[9,\"set\",43]{}\n", "invalid JSON journal entry")]
+    public async Task JsonRecovery_MalformedJournal_ThrowsFormatKeyError(string jsonLines, string expectedInnerMessage)
     {
         var storage = await CreateJsonStorageWithSegment(jsonLines);
         var sut = CreateTestSystemWithJsonCodec(storage);
 
-        var exception = await AssertRecoveryFailsAsync(sut.Lifecycle, JsonJournalingExtensions.LogFormatKey);
+        var exception = await AssertRecoveryFailsAsync(sut.Lifecycle, JsonJournalExtensions.JournalFormatKey);
 
         Assert.Contains(expectedInnerMessage, exception.InnerException!.Message, StringComparison.Ordinal);
     }
 
-    internal (IStateMachineManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(ILogStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
+    internal (IStateMachineManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle) CreateTestSystemWithJsonCodec(IJournalStorage? storage = null, System.Text.Json.JsonSerializerOptions? jsonOptions = null)
     {
         storage ??= CreateJsonStorage();
         jsonOptions ??= CreateJsonOptions();
 
-        var logStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
+        var journalStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
-        var manager = new LogStateMachineManager(
+        var manager = new JournalStateMachineManager(
             storage,
-            LoggerFactory.CreateLogger<LogStateMachineManager>(),
+            LoggerFactory.CreateLogger<JournalStateMachineManager>(),
             Microsoft.Extensions.Options.Options.Create(ManagerOptions),
-            logStreamIdsCodec,
+            journalStreamIdsCodec,
             retirementTrackerCodec,
             TimeProvider.System,
-            new JsonLinesLogFormat(),
-            JsonJournalingExtensions.LogFormatKey);
+            new JsonLinesJournalFormat(),
+            JsonJournalExtensions.JournalFormatKey);
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
 
-    private static VolatileLogStorage CreateJsonStorage() => new();
+    private static VolatileJournalStorage CreateJsonStorage() => new();
 
     private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
@@ -265,16 +265,16 @@ public class CodecRecoveryTests : JournalingTestBase
         where TKey : notnull
         => new(ValueCodec<TKey>(), ValueCodec<TValue>());
 
-    private ILogValueCodec<T> ValueCodec<T>() => new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
-    private static async Task<VolatileLogStorage> CreateJsonStorageWithSegment(string jsonLines)
+    private static async Task<VolatileJournalStorage> CreateJsonStorageWithSegment(string jsonLines)
     {
         var storage = CreateJsonStorage();
         await storage.AppendAsync(new ReadOnlySequence<byte>(Encoding.UTF8.GetBytes(jsonLines)), CancellationToken.None);
         return storage;
     }
 
-    private static async Task<InvalidOperationException> AssertRecoveryFailsAsync(ILifecycleSubject lifecycle, string logFormatKey)
+    private static async Task<InvalidOperationException> AssertRecoveryFailsAsync(ILifecycleSubject lifecycle, string journalFormatKey)
     {
         InvalidOperationException exception;
         try
@@ -287,7 +287,7 @@ public class CodecRecoveryTests : JournalingTestBase
             await lifecycle.OnStop(CancellationToken.None);
         }
 
-        Assert.Contains($"configured log format key '{logFormatKey}'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains($"configured journal format key '{journalFormatKey}'", exception.Message, StringComparison.Ordinal);
         Assert.NotNull(exception.InnerException);
         return exception;
     }

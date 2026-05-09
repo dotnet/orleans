@@ -1,7 +1,9 @@
 # Microsoft Orleans Journaling for Azure Storage
 
 ## Introduction
-Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows logging and tracking of grain operations using Azure Storage as a backing store.
+Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows journaling and tracking of grain operations using Azure Storage as a backing store.
+
+Blob names use the selected journal format's file extension, such as `.jsonl` for JSON Lines journals. When the selected journal format provides a MIME type, Azure append blobs are created with that content type.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -35,12 +37,12 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Storage as a journaling provider
-            .AddAzureAppendBlobLogStorage(optionsBuilder =>
+            .AddAzureAppendBlobJournalStorage(optionsBuilder =>
             {
                 optionsBuilder.Configure((options, serviceProvider) => options.BlobServiceClient = serviceProvider.GetRequiredService<BlobServiceClient>());
             })
             // JSON Lines is the default journaling format. Register metadata for all journaled payload types.
-            .UseJsonJournalingFormat(JournalJsonContext.Default);
+            .UseJsonJournalFormat(JournalJsonContext.Default);
     });
 
 var host = await builder.StartAsync();

@@ -58,18 +58,18 @@ public sealed class JsonOperationCodecAdditionalTests
     }
 
     [Fact]
-    public void UseJsonJournalingFormat_RegistersEveryFormatFamilyProviderByKey()
+    public void UseJsonJournalFormat_RegistersEveryFormatFamilyProviderByKey()
     {
         var builder = new TestSiloBuilder();
 
-        builder.UseJsonJournalingFormat(JsonCodecTestJsonContext.Default);
+        builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
-        Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredService<ILogFormat>());
+        Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
+        Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredService<IJournalFormat>());
         CodecTestHelpers.AssertCodecProviderRegistrations(
             serviceProvider,
-            JsonJournalingExtensions.LogFormatKey,
+            JsonJournalExtensions.JournalFormatKey,
             serviceProvider.GetRequiredService<JsonOperationCodecProvider>(),
             expectDefaultProvider: true);
     }
@@ -91,7 +91,7 @@ public sealed class JsonOperationCodecAdditionalTests
 
     private static void Apply<TKey, TValue>(
         IDurableDictionaryOperationCodec<TKey, TValue> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingDictionaryOperationHandler<TKey, TValue> consumer)
         where TKey : notnull
     {

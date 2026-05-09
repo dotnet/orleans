@@ -16,25 +16,29 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     private const string CustomFormatKey = "custom-test-format";
 
     [Fact]
-    public void AddLogStorage_RegistersJsonFamilyByDefaultAndBinaryFamilyByFormatKey()
+    public void AddJournalStorage_RegistersJsonFamilyByDefaultAndBinaryFamilyByFormatKey()
     {
         var builder = new TestSiloBuilder();
 
-        builder.AddLogStorage();
+        builder.AddJournalStorage();
 
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var jsonFormat = Assert.IsType<JsonLinesLogFormat>(serviceProvider.GetRequiredKeyedService<ILogFormat>(JsonJournalingExtensions.LogFormatKey));
-        Assert.Same(jsonFormat, serviceProvider.GetRequiredService<ILogFormat>());
+        var jsonFormat = Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
+        Assert.Same(jsonFormat, serviceProvider.GetRequiredService<IJournalFormat>());
+        Assert.Equal(".jsonl", jsonFormat.FileExtension);
+        Assert.Equal("application/jsonl", jsonFormat.MimeType);
         CodecTestHelpers.AssertCodecProviderRegistrations(
             serviceProvider,
-            JsonJournalingExtensions.LogFormatKey,
+            JsonJournalExtensions.JournalFormatKey,
             serviceProvider.GetRequiredService<JsonOperationCodecProvider>(),
             expectDefaultProvider: true);
 
-        Assert.Same(OrleansBinaryLogFormat.Instance, serviceProvider.GetRequiredKeyedService<ILogFormat>(OrleansBinaryLogFormat.LogFormatKey));
+        Assert.Same(OrleansBinaryJournalFormat.Instance, serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
+        Assert.Equal(".bin", OrleansBinaryJournalFormat.Instance.FileExtension);
+        Assert.Equal("application/vnd.microsoft.orleans.journal+binary", OrleansBinaryJournalFormat.Instance.MimeType);
         CodecTestHelpers.AssertCodecProviderRegistrations(
             serviceProvider,
-            OrleansBinaryLogFormat.LogFormatKey,
+            OrleansBinaryJournalFormat.JournalFormatKey,
             serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(),
             expectDefaultProvider: false);
     }
@@ -43,34 +47,34 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     public void StateMachineManager_MissingKeyedFormat_ThrowsClearConfigurationError()
     {
         using var serviceProvider = new ServiceCollection().BuildServiceProvider();
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => new LogStateMachineManager(
+        var exception = Assert.Throws<InvalidOperationException>(() => new JournalStateMachineManager(
             storage,
-            LoggerFactory.CreateLogger<LogStateMachineManager>(),
+            LoggerFactory.CreateLogger<JournalStateMachineManager>(),
             Options.Create(ManagerOptions),
             TimeProvider.System,
             serviceProvider,
             CustomFormatKey));
 
         Assert.Contains(CustomFormatKey, exception.Message);
-        Assert.Contains(nameof(ILogFormat), exception.Message);
+        Assert.Contains(nameof(IJournalFormat), exception.Message);
     }
 
     [Fact]
-    public void DurableService_ResolvesCodecProviderFromLogFormatKey()
+    public void DurableService_ResolvesCodecProviderFromJournalFormatKey()
     {
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
         var valueProvider = new TestValueCodecProvider();
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddOptions();
         services.AddSingleton(TimeProvider.System);
-        services.AddScoped<ILogStorage>(_ => storage);
-        services.AddKeyedScoped<string>(LogFormatServices.LogFormatKeyServiceKey, (_, _) => CustomFormatKey);
-        services.AddScoped<IStateMachineManager, LogStateMachineManager>();
+        services.AddScoped<IJournalStorage>(_ => storage);
+        services.AddKeyedScoped<string>(JournalFormatServices.JournalFormatKeyServiceKey, (_, _) => CustomFormatKey);
+        services.AddScoped<IStateMachineManager, JournalStateMachineManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
-        services.AddKeyedSingleton<ILogFormat>(CustomFormatKey, new TestLogFormat());
+        services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, new TestJournalFormat());
         services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(CustomFormatKey, new TestDictionaryCodecProvider());
         services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(CustomFormatKey, valueProvider);
 
@@ -89,11 +93,15 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         public IConfiguration Configuration { get; } = new ConfigurationBuilder().Build();
     }
 
-    private sealed class TestLogFormat : ILogFormat
+    private sealed class TestJournalFormat : IJournalFormat
     {
-        public ILogBatchWriter CreateWriter() => throw new NotSupportedException();
+        public string FileExtension => ".test";
 
-        public void Read(LogReadBuffer input, IStateMachineResolver resolver) => throw new NotSupportedException();
+        public string? MimeType => null;
+
+        public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
+
+        public void Read(JournalReadBuffer input, IStateMachineResolver resolver) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodecProvider : IDurableDictionaryOperationCodecProvider
@@ -106,13 +114,13 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     private sealed class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue>
         where TKey : notnull
     {
-        public void WriteSet(TKey key, TValue value, LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteSet(TKey key, TValue value, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteRemove(TKey key, LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteRemove(TKey key, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteClear(JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
@@ -130,7 +138,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class TestValueCodec<T> : IDurableValueOperationCodec<T>
     {
-        public void WriteSet(T value, LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteSet(T value, JournalStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) => throw new NotSupportedException();
     }

@@ -52,7 +52,7 @@ internal static class CollectionCodecHelpers
 
     [DoesNotReturn]
     private static void ThrowIntegerOverflow(string fieldName, uint value) =>
-        throw new InvalidOperationException($"Malformed binary log entry: {fieldName} {value} exceeds the maximum supported value {int.MaxValue}.");
+        throw new InvalidOperationException($"Malformed binary journal entry: {fieldName} {value} exceeds the maximum supported value {int.MaxValue}.");
 
     [DoesNotReturn]
     private static void ThrowNegativeSnapshotCount(int count) =>

@@ -8,7 +8,7 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// Each <c>GetCodec</c> method constructs the appropriate binary codec using <c>new</c> and
-/// resolves <see cref="ILogValueCodec{T}"/> from DI — no reflection required. Codec instances
+/// resolves <see cref="IJournalValueCodec{T}"/> from DI — no reflection required. Codec instances
 /// are cached per closed generic combination so they behave as singletons.
 /// </remarks>
 internal sealed class OrleansBinaryOperationCodecProvider(IServiceProvider serviceProvider) :
@@ -27,49 +27,49 @@ internal sealed class OrleansBinaryOperationCodecProvider(IServiceProvider servi
         => (IDurableDictionaryOperationCodec<TKey, TValue>)_codecs.GetOrAdd(
             typeof(IDurableDictionaryOperationCodec<TKey, TValue>),
             _ => new OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
-                serviceProvider.GetRequiredService<ILogValueCodec<TKey>>(),
-                serviceProvider.GetRequiredService<ILogValueCodec<TValue>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<TKey>>(),
+                serviceProvider.GetRequiredService<IJournalValueCodec<TValue>>()));
 
     /// <inheritdoc/>
     public IDurableListOperationCodec<T> GetCodec<T>()
         => (IDurableListOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableListOperationCodec<T>),
             _ => new OrleansBinaryListOperationCodec<T>(
-                serviceProvider.GetRequiredService<ILogValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
 
     /// <inheritdoc/>
     IDurableQueueOperationCodec<T> IDurableQueueOperationCodecProvider.GetCodec<T>()
         => (IDurableQueueOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableQueueOperationCodec<T>),
             _ => new OrleansBinaryQueueOperationCodec<T>(
-                serviceProvider.GetRequiredService<ILogValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
 
     /// <inheritdoc/>
     IDurableSetOperationCodec<T> IDurableSetOperationCodecProvider.GetCodec<T>()
         => (IDurableSetOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableSetOperationCodec<T>),
             _ => new OrleansBinarySetOperationCodec<T>(
-                serviceProvider.GetRequiredService<ILogValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
 
     /// <inheritdoc/>
     IDurableValueOperationCodec<T> IDurableValueOperationCodecProvider.GetCodec<T>()
         => (IDurableValueOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableValueOperationCodec<T>),
             _ => new OrleansBinaryValueOperationCodec<T>(
-                serviceProvider.GetRequiredService<ILogValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
 
     /// <inheritdoc/>
     IDurableStateOperationCodec<T> IDurableStateOperationCodecProvider.GetCodec<T>()
         => (IDurableStateOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableStateOperationCodec<T>),
             _ => new OrleansBinaryStateOperationCodec<T>(
-                serviceProvider.GetRequiredService<ILogValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
 
     /// <inheritdoc/>
     IDurableTaskCompletionSourceOperationCodec<T> IDurableTaskCompletionSourceOperationCodecProvider.GetCodec<T>()
         => (IDurableTaskCompletionSourceOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableTaskCompletionSourceOperationCodec<T>),
             _ => new OrleansBinaryTcsOperationCodec<T>(
-                serviceProvider.GetRequiredService<ILogValueCodec<T>>(),
-                serviceProvider.GetRequiredService<ILogValueCodec<Exception>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>(),
+                serviceProvider.GetRequiredService<IJournalValueCodec<Exception>>()));
 }

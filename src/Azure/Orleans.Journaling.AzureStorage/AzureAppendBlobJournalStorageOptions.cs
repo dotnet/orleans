@@ -1,0 +1,157 @@
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage;
+using Azure.Core;
+using Orleans.Journaling.Json;
+using Orleans.Runtime;
+
+namespace Orleans.Journaling;
+
+/// <summary>
+/// Options for configuring the Azure Append Blob state machine storage provider.
+/// </summary>
+public sealed class AzureAppendBlobJournalStorageOptions
+{
+    private const string DefaultJournalFormatKey = JsonJournalExtensions.JournalFormatKey;
+    private BlobServiceClient? _blobServiceClient;
+
+    /// <summary>
+    /// Container name where state machine state is stored.
+    /// </summary>
+    public string ContainerName { get; set; } = DEFAULT_CONTAINER_NAME;
+    public const string DEFAULT_CONTAINER_NAME = "state";
+
+    /// <summary>
+    /// Gets or sets the delegate used to generate the base blob name for a given grain. The selected journal format extension is appended automatically.
+    /// </summary>
+    public Func<GrainId, string> GetBlobName { get; set; } = DefaultGetBlobName;
+
+    private static readonly Func<GrainId, string> DefaultGetBlobName = static grainId => grainId.ToString();
+
+    /// <summary>
+    /// Gets or sets the default state machine journal format key.
+    /// </summary>
+    public string JournalFormatKey { get; set; } = DefaultJournalFormatKey;
+
+    /// <summary>
+    /// Gets or sets an optional selector for choosing the journal format key by grain type.
+    /// </summary>
+    public Func<GrainType, string>? JournalFormatKeySelector { get; set; }
+
+    /// <summary>
+    /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
+    /// </summary>
+    public BlobClientOptions? ClientOptions { get; set; }
+
+    /// <summary>
+    /// Gets or sets the client used to access the Azure Blob Service.
+    /// </summary>
+    public BlobServiceClient? BlobServiceClient
+    {
+        get => _blobServiceClient;
+        set
+        {
+            ArgumentNullException.ThrowIfNull(value);
+            _blobServiceClient = value;
+            CreateClient = ct => Task.FromResult(value);
+        }
+    }
+
+    /// <summary>
+    /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
+    /// </summary>
+    internal Func<CancellationToken, Task<BlobServiceClient>>? CreateClient { get; private set; }
+
+    internal string GetJournalFormatKey(GrainType grainType)
+    {
+        var result = JournalFormatKeySelector?.Invoke(grainType) ?? JournalFormatKey;
+        ArgumentException.ThrowIfNullOrWhiteSpace(result);
+        return result;
+    }
+
+    internal string GetBlobNameWithExtension(GrainId grainId, IJournalFormat journalFormat)
+    {
+        ArgumentNullException.ThrowIfNull(journalFormat);
+        var blobName = GetBlobName(grainId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
+
+        var extension = journalFormat.FileExtension;
+        if (string.IsNullOrWhiteSpace(extension) || extension[0] != '.')
+        {
+            throw new InvalidOperationException(
+                $"Journal format '{journalFormat.GetType().FullName}' must specify a non-empty file extension beginning with '.'.");
+        }
+
+        return blobName.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
+            ? blobName
+            : blobName + extension;
+    }
+
+    /// <summary>
+    /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
+    /// </summary>
+    public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
+    public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
+
+    /// <summary>
+    /// A function for building container factory instances.
+    /// </summary>
+    public Func<IServiceProvider, AzureAppendBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get; set; }
+        = static (provider, options) => new DefaultBlobContainerFactory(options);
+
+    /// <summary>
+    /// Configures the <see cref="BlobServiceClient"/> using a connection string.
+    /// </summary>
+    public void ConfigureBlobServiceClient(string connectionString)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(connectionString);
+        CreateClient = ct => Task.FromResult(new BlobServiceClient(connectionString, ClientOptions));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI.
+    /// </summary>
+    public void ConfigureBlobServiceClient(Uri serviceUri)
+    {
+        ArgumentNullException.ThrowIfNull(serviceUri);
+        CreateClient = ct => Task.FromResult(new BlobServiceClient(serviceUri, ClientOptions));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="BlobServiceClient"/> using the provided callback.
+    /// </summary>
+    public void ConfigureBlobServiceClient(Func<CancellationToken, Task<BlobServiceClient>> createClientCallback)
+    {
+        CreateClient = createClientCallback ?? throw new ArgumentNullException(nameof(createClientCallback));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="TokenCredential"/>.
+    /// </summary>
+    public void ConfigureBlobServiceClient(Uri serviceUri, TokenCredential tokenCredential)
+    {
+        ArgumentNullException.ThrowIfNull(serviceUri);
+        ArgumentNullException.ThrowIfNull(tokenCredential);
+        CreateClient = ct => Task.FromResult(new BlobServiceClient(serviceUri, tokenCredential, ClientOptions));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="AzureSasCredential"/>.
+    /// </summary>
+    public void ConfigureBlobServiceClient(Uri serviceUri, AzureSasCredential azureSasCredential)
+    {
+        ArgumentNullException.ThrowIfNull(serviceUri);
+        ArgumentNullException.ThrowIfNull(azureSasCredential);
+        CreateClient = ct => Task.FromResult(new BlobServiceClient(serviceUri, azureSasCredential, ClientOptions));
+    }
+
+    /// <summary>
+    /// Configures the <see cref="BlobServiceClient"/> using an authenticated service URI and a <see cref="StorageSharedKeyCredential"/>.
+    /// </summary>
+    public void ConfigureBlobServiceClient(Uri serviceUri, StorageSharedKeyCredential sharedKeyCredential)
+    {
+        ArgumentNullException.ThrowIfNull(serviceUri);
+        ArgumentNullException.ThrowIfNull(sharedKeyCredential);
+        CreateClient = ct => Task.FromResult(new BlobServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
+    }
+}

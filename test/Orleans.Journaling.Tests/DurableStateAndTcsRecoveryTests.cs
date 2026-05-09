@@ -48,7 +48,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
     [Fact]
     public async Task OrleansBinaryCodec_StateClear_WritesClearAndRecoversNoRecord()
     {
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
         var codec = new TrackingStateOperationCodec<string>(ValueCodec<string>());
         var sut = CreateTestSystem(storage: storage);
         var state = new DurableState<string>("state", sut.Manager, codec);
@@ -94,19 +94,19 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         Assert.True(tcs.TrySetResult(18));
     }
 
-    private ILogValueCodec<T> ValueCodec<T>() => new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
-    private sealed class TrackingStateOperationCodec<T>(ILogValueCodec<T> valueCodec) : IDurableStateOperationCodec<T>
+    private sealed class TrackingStateOperationCodec<T>(IJournalValueCodec<T> valueCodec) : IDurableStateOperationCodec<T>
     {
         private readonly OrleansBinaryStateOperationCodec<T> _inner = new(valueCodec);
 
         public int WriteClearCount { get; private set; }
 
-        public void WriteSet(T state, ulong version, LogStreamWriter writer) => _inner.WriteSet(state, version, writer);
+        public void WriteSet(T state, ulong version, JournalStreamWriter writer) => _inner.WriteSet(state, version, writer);
 
-        public void WriteClear(LogStreamWriter writer)
+        public void WriteClear(JournalStreamWriter writer)
         {
             WriteClearCount++;
             _inner.WriteClear(writer);

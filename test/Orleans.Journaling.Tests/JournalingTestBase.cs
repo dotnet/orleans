@@ -36,27 +36,27 @@ public abstract class JournalingTestBase
     /// <summary>
     /// Creates an in-memory storage for testing
     /// </summary>
-    protected virtual ILogStorage CreateStorage()
+    protected virtual IJournalStorage CreateStorage()
     {
-        return new VolatileLogStorage();
+        return new VolatileJournalStorage();
     }
 
     /// <summary>
-    /// Creates a log manager with in-memory storage
+    /// Creates a journal manager with in-memory storage
     /// </summary>
-    internal (IStateMachineManager Manager, ILogStorage Storage, ILifecycleSubject Lifecycle)
-        CreateTestSystem(ILogStorage? storage = null, TimeProvider? provider = null, ILogFormat? logFormat = null, string? logFormatKey = null)
+    internal (IStateMachineManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle)
+        CreateTestSystem(IJournalStorage? storage = null, TimeProvider? provider = null, IJournalFormat? journalFormat = null, string? journalFormatKey = null)
     {
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
 
-        var logger = LoggerFactory.CreateLogger<LogStateMachineManager>();
-        var stringCodec = new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var uint64Codec = new OrleansLogValueCodec<ulong>(CodecProvider.GetCodec<ulong>(), SessionPool);
-        var dateTimeCodec = new OrleansLogValueCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
-        var logStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
+        var logger = LoggerFactory.CreateLogger<JournalStateMachineManager>();
+        var stringCodec = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
+        var uint64Codec = new OrleansJournalValueCodec<ulong>(CodecProvider.GetCodec<ulong>(), SessionPool);
+        var dateTimeCodec = new OrleansJournalValueCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
+        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager = new LogStateMachineManager(storage, logger, Options.Create(ManagerOptions), logStreamIdsCodec, retirementTrackerCodec, provider, logFormat, logFormatKey);
+        var manager = new JournalStateMachineManager(storage, logger, Options.Create(ManagerOptions), journalStreamIdsCodec, retirementTrackerCodec, provider, journalFormat, journalFormatKey);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

@@ -15,7 +15,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
 {
     private ServiceProvider _azureServiceProvider = null!;
     private SiloLifecycleSubject _siloLifecycle = null!;
-    private ILogStorageProvider _storageProvider = null!;
+    private IJournalStorageProvider _storageProvider = null!;
 
     public AzureAppendBlobCodecRecoveryTests()
     {
@@ -26,14 +26,15 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.Configure<AzureAppendBlobLogStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
-        services.AddSingleton<AzureAppendBlobLogStorageProvider>();
-        services.AddFromExisting<ILogStorageProvider, AzureAppendBlobLogStorageProvider>();
-        services.AddFromExisting<ILogFormatKeyProvider, AzureAppendBlobLogStorageProvider>();
-        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobLogStorageProvider>();
+        services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
+        services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, OrleansBinaryJournalFormat.Instance);
+        services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
+        services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
 
         _azureServiceProvider = services.BuildServiceProvider();
-        _storageProvider = _azureServiceProvider.GetRequiredService<ILogStorageProvider>();
+        _storageProvider = _azureServiceProvider.GetRequiredService<IJournalStorageProvider>();
         _siloLifecycle = new SiloLifecycleSubject(_azureServiceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());
 
         foreach (var participant in _azureServiceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
@@ -60,7 +61,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     public async Task AzureAppendBlobStorage_AllDurableTypes_RecoverWithBinaryCodec()
     {
         var grainId = GrainId.Create("journaling-codec-recovery", Guid.NewGuid().ToString("N"));
-        var storage = _storageProvider.Create(new LogBatchTests.TestGrainContext(grainId));
+        var storage = _storageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
         var first = CreateStateMachines(storage);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await first.Manager.InitializeAsync(cts.Token);
@@ -78,7 +79,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         Assert.True(first.Tcs.TrySetResult(17));
         await first.Manager.WriteStateAsync(cts.Token);
 
-        var recoveredStorage = _storageProvider.Create(new LogBatchTests.TestGrainContext(grainId));
+        var recoveredStorage = _storageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
         var recovered = CreateStateMachines(recoveredStorage);
         await recovered.Manager.InitializeAsync(cts.Token);
 
@@ -97,7 +98,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         Assert.Equal(17, await recovered.Tcs.Task);
     }
 
-    private DurableStateMachines CreateStateMachines(ILogStorage storage)
+    private DurableStateMachines CreateStateMachines(IJournalStorage storage)
     {
         var manager = CreateManager(storage);
         return new DurableStateMachines(
@@ -116,21 +117,21 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
                 Copier<Exception>()));
     }
 
-    private LogStateMachineManager CreateManager(ILogStorage storage)
+    private JournalStateMachineManager CreateManager(IJournalStorage storage)
         => new(
             storage,
-            LoggerFactory.CreateLogger<LogStateMachineManager>(),
+            LoggerFactory.CreateLogger<JournalStateMachineManager>(),
             Options.Create(ManagerOptions),
             new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>()),
             new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>()),
             TimeProvider.System);
 
-    private ILogValueCodec<T> ValueCodec<T>() => new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
     private sealed record DurableStateMachines(
-        LogStateMachineManager Manager,
+        JournalStateMachineManager Manager,
         DurableDictionary<string, int> Dictionary,
         DurableList<string> List,
         DurableQueue<string> Queue,

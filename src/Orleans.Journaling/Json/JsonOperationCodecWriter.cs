@@ -5,11 +5,11 @@ namespace Orleans.Journaling.Json;
 internal static class JsonOperationCodecWriter
 {
     public static void Write<TArg>(
-        LogStreamWriter writer,
+        JournalStreamWriter writer,
         TArg argument,
         Action<Utf8JsonWriter, TArg> writeJsonArrayElements)
     {
-        var formattedEntry = JsonFormattedLogEntry.Create(argument, writeJsonArrayElements);
+        var formattedEntry = JsonFormattedJournalEntry.Create(argument, writeJsonArrayElements);
         if (writer.TryAppendFormattedEntry(formattedEntry))
         {
             return;

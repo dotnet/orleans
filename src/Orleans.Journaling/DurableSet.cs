@@ -24,16 +24,16 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 {
     private readonly IDurableSetOperationCodec<T> _codec;
     private readonly HashSet<T> _items = [];
-    private LogStreamWriter _storage;
+    private JournalStreamWriter _storage;
 
     public DurableSet(
         [ServiceKey] string key,
         IStateMachineManager manager,
-        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = LogFormatServices.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<T>();
+        _codec = JournalFormatServices.GetRequiredKeyedService<IDurableSetOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
         manager.RegisterStateMachine(key, this);
     }
 
@@ -49,18 +49,18 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(LogStreamWriter writer)
+    void IDurableStateMachine.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _storage = writer;
     }
 
-    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
+    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
     {
-        // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
+        // This state machine implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -117,7 +117,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IDurableStateMachine, IDur
         _items.EnsureCapacity(capacityHint);
     }
 
-    private LogStreamWriter GetStorage()
+    private JournalStreamWriter GetStorage()
     {
         Debug.Assert(_storage.IsInitialized);
         return _storage;

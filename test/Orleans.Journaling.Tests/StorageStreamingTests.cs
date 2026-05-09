@@ -10,7 +10,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_AppendAndReplaceStoreRawBuffers()
     {
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
         var segmentBytes = new byte[] { 1, 2, 3, 4 };
         var snapshotBytes = new byte[] { 5, 6, 7 };
 
@@ -31,9 +31,9 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_ReadsRawBuffersWithoutFormatDecoding()
     {
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
         var rawBytes = new byte[] { 255, 0, 1 };
-        var consumer = new CapturingLogStorageConsumer();
+        var consumer = new CapturingJournalStorageConsumer();
 
         using (var data = CreateBuffer(rawBytes))
         {
@@ -49,10 +49,10 @@ public sealed class StorageStreamingTests
     [Fact]
     public async Task VolatileStorage_InvokesConsumerForEachStoredSegment()
     {
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
         var first = new byte[] { 1, 2, 3 };
         var second = new byte[] { 4, 5 };
-        var consumer = new CapturingLogStorageConsumer();
+        var consumer = new CapturingJournalStorageConsumer();
 
         using (var data = CreateBuffer(first))
         {
@@ -76,7 +76,7 @@ public sealed class StorageStreamingTests
     public async Task StreamConsumerHelper_BuffersUnconsumedBytesAcrossReads()
     {
         var stream = new ChunkedReadStream([1, 2, 3, 4], chunkSize: 1);
-        var consumer = new TwoByteLogStorageConsumer();
+        var consumer = new TwoByteJournalStorageConsumer();
 
         var totalBytesRead = await consumer.ConsumeAsync(stream, CancellationToken.None);
 
@@ -91,7 +91,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public void SegmentConsumerHelper_BuffersUnconsumedBytesAcrossSegments()
     {
-        var consumer = new TwoByteLogStorageConsumer();
+        var consumer = new TwoByteJournalStorageConsumer();
         ReadOnlyMemory<byte>[] segments = [new byte[] { 1 }, new byte[] { 2, 3 }, new byte[] { 4 }];
 
         consumer.Consume(segments);
@@ -105,7 +105,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public void MemoryConsumerHelper_CompletesEmptyInput()
     {
-        var consumer = new CompletionTrackingLogStorageConsumer();
+        var consumer = new CompletionTrackingJournalStorageConsumer();
 
         consumer.Consume(ReadOnlyMemory<byte>.Empty);
 
@@ -116,7 +116,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public void MemoryConsumerHelper_RejectsUnconsumedDataWhenNotCompleted()
     {
-        var consumer = new LeavingLogStorageConsumer();
+        var consumer = new LeavingJournalStorageConsumer();
 
         Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }, complete: false));
     }
@@ -124,34 +124,34 @@ public sealed class StorageStreamingTests
     [Fact]
     public void MemoryConsumerHelper_RejectsUnconsumedDataWhenCompleted()
     {
-        var consumer = new LeavingLogStorageConsumer();
+        var consumer = new LeavingJournalStorageConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }));
 
-        Assert.Contains("did not consume all supplied log data", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("did not consume all supplied journal data", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task StreamConsumerHelper_RejectsUnconsumedDataWhenCompleted()
     {
         var stream = new ChunkedReadStream([1], chunkSize: 1);
-        var consumer = new LeavingLogStorageConsumer();
+        var consumer = new LeavingJournalStorageConsumer();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             async () => await consumer.ConsumeAsync(stream, CancellationToken.None));
 
-        Assert.Contains("did not consume all supplied log data", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("did not consume all supplied journal data", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void BinaryFormatRead_RejectsTruncatedVarUIntFrame()
     {
         using var writer = CreateWriter([0x15, 1, 2]);
-        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
-        var consumer = new CapturingLogEntrySink();
+        var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        var consumer = new CapturingJournalEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer));
+            ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer));
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -161,10 +161,10 @@ public sealed class StorageStreamingTests
     public void BinaryFormatRead_WaitsForIncompleteFrameWhenInputIsNotCompleted()
     {
         using var writer = CreateWriter([0x15, 1, 2]);
-        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: false);
-        var consumer = new CapturingLogEntrySink();
+        var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: false);
+        var consumer = new CapturingJournalEntrySink();
 
-        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
+        ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer);
 
         Assert.Equal(3, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -173,15 +173,15 @@ public sealed class StorageStreamingTests
     [Fact]
     public void BinaryFormatRead_ConsumesCompletePrefixAndWaitsForPartialSuffix()
     {
-        using var buffer = new OrleansBinaryLogBatchWriter();
-        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(8)), [1, 2, 3]);
+        using var buffer = new OrleansBinaryJournalBatchWriter();
+        AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [1, 2, 3]);
         using var committed = buffer.GetCommittedBuffer();
         var entryBytes = committed.ToArray();
         using var data = CreateWriter([.. entryBytes, 10, 0]);
-        var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: false);
-        var consumer = new CapturingLogEntrySink();
+        var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: false);
+        var consumer = new CapturingJournalEntrySink();
 
-        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
+        ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -189,7 +189,7 @@ public sealed class StorageStreamingTests
         Assert.Equal(2, reader.Length);
     }
 
-    private static void AppendEntry(LogStreamWriter writer, ReadOnlySpan<byte> payload)
+    private static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
         entry.Writer.Write(payload);
@@ -210,11 +210,11 @@ public sealed class StorageStreamingTests
         return buffer;
     }
 
-    private sealed class CapturingLogStorageConsumer : ILogStorageConsumer
+    private sealed class CapturingJournalStorageConsumer : IJournalStorageConsumer
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Consume(LogReadBuffer buffer)
+        public void Consume(JournalReadBuffer buffer)
         {
             if (buffer.IsCompleted || buffer.Length == 0)
             {
@@ -227,11 +227,11 @@ public sealed class StorageStreamingTests
         }
     }
 
-    private sealed class TwoByteLogStorageConsumer : ILogStorageConsumer
+    private sealed class TwoByteJournalStorageConsumer : IJournalStorageConsumer
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Consume(LogReadBuffer buffer)
+        public void Consume(JournalReadBuffer buffer)
         {
             var temp = new byte[2];
             while (buffer.TryPeek(temp))
@@ -251,22 +251,22 @@ public sealed class StorageStreamingTests
         }
     }
 
-    private sealed class CompletionTrackingLogStorageConsumer : ILogStorageConsumer
+    private sealed class CompletionTrackingJournalStorageConsumer : IJournalStorageConsumer
     {
         public bool IsCompleted { get; private set; }
 
         public int CompletedLength { get; private set; }
 
-        public void Consume(LogReadBuffer buffer)
+        public void Consume(JournalReadBuffer buffer)
         {
             IsCompleted = buffer.IsCompleted;
             CompletedLength = buffer.Length;
         }
     }
 
-    private sealed class LeavingLogStorageConsumer : ILogStorageConsumer
+    private sealed class LeavingJournalStorageConsumer : IJournalStorageConsumer
     {
-        public void Consume(LogReadBuffer buffer) { }
+        public void Consume(JournalReadBuffer buffer) { }
     }
 
     private sealed class ChunkedReadStream(byte[] data, int chunkSize) : Stream
@@ -315,25 +315,25 @@ public sealed class StorageStreamingTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine, IOrleansBinaryLogEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateMachineResolver, IDurableStateMachine, IOrleansBinaryJournalEntryCodec
     {
-        private LogStreamId _streamId;
+        private JournalStreamId _streamId;
 
-        public List<(LogStreamId StreamId, byte[] Payload)> Entries { get; } = [];
+        public List<(JournalStreamId StreamId, byte[] Payload)> Entries { get; } = [];
 
         object IDurableStateMachine.OperationCodec => this;
 
-        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
         {
             _streamId = streamId;
             return this;
         }
 
-        void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        public void Reset(LogStreamWriter writer) { }
-        public void AppendEntries(LogStreamWriter writer) { }
-        public void AppendSnapshot(LogStreamWriter writer) { }
+        public void Reset(JournalStreamWriter writer) { }
+        public void AppendEntries(JournalStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 

@@ -311,7 +311,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     {
         var services = new ServiceCollection();
         services.AddSerializer();
-        services.AddSingleton(typeof(ILogValueCodec<>), typeof(OrleansLogValueCodec<>));
+        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
         services.AddSingleton<OrleansBinaryOperationCodecProvider>();
 
         using var serviceProvider = services.BuildServiceProvider();
@@ -417,7 +417,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
         Assert.Contains("Malformed variable-length integer", exception.Message, StringComparison.Ordinal);
     }
 
-    private ILogValueCodec<T> ValueCodec<T>() => new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
     private static byte[] WriteVarUInt32(uint value)
     {
@@ -473,7 +473,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<TKey, TValue>(
         IDurableDictionaryOperationCodec<TKey, TValue> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingDictionaryOperationHandler<TKey, TValue> consumer)
         where TKey : notnull
     {
@@ -482,7 +482,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<T>(
         IDurableListOperationCodec<T> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingListOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
@@ -490,7 +490,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<T>(
         IDurableQueueOperationCodec<T> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingQueueOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
@@ -498,7 +498,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<T>(
         IDurableSetOperationCodec<T> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingSetOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
@@ -506,7 +506,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<T>(
         IDurableValueOperationCodec<T> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingValueOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
@@ -514,7 +514,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<T>(
         IDurableStateOperationCodec<T> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingStateOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
@@ -522,7 +522,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
 
     private static void Apply<T>(
         IDurableTaskCompletionSourceOperationCodec<T> codec,
-        Action<LogStreamWriter> write,
+        Action<JournalStreamWriter> write,
         RecordingTaskCompletionSourceOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
@@ -562,7 +562,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
         Assert.Contains("trailing data", exception.Message);
     }
 
-    private sealed class SingleByteValueCodec : ILogValueCodec<byte>
+    private sealed class SingleByteValueCodec : IJournalValueCodec<byte>
     {
         public static SingleByteValueCodec Instance { get; } = new();
 

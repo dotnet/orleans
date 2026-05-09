@@ -15,7 +15,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 {
     private readonly IDurableDictionaryOperationCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
-    private LogStreamWriter _storage;
+    private JournalStreamWriter _storage;
 
     protected DurableDictionary(IDurableDictionaryOperationCodec<K, V> codec)
     {
@@ -25,9 +25,9 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
     public DurableDictionary(
         [ServiceKey] string key,
         IStateMachineManager manager,
-        [FromKeyedServices(LogFormatServices.LogFormatKeyServiceKey)] string logFormatKey,
+        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider)
-        : this(LogFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, logFormatKey).GetCodec<K, V>())
+        : this(JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<K, V>())
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterStateMachine(key, this);
@@ -60,18 +60,18 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
 
     object IDurableStateMachine.OperationCodec => _codec;
 
-    void IDurableStateMachine.Reset(LogStreamWriter writer)
+    void IDurableStateMachine.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
         _storage = writer;
     }
 
-    void IDurableStateMachine.AppendEntries(LogStreamWriter writer)
+    void IDurableStateMachine.AppendEntries(JournalStreamWriter writer)
     {
-        // This state machine implementation appends log entries as the data structure is modified, so there is no need to perform separate writing here.
+        // This state machine implementation appends journal entries as the data structure is modified, so there is no need to perform separate writing here.
     }
 
-    void IDurableStateMachine.AppendSnapshot(LogStreamWriter snapshotWriter)
+    void IDurableStateMachine.AppendSnapshot(JournalStreamWriter snapshotWriter)
     {
         _codec.WriteSnapshot(_items, snapshotWriter);
     }
@@ -127,7 +127,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IDurableState
         _items.EnsureCapacity(capacityHint);
     }
 
-    protected virtual LogStreamWriter GetStorage()
+    protected virtual JournalStreamWriter GetStorage()
     {
         Debug.Assert(_storage.IsInitialized);
         return _storage;

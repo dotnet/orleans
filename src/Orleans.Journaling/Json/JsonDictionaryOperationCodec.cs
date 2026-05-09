@@ -5,7 +5,7 @@ using System.Text.Json.Serialization.Metadata;
 namespace Orleans.Journaling.Json;
 
 /// <summary>
-/// JSON codec for durable dictionary log entries.
+/// JSON codec for durable dictionary journal entries.
 /// </summary>
 /// <example>
 /// <code>
@@ -14,13 +14,13 @@ namespace Orleans.Journaling.Json;
 /// </code>
 /// </example>
 public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOptions? options = null)
-    : IDurableDictionaryOperationCodec<TKey, TValue>, IJsonLogEntryCodec where TKey : notnull
+    : IDurableDictionaryOperationCodec<TKey, TValue>, IJsonJournalEntryCodec where TKey : notnull
 {
     private readonly JsonTypeInfo<TKey> _keyTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TKey>(options);
     private readonly JsonTypeInfo<TValue> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TValue>(options);
 
     /// <inheritdoc/>
-    public void WriteSet(TKey key, TValue value, LogStreamWriter writer)
+    public void WriteSet(TKey key, TValue value, JournalStreamWriter writer)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -29,7 +29,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     }
 
     /// <inheritdoc/>
-    public void WriteRemove(TKey key, LogStreamWriter writer)
+    public void WriteRemove(TKey key, JournalStreamWriter writer)
     {
         JsonOperationCodecWriter.Write(
             writer,
@@ -38,16 +38,16 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     }
 
     /// <inheritdoc/>
-    public void WriteClear(LogStreamWriter writer)
+    public void WriteClear(JournalStreamWriter writer)
     {
         JsonOperationCodecWriter.Write(
             writer,
-            JsonLogEntryCommands.Clear,
+            JsonJournalEntryCommands.Clear,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
     }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, LogStreamWriter writer)
+    public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer)
     {
         ArgumentNullException.ThrowIfNull(items);
 
@@ -69,26 +69,26 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         var command = operation.Command;
         switch (command)
         {
-            case JsonLogEntryCommands.Set:
+            case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.Deserialize(1, JsonLogEntryFields.Key, _keyTypeInfo)!,
-                    operation.Deserialize(2, JsonLogEntryFields.Value, _valueTypeInfo)!);
+                    operation.Deserialize(1, JsonJournalEntryFields.Key, _keyTypeInfo)!,
+                    operation.Deserialize(2, JsonJournalEntryFields.Value, _valueTypeInfo)!);
                 operation.EnsureEnd(3);
                 break;
-            case JsonLogEntryCommands.Remove:
-                consumer.ApplyRemove(operation.Deserialize(1, JsonLogEntryFields.Key, _keyTypeInfo)!);
+            case JsonJournalEntryCommands.Remove:
+                consumer.ApplyRemove(operation.Deserialize(1, JsonJournalEntryFields.Key, _keyTypeInfo)!);
                 operation.EnsureEnd(2);
                 break;
-            case JsonLogEntryCommands.Clear:
+            case JsonJournalEntryCommands.Clear:
                 operation.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
-            case JsonLogEntryCommands.Snapshot:
-                var count = operation.StartArray(1, JsonLogEntryFields.Items);
+            case JsonJournalEntryCommands.Snapshot:
+                var count = operation.StartArray(1, JsonJournalEntryFields.Items);
                 consumer.Reset(count);
-                while (operation.ReadArrayItem(JsonLogEntryFields.Items))
+                while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    var (key, value) = operation.ReadCurrentPair(JsonLogEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
+                    var (key, value) = operation.ReadCurrentPair(JsonJournalEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
                     consumer.ApplySet(key!, value!);
                 }
 
@@ -100,7 +100,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         }
     }
 
-    void IJsonLogEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
+    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IDurableStateMachine stateMachine)
     {
         if (stateMachine is not IDurableDictionaryOperationHandler<TKey, TValue> consumer)
         {
@@ -115,7 +115,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     {
         public void Write(Utf8JsonWriter writer)
         {
-            writer.WriteStringValue(JsonLogEntryCommands.Set);
+            writer.WriteStringValue(JsonJournalEntryCommands.Set);
             JsonSerializer.Serialize(writer, key, keyTypeInfo);
             JsonSerializer.Serialize(writer, value, valueTypeInfo);
         }
@@ -125,7 +125,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     {
         public void Write(Utf8JsonWriter writer)
         {
-            writer.WriteStringValue(JsonLogEntryCommands.Remove);
+            writer.WriteStringValue(JsonJournalEntryCommands.Remove);
             JsonSerializer.Serialize(writer, key, keyTypeInfo);
         }
     }
@@ -139,7 +139,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         {
             var count = CollectionCodecHelpers.GetSnapshotCount(items);
 
-            writer.WriteStringValue(JsonLogEntryCommands.Snapshot);
+            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
             writer.WriteStartArray();
             var written = 0;
             foreach (var (key, value) in items)

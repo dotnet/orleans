@@ -31,9 +31,9 @@ public class StateMachineManagerTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<int>();
 
         // Act - Register state machines
-        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(codec, SessionPool)));
-        var list = new DurableList<string>("list1", manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var queue = new DurableQueue<int>("queue1", manager, new OrleansBinaryQueueOperationCodec<int>(new OrleansLogValueCodec<int>(codec, SessionPool)));
+        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(codec, SessionPool)));
+        var list = new DurableList<string>("list1", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var queue = new DurableQueue<int>("queue1", manager, new OrleansBinaryQueueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Add some data
@@ -64,27 +64,27 @@ public class StateMachineManagerTests : JournalingTestBase
     [Fact]
     public async Task StateMachineManager_Initialize_ThrowsWhenCompletedReadLeavesData()
     {
-        var storage = new VolatileLogStorage();
+        var storage = new VolatileJournalStorage();
         using (var data = CreateBuffer([1, 2, 3]))
         {
             await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        var sut = CreateTestSystem(storage: storage, logFormat: new NonConsumingLogFormat());
+        var sut = CreateTestSystem(storage: storage, journalFormat: new NonConsumingJournalFormat());
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
             sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
         Assert.NotNull(exception.InnerException);
-        Assert.Contains("did not consume the completed log data", exception.InnerException.Message, StringComparison.Ordinal);
+        Assert.Contains("did not consume the completed journal data", exception.InnerException.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public async Task StateMachineManager_Recovery_PreservesUnknownStateMachineEntry()
     {
-        var storage = new VolatileLogStorage();
-        using var segment = new OrleansBinaryLogBatchWriter();
-        using (var entry = segment.CreateLogStreamWriter(new LogStreamId(99)).BeginEntry())
+        var storage = new VolatileJournalStorage();
+        using var segment = new OrleansBinaryJournalBatchWriter();
+        using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
         {
             entry.Writer.Write([1, 2, 3]);
             entry.Commit();
@@ -113,8 +113,8 @@ public class StateMachineManagerTests : JournalingTestBase
             await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        var format = new DecodedPayloadOnlyLogFormat(new LogStreamId(99), decodedPayload);
-        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new DecodedPayloadOnlyJournalFormat(new JournalStreamId(99), decodedPayload);
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
 
         await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
         await sut.Manager.WriteStateAsync(CancellationToken.None);
@@ -142,8 +142,8 @@ public class StateMachineManagerTests : JournalingTestBase
         await initial.Manager.WriteStateAsync(CancellationToken.None);
 
         storage.IsCompactionRequested = true;
-        var format = new TrackingLogFormat();
-        var compacting = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var compacting = CreateTestSystem(storage: storage, journalFormat: format);
 
         await compacting.Lifecycle.OnStart();
         await compacting.Manager.WriteStateAsync(CancellationToken.None);
@@ -163,8 +163,8 @@ public class StateMachineManagerTests : JournalingTestBase
     public async Task StateMachineManager_DirectWrites_UseFormatOwnedCurrentSegmentWriter()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingLogFormat();
-        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
 
         await sut.Lifecycle.OnStart();
@@ -174,18 +174,18 @@ public class StateMachineManagerTests : JournalingTestBase
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
         Assert.Empty(storage.Replaces);
-        Assert.Contains(0UL, writer.CreatedLogStreamWriterIds);
-        Assert.Contains(writer.CreatedLogStreamWriterIds, id => id >= 8);
+        Assert.Contains(0UL, writer.CreatedJournalStreamWriterIds);
+        Assert.Contains(writer.CreatedJournalStreamWriterIds, id => id >= 8);
         Assert.True(writer.GetCommittedBufferCount > 0);
         Assert.True(writer.ResetCount > 0);
     }
 
     [Fact]
-    public async Task StateMachineManager_AppendLogFlush_UsesFormatOwnedWriter()
+    public async Task StateMachineManager_AppendJournalFlush_UsesFormatOwnedWriter()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingLogFormat();
-        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
 
         await sut.Lifecycle.OnStart();
@@ -194,7 +194,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
-        Assert.Contains(writer.CreatedLogStreamWriterIds, id => id >= 8);
+        Assert.Contains(writer.CreatedJournalStreamWriterIds, id => id >= 8);
         Assert.True(storage.Appends[0].Length > 0);
     }
 
@@ -313,8 +313,8 @@ public class StateMachineManagerTests : JournalingTestBase
     public async Task StateMachineManager_SnapshotFlush_ResetsPendingAppendData()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
-        var format = new TrackingLogFormat();
-        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
 
         await sut.Lifecycle.OnStart();
@@ -326,7 +326,7 @@ public class StateMachineManagerTests : JournalingTestBase
         Assert.Single(storage.Replaces);
         Assert.True(writer.ResetCount >= 2);
 
-        var recovered = CreateTestSystem(storage: storage, logFormat: new TrackingLogFormat());
+        var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat());
         var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
         await recovered.Lifecycle.OnStart();
 
@@ -337,8 +337,8 @@ public class StateMachineManagerTests : JournalingTestBase
     public async Task StateMachineManager_DirectWriteFailure_AbortsEntryBeforeMutation()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingLogFormat();
-        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var dictionary = new DurableDictionary<int, int>("dict", sut.Manager, new ThrowingDictionarySetCodec<int, int>());
 
         await sut.Lifecycle.OnStart();
@@ -357,8 +357,8 @@ public class StateMachineManagerTests : JournalingTestBase
     public async Task StateMachineManager_DirectWriteFailure_DoesNotPersistPartialEntry()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingLogFormat();
-        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var codec = new ToggleThrowingDictionarySetCodec<int, int>(CreateDictionaryCodec<int, int>());
         var dictionary = new DurableDictionary<int, int>("dict", sut.Manager, codec);
 
@@ -370,7 +370,7 @@ public class StateMachineManagerTests : JournalingTestBase
         dictionary.Add(1, 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
-        var recovered = CreateTestSystem(storage: storage, logFormat: new TrackingLogFormat());
+        var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat());
         var recoveredDictionary = new DurableDictionary<int, int>("dict", recovered.Manager, CreateDictionaryCodec<int, int>());
         await recovered.Lifecycle.OnStart();
 
@@ -382,8 +382,8 @@ public class StateMachineManagerTests : JournalingTestBase
     public async Task StateMachineManager_WriteStateAsync_DoesNotObserveActiveEntry()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingLogFormat();
-        var sut = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var stateMachine = new ManualDirectWriteStateMachine();
         sut.Manager.RegisterStateMachine("manual", stateMachine);
 
@@ -431,8 +431,8 @@ public class StateMachineManagerTests : JournalingTestBase
         var sut = CreateTestSystem();
 
         // Create and populate state machines
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
-        var list = new DurableList<string>("list1", sut.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var list = new DurableList<string>("list1", sut.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         dictionary.Add("key1", 1);
@@ -444,8 +444,8 @@ public class StateMachineManagerTests : JournalingTestBase
 
         // Act - Create new manager with same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
-        var recoveredList = new DurableList<string>("list1", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var recoveredList = new DurableList<string>("list1", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - State should be recovered
@@ -459,7 +459,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_UsesSelectedLogFormatRead()
+    public async Task StateMachineManager_Recovery_UsesSelectedJournalFormatRead()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -469,8 +469,8 @@ public class StateMachineManagerTests : JournalingTestBase
         value.Value = 42;
         await initial.Manager.WriteStateAsync(CancellationToken.None);
 
-        var format = new TrackingLogFormat();
-        var recovered = CreateTestSystem(storage: storage, logFormat: format);
+        var format = new TrackingJournalFormat();
+        var recovered = CreateTestSystem(storage: storage, journalFormat: format);
         var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
 
         await recovered.Lifecycle.OnStart();
@@ -480,7 +480,7 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task StateMachineManager_Recovery_ReadsConcatenatedLogData()
+    public async Task StateMachineManager_Recovery_ReadsConcatenatedJournalData()
     {
         var storage = new CapturingStorage();
         var initial = CreateTestSystem(storage: storage);
@@ -530,9 +530,9 @@ public class StateMachineManagerTests : JournalingTestBase
     public async Task StateMachineManager_Recovery_RejectsMalformedTrailingData()
     {
         byte[] bytes;
-        using (var segment = new OrleansBinaryLogBatchWriter())
+        using (var segment = new OrleansBinaryJournalBatchWriter())
         {
-            using (var entry = segment.CreateLogStreamWriter(new LogStreamId(99)).BeginEntry())
+            using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
             {
                 entry.Writer.Write([1, 2, 3]);
                 entry.Commit();
@@ -556,9 +556,9 @@ public class StateMachineManagerTests : JournalingTestBase
             await sut.Lifecycle.OnStop(CancellationToken.None);
         }
 
-        Assert.Contains("configured log format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("configured journal format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
         var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
-        Assert.Contains("Malformed binary log entry stream", inner.Message, StringComparison.Ordinal);
+        Assert.Contains("Malformed binary journal entry stream", inner.Message, StringComparison.Ordinal);
         Assert.Contains("truncated varuint32 entry length prefix", inner.Message, StringComparison.Ordinal);
     }
 
@@ -583,7 +583,7 @@ public class StateMachineManagerTests : JournalingTestBase
     [Fact]
     public async Task StateMachineManager_RecoveryRetry_PreservesUnknownStreamOnce()
     {
-        var validBytes = CreateUnknownStreamBytes(new LogStreamId(99), [1, 2, 3]);
+        var validBytes = CreateUnknownStreamBytes(new JournalStreamId(99), [1, 2, 3]);
         var storage = new MutableReadStorage([.. validBytes, 1, 2, 3]) { IsCompactionRequested = true };
         var sut = CreateTestSystem(storage: storage);
 
@@ -602,7 +602,7 @@ public class StateMachineManagerTests : JournalingTestBase
     [Fact]
     public async Task StateMachineManager_RecoveryRetry_RemovesStaleRetiredPlaceholder()
     {
-        var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new LogStreamId(8), [1, 2, 3]), 1, 2, 3]);
+        var storage = new MutableReadStorage([.. CreateNamedUnknownStreamBytes("stale", new JournalStreamId(8), [1, 2, 3]), 1, 2, 3]);
         var sut = CreateTestSystem(storage: storage);
 
         await Assert.ThrowsAsync<InvalidOperationException>(
@@ -647,7 +647,7 @@ public class StateMachineManagerTests : JournalingTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Multiple operations with WriteState in between
@@ -670,7 +670,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         // Create new manager to verify recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - Recovery should have final state
@@ -692,9 +692,9 @@ public class StateMachineManagerTests : JournalingTestBase
         var manager = sut.Manager;
 
         // Create multiple state machines with different types
-        var intDict = new DurableDictionary<int, string>("intDict", manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var stringList = new DurableList<string>("stringList", manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var personValue = new DurableValue<TestPerson>("personValue", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansLogValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
+        var intDict = new DurableDictionary<int, string>("intDict", manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var stringList = new DurableList<string>("stringList", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var personValue = new DurableValue<TestPerson>("personValue", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Populate all state machines
@@ -721,9 +721,9 @@ public class StateMachineManagerTests : JournalingTestBase
 
         // Create new manager to verify recovery of multiple state machines
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansLogValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
+        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All should be recovered with correct values
@@ -748,8 +748,8 @@ public class StateMachineManagerTests : JournalingTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dict1 = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
-        var dict2 = new DurableDictionary<string, int>("dict2", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var dict1 = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var dict2 = new DurableDictionary<string, int>("dict2", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Simulate concurrent operations on different state machines
@@ -782,7 +782,7 @@ public class StateMachineManagerTests : JournalingTestBase
     {
         // Arrange
         var sut = CreateTestSystem();
-        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut.Lifecycle.OnStart();
 
         // Act - Add many items
@@ -796,7 +796,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         // Create new manager for recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All items should be recovered
@@ -922,7 +922,7 @@ public class StateMachineManagerTests : JournalingTestBase
         // Note: The retirement of state machines has the nice benefit of being able to reuse machine names.
 
         DurableDictionary<string, int> CreateTestMachine(string key, IStateMachineManager manager) =>
-            new(key, manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansLogValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansLogValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+            new(key, manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
 
         static async Task TriggerCompaction(IStateMachineManager manager, DurableDictionary<string, int> dict)
         {
@@ -934,13 +934,13 @@ public class StateMachineManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class StreamingOnlyStorage : ILogStorage
+    private sealed class StreamingOnlyStorage : IJournalStorage
     {
         public bool StreamingReadCalled { get; private set; }
 
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             StreamingReadCalled = true;
             consumer.Complete();
@@ -955,26 +955,26 @@ public class StateMachineManagerTests : JournalingTestBase
     }
 
     private OrleansBinaryDictionaryOperationCodec<K, V> CreateDictionaryCodec<K, V>() where K : notnull =>
-        new(new OrleansLogValueCodec<K>(CodecProvider.GetCodec<K>(), SessionPool), new OrleansLogValueCodec<V>(CodecProvider.GetCodec<V>(), SessionPool));
+        new(new OrleansJournalValueCodec<K>(CodecProvider.GetCodec<K>(), SessionPool), new OrleansJournalValueCodec<V>(CodecProvider.GetCodec<V>(), SessionPool));
 
     private OrleansBinaryValueOperationCodec<T> CreateValueCodec<T>() =>
-        new(new OrleansLogValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
+        new(new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
 
     private byte[] CreatePersistedValueBytes(string name, int value)
     {
-        using var segment = new OrleansBinaryLogBatchWriter();
-        AppendDirectorySet(segment, name, new LogStreamId(8));
+        using var segment = new OrleansBinaryJournalBatchWriter();
+        AppendDirectorySet(segment, name, new JournalStreamId(8));
         var codec = CreateValueCodec<int>();
-        codec.WriteSet(value, segment.CreateLogStreamWriter(new LogStreamId(8)));
+        codec.WriteSet(value, segment.CreateJournalStreamWriter(new JournalStreamId(8)));
 
         using var committed = segment.GetCommittedBuffer();
         return committed.ToArray();
     }
 
-    private byte[] CreateUnknownStreamBytes(LogStreamId streamId, ReadOnlySpan<byte> payload)
+    private byte[] CreateUnknownStreamBytes(JournalStreamId streamId, ReadOnlySpan<byte> payload)
     {
-        using var segment = new OrleansBinaryLogBatchWriter();
-        using (var entry = segment.CreateLogStreamWriter(streamId).BeginEntry())
+        using var segment = new OrleansBinaryJournalBatchWriter();
+        using (var entry = segment.CreateJournalStreamWriter(streamId).BeginEntry())
         {
             entry.Writer.Write(payload);
             entry.Commit();
@@ -984,11 +984,11 @@ public class StateMachineManagerTests : JournalingTestBase
         return committed.ToArray();
     }
 
-    private byte[] CreateNamedUnknownStreamBytes(string name, LogStreamId streamId, ReadOnlySpan<byte> payload)
+    private byte[] CreateNamedUnknownStreamBytes(string name, JournalStreamId streamId, ReadOnlySpan<byte> payload)
     {
-        using var segment = new OrleansBinaryLogBatchWriter();
+        using var segment = new OrleansBinaryJournalBatchWriter();
         AppendDirectorySet(segment, name, streamId);
-        using (var entry = segment.CreateLogStreamWriter(streamId).BeginEntry())
+        using (var entry = segment.CreateJournalStreamWriter(streamId).BeginEntry())
         {
             entry.Writer.Write(payload);
             entry.Commit();
@@ -998,10 +998,10 @@ public class StateMachineManagerTests : JournalingTestBase
         return committed.ToArray();
     }
 
-    private void AppendDirectorySet(OrleansBinaryLogBatchWriter segment, string name, LogStreamId streamId)
+    private void AppendDirectorySet(OrleansBinaryJournalBatchWriter segment, string name, JournalStreamId streamId)
     {
         var codec = CreateDictionaryCodec<string, ulong>();
-        codec.WriteSet(name, streamId.Value, segment.CreateLogStreamWriter(new LogStreamId(0)));
+        codec.WriteSet(name, streamId.Value, segment.CreateJournalStreamWriter(new JournalStreamId(0)));
     }
 
     private static ArcBuffer CreateBuffer(ReadOnlySpan<byte> value)
@@ -1011,72 +1011,76 @@ public class StateMachineManagerTests : JournalingTestBase
         return writer.ConsumeSlice(writer.Length);
     }
 
-    private static List<CapturedLogEntry> ReadBinaryEntries(ReadOnlySpan<byte> bytes)
+    private static List<CapturedJournalEntry> ReadBinaryEntries(ReadOnlySpan<byte> bytes)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        var reader = new LogReadBuffer(new ArcBufferReader(writer), isCompleted: true);
-        var consumer = new CapturingLogEntrySink();
-        ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer);
+        var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        var consumer = new CapturingJournalEntrySink();
+        ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer);
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
     }
 
-    private readonly record struct CapturedLogEntry(LogStreamId StreamId, byte[] Payload);
+    private readonly record struct CapturedJournalEntry(JournalStreamId StreamId, byte[] Payload);
 
-    private static void AssertContainsRuntimeAndApplicationEntries(IReadOnlyCollection<CapturedLogEntry> entries)
+    private static void AssertContainsRuntimeAndApplicationEntries(IReadOnlyCollection<CapturedJournalEntry> entries)
     {
         Assert.Contains(entries, entry => entry.StreamId.Value == 0 && entry.Payload.Length > 0);
         Assert.Contains(entries, entry => entry.StreamId.Value >= 8 && entry.Payload.Length > 0);
     }
 
-    private interface ITestLogEntryCodec
+    private interface ITestJournalEntryCodec
     {
         void Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine);
     }
 
-    private sealed class CapturingLogEntrySink : IStateMachineResolver, IDurableStateMachine, ITestLogEntryCodec, IOrleansBinaryLogEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateMachineResolver, IDurableStateMachine, ITestJournalEntryCodec, IOrleansBinaryJournalEntryCodec
     {
-        private LogStreamId _streamId;
+        private JournalStreamId _streamId;
 
-        public List<CapturedLogEntry> Entries { get; } = [];
+        public List<CapturedJournalEntry> Entries { get; } = [];
 
         object IDurableStateMachine.OperationCodec => this;
 
-        public IDurableStateMachine ResolveStateMachine(LogStreamId streamId)
+        public IDurableStateMachine ResolveStateMachine(JournalStreamId streamId)
         {
             _streamId = streamId;
             return this;
         }
 
-        void ITestLogEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
+        void ITestJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        void IOrleansBinaryLogEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IDurableStateMachine stateMachine) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        public void Reset(LogStreamWriter writer) { }
-        public void AppendEntries(LogStreamWriter writer) { }
-        public void AppendSnapshot(LogStreamWriter writer) { }
+        public void Reset(JournalStreamWriter writer) { }
+        public void AppendEntries(JournalStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class DecodedPayloadOnlyLogFormat : ILogFormat
+    private sealed class DecodedPayloadOnlyJournalFormat : IJournalFormat
     {
-        private readonly LogStreamId _streamId;
+        private readonly JournalStreamId _streamId;
         private readonly byte[] _payload;
-        private readonly TrackingLogFormat _writerFormat = new();
+        private readonly TrackingJournalFormat _writerFormat = new();
 
-        public DecodedPayloadOnlyLogFormat(LogStreamId streamId, byte[] payload)
+        public DecodedPayloadOnlyJournalFormat(JournalStreamId streamId, byte[] payload)
         {
             _streamId = streamId;
             _payload = payload.ToArray();
         }
 
-        public List<TrackingLogBatchWriter> Writers => _writerFormat.Writers;
+        public List<TrackingJournalBatchWriter> Writers => _writerFormat.Writers;
 
-        public ILogBatchWriter CreateWriter() => _writerFormat.CreateWriter();
+        public string FileExtension => ".test";
 
-        public void Read(LogReadBuffer input, IStateMachineResolver resolver)
+        public string? MimeType => null;
+
+        public IJournalBatchWriter CreateWriter() => _writerFormat.CreateWriter();
+
+        public void Read(JournalReadBuffer input, IStateMachineResolver resolver)
         {
             if (input.Length == 0)
             {
@@ -1084,9 +1088,9 @@ public class StateMachineManagerTests : JournalingTestBase
             }
 
             var callbackPayload = _payload.ToArray();
-            var formattedEntry = new TestFormattedLogEntry(callbackPayload);
+            var formattedEntry = new TestFormattedJournalEntry(callbackPayload);
             var stateMachine = resolver.ResolveStateMachine(_streamId);
-            if (stateMachine is IFormattedLogEntryBuffer formattedEntryBuffer)
+            if (stateMachine is IFormattedJournalEntryBuffer formattedEntryBuffer)
             {
                 formattedEntryBuffer.AddFormattedEntry(formattedEntry);
             }
@@ -1100,7 +1104,7 @@ public class StateMachineManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class TestFormattedLogEntry(ReadOnlyMemory<byte> payload) : IFormattedLogEntry
+    private sealed class TestFormattedJournalEntry(ReadOnlyMemory<byte> payload) : IFormattedJournalEntry
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
 
@@ -1111,50 +1115,58 @@ public class StateMachineManagerTests : JournalingTestBase
                 return;
             }
 
-            if (stateMachine.OperationCodec is not ITestLogEntryCodec codec)
+            if (stateMachine.OperationCodec is not ITestJournalEntryCodec codec)
             {
                 throw new InvalidOperationException(
-                    $"State machine '{stateMachine.GetType().FullName}' is not compatible with test log entry codec.");
+                    $"State machine '{stateMachine.GetType().FullName}' is not compatible with test journal entry codec.");
             }
 
             codec.Apply(new ReadOnlySequence<byte>(Payload), stateMachine);
         }
     }
 
-    private sealed class NonConsumingLogFormat : ILogFormat
+    private sealed class NonConsumingJournalFormat : IJournalFormat
     {
-        public ILogBatchWriter CreateWriter() => throw new NotSupportedException();
+        public string FileExtension => ".test";
 
-        public void Read(LogReadBuffer input, IStateMachineResolver resolver)
+        public string? MimeType => null;
+
+        public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
+
+        public void Read(JournalReadBuffer input, IStateMachineResolver resolver)
         {
         }
     }
 
-    private sealed class TrackingLogFormat : ILogFormat
+    private sealed class TrackingJournalFormat : IJournalFormat
     {
-        public List<TrackingLogBatchWriter> Writers { get; } = [];
+        public List<TrackingJournalBatchWriter> Writers { get; } = [];
 
         public int ReadCount { get; private set; }
 
-        public ILogBatchWriter CreateWriter()
+        public string FileExtension => ".test";
+
+        public string? MimeType => null;
+
+        public IJournalBatchWriter CreateWriter()
         {
-            var writer = new TrackingLogBatchWriter();
+            var writer = new TrackingJournalBatchWriter();
             Writers.Add(writer);
             return writer;
         }
 
-        public void Read(LogReadBuffer input, IStateMachineResolver consumer)
+        public void Read(JournalReadBuffer input, IStateMachineResolver consumer)
         {
             ReadCount++;
-            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(input, consumer);
+            ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(input, consumer);
         }
     }
 
-    private sealed class TrackingLogBatchWriter : ILogBatchWriter
+    private sealed class TrackingJournalBatchWriter : IJournalBatchWriter
     {
-        private readonly OrleansBinaryLogBatchWriter _inner = new();
+        private readonly OrleansBinaryJournalBatchWriter _inner = new();
 
-        public List<ulong> CreatedLogStreamWriterIds { get; } = [];
+        public List<ulong> CreatedJournalStreamWriterIds { get; } = [];
 
         public List<ulong> BeganEntryIds { get; } = [];
 
@@ -1164,10 +1176,10 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public long Length => _inner.Length;
 
-        public LogStreamWriter CreateLogStreamWriter(LogStreamId streamId)
+        public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId)
         {
-            CreatedLogStreamWriterIds.Add(streamId.Value);
-            return new(streamId, new TrackingLogStreamWriterTarget(this));
+            CreatedJournalStreamWriterIds.Add(streamId.Value);
+            return new(streamId, new TrackingJournalStreamWriterTarget(this));
         }
 
         public ArcBuffer GetCommittedBuffer()
@@ -1184,23 +1196,23 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public void Dispose() => _inner.Dispose();
 
-        private sealed class TrackingLogStreamWriterTarget(TrackingLogBatchWriter owner) : ILogStreamWriterTarget
+        private sealed class TrackingJournalStreamWriterTarget(TrackingJournalBatchWriter owner) : IJournalStreamWriterTarget
         {
-            public LogEntryWriter BeginEntry(LogStreamId streamId, ILogEntryWriterCompletion? completion)
+            public JournalEntryWriter BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion)
             {
                 owner.BeganEntryIds.Add(streamId.Value);
                 return owner._inner.BeginEntry(streamId, completion);
             }
 
-            public void AppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+            public void AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
             {
                 owner.BeganEntryIds.Add(streamId.Value);
-                using var logEntry = new LogEntry(owner._inner.BeginEntry(streamId));
-                logEntry.Writer.Write(entry.Payload.Span);
-                logEntry.Commit();
+                using var journalEntry = new JournalEntry(owner._inner.BeginEntry(streamId));
+                journalEntry.Writer.Write(entry.Payload.Span);
+                journalEntry.Commit();
             }
 
-            public bool TryAppendFormattedEntry(LogStreamId streamId, IFormattedLogEntry entry)
+            public bool TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
             {
                 AppendFormattedEntry(streamId, entry);
                 return true;
@@ -1208,7 +1220,7 @@ public class StateMachineManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class CapturingStorage : ILogStorage
+    private sealed class CapturingStorage : IJournalStorage
     {
         private readonly List<byte[]> _segments = [];
 
@@ -1222,7 +1234,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
 
@@ -1297,11 +1309,11 @@ public class StateMachineManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class RawReadStorage(byte[] bytes) : ILogStorage
+    private sealed class RawReadStorage(byte[] bytes) : IJournalStorage
     {
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
@@ -1316,7 +1328,7 @@ public class StateMachineManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class MutableReadStorage(byte[] bytes) : ILogStorage
+    private sealed class MutableReadStorage(byte[] bytes) : IJournalStorage
     {
         public byte[] Bytes { get; set; } = bytes;
 
@@ -1324,7 +1336,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
@@ -1356,13 +1368,13 @@ public class StateMachineManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class ThrowingReadStorage : ILogStorage
+    private sealed class ThrowingReadStorage : IJournalStorage
     {
         public InvalidOperationException Exception { get; } = new("Storage read failed.");
 
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
             => ValueTask.FromException(Exception);
 
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
@@ -1372,13 +1384,13 @@ public class StateMachineManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class ChunkedReadStorage(byte[] bytes, int chunkSize) : ILogStorage
+    private sealed class ChunkedReadStorage(byte[] bytes, int chunkSize) : IJournalStorage
     {
         public int ReadConsumeCount { get; private set; }
 
         public bool IsCompactionRequested => false;
 
-        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             ArgumentNullException.ThrowIfNull(consumer);
 
@@ -1404,7 +1416,7 @@ public class StateMachineManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class DelayedBorrowingStorage : ILogStorage
+    private sealed class DelayedBorrowingStorage : IJournalStorage
     {
         public byte[]? AppendBytesAfterYield { get; private set; }
 
@@ -1412,7 +1424,7 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public bool IsCompactionRequested { get; set; }
 
-        public ValueTask ReadAsync(ILogStorageConsumer consumer, CancellationToken cancellationToken)
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             consumer.Complete();
             return default;
@@ -1437,12 +1449,12 @@ public class StateMachineManagerTests : JournalingTestBase
 
     private sealed class ManualDirectWriteStateMachine : IDurableStateMachine
     {
-        private LogStreamWriter _writer;
+        private JournalStreamWriter _writer;
         private bool _entryOpen;
 
         public bool AppendEntriesObservedOpenEntry { get; private set; }
 
-        public LogEntry BeginEntry()
+        public JournalEntry BeginEntry()
         {
             _entryOpen = true;
             return _writer.BeginEntry();
@@ -1452,21 +1464,21 @@ public class StateMachineManagerTests : JournalingTestBase
 
         public object OperationCodec => this;
 
-        public void Reset(LogStreamWriter writer) => _writer = writer;
+        public void Reset(JournalStreamWriter writer) => _writer = writer;
 
-        public void AppendEntries(LogStreamWriter writer)
+        public void AppendEntries(JournalStreamWriter writer)
         {
             AppendEntriesObservedOpenEntry |= _entryOpen;
         }
 
-        public void AppendSnapshot(LogStreamWriter writer) { }
+        public void AppendSnapshot(JournalStreamWriter writer) { }
 
         public IDurableStateMachine DeepCopy() => throw new NotSupportedException();
     }
 
     private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryOperationCodec<K, V> where K : notnull
     {
-        public void WriteSet(K key, V value, LogStreamWriter writer)
+        public void WriteSet(K key, V value, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
             entry.Writer.GetSpan(1)[0] = 1;
@@ -1474,11 +1486,11 @@ public class StateMachineManagerTests : JournalingTestBase
             throw new InvalidOperationException("Expected test exception.");
         }
 
-        public void WriteRemove(K key, LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteRemove(K key, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteClear(LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteClear(JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, LogStreamWriter writer) => throw new NotSupportedException();
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
     }
@@ -1488,7 +1500,7 @@ public class StateMachineManagerTests : JournalingTestBase
     {
         public bool ThrowOnSet { get; set; }
 
-        public void WriteSet(K key, V value, LogStreamWriter writer)
+        public void WriteSet(K key, V value, JournalStreamWriter writer)
         {
             if (!ThrowOnSet)
             {
@@ -1502,11 +1514,11 @@ public class StateMachineManagerTests : JournalingTestBase
             throw new InvalidOperationException("Expected test exception.");
         }
 
-        public void WriteRemove(K key, LogStreamWriter writer) => inner.WriteRemove(key, writer);
+        public void WriteRemove(K key, JournalStreamWriter writer) => inner.WriteRemove(key, writer);
 
-        public void WriteClear(LogStreamWriter writer) => inner.WriteClear(writer);
+        public void WriteClear(JournalStreamWriter writer) => inner.WriteClear(writer);
 
-        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, LogStreamWriter writer) => inner.WriteSnapshot(items, writer);
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, JournalStreamWriter writer) => inner.WriteSnapshot(items, writer);
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => inner.Apply(input, consumer);
     }
