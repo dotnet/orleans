@@ -43,11 +43,7 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
-            Debug.Assert(member is IGrainActivationWorkingSetMember);
-            if (member is IGrainActivationWorkingSetMember grainMember)
-            {
-                Add(grainMember.GrainId);
-            }
+            Add(member.GrainId);
         }
 
         internal bool Add(GrainId grainId)

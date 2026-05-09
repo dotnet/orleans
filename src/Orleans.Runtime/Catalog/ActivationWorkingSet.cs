@@ -216,7 +216,7 @@ namespace Orleans.Runtime
     /// <summary>
     /// Represents an activation from the perspective of <see cref="IActivationWorkingSet"/>.
     /// </summary>
-    public interface IActivationWorkingSetMember
+    public interface IActivationWorkingSetMember : IGrainContext
     {
         /// <summary>
         /// Returns <see langword="true"/> if the member is eligible for removal, <see langword="false"/> otherwise.
@@ -226,17 +226,6 @@ namespace Orleans.Runtime
         /// If this method returns <see langword="true"/> and <paramref name="wouldRemove"/> is <see langword="true"/>, the member must be removed from the working set and is eligible to be added again via a call to <see cref="IActivationWorkingSet.OnActivated(IActivationWorkingSetMember)"/>.
         /// </remarks>
         bool IsCandidateForRemoval(bool wouldRemove);
-    }
-
-    /// <summary>
-    /// Represents a grain activation from the perspective of <see cref="IActivationWorkingSet"/>.
-    /// </summary>
-    public interface IGrainActivationWorkingSetMember : IActivationWorkingSetMember
-    {
-        /// <summary>
-        /// Gets the grain id associated with this activation.
-        /// </summary>
-        GrainId GrainId { get; }
     }
 
     /// <summary>

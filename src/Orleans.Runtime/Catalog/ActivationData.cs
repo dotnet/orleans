@@ -32,7 +32,7 @@ internal sealed partial class ActivationData :
     IGrainContext,
     ICollectibleGrainContext,
     IGrainExtensionBinder,
-    IGrainActivationWorkingSetMember,
+    IActivationWorkingSetMember,
     IGrainTimerRegistry,
     IGrainManagementExtension,
     IGrainCallCancellationExtension,

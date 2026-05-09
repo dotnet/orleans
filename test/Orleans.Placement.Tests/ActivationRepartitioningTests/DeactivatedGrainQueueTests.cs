@@ -74,10 +74,28 @@ public class DeactivatedGrainQueueTests
         Assert.Contains(otherUnaffected, remainingEdges);
     }
 
-    private sealed class TestActivationWorkingSetMember(GrainId grainId) : IGrainActivationWorkingSetMember
+    private sealed class TestActivationWorkingSetMember(GrainId grainId) : IActivationWorkingSetMember
     {
         public GrainId GrainId { get; } = grainId;
 
+        public GrainReference GrainReference => throw new NotImplementedException();
+        public object GrainInstance => throw new NotImplementedException();
+        public ActivationId ActivationId => throw new NotImplementedException();
+        public GrainAddress Address => throw new NotImplementedException();
+        public IServiceProvider ActivationServices => throw new NotImplementedException();
+        public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();
+        public IWorkItemScheduler Scheduler => throw new NotImplementedException();
+        public Task Deactivated => Task.CompletedTask;
+
         public bool IsCandidateForRemoval(bool wouldRemove) => false;
+        public void SetComponent<TComponent>(TComponent value) where TComponent : class => throw new NotImplementedException();
+        public void ReceiveMessage(object message) => throw new NotImplementedException();
+        public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
+        public void Migrate(Dictionary<string, object> requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public object GetTarget() => throw new NotImplementedException();
+        public object GetComponent(Type componentType) => throw new NotImplementedException();
+        public bool Equals(IGrainContext other) => ReferenceEquals(this, other);
     }
 }
