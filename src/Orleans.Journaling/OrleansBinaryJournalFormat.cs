@@ -12,9 +12,9 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
     {
     }
 
-    public string FileExtension => ".bin";
+    public string FileExtension => ".obs";
 
-    public string? MimeType => "application/vnd.microsoft.orleans.journal+binary";
+    public string? MimeType => "application/octet-stream";
 
     IJournalBatchWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
