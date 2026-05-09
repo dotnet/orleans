@@ -343,8 +343,8 @@ internal partial class CosmosReminderTable : IReminderTable
 
         remindersCollection.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         remindersCollection.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
-        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartAt/*" });
-        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Period/*" });
+        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartAt/?" });
+        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Period/?" });
         remindersCollection.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
 
         const int maxRetries = 3;
