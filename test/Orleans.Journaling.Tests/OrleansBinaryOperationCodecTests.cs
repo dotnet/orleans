@@ -176,18 +176,16 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     public void Codecs_RejectMalformedCommandsAndOperands()
     {
         var valueCodec = new OrleansBinaryValueOperationCodec<byte>(SingleByteValueCodec.Instance);
-        var malformedCommand = Assert.Throws<InvalidOperationException>(
+        Assert.Throws<InvalidOperationException>(
             () => valueCodec.Apply(CodecTestHelpers.Sequence(new byte[] { 0, 0x80 }), new RecordingValueOperationHandler<byte>()));
-        Assert.Contains("variable-length integer", malformedCommand.Message);
 
         var missingValue = Assert.Throws<InvalidOperationException>(
             () => valueCodec.Apply(VersionedCommand(0), new RecordingValueOperationHandler<byte>()));
         Assert.Contains("Missing byte value", missingValue.Message);
 
         var listCodec = new OrleansBinaryListOperationCodec<byte>(SingleByteValueCodec.Instance);
-        var missingIndex = Assert.Throws<InvalidOperationException>(
+        Assert.Throws<InvalidOperationException>(
             () => listCodec.Apply(CodecTestHelpers.Sequence(new byte[] { 0, 3 }), new RecordingListOperationHandler<byte>()));
-        Assert.Contains("variable-length integer", missingIndex.Message);
     }
 
     [Fact]
@@ -340,20 +338,10 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [InlineData(0x0FFF_FFFFU)]
     [InlineData(0x1000_0000U)]
     [InlineData(uint.MaxValue)]
-    public void VarIntHelper_UInt32_MatchesOrleansSerialization(uint value)
+    public void OrleansSerialization_VarUInt32_RoundTrips(uint value)
     {
-        var expected = WriteSerializerVarUInt32(value);
-        var actual = WriteVarUInt32(value);
-
-        Assert.Equal(expected, actual);
-        Assert.Equal(value, ReadSerializerVarUInt32(actual));
-
-        var reader = new SequenceReader<byte>(CodecTestHelpers.Sequence(actual));
-        Assert.True(VarIntHelper.TryReadVarUInt32(ref reader, out var decoded, out var bytesRead, out var minimumBytes));
-        Assert.Equal(value, decoded);
-        Assert.Equal(actual.Length, bytesRead);
-        Assert.Equal(actual.Length, minimumBytes);
-        Assert.True(reader.End);
+        var encoded = WriteVarUInt32(value);
+        Assert.Equal(value, ReadSerializerVarUInt32(encoded));
     }
 
     [Theory]
@@ -371,69 +359,15 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [InlineData(0x7FFF_FFFF_FFFF_FFFFUL)]
     [InlineData(0x8000_0000_0000_0000UL)]
     [InlineData(ulong.MaxValue)]
-    public void VarIntHelper_UInt64_MatchesOrleansSerialization(ulong value)
+    public void OrleansSerialization_VarUInt64_RoundTrips(ulong value)
     {
-        var expected = WriteSerializerVarUInt64(value);
-        var actual = WriteVarUInt64(value);
-
-        Assert.Equal(expected, actual);
-        Assert.Equal(value, ReadSerializerVarUInt64(actual));
-
-        var reader = new SequenceReader<byte>(CodecTestHelpers.Sequence(actual));
-        Assert.True(VarIntHelper.TryReadVarUInt64(ref reader, out var decoded, out var bytesRead, out var minimumBytes));
-        Assert.Equal(value, decoded);
-        Assert.Equal(actual.Length, bytesRead);
-        Assert.Equal(actual.Length, minimumBytes);
-        Assert.True(reader.End);
-    }
-
-    [Theory]
-    [InlineData(new byte[] { 0x00 })]
-    [InlineData(new byte[] { 0x20 })]
-    [InlineData(new byte[] { 0x10, 0xFF, 0xFF, 0xFF, 0xFF })]
-    public void VarIntHelper_RejectsMalformedUInt32(byte[] bytes)
-    {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-        {
-            var reader = new SequenceReader<byte>(CodecTestHelpers.Sequence(bytes));
-            VarIntHelper.ReadVarUInt32(ref reader);
-        });
-
-        Assert.Contains("Malformed variable-length integer", exception.Message, StringComparison.Ordinal);
-    }
-
-    [Theory]
-    [InlineData(new byte[] { 0x00, 0x00 })]
-    [InlineData(new byte[] { 0x00, 0x04 })]
-    [InlineData(new byte[] { 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04 })]
-    public void VarIntHelper_RejectsMalformedUInt64(byte[] bytes)
-    {
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-        {
-            var reader = new SequenceReader<byte>(CodecTestHelpers.Sequence(bytes));
-            VarIntHelper.ReadVarUInt64(ref reader);
-        });
-
-        Assert.Contains("Malformed variable-length integer", exception.Message, StringComparison.Ordinal);
+        var encoded = WriteVarUInt64(value);
+        Assert.Equal(value, ReadSerializerVarUInt64(encoded));
     }
 
     private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
-    private static byte[] WriteVarUInt32(uint value)
-    {
-        var buffer = new ArrayBufferWriter<byte>();
-        VarIntHelper.WriteVarUInt32(buffer, value);
-        return buffer.WrittenMemory.ToArray();
-    }
-
-    private static byte[] WriteVarUInt64(ulong value)
-    {
-        var buffer = new ArrayBufferWriter<byte>();
-        VarIntHelper.WriteVarUInt64(buffer, value);
-        return buffer.WrittenMemory.ToArray();
-    }
-
-    private byte[] WriteSerializerVarUInt32(uint value)
+    private byte[] WriteVarUInt32(uint value)
     {
         var buffer = new ArrayBufferWriter<byte>();
         using var session = SessionPool.GetSession();
@@ -443,7 +377,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
         return buffer.WrittenMemory.ToArray();
     }
 
-    private byte[] WriteSerializerVarUInt64(ulong value)
+    private byte[] WriteVarUInt64(ulong value)
     {
         var buffer = new ArrayBufferWriter<byte>();
         using var session = SessionPool.GetSession();
@@ -531,13 +465,14 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     private static ReadOnlySequence<byte> VersionedCommand(uint command, params uint[] operands)
     {
         var buffer = new ArrayBufferWriter<byte>();
-        buffer.GetSpan(1)[0] = 0;
-        buffer.Advance(1);
-        VarIntHelper.WriteVarUInt32(buffer, command);
+        var writer = Writer.Create(buffer, session: null!);
+        writer.WriteByte(0);
+        writer.WriteVarUInt32(command);
         foreach (var operand in operands)
         {
-            VarIntHelper.WriteVarUInt32(buffer, operand);
+            writer.WriteVarUInt32(operand);
         }
+        writer.Commit();
 
         return CodecTestHelpers.Sequence(buffer.WrittenMemory);
     }

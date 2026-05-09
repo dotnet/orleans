@@ -1,4 +1,5 @@
 using System.Buffers;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -21,8 +22,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
 
     private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
     {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, SetCommand);
+        WriteHeader(output, SetCommand);
         keyCodec.Write(key, output);
         valueCodec.Write(value, output);
     }
@@ -33,8 +33,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
 
     private void WriteRemovePayload(TKey key, IBufferWriter<byte> output)
     {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, RemoveCommand);
+        WriteHeader(output, RemoveCommand);
         keyCodec.Write(key, output);
     }
 
@@ -42,11 +41,8 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     public void WriteClear(JournalStreamWriter writer) =>
         JournalOperationWriter.Write(writer, WriteClearPayload);
 
-    private static void WriteClearPayload(IBufferWriter<byte> output)
-    {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, ClearCommand);
-    }
+    private static void WriteClearPayload(IBufferWriter<byte> output) =>
+        WriteHeader(output, ClearCommand);
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) =>
@@ -55,9 +51,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     private void WriteSnapshotPayload(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
     {
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
-        VarIntHelper.WriteVarUInt32(output, (uint)count);
+        WriteHeader(output, SnapshotCommand, (uint)count);
         var written = 0;
         foreach (var (key, value) in items)
         {
@@ -129,11 +123,21 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         reader.EnsureEnd();
     }
 
-    private static void WriteVersionByte(IBufferWriter<byte> output)
+    private static void WriteHeader(IBufferWriter<byte> output, uint command)
     {
-        var span = output.GetSpan(1);
-        span[0] = FormatVersion;
-        output.Advance(1);
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteByte(FormatVersion);
+        writer.WriteVarUInt32(command);
+        writer.Commit();
+    }
+
+    private static void WriteHeader(IBufferWriter<byte> output, uint command, uint operand)
+    {
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteByte(FormatVersion);
+        writer.WriteVarUInt32(command);
+        writer.WriteVarUInt32(operand);
+        writer.Commit();
     }
 
 }

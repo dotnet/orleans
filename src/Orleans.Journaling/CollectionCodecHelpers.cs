@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Diagnostics.CodeAnalysis;
 
 namespace Orleans.Journaling;
@@ -18,12 +17,6 @@ internal static class CollectionCodecHelpers
         return count;
     }
 
-    public static int ReadSnapshotCount(ref SequenceReader<byte> reader)
-        => ConvertWireUInt32ToInt32(VarIntHelper.ReadVarUInt32(ref reader), "snapshot count");
-
-    public static int ReadListIndex(ref SequenceReader<byte> reader)
-        => ConvertWireUInt32ToInt32(VarIntHelper.ReadVarUInt32(ref reader), "list index");
-
     public static void ThrowIfSnapshotItemCountExceeded(int expectedCount, int actualCount)
     {
         if (actualCount >= expectedCount)
@@ -39,20 +32,6 @@ internal static class CollectionCodecHelpers
             ThrowSnapshotItemCountMismatch(expectedCount, actualCount);
         }
     }
-
-    private static int ConvertWireUInt32ToInt32(uint value, string fieldName)
-    {
-        if (value > int.MaxValue)
-        {
-            ThrowIntegerOverflow(fieldName, value);
-        }
-
-        return (int)value;
-    }
-
-    [DoesNotReturn]
-    private static void ThrowIntegerOverflow(string fieldName, uint value) =>
-        throw new InvalidOperationException($"Malformed binary journal entry: {fieldName} {value} exceeds the maximum supported value {int.MaxValue}.");
 
     [DoesNotReturn]
     private static void ThrowNegativeSnapshotCount(int count) =>

@@ -1,4 +1,5 @@
 using System.Buffers;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -18,10 +19,14 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
 
     private void WriteSetPayload(T state, ulong version, IBufferWriter<byte> output)
     {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, SetValueCommand);
+        var headerWriter = Writer.Create(output, session: null!);
+        headerWriter.WriteByte(FormatVersion);
+        headerWriter.WriteVarUInt32(SetValueCommand);
+        headerWriter.Commit();
         codec.Write(state, output);
-        VarIntHelper.WriteVarUInt64(output, version);
+        var versionWriter = Writer.Create(output, session: null!);
+        versionWriter.WriteVarUInt64(version);
+        versionWriter.Commit();
     }
 
     /// <inheritdoc/>
@@ -30,8 +35,10 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
 
     private static void WriteClearPayload(IBufferWriter<byte> output)
     {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, ClearValueCommand);
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteByte(FormatVersion);
+        writer.WriteVarUInt32(ClearValueCommand);
+        writer.Commit();
     }
 
     /// <inheritdoc/>
@@ -64,12 +71,4 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
         reader.EnsureEnd();
         consumer.ApplySet(state, version);
     }
-
-    private static void WriteVersionByte(IBufferWriter<byte> output)
-    {
-        var span = output.GetSpan(1);
-        span[0] = FormatVersion;
-        output.Advance(1);
-    }
-
 }

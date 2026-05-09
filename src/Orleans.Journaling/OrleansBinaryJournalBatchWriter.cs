@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Numerics;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
@@ -17,7 +18,7 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
             if (_entryWriter.IsActive)
             {
                 var bodyLength = checked((uint)_entryBuffer.Length);
-                length = checked(length + VarIntHelper.GetVarUInt32ByteCount(bodyLength) + _entryBuffer.Length);
+                length = checked(length + GetVarUInt32ByteCount(bodyLength) + _entryBuffer.Length);
             }
 
             return length;
@@ -49,7 +50,9 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
 
         var entryStart = Length;
         _entryBuffer.Reset();
-        VarIntHelper.WriteVarUInt64(_entryBuffer, streamId.Value);
+        var streamIdWriter = Writer.Create(_entryBuffer, session: null!);
+        streamIdWriter.WriteVarUInt64(streamId.Value);
+        streamIdWriter.Commit();
         _entryWriter.Initialize(this, entryStart, completion);
         return _entryWriter;
     }
@@ -58,7 +61,9 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
     {
         ValidateEntryStart(entryStart);
         var length = checked((uint)_entryBuffer.Length);
-        VarIntHelper.WriteVarUInt32(_buffer, length);
+        var lengthWriter = Writer.Create(_buffer, session: null!);
+        lengthWriter.WriteVarUInt32(length);
+        lengthWriter.Commit();
         using var body = _entryBuffer.PeekSlice(_entryBuffer.Length);
         _buffer.Write(body.AsReadOnlySequence());
         _entryBuffer.Reset();
@@ -140,6 +145,8 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
             throw new InvalidOperationException("The journal entry start does not match the active entry.");
         }
     }
+
+    private static int GetVarUInt32ByteCount(uint value) => ((int)BitOperations.Log2(value) / 7) + 1;
 
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream
     {

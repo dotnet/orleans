@@ -386,10 +386,6 @@ namespace Orleans.Journaling
         public void Write(System.Buffers.ReadOnlySequence<byte> value) { }
 
         public void Write(System.ReadOnlySpan<byte> value) { }
-
-        public void WriteVarUInt32(uint value) { }
-
-        public void WriteVarUInt64(ulong value) { }
     }
 
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>

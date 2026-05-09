@@ -1,4 +1,5 @@
 using System.Buffers;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -20,8 +21,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
 
     private void WriteEnqueuePayload(T item, IBufferWriter<byte> output)
     {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, EnqueueCommand);
+        WriteHeader(output, EnqueueCommand);
         codec.Write(item, output);
     }
 
@@ -29,21 +29,15 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     public void WriteDequeue(JournalStreamWriter writer) =>
         JournalOperationWriter.Write(writer, WriteDequeuePayload);
 
-    private static void WriteDequeuePayload(IBufferWriter<byte> output)
-    {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, DequeueCommand);
-    }
+    private static void WriteDequeuePayload(IBufferWriter<byte> output) =>
+        WriteHeader(output, DequeueCommand);
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer) =>
         JournalOperationWriter.Write(writer, WriteClearPayload);
 
-    private static void WriteClearPayload(IBufferWriter<byte> output)
-    {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, ClearCommand);
-    }
+    private static void WriteClearPayload(IBufferWriter<byte> output) =>
+        WriteHeader(output, ClearCommand);
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) =>
@@ -52,9 +46,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, SnapshotCommand);
-        VarIntHelper.WriteVarUInt32(output, (uint)count);
+        WriteHeader(output, SnapshotCommand, (uint)count);
         var written = 0;
         foreach (var item in items)
         {
@@ -112,11 +104,21 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         reader.EnsureEnd();
     }
 
-    private static void WriteVersionByte(IBufferWriter<byte> output)
+    private static void WriteHeader(IBufferWriter<byte> output, uint command)
     {
-        var span = output.GetSpan(1);
-        span[0] = FormatVersion;
-        output.Advance(1);
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteByte(FormatVersion);
+        writer.WriteVarUInt32(command);
+        writer.Commit();
+    }
+
+    private static void WriteHeader(IBufferWriter<byte> output, uint command, uint operand)
+    {
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteByte(FormatVersion);
+        writer.WriteVarUInt32(command);
+        writer.WriteVarUInt32(operand);
+        writer.Commit();
     }
 
 }

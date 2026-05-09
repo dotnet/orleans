@@ -382,11 +382,13 @@ public sealed class OrleansBinaryJournalBatchWriterTests
 
     private static (uint Length, ulong StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)
     {
-        var length = VarIntHelper.ReadVarUInt32(ref reader);
+        var lengthReader = Reader.Create(reader.UnreadSequence, session: null!);
+        var length = lengthReader.ReadVarUInt32();
+        reader.Advance(lengthReader.Position);
         var entry = reader.Sequence.Slice(reader.Consumed, length);
-        var entryReader = new SequenceReader<byte>(entry);
-        var streamId = VarIntHelper.ReadVarUInt64(ref entryReader);
-        var payload = entry.Slice(entryReader.Consumed);
+        var streamIdReader = Reader.Create(entry, session: null!);
+        var streamId = streamIdReader.ReadVarUInt64();
+        var payload = entry.Slice(streamIdReader.Position);
         reader.Advance(length);
 
         return (length, streamId, payload);

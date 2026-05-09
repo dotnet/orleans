@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections;
 using Orleans.Serialization;
+using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
@@ -112,8 +113,7 @@ public class JournalValueCodecTests
         var codec = new OrleansBinaryListOperationCodec<int>(valueCodec);
         var buffer = new ArrayBufferWriter<byte>();
 
-        WriteVersionAndCommand(buffer, 5);
-        VarIntHelper.WriteVarUInt32(buffer, 0x80000000);
+        WriteVersionAndCommand(buffer, 5, 0x80000000);
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), new ListConsumer<int>()));
@@ -128,8 +128,7 @@ public class JournalValueCodecTests
         var codec = new OrleansBinaryListOperationCodec<int>(valueCodec);
         var buffer = new ArrayBufferWriter<byte>();
 
-        WriteVersionAndCommand(buffer, 3);
-        VarIntHelper.WriteVarUInt32(buffer, 0x80000000);
+        WriteVersionAndCommand(buffer, 3, 0x80000000);
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), new ListConsumer<int>()));
@@ -192,11 +191,15 @@ public class JournalValueCodecTests
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
-    private static void WriteVersionAndCommand(IBufferWriter<byte> output, uint command)
+    private static void WriteVersionAndCommand(IBufferWriter<byte> output, uint command, uint? operand = null)
     {
-        var span = output.GetSpan(1);
-        span[0] = 0;
-        output.Advance(1);
-        VarIntHelper.WriteVarUInt32(output, command);
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteByte(0);
+        writer.WriteVarUInt32(command);
+        if (operand is { } value)
+        {
+            writer.WriteVarUInt32(value);
+        }
+        writer.Commit();
     }
 }

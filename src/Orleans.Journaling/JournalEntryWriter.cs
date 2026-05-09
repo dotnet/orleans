@@ -39,16 +39,6 @@ public sealed class JournalEntryWriter : IBufferWriter<byte>
     /// </summary>
     public void Write(ReadOnlySequence<byte> value) => GetTarget().Write(value);
 
-    /// <summary>
-    /// Writes an Orleans.Serialization-encoded unsigned 32-bit integer to the current journal entry.
-    /// </summary>
-    public void WriteVarUInt32(uint value) => VarIntHelper.WriteVarUInt32(this, value);
-
-    /// <summary>
-    /// Writes an Orleans.Serialization-encoded unsigned 64-bit integer to the current journal entry.
-    /// </summary>
-    public void WriteVarUInt64(ulong value) => VarIntHelper.WriteVarUInt64(this, value);
-
     internal void Initialize(IJournalEntryWriterTarget target, int entryStart, IJournalEntryWriterCompletion? completion = null)
     {
         if (_target is not null)

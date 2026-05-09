@@ -1,4 +1,5 @@
 using System.Buffers;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -17,8 +18,10 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
 
     private void WriteSetPayload(T value, IBufferWriter<byte> output)
     {
-        WriteVersionByte(output);
-        VarIntHelper.WriteVarUInt32(output, SetValueCommand);
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteByte(FormatVersion);
+        writer.WriteVarUInt32(SetValueCommand);
+        writer.Commit();
         codec.Write(value, output);
     }
 
@@ -42,12 +45,4 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
 
     void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
         Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableValueOperationHandler<T>>(state, this));
-
-    private static void WriteVersionByte(IBufferWriter<byte> output)
-    {
-        var span = output.GetSpan(1);
-        span[0] = FormatVersion;
-        output.Advance(1);
-    }
-
 }
