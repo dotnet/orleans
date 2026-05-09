@@ -411,7 +411,7 @@ jobs:
           -e ENABLE_EXPLORER=false \
           -e ENABLE_TELEMETRY=false \
           -e LOG_LEVEL=warn \
-          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview@sha256:bf3bd3cbe3fae2005a0745f77b01d1fc8cd04112193f3ee32289ee15ee9ae5fa
     - name: Wait for Azure Cosmos DB emulator
       run: |
         endpoint="https://localhost:8081/"
