@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace Orleans.Journaling;
 
 /// <summary>

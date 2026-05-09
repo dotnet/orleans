@@ -141,6 +141,12 @@ internal static class VarIntHelper
                 return false;
             }
 
+            if (byteCount == 10 && (upper & ~0x03FF) != 0)
+            {
+                reader = start;
+                ThrowOverflow();
+            }
+
             value = DecodeUInt64(lower, byteCount, upper);
             bytesRead = byteCount;
             minimumBytes = byteCount;

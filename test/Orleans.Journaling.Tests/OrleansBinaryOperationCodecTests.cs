@@ -405,6 +405,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Theory]
     [InlineData(new byte[] { 0x00, 0x00 })]
     [InlineData(new byte[] { 0x00, 0x04 })]
+    [InlineData(new byte[] { 0x00, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x04 })]
     public void VarIntHelper_RejectsMalformedUInt64(byte[] bytes)
     {
         var exception = Assert.Throws<InvalidOperationException>(() =>

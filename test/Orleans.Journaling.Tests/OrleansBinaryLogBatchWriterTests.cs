@@ -333,6 +333,24 @@ public sealed class OrleansBinaryLogBatchWriterTests
         Assert.Empty(consumer.Entries);
     }
 
+    [Fact]
+    public void BinaryFormat_Read_ReportsMalformedFrameOffsetAfterCompleteEntries()
+    {
+        using var buffer = new OrleansBinaryLogBatchWriter();
+        AppendEntry(buffer.CreateLogStreamWriter(new LogStreamId(8)), [1, 2, 3]);
+        using var committed = buffer.GetCommittedBuffer();
+        var entryBytes = committed.ToArray();
+        using var data = CreateWriter([.. entryBytes, 0x0B, 1, 2]);
+        var reader = new LogReadBuffer(new ArcBufferReader(data), isCompleted: true);
+        var consumer = new CollectingConsumer();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ((ILogFormat)OrleansBinaryLogFormat.Instance).Read(reader, consumer));
+
+        Assert.Contains($"byte offset {entryBytes.Length}", exception.Message, StringComparison.Ordinal);
+        Assert.Single(consumer.Entries);
+    }
+
     private static byte[] ToArray(OrleansBinaryLogBatchWriter buffer)
     {
         using var slice = buffer.PeekSlice();

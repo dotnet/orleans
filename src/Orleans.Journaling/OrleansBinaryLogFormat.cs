@@ -23,13 +23,16 @@ internal static class OrleansBinaryLogReader
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
-        while (TryReadEntry(input, resolver))
+        var offset = 0L;
+        while (TryReadEntry(input, resolver, offset, out var frameLength))
         {
+            offset += frameLength;
         }
     }
 
-    private static bool TryReadEntry(LogReadBuffer input, IStateMachineResolver resolver)
+    private static bool TryReadEntry(LogReadBuffer input, IStateMachineResolver resolver, long offset, out long frameLength)
     {
+        frameLength = 0;
         if (input.Length == 0)
         {
             return false;
@@ -39,11 +42,11 @@ internal static class OrleansBinaryLogReader
         var remaining = available.AsReadOnlySequence();
         if (!OrleansBinaryLogEntryFrameReader.TryReadEntry(
             ref remaining,
-            offset: 0,
+            offset,
             input.IsCompleted,
             out var streamId,
             out var payload,
-            out var frameLength,
+            out frameLength,
             out _))
         {
             return false;
@@ -52,7 +55,7 @@ internal static class OrleansBinaryLogReader
         if (frameLength > int.MaxValue)
         {
             throw new InvalidOperationException(
-                "Malformed binary log entry stream at byte offset 0: entry length exceeds maximum supported frame size.");
+                $"Malformed binary log entry stream at byte offset {offset}: entry length exceeds maximum supported frame size.");
         }
 
         input.Skip((int)frameLength);

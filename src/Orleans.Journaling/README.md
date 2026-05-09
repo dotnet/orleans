@@ -84,15 +84,15 @@ For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `Se
 
 ## Storage format
 
-The JSON journaling format stores log entries as true JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON object per log entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings.
+The JSON journaling format stores log entries as true JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON array per log entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings.
 
-Each record contains the state machine id and the durable entry payload:
+Each record contains the state machine id as element 0, followed by the durable operation payload:
 
 ```json
-{"streamId":8,"entry":{"cmd":"set","key":"alpha","value":1}}
+[8,"set","alpha",1]
 ```
 
-The `entry` object is the durable state machine command. It is nested so storage metadata such as `streamId` cannot collide with durable command fields such as `cmd`, `key`, `value`, `items`, or `version`. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
+The first operation payload element is the command name, followed by command-specific operands such as keys, values, item arrays, or versions. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
 The configured journaling format must match the data already stored for a grain. Switching formats over existing data is a migration concern outside this package.
 
