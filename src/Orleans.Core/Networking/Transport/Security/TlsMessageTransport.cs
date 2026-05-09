@@ -89,25 +89,16 @@ public abstract class TlsMessageTransport : StreamMessageTransport
     /// <inheritdoc/>
     public override async ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default)
     {
-        // Close outer stream loops FIRST (StreamMessageTransport)
-        await base.CloseAsync(closeException, cancellationToken).ConfigureAwait(false);
-
-        // Then close inner transport (socket)
+        // Close the inner transport first so any pending SslStream I/O unblocks promptly.
         await _innerTransport.CloseAsync(closeException, cancellationToken).ConfigureAwait(false);
+        await base.CloseAsync(closeException, cancellationToken).ConfigureAwait(false);
     }
 
     /// <inheritdoc/>
     protected override async Task RunAsyncCore()
     {
-        try
-        {
-            await AuthenticateAsync().ConfigureAwait(false);
-            await base.RunAsyncCore().ConfigureAwait(false);
-        }
-        finally
-        {
-            await CloseAsync(closeException: null, CancellationToken.None).ConfigureAwait(false);
-        }
+        await AuthenticateAsync().ConfigureAwait(false);
+        await base.RunAsyncCore().ConfigureAwait(false);
     }
 
     private async Task AuthenticateAsync()

@@ -64,7 +64,7 @@ public class TcpMessageTransportConnector : MessageTransportConnector
             socket.EnableFastPath(noDelay: options.NoDelay);
         }
 
-        var completion = new SingleUseAwaitableSocketAsyncEventArgs
+        using var completion = new SingleUseAwaitableSocketAsyncEventArgs
         {
             RemoteEndPoint = ip,
         };
@@ -95,7 +95,6 @@ public class TcpMessageTransportConnector : MessageTransportConnector
         catch
         {
             socket.Dispose();
-            completion.Dispose();
             throw;
         }
     }

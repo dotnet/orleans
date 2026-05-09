@@ -139,12 +139,19 @@ public class MessageTransportStream(MessageTransport transport, MemoryPool<byte>
 
         public override bool OnRead(ArcBufferReader bufferReader)
         {
-            var bytesRead = Math.Min(bufferReader.Length, _buffer.Length);
-            if (bytesRead > 0)
+            if (_buffer.Length == 0)
             {
-                bufferReader.Consume(_buffer.Span[..bytesRead]);
+                _completion.SetResult(0);
+                return true;
             }
 
+            if (bufferReader.Length == 0)
+            {
+                return false;
+            }
+
+            var bytesRead = Math.Min(bufferReader.Length, _buffer.Length);
+            bufferReader.Consume(_buffer.Span[..bytesRead]);
             _completion.SetResult(bytesRead);
             return true;
         }

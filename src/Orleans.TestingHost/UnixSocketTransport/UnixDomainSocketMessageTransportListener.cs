@@ -22,8 +22,9 @@ public class UnixDomainSocketMessageTransportListenerOptions
 
 internal class UnixDomainSocketMessageTransportListener : MessageTransportListener
 {
+    private readonly CancellationTokenSource _closingCts = new();
     private Socket? _listenSocket;
-    private IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions> _listenerOptions;
+    private readonly IOptionsMonitor<UnixDomainSocketMessageTransportListenerOptions> _listenerOptions;
 
     internal UnixDomainSocketMessageTransportListener(
         string endpointName,
@@ -60,7 +61,7 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
             throw new InvalidOperationException("Transport already bound");
         }
 
-        var listenSocket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
+        var listenSocket = CreateListenSocket();
 
         var options = _listenerOptions.Get(ListenerName);
         var path = options.Path;
@@ -81,15 +82,21 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
 
     public override async ValueTask<MessageTransport?> AcceptAsync(CancellationToken cancellationToken = default)
     {
-        while (true)
+        using var ct = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _closingCts.Token);
+        while (!ct.IsCancellationRequested)
         {
             try
             {
-                var acceptSocket = await _listenSocket!.AcceptAsync();
+                var acceptSocket = await _listenSocket!.AcceptAsync(ct.Token).ConfigureAwait(false);
                 var connection = new SocketMessageTransport(acceptSocket, Logger);
                 connection.Start();
 
                 return connection;
+            }
+            catch (OperationCanceledException)
+            {
+                // Graceful termination.
+                return null;
             }
             catch (ObjectDisposedException)
             {
@@ -107,17 +114,25 @@ internal class UnixDomainSocketMessageTransportListener : MessageTransportListen
                 SocketsLog.ConnectionReset(Logger, connection: "(null)");
             }
         }
+
+        return null;
+    }
+
+    private void DisposeCore()
+    {
+        _closingCts.Cancel();
+        _listenSocket?.Dispose();
     }
 
     public override ValueTask UnbindAsync(CancellationToken cancellationToken)
     {
-        _listenSocket?.Dispose();
+        DisposeCore();
         return default;
     }
 
     public override async ValueTask DisposeAsync()
     {
-        _listenSocket?.Dispose();
+        DisposeCore();
         GC.SuppressFinalize(this);
         await base.DisposeAsync();
     }

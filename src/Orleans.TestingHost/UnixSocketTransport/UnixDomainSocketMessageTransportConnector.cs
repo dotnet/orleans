@@ -40,7 +40,7 @@ internal class UnixDomainSocketMessageTransportConnector : MessageTransportConne
 
         var socket = new Socket(AddressFamily.Unix, SocketType.Stream, ProtocolType.Unspecified);
 
-        var completion = new SingleUseAwaitableSocketAsyncEventArgs
+        using var completion = new SingleUseAwaitableSocketAsyncEventArgs
         {
             RemoteEndPoint = unixEndPoint,
         };
@@ -71,7 +71,6 @@ internal class UnixDomainSocketMessageTransportConnector : MessageTransportConne
         catch
         {
             socket.Dispose();
-            completion.Dispose();
             throw;
         }
     }
