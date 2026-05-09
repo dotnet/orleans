@@ -45,7 +45,7 @@ public class TlsOptions
     /// If the certificate has an Extended Key Usage extension, the usages must include Server Authentication (OID 1.3.6.1.5.5.7.3.1).
     /// </para>
     /// </summary>
-    public Func<MessageTransport, string, X509Certificate2>? LocalServerCertificateSelector { get; set; }
+    public Func<MessageTransport, string?, X509Certificate2?>? LocalServerCertificateSelector { get; set; }
 
     /// <summary>
     /// <para>

@@ -768,6 +768,39 @@ namespace Orleans.Connections.Transport.Security
         protected static void EnsureCertificateIsAllowedForClientAuth(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { }
     }
 
+    public partial interface ITlsApplicationProtocolFeature
+    {
+        System.ReadOnlyMemory<byte> ApplicationProtocol { get; }
+    }
+
+    public partial interface ITlsConnectionFeature
+    {
+        System.Security.Cryptography.X509Certificates.X509Certificate2? RemoteCertificate { get; set; }
+
+        System.Threading.Tasks.Task<System.Security.Cryptography.X509Certificates.X509Certificate2?> GetRemoteCertificateAsync(System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface ITlsHandshakeFeature
+    {
+        System.Security.Authentication.CipherAlgorithmType CipherAlgorithm { get; }
+
+        int CipherStrength { get; }
+
+        System.Security.Authentication.HashAlgorithmType HashAlgorithm { get; }
+
+        int HashStrength { get; }
+
+        string HostName { get; }
+
+        System.Security.Authentication.ExchangeAlgorithmType KeyExchangeAlgorithm { get; }
+
+        int KeyExchangeStrength { get; }
+
+        System.Net.Security.TlsCipherSuite? NegotiatedCipherSuite { get; }
+
+        System.Security.Authentication.SslProtocols Protocol { get; }
+    }
+
     public enum RemoteCertificateMode
     {
         NoCertificate = 0,
@@ -776,7 +809,7 @@ namespace Orleans.Connections.Transport.Security
     }
 
     public delegate bool RemoteCertificateValidator(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Security.Cryptography.X509Certificates.X509Chain? chain, System.Net.Security.SslPolicyErrors policyErrors);
-    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificateSelectionCallback(object sender, string hostName);
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificateSelectionCallback(object sender, string? hostName);
     public partial class ServerTlsMessageTransport : TlsMessageTransport
     {
         public ServerTlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!, default!, default!) { }
@@ -804,6 +837,8 @@ namespace Orleans.Connections.Transport.Security
     public abstract partial class TlsMessageTransport : Streams.StreamMessageTransport
     {
         public TlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!) { }
+
+        public override FeatureCollection Features { get { throw null; } }
 
         protected MessageTransport InnerTransport { get { throw null; } }
 
@@ -867,7 +902,7 @@ namespace Orleans.Connections.Transport.Security
 
         public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate, string[], System.Security.Cryptography.X509Certificates.X509Certificate2>? LocalClientCertificateSelector { get { throw null; } set { } }
 
-        public System.Func<MessageTransport, string, System.Security.Cryptography.X509Certificates.X509Certificate2>? LocalServerCertificateSelector { get { throw null; } set { } }
+        public System.Func<MessageTransport, string?, System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalServerCertificateSelector { get { throw null; } set { } }
 
         public System.Buffers.MemoryPool<byte> MemoryPool { get { throw null; } set { } }
 

@@ -2,6 +2,7 @@
 
 using System;
 using System.Net.Security;
+using System.Security.Authentication;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -20,6 +21,7 @@ public abstract class TlsMessageTransport : StreamMessageTransport
     private readonly ILogger _logger;
     private readonly MessageTransportStream _networkTransportStream;
     private readonly SslStream _sslStream;
+    private readonly TlsConnectionFeature _tlsConnectionFeature = new();
 
     /// <summary>
     /// Initializes a new <see cref="TlsMessageTransport"/> instance.
@@ -30,10 +32,13 @@ public abstract class TlsMessageTransport : StreamMessageTransport
     /// <exception cref="ArgumentNullException"></exception>
     public TlsMessageTransport(MessageTransport transport, TlsOptions options, ILogger logger) : base(logger)
     {
-        _innerTransport = transport;
+        _innerTransport = transport ?? throw new ArgumentNullException(nameof(transport));
 
         _options = options ?? throw new ArgumentNullException(nameof(options));
         _logger = logger;
+        Features = new FeatureCollection(_innerTransport.Features);
+        Features.Set<ITlsConnectionFeature>(_tlsConnectionFeature);
+        Features.Set<ITlsHandshakeFeature>(_tlsConnectionFeature);
         _networkTransportStream = new MessageTransportStream(_innerTransport, _options.MemoryPool);
         _sslStream = new SslStream(
                 _networkTransportStream,
@@ -71,6 +76,9 @@ public abstract class TlsMessageTransport : StreamMessageTransport
                 });
     }
 
+    /// <inheritdoc/>
+    public override FeatureCollection Features { get; }
+
     /// <summary>
     /// Gets the TLS options.
     /// </summary>
@@ -85,6 +93,8 @@ public abstract class TlsMessageTransport : StreamMessageTransport
     /// Gets the underlying <see cref="MessageTransport"/>.
     /// </summary>
     protected MessageTransport InnerTransport => _innerTransport;
+
+    private protected TlsConnectionFeature TlsConnectionFeature => _tlsConnectionFeature;
 
     /// <inheritdoc/>
     public override async ValueTask CloseAsync(Exception? closeException, CancellationToken cancellationToken = default)
@@ -118,7 +128,8 @@ public abstract class TlsMessageTransport : StreamMessageTransport
         {
             try
             {
-                await AuthenticateAsyncCore(_innerTransport, certificateRequired, cancellationTokenSource.Token).ConfigureAwait(false);
+                await AuthenticateAsyncCore(this, certificateRequired, cancellationTokenSource.Token).ConfigureAwait(false);
+                PopulateTlsConnectionFeature();
             }
             catch (OperationCanceledException ex)
             {
@@ -139,6 +150,54 @@ public abstract class TlsMessageTransport : StreamMessageTransport
 
     /// <inheritdoc/>
     protected abstract Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, CancellationToken cancellationToken);
+
+    private void PopulateTlsConnectionFeature()
+    {
+        _tlsConnectionFeature.ApplicationProtocol = _sslStream.NegotiatedApplicationProtocol.Protocol;
+        Features.Set<ITlsApplicationProtocolFeature>(_tlsConnectionFeature);
+        _tlsConnectionFeature.LocalCertificate = ConvertToX509Certificate2(_sslStream.LocalCertificate);
+        _tlsConnectionFeature.RemoteCertificate = ConvertToX509Certificate2(_sslStream.RemoteCertificate);
+        _tlsConnectionFeature.NegotiatedCipherSuite = GetOptionalTlsProperty(() => _sslStream.NegotiatedCipherSuite);
+#if NET10_0_OR_GREATER
+#pragma warning disable SYSLIB0058
+#endif
+        _tlsConnectionFeature.CipherAlgorithm = GetOptionalTlsPropertyOrDefault(() => _sslStream.CipherAlgorithm);
+        _tlsConnectionFeature.CipherStrength = GetOptionalTlsPropertyOrDefault(() => _sslStream.CipherStrength);
+        _tlsConnectionFeature.HashAlgorithm = GetOptionalTlsPropertyOrDefault(() => _sslStream.HashAlgorithm);
+        _tlsConnectionFeature.HashStrength = GetOptionalTlsPropertyOrDefault(() => _sslStream.HashStrength);
+        _tlsConnectionFeature.KeyExchangeAlgorithm = GetOptionalTlsPropertyOrDefault(() => _sslStream.KeyExchangeAlgorithm);
+        _tlsConnectionFeature.KeyExchangeStrength = GetOptionalTlsPropertyOrDefault(() => _sslStream.KeyExchangeStrength);
+#if NET10_0_OR_GREATER
+#pragma warning restore SYSLIB0058
+#endif
+        _tlsConnectionFeature.Protocol = _sslStream.SslProtocol;
+    }
+
+    private static T? GetOptionalTlsProperty<T>(Func<T> accessor)
+        where T : struct
+    {
+        try
+        {
+            return accessor();
+        }
+        catch (NotSupportedException)
+        {
+            return null;
+        }
+    }
+
+    private static T GetOptionalTlsPropertyOrDefault<T>(Func<T> accessor)
+        where T : struct
+    {
+        try
+        {
+            return accessor();
+        }
+        catch (NotSupportedException)
+        {
+            return default;
+        }
+    }
 
     /// <inheritdoc/>
     public override async ValueTask DisposeAsync()

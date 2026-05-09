@@ -14,7 +14,7 @@ namespace Orleans.Connections.Transport.Security;
 public class ServerTlsMessageTransport : TlsMessageTransport
 {
     private readonly X509Certificate2? _certificate;
-    private readonly Func<MessageTransport, string, X509Certificate2>? _certificateSelector;
+    private readonly Func<MessageTransport, string?, X509Certificate2?>? _certificateSelector;
 
     public ServerTlsMessageTransport(MessageTransport transport, TlsOptions options, ILogger logger) : base(transport, options, logger)
     {
@@ -47,6 +47,7 @@ public class ServerTlsMessageTransport : TlsMessageTransport
         {
             selector = (sender, name) =>
             {
+                TlsConnectionFeature.HostName = name ?? string.Empty;
                 var cert = _certificateSelector(transport, name);
                 if (cert != null)
                 {
@@ -56,10 +57,19 @@ public class ServerTlsMessageTransport : TlsMessageTransport
                 return cert;
             };
         }
+        else if (_certificate != null)
+        {
+            // Even with a fixed certificate, capture the client's SNI host name.
+            selector = (sender, name) =>
+            {
+                TlsConnectionFeature.HostName = name ?? string.Empty;
+                return _certificate;
+            };
+        }
 
         var sslOptions = new TlsServerAuthenticationOptions
         {
-            ServerCertificate = _certificate,
+            ServerCertificate = selector is null ? _certificate : null,
             ServerCertificateSelectionCallback = selector,
             ClientCertificateRequired = certificateRequired,
             EnabledSslProtocols = Options.SslProtocols,

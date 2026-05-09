@@ -7,7 +7,7 @@ using System.Security.Cryptography.X509Certificates;
 
 namespace Orleans.Connections.Transport.Security;
 
-public delegate X509Certificate? ServerCertificateSelectionCallback(object sender, string hostName);
+public delegate X509Certificate? ServerCertificateSelectionCallback(object sender, string? hostName);
 
 public class TlsServerAuthenticationOptions
 {

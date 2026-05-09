@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Hosting;
 using Orleans.Connections.Transport.Security;
@@ -31,6 +32,7 @@ namespace Orleans.Connections.Security.Tests
         private const string CertificateSubjectName = "fakedomain.faketld";
         private const string CertificateConfigKey = "certificate";
         private const string ClientCertificateModeKey = "CertificateMode";
+        private static readonly ConcurrentBag<ITlsHandshakeFeature> ServerHandshakeFeatures = new();
 
         /// <summary>
         /// Tests the certificate utility functions for creating self-signed certificates.
@@ -48,6 +50,42 @@ namespace Orleans.Connections.Security.Tests
             var encoded = TestCertificateHelper.ConvertToBase64(original);
             var decoded = TestCertificateHelper.ConvertFromBase64(encoded);
             Assert.Equal(original, decoded);
+        }
+
+        [Fact]
+        public async Task TlsEndToEndPreservesServerNameIndication()
+        {
+            ServerHandshakeFeatures.Clear();
+            TestCluster testCluster = default;
+            try
+            {
+                var builder = new TestClusterBuilder()
+                    .AddSiloBuilderConfigurator<TlsServerSniConfigurator>()
+                    .AddClientBuilderConfigurator<TlsClientConfigurator>();
+
+                var certificate = TestCertificateHelper.CreateSelfSignedCertificate(
+                    CertificateSubjectName,
+                    new[] { TestCertificateHelper.ServerAuthenticationOid });
+
+                builder.Properties[CertificateConfigKey] = TestCertificateHelper.ConvertToBase64(certificate);
+                builder.Properties[ClientCertificateModeKey] = RemoteCertificateMode.NoCertificate.ToString();
+
+                testCluster = builder.Build();
+                await testCluster.DeployAsync();
+
+                var grain = testCluster.Client.GetGrain<IPingGrain>("pingu");
+                Assert.Equal("secret chit chat", await grain.Echo("secret chit chat"));
+
+                Assert.Contains(ServerHandshakeFeatures, feature => feature.HostName == CertificateSubjectName);
+            }
+            finally
+            {
+                if (testCluster != null)
+                {
+                    await testCluster.StopAllSilosAsync();
+                    testCluster.Dispose();
+                }
+            }
         }
 
         /// <summary>
@@ -124,6 +162,39 @@ namespace Orleans.Connections.Security.Tests
                         options.OnAuthenticateAsClient = (connection, sslOptions) =>
                         {
                             sslOptions.TargetHost = CertificateSubjectName;
+                        };
+                    });
+                });
+            }
+        }
+
+        private class TlsServerSniConfigurator : IHostConfigurator
+        {
+            public void Configure(IHostBuilder hostBuilder)
+            {
+                var config = hostBuilder.GetConfiguration();
+                var encodedCertificate = config[CertificateConfigKey];
+                var localCertificate = TestCertificateHelper.ConvertFromBase64(encodedCertificate);
+
+                hostBuilder.UseOrleans((ctx, siloBuilder) =>
+                {
+                    siloBuilder.UseTls(localCertificate, options =>
+                    {
+                        options.SslProtocols = System.Security.Authentication.SslProtocols.Tls12;
+                        options.AllowAnyRemoteCertificate();
+                        options.RemoteCertificateMode = RemoteCertificateMode.NoCertificate;
+                        options.ClientCertificateMode = RemoteCertificateMode.NoCertificate;
+                        options.OnAuthenticateAsClient = (connection, sslOptions) =>
+                        {
+                            sslOptions.TargetHost = CertificateSubjectName;
+                        };
+                        options.OnAuthenticateAsServer = (connection, sslOptions) =>
+                        {
+                            var feature = connection.Features.Get<ITlsHandshakeFeature>();
+                            if (feature is not null)
+                            {
+                                ServerHandshakeFeatures.Add(feature);
+                            }
                         };
                     });
                 });
