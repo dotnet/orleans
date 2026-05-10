@@ -15,6 +15,9 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Verify.Xunit" />
+    <Compile Remove="snapshots\**\*" />
+    <None Include="snapshots\**\*" />
   </ItemGroup>
 
   <ItemGroup>

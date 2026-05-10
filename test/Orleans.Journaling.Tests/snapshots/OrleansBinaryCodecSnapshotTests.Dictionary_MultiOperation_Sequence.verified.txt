@@ -1,0 +1,11 @@
+﻿HEX: 19110001400B616C706861000517110001400962657461000915110003400B616C7068612B110007054009626574610009400B67616D6D61000D
+DISASSEMBLY:
+[entry 0] length=12 streamId=8 version=0 payload-bytes=10
+0000  01 40 0B 61 6C 70 68 61  00 05                     |.@.alpha..|
+[entry 1] length=11 streamId=8 version=0 payload-bytes=9
+0000  01 40 09 62 65 74 61 00  09                        |.@.beta..|
+[entry 2] length=10 streamId=8 version=0 payload-bytes=8
+0000  03 40 0B 61 6C 70 68 61                            |.@.alpha|
+[entry 3] length=21 streamId=8 version=0 payload-bytes=19
+0000  07 05 40 09 62 65 74 61  00 09 40 0B 67 61 6D 6D   |..@.beta..@.gamm|
+0010  61 00 0D                                           |a..|
