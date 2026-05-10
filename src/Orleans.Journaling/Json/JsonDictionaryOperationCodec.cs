@@ -71,12 +71,12 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
         {
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.Deserialize(1, JsonJournalEntryFields.Key, _keyTypeInfo)!,
-                    operation.Deserialize(2, JsonJournalEntryFields.Value, _valueTypeInfo)!);
+                    operation.DeserializeRequired(1, JsonJournalEntryFields.Key, _keyTypeInfo),
+                    operation.DeserializeRequired(2, JsonJournalEntryFields.Value, _valueTypeInfo));
                 operation.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.Remove:
-                consumer.ApplyRemove(operation.Deserialize(1, JsonJournalEntryFields.Key, _keyTypeInfo)!);
+                consumer.ApplyRemove(operation.DeserializeRequired(1, JsonJournalEntryFields.Key, _keyTypeInfo));
                 operation.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Clear:
@@ -88,8 +88,8 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
                 consumer.Reset(count);
                 while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    var (key, value) = operation.ReadCurrentPair(JsonJournalEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
-                    consumer.ApplySet(key!, value!);
+                    var (key, value) = operation.ReadCurrentPairRequired(JsonJournalEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
+                    consumer.ApplySet(key, value);
                 }
 
                 operation.EnsureEnd(2);

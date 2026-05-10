@@ -58,6 +58,45 @@ public sealed class JsonOperationCodecAdditionalTests
     }
 
     [Fact]
+    public void ValueCodec_NullOperand_ThrowsClearException()
+    {
+        var codec = new JsonValueOperationCodec<string>(Options);
+        var payload = CodecTestHelpers.Sequence("""["set",null]"""u8.ToArray());
+
+        var exception = Assert.Throws<JsonException>(
+            () => codec.Apply(payload, new RecordingValueOperationHandler<string>()));
+
+        Assert.Contains("must not be null", exception.Message);
+        Assert.Contains(JsonJournalEntryFields.Value, exception.Message);
+    }
+
+    [Fact]
+    public void ListCodec_NullSnapshotItem_ThrowsClearException()
+    {
+        var codec = new JsonListOperationCodec<string>(Options);
+        var payload = CodecTestHelpers.Sequence("""["snapshot",["a",null,"c"]]"""u8.ToArray());
+
+        var exception = Assert.Throws<JsonException>(
+            () => codec.Apply(payload, new RecordingListOperationHandler<string>()));
+
+        Assert.Contains("must not be null", exception.Message);
+        Assert.Contains(JsonJournalEntryFields.Item, exception.Message);
+    }
+
+    [Fact]
+    public void DictionaryCodec_NullKeyInSnapshotPair_ThrowsClearException()
+    {
+        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
+        var payload = CodecTestHelpers.Sequence("""["snapshot",[[null,1]]]"""u8.ToArray());
+
+        var exception = Assert.Throws<JsonException>(
+            () => codec.Apply(payload, new RecordingDictionaryOperationHandler<string, int>()));
+
+        Assert.Contains("must not be null", exception.Message);
+        Assert.Contains(JsonJournalEntryFields.Key, exception.Message);
+    }
+
+    [Fact]
     public void UseJsonJournalFormat_RegistersEveryFormatFamilyProviderByKey()
     {
         var builder = new TestSiloBuilder();

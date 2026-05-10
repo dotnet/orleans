@@ -36,7 +36,29 @@ internal ref struct JsonOperationReader
         return JsonSerializer.Deserialize(ref _reader, typeInfo);
     }
 
+    public T DeserializeRequired<T>(int index, string operandName, JsonTypeInfo<T> typeInfo)
+    {
+        var value = Deserialize(index, operandName, typeInfo);
+        if (value is null)
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' must not be null.");
+        }
+
+        return value;
+    }
+
     public T? DeserializeCurrent<T>(JsonTypeInfo<T> typeInfo) => JsonSerializer.Deserialize(ref _reader, typeInfo);
+
+    public T DeserializeCurrentRequired<T>(string operandName, JsonTypeInfo<T> typeInfo)
+    {
+        var value = DeserializeCurrent(typeInfo);
+        if (value is null)
+        {
+            throw new JsonException($"JSON journal operation operand '{operandName}' must not be null.");
+        }
+
+        return value;
+    }
 
     public int ReadInt32(int index, string operandName)
     {
@@ -127,6 +149,25 @@ internal ref struct JsonOperationReader
         if (_reader.TokenType is not JsonTokenType.EndArray)
         {
             throw new JsonException("JSON journal operation contains unexpected extra elements.");
+        }
+
+        return (first, second);
+    }
+
+    public (TFirst First, TSecond Second) ReadCurrentPairRequired<TFirst, TSecond>(
+        string operandName,
+        JsonTypeInfo<TFirst> firstTypeInfo,
+        JsonTypeInfo<TSecond> secondTypeInfo)
+    {
+        var (first, second) = ReadCurrentPair(operandName, firstTypeInfo, secondTypeInfo);
+        if (first is null)
+        {
+            throw new JsonException($"JSON journal operation operand '{JsonJournalEntryFields.Key}' must not be null.");
+        }
+
+        if (second is null)
+        {
+            throw new JsonException($"JSON journal operation operand '{JsonJournalEntryFields.Value}' must not be null.");
         }
 
         return (first, second);

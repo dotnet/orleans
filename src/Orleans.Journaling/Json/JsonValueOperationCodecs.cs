@@ -34,7 +34,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         switch (command)
         {
             case JsonJournalEntryCommands.Set:
-                consumer.ApplySet(operation.Deserialize(1, JsonJournalEntryFields.Value, _valueTypeInfo)!);
+                consumer.ApplySet(operation.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
                 operation.EnsureEnd(2);
                 break;
             default:
@@ -98,7 +98,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         {
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.Deserialize(1, JsonJournalEntryFields.State, _stateTypeInfo)!,
+                    operation.DeserializeRequired(1, JsonJournalEntryFields.State, _stateTypeInfo),
                     operation.ReadUInt64(2, JsonJournalEntryFields.Version));
                 operation.EnsureEnd(3);
                 break;
@@ -195,7 +195,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
                 consumer.ApplyPending();
                 break;
             case JsonJournalEntryCommands.Completed:
-                consumer.ApplyCompleted(operation.Deserialize(1, JsonJournalEntryFields.Value, _valueTypeInfo)!);
+                consumer.ApplyCompleted(operation.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
                 operation.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Faulted:

@@ -50,19 +50,19 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         switch (command)
         {
             case JsonJournalEntryCommands.Add:
-                consumer.ApplyAdd(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
+                consumer.ApplyAdd(operation.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
                 operation.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
                     operation.ReadInt32(1, JsonJournalEntryFields.Index),
-                    operation.Deserialize(2, JsonJournalEntryFields.Item, _itemTypeInfo)!);
+                    operation.DeserializeRequired(2, JsonJournalEntryFields.Item, _itemTypeInfo));
                 operation.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.Insert:
                 consumer.ApplyInsert(
                     operation.ReadInt32(1, JsonJournalEntryFields.Index),
-                    operation.Deserialize(2, JsonJournalEntryFields.Item, _itemTypeInfo)!);
+                    operation.DeserializeRequired(2, JsonJournalEntryFields.Item, _itemTypeInfo));
                 operation.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.RemoveAt:
@@ -78,7 +78,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
                 consumer.Reset(count);
                 while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    consumer.ApplyAdd(operation.DeserializeCurrent(_itemTypeInfo)!);
+                    consumer.ApplyAdd(operation.DeserializeCurrentRequired(JsonJournalEntryFields.Item, _itemTypeInfo));
                 }
 
                 operation.EnsureEnd(2);
@@ -222,7 +222,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         switch (command)
         {
             case JsonJournalEntryCommands.Enqueue:
-                consumer.ApplyEnqueue(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
+                consumer.ApplyEnqueue(operation.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
                 operation.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Dequeue:
@@ -238,7 +238,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
                 consumer.Reset(count);
                 while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    consumer.ApplyEnqueue(operation.DeserializeCurrent(_itemTypeInfo)!);
+                    consumer.ApplyEnqueue(operation.DeserializeCurrentRequired(JsonJournalEntryFields.Item, _itemTypeInfo));
                 }
 
                 operation.EnsureEnd(2);
@@ -347,11 +347,11 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         switch (command)
         {
             case JsonJournalEntryCommands.Add:
-                consumer.ApplyAdd(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
+                consumer.ApplyAdd(operation.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
                 operation.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Remove:
-                consumer.ApplyRemove(operation.Deserialize(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
+                consumer.ApplyRemove(operation.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
                 operation.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Clear:
@@ -363,7 +363,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
                 consumer.Reset(count);
                 while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    consumer.ApplyAdd(operation.DeserializeCurrent(_itemTypeInfo)!);
+                    consumer.ApplyAdd(operation.DeserializeCurrentRequired(JsonJournalEntryFields.Item, _itemTypeInfo));
                 }
 
                 operation.EnsureEnd(2);
