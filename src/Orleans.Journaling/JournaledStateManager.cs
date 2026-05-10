@@ -1,3 +1,4 @@
+using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
 using System.Threading;
@@ -246,16 +247,30 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
                             if (journalBatchWriter is not null)
                             {
+                                var writeSequence = committedBuffer.AsReadOnlySequence();
+#if DEBUG
+                                // Defensive: copy the sequence into a pooled buffer so we can poison it
+                                // after the storage call returns. Any IJournalStorage implementation that
+                                // retains the sequence past task completion (a violation of the documented
+                                // contract on AppendAsync/ReplaceAsync) will read 0xCC bytes when it next
+                                // touches the buffer, surfacing the bug loudly in tests instead of letting
+                                // recycled pool data hide it.
+                                var debugPoisonLength = checked((int)writeSequence.Length);
+                                var debugPoisonBuffer = ArrayPool<byte>.Shared.Rent(debugPoisonLength);
+                                writeSequence.CopyTo(debugPoisonBuffer);
+                                writeSequence = new ReadOnlySequence<byte>(debugPoisonBuffer, 0, debugPoisonLength);
+#endif
+
                                 var writeSucceeded = false;
                                 try
                                 {
                                     if (isSnapshot)
                                     {
-                                        await _storage.ReplaceAsync(committedBuffer.AsReadOnlySequence(), cancellationToken).ConfigureAwait(true);
+                                        await _storage.ReplaceAsync(writeSequence, cancellationToken).ConfigureAwait(true);
                                     }
                                     else
                                     {
-                                        await _storage.AppendAsync(committedBuffer.AsReadOnlySequence(), cancellationToken).ConfigureAwait(true);
+                                        await _storage.AppendAsync(writeSequence, cancellationToken).ConfigureAwait(true);
                                     }
 
                                     writeSucceeded = true;
@@ -263,6 +278,10 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                 finally
                                 {
                                     committedBuffer.Dispose();
+#if DEBUG
+                                    debugPoisonBuffer.AsSpan(0, debugPoisonLength).Fill(0xCC);
+                                    ArrayPool<byte>.Shared.Return(debugPoisonBuffer);
+#endif
                                     if (!writeSucceeded)
                                     {
                                         journalBatchWriter.Dispose();
