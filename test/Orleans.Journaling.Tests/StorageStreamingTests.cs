@@ -1,5 +1,9 @@
 using System.Buffers;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -7,6 +11,7 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class StorageStreamingTests
 {
+    private static readonly SerializerSessionPool SessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
     [Fact]
     public async Task VolatileStorage_AppendAndReplaceStoreRawBuffers()
     {
@@ -151,7 +156,7 @@ public sealed class StorageStreamingTests
         var consumer = new CapturingJournalEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer));
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer));
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -164,7 +169,7 @@ public sealed class StorageStreamingTests
         var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
-        ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer);
 
         Assert.Equal(3, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -181,7 +186,7 @@ public sealed class StorageStreamingTests
         var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
-        ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -329,7 +334,11 @@ public sealed class StorageStreamingTests
             return this;
         }
 
-        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add(new(_streamId, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state)
+        {
+            var remaining = checked((uint)(reader.Length - reader.Position));
+            Entries.Add(new(_streamId, reader.ReadBytes(remaining)));
+        }
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }

@@ -1,4 +1,7 @@
 using System.Buffers;
+using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -11,7 +14,8 @@ namespace Orleans.Journaling;
 /// </remarks>
 internal sealed class OrleansBinaryTcsOperationCodec<T>(
     IJournalValueCodec<T> codec,
-    IJournalValueCodec<Exception> exceptionCodec) : IDurableTaskCompletionSourceOperationCodec<T>, IOrleansBinaryJournalEntryCodec
+    IJournalValueCodec<Exception> exceptionCodec,
+    SerializerSessionPool sessionPool) : IDurableTaskCompletionSourceOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
 
@@ -60,37 +64,47 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
     {
-        var reader = new OrleansBinaryOperationReader(input);
-        var statusByte = reader.ReadByte("status byte");
-        var status = (DurableTaskCompletionSourceStatus)statusByte;
+        ArgumentNullException.ThrowIfNull(consumer);
+        using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
+        using var session = sessionPool.GetSession();
+        var reader = Reader.Create(arcBuffer, session);
+        Apply(ref reader, consumer);
+        if (reader.Position != reader.Length)
+        {
+            throw new InvalidOperationException("Unexpected trailing data after binary journal operation.");
+        }
+    }
 
+    void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableTaskCompletionSourceOperationHandler<T>>(state, this));
+
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    {
+        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        if (reader.Position >= reader.Length)
+        {
+            throw new InvalidOperationException("Missing TCS status byte.");
+        }
+
+        var status = (DurableTaskCompletionSourceStatus)reader.ReadByte();
         switch (status)
         {
             case DurableTaskCompletionSourceStatus.Pending:
-                reader.EnsureEnd();
                 consumer.ApplyPending();
                 break;
             case DurableTaskCompletionSourceStatus.Completed:
-                var value = reader.ReadValue("value", codec);
-                reader.EnsureEnd();
-                consumer.ApplyCompleted(value);
+                consumer.ApplyCompleted(codec.Read(ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Faulted:
-                var exception = reader.ReadValue("exception", exceptionCodec);
-                reader.EnsureEnd();
-                consumer.ApplyFaulted(exception);
+                consumer.ApplyFaulted(exceptionCodec.Read(ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Canceled:
-                reader.EnsureEnd();
                 consumer.ApplyCanceled();
                 break;
             default:
                 throw new NotSupportedException($"Unsupported status: {status}");
         }
     }
-
-    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
-        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableTaskCompletionSourceOperationHandler<T>>(state, this));
 
     private static void WriteVersionByte(IBufferWriter<byte> output)
     {
@@ -105,5 +119,4 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         span[0] = value;
         output.Advance(1);
     }
-
 }

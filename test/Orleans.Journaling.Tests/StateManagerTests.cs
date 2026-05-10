@@ -2,6 +2,8 @@ using System.Buffers;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Time.Testing;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -31,9 +33,9 @@ public class StateManagerTests : JournalingTestBase
         var codec = CodecProvider.GetCodec<int>();
 
         // Act - Register states
-        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(codec, SessionPool)));
-        var list = new DurableList<string>("list1", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var queue = new DurableQueue<int>("queue1", manager, new OrleansBinaryQueueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool)));
+        var dictionary = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(codec, SessionPool), SessionPool));
+        var list = new DurableList<string>("list1", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
+        var queue = new DurableQueue<int>("queue1", manager, new OrleansBinaryQueueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Add some data
@@ -113,7 +115,7 @@ public class StateManagerTests : JournalingTestBase
             await storage.AppendAsync(data.AsReadOnlySequence(), CancellationToken.None);
         }
 
-        var format = new DecodedPayloadOnlyJournalFormat(new JournalStreamId(99), decodedPayload);
+        var format = new DecodedPayloadOnlyJournalFormat(new JournalStreamId(99), decodedPayload, SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
 
         await sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10));
@@ -142,7 +144,7 @@ public class StateManagerTests : JournalingTestBase
         await initial.Manager.WriteStateAsync(CancellationToken.None);
 
         storage.IsCompactionRequested = true;
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var compacting = CreateTestSystem(storage: storage, journalFormat: format);
 
         await compacting.Lifecycle.OnStart();
@@ -163,7 +165,7 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_DirectWrites_UseFormatOwnedCurrentSegmentWriter()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
 
@@ -184,7 +186,7 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_AppendJournalFlush_UsesFormatOwnedWriter()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var value = new DurableValue<int>("value", sut.Manager, CreateValueCodec<int>());
 
@@ -313,7 +315,7 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_SnapshotFlush_ResetsPendingAppendData()
     {
         var storage = new CapturingStorage { IsCompactionRequested = true };
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var dictionary = new DurableDictionary<string, int>("dict", sut.Manager, CreateDictionaryCodec<string, int>());
 
@@ -326,7 +328,7 @@ public class StateManagerTests : JournalingTestBase
         Assert.Single(storage.Replaces);
         Assert.True(writer.ResetCount >= 2);
 
-        var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat());
+        var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat(SessionPool));
         var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
         await recovered.Lifecycle.OnStart();
 
@@ -337,7 +339,7 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_DirectWriteFailure_AbortsEntryBeforeMutation()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var dictionary = new DurableDictionary<int, int>("dict", sut.Manager, new ThrowingDictionarySetCodec<int, int>());
 
@@ -357,7 +359,7 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_DirectWriteFailure_DoesNotPersistPartialEntry()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var codec = new ToggleThrowingDictionarySetCodec<int, int>(CreateDictionaryCodec<int, int>());
         var dictionary = new DurableDictionary<int, int>("dict", sut.Manager, codec);
@@ -370,7 +372,7 @@ public class StateManagerTests : JournalingTestBase
         dictionary.Add(1, 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
-        var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat());
+        var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat(SessionPool));
         var recoveredDictionary = new DurableDictionary<int, int>("dict", recovered.Manager, CreateDictionaryCodec<int, int>());
         await recovered.Lifecycle.OnStart();
 
@@ -382,7 +384,7 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_WriteStateAsync_DoesNotObserveActiveEntry()
     {
         var storage = new CapturingStorage();
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var sut = CreateTestSystem(storage: storage, journalFormat: format);
         var state = new ManualDirectWriteState();
         sut.Manager.RegisterState("manual", state);
@@ -431,8 +433,8 @@ public class StateManagerTests : JournalingTestBase
         var sut = CreateTestSystem();
 
         // Create and populate states
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
-        var list = new DurableList<string>("list1", sut.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), SessionPool));
+        var list = new DurableList<string>("list1", sut.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         dictionary.Add("key1", 1);
@@ -444,8 +446,8 @@ public class StateManagerTests : JournalingTestBase
 
         // Act - Create new manager with same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
-        var recoveredList = new DurableList<string>("list1", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), SessionPool));
+        var recoveredList = new DurableList<string>("list1", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
         await sut2.Lifecycle.OnStart();
 
         // Assert - State should be recovered
@@ -469,7 +471,7 @@ public class StateManagerTests : JournalingTestBase
         value.Value = 42;
         await initial.Manager.WriteStateAsync(CancellationToken.None);
 
-        var format = new TrackingJournalFormat();
+        var format = new TrackingJournalFormat(SessionPool);
         var recovered = CreateTestSystem(storage: storage, journalFormat: format);
         var recoveredValue = new DurableValue<int>("value", recovered.Manager, CreateValueCodec<int>());
 
@@ -647,7 +649,7 @@ public class StateManagerTests : JournalingTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var dictionary = new DurableDictionary<string, int>("dict1", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Multiple operations with WriteState in between
@@ -670,7 +672,7 @@ public class StateManagerTests : JournalingTestBase
 
         // Create new manager to verify recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var recoveredDict = new DurableDictionary<string, int>("dict1", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), SessionPool));
         await sut2.Lifecycle.OnStart();
 
         // Assert - Recovery should have final state
@@ -692,9 +694,9 @@ public class StateManagerTests : JournalingTestBase
         var manager = sut.Manager;
 
         // Create multiple states with different types
-        var intDict = new DurableDictionary<int, string>("intDict", manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var stringList = new DurableList<string>("stringList", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var personValue = new DurableValue<TestPerson>("personValue", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
+        var intDict = new DurableDictionary<int, string>("intDict", manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
+        var stringList = new DurableList<string>("stringList", manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
+        var personValue = new DurableValue<TestPerson>("personValue", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Populate all states
@@ -721,9 +723,9 @@ public class StateManagerTests : JournalingTestBase
 
         // Create new manager to verify recovery of multiple states
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
-        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool)));
+        var recoveredIntDict = new DurableDictionary<int, string>("intDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
+        var recoveredStringList = new DurableList<string>("stringList", sut2.Manager, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
+        var recoveredPersonValue = new DurableValue<TestPerson>("personValue", sut2.Manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(CodecProvider.GetCodec<TestPerson>(), SessionPool), SessionPool));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All should be recovered with correct values
@@ -748,8 +750,8 @@ public class StateManagerTests : JournalingTestBase
         // Arrange
         var sut = CreateTestSystem();
         var manager = sut.Manager;
-        var dict1 = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
-        var dict2 = new DurableDictionary<string, int>("dict2", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+        var dict1 = new DurableDictionary<string, int>("dict1", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), SessionPool));
+        var dict2 = new DurableDictionary<string, int>("dict2", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Simulate concurrent operations on different states
@@ -782,7 +784,7 @@ public class StateManagerTests : JournalingTestBase
     {
         // Arrange
         var sut = CreateTestSystem();
-        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var largeDict = new DurableDictionary<int, string>("largeDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Add many items
@@ -796,7 +798,7 @@ public class StateManagerTests : JournalingTestBase
 
         // Create new manager for recovery
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool)));
+        var recoveredDict = new DurableDictionary<int, string>("largeDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<int, string>(new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), SessionPool));
         await sut2.Lifecycle.OnStart();
 
         // Assert - All items should be recovered
@@ -922,7 +924,7 @@ public class StateManagerTests : JournalingTestBase
         // Note: The retirement of states has the nice benefit of being able to reuse state names.
 
         DurableDictionary<string, int> CreateTestState(string key, IStateManager manager) =>
-            new(key, manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool)));
+            new(key, manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool), new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool), SessionPool));
 
         static async Task TriggerCompaction(IStateManager manager, DurableDictionary<string, int> dict)
         {
@@ -955,10 +957,10 @@ public class StateManagerTests : JournalingTestBase
     }
 
     private OrleansBinaryDictionaryOperationCodec<K, V> CreateDictionaryCodec<K, V>() where K : notnull =>
-        new(new OrleansJournalValueCodec<K>(CodecProvider.GetCodec<K>(), SessionPool), new OrleansJournalValueCodec<V>(CodecProvider.GetCodec<V>(), SessionPool));
+        new(new OrleansJournalValueCodec<K>(CodecProvider.GetCodec<K>(), SessionPool), new OrleansJournalValueCodec<V>(CodecProvider.GetCodec<V>(), SessionPool), SessionPool);
 
     private OrleansBinaryValueOperationCodec<T> CreateValueCodec<T>() =>
-        new(new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool));
+        new(new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool), SessionPool);
 
     private byte[] CreatePersistedValueBytes(string name, int value)
     {
@@ -1011,13 +1013,13 @@ public class StateManagerTests : JournalingTestBase
         return writer.ConsumeSlice(writer.Length);
     }
 
-    private static List<CapturedJournalEntry> ReadBinaryEntries(ReadOnlySpan<byte> bytes)
+    private List<CapturedJournalEntry> ReadBinaryEntries(ReadOnlySpan<byte> bytes)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
         var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingJournalEntrySink();
-        ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer);
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
@@ -1052,7 +1054,11 @@ public class StateManagerTests : JournalingTestBase
 
         void ITestJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add(new(_streamId, payload.ToArray()));
 
-        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add(new(_streamId, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state)
+        {
+            var remaining = checked((uint)(reader.Length - reader.Position));
+            Entries.Add(new(_streamId, reader.ReadBytes(remaining)));
+        }
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }
@@ -1064,12 +1070,13 @@ public class StateManagerTests : JournalingTestBase
     {
         private readonly JournalStreamId _streamId;
         private readonly byte[] _payload;
-        private readonly TrackingJournalFormat _writerFormat = new();
+        private readonly TrackingJournalFormat _writerFormat;
 
-        public DecodedPayloadOnlyJournalFormat(JournalStreamId streamId, byte[] payload)
+        public DecodedPayloadOnlyJournalFormat(JournalStreamId streamId, byte[] payload, SerializerSessionPool sessionPool)
         {
             _streamId = streamId;
             _payload = payload.ToArray();
+            _writerFormat = new TrackingJournalFormat(sessionPool);
         }
 
         public List<TrackingJournalBatchWriter> Writers => _writerFormat.Writers;
@@ -1138,8 +1145,10 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class TrackingJournalFormat : IJournalFormat
+    private sealed class TrackingJournalFormat(SerializerSessionPool sessionPool) : IJournalFormat
     {
+        private readonly OrleansBinaryJournalFormat _inner = new(sessionPool);
+
         public List<TrackingJournalBatchWriter> Writers { get; } = [];
 
         public int ReadCount { get; private set; }
@@ -1158,7 +1167,7 @@ public class StateManagerTests : JournalingTestBase
         public void Read(JournalReadBuffer input, IStateResolver consumer)
         {
             ReadCount++;
-            ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(input, consumer);
+            ((IJournalFormat)_inner).Read(input, consumer);
         }
     }
 

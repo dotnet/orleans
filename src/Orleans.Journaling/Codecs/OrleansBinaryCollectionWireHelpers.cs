@@ -1,5 +1,6 @@
 using System.Diagnostics.CodeAnalysis;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
 
 namespace Orleans.Journaling;
 
@@ -12,7 +13,7 @@ internal static class OrleansBinaryCollectionWireHelpers
     /// </summary>
     internal const int MaxSnapshotItemCount = 50_000_000;
 
-    public static int ReadSnapshotCount(ref Reader<ReadOnlySequenceInput> reader)
+    public static int ReadSnapshotCount(ref Reader<ArcBufferReaderInput> reader)
     {
         var value = reader.ReadVarUInt32();
         if (value > MaxSnapshotItemCount)
@@ -23,7 +24,7 @@ internal static class OrleansBinaryCollectionWireHelpers
         return (int)value;
     }
 
-    public static int ReadListIndex(ref Reader<ReadOnlySequenceInput> reader)
+    public static int ReadListIndex(ref Reader<ArcBufferReaderInput> reader)
         => ConvertWireUInt32ToInt32(reader.ReadVarUInt32(), "list index");
 
     private static int ConvertWireUInt32ToInt32(uint value, string fieldName)

@@ -1,5 +1,6 @@
 using System.Collections.Concurrent;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -21,6 +22,9 @@ internal sealed class OrleansBinaryOperationCodecProvider(IServiceProvider servi
     IDurableTaskCompletionSourceOperationCodecProvider
 {
     private readonly ConcurrentDictionary<Type, object> _codecs = new();
+    private SerializerSessionPool? _sessionPool;
+
+    private SerializerSessionPool SessionPool => _sessionPool ??= serviceProvider.GetRequiredService<SerializerSessionPool>();
 
     /// <inheritdoc/>
     public IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>() where TKey : notnull
@@ -28,42 +32,48 @@ internal sealed class OrleansBinaryOperationCodecProvider(IServiceProvider servi
             typeof(IDurableDictionaryOperationCodec<TKey, TValue>),
             _ => new OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
                 serviceProvider.GetRequiredService<IJournalValueCodec<TKey>>(),
-                serviceProvider.GetRequiredService<IJournalValueCodec<TValue>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<TValue>>(),
+                SessionPool));
 
     /// <inheritdoc/>
     public IDurableListOperationCodec<T> GetCodec<T>()
         => (IDurableListOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableListOperationCodec<T>),
             _ => new OrleansBinaryListOperationCodec<T>(
-                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>(),
+                SessionPool));
 
     /// <inheritdoc/>
     IDurableQueueOperationCodec<T> IDurableQueueOperationCodecProvider.GetCodec<T>()
         => (IDurableQueueOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableQueueOperationCodec<T>),
             _ => new OrleansBinaryQueueOperationCodec<T>(
-                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>(),
+                SessionPool));
 
     /// <inheritdoc/>
     IDurableSetOperationCodec<T> IDurableSetOperationCodecProvider.GetCodec<T>()
         => (IDurableSetOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableSetOperationCodec<T>),
             _ => new OrleansBinarySetOperationCodec<T>(
-                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>(),
+                SessionPool));
 
     /// <inheritdoc/>
     IDurableValueOperationCodec<T> IDurableValueOperationCodecProvider.GetCodec<T>()
         => (IDurableValueOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableValueOperationCodec<T>),
             _ => new OrleansBinaryValueOperationCodec<T>(
-                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>(),
+                SessionPool));
 
     /// <inheritdoc/>
     IDurableStateOperationCodec<T> IDurableStateOperationCodecProvider.GetCodec<T>()
         => (IDurableStateOperationCodec<T>)_codecs.GetOrAdd(
             typeof(IDurableStateOperationCodec<T>),
             _ => new OrleansBinaryStateOperationCodec<T>(
-                serviceProvider.GetRequiredService<IJournalValueCodec<T>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<T>>(),
+                SessionPool));
 
     /// <inheritdoc/>
     IDurableTaskCompletionSourceOperationCodec<T> IDurableTaskCompletionSourceOperationCodecProvider.GetCodec<T>()
@@ -71,5 +81,6 @@ internal sealed class OrleansBinaryOperationCodecProvider(IServiceProvider servi
             typeof(IDurableTaskCompletionSourceOperationCodec<T>),
             _ => new OrleansBinaryTcsOperationCodec<T>(
                 serviceProvider.GetRequiredService<IJournalValueCodec<T>>(),
-                serviceProvider.GetRequiredService<IJournalValueCodec<Exception>>()));
+                serviceProvider.GetRequiredService<IJournalValueCodec<Exception>>(),
+                SessionPool));
 }

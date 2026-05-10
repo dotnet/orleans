@@ -54,8 +54,9 @@ public abstract class JournalingTestBase
         var stringCodec = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
         var uint64Codec = new OrleansJournalValueCodec<ulong>(CodecProvider.GetCodec<ulong>(), SessionPool);
         var dateTimeCodec = new OrleansJournalValueCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
-        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
-        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
+        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec, SessionPool);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, SessionPool);
+        journalFormat ??= new OrleansBinaryJournalFormat(SessionPool);
         var manager = new JournaledStateManager(storage, logger, Options.Create(ManagerOptions), journalStreamIdsCodec, retirementTrackerCodec, provider, journalFormat, journalFormatKey);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);

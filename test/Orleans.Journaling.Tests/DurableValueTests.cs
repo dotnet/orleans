@@ -25,7 +25,7 @@ public class DurableValueTests : JournalingTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string>();
-        var durableValue = new DurableValue<string>("testValue", manager, new OrleansBinaryValueOperationCodec<string>(new OrleansJournalValueCodec<string>(codec, SessionPool)));
+        var durableValue = new DurableValue<string>("testValue", manager, new OrleansBinaryValueOperationCodec<string>(new OrleansJournalValueCodec<string>(codec, SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Set initial value
@@ -54,7 +54,7 @@ public class DurableValueTests : JournalingTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<int>();
-        var durableValue = new DurableValue<int>("counter", manager, new OrleansBinaryValueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool)));
+        var durableValue = new DurableValue<int>("counter", manager, new OrleansBinaryValueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Modify and persist
@@ -63,7 +63,7 @@ public class DurableValueTests : JournalingTestBase
 
         // Create a new manager with the same storage
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var durableValue2 = new DurableValue<int>("counter", sut2.Manager, new OrleansBinaryValueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool)));
+        var durableValue2 = new DurableValue<int>("counter", sut2.Manager, new OrleansBinaryValueOperationCodec<int>(new OrleansJournalValueCodec<int>(codec, SessionPool), SessionPool));
         await sut2.Lifecycle.OnStart();
 
         // Assert - Value should be recovered
@@ -82,7 +82,7 @@ public class DurableValueTests : JournalingTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<string?>();
-        var durableValue = new DurableValue<string?>("nullableValue", manager, new OrleansBinaryValueOperationCodec<string?>(new OrleansJournalValueCodec<string?>(codec, SessionPool)));
+        var durableValue = new DurableValue<string?>("nullableValue", manager, new OrleansBinaryValueOperationCodec<string?>(new OrleansJournalValueCodec<string?>(codec, SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Set to null
@@ -119,7 +119,7 @@ public class DurableValueTests : JournalingTestBase
         var sut = CreateTestSystem();
         var manager = sut.Manager;
         var codec = CodecProvider.GetCodec<TestPerson>();
-        var durableValue = new DurableValue<TestPerson>("person", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(codec, SessionPool)));
+        var durableValue = new DurableValue<TestPerson>("person", manager, new OrleansBinaryValueOperationCodec<TestPerson>(new OrleansJournalValueCodec<TestPerson>(codec, SessionPool), SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act

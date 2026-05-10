@@ -30,7 +30,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut = CreateTestSystem(storage);
         var keyCodec = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
         var valueCodec = new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec));
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -42,7 +42,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut2 = CreateTestSystem(storage);
         var keyCodec2 = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
         var valueCodec2 = new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec2, valueCodec2));
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec2, valueCodec2, SessionPool));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, dict2.Count);
@@ -263,7 +263,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private OrleansBinaryDictionaryOperationCodec<TKey, TValue> CreateBinaryDictionaryCodec<TKey, TValue>()
         where TKey : notnull
-        => new(ValueCodec<TKey>(), ValueCodec<TValue>());
+        => new(ValueCodec<TKey>(), ValueCodec<TValue>(), SessionPool);
 
     private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 

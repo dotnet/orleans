@@ -71,12 +71,13 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         IDurableDictionaryOperationCodec<string, ulong> journalStreamIdsCodec,
         IDurableDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
         TimeProvider timeProvider,
-        IJournalFormat? journalFormat = null,
+        IJournalFormat journalFormat,
         string? journalFormatKey = null)
     {
+        ArgumentNullException.ThrowIfNull(journalFormat);
         _storage = storage;
         _journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey ?? OrleansBinaryJournalFormat.JournalFormatKey);
-        _journalFormat = journalFormat ?? OrleansBinaryJournalFormat.Instance;
+        _journalFormat = journalFormat;
         _logger = logger;
         _timeProvider = timeProvider;
         _retirementGracePeriod = options.Value.RetirementGracePeriod;

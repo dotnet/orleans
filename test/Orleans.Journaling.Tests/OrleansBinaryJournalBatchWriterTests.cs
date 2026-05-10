@@ -1,5 +1,9 @@
 using System.Buffers;
+using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -7,6 +11,7 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class OrleansBinaryJournalBatchWriterTests
 {
+    private static readonly SerializerSessionPool SessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
     [Fact]
     public void Commit_WritesLegacyVarUIntFramedEntry()
     {
@@ -107,7 +112,10 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void BinaryFormattedJournalEntry_Apply_UsesOperationCodec()
     {
-        var entry = new OrleansBinaryFormattedJournalEntry(new ReadOnlySequence<byte>(new byte[] { 0xAA, 0xBB }));
+        using var writer = new ArcBufferWriter();
+        writer.Write(new byte[] { 0xAA, 0xBB });
+        using var slice = writer.PeekSlice(writer.Length);
+        var entry = new OrleansBinaryFormattedJournalEntry(slice, SessionPool);
         var consumer = new CollectingConsumer();
 
         entry.Apply(consumer);
@@ -327,7 +335,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         var consumer = new CollectingConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer));
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer));
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -345,7 +353,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         var consumer = new CollectingConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer));
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer));
 
         Assert.Contains($"byte offset {entryBytes.Length}", exception.Message, StringComparison.Ordinal);
         Assert.Single(consumer.Entries);
@@ -376,7 +384,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
         var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
-        ((IJournalFormat)OrleansBinaryJournalFormat.Instance).Read(reader, consumer);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer);
         Assert.Equal(0, reader.Length);
     }
 
@@ -408,7 +416,11 @@ public sealed class OrleansBinaryJournalBatchWriterTests
             return this;
         }
 
-        void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add((_streamId.Value, payload.ToArray()));
+        void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state)
+        {
+            var remaining = checked((uint)(reader.Length - reader.Position));
+            Entries.Add((_streamId.Value, reader.ReadBytes(remaining)));
+        }
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }

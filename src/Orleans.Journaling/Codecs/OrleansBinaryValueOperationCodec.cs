@@ -1,5 +1,7 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -7,7 +9,8 @@ namespace Orleans.Journaling;
 /// Binary codec for durable value journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryValueOperationCodec<T>(
-    IJournalValueCodec<T> codec) : IDurableValueOperationCodec<T>, IOrleansBinaryJournalEntryCodec
+    IJournalValueCodec<T> codec,
+    SerializerSessionPool sessionPool) : IDurableValueOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
@@ -28,21 +31,31 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer)
     {
-        var reader = new OrleansBinaryOperationReader(input);
-        var command = reader.ReadCommand();
+        ArgumentNullException.ThrowIfNull(consumer);
+        using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
+        using var session = sessionPool.GetSession();
+        var reader = Reader.Create(arcBuffer, session);
+        Apply(ref reader, consumer);
+        if (reader.Position != reader.Length)
+        {
+            throw new InvalidOperationException("Unexpected trailing data after binary journal operation.");
+        }
+    }
 
+    void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableValueOperationHandler<T>>(state, this));
+
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableValueOperationHandler<T> consumer)
+    {
+        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        var command = reader.ReadVarUInt32();
         switch (command)
         {
             case SetValueCommand:
-                var value = reader.ReadValue("value", codec);
-                reader.EnsureEnd();
-                consumer.ApplySet(value);
+                consumer.ApplySet(codec.Read(ref reader));
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");
         }
     }
-
-    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
-        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableValueOperationHandler<T>>(state, this));
 }

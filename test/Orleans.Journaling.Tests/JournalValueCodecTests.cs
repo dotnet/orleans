@@ -35,10 +35,13 @@ public class JournalValueCodecTests
         var buffer = new ArrayBufferWriter<byte>();
         codec.Write(42, buffer);
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory), out var consumed);
+        using var session = _sessionPool.GetSession();
+        using var arc = OrleansBinaryOperationApplier.Materialize(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var reader = Reader.Create(arc, session);
+        var result = codec.Read(ref reader);
 
         Assert.Equal(42, result);
-        Assert.True(consumed > 0);
+        Assert.True(reader.Position > 0);
     }
 
     [Fact]
@@ -48,10 +51,13 @@ public class JournalValueCodecTests
         var buffer = new ArrayBufferWriter<byte>();
         codec.Write("hello world", buffer);
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory), out var consumed);
+        using var session = _sessionPool.GetSession();
+        using var arc = OrleansBinaryOperationApplier.Materialize(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var reader = Reader.Create(arc, session);
+        var result = codec.Read(ref reader);
 
         Assert.Equal("hello world", result);
-        Assert.True(consumed > 0);
+        Assert.True(reader.Position > 0);
     }
 
     [Fact]
@@ -62,10 +68,13 @@ public class JournalValueCodecTests
         var buffer = new ArrayBufferWriter<byte>();
         codec.Write(expected, buffer);
 
-        var result = codec.Read(new ReadOnlySequence<byte>(buffer.WrittenMemory), out var consumed);
+        using var session = _sessionPool.GetSession();
+        using var arc = OrleansBinaryOperationApplier.Materialize(new ReadOnlySequence<byte>(buffer.WrittenMemory));
+        var reader = Reader.Create(arc, session);
+        var result = codec.Read(ref reader);
 
         Assert.Equal(expected, result);
-        Assert.True(consumed > 0);
+        Assert.True(reader.Position > 0);
     }
 
     [Fact]
@@ -73,7 +82,7 @@ public class JournalValueCodecTests
     {
         var keyCodec = new OrleansJournalValueCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
         var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec);
+        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("key1", 42, writer));
 
@@ -89,7 +98,7 @@ public class JournalValueCodecTests
     {
         var keyCodec = new OrleansJournalValueCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
         var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec);
+        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
 
         var items = new List<KeyValuePair<string, int>>
         {
@@ -110,7 +119,7 @@ public class JournalValueCodecTests
     public void BinaryListOperationCodec_Rejects_Overflowed_SnapshotCount()
     {
         var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
-        var codec = new OrleansBinaryListOperationCodec<int>(valueCodec);
+        var codec = new OrleansBinaryListOperationCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
         WriteVersionAndCommand(buffer, 5, 0x80000000);
@@ -125,7 +134,7 @@ public class JournalValueCodecTests
     public void BinaryListOperationCodec_Rejects_Overflowed_Index()
     {
         var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
-        var codec = new OrleansBinaryListOperationCodec<int>(valueCodec);
+        var codec = new OrleansBinaryListOperationCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
         WriteVersionAndCommand(buffer, 3, 0x80000000);
@@ -141,7 +150,7 @@ public class JournalValueCodecTests
     {
         var keyCodec = new OrleansJournalValueCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
         var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec);
+        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
         var items = new MiscountedReadOnlyCollection<KeyValuePair<string, int>>(
             1,
             new[]

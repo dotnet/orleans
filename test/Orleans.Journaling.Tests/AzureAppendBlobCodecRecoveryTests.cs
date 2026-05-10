@@ -4,6 +4,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Core;
 using Orleans.Serialization;
+using Orleans.Serialization.Session;
 using Orleans.Runtime;
 using TestExtensions;
 using Xunit;
@@ -27,7 +28,8 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         var services = new ServiceCollection();
         services.AddLogging();
         services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
-        services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, OrleansBinaryJournalFormat.Instance);
+        services.AddSerializer();
+        services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
         services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
@@ -103,16 +105,16 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         var manager = CreateManager(storage);
         return new DurableStates(
             manager,
-            new DurableDictionary<string, int>("dict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>())),
-            new DurableList<string>("list", manager, new OrleansBinaryListOperationCodec<string>(ValueCodec<string>())),
-            new DurableQueue<string>("queue", manager, new OrleansBinaryQueueOperationCodec<string>(ValueCodec<string>())),
-            new DurableSet<string>("set", manager, new OrleansBinarySetOperationCodec<string>(ValueCodec<string>())),
-            new DurableValue<int>("value", manager, new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>())),
-            new DurableState<string>("state", manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>())),
+            new DurableDictionary<string, int>("dict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool)),
+            new DurableList<string>("list", manager, new OrleansBinaryListOperationCodec<string>(ValueCodec<string>(), SessionPool)),
+            new DurableQueue<string>("queue", manager, new OrleansBinaryQueueOperationCodec<string>(ValueCodec<string>(), SessionPool)),
+            new DurableSet<string>("set", manager, new OrleansBinarySetOperationCodec<string>(ValueCodec<string>(), SessionPool)),
+            new DurableValue<int>("value", manager, new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>(), SessionPool)),
+            new DurableState<string>("state", manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,
-                new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>()),
+                new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
                 Copier<int>(),
                 Copier<Exception>()));
     }
@@ -122,9 +124,10 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
             storage,
             LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
-            new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>()),
-            new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>()),
-            TimeProvider.System);
+            new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>(), SessionPool),
+            new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>(), SessionPool),
+            TimeProvider.System,
+            new OrleansBinaryJournalFormat(SessionPool));
 
     private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 

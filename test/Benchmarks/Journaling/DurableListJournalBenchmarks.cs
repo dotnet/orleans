@@ -3,7 +3,11 @@ using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using BenchmarkDotNet.Attributes;
 using Orleans.Journaling;
+using Orleans.Serialization;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 
 namespace Benchmarks.Journaling;
 
@@ -23,12 +27,14 @@ public class DurableListJournalBenchmarks
     private ArcBuffer _encodedJournalData;
     private ArcBufferWriter _recoveryBuffer;
     private RecoveryConsumer _recoveryConsumer;
+    private SerializerSessionPool _sessionPool;
 
     [GlobalSetup]
     public void GlobalSetup()
     {
-        _codec = new OrleansBinaryListOperationCodec<int>(RawInt32JournalValueCodec.Instance);
-        _journalFormat = OrleansBinaryJournalFormat.Instance;
+        _sessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
+        _codec = new OrleansBinaryListOperationCodec<int>(RawInt32JournalValueCodec.Instance, _sessionPool);
+        _journalFormat = new OrleansBinaryJournalFormat(_sessionPool);
         _writeBuffer = new OrleansBinaryJournalBatchWriter();
         _list = new DurableList<int>("list", new BenchmarkJournalManager(_writeBuffer, ListJournalStreamId), _codec);
         _state = _list;
@@ -128,17 +134,10 @@ public class DurableListJournalBenchmarks
             output.Advance(sizeof(int));
         }
 
-        public int Read(ReadOnlySequence<byte> input, out long bytesConsumed)
+        public int Read(ref Reader<ArcBufferReaderInput> reader)
         {
-            var reader = new SequenceReader<byte>(input);
             Span<byte> bytes = stackalloc byte[sizeof(int)];
-            if (reader.Remaining < sizeof(int) || !reader.TryCopyTo(bytes))
-            {
-                throw new InvalidOperationException("The encoded integer payload is truncated.");
-            }
-
-            reader.Advance(sizeof(int));
-            bytesConsumed = reader.Consumed;
+            reader.ReadBytes(bytes);
             return BinaryPrimitives.ReadInt32LittleEndian(bytes);
         }
     }

@@ -2,6 +2,7 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -12,7 +13,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void DictionaryCodec_AllCommands_RoundTrip()
     {
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>());
+        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool);
         var consumer = new RecordingDictionaryOperationHandler<string, int>();
 
         Apply(codec, writer => codec.WriteSet("alpha", 1, writer), consumer);
@@ -38,7 +39,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void ListCodec_AllCommands_RoundTrip()
     {
-        var codec = new OrleansBinaryListOperationCodec<string>(ValueCodec<string>());
+        var codec = new OrleansBinaryListOperationCodec<string>(ValueCodec<string>(), SessionPool);
         var consumer = new RecordingListOperationHandler<string>();
 
         Apply(codec, writer => codec.WriteAdd("one", writer), consumer);
@@ -67,7 +68,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void QueueCodec_AllCommands_RoundTrip()
     {
-        var codec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>());
+        var codec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>(), SessionPool);
         var consumer = new RecordingQueueOperationHandler<int>();
 
         Apply(codec, writer => codec.WriteEnqueue(10, writer), consumer);
@@ -92,7 +93,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void SetCodec_AllCommands_RoundTrip()
     {
-        var codec = new OrleansBinarySetOperationCodec<string>(ValueCodec<string>());
+        var codec = new OrleansBinarySetOperationCodec<string>(ValueCodec<string>(), SessionPool);
         var consumer = new RecordingSetOperationHandler<string>();
 
         Apply(codec, writer => codec.WriteAdd("a", writer), consumer);
@@ -117,11 +118,11 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void ValueStateAndTcsCodecs_AllCommands_RoundTrip()
     {
-        var valueCodec = new OrleansBinaryValueOperationCodec<string>(ValueCodec<string>());
+        var valueCodec = new OrleansBinaryValueOperationCodec<string>(ValueCodec<string>(), SessionPool);
         var valueConsumer = new RecordingValueOperationHandler<string>();
-        var stateCodec = new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>());
+        var stateCodec = new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>(), SessionPool);
         var stateConsumer = new RecordingStateOperationHandler<string>();
-        var tcsCodec = new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>());
+        var tcsCodec = new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool);
         var tcsConsumer = new RecordingTaskCompletionSourceOperationHandler<int>();
 
         Apply(valueCodec, writer => valueCodec.WriteSet("value", writer), valueConsumer);
@@ -142,7 +143,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void Codecs_RejectUnsupportedFormatVersion()
     {
-        var codec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>());
+        var codec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>(), SessionPool);
 
         var exception = Assert.Throws<NotSupportedException>(
             () => codec.Apply(CodecTestHelpers.Sequence(new byte[] { 1, 0 }), new RecordingValueOperationHandler<int>()));
@@ -153,7 +154,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void Codecs_RejectTruncatedFormatVersion()
     {
-        var codec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>());
+        var codec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>(), SessionPool);
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(CodecTestHelpers.Sequence(Array.Empty<byte>()), new RecordingValueOperationHandler<int>()));
@@ -164,7 +165,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void Codecs_RejectUnsupportedCommand()
     {
-        var codec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>());
+        var codec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>(), SessionPool);
 
         var exception = Assert.Throws<NotSupportedException>(
             () => codec.Apply(VersionedCommand(99), new RecordingQueueOperationHandler<int>()));
@@ -175,7 +176,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void Codecs_RejectMalformedCommandsAndOperands()
     {
-        var valueCodec = new OrleansBinaryValueOperationCodec<byte>(SingleByteValueCodec.Instance);
+        var valueCodec = new OrleansBinaryValueOperationCodec<byte>(SingleByteValueCodec.Instance, SessionPool);
         Assert.Throws<InvalidOperationException>(
             () => valueCodec.Apply(CodecTestHelpers.Sequence(new byte[] { 0, 0x80 }), new RecordingValueOperationHandler<byte>()));
 
@@ -183,7 +184,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
             () => valueCodec.Apply(VersionedCommand(0), new RecordingValueOperationHandler<byte>()));
         Assert.Contains("Missing byte value", missingValue.Message);
 
-        var listCodec = new OrleansBinaryListOperationCodec<byte>(SingleByteValueCodec.Instance);
+        var listCodec = new OrleansBinaryListOperationCodec<byte>(SingleByteValueCodec.Instance, SessionPool);
         Assert.Throws<InvalidOperationException>(
             () => listCodec.Apply(CodecTestHelpers.Sequence(new byte[] { 0, 3 }), new RecordingListOperationHandler<byte>()));
     }
@@ -191,7 +192,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void CollectionCodecs_RejectMalformedSnapshotCounts()
     {
-        var listCodec = new OrleansBinaryListOperationCodec<byte>(SingleByteValueCodec.Instance);
+        var listCodec = new OrleansBinaryListOperationCodec<byte>(SingleByteValueCodec.Instance, SessionPool);
 
         var overflow = Assert.Throws<InvalidOperationException>(
             () => listCodec.Apply(VersionedCommand(5, 0x8000_0000), new RecordingListOperationHandler<byte>()));
@@ -213,7 +214,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void DictionaryCodec_RejectsUnbalancedSnapshotKeyValues()
     {
-        var codec = new OrleansBinaryDictionaryOperationCodec<byte, byte>(SingleByteValueCodec.Instance, SingleByteValueCodec.Instance);
+        var codec = new OrleansBinaryDictionaryOperationCodec<byte, byte>(SingleByteValueCodec.Instance, SingleByteValueCodec.Instance, SessionPool);
 
         var missingValue = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(AppendBytes(VersionedCommand(3, 1), 10), new RecordingDictionaryOperationHandler<byte, byte>()));
@@ -227,37 +228,37 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void Codecs_RejectUnexpectedTrailingData()
     {
-        var valueCodec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>());
+        var valueCodec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>(), SessionPool);
         AssertTrailingDataRejected(() => valueCodec.Apply(
             WithTrailingByte(CodecTestHelpers.WriteEntry(writer => valueCodec.WriteSet(42, writer))),
             new RecordingValueOperationHandler<int>()));
 
-        var queueCodec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>());
+        var queueCodec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>(), SessionPool);
         AssertTrailingDataRejected(() => queueCodec.Apply(
             WithTrailingByte(CodecTestHelpers.WriteEntry(writer => queueCodec.WriteDequeue(writer))),
             new RecordingQueueOperationHandler<int>()));
 
-        var listCodec = new OrleansBinaryListOperationCodec<int>(ValueCodec<int>());
+        var listCodec = new OrleansBinaryListOperationCodec<int>(ValueCodec<int>(), SessionPool);
         AssertTrailingDataRejected(() => listCodec.Apply(
             WithTrailingByte(CodecTestHelpers.WriteEntry(writer => listCodec.WriteRemoveAt(0, writer))),
             new RecordingListOperationHandler<int>()));
 
-        var dictionaryCodec = new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>());
+        var dictionaryCodec = new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool);
         AssertTrailingDataRejected(() => dictionaryCodec.Apply(
             WithTrailingByte(CodecTestHelpers.WriteEntry(writer => dictionaryCodec.WriteSet("key", 1, writer))),
             new RecordingDictionaryOperationHandler<string, int>()));
 
-        var setCodec = new OrleansBinarySetOperationCodec<string>(ValueCodec<string>());
+        var setCodec = new OrleansBinarySetOperationCodec<string>(ValueCodec<string>(), SessionPool);
         AssertTrailingDataRejected(() => setCodec.Apply(
             WithTrailingByte(CodecTestHelpers.WriteEntry(writer => setCodec.WriteSnapshot(["item"], writer))),
             new RecordingSetOperationHandler<string>()));
 
-        var stateCodec = new OrleansBinaryStateOperationCodec<int>(ValueCodec<int>());
+        var stateCodec = new OrleansBinaryStateOperationCodec<int>(ValueCodec<int>(), SessionPool);
         AssertTrailingDataRejected(() => stateCodec.Apply(
             WithTrailingByte(CodecTestHelpers.WriteEntry(writer => stateCodec.WriteClear(writer))),
             new RecordingStateOperationHandler<int>()));
 
-        var tcsCodec = new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>());
+        var tcsCodec = new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool);
         AssertTrailingDataRejected(() => tcsCodec.Apply(
             WithTrailingByte(CodecTestHelpers.WriteEntry(writer => tcsCodec.WritePending(writer))),
             new RecordingTaskCompletionSourceOperationHandler<int>()));
@@ -266,17 +267,17 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void OperationCodecs_PreserveLegacyBinaryWirePayloads()
     {
-        var valueCodec = new OrleansBinaryValueOperationCodec<byte>(SingleByteValueCodec.Instance);
+        var valueCodec = new OrleansBinaryValueOperationCodec<byte>(SingleByteValueCodec.Instance, SessionPool);
         Assert.Equal(
             [0, 1, 42],
             CodecTestHelpers.WriteEntry(writer => valueCodec.WriteSet(42, writer)).ToArray());
 
-        var listCodec = new OrleansBinaryListOperationCodec<byte>(SingleByteValueCodec.Instance);
+        var listCodec = new OrleansBinaryListOperationCodec<byte>(SingleByteValueCodec.Instance, SessionPool);
         Assert.Equal(
             [0, 0x0B, 0x05, 10, 20],
             CodecTestHelpers.WriteEntry(writer => listCodec.WriteSnapshot([10, 20], writer)).ToArray());
 
-        var dictionaryCodec = new OrleansBinaryDictionaryOperationCodec<byte, byte>(SingleByteValueCodec.Instance, SingleByteValueCodec.Instance);
+        var dictionaryCodec = new OrleansBinaryDictionaryOperationCodec<byte, byte>(SingleByteValueCodec.Instance, SingleByteValueCodec.Instance, SessionPool);
         Assert.Equal(
             [0, 0x07, 0x05, 1, 2, 3, 4],
             CodecTestHelpers.WriteEntry(writer => dictionaryCodec.WriteSnapshot([new(1, 2), new(3, 4)], writer)).ToArray());
@@ -285,7 +286,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void TcsCodec_RejectsMissingAndUnsupportedStatus()
     {
-        var codec = new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>());
+        var codec = new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool);
 
         var missing = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(CodecTestHelpers.Sequence(new byte[] { 0 }), new RecordingTaskCompletionSourceOperationHandler<int>()));
@@ -299,8 +300,8 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     [Fact]
     public void SnapshotWriters_RejectMismatchedCollectionCounts()
     {
-        var queueCodec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>());
-        var setCodec = new OrleansBinarySetOperationCodec<int>(ValueCodec<int>());
+        var queueCodec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>(), SessionPool);
+        var setCodec = new OrleansBinarySetOperationCodec<int>(ValueCodec<int>(), SessionPool);
 
         var queueException = Assert.Throws<InvalidOperationException>(
             () => CodecTestHelpers.WriteEntry(writer => queueCodec.WriteSnapshot(new MiscountedReadOnlyCollection<int>(1, [1, 2]), writer)));
@@ -515,16 +516,14 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
             output.Advance(1);
         }
 
-        public byte Read(ReadOnlySequence<byte> input, out long bytesConsumed)
+        public byte Read(ref Reader<ArcBufferReaderInput> reader)
         {
-            var reader = new SequenceReader<byte>(input);
-            if (!reader.TryRead(out var value))
+            if (reader.Position >= reader.Length)
             {
                 throw new InvalidOperationException("Missing byte value.");
             }
 
-            bytesConsumed = reader.Consumed;
-            return value;
+            return reader.ReadByte();
         }
     }
 }

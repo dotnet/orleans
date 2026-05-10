@@ -2,6 +2,7 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Serialization;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -13,11 +14,11 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
     public async Task OrleansBinaryCodec_StateAndTcs_WriteAndRecover()
     {
         var sut = CreateTestSystem();
-        var state = new DurableState<string>("state", sut.Manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>()));
+        var state = new DurableState<string>("state", sut.Manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>(), SessionPool));
         var tcs = new DurableTaskCompletionSource<int>(
             "tcs",
             sut.Manager,
-            new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>()),
+            new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
             Copier<int>(),
             Copier<Exception>());
         await sut.Lifecycle.OnStart();
@@ -27,11 +28,11 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var state2 = new DurableState<string>("state", sut2.Manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>()));
+        var state2 = new DurableState<string>("state", sut2.Manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>(), SessionPool));
         var tcs2 = new DurableTaskCompletionSource<int>(
             "tcs",
             sut2.Manager,
-            new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>()),
+            new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
             Copier<int>(),
             Copier<Exception>());
         await sut2.Lifecycle.OnStart();
@@ -49,7 +50,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
     public async Task OrleansBinaryCodec_StateClear_WritesClearAndRecoversNoRecord()
     {
         var storage = new VolatileJournalStorage();
-        var codec = new TrackingStateOperationCodec<string>(ValueCodec<string>());
+        var codec = new TrackingStateOperationCodec<string>(ValueCodec<string>(), SessionPool);
         var sut = CreateTestSystem(storage: storage);
         var state = new DurableState<string>("state", sut.Manager, codec);
         var grainState = (IStorage<string>)state;
@@ -64,7 +65,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         Assert.Equal("0", grainState.Etag);
 
         var recovered = CreateTestSystem(storage: storage);
-        var recoveredState = new DurableState<string>("state", recovered.Manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>()));
+        var recoveredState = new DurableState<string>("state", recovered.Manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>(), SessionPool));
         await recovered.Lifecycle.OnStart();
 
         var recoveredStorage = (IStorage<string>)recoveredState;
@@ -79,7 +80,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         var tcs = new DurableTaskCompletionSource<int>(
             "tcs",
             sut.Manager,
-            new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>()),
+            new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
             Copier<int>(),
             Copier<Exception>());
         await sut.Lifecycle.OnStart();
@@ -98,9 +99,9 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
-    private sealed class TrackingStateOperationCodec<T>(IJournalValueCodec<T> valueCodec) : IDurableStateOperationCodec<T>
+    private sealed class TrackingStateOperationCodec<T>(IJournalValueCodec<T> valueCodec, SerializerSessionPool sessionPool) : IDurableStateOperationCodec<T>
     {
-        private readonly OrleansBinaryStateOperationCodec<T> _inner = new(valueCodec);
+        private readonly OrleansBinaryStateOperationCodec<T> _inner = new(valueCodec, sessionPool);
 
         public int WriteClearCount { get; private set; }
 

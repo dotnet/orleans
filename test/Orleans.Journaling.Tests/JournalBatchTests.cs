@@ -23,7 +23,7 @@ public sealed class AzureStorageJournalBatchTests : JournalBatchTests
     protected override void ConfigureServices(IServiceCollection services)
     {
         services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
-        services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, OrleansBinaryJournalFormat.Instance);
+        services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
         services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
@@ -91,10 +91,10 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var stringCodec = new OrleansJournalValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool);
         var uint64Codec = new OrleansJournalValueCodec<ulong>(codecProvider.GetCodec<ulong>(), sessionPool);
         var dateTimeCodec = new OrleansJournalValueCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
-        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
-        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager = new JournaledStateManager(storage, _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(), ManagerOptions, journalStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);
-        var list = new DurableList<T>(listName, manager, new OrleansBinaryListOperationCodec<T>(new OrleansJournalValueCodec<T>(codecProvider.GetCodec<T>(), sessionPool)));
+        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec, sessionPool);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, sessionPool);
+        var manager = new JournaledStateManager(storage, _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(), ManagerOptions, journalStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new OrleansBinaryJournalFormat(sessionPool));
+        var list = new DurableList<T>(listName, manager, new OrleansBinaryListOperationCodec<T>(new OrleansJournalValueCodec<T>(codecProvider.GetCodec<T>(), sessionPool), sessionPool));
         return (manager, list, storage);
     }
 
@@ -154,10 +154,10 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var stringCodec = new OrleansJournalValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool);
         var uint64Codec = new OrleansJournalValueCodec<ulong>(codecProvider.GetCodec<ulong>(), sessionPool);
         var dateTimeCodec = new OrleansJournalValueCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
-        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
-        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager2 = new JournaledStateManager(storage, _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(), ManagerOptions, journalStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);
-        var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool)));
+        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec, sessionPool);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, sessionPool);
+        var manager2 = new JournaledStateManager(storage, _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(), ManagerOptions, journalStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new OrleansBinaryJournalFormat(sessionPool));
+        var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(3, list2.Count);
@@ -358,10 +358,10 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var stringCodec = new OrleansJournalValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool);
         var uint64Codec = new OrleansJournalValueCodec<ulong>(codecProvider.GetCodec<ulong>(), sessionPool);
         var dateTimeCodec = new OrleansJournalValueCodec<DateTime>(codecProvider.GetCodec<DateTime>(), sessionPool);
-        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec);
-        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec);
-        var manager2 = new JournaledStateManager(storage, _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(), ManagerOptions, journalStreamIdsCodec, retirementTrackerCodec, TimeProvider.System);// Reuses the storage object linked via grainId
-        var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListOperationCodec<int>(new OrleansJournalValueCodec<int>(codecProvider.GetCodec<int>(), sessionPool)));
+        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec, sessionPool);
+        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, sessionPool);
+        var manager2 = new JournaledStateManager(storage, _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(), ManagerOptions, journalStreamIdsCodec, retirementTrackerCodec, TimeProvider.System, new OrleansBinaryJournalFormat(sessionPool));// Reuses the storage object linked via grainId
+        var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListOperationCodec<int>(new OrleansJournalValueCodec<int>(codecProvider.GetCodec<int>(), sessionPool), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(itemCount, list2.Count);

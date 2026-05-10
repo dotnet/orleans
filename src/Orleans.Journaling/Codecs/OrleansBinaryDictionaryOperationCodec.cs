@@ -1,5 +1,7 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -8,7 +10,8 @@ namespace Orleans.Journaling;
 /// </summary>
 internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     IJournalValueCodec<TKey> keyCodec,
-    IJournalValueCodec<TValue> valueCodec) : IDurableDictionaryOperationCodec<TKey, TValue>, IOrleansBinaryJournalEntryCodec where TKey : notnull
+    IJournalValueCodec<TValue> valueCodec,
+    SerializerSessionPool sessionPool) : IDurableDictionaryOperationCodec<TKey, TValue>, IOrleansBinaryJournalEntryCodec where TKey : notnull
 {
     private const byte FormatVersion = 0;
     private const uint SetCommand = 0;
@@ -67,19 +70,37 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     /// <inheritdoc/>
     public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var reader = new OrleansBinaryOperationReader(input);
-        var command = reader.ReadCommand();
+        ArgumentNullException.ThrowIfNull(consumer);
+        using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
+        using var session = sessionPool.GetSession();
+        var reader = Reader.Create(arcBuffer, session);
+        Apply(ref reader, consumer);
+        if (reader.Position != reader.Length)
+        {
+            throw new InvalidOperationException("Unexpected trailing data after binary journal operation.");
+        }
+    }
 
+    void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableDictionaryOperationHandler<TKey, TValue>>(state, this));
+
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    {
+        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        var command = reader.ReadVarUInt32();
         switch (command)
         {
             case SetCommand:
-                ApplySet(ref reader, consumer);
+            {
+                var key = keyCodec.Read(ref reader);
+                var value = valueCodec.Read(ref reader);
+                consumer.ApplySet(key, value);
                 break;
+            }
             case RemoveCommand:
-                ApplyRemove(ref reader, consumer);
+                consumer.ApplyRemove(keyCodec.Read(ref reader));
                 break;
             case ClearCommand:
-                reader.EnsureEnd();
                 consumer.ApplyClear();
                 break;
             case SnapshotCommand:
@@ -90,37 +111,17 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
     }
 
-    void IOrleansBinaryJournalEntryCodec.Apply(ReadOnlySequence<byte> input, IJournaledState state) =>
-        Apply(input, DurableOperationHandler.GetRequiredHandler<IDurableDictionaryOperationHandler<TKey, TValue>>(state, this));
-
-    private void ApplySet(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
     {
-        var key = reader.ReadValue("key", keyCodec);
-        var value = reader.ReadValue("value", valueCodec);
-        reader.EnsureEnd();
-        consumer.ApplySet(key, value);
-    }
-
-    private void ApplyRemove(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
-    {
-        var key = reader.ReadValue("key", keyCodec);
-        reader.EnsureEnd();
-        consumer.ApplyRemove(key);
-    }
-
-    private void ApplySnapshot(ref OrleansBinaryOperationReader reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
-    {
-        var count = reader.ReadSnapshotCount();
+        var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
 
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            var key = reader.ReadValue("key", keyCodec);
-            var value = reader.ReadValue("value", valueCodec);
+            var key = keyCodec.Read(ref reader);
+            var value = valueCodec.Read(ref reader);
             consumer.ApplySet(key, value);
         }
-
-        reader.EnsureEnd();
     }
 
     private static void WriteHeader(IBufferWriter<byte> output, uint command)
@@ -139,5 +140,4 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         writer.WriteVarUInt32(operand);
         writer.Commit();
     }
-
 }

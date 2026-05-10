@@ -1,5 +1,6 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
@@ -27,13 +28,9 @@ internal sealed class OrleansJournalValueCodec<T>(IFieldCodec<T> fieldCodec, Ser
     }
 
     /// <inheritdoc/>
-    public T Read(ReadOnlySequence<byte> input, out long bytesConsumed)
+    public T Read(ref Reader<ArcBufferReaderInput> reader)
     {
-        using var session = sessionPool.GetSession();
-        var reader = Reader.Create(input, session);
         var field = reader.ReadFieldHeader();
-        var result = fieldCodec.ReadValue(ref reader, field);
-        bytesConsumed = reader.Position;
-        return result;
+        return fieldCodec.ReadValue(ref reader, field);
     }
 }

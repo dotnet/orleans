@@ -36,8 +36,9 @@ public static class HostingExtensions
     {
         var key = JournalFormatServices.ValidateJournalFormatKey(OrleansBinaryJournalFormat.JournalFormatKey);
 
-        services.TryAddKeyedSingleton<IJournalFormat>(key, OrleansBinaryJournalFormat.Instance);
-        services.TryAddSingleton<IJournalFormat>(OrleansBinaryJournalFormat.Instance);
+        services.TryAddSingleton<OrleansBinaryJournalFormat>();
+        services.TryAddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
+        services.TryAddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<OrleansBinaryJournalFormat>());
 
         services.TryAddSingleton<OrleansBinaryOperationCodecProvider>();
         services.TryAddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());

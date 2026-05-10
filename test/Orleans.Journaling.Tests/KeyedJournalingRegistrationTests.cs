@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Hosting;
 using Orleans.Journaling.Json;
+using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
 using Xunit;
 
@@ -19,6 +20,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     public void AddJournalStorage_RegistersJsonFamilyByDefaultAndBinaryFamilyByFormatKey()
     {
         var builder = new TestSiloBuilder();
+        builder.Services.AddSerializer();
 
         builder.AddJournalStorage();
 
@@ -33,9 +35,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             serviceProvider.GetRequiredService<JsonOperationCodecProvider>(),
             expectDefaultProvider: true);
 
-        Assert.Same(OrleansBinaryJournalFormat.Instance, serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
-        Assert.Equal(".obs", OrleansBinaryJournalFormat.Instance.FileExtension);
-        Assert.Equal("application/octet-stream", OrleansBinaryJournalFormat.Instance.MimeType);
+        var binaryFormat = Assert.IsType<OrleansBinaryJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
+        Assert.Equal(".obs", binaryFormat.FileExtension);
+        Assert.Equal("application/octet-stream", binaryFormat.MimeType);
         CodecTestHelpers.AssertCodecProviderRegistrations(
             serviceProvider,
             OrleansBinaryJournalFormat.JournalFormatKey,

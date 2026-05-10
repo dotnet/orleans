@@ -1,6 +1,7 @@
 using System.Buffers;
 using System.Collections;
 using Microsoft.Extensions.DependencyInjection;
+using Orleans.Serialization.Buffers;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -19,19 +20,15 @@ public static class CodecTestHelpers
         using var batch = new OrleansBinaryJournalBatchWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
         using var committed = batch.PeekSlice();
-        var remaining = committed.AsReadOnlySequence();
-        if (!OrleansBinaryJournalEntryFrameReader.TryReadEntry(
-            ref remaining,
-            offset: 0,
-            isCompleted: true,
-            out _,
-            out var payload,
-            out _,
-            out _))
-        {
-            throw new InvalidOperationException("The test journal entry was not fully written.");
-        }
+        var sequence = committed.AsReadOnlySequence();
 
+        // Strip the [varuint32 body length][varuint64 stream id] framing and return the operation payload.
+        var lengthReader = Reader.Create(sequence, session: null!);
+        var bodyLength = lengthReader.ReadVarUInt32();
+        var entry = sequence.Slice(lengthReader.Position, bodyLength);
+        var streamIdReader = Reader.Create(entry, session: null!);
+        streamIdReader.ReadVarUInt64();
+        var payload = entry.Slice(streamIdReader.Position);
         return Sequence(payload.ToArray());
     }
 
