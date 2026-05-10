@@ -1,5 +1,7 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using Azure;
+using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Sas;
@@ -13,6 +15,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
     private readonly string? _mimeType;
     private readonly ILogger<AzureAppendBlobJournalStorage> _logger;
     private readonly Func<AppendBlobClient, string, AppendBlobClient> _snapshotClientFactory;
+    private readonly Func<AppendBlobClient, CancellationToken, IAsyncEnumerable<string>> _snapshotEnumerator;
     private readonly AppendBlobAppendBlockOptions _appendOptions;
     private bool _exists;
     private int _numBlocks;
@@ -34,7 +37,12 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
     {
     }
 
-    internal AzureAppendBlobJournalStorage(AppendBlobClient client, string? mimeType, ILogger<AzureAppendBlobJournalStorage> logger, Func<AppendBlobClient, string, AppendBlobClient> snapshotClientFactory)
+    internal AzureAppendBlobJournalStorage(
+        AppendBlobClient client,
+        string? mimeType,
+        ILogger<AzureAppendBlobJournalStorage> logger,
+        Func<AppendBlobClient, string, AppendBlobClient> snapshotClientFactory,
+        Func<AppendBlobClient, CancellationToken, IAsyncEnumerable<string>>? snapshotEnumerator = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(snapshotClientFactory);
@@ -43,6 +51,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         _mimeType = mimeType;
         _logger = logger;
         _snapshotClientFactory = snapshotClientFactory;
+        _snapshotEnumerator = snapshotEnumerator ?? DefaultEnumerateSnapshots;
 
         // For the first request, if we have not performed a read yet, we want to guard against clobbering an existing blob.
         _appendOptions = new AppendBlobAppendBlockOptions() { Conditions = new AppendBlobRequestConditions { IfNoneMatch = ETag.All } };
@@ -108,9 +117,78 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         _appendOptions.Conditions.IfMatch = result.Value.Details.ETag;
         _exists = true;
 
-        await using var rawStream = result.Value.Content;
-        var totalBytesRead = await consumer.ConsumeAsync(rawStream, cancellationToken).ConfigureAwait(false);
-        LogRead(_logger, totalBytesRead, _client.BlobContainerName, _client.Name);
+        await using (var rawStream = result.Value.Content)
+        {
+            var totalBytesRead = await consumer.ConsumeAsync(rawStream, cancellationToken).ConfigureAwait(false);
+            LogRead(_logger, totalBytesRead, _client.BlobContainerName, _client.Name);
+        }
+
+        // Best-effort cleanup of orphan snapshots left behind by previously-interrupted ReplaceAsync calls.
+        // After a successful read, no further operation depends on any pre-existing snapshot, so we can
+        // safely delete them. Failures here do not impact recovery and are only logged.
+        await TryCleanupOrphanSnapshotsAsync(cancellationToken).ConfigureAwait(false);
+    }
+
+    private async Task TryCleanupOrphanSnapshotsAsync(CancellationToken cancellationToken)
+    {
+        try
+        {
+            await foreach (var snapshot in _snapshotEnumerator(_client, cancellationToken).ConfigureAwait(false))
+            {
+                if (cancellationToken.IsCancellationRequested)
+                {
+                    break;
+                }
+
+                if (snapshot is not { Length: > 0 })
+                {
+                    continue;
+                }
+
+                try
+                {
+                    await _snapshotClientFactory(_client, snapshot)
+                        .DeleteAsync(conditions: null, cancellationToken: cancellationToken)
+                        .ConfigureAwait(false);
+                    LogOrphanSnapshotDeleted(_logger, _client.BlobContainerName, _client.Name, snapshot);
+                }
+                catch (RequestFailedException ex) when (ex.Status is 404)
+                {
+                    // Snapshot was already gone; nothing to do.
+                }
+                catch (Exception ex)
+                {
+                    LogOrphanSnapshotDeleteFailed(_logger, ex, _client.BlobContainerName, _client.Name, snapshot);
+                }
+            }
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            LogOrphanSnapshotEnumerationFailed(_logger, ex, _client.BlobContainerName, _client.Name);
+        }
+    }
+
+    private static async IAsyncEnumerable<string> DefaultEnumerateSnapshots(
+        AppendBlobClient client,
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        var container = client.GetParentBlobContainerClient();
+        await foreach (var item in container.GetBlobsAsync(
+            traits: BlobTraits.None,
+            states: BlobStates.Snapshots,
+            prefix: client.Name,
+            cancellationToken: cancellationToken).ConfigureAwait(false))
+        {
+            if (item.Snapshot is { Length: > 0 } snapshot
+                && string.Equals(item.Name, client.Name, StringComparison.Ordinal))
+            {
+                yield return snapshot;
+            }
+        }
     }
 
     private async Task<Response<BlobDownloadStreamingResult>> CopyFromSnapshotAsync(ETag eTag, string snapshotDetail, CancellationToken cancellationToken)
@@ -187,6 +265,21 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         Level = LogLevel.Debug,
         Message = "Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
+
+    [LoggerMessage(
+        Level = LogLevel.Debug,
+        Message = "Deleted orphan snapshot \"{Snapshot}\" of blob \"{ContainerName}/{BlobName}\"")]
+    private static partial void LogOrphanSnapshotDeleted(ILogger logger, string containerName, string blobName, string snapshot);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to delete orphan snapshot \"{Snapshot}\" of blob \"{ContainerName}/{BlobName}\"")]
+    private static partial void LogOrphanSnapshotDeleteFailed(ILogger logger, Exception exception, string containerName, string blobName, string snapshot);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to enumerate snapshots of blob \"{ContainerName}/{BlobName}\" while cleaning up orphans")]
+    private static partial void LogOrphanSnapshotEnumerationFailed(ILogger logger, Exception exception, string containerName, string blobName);
 
     private sealed class ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
     {

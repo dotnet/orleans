@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Runtime.CompilerServices;
 using Azure;
 using Azure.Core;
 using Azure.Storage.Blobs.Models;
@@ -150,6 +151,64 @@ public sealed class AzureAppendBlobJournalStorageTests
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         Assert.False(storage.IsCompactionRequested);
+    }
+
+    [Fact]
+    public async Task ReadAsync_DeletesOrphanSnapshotsLeftByInterruptedReplaceCalls()
+    {
+        var client = new FakeAppendBlobClient();
+        client.Downloads.Enqueue(new DownloadResult([1, 2, 3], new ETag("\"read\""), new Dictionary<string, string>(), BlobCommittedBlockCount: 1));
+
+        // Simulate a storage account that has accumulated orphan snapshots from
+        // earlier ReplaceAsync calls that crashed before snapshot deletion.
+        static async IAsyncEnumerable<string> EnumerateOrphans(AppendBlobClient _, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return "orphan-1";
+            yield return "orphan-2";
+            yield return "orphan-3";
+        }
+
+        var storage = new AzureAppendBlobJournalStorage(
+            client,
+            mimeType: null,
+            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
+            EnumerateOrphans);
+
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+
+        Assert.Equal(3, client.SnapshotDeleteCallCount);
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenSnapshotEnumerationFails_StillCompletesSuccessfully()
+    {
+        var client = new FakeAppendBlobClient();
+        client.Downloads.Enqueue(new DownloadResult([1], new ETag("\"read\""), new Dictionary<string, string>(), BlobCommittedBlockCount: 1));
+
+        static async IAsyncEnumerable<string> ThrowingEnumerator(AppendBlobClient _, [EnumeratorCancellation] CancellationToken cancellationToken)
+        {
+            await Task.Yield();
+            cancellationToken.ThrowIfCancellationRequested();
+            throw new InvalidOperationException("listing failed");
+#pragma warning disable CS0162 // Unreachable code detected
+            yield break;
+#pragma warning restore CS0162
+        }
+
+        var storage = new AzureAppendBlobJournalStorage(
+            client,
+            mimeType: null,
+            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
+            ThrowingEnumerator);
+
+        // Should not throw; cleanup failure must not break recovery.
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+
+        Assert.Equal(0, client.SnapshotDeleteCallCount);
     }
 
     [Fact]
