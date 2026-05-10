@@ -198,6 +198,13 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
         Assert.Contains("snapshot count", overflow.Message);
         Assert.Contains("exceeds", overflow.Message);
 
+        // Snapshot count must also be capped well below int.MaxValue to prevent corrupted
+        // journals from triggering huge in-memory allocations during recovery.
+        var overCap = Assert.Throws<InvalidOperationException>(
+            () => listCodec.Apply(VersionedCommand(5, (uint)OrleansBinaryCollectionCodecHelpers.MaxSnapshotItemCount + 1), new RecordingListOperationHandler<byte>()));
+        Assert.Contains("snapshot count", overCap.Message);
+        Assert.Contains(OrleansBinaryCollectionCodecHelpers.MaxSnapshotItemCount.ToString(System.Globalization.CultureInfo.InvariantCulture), overCap.Message);
+
         var missingSnapshotItem = Assert.Throws<InvalidOperationException>(
             () => listCodec.Apply(AppendBytes(VersionedCommand(5, 2), 42), new RecordingListOperationHandler<byte>()));
         Assert.Contains("Missing byte value", missingSnapshotItem.Message);
