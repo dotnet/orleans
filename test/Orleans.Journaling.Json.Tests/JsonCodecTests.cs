@@ -462,6 +462,48 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonLinesJournalFormat_Read_ErrorMessageReportsByteOffsetOfFailingLine()
+    {
+        var format = new JsonLinesJournalFormat();
+        var firstLine = """[8,"set",42]""" + "\n";
+        var jsonLines = firstLine + """[9,null]""" + "\n";
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
+
+        var expectedOffset = Encoding.UTF8.GetByteCount(firstLine);
+        Assert.Contains($"byte offset {expectedOffset}", exception.Message);
+        Assert.Contains("operation command string", exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesJournalFormat_Read_ReportsByteOffsetForBlankLineMidStream()
+    {
+        var format = new JsonLinesJournalFormat();
+        var firstLine = """[8,"set",42]""" + "\n";
+        var jsonLines = firstLine + "   \n";
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
+
+        var expectedOffset = Encoding.UTF8.GetByteCount(firstLine);
+        Assert.Contains($"byte offset {expectedOffset}", exception.Message);
+        Assert.Contains("blank lines", exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesJournalFormat_Read_ReportsByteOffsetForFinalLineMissingNewline()
+    {
+        var format = new JsonLinesJournalFormat();
+        var firstLine = """[8,"set",42]""" + "\n";
+        var jsonLines = firstLine + """[9,"set",43""";
+
+        var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
+
+        var expectedOffset = Encoding.UTF8.GetByteCount(firstLine);
+        Assert.Contains($"byte offset {expectedOffset}", exception.Message);
+        Assert.Contains("must end with a newline", exception.Message);
+    }
+
+    [Fact]
     public void JsonLinesJournalFormat_Read_PartialLineWaitsForNewlineWhenInputIsNotCompleted()
     {
         var format = new JsonLinesJournalFormat();

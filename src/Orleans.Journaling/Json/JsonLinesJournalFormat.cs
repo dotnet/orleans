@@ -20,12 +20,13 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
-        while (TryReadLine(input, resolver))
+        var offset = 0L;
+        while (TryReadLine(input, resolver, ref offset))
         {
         }
     }
 
-    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver)
+    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, ref long offset)
     {
         if (input.Length == 0)
         {
@@ -34,7 +35,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         if (input.IsNext(Bom))
         {
-            throw new InvalidOperationException("Malformed JSON Lines journal segment: UTF-8 byte order marks are not supported.");
+            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: UTF-8 byte order marks are not supported.");
         }
 
         if (!input.TryReadTo(out var lineBuffer, LineFeed, advancePastDelimiter: true))
@@ -44,8 +45,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 return false;
             }
 
-            throw new InvalidOperationException("Malformed JSON Lines journal segment at byte offset 0: journal entries must end with a newline.");
+            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: journal entries must end with a newline.");
         }
+
+        var lineOffset = offset;
+        // Account for the delimiter (LF) consumed by TryReadTo.
+        offset += lineBuffer.Length + 1;
 
         using (lineBuffer)
         {
@@ -57,10 +62,10 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             if (IsBlankLine(line))
             {
-                throw new InvalidOperationException("Malformed JSON Lines journal segment at byte offset 0: blank lines are not valid journal entries.");
+                throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {lineOffset}: blank lines are not valid journal entries.");
             }
 
-            ReadLine(line, offset: 0, resolver);
+            ReadLine(line, lineOffset, resolver);
         }
 
         return true;
