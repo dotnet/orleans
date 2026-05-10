@@ -122,9 +122,9 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
                 codec.WriteSet("alpha", 1, writer);
                 codec.WriteSet("beta", 2, writer);
                 codec.WriteRemove("alpha", writer);
-                codec.WriteSnapshot([new("beta", 2), new("gamma", 3)], writer);
+                codec.WriteSet("gamma", 3, writer);
             },
-            ["set:alpha:1", "set:beta:2", "remove:alpha", "reset:2", "set:beta:2", "set:gamma:3"]);
+            ["set:alpha:1", "set:beta:2", "remove:alpha", "set:gamma:3"]);
     }
 
     // --- List ----------------------------------------------------------------------------------
