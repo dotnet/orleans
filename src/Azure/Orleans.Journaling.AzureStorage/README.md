@@ -13,6 +13,30 @@ dotnet add package Microsoft.Orleans.Journaling.AzureStorage
 ```
 
 ## Example - Configuring Azure Storage Journaling
+
+The journaling provider resolves a registered `BlobServiceClient` from DI. How you obtain that client depends on your hosting model.
+
+### Authentication options
+
+For production workloads, prefer Microsoft Entra (Azure AD) credentials with `DefaultAzureCredential` rather than long-lived connection strings:
+
+```csharp
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.DependencyInjection;
+
+builder.Services.AddSingleton(_ =>
+    new BlobServiceClient(
+        new Uri("https://<your-account>.blob.core.windows.net"),
+        new DefaultAzureCredential()));
+```
+
+If you are integrating with .NET Aspire (as the bundled `JournalingAzureBlobJson` sample does), the AppHost emits a connection string that the consuming project resolves via `AddAzureBlobServiceClient`. Aspire wires up local emulator credentials in development and Entra-backed credentials in production.
+
+For ad-hoc local development you may register a `BlobServiceClient` from a connection string (such as the Azurite UseDevelopmentStorage shortcut). Do not embed production connection strings in source.
+
+### Wiring it into the silo
+
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
