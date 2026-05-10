@@ -112,16 +112,15 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     private static JsonElement ParseJournalEntry(ReadOnlySequence<byte> line, long offset)
     {
-        var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
         try
         {
-            var result = JsonElement.ParseValue(ref reader);
-            if (reader.Read())
-            {
-                throw new JsonException("Additional JSON content was found after the journal entry.");
-            }
-
-            return result;
+            // Use JsonDocument.Parse + Clone so the returned element does not retain a
+            // reference to the pooled JsonDocument backing array. Without Clone, the
+            // pooled buffer is held until the JsonElement (captured by JsonOperationEntry
+            // in the formatted-entry buffer) is GC'd, which can drain the array pool
+            // during recovery of grains with many retired/unknown states.
+            using var document = JsonDocument.Parse(line);
+            return document.RootElement.Clone();
         }
         catch (JsonException exception)
         {
