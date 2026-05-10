@@ -545,7 +545,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private static bool IsRecoveryFormatException(Exception exception) =>
         exception is InvalidOperationException { InnerException: not null }
-        && exception.Message.StartsWith("Failed to recover journaling state using configured journal format key ", StringComparison.Ordinal);
+        && exception.Message?.StartsWith("Failed to recover journaling state using configured journal format key ", StringComparison.Ordinal) == true;
 
     private InvalidOperationException CreateRecoveryFormatException(Exception exception) =>
         new(
