@@ -15,9 +15,14 @@ internal readonly struct JsonOperationEntry
     public JsonOperationEntry(JsonElement array, int offset, int length)
     {
         var arrayLength = GetArrayLength(array);
-        if ((uint)offset > (uint)arrayLength || length < 0 || offset + length > arrayLength)
+        if ((uint)offset > (uint)arrayLength)
         {
             throw new ArgumentOutOfRangeException(nameof(offset));
+        }
+
+        if (length < 0 || length > arrayLength - offset)
+        {
+            throw new ArgumentOutOfRangeException(nameof(length));
         }
 
         _array = array;

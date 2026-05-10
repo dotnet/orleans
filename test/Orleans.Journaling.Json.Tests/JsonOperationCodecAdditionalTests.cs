@@ -98,6 +98,42 @@ public sealed class JsonOperationCodecAdditionalTests
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
+    [Fact]
+    public void JsonOperationEntry_RejectsLengthOverflow()
+    {
+        using var doc = JsonDocument.Parse("[1,2,3]");
+
+        // Avoid (offset + length) wraparound by computing length > arrayLength - offset.
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new JsonOperationEntry(doc.RootElement, offset: 1, length: int.MaxValue));
+
+        Assert.Equal("length", ex.ParamName);
+    }
+
+    [Fact]
+    public void JsonOperationEntry_RejectsNegativeLength()
+    {
+        using var doc = JsonDocument.Parse("[1,2,3]");
+
+        var ex = Assert.Throws<ArgumentOutOfRangeException>(
+            () => new JsonOperationEntry(doc.RootElement, offset: 0, length: -1));
+
+        Assert.Equal("length", ex.ParamName);
+    }
+
+    [Fact]
+    public void JsonOperationEntry_AcceptsExactRangeBoundary()
+    {
+        using var doc = JsonDocument.Parse("[1,2,3,4,5]");
+
+        // length exactly equal to (arrayLength - offset) is the largest legal slice.
+        var entry = new JsonOperationEntry(doc.RootElement, offset: 2, length: 3);
+
+        Assert.Equal(3, entry.Length);
+        Assert.Equal(3, entry[0].GetInt32());
+        Assert.Equal(5, entry[2].GetInt32());
+    }
+
     private sealed class TestSiloBuilder : ISiloBuilder
     {
         public IServiceCollection Services { get; } = new ServiceCollection();
