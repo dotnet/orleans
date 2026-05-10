@@ -29,9 +29,9 @@ internal ref struct OrleansBinaryOperationReader
         return _reader.ReadByte();
     }
 
-    public int ReadListIndex() => OrleansBinaryCollectionCodecHelpers.ReadListIndex(ref _reader);
+    public int ReadListIndex() => OrleansBinaryCollectionWireHelpers.ReadListIndex(ref _reader);
 
-    public int ReadSnapshotCount() => OrleansBinaryCollectionCodecHelpers.ReadSnapshotCount(ref _reader);
+    public int ReadSnapshotCount() => OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref _reader);
 
     public ulong ReadVarUInt64() => _reader.ReadVarUInt64();
 

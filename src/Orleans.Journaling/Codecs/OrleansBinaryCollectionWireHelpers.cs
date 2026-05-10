@@ -3,7 +3,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal static class OrleansBinaryCollectionCodecHelpers
+internal static class OrleansBinaryCollectionWireHelpers
 {
     /// <summary>
     /// Defensive upper bound on a single snapshot's item count, applied during recovery.
