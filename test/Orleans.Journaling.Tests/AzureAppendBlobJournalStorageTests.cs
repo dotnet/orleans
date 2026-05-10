@@ -212,6 +212,106 @@ public sealed class AzureAppendBlobJournalStorageTests
     }
 
     [Fact]
+    public async Task AppendAsync_WhenJournalFormatKeyConfigured_StampsBlobMetadata()
+    {
+        var client = new FakeAppendBlobClient();
+        var storage = new AzureAppendBlobJournalStorage(
+            client,
+            mimeType: null,
+            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
+            snapshotEnumerator: null,
+            journalFormatKey: "json-lines");
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+
+        var create = client.CreateCalls.Single();
+        Assert.True(create.Metadata.TryGetValue(AzureAppendBlobJournalStorage.FormatKeyMetadataKey, out var stamped));
+        Assert.Equal("json-lines", stamped);
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenJournalFormatKeyConfigured_PreservesFormatKeyMetadata()
+    {
+        var client = new FakeAppendBlobClient();
+        var storage = new AzureAppendBlobJournalStorage(
+            client,
+            mimeType: null,
+            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
+            snapshotEnumerator: null,
+            journalFormatKey: "json-lines");
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+
+        var replaceCreate = client.CreateCalls[1];
+        Assert.Equal("snapshot-1", replaceCreate.Metadata["snapshot"]);
+        Assert.Equal("json-lines", replaceCreate.Metadata[AzureAppendBlobJournalStorage.FormatKeyMetadataKey]);
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenStoredFormatKeyDiffersFromConfigured_ThrowsExplanatoryError()
+    {
+        var client = new FakeAppendBlobClient();
+        client.Downloads.Enqueue(new DownloadResult(
+            [1, 2, 3],
+            new ETag("\"read\""),
+            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatKeyMetadataKey] = "orleans-binary" },
+            BlobCommittedBlockCount: 1));
+        var storage = new AzureAppendBlobJournalStorage(
+            client,
+            mimeType: null,
+            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
+            snapshotEnumerator: null,
+            journalFormatKey: "json-lines");
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None).AsTask());
+
+        Assert.Contains("orleans-binary", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("json-lines", exception.Message, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenStoredFormatKeyMatchesConfigured_Succeeds()
+    {
+        var client = new FakeAppendBlobClient();
+        client.Downloads.Enqueue(new DownloadResult(
+            [1, 2, 3],
+            new ETag("\"read\""),
+            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatKeyMetadataKey] = "json-lines" },
+            BlobCommittedBlockCount: 1));
+        var storage = new AzureAppendBlobJournalStorage(
+            client,
+            mimeType: null,
+            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
+            snapshotEnumerator: null,
+            journalFormatKey: "json-lines");
+
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+    }
+
+    [Fact]
+    public async Task ReadAsync_WhenLegacyBlobHasNoFormatKeyMetadata_AllowsReadForBackCompat()
+    {
+        var client = new FakeAppendBlobClient();
+        client.Downloads.Enqueue(new DownloadResult([1, 2, 3], new ETag("\"read\""), new Dictionary<string, string>(), BlobCommittedBlockCount: 1));
+        var storage = new AzureAppendBlobJournalStorage(
+            client,
+            mimeType: null,
+            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
+            snapshotEnumerator: null,
+            journalFormatKey: "json-lines");
+
+        // Should not throw — legacy data without the metadata stamp is accepted.
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+    }
+
+    [Fact]
     public async Task AppendAsync_WhenAppendFails_DoesNotAdvanceAppendCondition()
     {
         var client = new FakeAppendBlobClient();

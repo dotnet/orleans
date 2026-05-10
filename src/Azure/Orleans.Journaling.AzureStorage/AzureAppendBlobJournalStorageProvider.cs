@@ -33,7 +33,13 @@ internal sealed class AzureAppendBlobJournalStorageProvider(
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
         var blobName = _options.GetBlobNameWithExtension(grainContext.GrainId, journalFormat);
         var blobClient = container.GetAppendBlobClient(blobName);
-        return new AzureAppendBlobJournalStorage(blobClient, journalFormat.MimeType, logger);
+        return new AzureAppendBlobJournalStorage(
+            blobClient,
+            journalFormat.MimeType,
+            logger,
+            static (client, snapshot) => client.WithSnapshot(snapshot),
+            snapshotEnumerator: null,
+            journalFormatKey: journalFormatKey);
     }
 
     public string GetJournalFormatKey(IGrainContext grainContext)

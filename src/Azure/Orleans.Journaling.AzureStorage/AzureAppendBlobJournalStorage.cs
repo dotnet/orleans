@@ -11,8 +11,11 @@ namespace Orleans.Journaling;
 
 internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
 {
+    internal const string FormatKeyMetadataKey = "journalFormatKey";
+
     private readonly AppendBlobClient _client;
     private readonly string? _mimeType;
+    private readonly string? _journalFormatKey;
     private readonly ILogger<AzureAppendBlobJournalStorage> _logger;
     private readonly Func<AppendBlobClient, string, AppendBlobClient> _snapshotClientFactory;
     private readonly Func<AppendBlobClient, CancellationToken, IAsyncEnumerable<string>> _snapshotEnumerator;
@@ -42,13 +45,15 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         string? mimeType,
         ILogger<AzureAppendBlobJournalStorage> logger,
         Func<AppendBlobClient, string, AppendBlobClient> snapshotClientFactory,
-        Func<AppendBlobClient, CancellationToken, IAsyncEnumerable<string>>? snapshotEnumerator = null)
+        Func<AppendBlobClient, CancellationToken, IAsyncEnumerable<string>>? snapshotEnumerator = null,
+        string? journalFormatKey = null)
     {
         ArgumentNullException.ThrowIfNull(client);
         ArgumentNullException.ThrowIfNull(snapshotClientFactory);
 
         _client = client;
         _mimeType = mimeType;
+        _journalFormatKey = journalFormatKey;
         _logger = logger;
         _snapshotClientFactory = snapshotClientFactory;
         _snapshotEnumerator = snapshotEnumerator ?? DefaultEnumerateSnapshots;
@@ -103,6 +108,8 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
             consumer.Complete();
             return;
         }
+
+        ValidateFormatKeyMetadata(result.Value.Details.Metadata);
 
         if (result.Value.Details.ContentLength == 0)
         {
@@ -216,6 +223,12 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         var blobSnapshot = await _client.CreateSnapshotAsync(conditions: _appendOptions.Conditions, cancellationToken: cancellationToken).ConfigureAwait(false);
 
         // Open the blob for writing, overwriting existing contents.
+        var metadata = new Dictionary<string, string> { ["snapshot"] = blobSnapshot.Value.Snapshot };
+        if (_journalFormatKey is { Length: > 0 })
+        {
+            metadata[FormatKeyMetadataKey] = _journalFormatKey;
+        }
+
         var createOptions = new AppendBlobCreateOptions()
         {
             Conditions = new AppendBlobRequestConditions
@@ -223,7 +236,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
                 IfMatch = _appendOptions.Conditions.IfMatch,
                 IfNoneMatch = _appendOptions.Conditions.IfNoneMatch,
             },
-            Metadata = new Dictionary<string, string> { ["snapshot"] = blobSnapshot.Value.Snapshot },
+            Metadata = metadata,
             HttpHeaders = CreateHttpHeaders(),
         };
         var createResult = await _client.CreateAsync(createOptions, cancellationToken).ConfigureAwait(false);
@@ -247,9 +260,37 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
     {
         Conditions = conditions,
         HttpHeaders = CreateHttpHeaders(),
+        Metadata = CreateMetadata(),
     };
 
     private BlobHttpHeaders? CreateHttpHeaders() => _mimeType is { Length: > 0 } ? new BlobHttpHeaders { ContentType = _mimeType } : null;
+
+    private Dictionary<string, string>? CreateMetadata()
+        => _journalFormatKey is { Length: > 0 } ? new Dictionary<string, string> { [FormatKeyMetadataKey] = _journalFormatKey } : null;
+
+    private void ValidateFormatKeyMetadata(IDictionary<string, string>? metadata)
+    {
+        if (_journalFormatKey is not { Length: > 0 })
+        {
+            return;
+        }
+
+        if (metadata is null
+            || !metadata.TryGetValue(FormatKeyMetadataKey, out var storedKey)
+            || storedKey is not { Length: > 0 })
+        {
+            // Legacy blob written before format-key metadata was stamped. Allow it through;
+            // recovery will surface a parse-time format mismatch if the encoding differs.
+            return;
+        }
+
+        if (!string.Equals(storedKey, _journalFormatKey, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Blob \"{_client.BlobContainerName}/{_client.Name}\" was written with journal format key '{storedKey}', " +
+                $"but the configured key is '{_journalFormatKey}'. Reconfigure the format or migrate the data.");
+        }
+    }
 
     [LoggerMessage(
         Level = LogLevel.Debug,
