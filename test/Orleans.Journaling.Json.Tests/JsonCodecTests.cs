@@ -619,6 +619,45 @@ public class JsonCodecTests
     }
 
     [Fact]
+    public void JsonLinesJournalFormat_Read_DispatchPath_RejectsTrailingTokensAfterArray()
+    {
+        var format = new JsonLinesJournalFormat();
+        var codec = new RecordingJsonJournalEntryCodec();
+        var state = new RecordingState(codec);
+
+        // Dispatch path: codec.Apply -> EnsureEnd must reject any token after the closing ']'.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ReadOne(format, """[8,"set",42][9,"set",43]""" + "\n", new SingleStateResolver(state)));
+
+        Assert.Contains("invalid JSON", exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesJournalFormat_Read_DurableNothingPath_RejectsTrailingTokensAfterArray()
+    {
+        var format = new JsonLinesJournalFormat();
+        var state = new NoOpState();
+
+        // SkipToEnd for IDurableNothing must reject trailing JSON, not silently ignore it.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            ReadOne(format, """[8,"set",42][9,"set",43]""" + "\n", new SingleStateResolver(state)));
+
+        Assert.Contains("invalid JSON", exception.Message);
+    }
+
+    [Fact]
+    public void JsonLinesJournalFormat_Read_FormattedEntryPath_RejectsTrailingTokensAfterArray()
+    {
+        var format = new JsonLinesJournalFormat();
+
+        // Formatted-entry path: ParseJournalEntry -> JsonDocument.Parse must reject trailing JSON.
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+            Read(format, """[8,"set",42][9,"set",43]""" + "\n"));
+
+        Assert.Contains("invalid JSON", exception.Message);
+    }
+
+    [Fact]
     public void JsonFormattedJournalEntry_Apply_UsesOperationCodec()
     {
         var entry = JsonFormattedJournalEntry.Create(
