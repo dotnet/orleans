@@ -329,6 +329,92 @@ public sealed class AzureAppendBlobJournalStorageTests
         Assert.Equal([3], client.AppendCalls[2].Payload);
     }
 
+    [Fact]
+    public async Task AppendAsync_WhenBatchExceedsMaxAppendBlockBytes_ThrowsBeforeRoundTrip()
+    {
+        var client = new FakeAppendBlobClient();
+        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
+
+        var oversize = OversizedSequence(AzureAppendBlobJournalStorage.MaxAppendBlockBytes + 1);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.AppendAsync(oversize, CancellationToken.None).AsTask());
+
+        Assert.Contains("100 MiB", ex.Message);
+        Assert.Contains("journal batch", ex.Message);
+        Assert.Equal(0, client.CreateCallCount);
+        Assert.Equal(0, client.AppendCallCount);
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenBatchExceedsMaxAppendBlockBytes_ThrowsBeforeRoundTrip()
+    {
+        var client = new FakeAppendBlobClient();
+        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
+
+        // Establish a successful create + append baseline so ReplaceAsync has a snapshot precondition to use.
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        var baselineCreates = client.CreateCallCount;
+        var baselineAppends = client.AppendCallCount;
+
+        var oversize = OversizedSequence(AzureAppendBlobJournalStorage.MaxAppendBlockBytes + 1);
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.ReplaceAsync(oversize, CancellationToken.None).AsTask());
+
+        Assert.Contains("100 MiB", ex.Message);
+        Assert.Contains("snapshot", ex.Message);
+        Assert.Equal(baselineCreates, client.CreateCallCount);
+        Assert.Equal(baselineAppends, client.AppendCallCount);
+    }
+
+    [Fact]
+    public async Task AppendAsync_WhenApproachingBlockCeiling_Throws()
+    {
+        var client = new FakeAppendBlobClient { OverrideCommittedBlockCount = AzureAppendBlobJournalStorage.MaxAppendBlobBlocks - 50 };
+        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
+
+        // Prime the block counter via a successful append.
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+
+        var ex = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
+
+        Assert.Contains("maximum", ex.Message);
+        Assert.Contains("50,000", ex.Message);
+    }
+
+    private static ReadOnlySequence<byte> OversizedSequence(long length)
+    {
+        // Build a multi-segment sequence that reports the given Length without allocating a single contiguous array.
+        var segmentSize = 1 << 20;
+        var first = new ChunkSegment(new byte[segmentSize], 0);
+        var current = first;
+        var remaining = length - segmentSize;
+        while (remaining > 0)
+        {
+            var size = (int)Math.Min(segmentSize, remaining);
+            current = current.Append(new byte[size]);
+            remaining -= size;
+        }
+
+        return new ReadOnlySequence<byte>(first, 0, current, current.Memory.Length);
+    }
+
+    private sealed class ChunkSegment : System.Buffers.ReadOnlySequenceSegment<byte>
+    {
+        public ChunkSegment(byte[] buffer, long runningIndex)
+        {
+            Memory = buffer;
+            RunningIndex = runningIndex;
+        }
+
+        public ChunkSegment Append(byte[] buffer)
+        {
+            var next = new ChunkSegment(buffer, RunningIndex + Memory.Length);
+            Next = next;
+            return next;
+        }
+    }
+
     private sealed class DiscardingJournalStorageConsumer : IJournalStorageConsumer
     {
         public static DiscardingJournalStorageConsumer Instance { get; } = new();
@@ -370,6 +456,8 @@ public sealed class AzureAppendBlobJournalStorageTests
         public int SnapshotDeleteCallCount { get; private set; }
 
         public bool FailNextAppend { get; set; }
+
+        public int? OverrideCommittedBlockCount { get; set; }
 
         public CopyStatus CopyStatus { get; set; } = CopyStatus.Success;
 
@@ -424,8 +512,9 @@ public sealed class AzureAppendBlobJournalStorageTests
 
             _root._successfulAppendCount++;
             _root._eTag = new ETag($"\"append-{_root._successfulAppendCount}\"");
+            var committedBlocks = _root.OverrideCommittedBlockCount ?? _root._successfulAppendCount;
             return Response.FromValue(
-                BlobsModelFactory.BlobAppendInfo(_root._eTag, default, null, null, "0", _root._successfulAppendCount, false, null, null),
+                BlobsModelFactory.BlobAppendInfo(_root._eTag, default, null, null, "0", committedBlocks, false, null, null),
                 TestResponse.Instance);
         }
 

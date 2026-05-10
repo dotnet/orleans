@@ -13,6 +13,17 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
 {
     internal const string FormatKeyMetadataKey = "journalFormatKey";
 
+    // Azure Append Blob hard limits documented at:
+    // https://learn.microsoft.com/azure/storage/blobs/scalability-targets#scale-targets-for-blob-storage
+    // The append-block size cap is 100 MiB for service version >= 2022-11-02.
+    internal const long MaxAppendBlockBytes = 100L * 1024 * 1024;
+
+    // An append blob can hold up to 50,000 committed blocks. The compaction request
+    // (IsCompactionRequested) trips far earlier (at 10 blocks), so this guard exists only
+    // to fail fast if a consumer ignores compaction requests for an extended period.
+    internal const int MaxAppendBlobBlocks = 50_000;
+    private const int AppendBlobBlockCeilingHeadroom = 100;
+
     private readonly AppendBlobClient _client;
     private readonly string? _mimeType;
     private readonly string? _journalFormatKey;
@@ -64,6 +75,9 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
 
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
+        ThrowIfBatchTooLarge(value.Length, isReplace: false);
+        ThrowIfBlockCeilingApproached();
+
         if (!_exists)
         {
             var response = await _client.CreateAsync(CreateOptions(new AppendBlobRequestConditions { IfNoneMatch = ETag.All }), cancellationToken);
@@ -79,6 +93,31 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.ETag;
         _numBlocks = result.Value.BlobCommittedBlockCount;
+    }
+
+    private void ThrowIfBatchTooLarge(long length, bool isReplace)
+    {
+        if (length <= MaxAppendBlockBytes)
+        {
+            return;
+        }
+
+        var operation = isReplace ? "snapshot" : "journal batch";
+        throw new InvalidOperationException(
+            $"Azure Append Blob {operation} of {length:N0} bytes exceeds the per-block limit of {MaxAppendBlockBytes:N0} bytes (100 MiB). " +
+            "Reduce the snapshot/operation size or compact more aggressively.");
+    }
+
+    private void ThrowIfBlockCeilingApproached()
+    {
+        if (_numBlocks < MaxAppendBlobBlocks - AppendBlobBlockCeilingHeadroom)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Azure Append Blob '{_client.Name}' in container '{_client.BlobContainerName}' has reached {_numBlocks:N0} of the maximum {MaxAppendBlobBlocks:N0} committed blocks. " +
+            "Compaction must run (IsCompactionRequested has been signaled at 11 blocks). Refusing to append further to avoid hitting the hard Azure limit.");
     }
 
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
@@ -219,6 +258,8 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
 
     public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
+        ThrowIfBatchTooLarge(value.Length, isReplace: true);
+
         // Create a snapshot of the blob for recovery purposes.
         var blobSnapshot = await _client.CreateSnapshotAsync(conditions: _appendOptions.Conditions, cancellationToken: cancellationToken).ConfigureAwait(false);
 
