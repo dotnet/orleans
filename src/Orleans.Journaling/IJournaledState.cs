@@ -3,6 +3,40 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Interface for a state which can be persisted to durable storage.
 /// </summary>
+/// <remarks>
+/// <para>
+/// Implementations are owned by a single <see cref="JournaledStateManager"/> and are accessed
+/// from one logical thread at a time. They participate in the journaling lifecycle as follows:
+/// </para>
+/// <list type="bullet">
+/// <item>
+/// User code mutates in-memory state synchronously (typically by invoking codec helpers that
+/// both apply the mutation locally and emit the corresponding operation to the journal).
+/// </item>
+/// <item>
+/// At the end of the grain turn, the journaled state manager calls
+/// <see cref="AppendEntries"/> (and occasionally <see cref="AppendSnapshot"/>) to materialize
+/// the pending changes, then flushes the journal to durable storage.
+/// </item>
+/// <item>
+/// <see cref="OnWriteCompleted"/> is invoked when the durable write has been acknowledged.
+/// Implementations that need to know when state has actually been persisted (for example,
+/// to release waiters or trigger downstream notifications) should hook into this callback
+/// rather than treating in-memory mutations as durable.
+/// </item>
+/// <item>
+/// On failure, the journaled state manager triggers recovery by calling <see cref="Reset"/>
+/// followed by replaying snapshots and entries from durable storage. Implementations must
+/// therefore make any volatile in-memory bookkeeping fully recoverable from the journal.
+/// </item>
+/// </list>
+/// <para>
+/// In other words, <em>in-memory mutations are journaled within the same grain turn and become
+/// durable when the journal flushes</em>. Implementations are free to apply mutations eagerly
+/// (before the durable write completes); recovery rebuilds in-memory state from the journal,
+/// so a turn-failure-and-recovery cycle observably rewinds any unflushed changes.
+/// </para>
+/// </remarks>
 public interface IJournaledState
 {
     /// <summary>
