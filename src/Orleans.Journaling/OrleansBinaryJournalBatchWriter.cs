@@ -146,7 +146,19 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
         }
     }
 
-    private static int GetVarUInt32ByteCount(uint value) => ((int)BitOperations.Log2(value) / 7) + 1;
+    private static int GetVarUInt32ByteCount(uint value)
+    {
+        // BitOperations.Log2(0) returns 0, so the closed-form expression below would say zero is a 1-byte
+        // varint by accident. That happens to be the correct answer (0 encodes as a single 0x00 byte), but
+        // relying on Log2(0) returning 0 is implementation-defined behavior we shouldn't bet on. Handle the
+        // zero case explicitly so the helper stays correct if BitOperations changes its zero handling.
+        if (value == 0)
+        {
+            return 1;
+        }
+
+        return ((int)BitOperations.Log2(value) / 7) + 1;
+    }
 
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream
     {
