@@ -66,6 +66,12 @@ internal ref struct OrleansBinaryOperationReader
 
     private void Advance(long bytesConsumed, string operandName)
     {
+        if (bytesConsumed < 0)
+        {
+            throw new InvalidOperationException(
+                $"The value codec for binary journal operation operand '{operandName}' reported consuming {bytesConsumed} bytes, which is negative.");
+        }
+
         var remaining = _input.Length - _reader.Position;
         if ((ulong)bytesConsumed > (ulong)remaining)
         {
