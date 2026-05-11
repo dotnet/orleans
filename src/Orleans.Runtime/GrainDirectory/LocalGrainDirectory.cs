@@ -24,11 +24,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IInternalGrainFactory grainFactory;
         private readonly ActivationDirectory localActivations;
         private readonly InsideRuntimeClient runtimeClient;
-#if NET9_0_OR_GREATER
-        private readonly Lock writeLock = new();
-#else
-        private readonly object writeLock = new();
-#endif
         private readonly IServiceProvider _serviceProvider;
         private readonly CancellationTokenSource _membershipUpdatesCancellation = new();
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
@@ -167,12 +162,12 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 try
                 {
-                    await ApplyMembershipSnapshot(snapshot, cancellationToken);
+                    await ApplyMembershipSnapshot(snapshot);
 
                     await foreach (var update in clusterMembershipService.MembershipUpdates.WithCancellation(cancellationToken))
                     {
                         snapshot = update;
-                        await ApplyMembershipSnapshot(snapshot, cancellationToken);
+                        await ApplyMembershipSnapshot(snapshot);
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -202,92 +197,75 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private Task ApplyMembershipSnapshot(ClusterMembershipSnapshot snapshot, CancellationToken cancellationToken)
+        private Task ApplyMembershipSnapshot(ClusterMembershipSnapshot snapshot)
         {
             return CacheValidator.RunOrQueueTask(() =>
             {
-                cancellationToken.ThrowIfCancellationRequested();
-                ApplyMembershipSnapshot(snapshot);
+                ApplyMembershipSnapshotCore(snapshot);
                 return Task.CompletedTask;
             });
         }
 
-        private void ApplyMembershipSnapshot(ClusterMembershipSnapshot snapshot)
+        private void ApplyMembershipSnapshotCore(ClusterMembershipSnapshot snapshot)
         {
             if (!Running)
             {
                 return;
             }
 
-            lock (this.writeLock)
+            var previousSnapshot = hasAppliedClusterMembershipSnapshot ? appliedClusterMembershipSnapshot : ClusterMembershipSnapshot.Default;
+            if (hasAppliedClusterMembershipSnapshot && snapshot.Version <= previousSnapshot.Version)
             {
-                var previousSnapshot = hasAppliedClusterMembershipSnapshot ? appliedClusterMembershipSnapshot : ClusterMembershipSnapshot.Default;
-                if (hasAppliedClusterMembershipSnapshot && snapshot.Version <= previousSnapshot.Version)
+                return;
+            }
+
+            var previousMembership = CreateDirectoryMembership(previousSnapshot);
+            var targetMembership = CreateDirectoryMembership(snapshot);
+            this.directoryMembership = targetMembership;
+
+            var removedSilos = GetMembershipDifference(previousMembership, targetMembership);
+            var addedSilos = GetMembershipDifference(targetMembership, previousMembership);
+
+            ProcessSiloStatusChanges(snapshot, previousSnapshot, previousMembership);
+            AdjustLocalDirectory(targetMembership);
+            AdjustLocalCache(targetMembership);
+
+            foreach (var silo in removedSilos)
+            {
+                LogDebugSiloRemovedSilo(MyAddress, silo);
+            }
+
+            foreach (var silo in addedSilos)
+            {
+                HandoffManager.ProcessSiloAddEvent(silo);
+                LogDebugSiloAddedSilo(MyAddress, silo);
+            }
+
+            appliedClusterMembershipSnapshot = snapshot;
+            hasAppliedClusterMembershipSnapshot = true;
+        }
+
+        private void ProcessSiloStatusChanges(
+            ClusterMembershipSnapshot snapshot,
+            ClusterMembershipSnapshot previousSnapshot,
+            DirectoryMembership previousMembership)
+        {
+            var changes = previousSnapshot.Version != MembershipVersion.MinValue
+                ? snapshot.CreateUpdate(previousSnapshot)
+                : snapshot.AsUpdate();
+            var statusChanges = new List<ClusterMember>();
+            foreach (var change in changes.Changes)
+            {
+                if (!change.SiloAddress.Equals(MyAddress) && change.Status.IsTerminating())
                 {
-                    return;
+                    statusChanges.Add(change);
                 }
+            }
 
-                var previousMembership = CreateDirectoryMembership(previousSnapshot);
-                var targetMembership = CreateDirectoryMembership(snapshot);
-                var changes = hasAppliedClusterMembershipSnapshot && previousSnapshot.Version != MembershipVersion.MinValue
-                    ? snapshot.CreateUpdate(previousSnapshot)
-                    : snapshot.AsUpdate();
-                var statusChanges = new List<ClusterMember>();
-                foreach (var change in changes.Changes)
-                {
-                    if (!change.SiloAddress.Equals(MyAddress) && change.Status.IsTerminating())
-                    {
-                        statusChanges.Add(change);
-                    }
-                }
-
-                statusChanges.Sort(static (left, right) => CompareSiloAddress(left.SiloAddress, right.SiloAddress));
-                foreach (var change in statusChanges)
-                {
-                    OnSiloStatusChange(previousMembership, change.SiloAddress, change.Status);
-                }
-
-                var removedSilos = new List<(SiloAddress Silo, SiloStatus Status)>();
-                foreach (var silo in previousMembership.MembershipRingList)
-                {
-                    if (!silo.Equals(MyAddress) && !targetMembership.MembershipCache.Contains(silo))
-                    {
-                        var status = snapshot.GetSiloStatus(silo);
-                        removedSilos.Add((silo, status == SiloStatus.None ? SiloStatus.Dead : status));
-                    }
-                }
-
-                var addedSilos = new List<SiloAddress>();
-                foreach (var silo in targetMembership.MembershipRingList)
-                {
-                    if (!silo.Equals(MyAddress) && !previousMembership.MembershipCache.Contains(silo))
-                    {
-                        addedSilos.Add(silo);
-                    }
-                }
-
-                this.directoryMembership = targetMembership;
-
-                foreach (var (silo, _) in removedSilos)
-                {
-                    AdjustLocalDirectory(silo, dead: true);
-                    AdjustLocalCache(silo, dead: true);
-
-                    LogDebugSiloRemovedSilo(MyAddress, silo);
-                }
-
-                foreach (var silo in addedSilos)
-                {
-                    HandoffManager.ProcessSiloAddEvent(silo);
-
-                    AdjustLocalDirectory(silo, dead: false);
-                    AdjustLocalCache(silo, dead: false);
-
-                    LogDebugSiloAddedSilo(MyAddress, silo);
-                }
-
-                appliedClusterMembershipSnapshot = snapshot;
-                hasAppliedClusterMembershipSnapshot = true;
+            statusChanges.Sort(static (left, right) => CompareSiloAddress(left.SiloAddress, right.SiloAddress));
+            foreach (var change in statusChanges)
+            {
+                OnSiloStatusChange(previousMembership, change.SiloAddress, change.Status);
             }
         }
 
@@ -308,6 +286,22 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             return DirectoryMembership.Create(members);
+        }
+
+        private List<SiloAddress> GetMembershipDifference(
+            DirectoryMembership currentMembership,
+            DirectoryMembership otherMembership)
+        {
+            var result = new List<SiloAddress>();
+            foreach (var silo in currentMembership.MembershipRingList)
+            {
+                if (!silo.Equals(MyAddress) && !otherMembership.MembershipCache.Contains(silo))
+                {
+                    result.Add(silo);
+                }
+            }
+
+            return result;
         }
 
         private void OnSiloStatusChange(DirectoryMembership previousMembership, SiloAddress updatedSilo, SiloStatus status)
@@ -371,62 +365,49 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        /// <summary>
-        /// Adjust local directory following the addition/removal of a silo
-        /// </summary>
-        private void AdjustLocalDirectory(SiloAddress silo, bool dead)
+        private void AdjustLocalDirectory(DirectoryMembership targetMembership)
         {
-            // Determine which activations to remove.
             var activationsToRemove = new List<(GrainId, ActivationId)>();
             foreach (var entry in this.DirectoryPartition.GetItems())
             {
                 if (entry.Value.Activation is { } address)
                 {
-                    // Include any activations from dead silos and from predecessors.
-                    if (dead && address.SiloAddress!.Equals(silo) || address.SiloAddress!.IsPredecessorOf(silo))
+                    if (IsDefunctActivationSilo(targetMembership, address.SiloAddress))
                     {
                         activationsToRemove.Add((entry.Key, address.ActivationId));
                     }
                 }
             }
 
-            // Remove all defunct activations.
             foreach (var activation in activationsToRemove)
             {
                 DirectoryPartition.RemoveActivation(activation.Item1, activation.Item2);
             }
         }
 
-        /// Adjust local cache following the removal of a silo by dropping:
-        /// 1) entries that point to activations located on the removed silo
-        /// 2) entries for grains that are now owned by this silo (me)
-        /// 3) entries for grains that were owned by this removed silo - we currently do NOT do that.
-        ///     If we did 3, we need to do that BEFORE we change the membershipRingList (based on old Membership).
-        ///     We don't do that since first cache refresh handles that.
-        ///     Second, since Membership events are not guaranteed to be ordered, we may remove a cache entry that does not really point to a failed silo.
-        ///     To do that properly, we need to store for each cache entry who was the directory owner that registered this activation (the original partition owner).
-        private void AdjustLocalCache(SiloAddress silo, bool dead)
+        private void AdjustLocalCache(DirectoryMembership targetMembership)
         {
-            // remove all records of activations located on the removed silo
             foreach (var tuple in DirectoryCache.KeyValues)
             {
                 var activationAddress = tuple.ActivationAddress;
 
-                // 2) remove entries now owned by me (they should be retrieved from my directory partition)
-                if (MyAddress.Equals(CalculateGrainDirectoryPartition(activationAddress.GrainId)))
+                // Remove entries now owned by me. They should be retrieved from my directory partition.
+                if (MyAddress.Equals(CalculateGrainDirectoryPartition(activationAddress.GrainId, targetMembership)))
                 {
                     DirectoryCache.Remove(activationAddress.GrainId);
                     continue;
                 }
 
-                // 1) remove entries that point to activations located on the removed silo
-                // For dead silos, remove any activation registered to that silo or one of its predecessors.
-                // For new silos, remove any activation registered to one of its predecessors.
-                if (activationAddress.SiloAddress!.IsPredecessorOf(silo) || dead && activationAddress.SiloAddress.Equals(silo))
+                if (IsDefunctActivationSilo(targetMembership, activationAddress.SiloAddress))
                 {
                     DirectoryCache.Remove(activationAddress.GrainId);
                 }
             }
+        }
+
+        private static bool IsDefunctActivationSilo(DirectoryMembership targetMembership, SiloAddress? silo)
+        {
+            return silo is null || !targetMembership.MembershipCache.Contains(silo);
         }
 
         internal SiloAddress? FindPredecessor(SiloAddress silo)
