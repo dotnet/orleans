@@ -10,7 +10,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournaledStateManager : IStateManager, IJournalOperationCodecResolver, IJournalStreamWriterTarget, IJournalEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class JournaledStateManager : IStateManager, IStateResolver, IJournalStreamWriterTarget, IJournalEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationJournalStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -56,7 +56,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IJournalOpe
         _storage = storage;
         _serviceProvider = serviceProvider;
         _writeJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
-        _writeJournalFormat = JournalFormatServices.GetRequiredKeyedService<IJournalFormat>(serviceProvider, _writeJournalFormatKey);
+        _writeJournalFormat = JournalFormatServices.GetRequiredJournalFormat(serviceProvider, _writeJournalFormatKey);
         var dictionaryCodecProvider = JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, _writeJournalFormatKey);
         _logger = logger;
         _timeProvider = timeProvider;
@@ -584,24 +584,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IJournalOpe
         return state;
     }
 
-    object IJournalOperationCodecResolver.GetOperationCodec(IJournaledState state)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        var journalFormatKey = _recoveryJournalFormatKey ?? _writeJournalFormatKey;
-        if (state is IJournaledStateOperationCodecProvider codecProvider)
-        {
-            return codecProvider.GetOperationCodec(journalFormatKey);
-        }
-
-        if (string.Equals(journalFormatKey, _writeJournalFormatKey, StringComparison.Ordinal))
-        {
-            return state.OperationCodec;
-        }
-
-        throw new InvalidOperationException(
-            $"State '{state.GetType().FullName}' cannot recover journal format key '{journalFormatKey}' because it does not provide format-specific operation codecs.");
-    }
-
     private void SetStoredJournalFormatKey(string? journalFormatKey)
     {
         if (journalFormatKey is null)
@@ -638,7 +620,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IJournalOpe
         }
         else
         {
-            _recoveryJournalFormat = JournalFormatServices.GetRequiredKeyedService<IJournalFormat>(
+            _recoveryJournalFormat = JournalFormatServices.GetRequiredJournalFormat(
                 GetServiceProviderForFormat(journalFormatKey),
                 journalFormatKey);
         }
@@ -865,7 +847,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IJournalOpe
 
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDurableDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IJournaledStateOperationCodecProvider, IDurableDictionaryOperationHandler<string, ulong>
+        IDurableDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDurableDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
@@ -878,7 +860,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IJournalOpe
 
         object IJournaledState.OperationCodec => _codec;
 
-        object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey) => _manager.GetDictionaryOperationCodec(journalFormatKey, _codec);
+        object IJournaledState.GetOperationCodec(string journalFormatKey) => _manager.GetDictionaryOperationCodec(journalFormatKey, _codec);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 

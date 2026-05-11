@@ -10,7 +10,7 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableValueOperationHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDurableValueOperationHandler<T>
 {
     private readonly IDurableValueOperationCodec<T> _codec;
     private readonly IServiceProvider? _serviceProvider;
@@ -56,7 +56,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IJour
 
     object IJournaledState.OperationCodec => _codec;
 
-    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    object IJournaledState.GetOperationCodec(string journalFormatKey)
     {
         if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
         {

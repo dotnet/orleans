@@ -286,18 +286,16 @@ namespace Orleans.Journaling
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
         IJournaledState DeepCopy();
+        object GetOperationCodec(string journalFormatKey);
         void OnRecoveryCompleted();
         void OnWriteCompleted();
         void Reset(JournalStreamWriter writer);
     }
 
-    public partial interface IJournaledStateOperationCodecProvider
-    {
-        object GetOperationCodec(string journalFormatKey);
-    }
-
     public partial interface IJournalFormat
     {
+        string FormatKey { get; }
+
         string? MimeType { get; }
 
         IJournalBatchWriter CreateWriter();
@@ -352,11 +350,6 @@ namespace Orleans.Journaling
     public partial interface IStateResolver
     {
         IJournaledState ResolveState(JournalStreamId streamId);
-    }
-
-    public partial interface IJournalOperationCodecResolver : IStateResolver
-    {
-        object GetOperationCodec(IJournaledState state);
     }
 
     public abstract partial class JournalBatchWriterBase : IJournalBatchWriter, System.IDisposable

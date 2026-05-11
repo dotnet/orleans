@@ -1081,6 +1081,8 @@ public class StateManagerTests : JournalingTestBase
 
         public List<TrackingJournalBatchWriter> Writers => _writerFormat.Writers;
 
+        public string FormatKey => "test";
+
         public string? MimeType => null;
 
         public IJournalBatchWriter CreateWriter() => _writerFormat.CreateWriter();
@@ -1132,6 +1134,8 @@ public class StateManagerTests : JournalingTestBase
 
     private sealed class NonConsumingJournalFormat : IJournalFormat
     {
+        public string FormatKey => "test";
+
         public string? MimeType => null;
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
@@ -1148,6 +1152,8 @@ public class StateManagerTests : JournalingTestBase
         public List<TrackingJournalBatchWriter> Writers { get; } = [];
 
         public int ReadCount { get; private set; }
+
+        public string FormatKey => "test";
 
         public string? MimeType => null;
 

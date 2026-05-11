@@ -1,5 +1,6 @@
 using System.Buffers;
 using System.Text.Json;
+using Orleans.Journaling.Json;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Json;
@@ -10,6 +11,8 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
 
+    public string FormatKey => JsonJournalExtensions.JournalFormatKey;
+
     public string? MimeType => "application/jsonl";
 
     public IJournalBatchWriter CreateWriter() => new JsonLinesJournalBatchWriter();
@@ -19,12 +22,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         ArgumentNullException.ThrowIfNull(resolver);
 
         var offset = 0L;
-        while (TryReadLine(input, resolver, ref offset))
+        while (TryReadLine(input, resolver, ref offset, FormatKey))
         {
         }
     }
 
-    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, ref long offset)
+    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, ref long offset, string journalFormatKey)
     {
         if (input.Length == 0)
         {
@@ -63,13 +66,13 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {lineOffset}: blank lines are not valid journal entries.");
             }
 
-            ReadLine(line, lineOffset, resolver);
+            ReadLine(line, lineOffset, resolver, journalFormatKey);
         }
 
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver, string journalFormatKey)
     {
         var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
         try
@@ -105,7 +108,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 return;
             }
 
-            ApplyJsonEntry(resolver, stream, state, ref entry);
+            ApplyJsonEntry(stream, state, state.GetOperationCodec(journalFormatKey), ref entry);
         }
         catch (JsonException exception)
         {
@@ -131,9 +134,8 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         }
     }
 
-    private static void ApplyJsonEntry(IStateResolver resolver, JournalStreamId streamId, IJournaledState state, ref JsonOperationReader entry)
+    private static void ApplyJsonEntry(JournalStreamId streamId, IJournaledState state, object? operationCodec, ref JsonOperationReader entry)
     {
-        var operationCodec = JournalFormatServices.GetOperationCodec(resolver, state);
         if (operationCodec is not IJsonJournalEntryCodec jsonCodec)
         {
             entry.SkipToEnd();

@@ -30,6 +30,13 @@ internal sealed class AzureAppendBlobJournalStorageProvider(
                 $"Journal format key '{journalFormatKey}' requires keyed service '{typeof(IJournalFormat).FullName}', but none was registered.");
         }
 
+        if (!string.Equals(journalFormat.FormatKey, journalFormatKey, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Journal format key '{journalFormatKey}' resolved format '{journalFormat.GetType().FullName}', but its {nameof(IJournalFormat.FormatKey)} is '{journalFormat.FormatKey}'. " +
+                "Register the journal format using the same key it reports.");
+        }
+
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
         var blobName = _options.GetBlobNameForJournal(grainContext.GrainId);
         var blobClient = container.GetAppendBlobClient(blobName);

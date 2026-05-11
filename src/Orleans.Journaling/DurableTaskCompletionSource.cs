@@ -15,7 +15,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableTaskCompletionSourceOperationHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IDurableTaskCompletionSourceOperationHandler<T>
 {
     private readonly IDurableTaskCompletionSourceOperationCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -107,7 +107,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     object IJournaledState.OperationCodec => _codec;
 
-    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    object IJournaledState.GetOperationCodec(string journalFormatKey)
     {
         if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
         {

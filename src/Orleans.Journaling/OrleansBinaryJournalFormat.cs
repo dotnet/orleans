@@ -17,6 +17,8 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
         _sessionPool = sessionPool;
     }
 
+    public string FormatKey => JournalFormatKey;
+
     public string? MimeType => "application/octet-stream";
 
     internal SerializerSessionPool SessionPool => _sessionPool;
@@ -24,14 +26,14 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
     IJournalBatchWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
     void IJournalFormat.Read(JournalReadBuffer input, IStateResolver resolver) =>
-        OrleansBinaryJournalReader.Read(input, resolver, _sessionPool);
+        OrleansBinaryJournalReader.Read(input, resolver, _sessionPool, FormatKey);
 }
 
 internal static class OrleansBinaryJournalReader
 {
     internal const byte FormatVersion = 0;
 
-    public static void Read(JournalReadBuffer input, IStateResolver resolver, SerializerSessionPool sessionPool)
+    public static void Read(JournalReadBuffer input, IStateResolver resolver, SerializerSessionPool sessionPool, string journalFormatKey)
     {
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(sessionPool);
@@ -132,7 +134,7 @@ internal static class OrleansBinaryJournalReader
                 else if (state is not IDurableNothing)
                 {
                     var operationReader = Reader.Create(operationSlice, session);
-                    ApplyEntry(ref operationReader, resolver, state, streamIdValue);
+                    ApplyEntry(ref operationReader, state.GetOperationCodec(journalFormatKey), state, streamIdValue);
                 }
             }
             catch (Exception exception) when (exception is not InvalidOperationException ioe || !ioe.Message.StartsWith("Malformed binary journal entry stream", StringComparison.Ordinal))
@@ -152,12 +154,6 @@ internal static class OrleansBinaryJournalReader
     /// operation body (the bytes immediately after the stream-id varuint, starting with the format-version
     /// byte). After the codec returns, the framework verifies that <c>reader.Position == reader.Length</c>.
     /// </summary>
-    internal static void ApplyEntry(ref Reader<ArcBufferReaderInput> reader, IStateResolver resolver, IJournaledState state, ulong? streamId = null)
-    {
-        var operationCodec = JournalFormatServices.GetOperationCodec(resolver, state);
-        ApplyEntry(ref reader, operationCodec, state, streamId);
-    }
-
     internal static void ApplyEntry(ref Reader<ArcBufferReaderInput> reader, IJournaledState state, ulong? streamId = null)
     {
         ApplyEntry(ref reader, state.OperationCodec, state, streamId);

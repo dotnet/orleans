@@ -33,13 +33,17 @@ internal static class JournalFormatServices
         return service;
     }
 
-    public static object GetOperationCodec(IStateResolver resolver, IJournaledState state)
+    public static IJournalFormat GetRequiredJournalFormat(IServiceProvider serviceProvider, string journalFormatKey)
     {
-        ArgumentNullException.ThrowIfNull(resolver);
-        ArgumentNullException.ThrowIfNull(state);
+        var format = GetRequiredKeyedService<IJournalFormat>(serviceProvider, journalFormatKey);
+        var formatKey = ValidateJournalFormatKey(format.FormatKey);
+        if (!string.Equals(formatKey, journalFormatKey, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Journal format key '{journalFormatKey}' resolved format '{format.GetType().FullName}', but its {nameof(IJournalFormat.FormatKey)} is '{formatKey}'. " +
+                $"Register the journal format using the same key it reports.");
+        }
 
-        return resolver is IJournalOperationCodecResolver operationCodecResolver
-            ? operationCodecResolver.GetOperationCodec(state)
-            : state.OperationCodec;
+        return format;
     }
 }

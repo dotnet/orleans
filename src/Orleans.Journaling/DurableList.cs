@@ -14,7 +14,7 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableListOperationHandler<T>
+internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurableListOperationHandler<T>
 {
     private readonly IDurableListOperationCodec<T> _codec;
     private readonly IServiceProvider? _serviceProvider;
@@ -64,7 +64,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IJourna
 
     object IJournaledState.OperationCodec => _codec;
 
-    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    object IJournaledState.GetOperationCodec(string journalFormatKey)
     {
         if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
         {

@@ -10,6 +10,11 @@ namespace Orleans.Journaling;
 public interface IJournalFormat
 {
     /// <summary>
+    /// Gets the key which identifies this journal format in storage metadata and keyed service registration.
+    /// </summary>
+    string FormatKey { get; }
+
+    /// <summary>
     /// Gets the MIME type for journal storage written with this format, or <see langword="null"/> to use the storage provider's default.
     /// </summary>
     string? MimeType { get; }

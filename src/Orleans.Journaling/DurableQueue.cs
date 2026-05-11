@@ -19,7 +19,7 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableQueueOperationHandler<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDurableQueueOperationHandler<T>
 {
     private readonly IDurableQueueOperationCodec<T> _codec;
     private readonly IServiceProvider? _serviceProvider;
@@ -51,7 +51,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IJour
 
     object IJournaledState.OperationCodec => _codec;
 
-    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    object IJournaledState.GetOperationCodec(string journalFormatKey)
     {
         if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
         {

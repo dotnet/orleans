@@ -95,6 +95,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class TestJournalFormat : IJournalFormat
     {
+        public string FormatKey => CustomFormatKey;
+
         public string? MimeType => null;
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();

@@ -5,7 +5,7 @@ using Orleans.Core;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableStateOperationHandler<T>
+internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IDurableStateOperationHandler<T>
 {
     private readonly IDurableStateOperationCodec<T> _codec;
     private readonly IStateManager _manager;
@@ -61,7 +61,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IJ
 
     object IJournaledState.OperationCodec => _codec;
 
-    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    object IJournaledState.GetOperationCodec(string journalFormatKey)
     {
         if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
         {
