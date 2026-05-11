@@ -15,7 +15,6 @@ namespace Orleans.Runtime.GrainDirectory
     internal sealed partial class GrainDirectoryHandoffManager
     {
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
-        private const int MAX_OPERATION_DEQUEUE = 2;
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
         private readonly IInternalGrainFactory grainFactory;
@@ -71,6 +70,11 @@ namespace Orleans.Runtime.GrainDirectory
         private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<GrainAddress> splitPartListSingle)
         {
             if (!this.localDirectory.Running) return;
+            if (!addedSilo.Equals(localDirectory.FindSuccessor(localDirectory.MyAddress)))
+            {
+                LogDebugNotImmediateSuccessor(logger, addedSilo);
+                return;
+            }
 
             if (this.siloStatusOracle.GetApproximateSiloStatus(addedSilo) == SiloStatus.Active)
             {
@@ -123,6 +127,16 @@ namespace Orleans.Runtime.GrainDirectory
         private async Task AcceptExistingRegistrationsAsync(List<GrainAddress> singleActivations)
         {
             if (!this.localDirectory.Running) return;
+
+            for (var i = singleActivations.Count - 1; i >= 0; i--)
+            {
+                if (singleActivations[i].SiloAddress is not { } siloAddress || this.siloStatusOracle.GetApproximateSiloStatus(siloAddress).IsTerminating())
+                {
+                    singleActivations.RemoveAt(i);
+                }
+            }
+
+            if (singleActivations.Count == 0) return;
 
             LogDebugAcceptingRegistrations(logger, singleActivations.Count);
 
@@ -190,10 +204,7 @@ namespace Orleans.Runtime.GrainDirectory
             lock (this)
             {
                 this.pendingOperations.Enqueue((name, state, action));
-                if (this.pendingOperations.Count <= 2)
-                {
-                    this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
-                }
+                this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
             }
         }
 
@@ -201,7 +212,6 @@ namespace Orleans.Runtime.GrainDirectory
         {
             using (await executorLock.LockAsync())
             {
-                var dequeueCount = 0;
                 while (true)
                 {
                     // Get the next operation, or exit if there are none.
@@ -213,34 +223,23 @@ namespace Orleans.Runtime.GrainDirectory
                         op = this.pendingOperations.Peek();
                     }
 
-                    dequeueCount++;
-
                     try
                     {
                         await op.Action(this, op.State);
-                        // Success, reset the dequeue count
-                        dequeueCount = 0;
+                        lock (this)
+                        {
+                            this.pendingOperations.Dequeue();
+                        }
                     }
                     catch (Exception exception)
                     {
-                        if (dequeueCount < MAX_OPERATION_DEQUEUE)
+                        if (!this.localDirectory.Running)
                         {
-                            LogWarningOperationFailedRetry(logger, exception, op.Name);
-                            await Task.Delay(RetryDelay);
+                            return;
                         }
-                        else
-                        {
-                            LogWarningOperationFailedNoRetry(logger, exception, op.Name);
-                        }
-                    }
-                    if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)
-                    {
-                        lock (this)
-                        {
-                            // Remove the operation from the queue if it was a success
-                            // or if we tried too many times
-                            this.pendingOperations.Dequeue();
-                        }
+
+                        LogWarningOperationFailedRetry(logger, exception, op.Name);
+                        await Task.Delay(RetryDelay);
                     }
                 }
             }
@@ -335,10 +334,5 @@ namespace Orleans.Runtime.GrainDirectory
         )]
         private static partial void LogWarningOperationFailedRetry(ILogger logger, Exception exception, string operation);
 
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "{Operation} failed, will NOT be retried"
-        )]
-        private static partial void LogWarningOperationFailedNoRetry(ILogger logger, Exception exception, string operation);
     }
 }

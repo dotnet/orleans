@@ -140,6 +140,7 @@ namespace UnitTests.Directory
             localSiloDetails.Name.Returns("TestSilo");
             localSiloDetails.ClusterId.Returns("TestCluster");
             var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
+            var membershipService = new MockClusterMembershipService();
             var grainFactory = Substitute.For<IInternalGrainFactory>();
             var services = new ServiceCollection()
                 .AddSingleton<IGrainDirectoryCache>(cache)
@@ -160,6 +161,7 @@ namespace UnitTests.Directory
                 serviceProvider: services,
                 siloDetails: localSiloDetails,
                 siloStatusOracle: siloStatusOracle,
+                clusterMembershipService: membershipService.Target,
                 grainFactory: grainFactory,
                 grainDirectoryPartitionFactory: partitionFactory,
                 developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
