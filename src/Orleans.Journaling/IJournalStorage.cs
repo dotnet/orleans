@@ -13,6 +13,9 @@ public interface IJournalStorage
     /// <remarks>
     /// Implementations must notify <paramref name="consumer"/> when the read is complete by passing a
     /// <see cref="JournalReadBuffer"/> with <see cref="JournalReadBuffer.IsCompleted"/> set to <see langword="true"/>.
+    /// Each call must pass metadata describing the journal file being read. If storage has no metadata,
+    /// pass <see cref="JournalFileMetadata.Empty"/>. Metadata passed during one read must have the same
+    /// <see cref="IJournalFileMetadata.Format"/> value for every call.
     /// </remarks>
     /// <param name="consumer">The consumer of ordered raw journal data. Chunk boundaries are not journal-entry boundaries.</param>
     /// <param name="cancellationToken">The cancellation token.</param>

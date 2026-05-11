@@ -1,9 +1,12 @@
+using System.Buffers;
+using System.Runtime.CompilerServices;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Core;
 using Orleans.Serialization;
 using Xunit;
+using static VerifyXunit.Verifier;
 
 namespace Orleans.Journaling.Tests;
 
@@ -14,29 +17,23 @@ namespace Orleans.Journaling.Tests;
 /// in-memory state matches what main wrote.
 /// </summary>
 /// <remarks>
-/// The hex blob in <see cref="UpstreamMainJournalHex"/> was produced by the
+/// The binary fixture under <c>fixtures</c> was produced by the
 /// <c>CaptureCrossVersionRecoveryFixture.EmitMainJournalHex</c> test running against
 /// upstream/main (<c>5989958561</c>). The capture exercises every <c>Durable*</c> type and pins the
 /// stream-registration order so the journal stream IDs (8..14) line up with the registrations below.
 /// To regenerate after an intentional wire-format change to the OrleansBinary codecs, re-run that
-/// fixture in a worktree pinned to upstream/main and paste the new hex here.
+/// fixture in a worktree pinned to upstream/main, replace the fixture bytes, and accept the updated
+/// Verify snapshot under <c>snapshots</c>.
 /// </remarks>
 [TestCategory("BVT")]
 public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
 {
-    private const string UpstreamMainJournalHex =
-        "1701000140096469637401111701000140096C697374011319010001400B71756575650115" +
-        "150100014007736574011719010001400B76616C7565011919010001400B7374617465011B" +
-        "150100014007746373011D19110001400B616C706861010517110001400962657461010915" +
-        "130001400B666972737417130001400D7365636F6E6415130001400B74686972640B150001" +
-        "00290B1500010051111700014007666F6F1117000140076261720B19000100A9171B000140" +
-        "0B68656C6C6F010D1D0001001A03";
-
     [Fact]
     public async Task OrleansBinary_RecoversUpstreamMainWrittenJournal()
     {
+        var journalBytes = LoadUpstreamMainJournal();
         var storage = new VolatileJournalStorage();
-        await storage.AppendAsync(new System.Buffers.ReadOnlySequence<byte>(Convert.FromHexString(UpstreamMainJournalHex)), default);
+        await storage.AppendAsync(new ReadOnlySequence<byte>(journalBytes), default);
 
         var states = CreateStates(storage);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
@@ -61,6 +58,18 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
         Assert.Equal(DurableTaskCompletionSourceStatus.Completed, states.Tcs.State.Status);
         Assert.Equal(99, states.Tcs.State.Value);
         Assert.Equal(99, await states.Tcs.Task);
+
+        await Verify(JournalSnapshotFormatting.FormatBinary(journalBytes), extension: "txt").UseDirectory("snapshots");
+    }
+
+    private static byte[] LoadUpstreamMainJournal([CallerFilePath] string sourceFile = "")
+    {
+        var fixturePath = Path.Combine(
+            Path.GetDirectoryName(sourceFile)!,
+            "fixtures",
+            "UpstreamMainCompatibilityTests.upstream-main-journal.bin");
+
+        return File.ReadAllBytes(fixturePath);
     }
 
     private DurableStates CreateStates(IJournalStorage storage)

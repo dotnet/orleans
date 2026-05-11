@@ -423,16 +423,18 @@ public sealed class AzureAppendBlobJournalStorageTests
     {
         public static DiscardingJournalStorageConsumer Instance { get; } = new();
 
-        public void Consume(JournalReadBuffer buffer) => buffer.Skip(buffer.Length);
+        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata) => buffer.Skip(buffer.Length);
     }
 
-    private sealed class CapturingJournalStorageConsumer : IJournalStorageFormatMetadataConsumer
+    private sealed class CapturingJournalStorageConsumer : IJournalStorageConsumer
     {
         public string? JournalFormatKey { get; private set; }
 
-        public void SetJournalFormatKey(string? journalFormatKey) => JournalFormatKey = journalFormatKey;
-
-        public void Consume(JournalReadBuffer buffer) => buffer.Skip(buffer.Length);
+        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata)
+        {
+            JournalFormatKey = metadata.Format;
+            buffer.Skip(buffer.Length);
+        }
     }
 
     private sealed class FakeAppendBlobClient : AppendBlobClient

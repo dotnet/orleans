@@ -285,12 +285,12 @@ namespace Orleans.Journaling
 
     public partial interface IJournalStorageConsumer
     {
-        void Consume(JournalReadBuffer buffer);
+        void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata);
     }
 
-    public partial interface IJournalStorageFormatMetadataConsumer : IJournalStorageConsumer
+    public partial interface IJournalFileMetadata
     {
-        void SetJournalFormatKey(string? journalFormatKey);
+        string? Format { get; }
     }
 
     public partial interface IJournalStorageProvider
@@ -406,13 +406,32 @@ namespace Orleans.Journaling
     {
         public static void Complete(this IJournalStorageConsumer consumer) { }
 
+        public static void Complete(this IJournalStorageConsumer consumer, IJournalFileMetadata metadata) { }
+
         public static void Consume(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, bool complete = true) { }
+
+        public static void Consume(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, IJournalFileMetadata metadata, bool complete = true) { }
 
         public static void Consume(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, bool complete = true) { }
 
+        public static void Consume(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, IJournalFileMetadata metadata, bool complete = true) { }
+
         public static void Consume(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, bool complete = true) { }
 
+        public static void Consume(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalFileMetadata metadata, bool complete = true) { }
+
         public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public sealed partial class JournalFileMetadata : IJournalFileMetadata
+    {
+        public static IJournalFileMetadata Empty { get { throw null; } }
+
+        public JournalFileMetadata(string? format) { }
+
+        public string? Format { get { throw null; } }
     }
 
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>

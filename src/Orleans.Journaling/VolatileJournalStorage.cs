@@ -94,12 +94,10 @@ public sealed class VolatileJournalStorage : IJournalStorage
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
-        if (consumer is IJournalStorageFormatMetadataConsumer metadataConsumer)
-        {
-            metadataConsumer.SetJournalFormatKey(_storedJournalFormatKey);
-        }
-
-        consumer.Consume(GetSegments(_segments, cancellationToken));
+        var metadata = _storedJournalFormatKey is null
+            ? JournalFileMetadata.Empty
+            : new JournalFileMetadata(_storedJournalFormatKey);
+        consumer.Consume(GetSegments(_segments, cancellationToken), metadata);
         return default;
     }
 

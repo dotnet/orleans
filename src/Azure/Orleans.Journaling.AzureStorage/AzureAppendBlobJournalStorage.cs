@@ -148,10 +148,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
             return;
         }
 
-        if (consumer is IJournalStorageFormatMetadataConsumer metadataConsumer)
-        {
-            metadataConsumer.SetJournalFormatKey(GetFormatKeyMetadata(result.Value.Details.Metadata));
-        }
+        var metadata = CreateFileMetadata(result.Value.Details.Metadata);
 
         if (result.Value.Details.ContentLength == 0)
         {
@@ -168,7 +165,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
 
         await using (var rawStream = result.Value.Content)
         {
-            var totalBytesRead = await consumer.ConsumeAsync(rawStream, cancellationToken).ConfigureAwait(false);
+            var totalBytesRead = await consumer.ConsumeAsync(rawStream, metadata, cancellationToken).ConfigureAwait(false);
             LogRead(_logger, totalBytesRead, _client.BlobContainerName, _client.Name);
         }
 
@@ -318,6 +315,11 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
             && storedKey is { Length: > 0 }
                 ? storedKey
                 : null;
+
+    private static IJournalFileMetadata CreateFileMetadata(IDictionary<string, string>? metadata)
+        => GetFormatKeyMetadata(metadata) is { } format
+            ? new JournalFileMetadata(format)
+            : JournalFileMetadata.Empty;
 
     [LoggerMessage(
         Level = LogLevel.Debug,
