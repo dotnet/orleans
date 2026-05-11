@@ -45,11 +45,9 @@ public interface IJournaledState
     object OperationCodec { get; }
 
     /// <summary>
-    /// Gets the durable operation codec used by this state for the specified journal format key.
+    /// Gets the service type used to resolve this state's durable operation codec.
     /// </summary>
-    /// <param name="journalFormatKey">The journal format key being recovered.</param>
-    /// <returns>The operation codec for <paramref name="journalFormatKey"/>.</returns>
-    object GetOperationCodec(string journalFormatKey) => OperationCodec;
+    Type OperationCodecServiceType => JournalFormatServices.GetOperationCodecServiceType(OperationCodec);
 
     /// <summary>
     /// Resets the state.

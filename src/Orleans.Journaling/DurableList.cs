@@ -17,8 +17,6 @@ public interface IDurableList<T> : IList<T>
 internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurableListOperationHandler<T>
 {
     private readonly IDurableListOperationCodec<T> _codec;
-    private readonly IServiceProvider? _serviceProvider;
-    private readonly string? _journalFormatKey;
     private readonly List<T> _items = [];
     private JournalStreamWriter _storage;
 
@@ -29,9 +27,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredKeyedService<IDurableListOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
-        _serviceProvider = serviceProvider;
-        _journalFormatKey = journalFormatKey;
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableListOperationCodec<T>>(serviceProvider, journalFormatKey);
         manager.RegisterState(key, this);
     }
 
@@ -64,15 +60,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
 
     object IJournaledState.OperationCodec => _codec;
 
-    object IJournaledState.GetOperationCodec(string journalFormatKey)
-    {
-        if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
-        {
-            return _codec;
-        }
-
-        return JournalFormatServices.GetRequiredKeyedService<IDurableListOperationCodecProvider>(GetServiceProvider(journalFormatKey), journalFormatKey).GetCodec<T>();
-    }
+    Type IJournaledState.OperationCodecServiceType => typeof(IDurableListOperationCodec<T>);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -166,10 +154,6 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
         Debug.Assert(_storage.IsInitialized);
         return _storage;
     }
-
-    private IServiceProvider GetServiceProvider(string journalFormatKey)
-        => _serviceProvider ?? throw new InvalidOperationException(
-            $"State '{GetType().FullName}' cannot recover journal format key '{journalFormatKey}' because it was constructed with an explicit operation codec instead of a service provider.");
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();
     public void AddRange(IEnumerable<T> collection)

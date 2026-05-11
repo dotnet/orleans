@@ -39,7 +39,23 @@ public class JsonCodecTests
         builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(JsonJournalExtensions.JournalFormatKey).GetCodec<JsonCodecTestValue>();
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
+
+        var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
+        var consumer = new ValueConsumer<JsonCodecTestValue>();
+        codec.Apply(input, consumer);
+
+        Assert.Equal(new("test", 1), consumer.Value);
+    }
+
+    [Fact]
+    public void UseJsonJournalFormat_AfterAddJournalStorage_ReplacesDefaultPayloadMetadata()
+    {
+        var builder = new TestSiloBuilder();
+        builder.AddJournalStorage();
+        builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
         var consumer = new ValueConsumer<JsonCodecTestValue>();

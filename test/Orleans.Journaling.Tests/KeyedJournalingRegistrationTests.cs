@@ -28,19 +28,11 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         var jsonFormat = Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
         Assert.Same(jsonFormat, serviceProvider.GetRequiredService<IJournalFormat>());
         Assert.Equal("application/jsonl", jsonFormat.MimeType);
-        CodecTestHelpers.AssertCodecProviderRegistrations(
-            serviceProvider,
-            JsonJournalExtensions.JournalFormatKey,
-            serviceProvider.GetRequiredService<JsonOperationCodecProvider>(),
-            expectDefaultProvider: true);
+        CodecTestHelpers.AssertOperationCodecServiceRegistrations(serviceProvider, JsonJournalExtensions.JournalFormatKey);
 
         var binaryFormat = Assert.IsType<OrleansBinaryJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
         Assert.Equal("application/octet-stream", binaryFormat.MimeType);
-        CodecTestHelpers.AssertCodecProviderRegistrations(
-            serviceProvider,
-            OrleansBinaryJournalFormat.JournalFormatKey,
-            serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>(),
-            expectDefaultProvider: false);
+        CodecTestHelpers.AssertOperationCodecServiceRegistrations(serviceProvider, OrleansBinaryJournalFormat.JournalFormatKey);
     }
 
     [Fact]
@@ -62,10 +54,10 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     }
 
     [Fact]
-    public void DurableService_ResolvesCodecProviderFromJournalFormatKey()
+    public void DurableService_ResolvesOperationCodecFromJournalFormatKey()
     {
         var storage = new VolatileJournalStorage();
-        var valueProvider = new TestValueCodecProvider();
+        var wasUsed = false;
         var services = new ServiceCollection();
         services.AddLogging();
         services.AddOptions();
@@ -75,15 +67,20 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddScoped<IStateManager, JournaledStateManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, new TestJournalFormat());
-        services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(CustomFormatKey, new TestDictionaryCodecProvider());
-        services.AddKeyedSingleton<IDurableValueOperationCodecProvider>(CustomFormatKey, valueProvider);
+        services.AddKeyedSingleton<IDurableDictionaryOperationCodec<string, ulong>>(CustomFormatKey, new TestDictionaryCodec<string, ulong>());
+        services.AddKeyedSingleton<IDurableDictionaryOperationCodec<string, DateTime>>(CustomFormatKey, new TestDictionaryCodec<string, DateTime>());
+        services.AddKeyedSingleton<IDurableValueOperationCodec<int>>(CustomFormatKey, (_, _) =>
+        {
+            wasUsed = true;
+            return new TestValueCodec<int>();
+        });
 
         using var serviceProvider = services.BuildServiceProvider();
         using var scope = serviceProvider.CreateScope();
 
         _ = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
 
-        Assert.True(valueProvider.WasUsed);
+        Assert.True(wasUsed);
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder
@@ -104,13 +101,6 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         public void Read(JournalReadBuffer input, IStateResolver resolver) => throw new NotSupportedException();
     }
 
-    private sealed class TestDictionaryCodecProvider : IDurableDictionaryOperationCodecProvider
-    {
-        public IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>()
-            where TKey : notnull
-            => new TestDictionaryCodec<TKey, TValue>();
-    }
-
     private sealed class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue>
         where TKey : notnull
     {
@@ -123,17 +113,6 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
         public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
-    }
-
-    private sealed class TestValueCodecProvider : IDurableValueOperationCodecProvider
-    {
-        public bool WasUsed { get; private set; }
-
-        public IDurableValueOperationCodec<T> GetCodec<T>()
-        {
-            WasUsed = true;
-            return new TestValueCodec<T>();
-        }
     }
 
     private sealed class TestValueCodec<T> : IDurableValueOperationCodec<T>

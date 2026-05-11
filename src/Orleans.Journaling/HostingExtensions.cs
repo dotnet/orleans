@@ -40,21 +40,13 @@ public static class HostingExtensions
         services.TryAddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
         services.TryAddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<OrleansBinaryJournalFormat>());
 
-        services.TryAddSingleton<OrleansBinaryOperationCodecProvider>();
-        services.TryAddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddKeyedSingleton<IDurableListOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddKeyedSingleton<IDurableQueueOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddKeyedSingleton<IDurableSetOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddKeyedSingleton<IDurableValueOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddKeyedSingleton<IDurableStateOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddKeyedSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddSingleton<IDurableDictionaryOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddSingleton<IDurableListOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddSingleton<IDurableQueueOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddSingleton<IDurableSetOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddSingleton<IDurableValueOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddSingleton<IDurableStateOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
-        services.TryAddSingleton<IDurableTaskCompletionSourceOperationCodecProvider>(static sp => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+        services.TryAddKeyedSingleton(typeof(IDurableDictionaryOperationCodec<,>), key, typeof(OrleansBinaryDictionaryOperationCodec<,>));
+        services.TryAddKeyedSingleton(typeof(IDurableListOperationCodec<>), key, typeof(OrleansBinaryListOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableQueueOperationCodec<>), key, typeof(OrleansBinaryQueueOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableSetOperationCodec<>), key, typeof(OrleansBinarySetOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableTaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
     }
 
     private static string GetJournalFormatKey(IServiceProvider serviceProvider)

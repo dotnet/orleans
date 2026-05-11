@@ -370,17 +370,18 @@ public class CodecRecoveryTests : JournalingTestBase
         services.AddKeyedSingleton<IJournalFormat>(
             OrleansBinaryJournalFormat.JournalFormatKey,
             (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
-        services.AddSingleton<OrleansBinaryOperationCodecProvider>();
-        services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(
+        services.AddKeyedSingleton(
+            typeof(IDurableDictionaryOperationCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
-            (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+            typeof(OrleansBinaryDictionaryOperationCodec<,>));
 
         var jsonOptions = CreateJsonOptions();
-        services.AddSingleton(_ => new JsonOperationCodecProvider(jsonOptions));
+        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
-        services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(
+        services.AddKeyedSingleton(
+            typeof(IDurableDictionaryOperationCodec<,>),
             JsonJournalExtensions.JournalFormatKey,
-            (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+            typeof(JsonDictionaryOperationCodecService<,>));
 
         var serviceProvider = services.BuildServiceProvider();
         var managerOptions = new StateManagerOptions();

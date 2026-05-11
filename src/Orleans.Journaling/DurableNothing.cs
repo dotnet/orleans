@@ -24,6 +24,8 @@ internal sealed class DurableNothing : IDurableNothing, IJournaledState
 
     object IJournaledState.OperationCodec => NoOpCodec;
 
+    Type IJournaledState.OperationCodecServiceType => typeof(object);
+
     void IJournaledState.Reset(JournalStreamWriter writer) { }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer) { }

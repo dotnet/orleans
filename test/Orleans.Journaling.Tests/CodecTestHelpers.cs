@@ -65,25 +65,42 @@ public static class CodecTestHelpers
         entry.Commit();
     }
 
-    public static void AssertCodecProviderRegistrations(IServiceProvider serviceProvider, string journalFormatKey, object expectedProvider, bool expectDefaultProvider)
+    public static void AssertOperationCodecRegistrations(IServiceProvider serviceProvider, string journalFormatKey)
     {
-        AssertCodecProvider<IDurableDictionaryOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableListOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableQueueOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableSetOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableValueOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableStateOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
-        AssertCodecProvider<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, journalFormatKey, expectedProvider, expectDefaultProvider);
+        AssertOperationCodec<IDurableDictionaryOperationCodec<string, int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDurableDictionaryOperationCodec<string, ulong>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDurableListOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDurableQueueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDurableSetOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDurableValueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDurableStateOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDurableTaskCompletionSourceOperationCodec<int>>(serviceProvider, journalFormatKey);
     }
 
-    private static void AssertCodecProvider<TProvider>(IServiceProvider serviceProvider, string journalFormatKey, object expectedProvider, bool expectDefaultProvider)
-        where TProvider : class
+    public static void AssertOperationCodecServiceRegistrations(IServiceProvider serviceProvider, string journalFormatKey)
     {
-        Assert.Same(expectedProvider, serviceProvider.GetRequiredKeyedService<TProvider>(journalFormatKey));
-        if (expectDefaultProvider)
-        {
-            Assert.Same(expectedProvider, serviceProvider.GetRequiredService<TProvider>());
-        }
+        AssertOperationCodecService<IDurableDictionaryOperationCodec<string, int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDurableDictionaryOperationCodec<string, ulong>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDurableListOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDurableQueueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDurableSetOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDurableValueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDurableStateOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDurableTaskCompletionSourceOperationCodec<int>>(serviceProvider, journalFormatKey);
+    }
+
+    private static void AssertOperationCodec<TCodec>(IServiceProvider serviceProvider, string journalFormatKey)
+        where TCodec : class
+    {
+        var codec = serviceProvider.GetRequiredKeyedService<TCodec>(journalFormatKey);
+        Assert.Same(codec, serviceProvider.GetRequiredKeyedService<TCodec>(journalFormatKey));
+    }
+
+    private static void AssertOperationCodecService<TCodec>(IServiceProvider serviceProvider, string journalFormatKey)
+        where TCodec : class
+    {
+        var keyedServiceProvider = serviceProvider.GetRequiredService<IServiceProviderIsKeyedService>();
+        Assert.True(keyedServiceProvider.IsKeyedService(typeof(TCodec), journalFormatKey));
     }
 
     private sealed class BufferSegment : ReadOnlySequenceSegment<byte>

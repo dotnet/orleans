@@ -57,7 +57,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _serviceProvider = serviceProvider;
         _writeJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
         _writeJournalFormat = JournalFormatServices.GetRequiredJournalFormat(serviceProvider, _writeJournalFormatKey);
-        var dictionaryCodecProvider = JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, _writeJournalFormatKey);
+        var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, ulong>>(serviceProvider, _writeJournalFormatKey);
+        var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, DateTime>>(serviceProvider, _writeJournalFormatKey);
         _logger = logger;
         _timeProvider = timeProvider;
         _legacyJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(options.Value.LegacyJournalFormatKey);
@@ -65,12 +66,12 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
         // This allows us to recover the list of states ids without having to store it separately.
-        _journalStreamDirectory = new StateDirectory(this, dictionaryCodecProvider.GetCodec<string, ulong>());
+        _journalStreamDirectory = new StateDirectory(this, journalStreamIdsCodec);
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
 
         // The retirement tracker is a special internal state with a fixed id.
         // It is not stored in _journalStreamDirectory and does not participate in the general name->id mapping.
-        _retirementTracker = new RetiredStateTracker(this, dictionaryCodecProvider.GetCodec<string, DateTime>());
+        _retirementTracker = new RetiredStateTracker(this, retirementTrackerCodec);
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
     }
 
@@ -460,19 +461,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         }
     }
 
-    private IDurableDictionaryOperationCodec<TKey, TValue> GetDictionaryOperationCodec<TKey, TValue>(
-        string journalFormatKey,
-        IDurableDictionaryOperationCodec<TKey, TValue> fallback)
-        where TKey : notnull
-    {
-        if (string.Equals(journalFormatKey, _writeJournalFormatKey, StringComparison.Ordinal) || _serviceProvider is null)
-        {
-            return fallback;
-        }
-
-        return JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(_serviceProvider, journalFormatKey).GetCodec<TKey, TValue>();
-    }
-
     private IJournalBatchWriter GetOrCreateCurrentJournalBatchWriter() => _currentJournalBatchWriter ??= _writeJournalFormat.CreateWriter();
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
@@ -582,6 +570,22 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         }
 
         return state;
+    }
+
+    object IStateResolver.GetOperationCodec(IJournaledState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+
+        var journalFormatKey = _recoveryJournalFormatKey ?? _writeJournalFormatKey;
+        if (string.Equals(journalFormatKey, _writeJournalFormatKey, StringComparison.Ordinal))
+        {
+            return state.OperationCodec;
+        }
+
+        return JournalFormatServices.GetRequiredOperationCodec(
+            GetServiceProviderForFormat(journalFormatKey),
+            journalFormatKey,
+            state.OperationCodecServiceType);
     }
 
     private void SetStoredJournalFormatKey(string? journalFormatKey)
@@ -860,7 +864,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         object IJournaledState.OperationCodec => _codec;
 
-        object IJournaledState.GetOperationCodec(string journalFormatKey) => _manager.GetDictionaryOperationCodec(journalFormatKey, _codec);
+        Type IJournaledState.OperationCodecServiceType => typeof(IDurableDictionaryOperationCodec<string, ulong>);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
@@ -919,7 +923,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     /// <remarks>Resurrecting of retired states is supported.</remarks>
     private sealed class RetiredStateTracker(
         JournaledStateManager manager, IDurableDictionaryOperationCodec<string, DateTime> codec)
-            : DurableDictionary<string, DateTime>(codec, manager._serviceProvider, manager._writeJournalFormatKey)
+            : DurableDictionary<string, DateTime>(codec)
     {
         public const int Id = 1;
 
@@ -945,6 +949,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
 
         object IJournaledState.OperationCodec => NoOpCodec;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public void AddFormattedEntry(IFormattedJournalEntry entry)
         {

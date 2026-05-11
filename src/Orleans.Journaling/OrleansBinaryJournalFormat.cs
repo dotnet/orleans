@@ -26,14 +26,14 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
     IJournalBatchWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
     void IJournalFormat.Read(JournalReadBuffer input, IStateResolver resolver) =>
-        OrleansBinaryJournalReader.Read(input, resolver, _sessionPool, FormatKey);
+        OrleansBinaryJournalReader.Read(input, resolver, _sessionPool);
 }
 
 internal static class OrleansBinaryJournalReader
 {
     internal const byte FormatVersion = 0;
 
-    public static void Read(JournalReadBuffer input, IStateResolver resolver, SerializerSessionPool sessionPool, string journalFormatKey)
+    public static void Read(JournalReadBuffer input, IStateResolver resolver, SerializerSessionPool sessionPool)
     {
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(sessionPool);
@@ -134,7 +134,7 @@ internal static class OrleansBinaryJournalReader
                 else if (state is not IDurableNothing)
                 {
                     var operationReader = Reader.Create(operationSlice, session);
-                    ApplyEntry(ref operationReader, state.GetOperationCodec(journalFormatKey), state, streamIdValue);
+                    ApplyEntry(ref operationReader, resolver.GetOperationCodec(state), state, streamIdValue);
                 }
             }
             catch (Exception exception) when (exception is not InvalidOperationException ioe || !ioe.Message.StartsWith("Malformed binary journal entry stream", StringComparison.Ordinal))

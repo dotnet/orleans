@@ -14,17 +14,13 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDurableDictionaryOperationHandler<K, V> where K : notnull
 {
     private readonly IDurableDictionaryOperationCodec<K, V> _codec;
-    private readonly IServiceProvider? _serviceProvider;
-    private readonly string? _journalFormatKey;
     private readonly Dictionary<K, V> _items = [];
     private JournalStreamWriter _storage;
 
-    protected DurableDictionary(IDurableDictionaryOperationCodec<K, V> codec, IServiceProvider? serviceProvider = null, string? journalFormatKey = null)
+    protected DurableDictionary(IDurableDictionaryOperationCodec<K, V> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
-        _serviceProvider = serviceProvider;
-        _journalFormatKey = journalFormatKey;
     }
 
     public DurableDictionary(
@@ -32,7 +28,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         IStateManager manager,
         [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
         IServiceProvider serviceProvider)
-        : this(JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<K, V>(), serviceProvider, journalFormatKey)
+        : this(JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<K, V>>(serviceProvider, journalFormatKey))
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
@@ -65,15 +61,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     object IJournaledState.OperationCodec => _codec;
 
-    object IJournaledState.GetOperationCodec(string journalFormatKey)
-    {
-        if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
-        {
-            return _codec;
-        }
-
-        return JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(GetServiceProvider(journalFormatKey), journalFormatKey).GetCodec<K, V>();
-    }
+    Type IJournaledState.OperationCodecServiceType => typeof(IDurableDictionaryOperationCodec<K, V>);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -147,10 +135,6 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         Debug.Assert(_storage.IsInitialized);
         return _storage;
     }
-
-    private IServiceProvider GetServiceProvider(string journalFormatKey)
-        => _serviceProvider ?? throw new InvalidOperationException(
-            $"State '{GetType().FullName}' cannot recover journal format key '{journalFormatKey}' because it was constructed with an explicit operation codec instead of a service provider.");
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();
     public void Add(K key, V value)

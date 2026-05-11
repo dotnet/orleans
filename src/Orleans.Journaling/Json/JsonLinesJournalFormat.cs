@@ -22,12 +22,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         ArgumentNullException.ThrowIfNull(resolver);
 
         var offset = 0L;
-        while (TryReadLine(input, resolver, ref offset, FormatKey))
+        while (TryReadLine(input, resolver, ref offset))
         {
         }
     }
 
-    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, ref long offset, string journalFormatKey)
+    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, ref long offset)
     {
         if (input.Length == 0)
         {
@@ -66,13 +66,13 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {lineOffset}: blank lines are not valid journal entries.");
             }
 
-            ReadLine(line, lineOffset, resolver, journalFormatKey);
+            ReadLine(line, lineOffset, resolver);
         }
 
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver, string journalFormatKey)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver)
     {
         var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
         try
@@ -108,7 +108,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 return;
             }
 
-            ApplyJsonEntry(stream, state, state.GetOperationCodec(journalFormatKey), ref entry);
+            ApplyJsonEntry(stream, state, resolver.GetOperationCodec(state), ref entry);
         }
         catch (JsonException exception)
         {

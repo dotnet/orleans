@@ -313,24 +313,46 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     [Fact]
-    public void OperationCodecProvider_CachesPerClosedGenericCodecType()
+    public void KeyedOperationCodecServices_CachePerClosedGenericCodecType()
     {
         var services = new ServiceCollection();
         services.AddSerializer();
         services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
-        services.AddSingleton<OrleansBinaryOperationCodecProvider>();
+        var key = OrleansBinaryJournalFormat.JournalFormatKey;
+        services.AddKeyedSingleton(typeof(IDurableDictionaryOperationCodec<,>), key, typeof(OrleansBinaryDictionaryOperationCodec<,>));
+        services.AddKeyedSingleton(typeof(IDurableListOperationCodec<>), key, typeof(OrleansBinaryListOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IDurableQueueOperationCodec<>), key, typeof(OrleansBinaryQueueOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IDurableSetOperationCodec<>), key, typeof(OrleansBinarySetOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IDurableValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IDurableStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IDurableTaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
 
         using var serviceProvider = services.BuildServiceProvider();
-        var provider = serviceProvider.GetRequiredService<OrleansBinaryOperationCodecProvider>();
 
-        Assert.Same(provider.GetCodec<string, int>(), provider.GetCodec<string, int>());
-        Assert.NotSame(provider.GetCodec<string, int>(), provider.GetCodec<string, long>());
-        Assert.Same(provider.GetCodec<string>(), provider.GetCodec<string>());
-        Assert.Same(((IDurableQueueOperationCodecProvider)provider).GetCodec<int>(), ((IDurableQueueOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableSetOperationCodecProvider)provider).GetCodec<int>(), ((IDurableSetOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableValueOperationCodecProvider)provider).GetCodec<int>(), ((IDurableValueOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableStateOperationCodecProvider)provider).GetCodec<int>(), ((IDurableStateOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableTaskCompletionSourceOperationCodecProvider)provider).GetCodec<int>(), ((IDurableTaskCompletionSourceOperationCodecProvider)provider).GetCodec<int>());
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key));
+        Assert.NotSame(
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, long>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableListOperationCodec<string>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableListOperationCodec<string>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodec<int>>(key));
     }
 
     [Theory]

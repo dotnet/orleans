@@ -97,7 +97,7 @@ public sealed class JsonOperationCodecAdditionalTests
     }
 
     [Fact]
-    public void UseJsonJournalFormat_RegistersEveryFormatFamilyProviderByKey()
+    public void UseJsonJournalFormat_RegistersEveryOperationCodecByKey()
     {
         var builder = new TestSiloBuilder();
 
@@ -106,26 +106,42 @@ public sealed class JsonOperationCodecAdditionalTests
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
         Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredService<IJournalFormat>());
-        CodecTestHelpers.AssertCodecProviderRegistrations(
-            serviceProvider,
-            JsonJournalExtensions.JournalFormatKey,
-            serviceProvider.GetRequiredService<JsonOperationCodecProvider>(),
-            expectDefaultProvider: true);
+        CodecTestHelpers.AssertOperationCodecRegistrations(serviceProvider, JsonJournalExtensions.JournalFormatKey);
     }
 
     [Fact]
-    public void OperationCodecProvider_CachesPerClosedGenericCodecType()
+    public void KeyedOperationCodecServices_CachePerClosedGenericCodecType()
     {
-        var provider = new JsonOperationCodecProvider(Options);
+        var builder = new TestSiloBuilder();
+        builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
 
-        Assert.Same(provider.GetCodec<string, int>(), provider.GetCodec<string, int>());
-        Assert.NotSame(provider.GetCodec<string, int>(), provider.GetCodec<string, ulong>());
-        Assert.Same(provider.GetCodec<string>(), provider.GetCodec<string>());
-        Assert.Same(((IDurableQueueOperationCodecProvider)provider).GetCodec<int>(), ((IDurableQueueOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableSetOperationCodecProvider)provider).GetCodec<int>(), ((IDurableSetOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableValueOperationCodecProvider)provider).GetCodec<int>(), ((IDurableValueOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableStateOperationCodecProvider)provider).GetCodec<int>(), ((IDurableStateOperationCodecProvider)provider).GetCodec<int>());
-        Assert.Same(((IDurableTaskCompletionSourceOperationCodecProvider)provider).GetCodec<int>(), ((IDurableTaskCompletionSourceOperationCodecProvider)provider).GetCodec<int>());
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        var key = JsonJournalExtensions.JournalFormatKey;
+
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key));
+        Assert.NotSame(
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, ulong>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableListOperationCodec<string>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableListOperationCodec<string>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodec<int>>(key));
+        Assert.Same(
+            serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodec<int>>(key));
     }
 
     private static void Apply<TKey, TValue>(

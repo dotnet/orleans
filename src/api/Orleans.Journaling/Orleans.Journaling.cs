@@ -52,11 +52,6 @@ namespace Orleans.Journaling
         public static Hosting.ISiloBuilder AddJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
-    public partial interface IDurableDictionaryOperationCodecProvider
-    {
-        IDurableDictionaryOperationCodec<TKey, TValue> GetCodec<TKey, TValue>();
-    }
-
     public partial interface IDurableDictionaryOperationCodec<TKey, TValue>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer);
@@ -76,11 +71,6 @@ namespace Orleans.Journaling
 
     public partial interface IDurableDictionary<K, V> : System.Collections.Generic.IDictionary<K, V>, System.Collections.Generic.ICollection<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<K, V>>, System.Collections.IEnumerable
     {
-    }
-
-    public partial interface IDurableListOperationCodecProvider
-    {
-        IDurableListOperationCodec<T> GetCodec<T>();
     }
 
     public partial interface IDurableListOperationCodec<T>
@@ -114,11 +104,6 @@ namespace Orleans.Journaling
     {
     }
 
-    public partial interface IDurableQueueOperationCodecProvider
-    {
-        IDurableQueueOperationCodec<T> GetCodec<T>();
-    }
-
     public partial interface IDurableQueueOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer);
@@ -146,11 +131,6 @@ namespace Orleans.Journaling
         T Peek();
         bool TryDequeue(out T item);
         bool TryPeek(out T item);
-    }
-
-    public partial interface IDurableSetOperationCodecProvider
-    {
-        IDurableSetOperationCodec<T> GetCodec<T>();
     }
 
     public partial interface IDurableSetOperationCodec<T>
@@ -184,11 +164,6 @@ namespace Orleans.Journaling
         bool SetEquals(System.Collections.Generic.IEnumerable<T> other);
     }
 
-    public partial interface IDurableStateOperationCodecProvider
-    {
-        IDurableStateOperationCodec<T> GetCodec<T>();
-    }
-
     public partial interface IDurableStateOperationCodec<T>
     {
         void Apply(System.Buffers.ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer);
@@ -200,11 +175,6 @@ namespace Orleans.Journaling
     {
         void ApplyClear();
         void ApplySet(T state, ulong version);
-    }
-
-    public partial interface IDurableTaskCompletionSourceOperationCodecProvider
-    {
-        IDurableTaskCompletionSourceOperationCodec<T> GetCodec<T>();
     }
 
     public partial interface IDurableTaskCompletionSourceOperationCodec<T>
@@ -233,11 +203,6 @@ namespace Orleans.Journaling
         bool TrySetCanceled();
         bool TrySetException(System.Exception exception);
         bool TrySetResult(T value);
-    }
-
-    public partial interface IDurableValueOperationCodecProvider
-    {
-        IDurableValueOperationCodec<T> GetCodec<T>();
     }
 
     public partial interface IDurableValueOperationCodec<T>
@@ -283,10 +248,11 @@ namespace Orleans.Journaling
     {
         object OperationCodec { get; }
 
+        System.Type OperationCodecServiceType { get; }
+
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
         IJournaledState DeepCopy();
-        object GetOperationCodec(string journalFormatKey);
         void OnRecoveryCompleted();
         void OnWriteCompleted();
         void Reset(JournalStreamWriter writer);
@@ -349,6 +315,7 @@ namespace Orleans.Journaling
 
     public partial interface IStateResolver
     {
+        object GetOperationCodec(IJournaledState state);
         IJournaledState ResolveState(JournalStreamId streamId);
     }
 
