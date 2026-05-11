@@ -227,8 +227,8 @@ namespace Orleans.Runtime.GrainDirectory
             var addedSilos = GetMembershipDifference(targetMembership, previousMembership);
 
             ProcessSiloStatusChanges(snapshot, previousSnapshot, previousMembership);
-            AdjustLocalDirectory(targetMembership);
-            AdjustLocalCache(targetMembership);
+            AdjustLocalDirectory(snapshot);
+            AdjustLocalCache(snapshot, targetMembership);
 
             foreach (var silo in removedSilos)
             {
@@ -365,14 +365,14 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private void AdjustLocalDirectory(DirectoryMembership targetMembership)
+        private void AdjustLocalDirectory(ClusterMembershipSnapshot snapshot)
         {
             var activationsToRemove = new List<(GrainId, ActivationId)>();
             foreach (var entry in this.DirectoryPartition.GetItems())
             {
                 if (entry.Value.Activation is { } address)
                 {
-                    if (IsDefunctActivationSilo(targetMembership, address.SiloAddress))
+                    if (IsDefunctActivation(address, snapshot))
                     {
                         activationsToRemove.Add((entry.Key, address.ActivationId));
                     }
@@ -385,7 +385,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private void AdjustLocalCache(DirectoryMembership targetMembership)
+        private void AdjustLocalCache(ClusterMembershipSnapshot snapshot, DirectoryMembership targetMembership)
         {
             foreach (var tuple in DirectoryCache.KeyValues)
             {
@@ -398,16 +398,26 @@ namespace Orleans.Runtime.GrainDirectory
                     continue;
                 }
 
-                if (IsDefunctActivationSilo(targetMembership, activationAddress.SiloAddress))
+                if (IsDefunctActivation(activationAddress, snapshot))
                 {
                     DirectoryCache.Remove(activationAddress.GrainId);
                 }
             }
         }
 
-        private static bool IsDefunctActivationSilo(DirectoryMembership targetMembership, SiloAddress? silo)
+        private static bool IsDefunctActivation(GrainAddress address, ClusterMembershipSnapshot snapshot)
         {
-            return silo is null || !targetMembership.MembershipCache.Contains(silo);
+            if (address.SiloAddress is not { } silo)
+            {
+                return true;
+            }
+
+            if (snapshot.Members.TryGetValue(silo, out var member))
+            {
+                return member.Status.IsTerminating();
+            }
+
+            return address.MembershipVersion < snapshot.Version;
         }
 
         internal SiloAddress? FindPredecessor(SiloAddress silo)
