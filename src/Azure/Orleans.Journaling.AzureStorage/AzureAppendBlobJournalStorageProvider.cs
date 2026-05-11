@@ -31,7 +31,7 @@ internal sealed class AzureAppendBlobJournalStorageProvider(
         }
 
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
-        var blobName = _options.GetBlobNameWithExtension(grainContext.GrainId, journalFormat);
+        var blobName = _options.GetBlobNameForJournal(grainContext.GrainId);
         var blobClient = container.GetAppendBlobClient(blobName);
         return new AzureAppendBlobJournalStorage(
             blobClient,

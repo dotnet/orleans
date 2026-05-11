@@ -3,7 +3,7 @@
 ## Introduction
 Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows journaling and tracking of grain operations using Azure Storage as a backing store.
 
-Blob names use the selected journal format's file extension, such as `.jsonl` for JSON Lines journals. When the selected journal format provides a MIME type, Azure append blobs are created with that content type.
+Blob names are derived from the configured grain storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type.
 
 ## Getting Started
 To use this package, install it via NuGet:

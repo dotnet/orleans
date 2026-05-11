@@ -10,7 +10,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournaledStateManager : IStateManager, IStateResolver, IJournalStreamWriterTarget, IJournalEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class JournaledStateManager : IStateManager, IJournalOperationCodecResolver, IJournalStreamWriterTarget, IJournalEntryWriterCompletion, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationJournalStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -21,8 +21,10 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, IJournaledState> _statesMap = [];
     private readonly IJournalStorage _storage;
-    private readonly IJournalFormat _journalFormat;
-    private readonly string _journalFormatKey;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly IJournalFormat _writeJournalFormat;
+    private readonly string _writeJournalFormatKey;
+    private readonly string _legacyJournalFormatKey;
     private readonly ILogger<JournaledStateManager> _logger;
     private readonly TimeProvider _timeProvider;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -36,6 +38,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private Task? _pendingWrite;
     private ulong _nextJournalStreamId = MinApplicationJournalStreamId;
     private IJournalBatchWriter? _currentJournalBatchWriter;
+    private string? _storedJournalFormatKey;
+    private string? _recoveryJournalFormatKey;
+    private IJournalFormat? _recoveryJournalFormat;
+    private bool _recoveredJournalHadData;
+    private bool _migrationSnapshotRequired;
 
     public JournaledStateManager(
         IJournalStorage storage,
@@ -45,12 +52,15 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         IServiceProvider serviceProvider,
         [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey)
     {
+        ArgumentNullException.ThrowIfNull(serviceProvider);
         _storage = storage;
-        _journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
-        _journalFormat = JournalFormatServices.GetRequiredKeyedService<IJournalFormat>(serviceProvider, _journalFormatKey);
-        var dictionaryCodecProvider = JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, _journalFormatKey);
+        _serviceProvider = serviceProvider;
+        _writeJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
+        _writeJournalFormat = JournalFormatServices.GetRequiredKeyedService<IJournalFormat>(serviceProvider, _writeJournalFormatKey);
+        var dictionaryCodecProvider = JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(serviceProvider, _writeJournalFormatKey);
         _logger = logger;
         _timeProvider = timeProvider;
+        _legacyJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(options.Value.LegacyJournalFormatKey);
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
@@ -76,10 +86,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         ArgumentNullException.ThrowIfNull(journalFormat);
         _storage = storage;
-        _journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey ?? OrleansBinaryJournalFormat.JournalFormatKey);
-        _journalFormat = journalFormat;
+        _writeJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey ?? OrleansBinaryJournalFormat.JournalFormatKey);
+        _writeJournalFormat = journalFormat;
         _logger = logger;
         _timeProvider = timeProvider;
+        _legacyJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(options.Value.LegacyJournalFormatKey);
         _retirementGracePeriod = options.Value.RetirementGracePeriod;
 
         _journalStreamDirectory = new StateDirectory(this, journalStreamIdsCodec);
@@ -214,6 +225,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                     {
                                         RetireOrResurectStates();
                                     }
+
+                                    if (_migrationSnapshotRequired)
+                                    {
+                                        ThrowIfMigrationBlockedByRetiredStates();
+                                    }
                                 }
 
                                 var currentJournalBatchWriter = GetOrCreateCurrentJournalBatchWriter();
@@ -305,6 +321,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                     foreach (var state in _states.Values)
                                     {
                                         state.OnWriteCompleted();
+                                    }
+
+                                    if (isSnapshot)
+                                    {
+                                        _migrationSnapshotRequired = false;
                                     }
                                 }
                             }
@@ -425,7 +446,34 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         }
     }
 
-    private IJournalBatchWriter GetOrCreateCurrentJournalBatchWriter() => _currentJournalBatchWriter ??= _journalFormat.CreateWriter();
+    private void ThrowIfMigrationBlockedByRetiredStates()
+    {
+        foreach (var state in _statesMap.Values)
+        {
+            if (state is RetiredState { FormattedEntries.Count: > 0 } retiredState)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot migrate journal from format key '{_recoveryJournalFormatKey}' to '{_writeJournalFormatKey}' because stream " +
+                    $"{retiredState.StreamId.Value} belongs to a state which is not currently registered. Register the state so it can be decoded " +
+                    "and snapshotted in the configured format, or keep the previous journal format configured until the state can be retired.");
+            }
+        }
+    }
+
+    private IDurableDictionaryOperationCodec<TKey, TValue> GetDictionaryOperationCodec<TKey, TValue>(
+        string journalFormatKey,
+        IDurableDictionaryOperationCodec<TKey, TValue> fallback)
+        where TKey : notnull
+    {
+        if (string.Equals(journalFormatKey, _writeJournalFormatKey, StringComparison.Ordinal) || _serviceProvider is null)
+        {
+            return fallback;
+        }
+
+        return JournalFormatServices.GetRequiredKeyedService<IDurableDictionaryOperationCodecProvider>(_serviceProvider, journalFormatKey).GetCodec<TKey, TValue>();
+    }
+
+    private IJournalBatchWriter GetOrCreateCurrentJournalBatchWriter() => _currentJournalBatchWriter ??= _writeJournalFormat.CreateWriter();
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
 
@@ -468,6 +516,13 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         lock (_lock)
         {
+            if (_recoveredJournalHadData
+                && _recoveryJournalFormatKey is { } recoveryFormatKey
+                && !string.Equals(recoveryFormatKey, _writeJournalFormatKey, StringComparison.Ordinal))
+            {
+                _migrationSnapshotRequired = true;
+            }
+
             foreach ((var name, var state) in _states)
             {
                 state.OnRecoveryCompleted();
@@ -487,6 +542,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private void ResetForRecovery()
     {
         _currentJournalBatchWriter?.Reset();
+        _storedJournalFormatKey = null;
+        _recoveryJournalFormatKey = null;
+        _recoveryJournalFormat = null;
+        _recoveredJournalHadData = false;
+        _migrationSnapshotRequired = false;
         _statesMap.Clear();
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
@@ -524,11 +584,83 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         return state;
     }
 
+    object IJournalOperationCodecResolver.GetOperationCodec(IJournaledState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        var journalFormatKey = _recoveryJournalFormatKey ?? _writeJournalFormatKey;
+        if (state is IJournaledStateOperationCodecProvider codecProvider)
+        {
+            return codecProvider.GetOperationCodec(journalFormatKey);
+        }
+
+        if (string.Equals(journalFormatKey, _writeJournalFormatKey, StringComparison.Ordinal))
+        {
+            return state.OperationCodec;
+        }
+
+        throw new InvalidOperationException(
+            $"State '{state.GetType().FullName}' cannot recover journal format key '{journalFormatKey}' because it does not provide format-specific operation codecs.");
+    }
+
+    private void SetStoredJournalFormatKey(string? journalFormatKey)
+    {
+        if (journalFormatKey is null)
+        {
+            return;
+        }
+
+        var validatedKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
+        if (_recoveryJournalFormatKey is { } selectedKey
+            && !string.Equals(selectedKey, validatedKey, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Journal storage reported format key '{validatedKey}' after recovery had already selected format key '{selectedKey}'. " +
+                $"Storage providers must report format metadata before supplying journal bytes.");
+        }
+
+        _storedJournalFormatKey = validatedKey;
+    }
+
+    private IJournalFormat GetRecoveryJournalFormat(JournalReadBuffer buffer)
+    {
+        if (_recoveryJournalFormat is not null)
+        {
+            return _recoveryJournalFormat;
+        }
+
+        var journalFormatKey = buffer.Length == 0 && buffer.IsCompleted && !_recoveredJournalHadData
+            ? _writeJournalFormatKey
+            : _storedJournalFormatKey ?? (buffer.Length > 0 ? _legacyJournalFormatKey : _writeJournalFormatKey);
+        _recoveryJournalFormatKey = journalFormatKey;
+        if (string.Equals(journalFormatKey, _writeJournalFormatKey, StringComparison.Ordinal))
+        {
+            _recoveryJournalFormat = _writeJournalFormat;
+        }
+        else
+        {
+            _recoveryJournalFormat = JournalFormatServices.GetRequiredKeyedService<IJournalFormat>(
+                GetServiceProviderForFormat(journalFormatKey),
+                journalFormatKey);
+        }
+
+        return _recoveryJournalFormat;
+    }
+
+    private IServiceProvider GetServiceProviderForFormat(string journalFormatKey)
+        => _serviceProvider ?? throw new InvalidOperationException(
+            $"Cannot recover journal format key '{journalFormatKey}' because this state manager was constructed without a service provider for keyed format resolution.");
+
     private void ProcessRecoveryBuffer(JournalReadBuffer buffer)
     {
         try
         {
-            _journalFormat.Read(buffer, this);
+            if (buffer.Length > 0)
+            {
+                _recoveredJournalHadData = true;
+            }
+
+            var journalFormat = GetRecoveryJournalFormat(buffer);
+            journalFormat.Read(buffer, this);
 
             if (buffer.IsCompleted && buffer.Length > 0)
             {
@@ -546,12 +678,12 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private static bool IsRecoveryFormatException(Exception exception) =>
         exception is InvalidOperationException { InnerException: not null }
-        && exception.Message?.StartsWith("Failed to recover journaling state using configured journal format key ", StringComparison.Ordinal) == true;
+        && exception.Message?.StartsWith("Failed to recover journaling state using journal format key ", StringComparison.Ordinal) == true;
 
     private InvalidOperationException CreateRecoveryFormatException(Exception exception) =>
         new(
-            $"Failed to recover journaling state using configured journal format key '{_journalFormatKey}'. " +
-            "If this grain previously used another journaling format key, restore that key or migrate the data.",
+            $"Failed to recover journaling state using journal format key '{_recoveryJournalFormatKey ?? _writeJournalFormatKey}'. " +
+            $"The configured write journal format key is '{_writeJournalFormatKey}'.",
             exception);
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
@@ -568,11 +700,9 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             {
                 var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
                 _pendingWrite = completion.Task;
-                var workItemType = _storage.IsCompactionRequested switch
-                {
-                    true => WorkItemType.WriteSnapshot,
-                    false => WorkItemType.AppendJournal,
-                };
+                var workItemType = _migrationSnapshotRequired || _storage.IsCompactionRequested
+                    ? WorkItemType.WriteSnapshot
+                    : WorkItemType.AppendJournal;
 
                 _workQueue.Enqueue(new WorkItem(workItemType, completion));
                 didEnqueue = true;
@@ -726,14 +856,16 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         Ready
     }
 
-    private sealed class RecoveryJournalStorageConsumer(JournaledStateManager manager) : IJournalStorageConsumer
+    private sealed class RecoveryJournalStorageConsumer(JournaledStateManager manager) : IJournalStorageFormatMetadataConsumer
     {
+        public void SetJournalFormatKey(string? journalFormatKey) => manager.SetStoredJournalFormatKey(journalFormatKey);
+
         public void Consume(JournalReadBuffer buffer) => manager.ProcessRecoveryBuffer(buffer);
     }
 
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDurableDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDurableDictionaryOperationHandler<string, ulong>
+        IDurableDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IJournaledStateOperationCodecProvider, IDurableDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
@@ -745,6 +877,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         public ulong this[string name] => _ids[name];
 
         object IJournaledState.OperationCodec => _codec;
+
+        object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey) => _manager.GetDictionaryOperationCodec(journalFormatKey, _codec);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
@@ -803,7 +937,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     /// <remarks>Resurrecting of retired states is supported.</remarks>
     private sealed class RetiredStateTracker(
         JournaledStateManager manager, IDurableDictionaryOperationCodec<string, DateTime> codec)
-            : DurableDictionary<string, DateTime>(codec)
+            : DurableDictionary<string, DateTime>(codec, manager._serviceProvider, manager._writeJournalFormatKey)
     {
         public const int Id = 1;
 

@@ -53,6 +53,8 @@ siloBuilder
 
 JSON Lines is the default format key for built-in Journaling storage providers. If a provider is configured to use a different format, configure it to use `JsonJournalExtensions.JournalFormatKey` and call `UseJsonJournalFormat(...)` after registering that provider.
 
+Storage providers can persist the journal format key as metadata alongside journal bytes. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, `StateManagerOptions.LegacyJournalFormatKey` is used as the compatibility fallback. When a grain recovers data written with a different format than the currently configured write format, the next write is forced to a full snapshot so the journal is rewritten using the configured format and metadata is updated.
+
 ## Example - Using durable states
 ```csharp
 using Microsoft.Extensions.DependencyInjection;
@@ -84,7 +86,7 @@ For trimming and Native AOT, configure `SerializerOptions.TypeInfoResolver`, `Se
 
 ## Storage format
 
-The JSON journaling format stores journal entries as true JSON Lines (`.jsonl`): UTF-8 text, no byte order mark, and one JSON array per journal entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings. Storage providers which use format metadata should write JSON journals with the `.jsonl` file extension and `application/jsonl` MIME type.
+The JSON journaling format stores journal entries as true JSON Lines: UTF-8 text, no byte order mark, and one JSON array per journal entry line. Each line is terminated by `\n`. Recovery accepts both LF and CRLF line endings. Storage providers which use format metadata should store `JsonJournalExtensions.JournalFormatKey` as the format key and may use `application/jsonl` as the MIME type.
 
 Each record contains the state id as element 0, followed by the durable operation payload:
 
@@ -94,7 +96,7 @@ Each record contains the state id as element 0, followed by the durable operatio
 
 The first operation payload element is the command name, followed by command-specific operands such as keys, values, item arrays, or versions. Storage write batches append one or more complete JSON Lines records without adding a separate extent envelope or final container-close step.
 
-The configured journaling format must match the data already stored for a grain. Switching formats over existing data is a migration concern outside this package.
+The configured write format does not need to match existing stored data when the storage provider supplies format metadata or the legacy fallback key is configured correctly. Existing data is read using its stored format and migrated to the configured write format by the next snapshot write.
 
 ## Documentation
 For more comprehensive documentation, please refer to:

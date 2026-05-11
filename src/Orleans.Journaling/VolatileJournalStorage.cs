@@ -35,7 +35,12 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
     }
 
     public IJournalStorage Create(IGrainContext grainContext)
-        => _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage());
+    {
+        var journalFormatKey = GetJournalFormatKey(grainContext);
+        var storage = _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage(journalFormatKey));
+        storage.SetConfiguredJournalFormatKey(journalFormatKey);
+        return storage;
+    }
 
     public string GetJournalFormatKey(IGrainContext grainContext)
         => GetJournalFormatKey(grainContext.GrainId.Type);
@@ -53,19 +58,46 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
 public sealed class VolatileJournalStorage : IJournalStorage
 {
     private readonly List<byte[]> _segments = [];
+    private string? _configuredJournalFormatKey;
+    private string? _storedJournalFormatKey;
 
     public VolatileJournalStorage()
     {
+    }
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="VolatileJournalStorage"/> class.
+    /// </summary>
+    /// <param name="journalFormatKey">The journal format key to stamp on writes.</param>
+    public VolatileJournalStorage(string? journalFormatKey)
+    {
+        SetConfiguredJournalFormatKey(journalFormatKey);
     }
 
     public bool IsCompactionRequested => _segments.Count > 10;
 
     internal IReadOnlyList<byte[]> Segments => _segments;
 
+    internal string? StoredJournalFormatKey
+    {
+        get => _storedJournalFormatKey;
+        set => _storedJournalFormatKey = value;
+    }
+
+    internal void SetConfiguredJournalFormatKey(string? journalFormatKey)
+    {
+        _configuredJournalFormatKey = journalFormatKey;
+    }
+
     /// <inheritdoc/>
     public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
+
+        if (consumer is IJournalStorageFormatMetadataConsumer metadataConsumer)
+        {
+            metadataConsumer.SetJournalFormatKey(_storedJournalFormatKey);
+        }
 
         consumer.Consume(GetSegments(_segments, cancellationToken));
         return default;
@@ -84,6 +116,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
     public ValueTask AppendAsync(ReadOnlySequence<byte> segment, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _storedJournalFormatKey = _configuredJournalFormatKey;
         _segments.Add(segment.ToArray());
         return default;
     }
@@ -92,6 +125,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
     public ValueTask ReplaceAsync(ReadOnlySequence<byte> snapshot, CancellationToken cancellationToken)
     {
         cancellationToken.ThrowIfCancellationRequested();
+        _storedJournalFormatKey = _configuredJournalFormatKey;
         _segments.Clear();
         _segments.Add(snapshot.ToArray());
         return default;
@@ -101,6 +135,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
     {
         cancellationToken.ThrowIfCancellationRequested();
         _segments.Clear();
+        _storedJournalFormatKey = null;
         return default;
     }
 }

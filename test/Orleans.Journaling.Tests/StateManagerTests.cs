@@ -558,7 +558,7 @@ public class StateManagerTests : JournalingTestBase
             await sut.Lifecycle.OnStop(CancellationToken.None);
         }
 
-        Assert.Contains("configured journal format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("journal format key 'orleans-binary'", exception.Message, StringComparison.Ordinal);
         var inner = Assert.IsType<InvalidOperationException>(exception.InnerException);
         Assert.Contains("Malformed binary journal entry stream", inner.Message, StringComparison.Ordinal);
         Assert.Contains("truncated varuint32 entry length prefix", inner.Message, StringComparison.Ordinal);
@@ -1081,8 +1081,6 @@ public class StateManagerTests : JournalingTestBase
 
         public List<TrackingJournalBatchWriter> Writers => _writerFormat.Writers;
 
-        public string FileExtension => ".test";
-
         public string? MimeType => null;
 
         public IJournalBatchWriter CreateWriter() => _writerFormat.CreateWriter();
@@ -1134,8 +1132,6 @@ public class StateManagerTests : JournalingTestBase
 
     private sealed class NonConsumingJournalFormat : IJournalFormat
     {
-        public string FileExtension => ".test";
-
         public string? MimeType => null;
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
@@ -1152,8 +1148,6 @@ public class StateManagerTests : JournalingTestBase
         public List<TrackingJournalBatchWriter> Writers { get; } = [];
 
         public int ReadCount { get; private set; }
-
-        public string FileExtension => ".test";
 
         public string? MimeType => null;
 

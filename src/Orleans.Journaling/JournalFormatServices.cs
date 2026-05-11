@@ -32,4 +32,14 @@ internal static class JournalFormatServices
 
         return service;
     }
+
+    public static object GetOperationCodec(IStateResolver resolver, IJournaledState state)
+    {
+        ArgumentNullException.ThrowIfNull(resolver);
+        ArgumentNullException.ThrowIfNull(state);
+
+        return resolver is IJournalOperationCodecResolver operationCodecResolver
+            ? operationCodecResolver.GetOperationCodec(state)
+            : state.OperationCodec;
+    }
 }

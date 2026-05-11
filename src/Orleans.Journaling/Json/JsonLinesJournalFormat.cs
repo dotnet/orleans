@@ -10,8 +10,6 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
     private const byte LineFeed = (byte)'\n';
     private const byte CarriageReturn = (byte)'\r';
 
-    public string FileExtension => ".jsonl";
-
     public string? MimeType => "application/jsonl";
 
     public IJournalBatchWriter CreateWriter() => new JsonLinesJournalBatchWriter();
@@ -107,7 +105,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 return;
             }
 
-            ApplyJsonEntry(stream, state, ref entry);
+            ApplyJsonEntry(resolver, stream, state, ref entry);
         }
         catch (JsonException exception)
         {
@@ -133,9 +131,9 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         }
     }
 
-    private static void ApplyJsonEntry(JournalStreamId streamId, IJournaledState state, ref JsonOperationReader entry)
+    private static void ApplyJsonEntry(IStateResolver resolver, JournalStreamId streamId, IJournaledState state, ref JsonOperationReader entry)
     {
-        var operationCodec = state.OperationCodec;
+        var operationCodec = JournalFormatServices.GetOperationCodec(resolver, state);
         if (operationCodec is not IJsonJournalEntryCodec jsonCodec)
         {
             entry.SkipToEnd();

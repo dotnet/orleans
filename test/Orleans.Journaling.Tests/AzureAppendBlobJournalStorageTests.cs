@@ -50,27 +50,27 @@ public sealed class AzureAppendBlobJournalStorageTests
     }
 
     [Fact]
-    public void GetBlobNameWithExtension_AppendsSelectedJournalFormatExtension()
+    public void GetBlobNameForJournal_UsesConfiguredBlobNameWithoutAppendingFormatExtension()
     {
         var options = new AzureAppendBlobJournalStorageOptions
         {
             GetBlobName = _ => "journals/test-grain"
         };
 
-        var blobName = options.GetBlobNameWithExtension(GrainId.Create("test-grain", "0"), new TestJournalFormat(".jsonl"));
+        var blobName = options.GetBlobNameForJournal(GrainId.Create("test-grain", "0"));
 
-        Assert.Equal("journals/test-grain.jsonl", blobName);
+        Assert.Equal("journals/test-grain", blobName);
     }
 
     [Fact]
-    public void GetBlobNameWithExtension_DoesNotDuplicateSelectedJournalFormatExtension()
+    public void GetBlobNameForJournal_ReturnsConfiguredBlobNameVerbatim()
     {
         var options = new AzureAppendBlobJournalStorageOptions
         {
             GetBlobName = _ => "journals/test-grain.jsonl"
         };
 
-        var blobName = options.GetBlobNameWithExtension(GrainId.Create("test-grain", "0"), new TestJournalFormat(".jsonl"));
+        var blobName = options.GetBlobNameForJournal(GrainId.Create("test-grain", "0"));
 
         Assert.Equal("journals/test-grain.jsonl", blobName);
     }
@@ -226,7 +226,7 @@ public sealed class AzureAppendBlobJournalStorageTests
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var create = client.CreateCalls.Single();
-        Assert.True(create.Metadata.TryGetValue(AzureAppendBlobJournalStorage.FormatKeyMetadataKey, out var stamped));
+        Assert.True(create.Metadata.TryGetValue(AzureAppendBlobJournalStorage.FormatMetadataKey, out var stamped));
         Assert.Equal("json-lines", stamped);
     }
 
@@ -247,17 +247,17 @@ public sealed class AzureAppendBlobJournalStorageTests
 
         var replaceCreate = client.CreateCalls[1];
         Assert.Equal("snapshot-1", replaceCreate.Metadata["snapshot"]);
-        Assert.Equal("json-lines", replaceCreate.Metadata[AzureAppendBlobJournalStorage.FormatKeyMetadataKey]);
+        Assert.Equal("json-lines", replaceCreate.Metadata[AzureAppendBlobJournalStorage.FormatMetadataKey]);
     }
 
     [Fact]
-    public async Task ReadAsync_WhenStoredFormatKeyDiffersFromConfigured_ThrowsExplanatoryError()
+    public async Task ReadAsync_WhenStoredFormatKeyDiffersFromConfigured_ReportsStoredFormatKey()
     {
         var client = new FakeAppendBlobClient();
         client.Downloads.Enqueue(new DownloadResult(
             [1, 2, 3],
             new ETag("\"read\""),
-            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatKeyMetadataKey] = "orleans-binary" },
+            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatMetadataKey] = "orleans-binary" },
             BlobCommittedBlockCount: 1));
         var storage = new AzureAppendBlobJournalStorage(
             client,
@@ -267,11 +267,10 @@ public sealed class AzureAppendBlobJournalStorageTests
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
 
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None).AsTask());
+        var consumer = new CapturingJournalStorageConsumer();
+        await storage.ReadAsync(consumer, CancellationToken.None);
 
-        Assert.Contains("orleans-binary", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("json-lines", exception.Message, StringComparison.Ordinal);
+        Assert.Equal("orleans-binary", consumer.JournalFormatKey);
     }
 
     [Fact]
@@ -281,7 +280,7 @@ public sealed class AzureAppendBlobJournalStorageTests
         client.Downloads.Enqueue(new DownloadResult(
             [1, 2, 3],
             new ETag("\"read\""),
-            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatKeyMetadataKey] = "json-lines" },
+            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatMetadataKey] = "json-lines" },
             BlobCommittedBlockCount: 1));
         var storage = new AzureAppendBlobJournalStorage(
             client,
@@ -291,7 +290,10 @@ public sealed class AzureAppendBlobJournalStorageTests
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
 
-        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+        var consumer = new CapturingJournalStorageConsumer();
+        await storage.ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Equal("json-lines", consumer.JournalFormatKey);
     }
 
     [Fact]
@@ -307,8 +309,10 @@ public sealed class AzureAppendBlobJournalStorageTests
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
 
-        // Should not throw — legacy data without the metadata stamp is accepted.
-        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+        var consumer = new CapturingJournalStorageConsumer();
+        await storage.ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Null(consumer.JournalFormatKey);
     }
 
     [Fact]
@@ -418,6 +422,15 @@ public sealed class AzureAppendBlobJournalStorageTests
     private sealed class DiscardingJournalStorageConsumer : IJournalStorageConsumer
     {
         public static DiscardingJournalStorageConsumer Instance { get; } = new();
+
+        public void Consume(JournalReadBuffer buffer) => buffer.Skip(buffer.Length);
+    }
+
+    private sealed class CapturingJournalStorageConsumer : IJournalStorageFormatMetadataConsumer
+    {
+        public string? JournalFormatKey { get; private set; }
+
+        public void SetJournalFormatKey(string? journalFormatKey) => JournalFormatKey = journalFormatKey;
 
         public void Consume(JournalReadBuffer buffer) => buffer.Skip(buffer.Length);
     }
@@ -635,14 +648,4 @@ public sealed class AzureAppendBlobJournalStorageTests
         }
     }
 
-    private sealed class TestJournalFormat(string fileExtension) : IJournalFormat
-    {
-        public string FileExtension => fileExtension;
-
-        public string? MimeType => null;
-
-        public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
-
-        public void Read(JournalReadBuffer input, IStateResolver resolver) => throw new NotSupportedException();
-    }
 }

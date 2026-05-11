@@ -10,9 +10,11 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDurableValueOperationHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableValueOperationHandler<T>
 {
     private readonly IDurableValueOperationCodec<T> _codec;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly string? _journalFormatKey;
     private T? _value;
     private bool _isDirty;
 
@@ -24,6 +26,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
+        _serviceProvider = serviceProvider;
+        _journalFormatKey = journalFormatKey;
         manager.RegisterState(key, this);
     }
 
@@ -52,6 +56,16 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
 
     object IJournaledState.OperationCodec => _codec;
 
+    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    {
+        if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
+        {
+            return _codec;
+        }
+
+        return JournalFormatServices.GetRequiredKeyedService<IDurableValueOperationCodecProvider>(GetServiceProvider(journalFormatKey), journalFormatKey).GetCodec<T>();
+    }
+
     void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
     void IJournaledState.OnWriteCompleted() => OnValuePersisted();
 
@@ -78,6 +92,10 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
     {
         _codec.WriteSet(_value!, writer);
     }
+
+    private IServiceProvider GetServiceProvider(string journalFormatKey)
+        => _serviceProvider ?? throw new InvalidOperationException(
+            $"State '{GetType().FullName}' cannot recover journal format key '{journalFormatKey}' because it was constructed with an explicit operation codec instead of a service provider.");
 
     void IDurableValueOperationHandler<T>.ApplySet(T value) => _value = value;
 }

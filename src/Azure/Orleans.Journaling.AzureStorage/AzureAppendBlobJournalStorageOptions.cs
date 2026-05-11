@@ -22,7 +22,7 @@ public sealed class AzureAppendBlobJournalStorageOptions
     public const string DEFAULT_CONTAINER_NAME = "state";
 
     /// <summary>
-    /// Gets or sets the delegate used to generate the base blob name for a given grain. The selected journal format extension is appended automatically.
+    /// Gets or sets the delegate used to generate the blob name for a given grain.
     /// </summary>
     public Func<GrainId, string> GetBlobName { get; set; } = DefaultGetBlobName;
 
@@ -69,22 +69,11 @@ public sealed class AzureAppendBlobJournalStorageOptions
         return result;
     }
 
-    internal string GetBlobNameWithExtension(GrainId grainId, IJournalFormat journalFormat)
+    internal string GetBlobNameForJournal(GrainId grainId)
     {
-        ArgumentNullException.ThrowIfNull(journalFormat);
         var blobName = GetBlobName(grainId);
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
-
-        var extension = journalFormat.FileExtension;
-        if (string.IsNullOrWhiteSpace(extension) || extension[0] != '.')
-        {
-            throw new InvalidOperationException(
-                $"Journal format '{journalFormat.GetType().FullName}' must specify a non-empty file extension beginning with '.'.");
-        }
-
-        return blobName.EndsWith(extension, StringComparison.OrdinalIgnoreCase)
-            ? blobName
-            : blobName + extension;
+        return blobName;
     }
 
     /// <summary>

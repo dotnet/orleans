@@ -10,11 +10,6 @@ namespace Orleans.Journaling;
 public interface IJournalFormat
 {
     /// <summary>
-    /// Gets the file extension used for journal storage written with this format, including the leading dot.
-    /// </summary>
-    string FileExtension { get; }
-
-    /// <summary>
     /// Gets the MIME type for journal storage written with this format, or <see langword="null"/> to use the storage provider's default.
     /// </summary>
     string? MimeType { get; }

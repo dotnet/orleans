@@ -86,3 +86,16 @@ public interface IJournaledState
     /// <returns>A replica of this instance.</returns>
     IJournaledState DeepCopy();
 }
+
+/// <summary>
+/// Provides operation codecs for journaled state recovery by journal format key.
+/// </summary>
+public interface IJournaledStateOperationCodecProvider
+{
+    /// <summary>
+    /// Gets the durable operation codec for <paramref name="journalFormatKey"/>.
+    /// </summary>
+    /// <param name="journalFormatKey">The journal format key being recovered.</param>
+    /// <returns>The operation codec for the specified format.</returns>
+    object GetOperationCodec(string journalFormatKey);
+}

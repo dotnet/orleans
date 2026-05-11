@@ -27,7 +27,6 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         using var serviceProvider = builder.Services.BuildServiceProvider();
         var jsonFormat = Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
         Assert.Same(jsonFormat, serviceProvider.GetRequiredService<IJournalFormat>());
-        Assert.Equal(".jsonl", jsonFormat.FileExtension);
         Assert.Equal("application/jsonl", jsonFormat.MimeType);
         CodecTestHelpers.AssertCodecProviderRegistrations(
             serviceProvider,
@@ -36,7 +35,6 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             expectDefaultProvider: true);
 
         var binaryFormat = Assert.IsType<OrleansBinaryJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey));
-        Assert.Equal(".obs", binaryFormat.FileExtension);
         Assert.Equal("application/octet-stream", binaryFormat.MimeType);
         CodecTestHelpers.AssertCodecProviderRegistrations(
             serviceProvider,
@@ -97,8 +95,6 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
     private sealed class TestJournalFormat : IJournalFormat
     {
-        public string FileExtension => ".test";
-
         public string? MimeType => null;
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();

@@ -15,11 +15,13 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IDurableTaskCompletionSourceOperationHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableTaskCompletionSourceOperationHandler<T>
 {
     private readonly IDurableTaskCompletionSourceOperationCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly string? _journalFormatKey;
 
     private TaskCompletionSource<T> _completion = new(TaskCreationOptions.RunContinuationsAsynchronously);
     private DurableTaskCompletionSourceStatus _status;
@@ -36,6 +38,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
+        _serviceProvider = serviceProvider;
+        _journalFormatKey = journalFormatKey;
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterState(key, this);
@@ -103,6 +107,16 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     object IJournaledState.OperationCodec => _codec;
 
+    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    {
+        if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
+        {
+            return _codec;
+        }
+
+        return JournalFormatServices.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodecProvider>(GetServiceProvider(journalFormatKey), journalFormatKey).GetCodec<T>();
+    }
+
     private void OnValuePersisted()
     {
         switch (_status)
@@ -165,6 +179,10 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
                 break;
         }
     }
+
+    private IServiceProvider GetServiceProvider(string journalFormatKey)
+        => _serviceProvider ?? throw new InvalidOperationException(
+            $"State '{GetType().FullName}' cannot recover journal format key '{journalFormatKey}' because it was constructed with an explicit operation codec instead of a service provider.");
 
     void IDurableTaskCompletionSourceOperationHandler<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
     void IDurableTaskCompletionSourceOperationHandler<T>.ApplyCompleted(T value)

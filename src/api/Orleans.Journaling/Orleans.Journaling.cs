@@ -291,10 +291,13 @@ namespace Orleans.Journaling
         void Reset(JournalStreamWriter writer);
     }
 
+    public partial interface IJournaledStateOperationCodecProvider
+    {
+        object GetOperationCodec(string journalFormatKey);
+    }
+
     public partial interface IJournalFormat
     {
-        string FileExtension { get; }
-
         string? MimeType { get; }
 
         IJournalBatchWriter CreateWriter();
@@ -321,6 +324,11 @@ namespace Orleans.Journaling
         void Consume(JournalReadBuffer buffer);
     }
 
+    public partial interface IJournalStorageFormatMetadataConsumer : IJournalStorageConsumer
+    {
+        void SetJournalFormatKey(string? journalFormatKey);
+    }
+
     public partial interface IJournalStorageProvider
     {
         IJournalStorage Create(Runtime.IGrainContext grainContext);
@@ -344,6 +352,11 @@ namespace Orleans.Journaling
     public partial interface IStateResolver
     {
         IJournaledState ResolveState(JournalStreamId streamId);
+    }
+
+    public partial interface IJournalOperationCodecResolver : IStateResolver
+    {
+        object GetOperationCodec(IJournaledState state);
     }
 
     public abstract partial class JournalBatchWriterBase : IJournalBatchWriter, System.IDisposable
@@ -483,12 +496,18 @@ namespace Orleans.Journaling
     public sealed partial class StateManagerOptions
     {
         public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
+        public string LegacyJournalFormatKey { get { throw null; } set { } }
+
         public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
     }
 
     public sealed partial class VolatileJournalStorage : IJournalStorage
     {
         public bool IsCompactionRequested { get { throw null; } }
+
+        public VolatileJournalStorage(string? journalFormatKey) { }
+
+        public VolatileJournalStorage() { }
 
         public System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> segment, System.Threading.CancellationToken cancellationToken) { throw null; }
 

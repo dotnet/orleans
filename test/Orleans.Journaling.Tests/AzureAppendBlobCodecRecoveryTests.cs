@@ -3,6 +3,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Core;
+using Orleans.Journaling.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Session;
 using Orleans.Runtime;
@@ -29,7 +30,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         services.AddLogging();
         services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
         services.AddSerializer();
-        services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
+        ConfigureFormatServices(services);
         services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
@@ -46,6 +47,48 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
 
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await _siloLifecycle.OnStart(cts.Token);
+    }
+
+    [SkippableFact]
+    public async Task AzureAppendBlobStorage_BinaryJournal_MigratesToJsonOnFirstWrite()
+    {
+        var blobName = $"journaling-codec-migration/{Guid.NewGuid():N}";
+        var grainId = GrainId.Create("journaling-codec-migration", "0");
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        await using (var binaryProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token))
+        {
+            var storage = binaryProvider.StorageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
+            var manager = CreateFormatAwareManager(binaryProvider.ServiceProvider, storage, OrleansBinaryJournalFormat.JournalFormatKey);
+            var dict = CreateFormatAwareDictionary(binaryProvider.ServiceProvider, manager, OrleansBinaryJournalFormat.JournalFormatKey);
+            await manager.InitializeAsync(cts.Token);
+
+            dict.Add("alpha", 1);
+            await manager.WriteStateAsync(cts.Token);
+            ((IDisposable)manager).Dispose();
+        }
+
+        await using var jsonProvider = await CreateAzureProviderAsync(JsonJournalExtensions.JournalFormatKey, blobName, cts.Token);
+        var migratedStorage = jsonProvider.StorageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
+        var migratedManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, migratedStorage, JsonJournalExtensions.JournalFormatKey);
+        var migratedDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, migratedManager, JsonJournalExtensions.JournalFormatKey);
+        await migratedManager.InitializeAsync(cts.Token);
+
+        Assert.Equal(1, migratedDict["alpha"]);
+
+        migratedDict.Add("beta", 2);
+        await migratedManager.WriteStateAsync(cts.Token);
+        ((IDisposable)migratedManager).Dispose();
+
+        var recoveredStorage = jsonProvider.StorageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
+        var recoveredManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, recoveredStorage, JsonJournalExtensions.JournalFormatKey);
+        var recoveredDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, recoveredManager, JsonJournalExtensions.JournalFormatKey);
+        await recoveredManager.InitializeAsync(cts.Token);
+
+        Assert.Equal(1, recoveredDict["alpha"]);
+        Assert.Equal(2, recoveredDict["beta"]);
+        await recoveredStorage.DeleteAsync(cts.Token);
+        ((IDisposable)recoveredManager).Dispose();
     }
 
     public async Task DisposeAsync()
@@ -132,6 +175,82 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
+
+    private static void ConfigureFormatServices(IServiceCollection services)
+    {
+        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
+        services.AddKeyedSingleton<IJournalFormat>(
+            OrleansBinaryJournalFormat.JournalFormatKey,
+            (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
+        services.AddSingleton<OrleansBinaryOperationCodecProvider>();
+        services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(
+            OrleansBinaryJournalFormat.JournalFormatKey,
+            (sp, _) => sp.GetRequiredService<OrleansBinaryOperationCodecProvider>());
+
+        var jsonOptions = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = JournalingTestsJsonContext.Default };
+        services.AddSingleton(_ => new JsonOperationCodecProvider(jsonOptions));
+        services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
+        services.AddKeyedSingleton<IDurableDictionaryOperationCodecProvider>(
+            JsonJournalExtensions.JournalFormatKey,
+            (sp, _) => sp.GetRequiredService<JsonOperationCodecProvider>());
+    }
+
+    private async Task<AzureProviderFixture> CreateAzureProviderAsync(string journalFormatKey, string blobName, CancellationToken cancellationToken)
+    {
+        var services = new ServiceCollection();
+        services.AddLogging();
+        services.Configure<AzureAppendBlobJournalStorageOptions>(options =>
+        {
+            JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options);
+            options.JournalFormatKey = journalFormatKey;
+            options.GetBlobName = _ => blobName;
+        });
+        services.AddSerializer();
+        ConfigureFormatServices(services);
+        services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
+        services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
+
+        var serviceProvider = services.BuildServiceProvider();
+        var lifecycle = new SiloLifecycleSubject(serviceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());
+        foreach (var participant in serviceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
+        {
+            participant.Participate(lifecycle);
+        }
+
+        await lifecycle.OnStart(cancellationToken);
+        return new(serviceProvider, lifecycle, serviceProvider.GetRequiredService<IJournalStorageProvider>());
+    }
+
+    private static JournaledStateManager CreateFormatAwareManager(IServiceProvider serviceProvider, IJournalStorage storage, string journalFormatKey)
+        => new(
+            storage,
+            serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
+            Options.Create(new StateManagerOptions()),
+            TimeProvider.System,
+            serviceProvider,
+            journalFormatKey);
+
+    private static DurableDictionary<string, int> CreateFormatAwareDictionary(IServiceProvider serviceProvider, JournaledStateManager manager, string journalFormatKey)
+        => new("dict", manager, journalFormatKey, serviceProvider);
+
+    private sealed class AzureProviderFixture(
+        ServiceProvider serviceProvider,
+        SiloLifecycleSubject lifecycle,
+        IJournalStorageProvider storageProvider) : IAsyncDisposable
+    {
+        public ServiceProvider ServiceProvider { get; } = serviceProvider;
+
+        public IJournalStorageProvider StorageProvider { get; } = storageProvider;
+
+        public async ValueTask DisposeAsync()
+        {
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+            await lifecycle.OnStop(cts.Token);
+            await ServiceProvider.DisposeAsync();
+        }
+    }
 
     private sealed record DurableStates(
         JournaledStateManager Manager,

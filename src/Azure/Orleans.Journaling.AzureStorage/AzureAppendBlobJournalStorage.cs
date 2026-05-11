@@ -11,7 +11,7 @@ namespace Orleans.Journaling;
 
 internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
 {
-    internal const string FormatKeyMetadataKey = "journalFormatKey";
+    internal const string FormatMetadataKey = "format";
 
     // Azure Append Blob hard limits documented at:
     // https://learn.microsoft.com/azure/storage/blobs/scalability-targets#scale-targets-for-blob-storage
@@ -148,7 +148,10 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
             return;
         }
 
-        ValidateFormatKeyMetadata(result.Value.Details.Metadata);
+        if (consumer is IJournalStorageFormatMetadataConsumer metadataConsumer)
+        {
+            metadataConsumer.SetJournalFormatKey(GetFormatKeyMetadata(result.Value.Details.Metadata));
+        }
 
         if (result.Value.Details.ContentLength == 0)
         {
@@ -267,7 +270,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         var metadata = new Dictionary<string, string> { ["snapshot"] = blobSnapshot.Value.Snapshot };
         if (_journalFormatKey is { Length: > 0 })
         {
-            metadata[FormatKeyMetadataKey] = _journalFormatKey;
+            metadata[FormatMetadataKey] = _journalFormatKey;
         }
 
         var createOptions = new AppendBlobCreateOptions()
@@ -307,31 +310,14 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
     private BlobHttpHeaders? CreateHttpHeaders() => _mimeType is { Length: > 0 } ? new BlobHttpHeaders { ContentType = _mimeType } : null;
 
     private Dictionary<string, string>? CreateMetadata()
-        => _journalFormatKey is { Length: > 0 } ? new Dictionary<string, string> { [FormatKeyMetadataKey] = _journalFormatKey } : null;
+        => _journalFormatKey is { Length: > 0 } ? new Dictionary<string, string> { [FormatMetadataKey] = _journalFormatKey } : null;
 
-    private void ValidateFormatKeyMetadata(IDictionary<string, string>? metadata)
-    {
-        if (_journalFormatKey is not { Length: > 0 })
-        {
-            return;
-        }
-
-        if (metadata is null
-            || !metadata.TryGetValue(FormatKeyMetadataKey, out var storedKey)
-            || storedKey is not { Length: > 0 })
-        {
-            // Legacy blob written before format-key metadata was stamped. Allow it through;
-            // recovery will surface a parse-time format mismatch if the encoding differs.
-            return;
-        }
-
-        if (!string.Equals(storedKey, _journalFormatKey, StringComparison.Ordinal))
-        {
-            throw new InvalidOperationException(
-                $"Blob \"{_client.BlobContainerName}/{_client.Name}\" was written with journal format key '{storedKey}', " +
-                $"but the configured key is '{_journalFormatKey}'. Reconfigure the format or migrate the data.");
-        }
-    }
+    private static string? GetFormatKeyMetadata(IDictionary<string, string>? metadata)
+        => metadata is not null
+            && metadata.TryGetValue(FormatMetadataKey, out var storedKey)
+            && storedKey is { Length: > 0 }
+                ? storedKey
+                : null;
 
     [LoggerMessage(
         Level = LogLevel.Debug,

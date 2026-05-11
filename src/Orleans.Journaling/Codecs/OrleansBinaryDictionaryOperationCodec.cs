@@ -25,10 +25,6 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
 
     private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
     {
-        // The legacy writer in upstream Orleans (DurableDictionary.AppendSet) writes the key/value
-        // pair into a single Orleans Writer/SerializerSession so that the value field is encoded with a
-        // field-id delta of 1 (key field id 0 + 1). To remain byte-for-byte compatible with that data on
-        // disk, this codec must also share a single session/writer across the two field writes.
         var binaryKeyCodec = AsBinaryValueCodec(keyCodec, nameof(keyCodec));
         var binaryValueCodec = AsBinaryValueCodec(valueCodec, nameof(valueCodec));
         using var session = sessionPool.GetSession();

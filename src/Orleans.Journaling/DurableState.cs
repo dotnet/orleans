@@ -5,10 +5,12 @@ using Orleans.Core;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IDurableStateOperationHandler<T>
+internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IJournaledStateOperationCodecProvider, IDurableStateOperationHandler<T>
 {
     private readonly IDurableStateOperationCodec<T> _codec;
     private readonly IStateManager _manager;
+    private readonly IServiceProvider? _serviceProvider;
+    private readonly string? _journalFormatKey;
     private T? _value;
     private ulong _version;
     private ulong _pendingVersion;
@@ -24,6 +26,8 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = JournalFormatServices.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(serviceProvider, journalFormatKey).GetCodec<T>();
+        _serviceProvider = serviceProvider;
+        _journalFormatKey = journalFormatKey;
         manager.RegisterState(key, this);
         _manager = manager;
     }
@@ -56,6 +60,16 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
     bool IStorage.RecordExists => _version > 0;
 
     object IJournaledState.OperationCodec => _codec;
+
+    object IJournaledStateOperationCodecProvider.GetOperationCodec(string journalFormatKey)
+    {
+        if (_journalFormatKey is null || string.Equals(journalFormatKey, _journalFormatKey, StringComparison.Ordinal))
+        {
+            return _codec;
+        }
+
+        return JournalFormatServices.GetRequiredKeyedService<IDurableStateOperationCodecProvider>(GetServiceProvider(journalFormatKey), journalFormatKey).GetCodec<T>();
+    }
 
     void IJournaledState.OnWriteCompleted()
     {
@@ -129,6 +143,10 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
         _pendingWrite = PendingWriteKind.Clear;
         _pendingVersion = 0;
     }
+
+    private IServiceProvider GetServiceProvider(string journalFormatKey)
+        => _serviceProvider ?? throw new InvalidOperationException(
+            $"State '{GetType().FullName}' cannot recover journal format key '{journalFormatKey}' because it was constructed with an explicit operation codec instead of a service provider.");
 
     void IDurableStateOperationHandler<T>.ApplySet(T state, ulong version)
     {

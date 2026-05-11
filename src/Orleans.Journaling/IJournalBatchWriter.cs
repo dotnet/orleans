@@ -12,7 +12,10 @@ namespace Orleans.Journaling;
 public interface IJournalBatchWriter : IDisposable
 {
     /// <summary>
-    /// Gets the number of raw bytes written, including any currently active uncommitted entry.
+    /// Gets the number of bytes currently buffered by this writer, including any active uncommitted entry payload.
+    /// This value may exclude format framing that is materialized only when an entry is committed, so it is suitable
+    /// as a heuristic but not as an exact persisted byte count. Use <see cref="GetCommittedBuffer"/> after all entries
+    /// have been committed to obtain the exact committed byte count.
     /// </summary>
     long Length { get; }
 

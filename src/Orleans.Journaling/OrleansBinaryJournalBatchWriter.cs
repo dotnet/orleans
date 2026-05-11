@@ -1,5 +1,4 @@
 using System.Buffers;
-using System.Numerics;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
@@ -10,20 +9,7 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
     private readonly ArcBufferWriter _entryBuffer = new();
     private readonly JournalEntryWriter _entryWriter = new();
 
-    public int Length
-    {
-        get
-        {
-            var length = _buffer.Length;
-            if (_entryWriter.IsActive)
-            {
-                var bodyLength = checked((uint)_entryBuffer.Length);
-                length = checked(length + GetVarUInt32ByteCount(bodyLength) + _entryBuffer.Length);
-            }
-
-            return length;
-        }
-    }
+    public int Length => checked(_buffer.Length + (_entryWriter.IsActive ? _entryBuffer.Length : 0));
 
     long IJournalBatchWriter.Length => Length;
 
@@ -144,20 +130,6 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
         {
             throw new InvalidOperationException("The journal entry start does not match the active entry.");
         }
-    }
-
-    private static int GetVarUInt32ByteCount(uint value)
-    {
-        // BitOperations.Log2(0) returns 0, so the closed-form expression below would say zero is a 1-byte
-        // varint by accident. That happens to be the correct answer (0 encodes as a single 0x00 byte), but
-        // relying on Log2(0) returning 0 is implementation-defined behavior we shouldn't bet on. Handle the
-        // zero case explicitly so the helper stays correct if BitOperations changes its zero handling.
-        if (value == 0)
-        {
-            return 1;
-        }
-
-        return ((int)BitOperations.Log2(value) / 7) + 1;
     }
 
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream

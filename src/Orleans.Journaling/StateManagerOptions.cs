@@ -6,6 +6,11 @@ namespace Orleans.Journaling;
 public sealed class StateManagerOptions
 {
     /// <summary>
+    /// Gets or sets the journal format key to use when recovering non-empty journal data which does not have stored format metadata.
+    /// </summary>
+    public string LegacyJournalFormatKey { get; set; } = OrleansBinaryJournalFormat.JournalFormatKey;
+
+    /// <summary>
     /// Specifies the period of time to wait until the manager retires
     /// a <see cref="IJournaledState"/> if its not registered in the manager anymore.
     /// </summary>

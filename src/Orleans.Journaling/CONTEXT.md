@@ -188,8 +188,8 @@ _Avoid_: Per-operation undo
 - A public **Journal Format** is intentionally narrower than a public codec-family abstraction.
 - Storage is intentionally format-agnostic: it may expose a **Journal Format** key, but it should not inject, own, or call a **Journal Format** implementation.
 - Recovery parses ordered concatenated journal data; it must not depend on storage preserving individual **Journal Batch** boundaries.
-- Existing persisted data must match the configured **Journal Format**. Switching formats over existing data is a migration concern outside this design.
-- The **Journal Format** key is not persisted in journal data; storage provider configuration must remain consistent with stored bytes.
+- Existing persisted data can be read with a stored **Journal Format** key supplied by metadata-capable storage providers, then rewritten as a snapshot using the configured write format.
+- The **Journal Format** key is not persisted in journal entry bytes; metadata-capable storage providers persist it as storage metadata, and metadata-less non-empty journals use a configured legacy fallback key.
 - Format selection delegates receive the grain type only, not the full `IGrainContext` or `GrainId`.
 - Non-grain format selection uses **Journal Storage Id**, not a synthetic `IGrainContext`.
 - Builder-style extent APIs are retired from built-in paths; do not describe new designs in terms of builders or post-hoc extent codecs.
