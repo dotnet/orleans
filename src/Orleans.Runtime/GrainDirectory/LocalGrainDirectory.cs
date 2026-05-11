@@ -10,6 +10,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
+using Orleans.Internal;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -147,12 +148,12 @@ namespace Orleans.Runtime.GrainDirectory
             _membershipUpdatesCancellation.Cancel();
             if (membershipUpdatesTask is { } task)
             {
-                await task.ConfigureAwait(ConfigureAwaitOptions.SuppressThrowing);
+                await task.SuppressThrowing();
             }
 
             if (this.disposeDirectoryCache)
             {
-                await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(DirectoryCache);
+                await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(DirectoryCache).SuppressThrowing();
             }
 
             DirectoryPartition.Clear();
@@ -196,7 +197,7 @@ namespace Orleans.Runtime.GrainDirectory
                     }
 
                     snapshot = clusterMembershipService.CurrentSnapshot;
-                    await Task.Delay(RETRY_DELAY, cancellationToken);
+                    await Task.Delay(RETRY_DELAY, cancellationToken).SuppressThrowing();
                 }
             }
         }
