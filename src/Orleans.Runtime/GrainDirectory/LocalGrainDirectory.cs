@@ -320,6 +320,48 @@ namespace Orleans.Runtime.GrainDirectory
             return result;
         }
 
+        private Task RefreshMembershipIfNewer(GrainAddress address, GrainAddress? previousAddress = null)
+        {
+            var targetVersion = address.MembershipVersion;
+            if (previousAddress is not null && previousAddress.MembershipVersion > targetVersion)
+            {
+                targetVersion = previousAddress.MembershipVersion;
+            }
+
+            return RefreshMembershipIfNewer(targetVersion);
+        }
+
+        private Task RefreshMembershipIfNewer(List<GrainAddress> addresses)
+        {
+            var targetVersion = MembershipVersion.MinValue;
+            foreach (var address in addresses)
+            {
+                if (address.MembershipVersion > targetVersion)
+                {
+                    targetVersion = address.MembershipVersion;
+                }
+            }
+
+            return RefreshMembershipIfNewer(targetVersion);
+        }
+
+        private async Task RefreshMembershipIfNewer(MembershipVersion targetVersion)
+        {
+            if (targetVersion <= appliedClusterMembershipSnapshot.Version)
+            {
+                return;
+            }
+
+            var snapshot = clusterMembershipService.CurrentSnapshot;
+            if (targetVersion > snapshot.Version)
+            {
+                await clusterMembershipService.Refresh(targetVersion);
+                snapshot = clusterMembershipService.CurrentSnapshot;
+            }
+
+            await ApplyMembershipSnapshot(snapshot);
+        }
+
         private void OnSiloStatusChange(DirectoryMembership previousMembership, SiloAddress updatedSilo, SiloStatus status)
         {
             if (updatedSilo.Equals(MyAddress) || !status.IsTerminating())
@@ -580,6 +622,8 @@ namespace Orleans.Runtime.GrainDirectory
                 DirectoryInstruments.RegistrationsSingleActIssued.Add(1);
             }
 
+            await RefreshMembershipIfNewer(address, previousAddress);
+
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
 
@@ -630,20 +674,22 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        public Task UnregisterAfterNonexistingActivation(GrainAddress addr, SiloAddress origin)
+        public async Task UnregisterAfterNonexistingActivation(GrainAddress addr, SiloAddress origin)
         {
             LogTraceUnregisterAfterNonexistingActivation(addr, origin);
+
+            await RefreshMembershipIfNewer(addr);
 
             if (origin == null || this.directoryMembership.MembershipCache.Contains(origin))
             {
                 // the request originated in this cluster, call unregister here
-                return UnregisterAsync(addr, UnregistrationCause.NonexistentActivation, 0);
+                await UnregisterAsync(addr, UnregistrationCause.NonexistentActivation, 0);
             }
             else
             {
                 // the request originated in another cluster, call unregister there
                 var remoteDirectory = GetDirectoryReference(origin);
-                return remoteDirectory.UnregisterAsync(addr, UnregistrationCause.NonexistentActivation);
+                await remoteDirectory.UnregisterAsync(addr, UnregistrationCause.NonexistentActivation);
             }
         }
 
@@ -660,6 +706,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (hopCount == 0)
                 InvalidateCacheEntry(address);
+
+            await RefreshMembershipIfNewer(address);
 
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
@@ -726,6 +774,8 @@ namespace Orleans.Runtime.GrainDirectory
             {
                 DirectoryInstruments.UnregistrationsManyIssued.Add(1);
             }
+
+            await RefreshMembershipIfNewer(addresses);
 
             Dictionary<SiloAddress, List<GrainAddress>>? forwardlist = null;
 
