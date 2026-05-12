@@ -17,5 +17,5 @@ public interface IStateResolver
     /// </summary>
     /// <param name="state">The durable state.</param>
     /// <returns>The operation codec to use for applying entries.</returns>
-    object GetOperationCodec(IJournaledState state) => state.OperationCodec;
+    object GetOperationCodec(IJournaledState state) => JournalFormatServices.GetCurrentOperationCodec(state);
 }

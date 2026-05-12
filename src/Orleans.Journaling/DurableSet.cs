@@ -20,7 +20,7 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOperationHandler<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IJournaledStateOperationCodecProvider, ISetOperationHandler<T>
 {
     private readonly ISetOperationCodec<T> _codec;
     private readonly HashSet<T> _items = [];
@@ -47,7 +47,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOpera
     public int Count => _items.Count;
     public bool IsReadOnly => false;
 
-    object IJournaledState.OperationCodec => _codec;
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
 
     Type IJournaledState.OperationCodecServiceType => typeof(ISetOperationCodec<T>);
 

@@ -57,32 +57,18 @@ internal static class JournalFormatServices
         return service;
     }
 
-    public static Type GetOperationCodecServiceType(object operationCodec)
+    public static object GetCurrentOperationCodec(IJournaledState state)
     {
-        ArgumentNullException.ThrowIfNull(operationCodec);
+        ArgumentNullException.ThrowIfNull(state);
 
-        var codecType = operationCodec.GetType();
-        Type? result = null;
-        foreach (var candidate in codecType.GetInterfaces())
+        if (state is IJournaledStateOperationCodecProvider operationCodecProvider)
         {
-            if (!IsKnownOperationCodecServiceType(candidate))
-            {
-                continue;
-            }
-
-            if (result is not null)
-            {
-                throw new InvalidOperationException(
-                    $"Operation codec '{codecType.FullName}' implements multiple durable operation codec service interfaces. "
-                    + $"Override {nameof(IJournaledState.OperationCodecServiceType)} to select the service type used for keyed journal format resolution.");
-            }
-
-            result = candidate;
+            return operationCodecProvider.OperationCodec;
         }
 
-        return result ?? throw new InvalidOperationException(
-            $"Operation codec '{codecType.FullName}' does not implement a known durable operation codec service interface. "
-            + $"Override {nameof(IJournaledState.OperationCodecServiceType)} to specify the service type used for keyed journal format resolution.");
+        throw new InvalidOperationException(
+            $"State '{state.GetType().FullName}' does not expose a cached operation codec. "
+            + $"Resolve '{state.OperationCodecServiceType.FullName}' from keyed services instead.");
     }
 
     public static IJournalFormat GetRequiredJournalFormat(IServiceProvider serviceProvider, string journalFormatKey)
@@ -97,22 +83,5 @@ internal static class JournalFormatServices
         }
 
         return format;
-    }
-
-    private static bool IsKnownOperationCodecServiceType(Type type)
-    {
-        if (!type.IsGenericType)
-        {
-            return false;
-        }
-
-        var definition = type.GetGenericTypeDefinition();
-        return definition == typeof(IDictionaryOperationCodec<,>)
-            || definition == typeof(IListOperationCodec<>)
-            || definition == typeof(IQueueOperationCodec<>)
-            || definition == typeof(ISetOperationCodec<>)
-            || definition == typeof(IValueOperationCodec<>)
-            || definition == typeof(IStateOperationCodec<>)
-            || definition == typeof(ITaskCompletionSourceOperationCodec<>);
     }
 }

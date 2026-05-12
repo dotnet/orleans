@@ -686,7 +686,7 @@ public class JsonCodecTests
         var codec = new RecordingJsonJournalEntryCodec();
         var state = new RecordingState(codec);
 
-        entry.Apply(state);
+        entry.Apply(state, JournalFormatServices.GetCurrentOperationCodec(state));
 
         Assert.Same(state, codec.State);
         Assert.Equal(42, codec.Value);
@@ -703,7 +703,7 @@ public class JsonCodecTests
                 writer.WriteNumberValue(value);
             });
 
-        entry.Apply(new NoOpState());
+        entry.Apply(new NoOpState(), new object());
     }
 
     [Fact]
@@ -843,7 +843,7 @@ public class JsonCodecTests
         bool IJournalStreamWriterTarget.TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) => false;
     }
 
-    private sealed class RecordingJournalEntrySink : IStateResolver, IJournaledState, IFormattedJournalEntryBuffer
+    private sealed class RecordingJournalEntrySink : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IFormattedJournalEntryBuffer
     {
         private JournalStreamId _streamId;
 
@@ -851,7 +851,9 @@ public class JsonCodecTests
 
         public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => [];
 
-        object IJournaledState.OperationCodec => this;
+        object IJournaledStateOperationCodecProvider.OperationCodec => this;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -872,9 +874,11 @@ public class JsonCodecTests
         public IJournaledState ResolveState(JournalStreamId streamId) => state;
     }
 
-    private sealed class RecordingState(object codec) : IJournaledState
+    private sealed class RecordingState(object codec) : IJournaledState, IJournaledStateOperationCodecProvider
     {
-        public object OperationCodec => codec;
+        object IJournaledStateOperationCodecProvider.OperationCodec => codec;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public void Reset(JournalStreamWriter storage) { }
         public void AppendEntries(JournalStreamWriter writer) { }
@@ -884,7 +888,7 @@ public class JsonCodecTests
 
     private sealed class NoOpState : IDurableNothing, IJournaledState
     {
-        public object OperationCodec { get; } = new();
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public void Reset(JournalStreamWriter storage) { }
         public void AppendEntries(JournalStreamWriter writer) { }
@@ -910,7 +914,9 @@ public class JsonCodecTests
     {
         public ReadOnlyMemory<byte> Payload => ReadOnlyMemory<byte>.Empty;
 
-        public void Apply(IJournaledState state) => throw new NotSupportedException();
+        public string FormatKey => JsonJournalExtensions.JournalFormatKey;
+
+        public void Apply(IJournaledState state, object operationCodec) => throw new NotSupportedException();
     }
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDictionaryOperationHandler<TKey, TValue> where TKey : notnull

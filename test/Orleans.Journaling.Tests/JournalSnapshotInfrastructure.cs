@@ -206,7 +206,7 @@ public static class JournalSnapshotFormatting
 /// <see cref="IStateResolver"/> that returns a single supplied state for a single supplied stream id.
 /// </summary>
 /// <remarks>
-/// The OrleansBinary and JSONL readers dispatch through <see cref="IJournaledState.OperationCodec"/>,
+/// The OrleansBinary and JSONL readers dispatch through <see cref="IStateResolver.GetOperationCodec"/>,
 /// then call <c>state is THandler</c> to type-test. Snapshot tests therefore feed a <c>RecordingXxxState</c>
 /// instance directly so the same object satisfies both the <see cref="IJournaledState"/> contract and the
 /// codec's expected operation handler interface.
@@ -240,18 +240,21 @@ public sealed class SingleStreamResolver : IStateResolver
 /// state contract (so the journal readers will dispatch into it) and the dictionary operation handler
 /// (so the codec accepts it via <c>state is THandler</c>).
 /// </summary>
-public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, IDictionaryOperationHandler<TKey, TValue>
+public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, IJournaledStateOperationCodecProvider, IDictionaryOperationHandler<TKey, TValue>
     where TKey : notnull
 {
+    private readonly IDictionaryOperationCodec<TKey, TValue> _codec;
     private readonly RecordingDictionaryOperationHandler<TKey, TValue> _handler = new();
 
     public RecordingDictionaryState(IDictionaryOperationCodec<TKey, TValue> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
-        OperationCodec = codec;
+        _codec = codec;
     }
 
-    public object OperationCodec { get; }
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
+
+    Type IJournaledState.OperationCodecServiceType => typeof(IDictionaryOperationCodec<TKey, TValue>);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -275,17 +278,20 @@ public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, ID
 }
 
 /// <summary>Recording state for list-codec snapshot tests.</summary>
-public sealed class RecordingListState<T> : IJournaledState, IListOperationHandler<T>
+public sealed class RecordingListState<T> : IJournaledState, IJournaledStateOperationCodecProvider, IListOperationHandler<T>
 {
+    private readonly IListOperationCodec<T> _codec;
     private readonly RecordingListOperationHandler<T> _handler = new();
 
     public RecordingListState(IListOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
-        OperationCodec = codec;
+        _codec = codec;
     }
 
-    public object OperationCodec { get; }
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
+
+    Type IJournaledState.OperationCodecServiceType => typeof(IListOperationCodec<T>);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -311,17 +317,20 @@ public sealed class RecordingListState<T> : IJournaledState, IListOperationHandl
 }
 
 /// <summary>Recording state for queue-codec snapshot tests.</summary>
-public sealed class RecordingQueueState<T> : IJournaledState, IQueueOperationHandler<T>
+public sealed class RecordingQueueState<T> : IJournaledState, IJournaledStateOperationCodecProvider, IQueueOperationHandler<T>
 {
+    private readonly IQueueOperationCodec<T> _codec;
     private readonly RecordingQueueOperationHandler<T> _handler = new();
 
     public RecordingQueueState(IQueueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
-        OperationCodec = codec;
+        _codec = codec;
     }
 
-    public object OperationCodec { get; }
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
+
+    Type IJournaledState.OperationCodecServiceType => typeof(IQueueOperationCodec<T>);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -343,17 +352,20 @@ public sealed class RecordingQueueState<T> : IJournaledState, IQueueOperationHan
 }
 
 /// <summary>Recording state for set-codec snapshot tests.</summary>
-public sealed class RecordingSetState<T> : IJournaledState, ISetOperationHandler<T>
+public sealed class RecordingSetState<T> : IJournaledState, IJournaledStateOperationCodecProvider, ISetOperationHandler<T>
 {
+    private readonly ISetOperationCodec<T> _codec;
     private readonly RecordingSetOperationHandler<T> _handler = new();
 
     public RecordingSetState(ISetOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
-        OperationCodec = codec;
+        _codec = codec;
     }
 
-    public object OperationCodec { get; }
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
+
+    Type IJournaledState.OperationCodecServiceType => typeof(ISetOperationCodec<T>);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -375,17 +387,20 @@ public sealed class RecordingSetState<T> : IJournaledState, ISetOperationHandler
 }
 
 /// <summary>Recording state for value-codec snapshot tests.</summary>
-public sealed class RecordingValueState<T> : IJournaledState, IValueOperationHandler<T>
+public sealed class RecordingValueState<T> : IJournaledState, IJournaledStateOperationCodecProvider, IValueOperationHandler<T>
 {
+    private readonly IValueOperationCodec<T> _codec;
     private readonly RecordingValueOperationHandler<T> _handler = new();
 
     public RecordingValueState(IValueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
-        OperationCodec = codec;
+        _codec = codec;
     }
 
-    public object OperationCodec { get; }
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
+
+    Type IJournaledState.OperationCodecServiceType => typeof(IValueOperationCodec<T>);
 
     public T? Value => _handler.Value;
 
@@ -407,17 +422,20 @@ public sealed class RecordingValueState<T> : IJournaledState, IValueOperationHan
 }
 
 /// <summary>Recording state for state-codec snapshot tests.</summary>
-public sealed class RecordingStateState<T> : IJournaledState, IStateOperationHandler<T>
+public sealed class RecordingStateState<T> : IJournaledState, IJournaledStateOperationCodecProvider, IStateOperationHandler<T>
 {
+    private readonly IStateOperationCodec<T> _codec;
     private readonly RecordingStateOperationHandler<T> _handler = new();
 
     public RecordingStateState(IStateOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
-        OperationCodec = codec;
+        _codec = codec;
     }
 
-    public object OperationCodec { get; }
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
+
+    Type IJournaledState.OperationCodecServiceType => typeof(IStateOperationCodec<T>);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -439,17 +457,20 @@ public sealed class RecordingStateState<T> : IJournaledState, IStateOperationHan
 }
 
 /// <summary>Recording state for task-completion-source codec snapshot tests.</summary>
-public sealed class RecordingTcsState<T> : IJournaledState, ITaskCompletionSourceOperationHandler<T>
+public sealed class RecordingTcsState<T> : IJournaledState, IJournaledStateOperationCodecProvider, ITaskCompletionSourceOperationHandler<T>
 {
+    private readonly ITaskCompletionSourceOperationCodec<T> _codec;
     private readonly RecordingTaskCompletionSourceOperationHandler<T> _handler = new();
 
     public RecordingTcsState(ITaskCompletionSourceOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
-        OperationCodec = codec;
+        _codec = codec;
     }
 
-    public object OperationCodec { get; }
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
+
+    Type IJournaledState.OperationCodecServiceType => typeof(ITaskCompletionSourceOperationCodec<T>);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 

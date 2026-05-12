@@ -14,7 +14,7 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOperationHandler<T>
+internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IJournaledStateOperationCodecProvider, IListOperationHandler<T>
 {
     private readonly IListOperationCodec<T> _codec;
     private readonly List<T> _items = [];
@@ -58,7 +58,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
 
     bool ICollection<T>.IsReadOnly => false;
 
-    object IJournaledState.OperationCodec => _codec;
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
 
     Type IJournaledState.OperationCodecServiceType => typeof(IListOperationCodec<T>);
 

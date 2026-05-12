@@ -629,7 +629,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         Action<JournalStreamWriter> write,
         Action assertCommands)
     {
-        Assert.Same(codec, state.OperationCodec);
+        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         using var batch = new OrleansBinaryJournalBatchWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
         var bytes = SnapshotBytes(batch);
@@ -643,7 +643,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         Action<JournalStreamWriter> writeSequence,
         string[] expectedCommands)
     {
-        Assert.Same(codec, state.OperationCodec);
+        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         using var batch = new OrleansBinaryJournalBatchWriter();
         writeSequence(batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
         var bytes = SnapshotBytes(batch);

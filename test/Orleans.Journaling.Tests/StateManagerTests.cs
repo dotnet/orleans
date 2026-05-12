@@ -1038,13 +1038,15 @@ public class StateManagerTests : JournalingTestBase
         void Apply(ReadOnlySequence<byte> payload, IJournaledState state);
     }
 
-    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, ITestJournalEntryCodec, IOrleansBinaryJournalEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, ITestJournalEntryCodec, IOrleansBinaryJournalEntryCodec
     {
         private JournalStreamId _streamId;
 
         public List<CapturedJournalEntry> Entries { get; } = [];
 
-        object IJournaledState.OperationCodec => this;
+        object IJournaledStateOperationCodecProvider.OperationCodec => this;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -1103,7 +1105,7 @@ public class StateManagerTests : JournalingTestBase
             }
             else
             {
-                formattedEntry.Apply(state);
+                formattedEntry.Apply(state, resolver.GetOperationCodec(state));
             }
 
             Array.Fill(callbackPayload, byte.MaxValue);
@@ -1115,14 +1117,16 @@ public class StateManagerTests : JournalingTestBase
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
 
-        public void Apply(IJournaledState state)
+        public string FormatKey => "test";
+
+        public void Apply(IJournaledState state, object operationCodec)
         {
             if (state is IDurableNothing)
             {
                 return;
             }
 
-            if (state.OperationCodec is not ITestJournalEntryCodec codec)
+            if (operationCodec is not ITestJournalEntryCodec codec)
             {
                 throw new InvalidOperationException(
                     $"State '{state.GetType().FullName}' is not compatible with test journal entry codec.");
@@ -1456,7 +1460,7 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class ManualDirectWriteState : IJournaledState
+    private sealed class ManualDirectWriteState : IJournaledState, IJournaledStateOperationCodecProvider
     {
         private JournalStreamWriter _writer;
         private bool _entryOpen;
@@ -1471,7 +1475,9 @@ public class StateManagerTests : JournalingTestBase
 
         public void MarkEntryClosing() => _entryOpen = false;
 
-        public object OperationCodec => this;
+        object IJournaledStateOperationCodecProvider.OperationCodec => this;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public void Reset(JournalStreamWriter writer) => _writer = writer;
 

@@ -15,7 +15,7 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, ITaskCompletionSourceOperationHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IJournaledStateOperationCodecProvider, ITaskCompletionSourceOperationHandler<T>
 {
     private readonly ITaskCompletionSourceOperationCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
@@ -101,7 +101,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
-    object IJournaledState.OperationCodec => _codec;
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
 
     Type IJournaledState.OperationCodecServiceType => typeof(ITaskCompletionSourceOperationCodec<T>);
 

@@ -326,11 +326,13 @@ internal abstract class JsonFormattedJournalEntry : IFormattedJournalEntry
 
     public ReadOnlyMemory<byte> Payload => _payload ??= SerializePayload();
 
+    public string FormatKey => JsonJournalExtensions.JournalFormatKey;
+
     public abstract void WriteTo(Utf8JsonWriter writer);
 
     public abstract void WriteArrayElementsTo(Utf8JsonWriter writer);
 
-    public void Apply(IJournaledState state)
+    public void Apply(IJournaledState state, object operationCodec)
     {
         ArgumentNullException.ThrowIfNull(state);
         if (state is IDurableNothing)
@@ -338,7 +340,6 @@ internal abstract class JsonFormattedJournalEntry : IFormattedJournalEntry
             return;
         }
 
-        var operationCodec = state.OperationCodec;
         if (operationCodec is not IJsonJournalEntryCodec jsonCodec)
         {
             var codecType = operationCodec?.GetType().FullName ?? "<null>";

@@ -20,7 +20,9 @@ internal sealed class OrleansBinaryFormattedJournalEntry : IFormattedJournalEntr
 
     public ReadOnlyMemory<byte> Payload => _payload;
 
-    public void Apply(IJournaledState state)
+    public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
+
+    public void Apply(IJournaledState state, object operationCodec)
     {
         ArgumentNullException.ThrowIfNull(state);
         if (state is IDurableNothing)
@@ -35,6 +37,6 @@ internal sealed class OrleansBinaryFormattedJournalEntry : IFormattedJournalEntr
         using var slice = writer.PeekSlice(writer.Length);
         using var session = _sessionPool.GetSession();
         var reader = Reader.Create(slice, session);
-        OrleansBinaryJournalReader.ApplyEntry(ref reader, state);
+        OrleansBinaryJournalReader.ApplyEntry(ref reader, operationCodec, state);
     }
 }

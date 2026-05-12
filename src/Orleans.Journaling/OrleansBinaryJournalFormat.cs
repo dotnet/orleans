@@ -154,12 +154,7 @@ internal static class OrleansBinaryJournalReader
     /// operation body (the bytes immediately after the stream-id varuint, starting with the format-version
     /// byte). After the codec returns, the framework verifies that <c>reader.Position == reader.Length</c>.
     /// </summary>
-    internal static void ApplyEntry(ref Reader<ArcBufferReaderInput> reader, IJournaledState state, ulong? streamId = null)
-    {
-        ApplyEntry(ref reader, state.OperationCodec, state, streamId);
-    }
-
-    private static void ApplyEntry(ref Reader<ArcBufferReaderInput> reader, object? operationCodec, IJournaledState state, ulong? streamId)
+    internal static void ApplyEntry(ref Reader<ArcBufferReaderInput> reader, object? operationCodec, IJournaledState state, ulong? streamId = null)
     {
         if (operationCodec is not IOrleansBinaryJournalEntryCodec binaryCodec)
         {

@@ -118,7 +118,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         var entry = new OrleansBinaryFormattedJournalEntry(slice, SessionPool);
         var consumer = new CollectingConsumer();
 
-        entry.Apply(consumer);
+        entry.Apply(consumer, JournalFormatServices.GetCurrentOperationCodec(consumer));
 
         var applied = Assert.Single(consumer.Entries);
         Assert.Equal(0UL, applied.StreamId);
@@ -402,13 +402,15 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         return (length, streamId, payload);
     }
 
-    private sealed class CollectingConsumer : IStateResolver, IJournaledState, IOrleansBinaryJournalEntryCodec
+    private sealed class CollectingConsumer : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IOrleansBinaryJournalEntryCodec
     {
         private JournalStreamId _streamId;
 
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        object IJournaledState.OperationCodec => this;
+        object IJournaledStateOperationCodecProvider.OperationCodec => this;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -428,7 +430,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class BufferingConsumer : IStateResolver, IJournaledState, IFormattedJournalEntryBuffer
+    private sealed class BufferingConsumer : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IFormattedJournalEntryBuffer
     {
         private readonly List<IFormattedJournalEntry> _formattedEntries = [];
         private JournalStreamId _streamId;
@@ -437,7 +439,9 @@ public sealed class OrleansBinaryJournalBatchWriterTests
 
         public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
 
-        object IJournaledState.OperationCodec => this;
+        object IJournaledStateOperationCodecProvider.OperationCodec => this;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -468,6 +472,8 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     {
         public ReadOnlyMemory<byte> Payload { get; } = new byte[] { 1, 2, 3 };
 
-        public void Apply(IJournaledState state) => throw new NotSupportedException();
+        public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
+
+        public void Apply(IJournaledState state, object operationCodec) => throw new NotSupportedException();
     }
 }

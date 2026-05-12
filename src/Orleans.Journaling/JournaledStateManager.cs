@@ -100,7 +100,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
                     foreach (var entry in vessel.FormattedEntries)
                     {
-                        entry.Apply(state);
+                        entry.Apply(state, GetOperationCodec(state, entry.FormatKey));
                     }
 
                     var id = _journalStreamDirectory[name];
@@ -554,7 +554,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         if (string.Equals(journalFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
         {
-            return state.OperationCodec;
+            return JournalFormatServices.GetCurrentOperationCodec(state);
         }
 
         return JournalFormatServices.GetRequiredOperationCodec(
@@ -807,7 +807,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDictionaryOperationHandler<string, ulong>
+        IDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IJournaledStateOperationCodecProvider, IDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
@@ -818,7 +818,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         public ulong this[string name] => _ids[name];
 
-        object IJournaledState.OperationCodec => _codec;
+        object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
 
         Type IJournaledState.OperationCodecServiceType => typeof(IDictionaryOperationCodec<string, ulong>);
 
@@ -897,14 +897,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     [DebuggerDisplay("RetiredState Id = {StreamId.Value}")]
     private sealed class RetiredState(JournalStreamId streamId) : IJournaledState, IFormattedJournalEntryBuffer
     {
-        private static readonly object NoOpCodec = new();
         private readonly List<IFormattedJournalEntry> _formattedEntries = [];
 
         public JournalStreamId StreamId { get; } = streamId;
 
         public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
-
-        object IJournaledState.OperationCodec => NoOpCodec;
 
         Type IJournaledState.OperationCodecServiceType => typeof(object);
 

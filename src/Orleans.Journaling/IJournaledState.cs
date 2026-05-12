@@ -40,14 +40,9 @@ namespace Orleans.Journaling;
 public interface IJournaledState
 {
     /// <summary>
-    /// Gets the durable operation codec used by this state.
+    /// Gets the service type used to resolve this state's operation codec.
     /// </summary>
-    object OperationCodec { get; }
-
-    /// <summary>
-    /// Gets the service type used to resolve this state's durable operation codec.
-    /// </summary>
-    Type OperationCodecServiceType => JournalFormatServices.GetOperationCodecServiceType(OperationCodec);
+    Type OperationCodecServiceType { get; }
 
     /// <summary>
     /// Resets the state.
@@ -90,4 +85,9 @@ public interface IJournaledState
     /// </summary>
     /// <returns>A replica of this instance.</returns>
     IJournaledState DeepCopy();
+}
+
+internal interface IJournaledStateOperationCodecProvider
+{
+    object OperationCodec { get; }
 }

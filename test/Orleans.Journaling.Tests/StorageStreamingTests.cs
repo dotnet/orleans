@@ -320,13 +320,15 @@ public sealed class StorageStreamingTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, IOrleansBinaryJournalEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IOrleansBinaryJournalEntryCodec
     {
         private JournalStreamId _streamId;
 
         public List<(JournalStreamId StreamId, byte[] Payload)> Entries { get; } = [];
 
-        object IJournaledState.OperationCodec => this;
+        object IJournaledStateOperationCodecProvider.OperationCodec => this;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {

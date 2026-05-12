@@ -18,7 +18,7 @@ public class DurableListJournalBenchmarks
     private const int OperationsPerInvocation = 4_096;
     private static readonly JournalStreamId ListJournalStreamId = new(8);
 
-    private IDurableListOperationCodec<int> _codec;
+    private IListOperationCodec<int> _codec;
     private IJournalFormat _journalFormat;
     private DurableList<int> _list;
     private IJournaledState _state;
@@ -161,8 +161,8 @@ public class DurableListJournalBenchmarks
 
     private sealed class RecoveryConsumer(
         JournalStreamId expectedStreamId,
-        IDurableListOperationCodec<int> codec,
-        int capacity) : IStateResolver, IJournaledState, IDurableListOperationHandler<int>
+        IListOperationCodec<int> codec,
+        int capacity) : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -170,7 +170,9 @@ public class DurableListJournalBenchmarks
 
         public void Reset() => _items.Clear();
 
-        object IJournaledState.OperationCodec => codec;
+        object IJournaledStateOperationCodecProvider.OperationCodec => codec;
+
+        Type IJournaledState.OperationCodecServiceType => typeof(IListOperationCodec<int>);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {

@@ -5,7 +5,7 @@ using Orleans.Serialization.Buffers.Adaptors;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Helpers shared by the public ROS-based <c>IDurable*OperationCodec.Apply</c> entry points.
+/// Helpers shared by the public ROS-based <c>*OperationCodec.Apply</c> entry points.
 /// </summary>
 internal static class OrleansBinaryOperationApplier
 {

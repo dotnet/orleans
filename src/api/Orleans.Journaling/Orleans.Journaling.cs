@@ -223,9 +223,11 @@ namespace Orleans.Journaling
 
     public partial interface IFormattedJournalEntry
     {
+        string FormatKey { get; }
+
         System.ReadOnlyMemory<byte> Payload { get; }
 
-        void Apply(IJournaledState state);
+        void Apply(IJournaledState state, object operationCodec);
     }
 
     public partial interface IFormattedJournalEntryBuffer
@@ -246,8 +248,6 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledState
     {
-        object OperationCodec { get; }
-
         System.Type OperationCodecServiceType { get; }
 
         void AppendEntries(JournalStreamWriter writer);

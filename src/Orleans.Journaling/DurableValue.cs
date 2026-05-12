@@ -10,7 +10,7 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IValueOperationHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IJournaledStateOperationCodecProvider, IValueOperationHandler<T>
 {
     private readonly IValueOperationCodec<T> _codec;
     private T? _value;
@@ -50,7 +50,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IValu
 
     public void OnModified() => _isDirty = true;
 
-    object IJournaledState.OperationCodec => _codec;
+    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
 
     Type IJournaledState.OperationCodecServiceType => typeof(IValueOperationCodec<T>);
 

@@ -14,15 +14,11 @@ public interface IDurableNothing
 /// </summary>
 internal sealed class DurableNothing : IDurableNothing, IJournaledState
 {
-    private static readonly object NoOpCodec = new();
-
     public DurableNothing([ServiceKey] string key, IStateManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
     }
-
-    object IJournaledState.OperationCodec => NoOpCodec;
 
     Type IJournaledState.OperationCodecServiceType => typeof(object);
 

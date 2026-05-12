@@ -619,7 +619,7 @@ public sealed class JsonCodecSnapshotTests
         Action<JournalStreamWriter> write,
         Action assertCommands)
     {
-        Assert.Same(codec, state.OperationCodec);
+        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         write(writer.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
@@ -637,7 +637,7 @@ public sealed class JsonCodecSnapshotTests
         string[] expectedCommands,
         Func<IReadOnlyList<string>> getActualCommands)
     {
-        Assert.Same(codec, state.OperationCodec);
+        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         writeSequence(writer.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));

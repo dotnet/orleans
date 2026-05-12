@@ -6,7 +6,12 @@ namespace Orleans.Journaling;
 public interface IFormattedJournalEntry
 {
     /// <summary>
-    /// Gets the durable operation payload bytes for the formatted entry.
+    /// Gets the journal format key for this formatted entry.
+    /// </summary>
+    string FormatKey { get; }
+
+    /// <summary>
+    /// Gets the operation payload bytes for the formatted entry.
     /// </summary>
     ReadOnlyMemory<byte> Payload { get; }
 
@@ -14,7 +19,8 @@ public interface IFormattedJournalEntry
     /// Applies this entry to <paramref name="state"/>.
     /// </summary>
     /// <param name="state">The target state.</param>
-    void Apply(IJournaledState state);
+    /// <param name="operationCodec">The operation codec to use for applying the entry.</param>
+    void Apply(IJournaledState state, object operationCodec);
 }
 
 /// <summary>
