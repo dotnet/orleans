@@ -453,9 +453,14 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (snapshot.Members.TryGetValue(silo, out var member))
             {
+                // If this is a known host, remove the activation if the host is dead.
                 return member.Status == SiloStatus.Dead;
             }
 
+            // If this is not a known host, remove the activation if it was registered at an older membership version.
+            // This indicates that the host must have been removed.
+            // Hosts cannot activate grains before they are active, and we ensure that we refresh the membership before processing messages,
+            // so this is a reliable indicator of a defunct activation.
             return address.MembershipVersion < snapshot.Version;
         }
 
