@@ -18,8 +18,13 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     private const uint SnapshotCommand = 3;
 
     /// <inheritdoc/>
-    public void WriteEnqueue(T item, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteEnqueuePayload(item, output));
+    public void WriteEnqueue(T item, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, item),
+            static (output, operation) => operation.codec.WriteEnqueuePayload(operation.item, output));
+    }
 
     private void WriteEnqueuePayload(T item, IBufferWriter<byte> output)
     {
@@ -28,22 +33,31 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteDequeue(JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, WriteDequeuePayload);
-
-    private static void WriteDequeuePayload(IBufferWriter<byte> output) =>
-        WriteHeader(output, DequeueCommand);
-
-    /// <inheritdoc/>
-    public void WriteClear(JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, WriteClearPayload);
-
-    private static void WriteClearPayload(IBufferWriter<byte> output) =>
-        WriteHeader(output, ClearCommand);
+    public void WriteDequeue(JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            DequeueCommand,
+            static (output, command) => WriteHeader(output, command));
+    }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+    public void WriteClear(JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            ClearCommand,
+            static (output, command) => WriteHeader(output, command));
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, items),
+            static (output, operation) => operation.codec.WriteSnapshotPayload(operation.items, output));
+    }
 
     private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {

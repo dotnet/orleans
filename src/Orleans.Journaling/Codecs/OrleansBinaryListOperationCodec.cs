@@ -20,8 +20,13 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     private const uint SnapshotCommand = 5;
 
     /// <inheritdoc/>
-    public void WriteAdd(T item, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteAddPayload(item, output));
+    public void WriteAdd(T item, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, item),
+            static (output, operation) => operation.codec.WriteAddPayload(operation.item, output));
+    }
 
     private void WriteAddPayload(T item, IBufferWriter<byte> output)
     {
@@ -30,8 +35,13 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteSet(int index, T item, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteSetPayload(index, item, output));
+    public void WriteSet(int index, T item, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, index, item),
+            static (output, operation) => operation.codec.WriteSetPayload(operation.index, operation.item, output));
+    }
 
     private void WriteSetPayload(int index, T item, IBufferWriter<byte> output)
     {
@@ -40,8 +50,13 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteInsert(int index, T item, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteInsertPayload(index, item, output));
+    public void WriteInsert(int index, T item, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, index, item),
+            static (output, operation) => operation.codec.WriteInsertPayload(operation.index, operation.item, output));
+    }
 
     private void WriteInsertPayload(int index, T item, IBufferWriter<byte> output)
     {
@@ -50,22 +65,31 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteRemoveAt(int index, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteRemoveAtPayload(index, output));
-
-    private static void WriteRemoveAtPayload(int index, IBufferWriter<byte> output) =>
-        WriteHeader(output, RemoveCommand, (uint)index);
-
-    /// <inheritdoc/>
-    public void WriteClear(JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, WriteClearPayload);
-
-    private static void WriteClearPayload(IBufferWriter<byte> output) =>
-        WriteHeader(output, ClearCommand);
+    public void WriteRemoveAt(int index, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            index,
+            static (output, index) => WriteHeader(output, RemoveCommand, (uint)index));
+    }
 
     /// <inheritdoc/>
-    public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteSnapshotPayload(items, output));
+    public void WriteClear(JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            ClearCommand,
+            static (output, command) => WriteHeader(output, command));
+    }
+
+    /// <inheritdoc/>
+    public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, items),
+            static (output, operation) => operation.codec.WriteSnapshotPayload(operation.items, output));
+    }
 
     private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
     {

@@ -16,8 +16,12 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new SetOperation(_valueTypeInfo, value),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _valueTypeInfo, value),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
+                JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
+            });
     }
 
     /// <inheritdoc/>
@@ -41,15 +45,6 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
-
-    private readonly struct SetOperation(JsonTypeInfo<T> typeInfo, T value)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(JsonJournalEntryCommands.Set);
-            JsonSerializer.Serialize(writer, value, typeInfo);
-        }
-    }
 }
 
 /// <summary>
@@ -65,8 +60,13 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new SetOperation(_stateTypeInfo, state, version),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _stateTypeInfo, state, version),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
+                JsonSerializer.Serialize(jsonWriter, operation.state, operation.typeInfo);
+                jsonWriter.WriteNumberValue(operation.version);
+            });
     }
 
     /// <inheritdoc/>
@@ -107,16 +107,6 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
             command,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
     }
-
-    private readonly struct SetOperation(JsonTypeInfo<T> typeInfo, T state, ulong version)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(JsonJournalEntryCommands.Set);
-            JsonSerializer.Serialize(writer, state, typeInfo);
-            writer.WriteNumberValue(version);
-        }
-    }
 }
 
 /// <summary>
@@ -135,8 +125,12 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new CompletedOperation(_valueTypeInfo, value),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _valueTypeInfo, value),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Completed);
+                JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
+            });
     }
 
     /// <inheritdoc/>
@@ -195,14 +189,5 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
             writer,
             command,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-    }
-
-    private readonly struct CompletedOperation(JsonTypeInfo<T> typeInfo, T value)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(JsonJournalEntryCommands.Completed);
-            JsonSerializer.Serialize(writer, value, typeInfo);
-        }
     }
 }

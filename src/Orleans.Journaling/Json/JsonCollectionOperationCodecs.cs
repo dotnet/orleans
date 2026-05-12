@@ -32,8 +32,24 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
         ArgumentNullException.ThrowIfNull(items);
         JsonOperationCodecWriter.Write(
             writer,
-            new SnapshotOperation(_itemTypeInfo, items),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _itemTypeInfo, items),
+            static (jsonWriter, operation) =>
+            {
+                var count = CollectionCodecHelpers.GetSnapshotCount(operation.items);
+
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Snapshot);
+                jsonWriter.WriteStartArray();
+                var written = 0;
+                foreach (var item in operation.items)
+                {
+                    CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+                    JsonSerializer.Serialize(jsonWriter, item, operation.typeInfo);
+                    written++;
+                }
+
+                CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+                jsonWriter.WriteEndArray();
+            });
     }
 
     /// <inheritdoc/>
@@ -92,24 +108,37 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new ItemOperation(_itemTypeInfo, command, item),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _itemTypeInfo, command, item),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(operation.command);
+                JsonSerializer.Serialize(jsonWriter, operation.item, operation.typeInfo);
+            });
     }
 
     private void WriteIndexedItem(JournalStreamWriter writer, string command, int index, T item)
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new IndexedItemOperation(_itemTypeInfo, command, index, item),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _itemTypeInfo, command, index, item),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(operation.command);
+                jsonWriter.WriteNumberValue(operation.index);
+                JsonSerializer.Serialize(jsonWriter, operation.item, operation.typeInfo);
+            });
     }
 
     private static void WriteIndex(JournalStreamWriter writer, string command, int index)
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new IndexOperation(command, index),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (command, index),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(operation.command);
+                jsonWriter.WriteNumberValue(operation.index);
+            });
     }
 
     private static void WriteCommand(JournalStreamWriter writer, string command)
@@ -118,55 +147,6 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
             writer,
             command,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-    }
-
-    private readonly struct ItemOperation(JsonTypeInfo<T> typeInfo, string command, T item)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(command);
-            JsonSerializer.Serialize(writer, item, typeInfo);
-        }
-    }
-
-    private readonly struct IndexedItemOperation(JsonTypeInfo<T> typeInfo, string command, int index, T item)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(command);
-            writer.WriteNumberValue(index);
-            JsonSerializer.Serialize(writer, item, typeInfo);
-        }
-    }
-
-    private readonly struct IndexOperation(string command, int index)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(command);
-            writer.WriteNumberValue(index);
-        }
-    }
-
-    private readonly struct SnapshotOperation(JsonTypeInfo<T> typeInfo, IReadOnlyCollection<T> items)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            var count = CollectionCodecHelpers.GetSnapshotCount(items);
-
-            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
-            writer.WriteStartArray();
-            var written = 0;
-            foreach (var item in items)
-            {
-                CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-                JsonSerializer.Serialize(writer, item, typeInfo);
-                written++;
-            }
-
-            CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
-            writer.WriteEndArray();
-        }
     }
 }
 
@@ -193,8 +173,24 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
         ArgumentNullException.ThrowIfNull(items);
         JsonOperationCodecWriter.Write(
             writer,
-            new SnapshotOperation(_itemTypeInfo, items),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _itemTypeInfo, items),
+            static (jsonWriter, operation) =>
+            {
+                var count = CollectionCodecHelpers.GetSnapshotCount(operation.items);
+
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Snapshot);
+                jsonWriter.WriteStartArray();
+                var written = 0;
+                foreach (var item in operation.items)
+                {
+                    CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+                    JsonSerializer.Serialize(jsonWriter, item, operation.typeInfo);
+                    written++;
+                }
+
+                CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+                jsonWriter.WriteEndArray();
+            });
     }
 
     /// <inheritdoc/>
@@ -241,8 +237,12 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new ItemOperation(_itemTypeInfo, command, item),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _itemTypeInfo, command, item),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(operation.command);
+                JsonSerializer.Serialize(jsonWriter, operation.item, operation.typeInfo);
+            });
     }
 
     private static void WriteCommand(JournalStreamWriter writer, string command)
@@ -251,36 +251,6 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
             writer,
             command,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-    }
-
-    private readonly struct ItemOperation(JsonTypeInfo<T> typeInfo, string command, T item)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(command);
-            JsonSerializer.Serialize(writer, item, typeInfo);
-        }
-    }
-
-    private readonly struct SnapshotOperation(JsonTypeInfo<T> typeInfo, IReadOnlyCollection<T> items)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            var count = CollectionCodecHelpers.GetSnapshotCount(items);
-
-            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
-            writer.WriteStartArray();
-            var written = 0;
-            foreach (var item in items)
-            {
-                CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-                JsonSerializer.Serialize(writer, item, typeInfo);
-                written++;
-            }
-
-            CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
-            writer.WriteEndArray();
-        }
     }
 }
 
@@ -307,8 +277,24 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
         ArgumentNullException.ThrowIfNull(items);
         JsonOperationCodecWriter.Write(
             writer,
-            new SnapshotOperation(_itemTypeInfo, items),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _itemTypeInfo, items),
+            static (jsonWriter, operation) =>
+            {
+                var count = CollectionCodecHelpers.GetSnapshotCount(operation.items);
+
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Snapshot);
+                jsonWriter.WriteStartArray();
+                var written = 0;
+                foreach (var item in operation.items)
+                {
+                    CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+                    JsonSerializer.Serialize(jsonWriter, item, operation.typeInfo);
+                    written++;
+                }
+
+                CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+                jsonWriter.WriteEndArray();
+            });
     }
 
     /// <inheritdoc/>
@@ -355,8 +341,12 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new ItemOperation(_itemTypeInfo, command, item),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (typeInfo: _itemTypeInfo, command, item),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(operation.command);
+                JsonSerializer.Serialize(jsonWriter, operation.item, operation.typeInfo);
+            });
     }
 
     private static void WriteCommand(JournalStreamWriter writer, string command)
@@ -365,35 +355,5 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
             writer,
             command,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-    }
-
-    private readonly struct ItemOperation(JsonTypeInfo<T> typeInfo, string command, T item)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(command);
-            JsonSerializer.Serialize(writer, item, typeInfo);
-        }
-    }
-
-    private readonly struct SnapshotOperation(JsonTypeInfo<T> typeInfo, IReadOnlyCollection<T> items)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            var count = CollectionCodecHelpers.GetSnapshotCount(items);
-
-            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
-            writer.WriteStartArray();
-            var written = 0;
-            foreach (var item in items)
-            {
-                CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-                JsonSerializer.Serialize(writer, item, typeInfo);
-                written++;
-            }
-
-            CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
-            writer.WriteEndArray();
-        }
     }
 }

@@ -257,10 +257,13 @@ public interface ITaskCompletionSourceOperationHandler<T>
 
 internal static class JournalOperationWriter
 {
-    public static void Write(JournalStreamWriter writer, Action<JournalEntryWriter> write)
+    public static void Write<TArg>(
+        JournalStreamWriter writer,
+        TArg argument,
+        Action<JournalEntryWriter, TArg> write)
     {
         using var entry = writer.BeginEntry();
-        write(entry.Writer);
+        write(entry.Writer, argument);
         entry.Commit();
     }
 }

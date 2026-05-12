@@ -23,8 +23,13 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new SetOperation(_keyTypeInfo, _valueTypeInfo, key, value),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (keyTypeInfo: _keyTypeInfo, valueTypeInfo: _valueTypeInfo, key, value),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
+                JsonSerializer.Serialize(jsonWriter, operation.key, operation.keyTypeInfo);
+                JsonSerializer.Serialize(jsonWriter, operation.value, operation.valueTypeInfo);
+            });
     }
 
     /// <inheritdoc/>
@@ -32,8 +37,12 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     {
         JsonOperationCodecWriter.Write(
             writer,
-            new RemoveOperation(_keyTypeInfo, key),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (keyTypeInfo: _keyTypeInfo, key),
+            static (jsonWriter, operation) =>
+            {
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Remove);
+                JsonSerializer.Serialize(jsonWriter, operation.key, operation.keyTypeInfo);
+            });
     }
 
     /// <inheritdoc/>
@@ -52,8 +61,27 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
 
         JsonOperationCodecWriter.Write(
             writer,
-            new SnapshotOperation(_keyTypeInfo, _valueTypeInfo, items),
-            static (jsonWriter, operation) => operation.Write(jsonWriter));
+            (keyTypeInfo: _keyTypeInfo, valueTypeInfo: _valueTypeInfo, items),
+            static (jsonWriter, operation) =>
+            {
+                var count = CollectionCodecHelpers.GetSnapshotCount(operation.items);
+
+                jsonWriter.WriteStringValue(JsonJournalEntryCommands.Snapshot);
+                jsonWriter.WriteStartArray();
+                var written = 0;
+                foreach (var (key, value) in operation.items)
+                {
+                    CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
+                    jsonWriter.WriteStartArray();
+                    JsonSerializer.Serialize(jsonWriter, key, operation.keyTypeInfo);
+                    JsonSerializer.Serialize(jsonWriter, value, operation.valueTypeInfo);
+                    jsonWriter.WriteEndArray();
+                    written++;
+                }
+
+                CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+                jsonWriter.WriteEndArray();
+            });
     }
 
     /// <inheritdoc/>
@@ -96,52 +124,6 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
             default:
                 operation.EnsureEnd(1);
                 throw new NotSupportedException($"Command type '{command}' is not supported");
-        }
-    }
-
-    private readonly struct SetOperation(JsonTypeInfo<TKey> keyTypeInfo, JsonTypeInfo<TValue> valueTypeInfo, TKey key, TValue value)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(JsonJournalEntryCommands.Set);
-            JsonSerializer.Serialize(writer, key, keyTypeInfo);
-            JsonSerializer.Serialize(writer, value, valueTypeInfo);
-        }
-    }
-
-    private readonly struct RemoveOperation(JsonTypeInfo<TKey> keyTypeInfo, TKey key)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            writer.WriteStringValue(JsonJournalEntryCommands.Remove);
-            JsonSerializer.Serialize(writer, key, keyTypeInfo);
-        }
-    }
-
-    private readonly struct SnapshotOperation(
-        JsonTypeInfo<TKey> keyTypeInfo,
-        JsonTypeInfo<TValue> valueTypeInfo,
-        IReadOnlyCollection<KeyValuePair<TKey, TValue>> items)
-    {
-        public void Write(Utf8JsonWriter writer)
-        {
-            var count = CollectionCodecHelpers.GetSnapshotCount(items);
-
-            writer.WriteStringValue(JsonJournalEntryCommands.Snapshot);
-            writer.WriteStartArray();
-            var written = 0;
-            foreach (var (key, value) in items)
-            {
-                CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-                writer.WriteStartArray();
-                JsonSerializer.Serialize(writer, key, keyTypeInfo);
-                JsonSerializer.Serialize(writer, value, valueTypeInfo);
-                writer.WriteEndArray();
-                written++;
-            }
-
-            CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
-            writer.WriteEndArray();
         }
     }
 }

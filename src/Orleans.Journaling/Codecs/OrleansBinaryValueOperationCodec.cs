@@ -15,8 +15,13 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
     private const uint SetValueCommand = 0;
 
     /// <inheritdoc/>
-    public void WriteSet(T value, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteSetPayload(value, output));
+    public void WriteSet(T value, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, value),
+            static (output, operation) => operation.codec.WriteSetPayload(operation.value, output));
+    }
 
     private void WriteSetPayload(T value, IBufferWriter<byte> output)
     {

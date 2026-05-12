@@ -19,18 +19,28 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     private const byte FormatVersion = 0;
 
     /// <inheritdoc/>
-    public void WritePending(JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, WritePendingPayload);
+    public void WritePending(JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            DurableTaskCompletionSourceStatus.Pending,
+            static (output, status) => WriteStatusPayload(status, output));
+    }
 
-    private static void WritePendingPayload(IBufferWriter<byte> output)
+    private static void WriteStatusPayload(DurableTaskCompletionSourceStatus status, IBufferWriter<byte> output)
     {
         WriteVersionByte(output);
-        WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Pending);
+        WriteByte(output, (byte)status);
     }
 
     /// <inheritdoc/>
-    public void WriteCompleted(T value, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteCompletedPayload(value, output));
+    public void WriteCompleted(T value, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, value),
+            static (output, operation) => operation.codec.WriteCompletedPayload(operation.value, output));
+    }
 
     private void WriteCompletedPayload(T value, IBufferWriter<byte> output)
     {
@@ -40,8 +50,13 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteFaulted(Exception exception, JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, output => WriteFaultedPayload(exception, output));
+    public void WriteFaulted(Exception exception, JournalStreamWriter writer)
+    {
+        JournalOperationWriter.Write(
+            writer,
+            (codec: this, exception),
+            static (output, operation) => operation.codec.WriteFaultedPayload(operation.exception, output));
+    }
 
     private void WriteFaultedPayload(Exception exception, IBufferWriter<byte> output)
     {
@@ -51,13 +66,12 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void WriteCanceled(JournalStreamWriter writer) =>
-        JournalOperationWriter.Write(writer, WriteCanceledPayload);
-
-    private static void WriteCanceledPayload(IBufferWriter<byte> output)
+    public void WriteCanceled(JournalStreamWriter writer)
     {
-        WriteVersionByte(output);
-        WriteByte(output, (byte)DurableTaskCompletionSourceStatus.Canceled);
+        JournalOperationWriter.Write(
+            writer,
+            DurableTaskCompletionSourceStatus.Canceled,
+            static (output, status) => WriteStatusPayload(status, output));
     }
 
     /// <inheritdoc/>
