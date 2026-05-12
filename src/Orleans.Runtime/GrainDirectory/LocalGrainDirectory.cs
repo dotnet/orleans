@@ -433,7 +433,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return true;
             }
 
-            return snapshot.GetSiloStatus(silo) == SiloStatus.Dead;
+            return address.MembershipVersion < snapshot.Version && snapshot.GetSiloStatus(silo) == SiloStatus.Dead;
         }
 
         internal SiloAddress? FindPredecessor(SiloAddress silo)
