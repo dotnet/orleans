@@ -2014,11 +2014,6 @@ internal sealed partial class ActivationData :
                     }
                 }
             }
-            else if (isDirectoryFailure)
-            {
-                // Optimization: forward to the same host to restart activation without needing to invalidate caches.
-                ForwardingAddress ??= Address.SiloAddress;
-            }
         }
         catch (Exception ex)
         {
