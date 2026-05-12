@@ -738,8 +738,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist, "UnregisterManyAsync");
 
-            // before forwarding to other silos, we insert a retry delay and re-check destination
-            if (hopCount > 0 && forwardlist != null)
+            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            if (hopCount > 1 && forwardlist != null)
             {
                 await Task.Delay(RETRY_DELAY);
                 Dictionary<SiloAddress, List<GrainAddress>>? forwardlist2 = null;
@@ -852,8 +852,8 @@ namespace Orleans.Runtime.GrainDirectory
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
 
-            // on all silos other than first, we insert a retry delay and recheck owner before forwarding
-            if (hopCount > 0 && forwardAddress != null)
+            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
@@ -913,8 +913,8 @@ namespace Orleans.Runtime.GrainDirectory
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
 
-            // on all silos other than first, we insert a retry delay and recheck owner before forwarding
-            if (hopCount > 0 && forwardAddress != null)
+            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
