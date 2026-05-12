@@ -532,6 +532,51 @@ namespace UnitTests.Directory
         }
 
         [Fact]
+        public async Task CleanupWhenSiloIsDeadOnlyProcessesIncrementalChanges()
+        {
+            var expectedSilo = GenerateSiloAddress();
+            var outdatedSilo = GenerateSiloAddress();
+
+            this.mockMembershipService.UpdateSiloStatus(expectedSilo, SiloStatus.Active, "exp");
+            this.mockMembershipService.UpdateSiloStatus(outdatedSilo, SiloStatus.Active, "old");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            this.mockMembershipService.UpdateSiloStatus(outdatedSilo, SiloStatus.Dead, "old");
+            await WaitUntilClusterChangePropagated();
+
+            await this.grainDirectory
+                .Received(1)
+                .UnregisterSilos(Arg.Is<List<SiloAddress>>(list => list.Count == 1 && list.Contains(outdatedSilo)));
+
+            this.mockMembershipService.UpdateSiloStatus(expectedSilo, SiloStatus.Active, "exp2");
+            await WaitUntilClusterChangePropagated();
+
+            await this.grainDirectory
+                .Received(1)
+                .UnregisterSilos(Arg.Is<List<SiloAddress>>(list => list.Count == 1 && list.Contains(outdatedSilo)));
+
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
+        public async Task UpdateCacheStampsCurrentMembershipVersion()
+        {
+            await this.lifecycle.OnStart();
+
+            var grainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid()));
+            var silo = GenerateSiloAddress();
+
+            this.grainLocator.UpdateCache(grainId, silo);
+
+            Assert.True(this.grainLocator.TryLookupInCache(grainId, out var cached));
+            Assert.Equal(silo, cached.SiloAddress);
+            Assert.Equal(this.mockMembershipService.CurrentVersion, cached.MembershipVersion);
+
+            await this.lifecycle.OnStop();
+        }
+
+        [Fact]
         public async Task UnregisterCallDirectoryAndCleanCache()
         {
             var expectedSilo = GenerateSiloAddress();
