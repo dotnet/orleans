@@ -11,6 +11,7 @@ using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
+using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
 
 namespace Orleans.Runtime.GrainDirectory
@@ -122,6 +123,7 @@ namespace Orleans.Runtime.GrainDirectory
             LogDebugStart();
 
             Running = true;
+            using var _ = new ExecutionContextSuppressor();
             membershipUpdatesTask = Task.Run(() => ProcessMembershipUpdates(_membershipUpdatesCancellation.Token));
         }
 
@@ -141,14 +143,28 @@ namespace Orleans.Runtime.GrainDirectory
             //mark Running as false will exclude myself from CalculateGrainDirectoryPartition(grainId)
             Running = false;
             _membershipUpdatesCancellation.Cancel();
-            if (membershipUpdatesTask is { } task)
+            try
             {
-                await task.SuppressThrowing();
+                if (membershipUpdatesTask is { } task)
+                {
+                    await task.SuppressThrowing();
+                }
+            }
+            finally
+            {
+                _membershipUpdatesCancellation.Dispose();
             }
 
             if (this.disposeDirectoryCache)
             {
-                await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(DirectoryCache).SuppressThrowing();
+                try
+                {
+                    await GrainDirectoryCacheFactory.DisposeGrainDirectoryCacheAsync(DirectoryCache);
+                }
+                catch (Exception exception)
+                {
+                    LogWarningDisposeDirectoryCacheFailed(exception);
+                }
             }
 
             DirectoryPartition.Clear();
@@ -414,7 +430,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (snapshot.Members.TryGetValue(silo, out var member))
             {
-                return member.Status.IsTerminating();
+                return member.Status == SiloStatus.Dead;
             }
 
             return address.MembershipVersion < snapshot.Version;
@@ -1026,6 +1042,12 @@ namespace Orleans.Runtime.GrainDirectory
             Message = "Failed to refresh cluster membership after a directory membership update processing error."
         )]
         private partial void LogWarningRefreshingClusterMembershipFailed(Exception exception);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Failed to dispose the grain directory cache."
+        )]
+        private partial void LogWarningDisposeDirectoryCacheFailed(Exception exception);
 
         [LoggerMessage(
             Level = LogLevel.Debug,

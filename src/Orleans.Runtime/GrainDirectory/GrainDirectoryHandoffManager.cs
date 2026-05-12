@@ -130,7 +130,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             for (var i = singleActivations.Count - 1; i >= 0; i--)
             {
-                if (singleActivations[i].SiloAddress is not { } siloAddress || this.siloStatusOracle.GetApproximateSiloStatus(siloAddress).IsTerminating())
+                if (singleActivations[i].SiloAddress is not { } siloAddress || this.siloStatusOracle.GetApproximateSiloStatus(siloAddress) == SiloStatus.Dead)
                 {
                     singleActivations.RemoveAt(i);
                 }
