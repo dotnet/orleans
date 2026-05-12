@@ -11,7 +11,7 @@ namespace Orleans.Runtime.MembershipService;
 /// <summary>
 /// Manages <see cref="ISiloStatusListener"/> instances.
 /// </summary>
-internal partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
+internal sealed partial class SiloStatusListenerManager : ILifecycleParticipant<ISiloLifecycle>
 {
 #if NET9_0_OR_GREATER
     private readonly Lock _listenersLock = new();
