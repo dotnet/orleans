@@ -43,7 +43,10 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
         void IActivationWorkingSetObserver.OnDeactivated(IActivationWorkingSetMember member)
         {
-            Add(member.GrainId);
+            if (member is IGrainContext context)
+            {
+                Add(context.GrainId);
+            }
         }
 
         internal bool Add(GrainId grainId)
@@ -55,21 +58,20 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
         private void TrimIfNeeded()
         {
-            while (_deactivatedGrains.Count > MaxTrackedDeactivatedGrains)
+            var excessCount = _deactivatedGrains.Count - MaxTrackedDeactivatedGrains;
+            if (excessCount <= 0)
             {
-                var removed = false;
-                foreach (var grainId in _deactivatedGrains.Keys)
-                {
-                    if (_deactivatedGrains.TryRemove(grainId, out _))
-                    {
-                        removed = true;
-                        break;
-                    }
-                }
+                return;
+            }
 
-                if (!removed)
+            foreach (var grainId in _deactivatedGrains.Keys)
+            {
+                if (_deactivatedGrains.TryRemove(grainId, out _))
                 {
-                    break;
+                    if (--excessCount == 0)
+                    {
+                        return;
+                    }
                 }
             }
         }

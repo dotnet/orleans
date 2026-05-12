@@ -682,7 +682,7 @@ namespace Orleans.Runtime
         void OnDeactivating(IActivationWorkingSetMember member);
     }
 
-    public partial interface IActivationWorkingSetMember : IGrainContext
+    public partial interface IActivationWorkingSetMember
     {
         bool IsCandidateForRemoval(bool wouldRemove);
     }

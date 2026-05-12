@@ -74,7 +74,7 @@ public class DeactivatedGrainQueueTests
         Assert.Contains(otherUnaffected, remainingEdges);
     }
 
-    private sealed class TestActivationWorkingSetMember(GrainId grainId) : IActivationWorkingSetMember
+    private sealed class TestActivationWorkingSetMember(GrainId grainId) : IActivationWorkingSetMember, IGrainContext
     {
         public GrainId GrainId { get; } = grainId;
 
