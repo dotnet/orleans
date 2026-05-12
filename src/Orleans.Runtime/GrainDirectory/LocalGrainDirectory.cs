@@ -585,7 +585,8 @@ namespace Orleans.Runtime.GrainDirectory
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
 
-            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            // The first forwarded owner (hopCount == 1) forwards immediately if ownership changed again.
+            // Once the request has already been re-forwarded, pause and recheck before bouncing it again.
             if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
@@ -670,7 +671,8 @@ namespace Orleans.Runtime.GrainDirectory
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
 
-            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            // The first forwarded owner (hopCount == 1) forwards immediately if ownership changed again.
+            // Once the request has already been re-forwarded, pause and recheck before bouncing it again.
             if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
@@ -738,7 +740,8 @@ namespace Orleans.Runtime.GrainDirectory
 
             UnregisterOrPutInForwardList(addresses, cause, hopCount, ref forwardlist, "UnregisterManyAsync");
 
-            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            // The first forwarded owner (hopCount == 1) forwards immediately if ownership changed again.
+            // Once the request has already been re-forwarded, pause and recheck before bouncing it again.
             if (hopCount > 1 && forwardlist != null)
             {
                 await Task.Delay(RETRY_DELAY);
@@ -852,7 +855,8 @@ namespace Orleans.Runtime.GrainDirectory
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "LookUpAsync");
 
-            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            // The first forwarded owner (hopCount == 1) forwards immediately if ownership changed again.
+            // Once the request has already been re-forwarded, pause and recheck before bouncing it again.
             if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
@@ -913,7 +917,8 @@ namespace Orleans.Runtime.GrainDirectory
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(grainId, hopCount, "DeleteGrainAsync");
 
-            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            // The first forwarded owner (hopCount == 1) forwards immediately if ownership changed again.
+            // Once the request has already been re-forwarded, pause and recheck before bouncing it again.
             if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
