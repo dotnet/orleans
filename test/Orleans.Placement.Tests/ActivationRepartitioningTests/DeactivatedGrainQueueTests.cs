@@ -15,7 +15,7 @@ public class DeactivatedGrainQueueTests
     private static readonly GrainId Id_E = GrainId.Create("E", Guid.NewGuid().ToString());
 
     [Fact]
-    public void DeactivatedGrainQueue_DeduplicatesUntilDrained()
+    public void DeactivatedGrainQueue_DrainsToDistinctAffectedGrains()
     {
         var queue = new ActivationRepartitioner.DeactivatedGrainQueue();
         var observer = (IActivationWorkingSetObserver)queue;
@@ -24,7 +24,7 @@ public class DeactivatedGrainQueueTests
         observer.OnDeactivated(member);
         observer.OnDeactivated(member);
 
-        Assert.Equal(1, queue.Count);
+        Assert.Equal(2, queue.Count);
 
         HashSet<GrainId> affected = [];
         queue.DrainTo(affected);
@@ -49,6 +49,7 @@ public class DeactivatedGrainQueueTests
         }
 
         Assert.Equal(ActivationRepartitioner.DeactivatedGrainQueue.MaxTrackedDeactivatedGrains, queue.Count);
+        Assert.False(queue.Add(GrainId.Create("bounded-grain", "overflow")));
     }
 
     [Fact]

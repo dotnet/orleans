@@ -24,20 +24,19 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 {
     internal sealed class DeactivatedGrainQueue : IActivationWorkingSetObserver
     {
-        // Exchanges can be skipped for long periods, so keep this best-effort set bounded.
+        // Exchanges can be skipped for long periods, so keep this best-effort queue bounded.
         internal const int MaxTrackedDeactivatedGrains = 16_384;
-        private readonly ConcurrentDictionary<GrainId, byte> _deactivatedGrains = new();
+        private readonly ConcurrentQueue<GrainId> _deactivatedGrains = new();
+        private int _count;
 
-        public int Count => _deactivatedGrains.Count;
+        public int Count => Volatile.Read(ref _count);
 
         public void DrainTo(HashSet<GrainId> destination)
         {
-            foreach (var grainId in _deactivatedGrains.Keys)
+            while (_deactivatedGrains.TryDequeue(out var grainId))
             {
-                if (_deactivatedGrains.TryRemove(grainId, out _))
-                {
-                    destination.Add(grainId);
-                }
+                Interlocked.Decrement(ref _count);
+                destination.Add(grainId);
             }
         }
 
@@ -51,27 +50,18 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
 
         internal bool Add(GrainId grainId)
         {
-            var added = _deactivatedGrains.TryAdd(grainId, 0);
-            TrimIfNeeded();
-            return added;
-        }
-
-        private void TrimIfNeeded()
-        {
-            var excessCount = _deactivatedGrains.Count - MaxTrackedDeactivatedGrains;
-            if (excessCount <= 0)
+            while (true)
             {
-                return;
-            }
-
-            foreach (var grainId in _deactivatedGrains.Keys)
-            {
-                if (_deactivatedGrains.TryRemove(grainId, out _))
+                var count = Volatile.Read(ref _count);
+                if (count >= MaxTrackedDeactivatedGrains)
                 {
-                    if (--excessCount == 0)
-                    {
-                        return;
-                    }
+                    return false;
+                }
+
+                if (Interlocked.CompareExchange(ref _count, count + 1, count) == count)
+                {
+                    _deactivatedGrains.Enqueue(grainId);
+                    return true;
                 }
             }
         }
