@@ -41,11 +41,15 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         using var serviceProvider = new ServiceCollection().BuildServiceProvider();
         var storage = new VolatileJournalStorage();
         var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
-        var shared = JournaledStateManagerShared.CreateForTests(
+        var options = new JournaledStateManagerOptions
+        {
+            JournalFormatKey = CustomFormatKey,
+            RetirementGracePeriod = ManagerOptions.RetirementGracePeriod
+        };
+        var shared = new JournaledStateManagerShared(
             logger,
-            Options.Create(ManagerOptions),
-            TimeProvider.System,
-            CustomFormatKey);
+            Options.Create(options),
+            TimeProvider.System);
 
         var exception = Assert.Throws<InvalidOperationException>(() => new JournaledStateManager(
             storage,

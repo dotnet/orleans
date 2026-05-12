@@ -2,7 +2,6 @@ using Azure;
 using Azure.Storage.Blobs;
 using Azure.Storage;
 using Azure.Core;
-using Orleans.Journaling.Json;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
@@ -12,7 +11,6 @@ namespace Orleans.Journaling;
 /// </summary>
 public sealed class AzureAppendBlobJournalStorageOptions
 {
-    private const string DefaultJournalFormatKey = JsonJournalExtensions.JournalFormatKey;
     private BlobServiceClient? _blobServiceClient;
 
     /// <summary>
@@ -27,16 +25,6 @@ public sealed class AzureAppendBlobJournalStorageOptions
     public Func<GrainId, string> GetBlobName { get; set; } = DefaultGetBlobName;
 
     private static readonly Func<GrainId, string> DefaultGetBlobName = static grainId => grainId.ToString();
-
-    /// <summary>
-    /// Gets or sets the default state journal format key.
-    /// </summary>
-    public string JournalFormatKey { get; set; } = DefaultJournalFormatKey;
-
-    /// <summary>
-    /// Gets or sets an optional selector for choosing the journal format key by grain type.
-    /// </summary>
-    public Func<GrainType, string>? JournalFormatKeySelector { get; set; }
 
     /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
@@ -62,25 +50,12 @@ public sealed class AzureAppendBlobJournalStorageOptions
     /// </summary>
     internal Func<CancellationToken, Task<BlobServiceClient>>? CreateClient { get; private set; }
 
-    internal string GetJournalFormatKey(GrainType grainType)
-    {
-        var result = JournalFormatKeySelector?.Invoke(grainType) ?? JournalFormatKey;
-        ArgumentException.ThrowIfNullOrWhiteSpace(result);
-        return result;
-    }
-
     internal string GetBlobNameForJournal(GrainId grainId)
     {
         var blobName = GetBlobName(grainId);
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
-
-    /// <summary>
-    /// Stage of silo lifecycle where storage should be initialized.  Storage must be initialized prior to use.
-    /// </summary>
-    public int InitStage { get; set; } = DEFAULT_INIT_STAGE;
-    public const int DEFAULT_INIT_STAGE = ServiceLifecycleStage.ApplicationServices;
 
     /// <summary>
     /// A function for building container factory instances.

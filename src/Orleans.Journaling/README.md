@@ -51,7 +51,7 @@ siloBuilder
     });
 ```
 
-JSON Lines is the default format key for built-in Journaling storage providers. If a provider is configured to use a different format, configure it to use `JsonJournalExtensions.JournalFormatKey` and call `UseJsonJournalFormat(...)` after registering that provider.
+JSON Lines is the default `JournaledStateManagerOptions.JournalFormatKey`. If the manager is configured to use a different format, configure it to use `JsonJournalExtensions.JournalFormatKey` and call `UseJsonJournalFormat(...)` after registering the storage provider.
 
 Storage providers can persist the journal format key as metadata alongside journal bytes. During recovery, Orleans uses that stored key to select the matching journal format and durable operation codecs. If a non-empty journal has no stored format metadata, Orleans uses the OrleansBinary format as the compatibility fallback. When a grain recovers data written with a different format than `JournaledStateManagerOptions.JournalFormatKey`, the next write is forced to a full snapshot so the journal is rewritten using the configured format and metadata is updated.
 

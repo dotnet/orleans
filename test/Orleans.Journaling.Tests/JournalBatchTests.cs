@@ -23,10 +23,10 @@ public sealed class AzureStorageJournalBatchTests : JournalBatchTests
     protected override void ConfigureServices(IServiceCollection services)
     {
         services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
         services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
     }
 }
@@ -56,17 +56,17 @@ public abstract class JournalBatchTests : IAsyncLifetime
     });
 
     private JournaledStateManagerShared CreateShared()
-        => JournaledStateManagerShared.CreateForTests(
+        => new(
             _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             ManagerOptions,
-            TimeProvider.System,
-            OrleansBinaryJournalFormat.JournalFormatKey);
+            TimeProvider.System);
 
     public virtual async Task InitializeAsync()
     {
         var services = new ServiceCollection();
         services.AddSerializer();
         services.AddLogging();
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
         _siloLifecycle = new SiloLifecycleSubject(_serviceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());

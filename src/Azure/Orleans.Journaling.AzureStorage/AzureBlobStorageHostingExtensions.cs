@@ -27,7 +27,6 @@ public static class AzureBlobStorageHostingExtensions
 
         builder.Services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
         builder.Services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        builder.Services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
         builder.Services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
         return builder;
     }

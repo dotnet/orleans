@@ -268,11 +268,6 @@ namespace Orleans.Journaling
         void Read(JournalReadBuffer input, IStateResolver resolver);
     }
 
-    public partial interface IJournalFormatKeyProvider
-    {
-        string GetJournalFormatKey(Runtime.IGrainContext grainContext);
-    }
-
     public partial interface IJournalStorage
     {
         bool IsCompactionRequested { get; }
@@ -487,17 +482,13 @@ namespace Orleans.Journaling
         public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalFormatKeyProvider
+    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider
     {
         public VolatileJournalStorageProvider() { }
 
-        public VolatileJournalStorageProvider(string journalFormatKey, System.Func<Runtime.GrainType, string>? journalFormatKeySelector) { }
-
-        public VolatileJournalStorageProvider(string journalFormatKey) { }
+        public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
         public IJournalStorage Create(Runtime.IGrainContext grainContext) { throw null; }
-
-        public string GetJournalFormatKey(Runtime.IGrainContext grainContext) { throw null; }
     }
 }
 

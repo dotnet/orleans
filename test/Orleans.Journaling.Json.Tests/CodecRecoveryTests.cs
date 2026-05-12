@@ -258,10 +258,10 @@ public class CodecRecoveryTests : JournalingTestBase
         await first.Lifecycle.OnStart();
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
-        storage.StoredJournalFormatKey = null;
+        var metadataLessStorage = new MetadataOverridingStorage(storage, storedJournalFormatKey: null);
 
         storage.SetConfiguredJournalFormatKey(JsonJournalExtensions.JournalFormatKey);
-        using var recovered = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
+        using var recovered = CreateFormatAwareTestSystem(metadataLessStorage, JsonJournalExtensions.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, JsonJournalExtensions.JournalFormatKey);
         await recovered.Lifecycle.OnStart();
 
@@ -278,8 +278,8 @@ public class CodecRecoveryTests : JournalingTestBase
     public async Task Recovery_EmptyJournalWithStaleMetadata_WritesConfiguredFormat()
     {
         var storage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
-        storage.StoredJournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey;
-        using var system = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
+        var staleMetadataStorage = new MetadataOverridingStorage(storage, OrleansBinaryJournalFormat.JournalFormatKey);
+        using var system = CreateFormatAwareTestSystem(staleMetadataStorage, JsonJournalExtensions.JournalFormatKey);
         var dict = CreateFormatAwareDictionary(system, JsonJournalExtensions.JournalFormatKey);
         await system.Lifecycle.OnStart();
 
@@ -334,11 +334,15 @@ public class CodecRecoveryTests : JournalingTestBase
         var journalStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
         var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
-        var shared = JournaledStateManagerShared.CreateForTests(
+        var managerOptions = new JournaledStateManagerOptions
+        {
+            JournalFormatKey = JsonJournalExtensions.JournalFormatKey,
+            RetirementGracePeriod = ManagerOptions.RetirementGracePeriod
+        };
+        var shared = new JournaledStateManagerShared(
             logger,
-            Microsoft.Extensions.Options.Options.Create(ManagerOptions),
-            TimeProvider.System,
-            JsonJournalExtensions.JournalFormatKey);
+            Microsoft.Extensions.Options.Options.Create(managerOptions),
+            TimeProvider.System);
         var manager = new JournaledStateManager(
             storage,
             shared,
@@ -356,7 +360,7 @@ public class CodecRecoveryTests : JournalingTestBase
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
 
     private FormatAwareTestSystem CreateFormatAwareTestSystem(
-        VolatileJournalStorage storage,
+        IJournalStorage storage,
         string writeJournalFormatKey)
     {
         var services = new ServiceCollection();
@@ -384,11 +388,10 @@ public class CodecRecoveryTests : JournalingTestBase
         {
             JournalFormatKey = writeJournalFormatKey
         };
-        var shared = JournaledStateManagerShared.CreateForTests(
+        var shared = new JournaledStateManagerShared(
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Microsoft.Extensions.Options.Options.Create(managerOptions),
-            TimeProvider.System,
-            writeJournalFormatKey);
+            TimeProvider.System);
 
         var manager = new JournaledStateManager(
             storage,
@@ -442,6 +445,48 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
+
+    private sealed class MetadataOverridingStorage(VolatileJournalStorage inner, string? storedJournalFormatKey) : IJournalStorage
+    {
+        public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            => inner.AppendAsync(value, cancellationToken);
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+            => inner.DeleteAsync(cancellationToken);
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+            => inner.ReplaceAsync(value, cancellationToken);
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+        {
+            ArgumentNullException.ThrowIfNull(consumer);
+
+            var metadata = storedJournalFormatKey is null
+                ? JournalFileMetadata.Empty
+                : new JournalFileMetadata(storedJournalFormatKey);
+            if (inner.Segments.Count == 0)
+            {
+                consumer.Complete(metadata);
+            }
+            else
+            {
+                consumer.Consume(ReadSegments(cancellationToken), metadata, complete: true);
+            }
+
+            return default;
+        }
+
+        private IEnumerable<ReadOnlyMemory<byte>> ReadSegments(CancellationToken cancellationToken)
+        {
+            foreach (var segment in inner.Segments)
+            {
+                cancellationToken.ThrowIfCancellationRequested();
+                yield return segment;
+            }
+        }
+    }
 
     private sealed class FormatAwareTestSystem(ServiceProvider serviceProvider, JournaledStateManager manager, TestGrainLifecycle lifecycle) : IDisposable
     {

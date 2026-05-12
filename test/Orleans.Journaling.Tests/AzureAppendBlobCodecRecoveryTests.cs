@@ -29,11 +29,11 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         var services = new ServiceCollection();
         services.AddLogging();
         services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         services.AddSerializer();
         ConfigureFormatServices(services);
         services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
 
         _azureServiceProvider = services.BuildServiceProvider();
@@ -165,11 +165,10 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     private JournaledStateManager CreateManager(IJournalStorage storage)
     {
         var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
-        var shared = JournaledStateManagerShared.CreateForTests(
+        var shared = new JournaledStateManagerShared(
             logger,
             Options.Create(ManagerOptions),
-            TimeProvider.System,
-            OrleansBinaryJournalFormat.JournalFormatKey);
+            TimeProvider.System);
 
         return new(
             storage,
@@ -210,14 +209,13 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         services.Configure<AzureAppendBlobJournalStorageOptions>(options =>
         {
             JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options);
-            options.JournalFormatKey = journalFormatKey;
             options.GetBlobName = _ => blobName;
         });
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
         services.AddSerializer();
         ConfigureFormatServices(services);
         services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalFormatKeyProvider, AzureAppendBlobJournalStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -233,11 +231,10 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
 
     private static JournaledStateManager CreateFormatAwareManager(IServiceProvider serviceProvider, IJournalStorage storage, string journalFormatKey)
     {
-        var shared = JournaledStateManagerShared.CreateForTests(
+        var shared = new JournaledStateManagerShared(
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
-            Options.Create(new JournaledStateManagerOptions()),
-            TimeProvider.System,
-            journalFormatKey);
+            Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
+            TimeProvider.System);
 
         return new(storage, shared, serviceProvider);
     }

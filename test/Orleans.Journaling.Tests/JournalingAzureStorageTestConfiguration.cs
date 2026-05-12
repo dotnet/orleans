@@ -19,8 +19,6 @@ internal static class JournalingAzureStorageTestConfiguration
 
     public static AzureAppendBlobJournalStorageOptions ConfigureTestDefaults(this AzureAppendBlobJournalStorageOptions options)
     {
-        options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey;
-
         if (TestDefaultConfiguration.UseAadAuthentication)
         {
             options.ConfigureBlobServiceClient(TestDefaultConfiguration.DataBlobUri, TestDefaultConfiguration.TokenCredential);

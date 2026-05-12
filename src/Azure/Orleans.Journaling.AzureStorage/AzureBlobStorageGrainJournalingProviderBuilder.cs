@@ -23,12 +23,6 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
                 options.ContainerName = containerName;
             }
 
-            var journalFormatKey = configurationSection[nameof(AzureAppendBlobJournalStorageOptions.JournalFormatKey)];
-            if (!string.IsNullOrWhiteSpace(journalFormatKey))
-            {
-                options.JournalFormatKey = journalFormatKey;
-            }
-
             var serviceKey = configurationSection["ServiceKey"];
             if (!string.IsNullOrEmpty(serviceKey))
             {
@@ -59,5 +53,11 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
                 }
             }
         });
+
+        var journalFormatKey = configurationSection[nameof(JournaledStateManagerOptions.JournalFormatKey)];
+        if (!string.IsNullOrWhiteSpace(journalFormatKey))
+        {
+            builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
+        }
     }
 }

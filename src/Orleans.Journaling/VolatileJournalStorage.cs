@@ -1,56 +1,39 @@
 using System.Buffers;
 using System.Collections.Concurrent;
+using Microsoft.Extensions.Options;
 using Orleans.Journaling.Json;
 
 namespace Orleans.Journaling;
 
-public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalFormatKeyProvider
+public sealed class VolatileJournalStorageProvider : IJournalStorageProvider
 {
-    private readonly string _journalFormatKey;
-    private readonly Func<GrainType, string>? _journalFormatKeySelector;
+    private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<GrainId, VolatileJournalStorage> _storage = new();
 
-    public VolatileJournalStorageProvider() : this(JsonJournalExtensions.JournalFormatKey)
+    public VolatileJournalStorageProvider()
     {
     }
 
     /// <summary>
     /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class.
     /// </summary>
-    /// <param name="journalFormatKey">The default state journal format key.</param>
-    public VolatileJournalStorageProvider(string journalFormatKey) : this(journalFormatKey, journalFormatKeySelector: null)
+    /// <param name="options">The journaled state manager options.</param>
+    public VolatileJournalStorageProvider(IOptions<JournaledStateManagerOptions> options)
     {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="VolatileJournalStorageProvider"/> class.
-    /// </summary>
-    /// <param name="journalFormatKey">The default state journal format key.</param>
-    /// <param name="journalFormatKeySelector">An optional selector for choosing the journal format key by grain type.</param>
-    public VolatileJournalStorageProvider(string journalFormatKey, Func<GrainType, string>? journalFormatKeySelector)
-    {
-        ArgumentException.ThrowIfNullOrWhiteSpace(journalFormatKey);
-        _journalFormatKey = journalFormatKey;
-        _journalFormatKeySelector = journalFormatKeySelector;
+        ArgumentNullException.ThrowIfNull(options);
+        _options = options;
     }
 
     public IJournalStorage Create(IGrainContext grainContext)
     {
-        var journalFormatKey = GetJournalFormatKey(grainContext);
+        var journalFormatKey = GetJournalFormatKey();
         var storage = _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage(journalFormatKey));
         storage.SetConfiguredJournalFormatKey(journalFormatKey);
         return storage;
     }
 
-    public string GetJournalFormatKey(IGrainContext grainContext)
-        => GetJournalFormatKey(grainContext.GrainId.Type);
-
-    private string GetJournalFormatKey(GrainType grainType)
-    {
-        var result = _journalFormatKeySelector?.Invoke(grainType) ?? _journalFormatKey;
-        ArgumentException.ThrowIfNullOrWhiteSpace(result);
-        return result;
-    }
+    private string GetJournalFormatKey()
+        => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonJournalExtensions.JournalFormatKey);
 }
 /// <summary>
 /// An in-memory, volatile implementation of <see cref="IJournalStorage"/> for non-durable use cases, such as development and testing.
@@ -79,10 +62,7 @@ public sealed class VolatileJournalStorage : IJournalStorage
     internal IReadOnlyList<byte[]> Segments => _segments;
 
     internal string? StoredJournalFormatKey
-    {
-        get => _storedJournalFormatKey;
-        set => _storedJournalFormatKey = value;
-    }
+        => _storedJournalFormatKey;
 
     internal void SetConfiguredJournalFormatKey(string? journalFormatKey)
     {

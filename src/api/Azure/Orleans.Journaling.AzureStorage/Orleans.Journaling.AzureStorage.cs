@@ -11,7 +11,6 @@ namespace Orleans.Journaling
     public sealed partial class AzureAppendBlobJournalStorageOptions
     {
         public const string DEFAULT_CONTAINER_NAME = "state";
-        public const int DEFAULT_INIT_STAGE = 10000;
         public Azure.Storage.Blobs.BlobServiceClient? BlobServiceClient { get { throw null; } set { } }
 
         public System.Func<System.IServiceProvider, AzureAppendBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }
@@ -21,12 +20,6 @@ namespace Orleans.Journaling
         public string ContainerName { get { throw null; } set { } }
 
         public System.Func<Runtime.GrainId, string> GetBlobName { get { throw null; } set { } }
-
-        public int InitStage { get { throw null; } set { } }
-
-        public string JournalFormatKey { get { throw null; } set { } }
-
-        public System.Func<Runtime.GrainType, string>? JournalFormatKeySelector { get { throw null; } set { } }
 
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 

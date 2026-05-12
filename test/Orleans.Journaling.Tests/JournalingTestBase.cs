@@ -18,7 +18,10 @@ public abstract class JournalingTestBase
     protected readonly SerializerSessionPool SessionPool;
     protected readonly ICodecProvider CodecProvider;
     protected readonly ILoggerFactory LoggerFactory;
-    protected readonly JournaledStateManagerOptions ManagerOptions = new();
+    protected readonly JournaledStateManagerOptions ManagerOptions = new()
+    {
+        JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey
+    };
 
     protected JournalingTestBase()
     {
@@ -45,7 +48,7 @@ public abstract class JournalingTestBase
     /// Creates a journal manager with in-memory storage
     /// </summary>
     internal (IStateManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle)
-        CreateTestSystem(IJournalStorage? storage = null, TimeProvider? provider = null, IJournalFormat? journalFormat = null, string? journalFormatKey = null)
+        CreateTestSystem(IJournalStorage? storage = null, TimeProvider? provider = null, IJournalFormat? journalFormat = null)
     {
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
@@ -57,7 +60,7 @@ public abstract class JournalingTestBase
         var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec, SessionPool);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, SessionPool);
         journalFormat ??= new OrleansBinaryJournalFormat(SessionPool);
-        var shared = JournaledStateManagerShared.CreateForTests(logger, Options.Create(ManagerOptions), provider, journalFormatKey ?? OrleansBinaryJournalFormat.JournalFormatKey);
+        var shared = new JournaledStateManagerShared(logger, Options.Create(ManagerOptions), provider);
         var manager = new JournaledStateManager(storage, shared, journalStreamIdsCodec, retirementTrackerCodec, journalFormat);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);

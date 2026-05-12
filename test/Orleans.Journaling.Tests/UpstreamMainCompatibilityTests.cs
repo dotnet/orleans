@@ -102,11 +102,10 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
     private JournaledStateManager CreateManager(IJournalStorage storage)
     {
         var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
-        var shared = JournaledStateManagerShared.CreateForTests(
+        var shared = new JournaledStateManagerShared(
             logger,
             Options.Create(ManagerOptions),
-            TimeProvider.System,
-            OrleansBinaryJournalFormat.JournalFormatKey);
+            TimeProvider.System);
 
         return new(
             storage,

@@ -8,10 +8,12 @@ namespace Orleans.Journaling;
 
 internal sealed class AzureAppendBlobJournalStorageProvider(
     IOptions<AzureAppendBlobJournalStorageOptions> options,
+    IOptions<JournaledStateManagerOptions> managerOptions,
     IServiceProvider serviceProvider,
-    ILogger<AzureAppendBlobJournalStorage> logger) : IJournalStorageProvider, IJournalFormatKeyProvider, ILifecycleParticipant<ISiloLifecycle>
+    ILogger<AzureAppendBlobJournalStorage> logger) : IJournalStorageProvider, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly IBlobContainerFactory _containerFactory = options.Value.BuildContainerFactory(serviceProvider, options.Value);
+    private readonly string _journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
     private readonly AzureAppendBlobJournalStorageOptions _options = options.Value;
 
     private async Task Initialize(CancellationToken cancellationToken)
@@ -22,7 +24,7 @@ internal sealed class AzureAppendBlobJournalStorageProvider(
 
     public IJournalStorage Create(IGrainContext grainContext)
     {
-        var journalFormatKey = _options.GetJournalFormatKey(grainContext.GrainId.Type);
+        var journalFormatKey = _journalFormatKey;
         var journalFormat = serviceProvider.GetKeyedService<IJournalFormat>(journalFormatKey);
         if (journalFormat is null)
         {
@@ -49,14 +51,21 @@ internal sealed class AzureAppendBlobJournalStorageProvider(
             journalFormatKey: journalFormatKey);
     }
 
-    public string GetJournalFormatKey(IGrainContext grainContext)
-        => _options.GetJournalFormatKey(grainContext.GrainId.Type);
-
     public void Participate(ISiloLifecycle observer)
     {
         observer.Subscribe(
             nameof(AzureAppendBlobJournalStorageProvider),
             ServiceLifecycleStage.RuntimeInitialize,
             onStart: Initialize);
+    }
+
+    private static string ValidateJournalFormatKey(string? journalFormatKey)
+    {
+        if (string.IsNullOrWhiteSpace(journalFormatKey))
+        {
+            throw new InvalidOperationException("The configured journal format key must be non-empty.");
+        }
+
+        return journalFormatKey;
     }
 }
