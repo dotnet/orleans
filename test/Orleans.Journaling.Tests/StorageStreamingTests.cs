@@ -156,7 +156,10 @@ public sealed class StorageStreamingTests
         var consumer = new CapturingJournalEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer));
+        {
+            var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
+        });
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
         Assert.Empty(consumer.Entries);
@@ -169,7 +172,8 @@ public sealed class StorageStreamingTests
         var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
 
         Assert.Equal(3, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -186,7 +190,8 @@ public sealed class StorageStreamingTests
         var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -320,15 +325,11 @@ public sealed class StorageStreamingTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IOrleansBinaryJournalEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState
     {
         private JournalStreamId _streamId;
 
         public List<(JournalStreamId StreamId, byte[] Payload)> Entries { get; } = [];
-
-        object IJournaledStateOperationCodecProvider.OperationCodec => this;
-
-        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -336,11 +337,8 @@ public sealed class StorageStreamingTests
             return this;
         }
 
-        void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state)
-        {
-            var remaining = checked((uint)(reader.Length - reader.Position));
-            Entries.Add(new(_streamId, reader.ReadBytes(remaining)));
-        }
+        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
+            Entries.Add(new(_streamId, operation.Payload.ToArray()));
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }

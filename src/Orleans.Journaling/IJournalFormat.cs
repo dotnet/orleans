@@ -30,10 +30,11 @@ public interface IJournalFormat
     /// </summary>
     /// <param name="input">The buffered persisted journal data, including its completion state.</param>
     /// <param name="resolver">The resolver used to locate states by journal stream id.</param>
+    /// <param name="context">The replay context.</param>
     /// <remarks>
     /// If <see cref="JournalReadBuffer.IsCompleted"/> is <see langword="false"/>, this method returns when
     /// there is insufficient data to read another complete journal entry. If <see cref="JournalReadBuffer.IsCompleted"/>
     /// is <see langword="true"/>, this method throws if the remaining data does not contain complete journal entries.
     /// </remarks>
-    void Read(JournalReadBuffer input, IStateResolver resolver);
+    void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context);
 }

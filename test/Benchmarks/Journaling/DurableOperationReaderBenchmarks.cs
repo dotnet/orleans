@@ -73,7 +73,8 @@ public class DurableOperationReaderBenchmarks
         _readBuffer.Reset();
         _readBuffer.Write(data.Buffer.AsReadOnlySequence());
         var reader = new JournalReadBuffer(new ArcBufferReader(_readBuffer), isCompleted: true);
-        _journalFormat.Read(reader, _consumer);
+        var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
+        _journalFormat.Read(reader, _consumer, in context);
     }
 
     private void ValidateEncodedJournalData(EncodedJournalData data, int expectedCount)
@@ -159,7 +160,7 @@ public class DurableOperationReaderBenchmarks
     private sealed class ListReplayConsumer(
         JournalStreamId expectedStreamId,
         IListOperationCodec<int> codec,
-        int capacity) : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IListOperationHandler<int>
+        int capacity) : IStateResolver, IJournaledState, IListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
         private long _checksum;
@@ -167,10 +168,6 @@ public class DurableOperationReaderBenchmarks
         public int Count => _items.Count;
 
         public long Result => _checksum ^ _items.Count;
-
-        object IJournaledStateOperationCodecProvider.OperationCodec => codec;
-
-        Type IJournaledState.OperationCodecServiceType => typeof(IListOperationCodec<int>);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -189,6 +186,9 @@ public class DurableOperationReaderBenchmarks
         }
 
         void IJournaledState.Reset(JournalStreamWriter storage) => ResetForReplay();
+
+        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
+            context.GetRequiredOperationCodec(operation.FormatKey, codec).Apply(operation.Payload, this);
 
         void IJournaledState.AppendEntries(JournalStreamWriter writer)
         {
@@ -237,6 +237,17 @@ public class DurableOperationReaderBenchmarks
             _items.EnsureCapacity(capacityHint);
             _checksum = 0;
         }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public static readonly EmptyServiceProvider Instance = new();
+
+        private EmptyServiceProvider()
+        {
+        }
+
+        public object GetService(Type serviceType) => null;
     }
 
     private sealed class RawInt32JournalValueCodec : IJournalValueCodec<int>

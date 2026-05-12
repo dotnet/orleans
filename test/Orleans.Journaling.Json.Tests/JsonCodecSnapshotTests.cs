@@ -619,7 +619,6 @@ public sealed class JsonCodecSnapshotTests
         Action<JournalStreamWriter> write,
         Action assertCommands)
     {
-        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         write(writer.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
@@ -637,7 +636,6 @@ public sealed class JsonCodecSnapshotTests
         string[] expectedCommands,
         Func<IReadOnlyList<string>> getActualCommands)
     {
-        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         writeSequence(writer.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
@@ -672,8 +670,9 @@ public sealed class JsonCodecSnapshotTests
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
         var buffer = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
-        var resolver = new SingleStreamResolver(new JournalStreamId(SnapshotStreamId), state);
-        ((IJournalFormat)format).Read(buffer, resolver);
+        var resolver = new SingleStreamResolver(new JournalStreamId(SnapshotStreamId), state, JsonJournalExtensions.JournalFormatKey);
+        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
+        ((IJournalFormat)format).Read(buffer, resolver, in context);
         Assert.Equal(0, buffer.Length);
         assertCommands();
     }

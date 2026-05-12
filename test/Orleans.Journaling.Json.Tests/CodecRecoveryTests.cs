@@ -346,6 +346,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var manager = new JournaledStateManager(
             storage,
             shared,
+            ServiceProvider,
             journalStreamIdsCodec,
             retirementTrackerCodec,
             new JsonLinesJournalFormat());

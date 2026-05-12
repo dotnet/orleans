@@ -3,7 +3,7 @@ using System.Buffers;
 namespace Orleans.Journaling.Json;
 
 internal sealed class JsonDictionaryOperationCodecService<TKey, TValue>(JsonJournalOptions options)
-    : IDictionaryOperationCodec<TKey, TValue>, IJsonJournalEntryCodec where TKey : notnull
+    : IDictionaryOperationCodec<TKey, TValue> where TKey : notnull
 {
     private readonly JsonDictionaryOperationCodec<TKey, TValue> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
 
@@ -17,11 +17,10 @@ internal sealed class JsonDictionaryOperationCodecService<TKey, TValue>(JsonJour
 
     public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer) => _inner.Apply(input, consumer);
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state) => ((IJsonJournalEntryCodec)_inner).Apply(ref reader, state);
 }
 
 internal sealed class JsonListOperationCodecService<T>(JsonJournalOptions options)
-    : IListOperationCodec<T>, IJsonJournalEntryCodec
+    : IListOperationCodec<T>
 {
     private readonly JsonListOperationCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
 
@@ -39,11 +38,10 @@ internal sealed class JsonListOperationCodecService<T>(JsonJournalOptions option
 
     public void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state) => ((IJsonJournalEntryCodec)_inner).Apply(ref reader, state);
 }
 
 internal sealed class JsonQueueOperationCodecService<T>(JsonJournalOptions options)
-    : IQueueOperationCodec<T>, IJsonJournalEntryCodec
+    : IQueueOperationCodec<T>
 {
     private readonly JsonQueueOperationCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
 
@@ -57,11 +55,10 @@ internal sealed class JsonQueueOperationCodecService<T>(JsonJournalOptions optio
 
     public void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state) => ((IJsonJournalEntryCodec)_inner).Apply(ref reader, state);
 }
 
 internal sealed class JsonSetOperationCodecService<T>(JsonJournalOptions options)
-    : ISetOperationCodec<T>, IJsonJournalEntryCodec
+    : ISetOperationCodec<T>
 {
     private readonly JsonSetOperationCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
 
@@ -75,11 +72,10 @@ internal sealed class JsonSetOperationCodecService<T>(JsonJournalOptions options
 
     public void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state) => ((IJsonJournalEntryCodec)_inner).Apply(ref reader, state);
 }
 
 internal sealed class JsonValueOperationCodecService<T>(JsonJournalOptions options)
-    : IValueOperationCodec<T>, IJsonJournalEntryCodec
+    : IValueOperationCodec<T>
 {
     private readonly JsonValueOperationCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
 
@@ -87,11 +83,10 @@ internal sealed class JsonValueOperationCodecService<T>(JsonJournalOptions optio
 
     public void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state) => ((IJsonJournalEntryCodec)_inner).Apply(ref reader, state);
 }
 
 internal sealed class JsonStateOperationCodecService<T>(JsonJournalOptions options)
-    : IStateOperationCodec<T>, IJsonJournalEntryCodec
+    : IStateOperationCodec<T>
 {
     private readonly JsonStateOperationCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
 
@@ -101,11 +96,10 @@ internal sealed class JsonStateOperationCodecService<T>(JsonJournalOptions optio
 
     public void Apply(ReadOnlySequence<byte> input, IStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state) => ((IJsonJournalEntryCodec)_inner).Apply(ref reader, state);
 }
 
 internal sealed class JsonTcsOperationCodecService<T>(JsonJournalOptions options)
-    : ITaskCompletionSourceOperationCodec<T>, IJsonJournalEntryCodec
+    : ITaskCompletionSourceOperationCodec<T>
 {
     private readonly JsonTcsOperationCodec<T> _inner = new((options ?? throw new ArgumentNullException(nameof(options))).SerializerOptions);
 
@@ -119,5 +113,4 @@ internal sealed class JsonTcsOperationCodecService<T>(JsonJournalOptions options
 
     public void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state) => ((IJsonJournalEntryCodec)_inner).Apply(ref reader, state);
 }

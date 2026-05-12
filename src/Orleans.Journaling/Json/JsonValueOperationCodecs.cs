@@ -8,7 +8,7 @@ namespace Orleans.Journaling.Json;
 /// JSON codec for durable value journal entries.
 /// </summary>
 public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IValueOperationCodec<T>, IJsonJournalEntryCodec
+    : IValueOperationCodec<T>
 {
     private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
@@ -43,17 +43,6 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
-    {
-        if (state is not IValueOperationHandler<T> consumer)
-        {
-            throw new InvalidOperationException(
-                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
-        }
-
-        Apply(ref reader, consumer);
-    }
-
     private readonly struct SetOperation(JsonTypeInfo<T> typeInfo, T value)
     {
         public void Write(Utf8JsonWriter writer)
@@ -68,7 +57,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
 /// JSON codec for durable persistent state journal entries.
 /// </summary>
 public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IStateOperationCodec<T>, IJsonJournalEntryCodec
+    : IStateOperationCodec<T>
 {
     private readonly JsonTypeInfo<T> _stateTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
@@ -112,17 +101,6 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
-    {
-        if (state is not IStateOperationHandler<T> consumer)
-        {
-            throw new InvalidOperationException(
-                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
-        }
-
-        Apply(ref reader, consumer);
-    }
-
     private static void WriteCommand(JournalStreamWriter writer, string command)
     {
         JsonOperationCodecWriter.Write(
@@ -146,7 +124,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
 /// JSON codec for durable task completion source journal entries.
 /// </summary>
 public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = null)
-    : ITaskCompletionSourceOperationCodec<T>, IJsonJournalEntryCodec
+    : ITaskCompletionSourceOperationCodec<T>
 {
     private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
@@ -210,17 +188,6 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
                 operation.EnsureEnd(1);
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
-    }
-
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
-    {
-        if (state is not ITaskCompletionSourceOperationHandler<T> consumer)
-        {
-            throw new InvalidOperationException(
-                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
-        }
-
-        Apply(ref reader, consumer);
     }
 
     private static void WriteCommand(JournalStreamWriter writer, string command)

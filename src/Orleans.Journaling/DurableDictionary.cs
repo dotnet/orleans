@@ -11,7 +11,7 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IJournaledStateOperationCodecProvider, IDictionaryOperationHandler<K, V> where K : notnull
+internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDictionaryOperationHandler<K, V> where K : notnull
 {
     private readonly IDictionaryOperationCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
@@ -59,9 +59,8 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
 
-    object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
-
-    Type IJournaledState.OperationCodecServiceType => typeof(IDictionaryOperationCodec<K, V>);
+    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
+        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {

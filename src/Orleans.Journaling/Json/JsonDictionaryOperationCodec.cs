@@ -14,7 +14,7 @@ namespace Orleans.Journaling.Json;
 /// </code>
 /// </example>
 public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOptions? options = null)
-    : IDictionaryOperationCodec<TKey, TValue>, IJsonJournalEntryCodec where TKey : notnull
+    : IDictionaryOperationCodec<TKey, TValue> where TKey : notnull
 {
     private readonly JsonTypeInfo<TKey> _keyTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TKey>(options);
     private readonly JsonTypeInfo<TValue> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TValue>(options);
@@ -98,17 +98,6 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
                 operation.EnsureEnd(1);
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
-    }
-
-    void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
-    {
-        if (state is not IDictionaryOperationHandler<TKey, TValue> consumer)
-        {
-            throw new InvalidOperationException(
-                $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
-        }
-
-        Apply(ref reader, consumer);
     }
 
     private readonly struct SetOperation(JsonTypeInfo<TKey> keyTypeInfo, JsonTypeInfo<TValue> valueTypeInfo, TKey key, TValue value)

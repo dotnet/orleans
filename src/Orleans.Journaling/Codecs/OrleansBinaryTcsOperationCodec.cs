@@ -15,7 +15,7 @@ namespace Orleans.Journaling;
 internal sealed class OrleansBinaryTcsOperationCodec<T>(
     IJournalValueCodec<T> codec,
     IJournalValueCodec<Exception> exceptionCodec,
-    SerializerSessionPool sessionPool) : ITaskCompletionSourceOperationCodec<T>, IOrleansBinaryJournalEntryCodec
+    SerializerSessionPool sessionPool) : ITaskCompletionSourceOperationCodec<T>
 {
     private const byte FormatVersion = 0;
 
@@ -74,9 +74,6 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
             throw new InvalidOperationException("Unexpected trailing data after binary journal operation.");
         }
     }
-
-    void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
-        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<ITaskCompletionSourceOperationHandler<T>>(state, this));
 
     private void Apply(ref Reader<ArcBufferReaderInput> reader, ITaskCompletionSourceOperationHandler<T> consumer)
     {

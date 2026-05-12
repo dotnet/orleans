@@ -40,9 +40,15 @@ namespace Orleans.Journaling;
 public interface IJournaledState
 {
     /// <summary>
-    /// Gets the service type used to resolve this state's operation codec.
+    /// Applies one operation during journal recovery.
     /// </summary>
-    Type OperationCodecServiceType { get; }
+    /// <param name="operation">The operation to apply.</param>
+    /// <param name="context">The replay context.</param>
+    /// <remarks>
+    /// Implementations must not retain <see cref="JournalOperation.Payload"/> or references to its
+    /// backing storage after this method returns unless they copy the payload.
+    /// </remarks>
+    void ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context);
 
     /// <summary>
     /// Resets the state.
@@ -85,9 +91,4 @@ public interface IJournaledState
     /// </summary>
     /// <returns>A replica of this instance.</returns>
     IJournaledState DeepCopy();
-}
-
-internal interface IJournaledStateOperationCodecProvider
-{
-    object OperationCodec { get; }
 }

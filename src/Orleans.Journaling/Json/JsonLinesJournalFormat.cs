@@ -17,17 +17,17 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public IJournalBatchWriter CreateWriter() => new JsonLinesJournalBatchWriter();
 
-    public void Read(JournalReadBuffer input, IStateResolver resolver)
+    public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
         var offset = 0L;
-        while (TryReadLine(input, resolver, ref offset))
+        while (TryReadLine(input, resolver, in context, ref offset))
         {
         }
     }
 
-    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, ref long offset)
+    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context, ref long offset)
     {
         if (input.Length == 0)
         {
@@ -66,13 +66,13 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {lineOffset}: blank lines are not valid journal entries.");
             }
 
-            ReadLine(line, lineOffset, resolver);
+            ReadLine(line, lineOffset, resolver, in context);
         }
 
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver, in JournaledStateReplayContext context)
     {
         var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
         try
@@ -92,23 +92,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: element 0 must be an unsigned integer stream id.");
             }
 
-            var entry = new JsonOperationReader(ref reader);
             var stream = new JournalStreamId(streamId);
             var state = resolver.ResolveState(stream);
-            if (state is IFormattedJournalEntryBuffer formattedEntryBuffer)
-            {
-                var journalEntry = ParseJournalEntry(line, offset);
-                formattedEntryBuffer.AddFormattedEntry(JsonFormattedJournalEntry.Create(new JsonOperationEntry(journalEntry, offset: 1, journalEntry.GetArrayLength() - 1)));
-                return;
-            }
-
-            if (state is IDurableNothing)
-            {
-                entry.SkipToEnd();
-                return;
-            }
-
-            ApplyJsonEntry(stream, state, resolver.GetOperationCodec(state), ref entry);
+            var journalEntry = ParseJournalEntry(line, offset);
+            var payload = JsonFormattedJournalEntry.Create(new JsonOperationEntry(journalEntry, offset: 1, journalEntry.GetArrayLength() - 1)).Payload;
+            _ = new JsonOperationReader(new ReadOnlySequence<byte>(payload));
+            state.ApplyOperation(new JournalOperation(JsonJournalExtensions.JournalFormatKey, new ReadOnlySequence<byte>(payload)), in context);
         }
         catch (JsonException exception)
         {
@@ -121,10 +110,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         try
         {
             // Use JsonDocument.Parse + Clone so the returned element does not retain a
-            // reference to the pooled JsonDocument backing array. Without Clone, the
-            // pooled buffer is held until the JsonElement (captured by JsonOperationEntry
-            // in the formatted-entry buffer) is GC'd, which can drain the array pool
-            // during recovery of grains with many retired/unknown states.
+            // reference to the pooled JsonDocument backing array.
             using var document = JsonDocument.Parse(line);
             return document.RootElement.Clone();
         }
@@ -132,20 +118,6 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         {
             throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: invalid JSON journal entry. {exception.Message}", exception);
         }
-    }
-
-    private static void ApplyJsonEntry(JournalStreamId streamId, IJournaledState state, object? operationCodec, ref JsonOperationReader entry)
-    {
-        if (operationCodec is not IJsonJournalEntryCodec jsonCodec)
-        {
-            entry.SkipToEnd();
-            var codecType = operationCodec?.GetType().FullName ?? "<null>";
-            throw new InvalidOperationException(
-                $"The JSON journal entry for stream {streamId.Value} resolved to state " +
-                $"'{state.GetType().FullName}', but its codec '{codecType}' does not implement IJsonJournalEntryCodec.");
-        }
-
-        jsonCodec.Apply(ref entry, state);
     }
 
     private static bool EndsWith(ReadOnlySequence<byte> input, byte value)
@@ -246,12 +218,20 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         protected override bool OnTryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
         {
-            if (entry is not JsonFormattedJournalEntry jsonEntry)
+            if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
             {
                 return false;
             }
 
-            WriteJournalEntry(streamId, jsonEntry, _buffer);
+            if (entry is JsonFormattedJournalEntry jsonEntry)
+            {
+                WriteJournalEntry(streamId, jsonEntry, _buffer);
+            }
+            else
+            {
+                WriteJournalEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), _buffer);
+            }
+
             return true;
         }
 
@@ -331,26 +311,6 @@ internal abstract class JsonFormattedJournalEntry : IFormattedJournalEntry
     public abstract void WriteTo(Utf8JsonWriter writer);
 
     public abstract void WriteArrayElementsTo(Utf8JsonWriter writer);
-
-    public void Apply(IJournaledState state, object operationCodec)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        if (state is IDurableNothing)
-        {
-            return;
-        }
-
-        if (operationCodec is not IJsonJournalEntryCodec jsonCodec)
-        {
-            var codecType = operationCodec?.GetType().FullName ?? "<null>";
-            throw new InvalidOperationException(
-                $"The JSON journal entry resolved to state '{state.GetType().FullName}', " +
-                $"but its codec '{codecType}' does not implement IJsonJournalEntryCodec.");
-        }
-
-        var reader = new JsonOperationReader(new ReadOnlySequence<byte>(Payload));
-        jsonCodec.Apply(ref reader, state);
-    }
 
     private byte[] SerializePayload()
     {

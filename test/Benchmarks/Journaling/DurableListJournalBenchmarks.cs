@@ -120,7 +120,8 @@ public class DurableListJournalBenchmarks
         _recoveryBuffer.Reset();
         _recoveryBuffer.Write(_encodedJournalData.AsReadOnlySequence());
         var reader = new JournalReadBuffer(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
-        _journalFormat.Read(reader, _recoveryConsumer);
+        var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
+        _journalFormat.Read(reader, _recoveryConsumer, in context);
     }
 
     private sealed class RawInt32JournalValueCodec : IJournalValueCodec<int>
@@ -162,17 +163,13 @@ public class DurableListJournalBenchmarks
     private sealed class RecoveryConsumer(
         JournalStreamId expectedStreamId,
         IListOperationCodec<int> codec,
-        int capacity) : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, IListOperationHandler<int>
+        int capacity) : IStateResolver, IJournaledState, IListOperationHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
         public int Count => _items.Count;
 
         public void Reset() => _items.Clear();
-
-        object IJournaledStateOperationCodecProvider.OperationCodec => codec;
-
-        Type IJournaledState.OperationCodecServiceType => typeof(IListOperationCodec<int>);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -185,6 +182,10 @@ public class DurableListJournalBenchmarks
         }
 
         void IJournaledState.Reset(JournalStreamWriter storage) => Reset();
+
+        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
+            context.GetRequiredOperationCodec(operation.FormatKey, codec).Apply(operation.Payload, this);
+
         void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
         void IJournaledState.AppendSnapshot(JournalStreamWriter writer) { }
         IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
@@ -204,5 +205,16 @@ public class DurableListJournalBenchmarks
             _items.Clear();
             _items.EnsureCapacity(capacityHint);
         }
+    }
+
+    private sealed class EmptyServiceProvider : IServiceProvider
+    {
+        public static readonly EmptyServiceProvider Instance = new();
+
+        private EmptyServiceProvider()
+        {
+        }
+
+        public object GetService(Type serviceType) => null;
     }
 }

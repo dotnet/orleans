@@ -97,27 +97,27 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
     void IJournalStreamWriterTarget.AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        if (entry is not OrleansBinaryFormattedJournalEntry binaryEntry)
+        if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"The Orleans binary journal batch writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+                $"The Orleans binary journal batch writer cannot append formatted entry for journal format key '{entry.FormatKey}'.");
         }
 
         using var journalEntry = new JournalEntry(BeginEntry(streamId));
-        journalEntry.Writer.Write(binaryEntry.Payload.Span);
+        journalEntry.Writer.Write(entry.Payload.Span);
         journalEntry.Commit();
     }
 
     bool IJournalStreamWriterTarget.TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        if (entry is not OrleansBinaryFormattedJournalEntry binaryEntry)
+        if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             return false;
         }
 
         using var journalEntry = new JournalEntry(BeginEntry(streamId));
-        journalEntry.Writer.Write(binaryEntry.Payload.Span);
+        journalEntry.Writer.Write(entry.Payload.Span);
         journalEntry.Commit();
         return true;
     }

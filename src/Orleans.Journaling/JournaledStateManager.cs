@@ -20,7 +20,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, IJournaledState> _statesMap = [];
     private readonly IJournalStorage _storage;
-    private readonly IServiceProvider? _serviceProvider;
+    private readonly IServiceProvider _serviceProvider;
     private readonly JournaledStateManagerShared _shared;
     private readonly IJournalFormat _writeJournalFormat;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -63,14 +63,17 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     internal JournaledStateManager(
         IJournalStorage storage,
         JournaledStateManagerShared shared,
+        IServiceProvider serviceProvider,
         IDictionaryOperationCodec<string, ulong> journalStreamIdsCodec,
         IDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
         IJournalFormat journalFormat)
     {
         ArgumentNullException.ThrowIfNull(shared);
+        ArgumentNullException.ThrowIfNull(serviceProvider);
         ArgumentNullException.ThrowIfNull(journalFormat);
         _storage = storage;
         _shared = shared;
+        _serviceProvider = serviceProvider;
         _writeJournalFormat = journalFormat;
 
         _journalStreamDirectory = new StateDirectory(this, journalStreamIdsCodec);
@@ -98,9 +101,10 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this state's place.
                     state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
+                    var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _serviceProvider);
                     foreach (var entry in vessel.FormattedEntries)
                     {
-                        entry.Apply(state, GetOperationCodec(state, entry.FormatKey));
+                        state.ApplyOperation(new JournalOperation(entry.FormatKey, new ReadOnlySequence<byte>(entry.Payload)), in replayContext);
                     }
 
                     var id = _journalStreamDirectory[name];
@@ -545,24 +549,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         return state;
     }
 
-    object IStateResolver.GetOperationCodec(IJournaledState state)
-        => GetOperationCodec(state, WriteJournalFormatKey);
-
-    private object GetOperationCodec(IJournaledState state, string journalFormatKey)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-
-        if (string.Equals(journalFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
-        {
-            return JournalFormatServices.GetCurrentOperationCodec(state);
-        }
-
-        return JournalFormatServices.GetRequiredOperationCodec(
-            GetServiceProviderForFormat(journalFormatKey),
-            journalFormatKey,
-            state.OperationCodecServiceType);
-    }
-
     private IJournalFormat GetJournalFormat(string journalFormatKey)
     {
         if (string.Equals(journalFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
@@ -570,14 +556,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             return _writeJournalFormat;
         }
 
-        return JournalFormatServices.GetRequiredJournalFormat(
-            GetServiceProviderForFormat(journalFormatKey),
-            journalFormatKey);
+        return JournalFormatServices.GetRequiredJournalFormat(_serviceProvider, journalFormatKey);
     }
-
-    private IServiceProvider GetServiceProviderForFormat(string journalFormatKey)
-        => _serviceProvider ?? throw new InvalidOperationException(
-            $"Cannot recover journal format key '{journalFormatKey}' because this state manager was constructed without a service provider for keyed format resolution.");
 
     private void ProcessRecoveryBuffer(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
     {
@@ -597,7 +577,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             }
 
             var journalFormat = GetJournalFormat(journalFormatKey);
-            journalFormat.Read(buffer, new RecoveryStateResolver(this, journalFormatKey));
+            var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _serviceProvider);
+            journalFormat.Read(buffer, this, in replayContext);
 
             if (buffer.IsCompleted && buffer.Length > 0)
             {
@@ -798,16 +779,9 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata) => manager.ProcessRecoveryBuffer(buffer, metadata);
     }
 
-    private sealed class RecoveryStateResolver(JournaledStateManager manager, string journalFormatKey) : IStateResolver
-    {
-        public IJournaledState ResolveState(JournalStreamId streamId) => manager.ResolveState(streamId);
-
-        public object GetOperationCodec(IJournaledState state) => manager.GetOperationCodec(state, journalFormatKey);
-    }
-
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IJournaledStateOperationCodecProvider, IDictionaryOperationHandler<string, ulong>
+        IDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
@@ -818,9 +792,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         public ulong this[string name] => _ids[name];
 
-        object IJournaledStateOperationCodecProvider.OperationCodec => _codec;
-
-        Type IJournaledState.OperationCodecServiceType => typeof(IDictionaryOperationCodec<string, ulong>);
+        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
+            context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
@@ -895,7 +868,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     /// This keeps buffering entries and dumps them back into the journal upon compaction.
     /// </summary>
     [DebuggerDisplay("RetiredState Id = {StreamId.Value}")]
-    private sealed class RetiredState(JournalStreamId streamId) : IJournaledState, IFormattedJournalEntryBuffer
+    private sealed class RetiredState(JournalStreamId streamId) : IJournaledState
     {
         private readonly List<IFormattedJournalEntry> _formattedEntries = [];
 
@@ -903,13 +876,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
 
-        Type IJournaledState.OperationCodecServiceType => typeof(object);
-
-        public void AddFormattedEntry(IFormattedJournalEntry entry)
-        {
-            ArgumentNullException.ThrowIfNull(entry);
-            _formattedEntries.Add(entry);
-        }
+        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
+            _formattedEntries.Add(new FormattedJournalEntry(operation.FormatKey, operation.Payload));
 
         void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
         {

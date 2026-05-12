@@ -20,9 +20,9 @@ internal sealed class DurableNothing : IDurableNothing, IJournaledState
         manager.RegisterState(key, this);
     }
 
-    Type IJournaledState.OperationCodecServiceType => typeof(object);
-
     void IJournaledState.Reset(JournalStreamWriter writer) { }
+
+    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) { }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
 

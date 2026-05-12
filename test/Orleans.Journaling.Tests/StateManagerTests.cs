@@ -1019,7 +1019,8 @@ public class StateManagerTests : JournalingTestBase
         writer.Write(bytes);
         var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingJournalEntrySink();
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
@@ -1033,20 +1034,11 @@ public class StateManagerTests : JournalingTestBase
         Assert.Contains(entries, entry => entry.StreamId.Value >= 8 && entry.Payload.Length > 0);
     }
 
-    private interface ITestJournalEntryCodec
-    {
-        void Apply(ReadOnlySequence<byte> payload, IJournaledState state);
-    }
-
-    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState, IJournaledStateOperationCodecProvider, ITestJournalEntryCodec, IOrleansBinaryJournalEntryCodec
+    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState
     {
         private JournalStreamId _streamId;
 
         public List<CapturedJournalEntry> Entries { get; } = [];
-
-        object IJournaledStateOperationCodecProvider.OperationCodec => this;
-
-        Type IJournaledState.OperationCodecServiceType => typeof(object);
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -1054,13 +1046,8 @@ public class StateManagerTests : JournalingTestBase
             return this;
         }
 
-        void ITestJournalEntryCodec.Apply(ReadOnlySequence<byte> payload, IJournaledState state) => Entries.Add(new(_streamId, payload.ToArray()));
-
-        void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state)
-        {
-            var remaining = checked((uint)(reader.Length - reader.Position));
-            Entries.Add(new(_streamId, reader.ReadBytes(remaining)));
-        }
+        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
+            Entries.Add(new(_streamId, operation.Payload.ToArray()));
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }
@@ -1089,7 +1076,7 @@ public class StateManagerTests : JournalingTestBase
 
         public IJournalBatchWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public void Read(JournalReadBuffer input, IStateResolver resolver)
+        public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
         {
             if (input.Length == 0)
             {
@@ -1097,16 +1084,8 @@ public class StateManagerTests : JournalingTestBase
             }
 
             var callbackPayload = _payload.ToArray();
-            var formattedEntry = new TestFormattedJournalEntry(callbackPayload);
             var state = resolver.ResolveState(_streamId);
-            if (state is IFormattedJournalEntryBuffer formattedEntryBuffer)
-            {
-                formattedEntryBuffer.AddFormattedEntry(formattedEntry);
-            }
-            else
-            {
-                formattedEntry.Apply(state, resolver.GetOperationCodec(state));
-            }
+            state.ApplyOperation(new JournalOperation(FormatKey, new ReadOnlySequence<byte>(callbackPayload)), in context);
 
             Array.Fill(callbackPayload, byte.MaxValue);
             input.Skip(input.Length);
@@ -1119,21 +1098,6 @@ public class StateManagerTests : JournalingTestBase
 
         public string FormatKey => "test";
 
-        public void Apply(IJournaledState state, object operationCodec)
-        {
-            if (state is IDurableNothing)
-            {
-                return;
-            }
-
-            if (operationCodec is not ITestJournalEntryCodec codec)
-            {
-                throw new InvalidOperationException(
-                    $"State '{state.GetType().FullName}' is not compatible with test journal entry codec.");
-            }
-
-            codec.Apply(new ReadOnlySequence<byte>(Payload), state);
-        }
     }
 
     private sealed class NonConsumingJournalFormat : IJournalFormat
@@ -1144,7 +1108,7 @@ public class StateManagerTests : JournalingTestBase
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
 
-        public void Read(JournalReadBuffer input, IStateResolver resolver)
+        public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
         {
         }
     }
@@ -1168,10 +1132,10 @@ public class StateManagerTests : JournalingTestBase
             return writer;
         }
 
-        public void Read(JournalReadBuffer input, IStateResolver consumer)
+        public void Read(JournalReadBuffer input, IStateResolver consumer, in JournaledStateReplayContext context)
         {
             ReadCount++;
-            ((IJournalFormat)_inner).Read(input, consumer);
+            ((IJournalFormat)_inner).Read(input, consumer, in context);
         }
     }
 
@@ -1460,7 +1424,7 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class ManualDirectWriteState : IJournaledState, IJournaledStateOperationCodecProvider
+    private sealed class ManualDirectWriteState : IJournaledState
     {
         private JournalStreamWriter _writer;
         private bool _entryOpen;
@@ -1475,9 +1439,7 @@ public class StateManagerTests : JournalingTestBase
 
         public void MarkEntryClosing() => _entryOpen = false;
 
-        object IJournaledStateOperationCodecProvider.OperationCodec => this;
-
-        Type IJournaledState.OperationCodecServiceType => typeof(object);
+        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) { }
 
         public void Reset(JournalStreamWriter writer) => _writer = writer;
 

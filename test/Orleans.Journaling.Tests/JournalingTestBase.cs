@@ -61,7 +61,7 @@ public abstract class JournalingTestBase
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, SessionPool);
         journalFormat ??= new OrleansBinaryJournalFormat(SessionPool);
         var shared = new JournaledStateManagerShared(logger, Options.Create(ManagerOptions), provider);
-        var manager = new JournaledStateManager(storage, shared, journalStreamIdsCodec, retirementTrackerCodec, journalFormat);
+        var manager = new JournaledStateManager(storage, shared, ServiceProvider, journalStreamIdsCodec, retirementTrackerCodec, journalFormat);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

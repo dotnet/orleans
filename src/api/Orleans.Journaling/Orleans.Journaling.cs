@@ -226,15 +226,6 @@ namespace Orleans.Journaling
         string FormatKey { get; }
 
         System.ReadOnlyMemory<byte> Payload { get; }
-
-        void Apply(IJournaledState state, object operationCodec);
-    }
-
-    public partial interface IFormattedJournalEntryBuffer
-    {
-        System.Collections.Generic.IReadOnlyList<IFormattedJournalEntry> FormattedEntries { get; }
-
-        void AddFormattedEntry(IFormattedJournalEntry entry);
     }
 
     public partial interface IJournalBatchWriter : System.IDisposable
@@ -248,10 +239,9 @@ namespace Orleans.Journaling
 
     public partial interface IJournaledState
     {
-        System.Type OperationCodecServiceType { get; }
-
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
+        void ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context);
         IJournaledState DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
@@ -265,7 +255,7 @@ namespace Orleans.Journaling
         string? MimeType { get; }
 
         IJournalBatchWriter CreateWriter();
-        void Read(JournalReadBuffer input, IStateResolver resolver);
+        void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context);
     }
 
     public partial interface IJournalStorage
@@ -310,7 +300,6 @@ namespace Orleans.Journaling
 
     public partial interface IStateResolver
     {
-        object GetOperationCodec(IJournaledState state);
         IJournaledState ResolveState(JournalStreamId streamId);
     }
 
@@ -417,6 +406,26 @@ namespace Orleans.Journaling
         public JournalFileMetadata(string? format) { }
 
         public string? Format { get { throw null; } }
+    }
+
+    public readonly partial struct JournalOperation
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public JournalOperation(string formatKey, System.Buffers.ReadOnlySequence<byte> payload) { }
+        public string FormatKey { get { throw null; } }
+        public System.Buffers.ReadOnlySequence<byte> Payload { get { throw null; } }
+    }
+
+    public readonly ref partial struct JournaledStateReplayContext
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public JournaledStateReplayContext(string writeJournalFormatKey, System.IServiceProvider serviceProvider) { }
+        public System.IServiceProvider ServiceProvider { get { throw null; } }
+        public string WriteJournalFormatKey { get { throw null; } }
+        public TCodec GetRequiredOperationCodec<TCodec>(string operationFormatKey, TCodec writeOperationCodec)
+            where TCodec : notnull { throw null; }
     }
 
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>

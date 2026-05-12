@@ -106,7 +106,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
 
-        public void Read(JournalReadBuffer input, IStateResolver resolver) => throw new NotSupportedException();
+        public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodec<TKey, TValue> : IDictionaryOperationCodec<TKey, TValue>

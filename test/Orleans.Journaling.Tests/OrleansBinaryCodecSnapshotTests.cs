@@ -629,7 +629,6 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         Action<JournalStreamWriter> write,
         Action assertCommands)
     {
-        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         using var batch = new OrleansBinaryJournalBatchWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
         var bytes = SnapshotBytes(batch);
@@ -643,7 +642,6 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         Action<JournalStreamWriter> writeSequence,
         string[] expectedCommands)
     {
-        Assert.Same(codec, JournalFormatServices.GetCurrentOperationCodec(state));
         using var batch = new OrleansBinaryJournalBatchWriter();
         writeSequence(batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
         var bytes = SnapshotBytes(batch);
@@ -677,7 +675,8 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         writer.Write(bytes);
         var buffer = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var resolver = new SingleStreamResolver(new JournalStreamId(SnapshotStreamId), state);
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(buffer, resolver);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(buffer, resolver, in context);
         Assert.Equal(0, buffer.Length);
         assertCommands();
     }

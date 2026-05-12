@@ -1,3 +1,5 @@
+using System.Buffers;
+
 namespace Orleans.Journaling;
 
 /// <summary>
@@ -14,28 +16,25 @@ public interface IFormattedJournalEntry
     /// Gets the operation payload bytes for the formatted entry.
     /// </summary>
     ReadOnlyMemory<byte> Payload { get; }
-
-    /// <summary>
-    /// Applies this entry to <paramref name="state"/>.
-    /// </summary>
-    /// <param name="state">The target state.</param>
-    /// <param name="operationCodec">The operation codec to use for applying the entry.</param>
-    void Apply(IJournaledState state, object operationCodec);
 }
 
-/// <summary>
-/// Buffers format-owned journal entries for a stream which is not currently registered.
-/// </summary>
-public interface IFormattedJournalEntryBuffer
+internal sealed class FormattedJournalEntry : IFormattedJournalEntry
 {
-    /// <summary>
-    /// Adds a formatted journal entry to the buffer.
-    /// </summary>
-    /// <param name="entry">The formatted journal entry.</param>
-    void AddFormattedEntry(IFormattedJournalEntry entry);
+    private readonly byte[] _payload;
 
-    /// <summary>
-    /// Gets the buffered formatted entries.
-    /// </summary>
-    IReadOnlyList<IFormattedJournalEntry> FormattedEntries { get; }
+    public FormattedJournalEntry(string formatKey, ReadOnlySequence<byte> payload)
+    {
+        FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);
+        _payload = payload.ToArray();
+    }
+
+    public FormattedJournalEntry(string formatKey, ReadOnlyMemory<byte> payload)
+    {
+        FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);
+        _payload = payload.ToArray();
+    }
+
+    public string FormatKey { get; }
+
+    public ReadOnlyMemory<byte> Payload => _payload;
 }
