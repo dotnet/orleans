@@ -403,9 +403,9 @@ namespace Orleans.Runtime.GrainDirectory
                 return;
             }
 
-            LogInfoSiloStatusChangeNotification(activationsToShutdown.Count, new(updatedSilo));
+            LogInfoSiloStatusChangeNotification(activationsToShutdown.Count, new(updatedSilo), status);
 
-            var reasonText = $"This activation is being deactivated due to a failure of server {updatedSilo}, since it was responsible for this activation's grain directory registration.";
+            var reasonText = $"This activation is being deactivated because server {updatedSilo} entered status {status} and was responsible for this activation's grain directory registration.";
             var reason = new DeactivationReason(DeactivationReasonCode.DirectoryFailure, reasonText);
             foreach (var activation in activationsToShutdown)
             {
@@ -1066,13 +1066,13 @@ namespace Orleans.Runtime.GrainDirectory
         [LoggerMessage(
             Level = LogLevel.Information,
             EventId = (int)ErrorCode.Catalog_SiloStatusChangeNotification,
-            Message = "LocalGrainDirectory is deactivating {Count} activations due to a failure of silo {Silo}, since it is a primary directory partition to these grain ids."
+            Message = "LocalGrainDirectory is deactivating {Count} activations because silo {Silo} entered status {Status} and was the primary directory partition for these grain ids."
         )]
-        private partial void LogInfoSiloStatusChangeNotification(int count, SiloAddressLogValue silo);
+        private partial void LogInfoSiloStatusChangeNotification(int count, SiloAddressLogValue silo, SiloStatus status);
 
         [LoggerMessage(
             Level = LogLevel.Error,
-            EventId = (int)ErrorCode.Catalog_SiloStatusChangeNotification_Exception,
+            EventId = (int)ErrorCode.Catalog_DeactivateActivation_Exception,
             Message = "LocalGrainDirectory has thrown an exception while deactivating activation {GrainId} due to removal of silo {Silo}."
         )]
         private partial void LogErrorDeactivatingActivationForRemovedSilo(Exception exception, GrainId grainId, SiloAddressLogValue silo);
