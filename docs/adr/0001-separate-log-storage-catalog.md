@@ -1,3 +1,0 @@
-# Separate log storage catalog from replayed journal entries
-
-We will extend Orleans Journaling with provider-neutral **Log Storage Ids**, a **Log Storage Catalog**, **Log Storage Properties**, and **Log Storage ETags** for conditional coordination updates. DurableJobs shard discovery, ownership, adoption, and cancellation routing use these catalog properties instead of fake grain contexts, provider-specific metadata APIs, or replayed **Control Log Entries**, because those concerns must be queryable and conditionally updated before opening a shard journal while durable job state remains in ordered **Log Entries**.
