@@ -112,21 +112,22 @@ namespace Orleans.Runtime.GrainDirectory
         private Dictionary<GrainId, GrainInfo> partitionData;
         private readonly object lockable;
         private readonly ILogger log;
-        private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly IOptions<GrainDirectoryOptions> grainDirectoryOptions;
 
         internal int Count { get { return partitionData.Count; } }
 
-        public LocalGrainDirectoryPartition(ISiloStatusOracle siloStatusOracle, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
+        public LocalGrainDirectoryPartition(IClusterMembershipService clusterMembershipService, IOptions<GrainDirectoryOptions> grainDirectoryOptions, ILoggerFactory loggerFactory)
         {
             partitionData = new Dictionary<GrainId, GrainInfo>();
             lockable = new object();
             log = loggerFactory.CreateLogger<LocalGrainDirectoryPartition>();
-            this.siloStatusOracle = siloStatusOracle;
+            this.clusterMembershipService = clusterMembershipService;
             this.grainDirectoryOptions = grainDirectoryOptions;
         }
 
-        private bool IsValidSilo(SiloAddress? silo) => silo is not null && siloStatusOracle.IsFunctionalDirectory(silo);
+        private bool IsDefunctActivation(GrainAddress? address)
+            => address is null || LocalGrainDirectory.IsDefunctActivation(address, clusterMembershipService.CurrentSnapshot);
 
         internal void Clear()
         {
@@ -156,9 +157,11 @@ namespace Orleans.Runtime.GrainDirectory
         {
             LogTraceAddingSingleActivation(address.SiloAddress, address.GrainId, address.ActivationId);
 
-            if (!IsValidSilo(address.SiloAddress))
+            if (IsDefunctActivation(address))
             {
-                var siloStatus = this.siloStatusOracle.GetApproximateSiloStatus(address.SiloAddress);
+                var siloStatus = address.SiloAddress is { } siloAddress
+                    ? this.clusterMembershipService.CurrentSnapshot.GetSiloStatus(siloAddress, address.MembershipVersion)
+                    : SiloStatus.None;
                 throw new OrleansException($"Trying to register {address.GrainId} on invalid silo: {address.SiloAddress}. Known status: {siloStatus}");
             }
 
@@ -170,10 +173,8 @@ namespace Orleans.Runtime.GrainDirectory
                 }
                 else
                 {
-                    var siloAddress = grainInfo.Activation?.SiloAddress;
-
                     // If there is an existing entry pointing to an invalid silo then remove it 
-                    if (siloAddress != null && !IsValidSilo(siloAddress))
+                    if (IsDefunctActivation(grainInfo.Activation))
                     {
                         partitionData[address.GrainId] = grainInfo = new GrainInfo();
                     }
@@ -230,7 +231,7 @@ namespace Orleans.Runtime.GrainDirectory
                 result = new(grainInfo.Activation, grainInfo.VersionTag);
             }
 
-            if (!IsValidSilo(result.Address?.SiloAddress))
+            if (IsDefunctActivation(result.Address))
             {
                 result = new(null, result.VersionTag);
             }
@@ -308,7 +309,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             for (var i = result.Count - 1; i >= 0; i--)
             {
-                if (!IsValidSilo(result[i].SiloAddress))
+                if (IsDefunctActivation(result[i]))
                 {
                     result.RemoveAt(i);
                 }

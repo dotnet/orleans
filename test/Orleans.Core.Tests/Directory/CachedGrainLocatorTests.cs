@@ -146,7 +146,7 @@ namespace UnitTests.Directory
                 .AddSingleton<IGrainDirectoryCache>(cache)
                 .BuildServiceProvider();
             Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
-                siloStatusOracle,
+                membershipService.Target,
                 Options.Create(new GrainDirectoryOptions()),
                 this.loggerFactory);
             var systemTargetShared = new SystemTargetShared(
@@ -450,6 +450,35 @@ namespace UnitTests.Directory
             // Local lookup should never call the directory
             await this.grainDirectory.DidNotReceive().Lookup(outdatedAddr.GrainId);
             await this.grainDirectory.DidNotReceive().Unregister(outdatedAddr);
+
+            await this.lifecycle.OnStop();
+        }
+
+        [Theory]
+        [InlineData(SiloStatus.ShuttingDown)]
+        [InlineData(SiloStatus.Stopping)]
+        public async Task LocalLookupWhenCachedEntrySiloIsTerminatingButNotDead(SiloStatus status)
+        {
+            var silo = GenerateSiloAddress();
+
+            // Setup membership service
+            this.mockMembershipService.UpdateSiloStatus(silo, SiloStatus.Active, "silo");
+            await this.lifecycle.OnStart();
+            await WaitUntilClusterChangePropagated();
+
+            var address = GenerateGrainAddress(silo);
+            this.grainDirectory.Register(address, previousAddress: null).Returns(address);
+
+            await this.grainLocator.Register(address, previousAddress: null);
+            Assert.True(this.grainLocator.TryLookupInCache(address.GrainId, out var cached));
+            Assert.Equal(address, cached);
+
+            this.mockMembershipService.UpdateSiloStatus(silo, status, "silo");
+            await WaitUntilClusterChangePropagated();
+
+            Assert.True(this.grainLocator.TryLookupInCache(address.GrainId, out cached));
+            Assert.Equal(address, cached);
+            await this.grainDirectory.DidNotReceive().UnregisterSilos(Arg.Any<List<SiloAddress>>());
 
             await this.lifecycle.OnStop();
         }

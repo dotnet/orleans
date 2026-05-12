@@ -17,24 +17,24 @@ namespace Orleans.Runtime.GrainDirectory
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ILogger logger;
-        private readonly Factory<LocalGrainDirectoryPartition> createPartion;
         private readonly Queue<(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)> pendingOperations = new();
         private readonly AsyncLock executorLock = new AsyncLock();
 
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,
             ISiloStatusOracle siloStatusOracle,
+            IClusterMembershipService clusterMembershipService,
             IInternalGrainFactory grainFactory,
-            Factory<LocalGrainDirectoryPartition> createPartion,
             ILoggerFactory loggerFactory)
         {
             logger = loggerFactory.CreateLogger<GrainDirectoryHandoffManager>();
             this.localDirectory = localDirectory;
             this.siloStatusOracle = siloStatusOracle;
+            this.clusterMembershipService = clusterMembershipService;
             this.grainFactory = grainFactory;
-            this.createPartion = createPartion;
         }
 
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)
@@ -128,9 +128,10 @@ namespace Orleans.Runtime.GrainDirectory
         {
             if (!this.localDirectory.Running) return;
 
+            var snapshot = this.clusterMembershipService.CurrentSnapshot;
             for (var i = singleActivations.Count - 1; i >= 0; i--)
             {
-                if (singleActivations[i].SiloAddress is not { } siloAddress || this.siloStatusOracle.GetApproximateSiloStatus(siloAddress) == SiloStatus.Dead)
+                if (!IsTransferableRegistration(singleActivations[i], snapshot))
                 {
                     singleActivations.RemoveAt(i);
                 }
@@ -197,6 +198,16 @@ namespace Orleans.Runtime.GrainDirectory
 
                 duplicates.Remove(pair.Key);
             }
+        }
+
+        internal static bool IsTransferableRegistration(GrainAddress address, ClusterMembershipSnapshot snapshot)
+        {
+            if (address.SiloAddress is not { } silo)
+            {
+                return false;
+            }
+
+            return snapshot.GetSiloStatus(silo, address.MembershipVersion) != SiloStatus.Dead;
         }
 
         private void EnqueueOperation(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)

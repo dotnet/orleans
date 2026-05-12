@@ -111,7 +111,8 @@ internal sealed partial class GrainDirectoryPartition
         return existing;
     }
 
-    private bool IsSiloDead(GrainAddress existing) => _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress) == SiloStatus.Dead;
+    private bool IsSiloDead(GrainAddress existing)
+        => existing.SiloAddress is null || _owner.ClusterMembershipSnapshot.GetSiloStatus(existing.SiloAddress, existing.MembershipVersion) == SiloStatus.Dead;
 
     [LoggerMessage(
         Level = LogLevel.Trace,

@@ -169,10 +169,10 @@ namespace Orleans.Runtime.GrainDirectory
             var updates = this.clusterMembershipService.MembershipUpdates.WithCancellation(this.shutdownToken.Token);
             await foreach (var snapshot in updates)
             {
-                // Active filtering: detect silos that went down and try to clean proactively the directory
+                // Active filtering: detect dead silos and try to clean proactively the directory
                 var changes = snapshot.CreateUpdate(previousSnapshot).Changes;
                 var deadSilos = changes
-                    .Where(member => member.Status.IsTerminating())
+                    .Where(member => member.Status == SiloStatus.Dead)
                     .Select(member => member.SiloAddress)
                     .ToList();
 
@@ -196,17 +196,7 @@ namespace Orleans.Runtime.GrainDirectory
         private bool IsKnownDeadSilo(SiloAddress siloAddress, MembershipVersion membershipVersion)
         {
             var current = this.clusterMembershipService.CurrentSnapshot;
-
-            // Check if the target silo is in the cluster
-            if (current.Members.TryGetValue(siloAddress, out var value))
-            {
-                // It is, check if it's alive
-                return value.Status.IsTerminating();
-            }
-
-            // We didn't find it in the cluster. If the silo entry is too old, it has been cleaned in the membership table: the entry isn't valid anymore.
-            // Otherwise, maybe the membership service isn't up to date yet. The entry should be valid
-            return current.Version > membershipVersion;
+            return siloAddress is null || current.GetSiloStatus(siloAddress, membershipVersion) == SiloStatus.Dead;
         }
 
         private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
@@ -222,10 +212,10 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowUnsupportedGrainType(grainId);
             }
 
-            if (this.cache.LookUp(grainId, out address, out var version))
+            if (this.cache.LookUp(grainId, out address, out _))
             {
                 // If the silo is dead, remove the entry
-                if (IsKnownDeadSilo(address.SiloAddress, new MembershipVersion(version)))
+                if (IsKnownDeadSilo(address))
                 {
                     address = default;
                     this.cache.Remove(grainId);

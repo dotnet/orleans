@@ -547,6 +547,8 @@ namespace Orleans.Runtime
 
         public SiloStatus GetSiloStatus(SiloAddress silo) { throw null; }
 
+        public SiloStatus GetSiloStatus(SiloAddress silo, MembershipVersion seenAtVersion) { throw null; }
+
         public override string ToString() { throw null; }
     }
 

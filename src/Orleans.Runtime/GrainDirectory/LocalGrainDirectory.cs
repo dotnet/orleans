@@ -80,7 +80,7 @@ namespace Orleans.Runtime.GrainDirectory
             }
 
             DirectoryPartition = grainDirectoryPartitionFactory();
-            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, grainFactory, grainDirectoryPartitionFactory, loggerFactory);
+            HandoffManager = new GrainDirectoryHandoffManager(this, siloStatusOracle, clusterMembershipService, grainFactory, loggerFactory);
 
             // When DistributedGrainDirectory is active, it registers its own IRemoteGrainDirectory system targets.
             // In that case, create the RemoteGrainDirectory objects (still needed for WorkItemGroup scheduling)
@@ -449,8 +449,7 @@ namespace Orleans.Runtime.GrainDirectory
                 return true;
             }
 
-            var status = snapshot.GetSiloStatus(silo);
-            return status == SiloStatus.Dead || (status == SiloStatus.None && address.MembershipVersion < snapshot.Version);
+            return snapshot.GetSiloStatus(silo, address.MembershipVersion) == SiloStatus.Dead;
         }
 
         internal SiloAddress? FindPredecessor(SiloAddress silo)
@@ -640,7 +639,7 @@ namespace Orleans.Runtime.GrainDirectory
                 // this way next local lookup will find this ActivationAddress in the cache and we will save a full lookup!
                 if (result.Address == null) return result;
 
-                if (!address.Equals(result.Address) || !IsValidSilo(address.SiloAddress)) return result;
+                if (!address.Equals(result.Address) || IsDefunctActivation(address, clusterMembershipService.CurrentSnapshot)) return result;
 
                 // update the cache so next local lookup will find this ActivationAddress in the cache and we will save full lookup.
                 DirectoryCache.AddOrUpdate(result.Address, result.VersionTag);
@@ -845,7 +844,15 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AddressAndTag GetLocalDirectoryData(GrainId grain) => DirectoryPartition.LookUpActivation(grain);
 
-        public GrainAddress? GetLocalCacheData(GrainId grain) => DirectoryCache.LookUp(grain, out var cache) && IsValidSilo(cache.SiloAddress) ? cache : null;
+        public GrainAddress? GetLocalCacheData(GrainId grain)
+        {
+            if (!DirectoryCache.LookUp(grain, out var cache))
+            {
+                return null;
+            }
+
+            return IsDefunctActivation(cache, clusterMembershipService.CurrentSnapshot) ? null : cache;
+        }
 
         public async Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
         {
@@ -906,7 +913,7 @@ namespace Orleans.Runtime.GrainDirectory
                 var result = await GetDirectoryReference(forwardAddress).LookupAsync(grainId, hopCount + 1);
 
                 // update the cache
-                if (result.Address is { } address && IsValidSilo(address.SiloAddress))
+                if (result.Address is { } address && !IsDefunctActivation(address, clusterMembershipService.CurrentSnapshot))
                 {
                     DirectoryCache.AddOrUpdate(address, result.VersionTag);
                 }
