@@ -26,31 +26,32 @@ public class LocalGrainDirectoryTests
     public void IsDefunctActivation_RemovesDeadSilos()
     {
         var silo = CreateSiloAddress(1);
-        var address = CreateGrainAddress(silo);
+        var address = CreateGrainAddress(silo, membershipVersion: 2);
         var snapshot = CreateSnapshot(new ClusterMember(silo, SiloStatus.Dead, "silo"), version: 2);
 
         Assert.True(LocalGrainDirectory.IsDefunctActivation(address, snapshot));
     }
 
     [Fact]
-    public void IsDefunctActivation_DoesNotRemoveDeadSiloWithoutNewerMembershipVersion()
+    public void IsDefunctActivation_DoesNotRemoveUnknownSiloWithoutNewerMembershipVersion()
     {
         var silo = CreateSiloAddress(1);
+        var unrelatedSilo = CreateSiloAddress(1, port: 11112);
         var address = CreateGrainAddress(silo, membershipVersion: 2);
-        var snapshot = CreateSnapshot(new ClusterMember(silo, SiloStatus.Dead, "silo"), version: 2);
+        var snapshot = CreateSnapshot(new ClusterMember(unrelatedSilo, SiloStatus.Active, "other"), version: 2);
 
         Assert.False(LocalGrainDirectory.IsDefunctActivation(address, snapshot));
     }
 
     [Fact]
-    public void IsDefunctActivation_DoesNotRemoveUnknownSiloUntilKnownDead()
+    public void IsDefunctActivation_RemovesUnknownSiloWithOlderMembershipVersion()
     {
         var silo = CreateSiloAddress(1);
         var unrelatedSilo = CreateSiloAddress(1, port: 11112);
         var address = CreateGrainAddress(silo, membershipVersion: 1);
         var snapshot = CreateSnapshot(new ClusterMember(unrelatedSilo, SiloStatus.Active, "other"), version: 2);
 
-        Assert.False(LocalGrainDirectory.IsDefunctActivation(address, snapshot));
+        Assert.True(LocalGrainDirectory.IsDefunctActivation(address, snapshot));
     }
 
     [Fact]
@@ -58,7 +59,7 @@ public class LocalGrainDirectoryTests
     {
         var silo = CreateSiloAddress(1);
         var successor = CreateSiloAddress(2);
-        var address = CreateGrainAddress(silo, membershipVersion: 1);
+        var address = CreateGrainAddress(silo, membershipVersion: 2);
         var snapshot = CreateSnapshot(new ClusterMember(successor, SiloStatus.Active, "silo"), version: 2);
 
         Assert.True(LocalGrainDirectory.IsDefunctActivation(address, snapshot));
