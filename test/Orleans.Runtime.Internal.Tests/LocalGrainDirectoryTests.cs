@@ -33,6 +33,16 @@ public class LocalGrainDirectoryTests
     }
 
     [Fact]
+    public void IsDefunctActivation_DoesNotRemoveDeadSiloWithoutNewerMembershipVersion()
+    {
+        var silo = CreateSiloAddress(1);
+        var address = CreateGrainAddress(silo, membershipVersion: 2);
+        var snapshot = CreateSnapshot(new ClusterMember(silo, SiloStatus.Dead, "silo"), version: 2);
+
+        Assert.False(LocalGrainDirectory.IsDefunctActivation(address, snapshot));
+    }
+
+    [Fact]
     public void IsDefunctActivation_DoesNotRemoveUnknownSiloUntilKnownDead()
     {
         var silo = CreateSiloAddress(1);
