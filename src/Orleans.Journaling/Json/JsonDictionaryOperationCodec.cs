@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -58,7 +57,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer)
+    public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);

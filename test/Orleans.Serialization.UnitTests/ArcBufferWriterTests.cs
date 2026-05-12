@@ -137,6 +137,180 @@ public class ArcBufferWriterTests
         Assert.Equal(data.Length * 1_000L, length);
     }
 
+    [Fact]
+    public void AppendPinned_WholeBufferPinsPagesAndReadsData()
+    {
+        using var source = new ArcBufferWriter();
+        var data = new byte[PageSize * 3];
+        _random.NextBytes(data);
+        source.Write(data);
+
+        using var slice = source.PeekSlice(source.Length);
+        var pages = slice.Pages.ToArray();
+        var referenceCounts = pages.Select(static page => page.ReferenceCount).ToArray();
+
+        using var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+
+        Assert.Equal(data.Length, destination.Length);
+        Assert.Equal(referenceCounts.Select(static count => count + 1), pages.Select(static page => page.ReferenceCount));
+        Assert.Equal(data, ToArray(destination));
+    }
+
+    [Fact]
+    public void AppendPinned_PartialSliceBoundsReadsToSlice()
+    {
+        using var source = new ArcBufferWriter();
+        var data = new byte[PageSize * 3];
+        _random.NextBytes(data);
+        source.Write(data);
+
+        using var full = source.PeekSlice(source.Length);
+        var offset = 123;
+        var length = PageSize * 2 - 456;
+        using var slice = full.Slice(offset, length);
+
+        using var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+
+        Assert.Equal(length, destination.Length);
+        Assert.Equal(data.AsSpan(offset, length).ToArray(), ToArray(destination));
+
+        var reader = new ArcBufferReader(destination);
+        var firstRead = new byte[PageSize - offset];
+        reader.Consume(firstRead);
+        Assert.Equal(data.AsSpan(offset, firstRead.Length).ToArray(), firstRead);
+        Assert.Equal(length - firstRead.Length, destination.Length);
+
+        var remaining = new byte[destination.Length];
+        reader.Consume(remaining);
+        Assert.Equal(data.AsSpan(offset + firstRead.Length, remaining.Length).ToArray(), remaining);
+        Assert.Equal(0, destination.Length);
+    }
+
+    [Fact]
+    public void AppendPinned_DestinationOutlivesSource()
+    {
+        var source = new ArcBufferWriter();
+        var data = new byte[PageSize + 17];
+        _random.NextBytes(data);
+        source.Write(data);
+
+        var slice = source.PeekSlice(source.Length);
+        var pages = slice.Pages.ToArray();
+        var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+
+        source.Dispose();
+        slice.Dispose();
+
+        Assert.All(pages, page => Assert.Equal(1, page.ReferenceCount));
+        Assert.Equal(data, ToArray(destination));
+
+        destination.Dispose();
+        Assert.All(pages, page => Assert.Equal(0, page.ReferenceCount));
+    }
+
+    [Fact]
+    public void AppendPinned_DisposeStopsAtAppendedTail()
+    {
+        using var source = new ArcBufferWriter();
+        var data = new byte[PageSize * 3];
+        _random.NextBytes(data);
+        source.Write(data);
+
+        ArcBufferPage[] pages;
+        using (var all = source.PeekSlice(source.Length))
+        {
+            pages = all.Pages.ToArray();
+        }
+
+        using var slice = source.PeekSlice(PageSize * 2);
+        var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+
+        Assert.Equal(3, pages[0].ReferenceCount);
+        Assert.Equal(3, pages[1].ReferenceCount);
+        Assert.Equal(1, pages[2].ReferenceCount);
+
+        destination.Dispose();
+
+        Assert.Equal(2, pages[0].ReferenceCount);
+        Assert.Equal(2, pages[1].ReferenceCount);
+        Assert.Equal(1, pages[2].ReferenceCount);
+    }
+
+    [Fact]
+    public void AppendPinned_ResetReleasesPinnedPagesAndRestoresWritableState()
+    {
+        using var source = new ArcBufferWriter();
+        var data = new byte[PageSize + 5];
+        _random.NextBytes(data);
+        source.Write(data);
+
+        using var slice = source.PeekSlice(source.Length);
+        var pages = slice.Pages.ToArray();
+
+        using var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+        Assert.All(pages, page => Assert.Equal(3, page.ReferenceCount));
+
+        destination.Reset();
+
+        Assert.All(pages, page => Assert.Equal(2, page.ReferenceCount));
+        destination.Write([1, 2, 3]);
+        Assert.Equal([1, 2, 3], ToArray(destination));
+    }
+
+    [Fact]
+    public void AppendPinned_PreventsMutatingPinnedPages()
+    {
+        using var source = new ArcBufferWriter();
+        source.Write([1, 2, 3]);
+        using var slice = source.PeekSlice(source.Length);
+
+        using var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+
+        Assert.Throws<InvalidOperationException>(() => destination.GetSpan(1));
+        Assert.Throws<InvalidOperationException>(() => destination.GetMemory(1));
+        Assert.Throws<InvalidOperationException>(() => destination.Write([4]));
+        Assert.Throws<InvalidOperationException>(() => destination.AdvanceWriter(1));
+        Assert.Throws<InvalidOperationException>(() => destination.WriteAt(0, [4]));
+        Assert.Throws<InvalidOperationException>(() => destination.Truncate(1));
+        Assert.Throws<InvalidOperationException>(() => destination.ReplenishBuffers(new List<ArraySegment<byte>>(1)));
+    }
+
+    [Fact]
+    public void AppendPinned_RequiresEmptyWriter()
+    {
+        using var source = new ArcBufferWriter();
+        source.Write([1, 2, 3]);
+        using var slice = source.PeekSlice(source.Length);
+        var pages = slice.Pages.ToArray();
+        var referenceCounts = pages.Select(static page => page.ReferenceCount).ToArray();
+
+        using var destination = new ArcBufferWriter();
+        destination.Write([0]);
+
+        Assert.Throws<InvalidOperationException>(() => destination.AppendPinned(slice));
+        Assert.Equal(referenceCounts, pages.Select(static page => page.ReferenceCount));
+    }
+
+    [Fact]
+    public void AppendPinned_EmptySliceLeavesWriterWritable()
+    {
+        using var source = new ArcBufferWriter();
+        source.Write([1, 2, 3]);
+        using var slice = source.PeekSlice(0);
+
+        using var destination = new ArcBufferWriter();
+        destination.AppendPinned(slice);
+        destination.Write([4, 5]);
+
+        Assert.Equal([4, 5], ToArray(destination));
+    }
+
     /// <summary>
     /// Verifies that page reference counts and versions are managed correctly as slices are consumed and disposed.
     /// </summary>
@@ -1006,5 +1180,11 @@ public class ArcBufferWriterTests
         Assert.Equal(1, page.ReferenceCount); // Only buffer's own pin remains
         buffer.Dispose();
         Assert.Equal(0, page.ReferenceCount);
+    }
+
+    private static byte[] ToArray(ArcBufferWriter writer)
+    {
+        using var slice = writer.PeekSlice(writer.Length);
+        return slice.ToArray();
     }
 }

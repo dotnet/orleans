@@ -43,6 +43,9 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     // Indicates whether the writer has been disposed.
     private bool _disposed;
 
+    // Indicates that this writer directly references pages pinned from another buffer.
+    private bool _hasPinnedPages;
+
     /// <summary>
     /// Gets the minimum page size.
     /// </summary>
@@ -78,6 +81,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public void ReplenishBuffers(List<ArraySegment<byte>> buffers)
     {
         ThrowIfDisposed();
+        ThrowIfPinnedPages();
 
         // Skip half-full pages in an attempt to minimize the number of buffers added to the destination
         // at the expense of under-utilized memory. This could be tweaked up to increase page utilization.
@@ -108,6 +112,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public void AdvanceWriter(int count)
     {
         ThrowIfDisposed();
+        ThrowIfPinnedPages();
 
 #if NET5_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfLessThan(count, 0);
@@ -140,6 +145,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public void WriteAt(int offset, ReadOnlySpan<byte> value)
     {
         ThrowIfDisposed();
+        ThrowIfPinnedPages();
 
 #if NET5_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfLessThan(offset, 0);
@@ -190,6 +196,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public void Truncate(int length)
     {
         ThrowIfDisposed();
+        ThrowIfPinnedPages();
 
 #if NET5_0_OR_GREATER
         ArgumentOutOfRangeException.ThrowIfLessThan(length, 0);
@@ -237,6 +244,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         ThrowIfDisposed();
 
         UnpinAll();
+        _hasPinnedPages = false;
         _totalLength = _readIndex = 0;
         _readPage = _writePage = _tail = ArcBufferPagePool.Shared.Rent();
         Debug.Assert(_readPage.ReferenceCount == 0);
@@ -249,6 +257,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         if (_disposed) return;
 
         UnpinAll();
+        _hasPinnedPages = false;
         _totalLength = _readIndex = 0;
         _readPage = _writePage = _tail = null!;
         _disposed = true;
@@ -259,6 +268,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public Memory<byte> GetMemory(int sizeHint = 0)
     {
         ThrowIfDisposed();
+        ThrowIfPinnedPages();
 
         if (sizeHint >= _writePage.WriteCapacity)
         {
@@ -273,6 +283,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     public Span<byte> GetSpan(int sizeHint = 0)
     {
         ThrowIfDisposed();
+        ThrowIfPinnedPages();
 
         if (sizeHint >= _writePage.WriteCapacity)
         {
@@ -292,7 +303,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         ThrowIfDisposed();
 
         // Single span.
-        var firstSpan = _readPage.AsSpan(_readIndex, _readPage.Length - _readIndex);
+        var firstSpan = _readPage.AsSpan(_readIndex, Math.Min(_readPage.Length - _readIndex, Length));
         if (firstSpan.Length >= destination.Length)
         {
             return firstSpan;
@@ -309,17 +320,19 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     {
         ThrowIfDisposed();
 
+        var remaining = Math.Min(output.Length, Length);
         var bytesCopied = 0;
         var current = _readPage;
         var offset = _readIndex;
-        while (output.Length > 0 && current != null)
+        while (remaining > 0 && current != null)
         {
-            var segment = current.AsSpan(offset, current.Length - offset);
+            var segment = current.AsSpan(offset, Math.Min(current.Length - offset, remaining));
             var copyLength = Math.Min(segment.Length, output.Length);
             bytesCopied += copyLength;
             var slice = segment[..copyLength];
             slice.CopyTo(output);
             output = output[slice.Length..];
+            remaining -= slice.Length;
             current = current.Next;
             offset = 0;
         }
@@ -340,7 +353,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
                 return default;
             }
 
-            return _readPage.AsSpan(_readIndex, _readPage.Length - _readIndex);
+            return _readPage.AsSpan(_readIndex, Math.Min(_readPage.Length - _readIndex, Length));
         }
     }
 
@@ -487,6 +500,47 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         }
     }
 
+    /// <summary>
+    /// Appends the pages referenced by <paramref name="input"/> directly to this writer by pinning them.
+    /// </summary>
+    /// <param name="input">The buffer to append.</param>
+    /// <remarks>
+    /// The writer must be empty and must not be written to after calling this method. The caller retains ownership
+    /// of <paramref name="input"/> and must dispose it independently.
+    /// </remarks>
+    public void AppendPinned(ArcBuffer input)
+    {
+        ThrowIfDisposed();
+
+        if (input.Length == 0)
+        {
+            return;
+        }
+
+        ThrowIfPinnedPages();
+        if (_totalLength != 0 || _readIndex != 0 || _readPage != _writePage || _writePage != _tail || _readPage.Length != 0)
+        {
+            throw new InvalidOperationException("Pinned pages can only be appended to an empty writer.");
+        }
+
+        input.Pin();
+
+        ArcBufferPage? tail = null;
+        foreach (var segment in input.PageSegments)
+        {
+            tail = segment.Page;
+        }
+
+        Debug.Assert(tail is not null);
+
+        _readPage.Unpin(_readPage.Version);
+        _readPage = input.First;
+        _writePage = _tail = tail!;
+        _readIndex = input.Offset;
+        _totalLength = checked(input.Offset + input.Length);
+        _hasPinnedPages = true;
+    }
+
     private void WriteMultiSegment(in ReadOnlySpan<byte> source, Span<byte> destination)
     {
         var input = source;
@@ -516,7 +570,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         while (current != null)
         {
             var previous = current;
-            current = previous.Next;
+            current = ReferenceEquals(previous, _tail) ? null : previous.Next;
             previous.Unpin(previous.Version);
         }
     }
@@ -608,6 +662,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 
     private ArcBufferPage AllocatePage(int sizeHint)
     {
+        ThrowIfPinnedPages();
         Debug.Assert(_tail.Next is null);
 
         var newBuffer = ArcBufferPagePool.Shared.Rent(sizeHint);
@@ -633,6 +688,14 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     {
         if (_disposed)
             throw new ObjectDisposedException(nameof(ArcBufferWriter));
+    }
+
+    private void ThrowIfPinnedPages()
+    {
+        if (_hasPinnedPages)
+        {
+            throw new InvalidOperationException("This writer references pages pinned from another buffer and cannot be written to.");
+        }
     }
 }
 

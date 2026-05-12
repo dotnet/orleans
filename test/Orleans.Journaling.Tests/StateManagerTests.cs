@@ -1085,7 +1085,7 @@ public class StateManagerTests : JournalingTestBase
 
             var callbackPayload = _payload.ToArray();
             var state = resolver.ResolveState(_streamId);
-            state.ApplyOperation(new JournalOperation(FormatKey, new ReadOnlySequence<byte>(callbackPayload)), in context);
+            state.ApplyOperation(new JournalOperation(FormatKey, CodecTestHelpers.ReadBuffer(callbackPayload)), in context);
 
             Array.Fill(callbackPayload, byte.MaxValue);
             input.Skip(input.Length);
@@ -1469,7 +1469,7 @@ public class StateManagerTests : JournalingTestBase
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
     }
 
     private sealed class ToggleThrowingDictionarySetCodec<K, V>(IDictionaryOperationCodec<K, V> inner) : IDictionaryOperationCodec<K, V>
@@ -1497,6 +1497,6 @@ public class StateManagerTests : JournalingTestBase
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, JournalStreamWriter writer) => inner.WriteSnapshot(items, writer);
 
-        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<K, V> consumer) => inner.Apply(input, consumer);
+        public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<K, V> consumer) => inner.Apply(input, consumer);
     }
 }

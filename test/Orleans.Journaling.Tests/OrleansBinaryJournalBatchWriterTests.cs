@@ -327,11 +327,11 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
         using var data = CreateWriter(bytes);
-        var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: true);
         var consumer = new CollectingConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
+            var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
         });
@@ -348,11 +348,11 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         using var committed = buffer.GetCommittedBuffer();
         var entryBytes = committed.ToArray();
         using var data = CreateWriter([.. entryBytes, 0x0B, 1, 2]);
-        var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: true);
         var consumer = new CollectingConsumer();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
+            var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
         });

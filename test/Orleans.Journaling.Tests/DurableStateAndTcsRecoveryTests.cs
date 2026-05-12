@@ -113,6 +113,6 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             _inner.WriteClear(writer);
         }
 
-        public void Apply(ReadOnlySequence<byte> input, IStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+        public void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);
     }
 }

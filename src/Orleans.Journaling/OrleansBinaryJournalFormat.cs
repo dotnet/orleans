@@ -122,11 +122,13 @@ internal static class OrleansBinaryJournalReader
             var operationStart = (int)reader.Position;
             var operationLength = frameLength - operationStart;
             using var operationSlice = batchSlice.Slice(operationStart, operationLength);
+            using var operationBuffer = new ArcBufferWriter();
+            operationBuffer.AppendPinned(operationSlice);
 
             try
             {
                 state.ApplyOperation(
-                    new JournalOperation(OrleansBinaryJournalFormat.JournalFormatKey, operationSlice.AsReadOnlySequence()),
+                    new JournalOperation(OrleansBinaryJournalFormat.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(operationBuffer), isCompleted: true)),
                     in context);
             }
             catch (Exception exception) when (exception is not InvalidOperationException ioe || !ioe.Message.StartsWith("Malformed binary journal entry stream", StringComparison.Ordinal))

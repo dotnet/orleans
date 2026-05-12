@@ -46,25 +46,25 @@ public sealed class JsonOperationCodecAdditionalTests
     [Fact]
     public void OperationCodecs_RejectUnsupportedCommands()
     {
-        var payload = CodecTestHelpers.Sequence("""["unknown"]"""u8.ToArray());
+        var payload = """["unknown"]"""u8.ToArray();
 
-        Assert.Throws<NotSupportedException>(() => new JsonDictionaryOperationCodec<string, int>(Options).Apply(payload, new RecordingDictionaryOperationHandler<string, int>()));
-        Assert.Throws<NotSupportedException>(() => new JsonListOperationCodec<int>(Options).Apply(payload, new RecordingListOperationHandler<int>()));
-        Assert.Throws<NotSupportedException>(() => new JsonQueueOperationCodec<int>(Options).Apply(payload, new RecordingQueueOperationHandler<int>()));
-        Assert.Throws<NotSupportedException>(() => new JsonSetOperationCodec<int>(Options).Apply(payload, new RecordingSetOperationHandler<int>()));
-        Assert.Throws<NotSupportedException>(() => new JsonValueOperationCodec<int>(Options).Apply(payload, new RecordingValueOperationHandler<int>()));
-        Assert.Throws<NotSupportedException>(() => new JsonStateOperationCodec<int>(Options).Apply(payload, new RecordingStateOperationHandler<int>()));
-        Assert.Throws<NotSupportedException>(() => new JsonTcsOperationCodec<int>(Options).Apply(payload, new RecordingTaskCompletionSourceOperationHandler<int>()));
+        Assert.Throws<NotSupportedException>(() => new JsonDictionaryOperationCodec<string, int>(Options).Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingDictionaryOperationHandler<string, int>()));
+        Assert.Throws<NotSupportedException>(() => new JsonListOperationCodec<int>(Options).Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingListOperationHandler<int>()));
+        Assert.Throws<NotSupportedException>(() => new JsonQueueOperationCodec<int>(Options).Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingQueueOperationHandler<int>()));
+        Assert.Throws<NotSupportedException>(() => new JsonSetOperationCodec<int>(Options).Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingSetOperationHandler<int>()));
+        Assert.Throws<NotSupportedException>(() => new JsonValueOperationCodec<int>(Options).Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingValueOperationHandler<int>()));
+        Assert.Throws<NotSupportedException>(() => new JsonStateOperationCodec<int>(Options).Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingStateOperationHandler<int>()));
+        Assert.Throws<NotSupportedException>(() => new JsonTcsOperationCodec<int>(Options).Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingTaskCompletionSourceOperationHandler<int>()));
     }
 
     [Fact]
     public void ValueCodec_NullOperand_ThrowsClearException()
     {
         var codec = new JsonValueOperationCodec<string>(Options);
-        var payload = CodecTestHelpers.Sequence("""["set",null]"""u8.ToArray());
+        var payload = """["set",null]"""u8.ToArray();
 
         var exception = Assert.Throws<JsonException>(
-            () => codec.Apply(payload, new RecordingValueOperationHandler<string>()));
+            () => codec.Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingValueOperationHandler<string>()));
 
         Assert.Contains("must not be null", exception.Message);
         Assert.Contains(JsonJournalEntryFields.Value, exception.Message);
@@ -74,10 +74,10 @@ public sealed class JsonOperationCodecAdditionalTests
     public void ListCodec_NullSnapshotItem_ThrowsClearException()
     {
         var codec = new JsonListOperationCodec<string>(Options);
-        var payload = CodecTestHelpers.Sequence("""["snapshot",["a",null,"c"]]"""u8.ToArray());
+        var payload = """["snapshot",["a",null,"c"]]"""u8.ToArray();
 
         var exception = Assert.Throws<JsonException>(
-            () => codec.Apply(payload, new RecordingListOperationHandler<string>()));
+            () => codec.Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingListOperationHandler<string>()));
 
         Assert.Contains("must not be null", exception.Message);
         Assert.Contains(JsonJournalEntryFields.Item, exception.Message);
@@ -87,10 +87,10 @@ public sealed class JsonOperationCodecAdditionalTests
     public void DictionaryCodec_NullKeyInSnapshotPair_ThrowsClearException()
     {
         var codec = new JsonDictionaryOperationCodec<string, int>(Options);
-        var payload = CodecTestHelpers.Sequence("""["snapshot",[[null,1]]]"""u8.ToArray());
+        var payload = """["snapshot",[[null,1]]]"""u8.ToArray();
 
         var exception = Assert.Throws<JsonException>(
-            () => codec.Apply(payload, new RecordingDictionaryOperationHandler<string, int>()));
+            () => codec.Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingDictionaryOperationHandler<string, int>()));
 
         Assert.Contains("must not be null", exception.Message);
         Assert.Contains(JsonJournalEntryFields.Key, exception.Message);
@@ -150,7 +150,7 @@ public sealed class JsonOperationCodecAdditionalTests
         RecordingDictionaryOperationHandler<TKey, TValue> consumer)
         where TKey : notnull
     {
-        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(write)), consumer);
     }
 
     [Fact]

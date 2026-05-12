@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace Orleans.Journaling;
 
 /// <summary>
@@ -20,7 +18,7 @@ public interface IDictionaryOperationCodec<TKey, TValue> where TKey : notnull
     void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer);
+    void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer);
 }
 
 /// <summary>
@@ -47,7 +45,7 @@ public interface IListOperationCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer);
+    void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer);
 }
 
 /// <summary>
@@ -68,7 +66,7 @@ public interface IQueueOperationCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer);
+    void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer);
 }
 
 /// <summary>
@@ -89,7 +87,7 @@ public interface ISetOperationCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer);
+    void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer);
 }
 
 /// <summary>
@@ -101,7 +99,7 @@ public interface IValueOperationCodec<T>
     void WriteSet(T value, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<T> consumer);
+    void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer);
 }
 
 /// <summary>
@@ -116,7 +114,7 @@ public interface IStateOperationCodec<T>
     void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IStateOperationHandler<T> consumer);
+    void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer);
 }
 
 /// <summary>
@@ -137,7 +135,7 @@ public interface ITaskCompletionSourceOperationCodec<T>
     void WriteCanceled(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer);
+    void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer);
 }
 
 /// <summary>

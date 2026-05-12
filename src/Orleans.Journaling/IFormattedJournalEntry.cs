@@ -28,6 +28,12 @@ internal sealed class FormattedJournalEntry : IFormattedJournalEntry
         _payload = payload.ToArray();
     }
 
+    public FormattedJournalEntry(string formatKey, JournalReadBuffer payload)
+    {
+        FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);
+        _payload = payload.ToArray();
+    }
+
     public FormattedJournalEntry(string formatKey, ReadOnlyMemory<byte> payload)
     {
         FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);

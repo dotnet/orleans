@@ -1,5 +1,5 @@
-using System.Buffers;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -14,7 +14,7 @@ internal static class OrleansBinaryOperationApplier
     /// <summary>
     /// Creates a reader directly over <paramref name="input"/>.
     /// </summary>
-    public static Reader<ReadOnlySequenceInput> CreateReader(ReadOnlySequence<byte> input, SerializerSession session) =>
+    public static Reader<ArcBufferReaderInput> CreateReader(ArcBuffer input, SerializerSession session) =>
         Reader.Create(input, session);
 
     /// <summary>

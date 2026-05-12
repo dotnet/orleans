@@ -782,6 +782,8 @@ namespace Orleans.Serialization.Buffers
 
         public void AdvanceWriter(int count) { }
 
+        public void AppendPinned(ArcBuffer input) { }
+
         public ArcBuffer ConsumeSlice(int count) { throw null; }
 
         public void Dispose() { }

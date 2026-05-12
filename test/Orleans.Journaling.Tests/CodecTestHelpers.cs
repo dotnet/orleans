@@ -15,7 +15,7 @@ public static class CodecTestHelpers
         return buffer;
     }
 
-    public static ReadOnlySequence<byte> WriteEntry(Action<JournalStreamWriter> write)
+    public static byte[] WriteEntry(Action<JournalStreamWriter> write)
     {
         using var batch = new OrleansBinaryJournalBatchWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
@@ -29,10 +29,15 @@ public static class CodecTestHelpers
         var streamIdReader = Reader.Create(entry, session: null!);
         streamIdReader.ReadVarUInt64();
         var payload = entry.Slice(streamIdReader.Position);
-        return Sequence(payload.ToArray());
+        return payload.ToArray();
     }
 
-    public static ReadOnlySequence<byte> Sequence(ReadOnlyMemory<byte> bytes) => new(bytes);
+    public static JournalReadBuffer ReadBuffer(ReadOnlyMemory<byte> bytes)
+    {
+        var writer = new ArcBufferWriter();
+        writer.Write(bytes.Span);
+        return new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+    }
 
     public static ReadOnlySequence<byte> SegmentedSequence(params byte[][] segments)
     {

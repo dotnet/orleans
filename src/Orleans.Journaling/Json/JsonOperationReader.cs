@@ -21,6 +21,18 @@ internal ref struct JsonOperationReader
         Command = ReadCommandCore();
     }
 
+    public JsonOperationReader(JournalReadBuffer input)
+    {
+        _reader = new Utf8JsonReader(input.AsReadOnlySequence(), isFinalBlock: true, state: default);
+        _nextIndex = 0;
+        if (!_reader.Read() || _reader.TokenType is not JsonTokenType.StartArray)
+        {
+            throw new JsonException("A JSON journal operation must be an array.");
+        }
+
+        Command = ReadCommandCore();
+    }
+
     public JsonOperationReader(ref Utf8JsonReader reader)
     {
         _reader = reader;

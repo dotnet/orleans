@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace Orleans.Journaling;
 
 /// <summary>
@@ -16,8 +14,8 @@ namespace Orleans.Journaling;
 /// </para>
 /// </remarks>
 /// <param name="formatKey">The journal format key for <paramref name="payload"/>.</param>
-/// <param name="payload">The operation payload bytes.</param>
-public readonly struct JournalOperation(string formatKey, ReadOnlySequence<byte> payload)
+/// <param name="payload">The operation payload buffer.</param>
+public readonly ref struct JournalOperation(string formatKey, JournalReadBuffer payload)
 {
     /// <summary>
     /// Gets the journal format key for this operation.
@@ -25,7 +23,7 @@ public readonly struct JournalOperation(string formatKey, ReadOnlySequence<byte>
     public string FormatKey { get; } = JournalFormatServices.ValidateJournalFormatKey(formatKey);
 
     /// <summary>
-    /// Gets the operation payload bytes.
+    /// Gets the operation payload buffer.
     /// </summary>
-    public ReadOnlySequence<byte> Payload { get; } = payload;
+    public JournalReadBuffer Payload { get; } = payload;
 }

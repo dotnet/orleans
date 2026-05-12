@@ -171,7 +171,7 @@ public sealed class DurableListDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private static void WriteOrThrow(JournalStreamWriter writer, bool shouldThrow)

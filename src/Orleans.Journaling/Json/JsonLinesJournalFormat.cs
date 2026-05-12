@@ -96,8 +96,11 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             var state = resolver.ResolveState(stream);
             var journalEntry = ParseJournalEntry(line, offset);
             var payload = JsonFormattedJournalEntry.Create(new JsonOperationEntry(journalEntry, offset: 1, journalEntry.GetArrayLength() - 1)).Payload;
-            _ = new JsonOperationReader(new ReadOnlySequence<byte>(payload));
-            state.ApplyOperation(new JournalOperation(JsonJournalExtensions.JournalFormatKey, new ReadOnlySequence<byte>(payload)), in context);
+            using var payloadBuffer = new ArcBufferWriter();
+            payloadBuffer.Write(payload.Span);
+            var operation = new JournalOperation(JsonJournalExtensions.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true));
+            _ = new JsonOperationReader(operation.Payload);
+            state.ApplyOperation(operation, in context);
         }
         catch (JsonException exception)
         {

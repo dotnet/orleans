@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -38,7 +37,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
@@ -199,7 +198,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
@@ -313,7 +312,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);

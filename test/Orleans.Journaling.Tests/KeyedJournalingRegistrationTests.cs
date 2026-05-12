@@ -120,13 +120,13 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
 
     private sealed class TestValueCodec<T> : IValueOperationCodec<T>
     {
         public void WriteSet(T value, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 }

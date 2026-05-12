@@ -1,4 +1,3 @@
-using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
 
@@ -22,7 +21,7 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
@@ -74,7 +73,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     public void WriteClear(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Clear);
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IStateOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
@@ -157,7 +156,7 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     public void WriteCanceled(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Canceled);
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);

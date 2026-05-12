@@ -5,6 +5,9 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Provides access to buffered journal data read from storage.
 /// </summary>
+/// <remarks>
+/// Instances are temporary cursors over pooled buffer pages and must not be retained beyond the synchronous call which supplied them.
+/// </remarks>
 public readonly struct JournalReadBuffer
 {
     /// <summary>
@@ -36,7 +39,7 @@ public readonly struct JournalReadBuffer
     /// <param name="count">The number of bytes to read.</param>
     /// <param name="destination">Temporary storage used if the requested bytes are not contiguous.</param>
     /// <returns>A span containing the requested bytes. The returned span must not be retained after the consumer returns.</returns>
-    public ReadOnlySpan<byte> Peek(int count, Span<byte> destination)
+    public readonly ReadOnlySpan<byte> Peek(int count, Span<byte> destination)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         ArgumentOutOfRangeException.ThrowIfGreaterThan(count, Length);
@@ -59,7 +62,7 @@ public readonly struct JournalReadBuffer
     /// </summary>
     /// <param name="destination">The destination to copy to.</param>
     /// <returns><see langword="true"/> if enough bytes were available; otherwise, <see langword="false"/>.</returns>
-    public bool TryPeek(Span<byte> destination)
+    public readonly bool TryPeek(Span<byte> destination)
     {
         if (destination.Length > Length)
         {
@@ -68,6 +71,17 @@ public readonly struct JournalReadBuffer
 
         Peek(destination.Length, destination).CopyTo(destination);
         return true;
+    }
+
+    /// <summary>
+    /// Copies the remaining bytes into a new array without consuming them.
+    /// </summary>
+    /// <returns>A byte array containing the remaining bytes.</returns>
+    public readonly byte[] ToArray()
+    {
+        var result = new byte[Length];
+        Peek(result.Length, result).CopyTo(result);
+        return result;
     }
 
     /// <summary>
@@ -106,7 +120,7 @@ public readonly struct JournalReadBuffer
     /// </summary>
     /// <param name="destination">The destination to copy to.</param>
     /// <returns><see langword="true"/> if enough bytes were available; otherwise, <see langword="false"/>.</returns>
-    public bool TryConsume(Span<byte> destination)
+    public readonly bool TryConsume(Span<byte> destination)
     {
         if (!TryPeek(destination))
         {
@@ -128,7 +142,7 @@ public readonly struct JournalReadBuffer
     /// </summary>
     /// <param name="count">The number of bytes to consume.</param>
     /// <returns><see langword="true"/> if enough bytes were available; otherwise, <see langword="false"/>.</returns>
-    public bool TrySkip(int count)
+    public readonly bool TrySkip(int count)
     {
         ArgumentOutOfRangeException.ThrowIfNegative(count);
         if (count > Length)
@@ -138,5 +152,11 @@ public readonly struct JournalReadBuffer
 
         Skip(count);
         return true;
+    }
+
+    internal readonly System.Buffers.ReadOnlySequence<byte> AsReadOnlySequence()
+    {
+        using var slice = PeekSlice(Length);
+        return slice.AsReadOnlySequence();
     }
 }

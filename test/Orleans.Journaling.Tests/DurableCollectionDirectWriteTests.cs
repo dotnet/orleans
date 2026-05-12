@@ -271,7 +271,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectSetCodec<T> : TestSetCodec<T>
@@ -342,7 +342,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public virtual void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectDictionaryCodec<TKey, TValue> : TestDictionaryCodec<TKey, TValue> where TKey : notnull
@@ -401,7 +401,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
 
     private static void WriteCommittedByte(JournalStreamWriter writer)

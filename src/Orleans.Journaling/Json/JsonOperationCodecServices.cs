@@ -1,5 +1,3 @@
-using System.Buffers;
-
 namespace Orleans.Journaling.Json;
 
 internal sealed class JsonDictionaryOperationCodecService<TKey, TValue>(JsonJournalOptions options)
@@ -15,7 +13,7 @@ internal sealed class JsonDictionaryOperationCodecService<TKey, TValue>(JsonJour
 
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -36,7 +34,7 @@ internal sealed class JsonListOperationCodecService<T>(JsonJournalOptions option
 
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -53,7 +51,7 @@ internal sealed class JsonQueueOperationCodecService<T>(JsonJournalOptions optio
 
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -70,7 +68,7 @@ internal sealed class JsonSetOperationCodecService<T>(JsonJournalOptions options
 
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -81,7 +79,7 @@ internal sealed class JsonValueOperationCodecService<T>(JsonJournalOptions optio
 
     public void WriteSet(T value, JournalStreamWriter writer) => _inner.WriteSet(value, writer);
 
-    public void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -94,7 +92,7 @@ internal sealed class JsonStateOperationCodecService<T>(JsonJournalOptions optio
 
     public void WriteClear(JournalStreamWriter writer) => _inner.WriteClear(writer);
 
-    public void Apply(ReadOnlySequence<byte> input, IStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -111,6 +109,6 @@ internal sealed class JsonTcsOperationCodecService<T>(JsonJournalOptions options
 
     public void WriteCanceled(JournalStreamWriter writer) => _inner.WriteCanceled(writer);
 
-    public void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }

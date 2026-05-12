@@ -152,11 +152,11 @@ public sealed class StorageStreamingTests
     public void BinaryFormatRead_RejectsTruncatedVarUIntFrame()
     {
         using var writer = CreateWriter([0x15, 1, 2]);
-        var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingJournalEntrySink();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
+            var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
         });

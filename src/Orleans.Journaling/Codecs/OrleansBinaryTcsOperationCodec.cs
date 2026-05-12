@@ -61,11 +61,12 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
+        using var slice = input.PeekSlice(input.Length);
         using var session = sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(input, session);
+        var reader = OrleansBinaryOperationApplier.CreateReader(slice, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {

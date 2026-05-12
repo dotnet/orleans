@@ -36,7 +36,10 @@ public class JournalValueCodecTests
         codec.Write(42, buffer);
 
         using var session = _sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(new ReadOnlySequence<byte>(buffer.WrittenMemory), session);
+        using var readerBuffer = new ArcBufferWriter();
+        readerBuffer.Write(buffer.WrittenSpan);
+        using var payload = readerBuffer.PeekSlice(readerBuffer.Length);
+        var reader = OrleansBinaryOperationApplier.CreateReader(payload, session);
         var result = codec.Read(ref reader);
 
         Assert.Equal(42, result);
@@ -51,7 +54,10 @@ public class JournalValueCodecTests
         codec.Write("hello world", buffer);
 
         using var session = _sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(new ReadOnlySequence<byte>(buffer.WrittenMemory), session);
+        using var readerBuffer = new ArcBufferWriter();
+        readerBuffer.Write(buffer.WrittenSpan);
+        using var payload = readerBuffer.PeekSlice(readerBuffer.Length);
+        var reader = OrleansBinaryOperationApplier.CreateReader(payload, session);
         var result = codec.Read(ref reader);
 
         Assert.Equal("hello world", result);
@@ -67,7 +73,10 @@ public class JournalValueCodecTests
         codec.Write(expected, buffer);
 
         using var session = _sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(new ReadOnlySequence<byte>(buffer.WrittenMemory), session);
+        using var readerBuffer = new ArcBufferWriter();
+        readerBuffer.Write(buffer.WrittenSpan);
+        using var payload = readerBuffer.PeekSlice(readerBuffer.Length);
+        var reader = OrleansBinaryOperationApplier.CreateReader(payload, session);
         var result = codec.Read(ref reader);
 
         Assert.Equal(expected, result);
@@ -84,7 +93,7 @@ public class JournalValueCodecTests
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("key1", 42, writer));
 
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(input, consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(input), consumer);
 
         Assert.Equal("key1", consumer.LastSetKey);
         Assert.Equal(42, consumer.LastSetValue);
@@ -105,7 +114,7 @@ public class JournalValueCodecTests
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(items, writer));
 
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(input, consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(input), consumer);
 
         Assert.Equal(2, consumer.Items.Count);
         Assert.Equal("alpha", consumer.Items[0].Key);
@@ -122,7 +131,7 @@ public class JournalValueCodecTests
         WriteVersionAndCommand(buffer, 5, 0x80000000);
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), new ListConsumer<int>()));
+            () => codec.Apply(CodecTestHelpers.ReadBuffer(buffer.WrittenMemory), new ListConsumer<int>()));
 
         Assert.Contains("snapshot count", exception.Message);
     }
@@ -137,7 +146,7 @@ public class JournalValueCodecTests
         WriteVersionAndCommand(buffer, 3, 0x80000000);
 
         var exception = Assert.Throws<InvalidOperationException>(
-            () => codec.Apply(new ReadOnlySequence<byte>(buffer.WrittenMemory), new ListConsumer<int>()));
+            () => codec.Apply(CodecTestHelpers.ReadBuffer(buffer.WrittenMemory), new ListConsumer<int>()));
 
         Assert.Contains("list index", exception.Message);
     }

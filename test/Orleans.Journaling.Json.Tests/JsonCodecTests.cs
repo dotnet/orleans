@@ -26,7 +26,7 @@ public class JsonCodecTests
 
         var input = AssertPayload("""["set","alice",42]""", writer => codec.WriteSet("alice", 42, writer));
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(input, consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(input), consumer);
 
         Assert.Equal("alice", consumer.LastSetKey);
         Assert.Equal(42, consumer.LastSetValue);
@@ -43,7 +43,7 @@ public class JsonCodecTests
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
         var consumer = new ValueConsumer<JsonCodecTestValue>();
-        codec.Apply(input, consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(input), consumer);
 
         Assert.Equal(new("test", 1), consumer.Value);
     }
@@ -59,7 +59,7 @@ public class JsonCodecTests
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
         var consumer = new ValueConsumer<JsonCodecTestValue>();
-        codec.Apply(input, consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(input), consumer);
 
         Assert.Equal(new("test", 1), consumer.Value);
     }
@@ -76,7 +76,7 @@ public class JsonCodecTests
 
         var input = AssertPayload("""["snapshot",[["alpha",1],["beta",2]]]""", writer => codec.WriteSnapshot(items, writer));
         var consumer = new DictionaryConsumer<string, int>();
-        codec.Apply(input, consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(input), consumer);
 
         Assert.Equal(items, consumer.Items);
     }
@@ -111,7 +111,7 @@ public class JsonCodecTests
         var codec = new JsonListOperationCodec<string>(Options);
         var consumer = new ListConsumer<string>();
 
-        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(new[] { "one", "two" }, writer)), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSnapshot(new[] { "one", "two" }, writer))), consumer);
 
         Assert.Equal(["reset:2", "add:one", "add:two"], consumer.Commands);
     }
@@ -174,10 +174,10 @@ public class JsonCodecTests
         var codec = new JsonQueueOperationCodec<int>(Options);
         var consumer = new QueueConsumer<int>();
 
-        codec.Apply(AssertPayload("""["enqueue",10]""", writer => codec.WriteEnqueue(10, writer)), consumer);
-        codec.Apply(AssertPayload("""["dequeue"]""", writer => codec.WriteDequeue(writer)), consumer);
-        codec.Apply(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer)), consumer);
-        codec.Apply(AssertPayload("""["snapshot",[20,30]]""", writer => codec.WriteSnapshot(new[] { 20, 30 }, writer)), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["enqueue",10]""", writer => codec.WriteEnqueue(10, writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["dequeue"]""", writer => codec.WriteDequeue(writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["snapshot",[20,30]]""", writer => codec.WriteSnapshot(new[] { 20, 30 }, writer))), consumer);
 
         Assert.Equal(["enqueue:10", "dequeue", "clear", "reset:2", "enqueue:20", "enqueue:30"], consumer.Commands);
     }
@@ -188,10 +188,10 @@ public class JsonCodecTests
         var codec = new JsonSetOperationCodec<string>(Options);
         var consumer = new SetConsumer<string>();
 
-        codec.Apply(AssertPayload("""["add","a"]""", writer => codec.WriteAdd("a", writer)), consumer);
-        codec.Apply(AssertPayload("""["remove","a"]""", writer => codec.WriteRemove("a", writer)), consumer);
-        codec.Apply(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer)), consumer);
-        codec.Apply(AssertPayload("""["snapshot",["b","c"]]""", writer => codec.WriteSnapshot(new[] { "b", "c" }, writer)), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["add","a"]""", writer => codec.WriteAdd("a", writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["remove","a"]""", writer => codec.WriteRemove("a", writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["snapshot",["b","c"]]""", writer => codec.WriteSnapshot(new[] { "b", "c" }, writer))), consumer);
 
         Assert.Equal(["add:a", "remove:a", "clear", "reset:2", "add:b", "add:c"], consumer.Commands);
     }
@@ -202,7 +202,7 @@ public class JsonCodecTests
         var codec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
 
-        codec.Apply(AssertPayload("""["set",42]""", writer => codec.WriteSet(42, writer)), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["set",42]""", writer => codec.WriteSet(42, writer))), consumer);
 
         Assert.Equal(42, consumer.Value);
     }
@@ -214,7 +214,7 @@ public class JsonCodecTests
         var consumer = new ValueConsumer<JsonCodecTestValue>();
         var value = new JsonCodecTestValue("alpha", 3);
 
-        codec.Apply(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(value, writer)), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(writer => codec.WriteSet(value, writer))), consumer);
 
         Assert.Equal(value, consumer.Value);
     }
@@ -235,8 +235,8 @@ public class JsonCodecTests
         var codec = new JsonStateOperationCodec<string>(Options);
         var consumer = new StateConsumer<string>();
 
-        codec.Apply(AssertPayload("""["set","state",7]""", writer => codec.WriteSet("state", 7, writer)), consumer);
-        codec.Apply(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer)), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["set","state",7]""", writer => codec.WriteSet("state", 7, writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["clear"]""", writer => codec.WriteClear(writer))), consumer);
 
         Assert.Equal(["set:state:7", "clear"], consumer.Commands);
     }
@@ -247,10 +247,10 @@ public class JsonCodecTests
         var codec = new JsonTcsOperationCodec<int>(Options);
         var consumer = new TcsConsumer<int>();
 
-        codec.Apply(AssertPayload("""["pending"]""", writer => codec.WritePending(writer)), consumer);
-        codec.Apply(AssertPayload("""["completed",5]""", writer => codec.WriteCompleted(5, writer)), consumer);
-        codec.Apply(AssertPayload("""["faulted","boom"]""", writer => codec.WriteFaulted(new InvalidOperationException("boom"), writer)), consumer);
-        codec.Apply(AssertPayload("""["canceled"]""", writer => codec.WriteCanceled(writer)), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["pending"]""", writer => codec.WritePending(writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["completed",5]""", writer => codec.WriteCompleted(5, writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["faulted","boom"]""", writer => codec.WriteFaulted(new InvalidOperationException("boom"), writer))), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(AssertPayload("""["canceled"]""", writer => codec.WriteCanceled(writer))), consumer);
 
         Assert.Equal(["pending", "completed:5", "faulted:boom", "canceled"], consumer.Commands);
     }
@@ -428,7 +428,7 @@ public class JsonCodecTests
         var valueCodec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
 
-        valueCodec.Apply(new ReadOnlySequence<byte>(entry.Payload), consumer);
+        valueCodec.Apply(CodecTestHelpers.ReadBuffer(entry.Payload), consumer);
 
         Assert.Equal((ulong)8, entry.StreamId.Value);
         Assert.Equal(42, consumer.Value);
@@ -722,30 +722,30 @@ public class JsonCodecTests
 
     private static void Apply<T>(IListOperationCodec<T> codec, Action<JournalStreamWriter> write, IListOperationHandler<T> consumer)
     {
-        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(write)), consumer);
     }
 
     private static void Apply<T>(IQueueOperationCodec<T> codec, Action<JournalStreamWriter> write, IQueueOperationHandler<T> consumer)
     {
-        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(write)), consumer);
     }
 
     private static void Apply<T>(ISetOperationCodec<T> codec, Action<JournalStreamWriter> write, ISetOperationHandler<T> consumer)
     {
-        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(write)), consumer);
     }
 
     private static void Apply<T>(IStateOperationCodec<T> codec, Action<JournalStreamWriter> write, IStateOperationHandler<T> consumer)
     {
-        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(write)), consumer);
     }
 
     private static void Apply<T>(ITaskCompletionSourceOperationCodec<T> codec, Action<JournalStreamWriter> write, ITaskCompletionSourceOperationHandler<T> consumer)
     {
-        codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
+        codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(write)), consumer);
     }
 
-    private static ReadOnlySequence<byte> AssertPayload(string expectedJson, Action<JournalStreamWriter> write)
+    private static byte[] AssertPayload(string expectedJson, Action<JournalStreamWriter> write)
     {
         var payload = CodecTestHelpers.WriteEntry(write);
         Assert.Equal(expectedJson, GetString(payload));
@@ -754,7 +754,7 @@ public class JsonCodecTests
 
     private static string GetString(ArrayBufferWriter<byte> buffer) => Encoding.UTF8.GetString(buffer.WrittenSpan);
 
-    private static string GetString(ReadOnlySequence<byte> payload) => Encoding.UTF8.GetString(payload.ToArray());
+    private static string GetString(ReadOnlyMemory<byte> payload) => Encoding.UTF8.GetString(payload.Span);
 
     private static string GetString(IJournalBatchWriter writer)
     {
@@ -917,7 +917,7 @@ public class JsonCodecTests
 
         public void WriteSet(int value, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<int> consumer)
+        public void Apply(JournalReadBuffer input, IValueOperationHandler<int> consumer)
         {
             var reader = new JsonOperationReader(input);
             Consumer = consumer;

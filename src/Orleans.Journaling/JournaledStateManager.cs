@@ -104,7 +104,9 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _serviceProvider);
                     foreach (var entry in vessel.FormattedEntries)
                     {
-                        state.ApplyOperation(new JournalOperation(entry.FormatKey, new ReadOnlySequence<byte>(entry.Payload)), in replayContext);
+                        using var buffer = new ArcBufferWriter();
+                        buffer.Write(entry.Payload.Span);
+                        state.ApplyOperation(new JournalOperation(entry.FormatKey, new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true)), in replayContext);
                     }
 
                     var id = _journalStreamDirectory[name];
