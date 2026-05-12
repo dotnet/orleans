@@ -23,7 +23,6 @@ namespace Orleans.Runtime.GrainDirectory
         private readonly IClusterMembershipService clusterMembershipService;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ActivationDirectory localActivations;
-        private readonly InsideRuntimeClient runtimeClient;
         private readonly IServiceProvider _serviceProvider;
         private readonly CancellationTokenSource _membershipUpdatesCancellation = new();
         private DirectoryMembership directoryMembership = DirectoryMembership.Default;
@@ -70,7 +69,6 @@ namespace Orleans.Runtime.GrainDirectory
             this.clusterMembershipService = clusterMembershipService;
             this.grainFactory = grainFactory;
             this.localActivations = systemTargetShared.ActivationDirectory;
-            this.runtimeClient = systemTargetShared.RuntimeClient;
 
             DirectoryCache = GrainDirectoryCacheFactory.CreateGrainDirectoryCache(serviceProvider, grainDirectoryOptions.Value, out this.disposeDirectoryCache);
 
@@ -303,17 +301,6 @@ namespace Orleans.Runtime.GrainDirectory
             return result;
         }
 
-        private Task RefreshMembershipIfNewer(GrainAddress address, GrainAddress? previousAddress = null)
-        {
-            var targetVersion = address.MembershipVersion;
-            if (previousAddress is not null && previousAddress.MembershipVersion > targetVersion)
-            {
-                targetVersion = previousAddress.MembershipVersion;
-            }
-
-            return RefreshMembershipIfNewer(targetVersion);
-        }
-
         private Task RefreshMembershipIfNewer(List<GrainAddress> addresses)
         {
             var targetVersion = MembershipVersion.MinValue;
@@ -348,11 +335,6 @@ namespace Orleans.Runtime.GrainDirectory
             if (updatedSilo.Equals(MyAddress) || !status.IsTerminating())
             {
                 return;
-            }
-
-            if (status == SiloStatus.Dead)
-            {
-                runtimeClient.BreakOutstandingMessagesToSilo(updatedSilo);
             }
 
             var activationsToShutdown = new List<IGrainContext>();
@@ -444,24 +426,14 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-        private static bool IsDefunctActivation(GrainAddress address, ClusterMembershipSnapshot snapshot)
+        internal static bool IsDefunctActivation(GrainAddress address, ClusterMembershipSnapshot snapshot)
         {
             if (address.SiloAddress is not { } silo)
             {
                 return true;
             }
 
-            if (snapshot.Members.TryGetValue(silo, out var member))
-            {
-                // If this is a known host, remove the activation if the host is dead.
-                return member.Status == SiloStatus.Dead;
-            }
-
-            // If this is not a known host, remove the activation if it was registered at an older membership version.
-            // This indicates that the host must have been removed.
-            // Hosts cannot activate grains before they are active, and we ensure that we refresh the membership before processing messages,
-            // so this is a reliable indicator of a defunct activation.
-            return address.MembershipVersion < snapshot.Version;
+            return snapshot.GetSiloStatus(silo) == SiloStatus.Dead;
         }
 
         internal SiloAddress? FindPredecessor(SiloAddress silo)
@@ -608,13 +580,13 @@ namespace Orleans.Runtime.GrainDirectory
                 DirectoryInstruments.RegistrationsSingleActIssued.Add(1);
             }
 
-            await RefreshMembershipIfNewer(address, previousAddress);
+            await RefreshMembershipIfNewer(address.MembershipVersion);
 
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
 
-            // on all silos other than first, we insert a retry delay and recheck owner before forwarding
-            if (hopCount > 0 && forwardAddress != null)
+            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "RegisterAsync");
@@ -664,7 +636,7 @@ namespace Orleans.Runtime.GrainDirectory
         {
             LogTraceUnregisterAfterNonexistingActivation(addr, origin);
 
-            await RefreshMembershipIfNewer(addr);
+            await RefreshMembershipIfNewer(addr.MembershipVersion);
 
             if (origin == null || this.directoryMembership.MembershipCache.Contains(origin))
             {
@@ -693,13 +665,13 @@ namespace Orleans.Runtime.GrainDirectory
             if (hopCount == 0)
                 InvalidateCacheEntry(address);
 
-            await RefreshMembershipIfNewer(address);
+            await RefreshMembershipIfNewer(address.MembershipVersion);
 
             // see if the owner is somewhere else (returns null if we are owner)
             var forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
 
-            // on all silos other than first, we insert a retry delay and recheck owner before forwarding
-            if (hopCount > 0 && forwardAddress != null)
+            // After the first forward, we insert a retry delay and recheck owner before forwarding again
+            if (hopCount > 1 && forwardAddress != null)
             {
                 await Task.Delay(RETRY_DELAY);
                 forwardAddress = this.CheckIfShouldForward(address.GrainId, hopCount, "UnregisterAsync");
