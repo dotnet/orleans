@@ -177,6 +177,72 @@ namespace UnitTests.Directory
         }
 
         [Fact]
+        public async Task LocalGrainDirectoryAppliesNewerMembershipBeforeRegisterForwarding()
+        {
+            var localSilo = GenerateSiloAddress();
+            var remoteSilo = GenerateSiloAddress();
+            var membershipService = new MockClusterMembershipService(new()
+            {
+                [localSilo] = (SiloStatus.Active, "local")
+            });
+            var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+            localSiloDetails.SiloAddress.Returns(localSilo);
+            localSiloDetails.GatewayAddress.Returns(localSilo);
+            localSiloDetails.DnsHostName.Returns("localhost");
+            localSiloDetails.Name.Returns("TestSilo");
+            localSiloDetails.ClusterId.Returns("TestCluster");
+            var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
+            var grainFactory = Substitute.For<IInternalGrainFactory>();
+            var remoteDirectory = Substitute.For<IRemoteGrainDirectory>();
+            grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, remoteSilo).Returns(remoteDirectory);
+            var services = new ServiceCollection().BuildServiceProvider();
+            Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
+                siloStatusOracle,
+                Options.Create(new GrainDirectoryOptions()),
+                this.loggerFactory);
+            var systemTargetShared = new SystemTargetShared(
+                runtimeClient: null!,
+                localSiloDetails: localSiloDetails,
+                loggerFactory: this.loggerFactory,
+                schedulingOptions: Options.Create(new SchedulingOptions()),
+                grainReferenceActivator: null,
+                timerRegistry: null,
+                activations: new ActivationDirectory());
+            var localGrainDirectory = new LocalGrainDirectory(
+                serviceProvider: services,
+                siloDetails: localSiloDetails,
+                siloStatusOracle: siloStatusOracle,
+                clusterMembershipService: membershipService.Target,
+                grainFactory: grainFactory,
+                grainDirectoryPartitionFactory: partitionFactory,
+                developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
+                grainDirectoryOptions: Options.Create(new GrainDirectoryOptions()),
+                loggerFactory: this.loggerFactory,
+                systemTargetShared: systemTargetShared)
+            {
+                Running = true
+            };
+
+            membershipService.UpdateSiloStatus(remoteSilo, SiloStatus.Active, "remote");
+            var address = GenerateGrainAddressOwnedBy(remoteSilo, localSilo, remoteSilo, membershipService.CurrentVersion);
+            remoteDirectory.RegisterAsync(address, null, 1).Returns(Task.FromResult(new AddressAndTag(address, 1)));
+
+            try
+            {
+                var result = await localGrainDirectory.RegisterAsync(address, hopCount: 0);
+
+                Assert.Equal(address, result.Address);
+                Assert.Equal(0, membershipService.RefreshCallCount);
+                await remoteDirectory.Received(1).RegisterAsync(address, null, 1);
+                Assert.Null(localGrainDirectory.GetLocalDirectoryData(address.GrainId).Address);
+            }
+            finally
+            {
+                await localGrainDirectory.StopAsync();
+            }
+        }
+
+        [Fact]
         public async Task RegisterWhenOtherEntryExists()
         {
             var expectedSilo = GenerateSiloAddress();
@@ -567,15 +633,49 @@ namespace UnitTests.Directory
             Assert.True(this.grainLocator.TryLookupInCache(secondAddr.GrainId, out _));
         }
 
-        private GrainAddress GenerateGrainAddress(SiloAddress siloAddress = null)
+        private GrainAddress GenerateGrainAddress(SiloAddress siloAddress = null, MembershipVersion? membershipVersion = null)
         {
             return new GrainAddress
             {
                 GrainId = GrainId.Create(GrainType.Create("test"), GrainIdKeyExtensions.CreateGuidKey(Guid.NewGuid())),
                 ActivationId = ActivationId.NewId(),
                 SiloAddress = siloAddress ?? GenerateSiloAddress(),
-                MembershipVersion = this.mockMembershipService.CurrentVersion,
+                MembershipVersion = membershipVersion ?? this.mockMembershipService.CurrentVersion,
             };
+        }
+
+        private GrainAddress GenerateGrainAddressOwnedBy(SiloAddress owner, SiloAddress localSilo, SiloAddress remoteSilo, MembershipVersion membershipVersion)
+        {
+            for (var i = 0; i < 1000; i++)
+            {
+                var candidate = GenerateGrainAddress(localSilo, membershipVersion);
+                if (CalculateDirectoryOwner(candidate.GrainId, localSilo, remoteSilo).Equals(owner))
+                {
+                    return candidate;
+                }
+            }
+
+            throw new InvalidOperationException($"Unable to generate a grain id owned by {owner}.");
+        }
+
+        private static SiloAddress CalculateDirectoryOwner(GrainId grainId, params SiloAddress[] silos)
+        {
+            Array.Sort(silos, static (left, right) =>
+            {
+                var hashComparison = left.GetConsistentHashCode().CompareTo(right.GetConsistentHashCode());
+                return hashComparison != 0 ? hashComparison : left.CompareTo(right);
+            });
+
+            var hash = unchecked((int)grainId.GetUniformHashCode());
+            for (var i = silos.Length - 1; i >= 0; --i)
+            {
+                if (silos[i].GetConsistentHashCode() <= hash)
+                {
+                    return silos[i];
+                }
+            }
+
+            return silos[^1];
         }
 
         private int generation = 0;

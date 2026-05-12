@@ -7,6 +7,7 @@ namespace UnitTests.Directory
     internal class MockClusterMembershipService : IClusterMembershipService
     {
         private long version = 0;
+        private int refreshCallCount;
         private readonly Dictionary<SiloAddress, (SiloStatus Status, string Name)> statuses;
         private ClusterMembershipSnapshot snapshot;
         private readonly AsyncEnumerable<ClusterMembershipSnapshot> updates;
@@ -14,6 +15,10 @@ namespace UnitTests.Directory
         ClusterMembershipSnapshot IClusterMembershipService.CurrentSnapshot => this.snapshot;
 
         public MembershipVersion CurrentVersion => this.snapshot.Version;
+
+        public int RefreshCallCount => this.refreshCallCount;
+
+        public MembershipVersion LastRefreshMinimumVersion { get; private set; }
 
         IAsyncEnumerable<ClusterMembershipSnapshot> IClusterMembershipService.MembershipUpdates => this.updates;
 
@@ -44,7 +49,12 @@ namespace UnitTests.Directory
             return new ClusterMembershipSnapshot(dictBuilder.ToImmutable(), new MembershipVersion(version));
         }
 
-        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => new ValueTask();
+        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default)
+        {
+            Interlocked.Increment(ref this.refreshCallCount);
+            this.LastRefreshMinimumVersion = minimumVersion;
+            return new ValueTask();
+        }
 
         public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
     }
