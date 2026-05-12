@@ -187,6 +187,7 @@ namespace Orleans.Runtime.GrainDirectory
                 }
 
                 ((ITestAccessor)this).LastMembershipVersion = snapshot.Version;
+                previousSnapshot = snapshot;
             }
         }
 
@@ -201,7 +202,11 @@ namespace Orleans.Runtime.GrainDirectory
 
         private static void ThrowUnsupportedGrainType(GrainId grainId) => throw new InvalidOperationException($"Unsupported grain type for grain {grainId}");
 
-        public void UpdateCache(GrainId grainId, SiloAddress siloAddress) => cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
+        public void UpdateCache(GrainId grainId, SiloAddress siloAddress)
+        {
+            var membershipVersion = this.clusterMembershipService.CurrentSnapshot.Version;
+            cache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress, MembershipVersion = membershipVersion }, (int)membershipVersion.Value);
+        }
         public void InvalidateCache(GrainId grainId) => cache.Remove(grainId);
         public void InvalidateCache(GrainAddress address) => cache.Remove(address);
         public bool TryLookupInCache(GrainId grainId, out GrainAddress address)
