@@ -197,7 +197,7 @@ namespace UnitTests.Directory
             grainFactory.GetSystemTarget<IRemoteGrainDirectory>(Constants.DirectoryServiceType, remoteSilo).Returns(remoteDirectory);
             var services = new ServiceCollection().BuildServiceProvider();
             Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
-                siloStatusOracle,
+                membershipService.Target,
                 Options.Create(new GrainDirectoryOptions()),
                 this.loggerFactory);
             var systemTargetShared = new SystemTargetShared(
