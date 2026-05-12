@@ -204,7 +204,10 @@ namespace Orleans.Runtime.GrainDirectory
             lock (this)
             {
                 this.pendingOperations.Enqueue((name, state, action));
-                this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
+                if (this.pendingOperations.Count <= 2)
+                {
+                    this.localDirectory.RemoteGrainDirectory.WorkItemGroup.QueueTask(ExecutePendingOperations, localDirectory.RemoteGrainDirectory);
+                }
             }
         }
 
