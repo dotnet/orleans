@@ -243,6 +243,17 @@ namespace Orleans.Runtime.GrainDirectory
 
                         LogWarningOperationFailedRetry(logger, exception, op.Name);
                         await Task.Delay(RetryDelay);
+                        if (!this.localDirectory.Running)
+                        {
+                            return;
+                        }
+
+                        // Keep retrying failed handoff work, but let later queued operations make progress.
+                        lock (this)
+                        {
+                            this.pendingOperations.Dequeue();
+                            this.pendingOperations.Enqueue(op);
+                        }
                     }
                 }
             }
