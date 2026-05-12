@@ -285,7 +285,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournalValueCodec<T>
     {
-        T Read(ref Serialization.Buffers.Reader<Serialization.Buffers.Adaptors.ArcBufferReaderInput> reader);
+        T Read<TInput>(ref Serialization.Buffers.Reader<TInput> reader);
         void Write(T value, System.Buffers.IBufferWriter<byte> output);
     }
 

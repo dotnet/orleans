@@ -6,7 +6,6 @@ using Orleans.Journaling;
 using Orleans.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
 
 namespace Benchmarks.Journaling;
@@ -135,7 +134,7 @@ public class DurableListJournalBenchmarks
             output.Advance(sizeof(int));
         }
 
-        public int Read(ref Reader<ArcBufferReaderInput> reader)
+        public int Read<TInput>(ref Reader<TInput> reader)
         {
             Span<byte> bytes = stackalloc byte[sizeof(int)];
             reader.ReadBytes(bytes);

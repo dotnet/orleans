@@ -1,6 +1,5 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 
 namespace Orleans.Journaling;
 
@@ -41,7 +40,8 @@ public interface IJournalValueCodec<T>
     /// <summary>
     /// Deserializes a value of type <typeparamref name="T"/> from the provided <paramref name="reader"/>.
     /// </summary>
+    /// <typeparam name="TInput">The Orleans serializer reader input type.</typeparam>
     /// <param name="reader">The reader positioned at the start of the encoded value. Implementations advance the reader past the value's bytes.</param>
     /// <returns>The deserialized value.</returns>
-    T Read(ref Reader<ArcBufferReaderInput> reader);
+    T Read<TInput>(ref Reader<TInput> reader);
 }

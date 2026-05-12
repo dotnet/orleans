@@ -2,7 +2,6 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -538,7 +537,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
             output.Advance(1);
         }
 
-        public byte Read(ref Reader<ArcBufferReaderInput> reader)
+        public byte Read<TInput>(ref Reader<TInput> reader)
         {
             if (reader.Position >= reader.Length)
             {

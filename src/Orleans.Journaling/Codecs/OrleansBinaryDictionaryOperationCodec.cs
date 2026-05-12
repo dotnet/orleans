@@ -1,6 +1,5 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -88,9 +87,8 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
-        using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
         using var session = sessionPool.GetSession();
-        var reader = Reader.Create(arcBuffer, session);
+        var reader = OrleansBinaryOperationApplier.CreateReader(input, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
@@ -98,7 +96,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
     }
 
-    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDictionaryOperationHandler<TKey, TValue> consumer)
+    private void Apply<TInput>(ref Reader<TInput> reader, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         OrleansBinaryOperationApplier.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
@@ -125,7 +123,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
     }
 
-    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IDictionaryOperationHandler<TKey, TValue> consumer)
+    private void ApplySnapshot<TInput>(ref Reader<TInput> reader, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
 

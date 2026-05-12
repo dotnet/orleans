@@ -1,6 +1,6 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
@@ -12,20 +12,15 @@ internal static class OrleansBinaryOperationApplier
     private const byte FormatVersion = 0;
 
     /// <summary>
-    /// Copies <paramref name="input"/> into a freshly-allocated <see cref="ArcBuffer"/> and returns the pinned slice.
-    /// The caller is responsible for disposing the returned buffer.
+    /// Creates a reader directly over <paramref name="input"/>.
     /// </summary>
-    public static ArcBuffer Materialize(ReadOnlySequence<byte> input)
-    {
-        using var writer = new ArcBufferWriter();
-        writer.Write(input);
-        return writer.PeekSlice(writer.Length);
-    }
+    public static Reader<ReadOnlySequenceInput> CreateReader(ReadOnlySequence<byte> input, SerializerSession session) =>
+        Reader.Create(input, session);
 
     /// <summary>
     /// Reads and validates the format-version byte at the current reader position.
     /// </summary>
-    public static void ReadVersion(ref Reader<ArcBufferReaderInput> reader)
+    public static void ReadVersion<TInput>(ref Reader<TInput> reader)
     {
         if (reader.Position >= reader.Length)
         {

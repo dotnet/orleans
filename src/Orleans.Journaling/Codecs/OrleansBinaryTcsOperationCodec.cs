@@ -1,6 +1,5 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -65,9 +64,8 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     public void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
-        using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
         using var session = sessionPool.GetSession();
-        var reader = Reader.Create(arcBuffer, session);
+        var reader = OrleansBinaryOperationApplier.CreateReader(input, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
@@ -75,7 +73,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         }
     }
 
-    private void Apply(ref Reader<ArcBufferReaderInput> reader, ITaskCompletionSourceOperationHandler<T> consumer)
+    private void Apply<TInput>(ref Reader<TInput> reader, ITaskCompletionSourceOperationHandler<T> consumer)
     {
         OrleansBinaryOperationApplier.ReadVersion(ref reader);
         if (reader.Position >= reader.Length)

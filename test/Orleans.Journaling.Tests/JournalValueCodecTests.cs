@@ -36,8 +36,7 @@ public class JournalValueCodecTests
         codec.Write(42, buffer);
 
         using var session = _sessionPool.GetSession();
-        using var arc = OrleansBinaryOperationApplier.Materialize(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var reader = Reader.Create(arc, session);
+        var reader = OrleansBinaryOperationApplier.CreateReader(new ReadOnlySequence<byte>(buffer.WrittenMemory), session);
         var result = codec.Read(ref reader);
 
         Assert.Equal(42, result);
@@ -52,8 +51,7 @@ public class JournalValueCodecTests
         codec.Write("hello world", buffer);
 
         using var session = _sessionPool.GetSession();
-        using var arc = OrleansBinaryOperationApplier.Materialize(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var reader = Reader.Create(arc, session);
+        var reader = OrleansBinaryOperationApplier.CreateReader(new ReadOnlySequence<byte>(buffer.WrittenMemory), session);
         var result = codec.Read(ref reader);
 
         Assert.Equal("hello world", result);
@@ -69,8 +67,7 @@ public class JournalValueCodecTests
         codec.Write(expected, buffer);
 
         using var session = _sessionPool.GetSession();
-        using var arc = OrleansBinaryOperationApplier.Materialize(new ReadOnlySequence<byte>(buffer.WrittenMemory));
-        var reader = Reader.Create(arc, session);
+        var reader = OrleansBinaryOperationApplier.CreateReader(new ReadOnlySequence<byte>(buffer.WrittenMemory), session);
         var result = codec.Read(ref reader);
 
         Assert.Equal(expected, result);
