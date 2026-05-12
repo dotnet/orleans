@@ -23,11 +23,11 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
     public DurableList(
         [ServiceKey] string key,
         IStateManager manager,
-        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
+        JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableListOperationCodec<T>>(serviceProvider, journalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableListOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 

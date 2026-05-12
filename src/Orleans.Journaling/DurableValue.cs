@@ -19,11 +19,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
     public DurableValue(
         [ServiceKey] string key,
         IStateManager manager,
-        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
+        JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableValueOperationCodec<T>>(serviceProvider, journalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableValueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 

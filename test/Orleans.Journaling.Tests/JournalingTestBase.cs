@@ -18,7 +18,7 @@ public abstract class JournalingTestBase
     protected readonly SerializerSessionPool SessionPool;
     protected readonly ICodecProvider CodecProvider;
     protected readonly ILoggerFactory LoggerFactory;
-    protected readonly StateManagerOptions ManagerOptions = new();
+    protected readonly JournaledStateManagerOptions ManagerOptions = new();
 
     protected JournalingTestBase()
     {
@@ -57,7 +57,8 @@ public abstract class JournalingTestBase
         var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec, SessionPool);
         var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, SessionPool);
         journalFormat ??= new OrleansBinaryJournalFormat(SessionPool);
-        var manager = new JournaledStateManager(storage, logger, Options.Create(ManagerOptions), journalStreamIdsCodec, retirementTrackerCodec, provider, journalFormat, journalFormatKey);
+        var shared = JournaledStateManagerShared.CreateForTests(logger, Options.Create(ManagerOptions), provider, journalFormatKey ?? OrleansBinaryJournalFormat.JournalFormatKey);
+        var manager = new JournaledStateManager(storage, shared, journalStreamIdsCodec, retirementTrackerCodec, journalFormat);
         var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

@@ -144,7 +144,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
             _exists = false;
-            consumer.Complete();
+            consumer.Complete(metadata: null);
             return;
         }
 

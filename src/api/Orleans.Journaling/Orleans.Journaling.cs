@@ -285,7 +285,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournalStorageConsumer
     {
-        void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata);
+        void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata);
     }
 
     public partial interface IJournalFileMetadata
@@ -404,25 +404,15 @@ namespace Orleans.Journaling
 
     public static partial class JournalStorageConsumerExtensions
     {
-        public static void Complete(this IJournalStorageConsumer consumer) { }
+        public static void Complete(this IJournalStorageConsumer consumer, IJournalFileMetadata? metadata) { }
 
-        public static void Complete(this IJournalStorageConsumer consumer, IJournalFileMetadata metadata) { }
+        public static void Consume(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, IJournalFileMetadata? metadata, bool complete) { }
 
-        public static void Consume(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, bool complete = true) { }
+        public static void Consume(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, IJournalFileMetadata? metadata, bool complete) { }
 
-        public static void Consume(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, IJournalFileMetadata metadata, bool complete = true) { }
+        public static void Consume(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalFileMetadata? metadata, bool complete) { }
 
-        public static void Consume(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, bool complete = true) { }
-
-        public static void Consume(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, IJournalFileMetadata metadata, bool complete = true) { }
-
-        public static void Consume(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, bool complete = true) { }
-
-        public static void Consume(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalFileMetadata metadata, bool complete = true) { }
-
-        public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, System.Threading.CancellationToken cancellationToken) { throw null; }
-
-        public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public sealed partial class JournalFileMetadata : IJournalFileMetadata
@@ -472,10 +462,10 @@ namespace Orleans.Journaling
         public readonly bool TryAppendFormattedEntry(IFormattedJournalEntry entry) { throw null; }
     }
 
-    public sealed partial class StateManagerOptions
+    public sealed partial class JournaledStateManagerOptions
     {
         public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
-        public string LegacyJournalFormatKey { get { throw null; } set { } }
+        public string JournalFormatKey { get { throw null; } set { } }
 
         public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
     }

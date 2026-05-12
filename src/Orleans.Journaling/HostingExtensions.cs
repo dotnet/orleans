@@ -9,8 +9,8 @@ public static class HostingExtensions
 {
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
-        builder.Services.AddOptions<StateManagerOptions>();
-        builder.Services.TryAddKeyedScoped<string>(JournalFormatServices.JournalFormatKeyServiceKey, static (sp, _) => GetJournalFormatKey(sp));
+        builder.Services.AddOptions<JournaledStateManagerOptions>();
+        builder.Services.TryAddScoped<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournalStorage>(sp => sp.GetRequiredService<IJournalStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<IStateManager, JournaledStateManager>();
 
@@ -47,17 +47,5 @@ public static class HostingExtensions
         services.TryAddKeyedSingleton(typeof(IDurableValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
         services.TryAddKeyedSingleton(typeof(IDurableStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
         services.TryAddKeyedSingleton(typeof(IDurableTaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
-    }
-
-    private static string GetJournalFormatKey(IServiceProvider serviceProvider)
-    {
-        var grainContext = serviceProvider.GetRequiredService<IGrainContext>();
-        var journalFormatKeyProvider = serviceProvider.GetService<IJournalFormatKeyProvider>();
-        if (journalFormatKeyProvider is null && serviceProvider.GetService<IJournalStorageProvider>() is IJournalFormatKeyProvider storageProvider)
-        {
-            journalFormatKeyProvider = storageProvider;
-        }
-
-        return journalFormatKeyProvider?.GetJournalFormatKey(grainContext) ?? JsonJournalExtensions.JournalFormatKey;
     }
 }

@@ -28,11 +28,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
     public DurableQueue(
         [ServiceKey] string key,
         IStateManager manager,
-        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
+        JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableQueueOperationCodec<T>>(serviceProvider, journalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableQueueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 

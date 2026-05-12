@@ -945,7 +945,7 @@ public class StateManagerTests : JournalingTestBase
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
             StreamingReadCalled = true;
-            consumer.Complete();
+            consumer.Complete(metadata: null);
             return default;
         }
 
@@ -1267,17 +1267,17 @@ public class StateManagerTests : JournalingTestBase
                     }
 
                     ReadConsumeCount++;
-                    consumer.Consume(concatenated);
+                    consumer.Consume(concatenated, metadata: null, complete: true);
                 }
                 else
                 {
-                    consumer.Complete();
+                    consumer.Complete(metadata: null);
                 }
 
                 return default;
             }
 
-            consumer.Consume(GetSegments());
+            consumer.Consume(GetSegments(), metadata: null, complete: true);
             return default;
 
             IEnumerable<ReadOnlyMemory<byte>> GetSegments()
@@ -1326,7 +1326,7 @@ public class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            consumer.Consume(bytes);
+            consumer.Consume(bytes, metadata: null, complete: true);
             return default;
         }
 
@@ -1349,7 +1349,7 @@ public class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            consumer.Consume(Bytes);
+            consumer.Consume(Bytes, metadata: null, complete: true);
             return default;
         }
 
@@ -1403,7 +1403,7 @@ public class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
 
-            consumer.Consume(GetChunks());
+            consumer.Consume(GetChunks(), metadata: null, complete: true);
             return default;
 
             IEnumerable<ReadOnlyMemory<byte>> GetChunks()
@@ -1435,7 +1435,7 @@ public class StateManagerTests : JournalingTestBase
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
-            consumer.Complete();
+            consumer.Complete(metadata: null);
             return default;
         }
 

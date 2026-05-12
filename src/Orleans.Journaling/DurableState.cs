@@ -19,11 +19,11 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
     public DurableState(
         [ServiceKey] string key,
         IStateManager manager,
-        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
+        JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableStateOperationCodec<T>>(serviceProvider, journalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableStateOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
         _manager = manager;
     }

@@ -83,7 +83,7 @@ public sealed class StorageStreamingTests
         var stream = new ChunkedReadStream([1, 2, 3, 4], chunkSize: 1);
         var consumer = new TwoByteJournalStorageConsumer();
 
-        var totalBytesRead = await consumer.ConsumeAsync(stream, CancellationToken.None);
+        var totalBytesRead = await consumer.ConsumeAsync(stream, metadata: null, CancellationToken.None);
 
         Assert.Equal(4, totalBytesRead);
         Assert.Equal(4, stream.ReadCount);
@@ -99,7 +99,7 @@ public sealed class StorageStreamingTests
         var consumer = new TwoByteJournalStorageConsumer();
         ReadOnlyMemory<byte>[] segments = [new byte[] { 1 }, new byte[] { 2, 3 }, new byte[] { 4 }];
 
-        consumer.Consume(segments);
+        consumer.Consume(segments, metadata: null, complete: true);
 
         Assert.Collection(
             consumer.Segments,
@@ -112,7 +112,7 @@ public sealed class StorageStreamingTests
     {
         var consumer = new CompletionTrackingJournalStorageConsumer();
 
-        consumer.Consume(ReadOnlyMemory<byte>.Empty);
+        consumer.Consume(ReadOnlyMemory<byte>.Empty, metadata: null, complete: true);
 
         Assert.True(consumer.IsCompleted);
         Assert.Equal(0, consumer.CompletedLength);
@@ -123,7 +123,7 @@ public sealed class StorageStreamingTests
     {
         var consumer = new LeavingJournalStorageConsumer();
 
-        Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }, complete: false));
+        Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }, metadata: null, complete: false));
     }
 
     [Fact]
@@ -131,7 +131,7 @@ public sealed class StorageStreamingTests
     {
         var consumer = new LeavingJournalStorageConsumer();
 
-        var exception = Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }));
+        var exception = Assert.Throws<InvalidOperationException>(() => consumer.Consume(new byte[] { 1 }, metadata: null, complete: true));
 
         Assert.Contains("did not consume all supplied journal data", exception.Message, StringComparison.Ordinal);
     }
@@ -143,7 +143,7 @@ public sealed class StorageStreamingTests
         var consumer = new LeavingJournalStorageConsumer();
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            async () => await consumer.ConsumeAsync(stream, CancellationToken.None));
+            async () => await consumer.ConsumeAsync(stream, metadata: null, CancellationToken.None));
 
         Assert.Contains("did not consume all supplied journal data", exception.Message, StringComparison.Ordinal);
     }
@@ -219,7 +219,7 @@ public sealed class StorageStreamingTests
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata)
+        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
         {
             if (buffer.IsCompleted || buffer.Length == 0)
             {
@@ -236,7 +236,7 @@ public sealed class StorageStreamingTests
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata)
+        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
         {
             var temp = new byte[2];
             while (buffer.TryPeek(temp))
@@ -262,7 +262,7 @@ public sealed class StorageStreamingTests
 
         public int CompletedLength { get; private set; }
 
-        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata)
+        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
         {
             IsCompleted = buffer.IsCompleted;
             CompletedLength = buffer.Length;
@@ -271,7 +271,7 @@ public sealed class StorageStreamingTests
 
     private sealed class LeavingJournalStorageConsumer : IJournalStorageConsumer
     {
-        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata metadata) { }
+        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata) { }
     }
 
     private sealed class ChunkedReadStream(byte[] data, int chunkSize) : Stream

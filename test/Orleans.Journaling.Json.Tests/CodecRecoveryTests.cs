@@ -250,7 +250,7 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task Recovery_MetadataLessJournal_UsesLegacyFallbackAndMigratesOnFirstWrite()
+    public async Task Recovery_MetadataLessJournal_UsesBinaryFallbackAndMigratesOnFirstWrite()
     {
         var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
         using var first = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
@@ -261,10 +261,7 @@ public class CodecRecoveryTests : JournalingTestBase
         storage.StoredJournalFormatKey = null;
 
         storage.SetConfiguredJournalFormatKey(JsonJournalExtensions.JournalFormatKey);
-        using var recovered = CreateFormatAwareTestSystem(
-            storage,
-            JsonJournalExtensions.JournalFormatKey,
-            legacyJournalFormatKey: OrleansBinaryJournalFormat.JournalFormatKey);
+        using var recovered = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, JsonJournalExtensions.JournalFormatKey);
         await recovered.Lifecycle.OnStart();
 
@@ -282,10 +279,7 @@ public class CodecRecoveryTests : JournalingTestBase
     {
         var storage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
         storage.StoredJournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey;
-        using var system = CreateFormatAwareTestSystem(
-            storage,
-            JsonJournalExtensions.JournalFormatKey,
-            legacyJournalFormatKey: OrleansBinaryJournalFormat.JournalFormatKey);
+        using var system = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
         var dict = CreateFormatAwareDictionary(system, JsonJournalExtensions.JournalFormatKey);
         await system.Lifecycle.OnStart();
 
@@ -339,15 +333,18 @@ public class CodecRecoveryTests : JournalingTestBase
 
         var journalStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
         var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
+        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
+        var shared = JournaledStateManagerShared.CreateForTests(
+            logger,
+            Microsoft.Extensions.Options.Options.Create(ManagerOptions),
+            TimeProvider.System,
+            JsonJournalExtensions.JournalFormatKey);
         var manager = new JournaledStateManager(
             storage,
-            LoggerFactory.CreateLogger<JournaledStateManager>(),
-            Microsoft.Extensions.Options.Options.Create(ManagerOptions),
+            shared,
             journalStreamIdsCodec,
             retirementTrackerCodec,
-            TimeProvider.System,
-            new JsonLinesJournalFormat(),
-            JsonJournalExtensions.JournalFormatKey);
+            new JsonLinesJournalFormat());
         var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
@@ -360,8 +357,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private FormatAwareTestSystem CreateFormatAwareTestSystem(
         VolatileJournalStorage storage,
-        string writeJournalFormatKey,
-        string? legacyJournalFormatKey = null)
+        string writeJournalFormatKey)
     {
         var services = new ServiceCollection();
         services.AddSerializer();
@@ -384,19 +380,20 @@ public class CodecRecoveryTests : JournalingTestBase
             typeof(JsonDictionaryOperationCodecService<,>));
 
         var serviceProvider = services.BuildServiceProvider();
-        var managerOptions = new StateManagerOptions();
-        if (legacyJournalFormatKey is not null)
+        var managerOptions = new JournaledStateManagerOptions
         {
-            managerOptions.LegacyJournalFormatKey = legacyJournalFormatKey;
-        }
-
-        var manager = new JournaledStateManager(
-            storage,
+            JournalFormatKey = writeJournalFormatKey
+        };
+        var shared = JournaledStateManagerShared.CreateForTests(
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Microsoft.Extensions.Options.Options.Create(managerOptions),
             TimeProvider.System,
-            serviceProvider,
             writeJournalFormatKey);
+
+        var manager = new JournaledStateManager(
+            storage,
+            shared,
+            serviceProvider);
         var lifecycle = new TestGrainLifecycle(serviceProvider.GetRequiredService<ILogger<TestGrainLifecycle>>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return new(serviceProvider, manager, lifecycle);
@@ -406,7 +403,12 @@ public class CodecRecoveryTests : JournalingTestBase
         FormatAwareTestSystem system,
         string writeJournalFormatKey,
         string name = "dict")
-        => new(name, system.Manager, writeJournalFormatKey, system.ServiceProvider);
+        => new(
+            name,
+            system.Manager,
+            JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, int>>(
+                system.ServiceProvider,
+                writeJournalFormatKey));
 
     private OrleansBinaryDictionaryOperationCodec<TKey, TValue> CreateBinaryDictionaryCodec<TKey, TValue>()
         where TKey : notnull

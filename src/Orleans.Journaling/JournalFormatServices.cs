@@ -4,8 +4,6 @@ namespace Orleans.Journaling;
 
 internal static class JournalFormatServices
 {
-    public const string JournalFormatKeyServiceKey = "Orleans.Journaling.JournalFormatKey";
-
     public static string ValidateJournalFormatKey(string? journalFormatKey)
     {
         if (string.IsNullOrWhiteSpace(journalFormatKey))

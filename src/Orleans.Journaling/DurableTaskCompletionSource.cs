@@ -29,13 +29,13 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
         IStateManager manager,
-        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
+        JournaledStateManagerShared shared,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableTaskCompletionSourceOperationCodec<T>>(serviceProvider, journalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableTaskCompletionSourceOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterState(key, this);

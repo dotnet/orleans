@@ -100,14 +100,21 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
     }
 
     private JournaledStateManager CreateManager(IJournalStorage storage)
-        => new(
-            storage,
-            LoggerFactory.CreateLogger<JournaledStateManager>(),
+    {
+        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
+        var shared = JournaledStateManagerShared.CreateForTests(
+            logger,
             Options.Create(ManagerOptions),
+            TimeProvider.System,
+            OrleansBinaryJournalFormat.JournalFormatKey);
+
+        return new(
+            storage,
+            shared,
             new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>(), SessionPool),
             new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>(), SessionPool),
-            TimeProvider.System,
             new OrleansBinaryJournalFormat(SessionPool));
+    }
 
     private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 

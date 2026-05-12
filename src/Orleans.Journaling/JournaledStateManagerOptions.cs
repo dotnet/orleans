@@ -1,14 +1,16 @@
+using Orleans.Journaling.Json;
+
 namespace Orleans.Journaling;
 
 /// <summary>
 /// Options to configure the <see cref="IStateManager"/>.
 /// </summary>
-public sealed class StateManagerOptions
+public sealed class JournaledStateManagerOptions
 {
     /// <summary>
-    /// Gets or sets the journal format key to use when recovering non-empty journal data which does not have stored format metadata.
+    /// Gets or sets the journal format key used to write journal data.
     /// </summary>
-    public string LegacyJournalFormatKey { get; set; } = OrleansBinaryJournalFormat.JournalFormatKey;
+    public string JournalFormatKey { get; set; } = JsonJournalExtensions.JournalFormatKey;
 
     /// <summary>
     /// Specifies the period of time to wait until the manager retires

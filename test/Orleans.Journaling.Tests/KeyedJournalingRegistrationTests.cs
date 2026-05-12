@@ -40,14 +40,17 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
     {
         using var serviceProvider = new ServiceCollection().BuildServiceProvider();
         var storage = new VolatileJournalStorage();
+        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
+        var shared = JournaledStateManagerShared.CreateForTests(
+            logger,
+            Options.Create(ManagerOptions),
+            TimeProvider.System,
+            CustomFormatKey);
 
         var exception = Assert.Throws<InvalidOperationException>(() => new JournaledStateManager(
             storage,
-            LoggerFactory.CreateLogger<JournaledStateManager>(),
-            Options.Create(ManagerOptions),
-            TimeProvider.System,
-            serviceProvider,
-            CustomFormatKey));
+            shared,
+            serviceProvider));
 
         Assert.Contains(CustomFormatKey, exception.Message);
         Assert.Contains(nameof(IJournalFormat), exception.Message);
@@ -63,7 +66,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddOptions();
         services.AddSingleton(TimeProvider.System);
         services.AddScoped<IJournalStorage>(_ => storage);
-        services.AddKeyedScoped<string>(JournalFormatServices.JournalFormatKeyServiceKey, (_, _) => CustomFormatKey);
+        services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = CustomFormatKey);
+        services.AddScoped<JournaledStateManagerShared>();
         services.AddScoped<IStateManager, JournaledStateManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, new TestJournalFormat());

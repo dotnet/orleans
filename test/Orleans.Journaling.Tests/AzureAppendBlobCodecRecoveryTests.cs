@@ -163,14 +163,21 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     }
 
     private JournaledStateManager CreateManager(IJournalStorage storage)
-        => new(
-            storage,
-            LoggerFactory.CreateLogger<JournaledStateManager>(),
+    {
+        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
+        var shared = JournaledStateManagerShared.CreateForTests(
+            logger,
             Options.Create(ManagerOptions),
+            TimeProvider.System,
+            OrleansBinaryJournalFormat.JournalFormatKey);
+
+        return new(
+            storage,
+            shared,
             new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>(), SessionPool),
             new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>(), SessionPool),
-            TimeProvider.System,
             new OrleansBinaryJournalFormat(SessionPool));
+    }
 
     private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
 
@@ -225,16 +232,23 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     }
 
     private static JournaledStateManager CreateFormatAwareManager(IServiceProvider serviceProvider, IJournalStorage storage, string journalFormatKey)
-        => new(
-            storage,
+    {
+        var shared = JournaledStateManagerShared.CreateForTests(
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
-            Options.Create(new StateManagerOptions()),
+            Options.Create(new JournaledStateManagerOptions()),
             TimeProvider.System,
-            serviceProvider,
             journalFormatKey);
 
+        return new(storage, shared, serviceProvider);
+    }
+
     private static DurableDictionary<string, int> CreateFormatAwareDictionary(IServiceProvider serviceProvider, JournaledStateManager manager, string journalFormatKey)
-        => new("dict", manager, journalFormatKey, serviceProvider);
+        => new(
+            "dict",
+            manager,
+            JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, int>>(
+                serviceProvider,
+                journalFormatKey));
 
     private sealed class AzureProviderFixture(
         ServiceProvider serviceProvider,

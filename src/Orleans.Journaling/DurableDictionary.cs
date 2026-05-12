@@ -26,9 +26,9 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
     public DurableDictionary(
         [ServiceKey] string key,
         IStateManager manager,
-        [FromKeyedServices(JournalFormatServices.JournalFormatKeyServiceKey)] string journalFormatKey,
+        JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
-        : this(JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<K, V>>(serviceProvider, journalFormatKey))
+        : this(JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<K, V>>(serviceProvider, shared.JournalFormatKey))
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
