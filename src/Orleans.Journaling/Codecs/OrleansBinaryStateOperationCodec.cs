@@ -1,4 +1,3 @@
-using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
@@ -18,14 +17,8 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
     /// <inheritdoc/>
     public void WriteSet(T state, ulong version, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, state, version),
-            static (output, operation) => operation.codec.WriteSetPayload(operation.state, operation.version, output));
-    }
-
-    private void WriteSetPayload(T state, ulong version, IBufferWriter<byte> output)
-    {
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
         var headerWriter = Writer.Create(output, session: null!);
         headerWriter.WriteByte(FormatVersion);
         headerWriter.WriteVarUInt32(SetValueCommand);
@@ -34,23 +27,18 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
         var versionWriter = Writer.Create(output, session: null!);
         versionWriter.WriteVarUInt64(version);
         versionWriter.Commit();
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            ClearValueCommand,
-            static (output, command) => WriteHeader(output, command));
-    }
-
-    private static void WriteHeader(IBufferWriter<byte> output, uint command)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(command);
-        writer.Commit();
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(ClearValueCommand);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     /// <inheritdoc/>

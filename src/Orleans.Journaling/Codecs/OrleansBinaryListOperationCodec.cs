@@ -1,4 +1,3 @@
-using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
@@ -22,79 +21,78 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     /// <inheritdoc/>
     public void WriteAdd(T item, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, item),
-            static (output, operation) => operation.codec.WriteAddPayload(operation.item, output));
-    }
-
-    private void WriteAddPayload(T item, IBufferWriter<byte> output)
-    {
-        WriteHeader(output, AddCommand);
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(AddCommand);
+        payloadWriter.Commit();
         codec.Write(item, output);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteSet(int index, T item, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, index, item),
-            static (output, operation) => operation.codec.WriteSetPayload(operation.index, operation.item, output));
-    }
-
-    private void WriteSetPayload(int index, T item, IBufferWriter<byte> output)
-    {
-        WriteHeader(output, SetCommand, (uint)index);
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(SetCommand);
+        payloadWriter.WriteVarUInt32((uint)index);
+        payloadWriter.Commit();
         codec.Write(item, output);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteInsert(int index, T item, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, index, item),
-            static (output, operation) => operation.codec.WriteInsertPayload(operation.index, operation.item, output));
-    }
-
-    private void WriteInsertPayload(int index, T item, IBufferWriter<byte> output)
-    {
-        WriteHeader(output, InsertCommand, (uint)index);
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(InsertCommand);
+        payloadWriter.WriteVarUInt32((uint)index);
+        payloadWriter.Commit();
         codec.Write(item, output);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteRemoveAt(int index, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            index,
-            static (output, index) => WriteHeader(output, RemoveCommand, (uint)index));
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(RemoveCommand);
+        payloadWriter.WriteVarUInt32((uint)index);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            ClearCommand,
-            static (output, command) => WriteHeader(output, command));
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(ClearCommand);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, items),
-            static (output, operation) => operation.codec.WriteSnapshotPayload(operation.items, output));
-    }
-
-    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
-    {
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        WriteHeader(output, SnapshotCommand, (uint)count);
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(SnapshotCommand);
+        payloadWriter.WriteVarUInt32((uint)count);
+        payloadWriter.Commit();
         var written = 0;
         foreach (var item in items)
         {
@@ -104,6 +102,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         }
 
         CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
@@ -168,20 +167,4 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         }
     }
 
-    private static void WriteHeader(IBufferWriter<byte> output, uint command)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(command);
-        writer.Commit();
-    }
-
-    private static void WriteHeader(IBufferWriter<byte> output, uint command, uint operand)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(command);
-        writer.WriteVarUInt32(operand);
-        writer.Commit();
-    }
 }

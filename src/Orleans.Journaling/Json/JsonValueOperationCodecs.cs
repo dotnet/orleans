@@ -14,14 +14,26 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void WriteSet(T value, JournalStreamWriter writer)
     {
-        JsonOperationCodecWriter.Write(
-            writer,
+        var formattedEntry = JsonFormattedJournalEntry.Create(
             (typeInfo: _valueTypeInfo, value),
             static (jsonWriter, operation) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
                 JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
             });
+        if (writer.TryAppendFormattedEntry(formattedEntry))
+        {
+            return;
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
     }
 
     /// <inheritdoc/>
@@ -58,8 +70,7 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void WriteSet(T state, ulong version, JournalStreamWriter writer)
     {
-        JsonOperationCodecWriter.Write(
-            writer,
+        var formattedEntry = JsonFormattedJournalEntry.Create(
             (typeInfo: _stateTypeInfo, state, version),
             static (jsonWriter, operation) =>
             {
@@ -67,10 +78,41 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
                 JsonSerializer.Serialize(jsonWriter, operation.state, operation.typeInfo);
                 jsonWriter.WriteNumberValue(operation.version);
             });
+        if (writer.TryAppendFormattedEntry(formattedEntry))
+        {
+            return;
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
     }
 
     /// <inheritdoc/>
-    public void WriteClear(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Clear);
+    public void WriteClear(JournalStreamWriter writer)
+    {
+        var formattedEntry = JsonFormattedJournalEntry.Create(
+            JsonJournalEntryCommands.Clear,
+            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
+        if (writer.TryAppendFormattedEntry(formattedEntry))
+        {
+            return;
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
+    }
 
     /// <inheritdoc/>
     public void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer)
@@ -100,13 +142,6 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 
-    private static void WriteCommand(JournalStreamWriter writer, string command)
-    {
-        JsonOperationCodecWriter.Write(
-            writer,
-            command,
-            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-    }
 }
 
 /// <summary>
@@ -118,36 +153,96 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
-    public void WritePending(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Pending);
+    public void WritePending(JournalStreamWriter writer)
+    {
+        var formattedEntry = JsonFormattedJournalEntry.Create(
+            JsonJournalEntryCommands.Pending,
+            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
+        if (writer.TryAppendFormattedEntry(formattedEntry))
+        {
+            return;
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
+    }
 
     /// <inheritdoc/>
     public void WriteCompleted(T value, JournalStreamWriter writer)
     {
-        JsonOperationCodecWriter.Write(
-            writer,
+        var formattedEntry = JsonFormattedJournalEntry.Create(
             (typeInfo: _valueTypeInfo, value),
             static (jsonWriter, operation) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Completed);
                 JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
             });
+        if (writer.TryAppendFormattedEntry(formattedEntry))
+        {
+            return;
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteFaulted(Exception exception, JournalStreamWriter writer)
     {
-        JsonOperationCodecWriter.Write(
-            writer,
+        var formattedEntry = JsonFormattedJournalEntry.Create(
             exception.Message,
             static (jsonWriter, message) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Faulted);
                 jsonWriter.WriteStringValue(message);
             });
+        if (writer.TryAppendFormattedEntry(formattedEntry))
+        {
+            return;
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
     }
 
     /// <inheritdoc/>
-    public void WriteCanceled(JournalStreamWriter writer) => WriteCommand(writer, JsonJournalEntryCommands.Canceled);
+    public void WriteCanceled(JournalStreamWriter writer)
+    {
+        var formattedEntry = JsonFormattedJournalEntry.Create(
+            JsonJournalEntryCommands.Canceled,
+            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
+        if (writer.TryAppendFormattedEntry(formattedEntry))
+        {
+            return;
+        }
+
+        using var entry = writer.BeginEntry();
+        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        {
+            formattedEntry.WriteTo(jsonWriter);
+            jsonWriter.Flush();
+        }
+
+        entry.Commit();
+    }
 
     /// <inheritdoc/>
     public void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer)
@@ -183,11 +278,4 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
         }
     }
 
-    private static void WriteCommand(JournalStreamWriter writer, string command)
-    {
-        JsonOperationCodecWriter.Write(
-            writer,
-            command,
-            static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-    }
 }

@@ -1,4 +1,3 @@
-using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
@@ -21,23 +20,18 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     /// <inheritdoc/>
     public void WriteSet(TKey key, TValue value, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, key, value),
-            static (output, operation) => operation.codec.WriteSetPayload(operation.key, operation.value, output));
-    }
-
-    private void WriteSetPayload(TKey key, TValue value, IBufferWriter<byte> output)
-    {
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
         var binaryKeyCodec = AsBinaryValueCodec(keyCodec, nameof(keyCodec));
         var binaryValueCodec = AsBinaryValueCodec(valueCodec, nameof(valueCodec));
         using var session = sessionPool.GetSession();
-        var writer = Writer.Create(output, session);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(SetCommand);
-        binaryKeyCodec.FieldCodec.WriteField(ref writer, 0, typeof(TKey), key);
-        binaryValueCodec.FieldCodec.WriteField(ref writer, 1, typeof(TValue), value);
-        writer.Commit();
+        var payloadWriter = Writer.Create(output, session);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(SetCommand);
+        binaryKeyCodec.FieldCodec.WriteField(ref payloadWriter, 0, typeof(TKey), key);
+        binaryValueCodec.FieldCodec.WriteField(ref payloadWriter, 1, typeof(TValue), value);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     private static IOrleansBinaryValueCodec<T> AsBinaryValueCodec<T>(IJournalValueCodec<T> codec, string parameterName)
@@ -54,40 +48,38 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     /// <inheritdoc/>
     public void WriteRemove(TKey key, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, key),
-            static (output, operation) => operation.codec.WriteRemovePayload(operation.key, output));
-    }
-
-    private void WriteRemovePayload(TKey key, IBufferWriter<byte> output)
-    {
-        WriteHeader(output, RemoveCommand);
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(RemoveCommand);
+        payloadWriter.Commit();
         keyCodec.Write(key, output);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            ClearCommand,
-            static (output, command) => WriteHeader(output, command));
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(ClearCommand);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, items),
-            static (output, operation) => operation.codec.WriteSnapshotPayload(operation.items, output));
-    }
-
-    private void WriteSnapshotPayload(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, IBufferWriter<byte> output)
-    {
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        WriteHeader(output, SnapshotCommand, (uint)count);
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(SnapshotCommand);
+        payloadWriter.WriteVarUInt32((uint)count);
+        payloadWriter.Commit();
         var written = 0;
         foreach (var (key, value) in items)
         {
@@ -98,6 +90,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
 
         CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
@@ -154,20 +147,4 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
     }
 
-    private static void WriteHeader(IBufferWriter<byte> output, uint command)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(command);
-        writer.Commit();
-    }
-
-    private static void WriteHeader(IBufferWriter<byte> output, uint command, uint operand)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(command);
-        writer.WriteVarUInt32(operand);
-        writer.Commit();
-    }
 }

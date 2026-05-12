@@ -1,4 +1,3 @@
-using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
@@ -17,19 +16,14 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
     /// <inheritdoc/>
     public void WriteSet(T value, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, value),
-            static (output, operation) => operation.codec.WriteSetPayload(operation.value, output));
-    }
-
-    private void WriteSetPayload(T value, IBufferWriter<byte> output)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(SetValueCommand);
-        writer.Commit();
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(SetValueCommand);
+        payloadWriter.Commit();
         codec.Write(value, output);
+        entry.Commit();
     }
 
     /// <inheritdoc/>

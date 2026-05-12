@@ -254,16 +254,3 @@ public interface ITaskCompletionSourceOperationHandler<T>
     /// <summary>Applies a canceled command.</summary>
     void ApplyCanceled();
 }
-
-internal static class JournalOperationWriter
-{
-    public static void Write<TArg>(
-        JournalStreamWriter writer,
-        TArg argument,
-        Action<JournalEntryWriter, TArg> write)
-    {
-        using var entry = writer.BeginEntry();
-        write(entry.Writer, argument);
-        entry.Commit();
-    }
-}

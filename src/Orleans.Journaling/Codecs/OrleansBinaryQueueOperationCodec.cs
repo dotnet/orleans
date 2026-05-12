@@ -1,4 +1,3 @@
-using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
@@ -20,49 +19,49 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     /// <inheritdoc/>
     public void WriteEnqueue(T item, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, item),
-            static (output, operation) => operation.codec.WriteEnqueuePayload(operation.item, output));
-    }
-
-    private void WriteEnqueuePayload(T item, IBufferWriter<byte> output)
-    {
-        WriteHeader(output, EnqueueCommand);
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(EnqueueCommand);
+        payloadWriter.Commit();
         codec.Write(item, output);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteDequeue(JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            DequeueCommand,
-            static (output, command) => WriteHeader(output, command));
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(DequeueCommand);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            ClearCommand,
-            static (output, command) => WriteHeader(output, command));
+        using var entry = writer.BeginEntry();
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(ClearCommand);
+        payloadWriter.Commit();
+        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
-        JournalOperationWriter.Write(
-            writer,
-            (codec: this, items),
-            static (output, operation) => operation.codec.WriteSnapshotPayload(operation.items, output));
-    }
-
-    private void WriteSnapshotPayload(IReadOnlyCollection<T> items, IBufferWriter<byte> output)
-    {
+        using var entry = writer.BeginEntry();
+        var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
-        WriteHeader(output, SnapshotCommand, (uint)count);
+        var payloadWriter = Writer.Create(output, session: null!);
+        payloadWriter.WriteByte(FormatVersion);
+        payloadWriter.WriteVarUInt32(SnapshotCommand);
+        payloadWriter.WriteVarUInt32((uint)count);
+        payloadWriter.Commit();
         var written = 0;
         foreach (var item in items)
         {
@@ -72,6 +71,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         }
 
         CollectionCodecHelpers.RequireSnapshotItemCount(count, written);
+        entry.Commit();
     }
 
     /// <inheritdoc/>
@@ -122,20 +122,4 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         }
     }
 
-    private static void WriteHeader(IBufferWriter<byte> output, uint command)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(command);
-        writer.Commit();
-    }
-
-    private static void WriteHeader(IBufferWriter<byte> output, uint command, uint operand)
-    {
-        var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(FormatVersion);
-        writer.WriteVarUInt32(command);
-        writer.WriteVarUInt32(operand);
-        writer.Commit();
-    }
 }
