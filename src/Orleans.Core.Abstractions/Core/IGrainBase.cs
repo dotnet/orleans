@@ -310,11 +310,4 @@ namespace Orleans
         HighMemoryPressure,
     }
 
-    internal static class DeactivationReasonCodeExtensions
-    {
-        public static bool IsTransientError(this DeactivationReasonCode reasonCode)
-        {
-            return reasonCode is DeactivationReasonCode.DirectoryFailure;
-        }
-    }
 }

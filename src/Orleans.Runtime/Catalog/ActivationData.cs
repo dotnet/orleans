@@ -1591,15 +1591,6 @@ internal sealed partial class ActivationData :
                 return;
             }
 
-            // If deactivation was caused by a transient failure, allow messages to be forwarded.
-            if (DeactivationReason.ReasonCode.IsTransientError())
-            {
-                foreach (var msg in msgs)
-                {
-                    msg.ForwardCount = Math.Max(msg.ForwardCount - 1, 0);
-                }
-            }
-
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
                 if (ForwardingAddress is { } address)
