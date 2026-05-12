@@ -20,9 +20,9 @@ public interface IDurableSet<T> : ISet<T>, IReadOnlyCollection<T>, IReadOnlySet<
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableSetOperationHandler<T>
+internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOperationHandler<T>
 {
-    private readonly IDurableSetOperationCodec<T> _codec;
+    private readonly ISetOperationCodec<T> _codec;
     private readonly HashSet<T> _items = [];
     private JournalStreamWriter _storage;
 
@@ -33,11 +33,11 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableSetOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<ISetOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 
-    internal DurableSet(string key, IStateManager manager, IDurableSetOperationCodec<T> codec)
+    internal DurableSet(string key, IStateManager manager, ISetOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -49,7 +49,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
 
     object IJournaledState.OperationCodec => _codec;
 
-    Type IJournaledState.OperationCodecServiceType => typeof(IDurableSetOperationCodec<T>);
+    Type IJournaledState.OperationCodecServiceType => typeof(ISetOperationCodec<T>);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -110,10 +110,10 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
     protected bool ApplyAdd(T item) => _items.Add(item);
     protected bool ApplyRemove(T item) => _items.Remove(item);
     protected void ApplyClear() => _items.Clear();
-    void IDurableSetOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
-    void IDurableSetOperationHandler<T>.ApplyRemove(T item) => ApplyRemove(item);
-    void IDurableSetOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IDurableSetOperationHandler<T>.Reset(int capacityHint)
+    void ISetOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
+    void ISetOperationHandler<T>.ApplyRemove(T item) => ApplyRemove(item);
+    void ISetOperationHandler<T>.ApplyClear() => ApplyClear();
+    void ISetOperationHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);

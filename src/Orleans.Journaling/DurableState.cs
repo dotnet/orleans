@@ -5,9 +5,9 @@ using Orleans.Core;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IDurableStateOperationHandler<T>
+internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IStateOperationHandler<T>
 {
-    private readonly IDurableStateOperationCodec<T> _codec;
+    private readonly IStateOperationCodec<T> _codec;
     private readonly IStateManager _manager;
     private T? _value;
     private ulong _version;
@@ -23,12 +23,12 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableStateOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IStateOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
         _manager = manager;
     }
 
-    internal DurableState(string key, IStateManager manager, IDurableStateOperationCodec<T> codec)
+    internal DurableState(string key, IStateManager manager, IStateOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -57,7 +57,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
 
     object IJournaledState.OperationCodec => _codec;
 
-    Type IJournaledState.OperationCodecServiceType => typeof(IDurableStateOperationCodec<T>);
+    Type IJournaledState.OperationCodecServiceType => typeof(IStateOperationCodec<T>);
 
     void IJournaledState.OnWriteCompleted()
     {
@@ -132,7 +132,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
         _pendingVersion = 0;
     }
 
-    void IDurableStateOperationHandler<T>.ApplySet(T state, ulong version)
+    void IStateOperationHandler<T>.ApplySet(T state, ulong version)
     {
         _value = state;
         _version = version;
@@ -140,7 +140,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, ID
         _clearRequested = false;
     }
 
-    void IDurableStateOperationHandler<T>.ApplyClear()
+    void IStateOperationHandler<T>.ApplyClear()
     {
         _value = default;
         _version = 0;

@@ -7,27 +7,27 @@ namespace Orleans.Journaling;
 
 public static class AzureBlobStorageHostingExtensions
 {
-    public static ISiloBuilder AddAzureAppendBlobJournalStorage(this ISiloBuilder builder) => builder.AddAzureAppendBlobJournalStorage(configure: null);
-    public static ISiloBuilder AddAzureAppendBlobJournalStorage(this ISiloBuilder builder, Action<AzureAppendBlobJournalStorageOptions>? configure)
+    public static ISiloBuilder AddAzureBlobJournalStorage(this ISiloBuilder builder) => builder.AddAzureBlobJournalStorage(configure: null);
+    public static ISiloBuilder AddAzureBlobJournalStorage(this ISiloBuilder builder, Action<AzureBlobJournalStorageOptions>? configure)
     {
         builder.AddJournalStorage();
 
         var services = builder.Services;
 
-        var options = builder.Services.AddOptions<AzureAppendBlobJournalStorageOptions>();
+        var options = builder.Services.AddOptions<AzureBlobJournalStorageOptions>();
         if (configure is not null)
         {
             options.Configure(configure);
         }
 
-        if (services.Any(service => service.ServiceType.Equals(typeof(AzureAppendBlobJournalStorageProvider))))
+        if (services.Any(service => service.ServiceType.Equals(typeof(AzureBlobJournalStorageProvider))))
         {
             return builder;
         }
 
-        builder.Services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
-        builder.Services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        builder.Services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
+        builder.Services.AddSingleton<AzureBlobJournalStorageProvider>();
+        builder.Services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
+        builder.Services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
         return builder;
     }
 }

@@ -56,7 +56,7 @@ internal static class Program
                     options.ServiceId = "journaling-azure-blob-json-sample";
                 })
                 .Configure<EndpointOptions>(options => options.AdvertisedIPAddress = IPAddress.Loopback)
-                .AddAzureAppendBlobJournalStorage(options =>
+                .AddAzureBlobJournalStorage(options =>
                 {
                     options.BlobServiceClient = blobServiceClient;
                     options.ContainerName = settings.ContainerName;

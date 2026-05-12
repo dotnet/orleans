@@ -319,40 +319,40 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
         services.AddSerializer();
         services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
         var key = OrleansBinaryJournalFormat.JournalFormatKey;
-        services.AddKeyedSingleton(typeof(IDurableDictionaryOperationCodec<,>), key, typeof(OrleansBinaryDictionaryOperationCodec<,>));
-        services.AddKeyedSingleton(typeof(IDurableListOperationCodec<>), key, typeof(OrleansBinaryListOperationCodec<>));
-        services.AddKeyedSingleton(typeof(IDurableQueueOperationCodec<>), key, typeof(OrleansBinaryQueueOperationCodec<>));
-        services.AddKeyedSingleton(typeof(IDurableSetOperationCodec<>), key, typeof(OrleansBinarySetOperationCodec<>));
-        services.AddKeyedSingleton(typeof(IDurableValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
-        services.AddKeyedSingleton(typeof(IDurableStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
-        services.AddKeyedSingleton(typeof(IDurableTaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IDictionaryOperationCodec<,>), key, typeof(OrleansBinaryDictionaryOperationCodec<,>));
+        services.AddKeyedSingleton(typeof(IListOperationCodec<>), key, typeof(OrleansBinaryListOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IQueueOperationCodec<>), key, typeof(OrleansBinaryQueueOperationCodec<>));
+        services.AddKeyedSingleton(typeof(ISetOperationCodec<>), key, typeof(OrleansBinarySetOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
+        services.AddKeyedSingleton(typeof(IStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
+        services.AddKeyedSingleton(typeof(ITaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
 
         using var serviceProvider = services.BuildServiceProvider();
 
         Assert.Same(
-            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key));
+            serviceProvider.GetRequiredKeyedService<IDictionaryOperationCodec<string, int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDictionaryOperationCodec<string, int>>(key));
         Assert.NotSame(
-            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableDictionaryOperationCodec<string, long>>(key));
+            serviceProvider.GetRequiredKeyedService<IDictionaryOperationCodec<string, int>>(key),
+            serviceProvider.GetRequiredKeyedService<IDictionaryOperationCodec<string, long>>(key));
         Assert.Same(
-            serviceProvider.GetRequiredKeyedService<IDurableListOperationCodec<string>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableListOperationCodec<string>>(key));
+            serviceProvider.GetRequiredKeyedService<IListOperationCodec<string>>(key),
+            serviceProvider.GetRequiredKeyedService<IListOperationCodec<string>>(key));
         Assert.Same(
-            serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodec<int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableQueueOperationCodec<int>>(key));
+            serviceProvider.GetRequiredKeyedService<IQueueOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IQueueOperationCodec<int>>(key));
         Assert.Same(
-            serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodec<int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableSetOperationCodec<int>>(key));
+            serviceProvider.GetRequiredKeyedService<ISetOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<ISetOperationCodec<int>>(key));
         Assert.Same(
-            serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<int>>(key));
+            serviceProvider.GetRequiredKeyedService<IValueOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IValueOperationCodec<int>>(key));
         Assert.Same(
-            serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodec<int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableStateOperationCodec<int>>(key));
+            serviceProvider.GetRequiredKeyedService<IStateOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<IStateOperationCodec<int>>(key));
         Assert.Same(
-            serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodec<int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceOperationCodec<int>>(key));
+            serviceProvider.GetRequiredKeyedService<ITaskCompletionSourceOperationCodec<int>>(key),
+            serviceProvider.GetRequiredKeyedService<ITaskCompletionSourceOperationCodec<int>>(key));
     }
 
     [Theory]
@@ -436,7 +436,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     private static void Apply<TKey, TValue>(
-        IDurableDictionaryOperationCodec<TKey, TValue> codec,
+        IDictionaryOperationCodec<TKey, TValue> codec,
         Action<JournalStreamWriter> write,
         RecordingDictionaryOperationHandler<TKey, TValue> consumer)
         where TKey : notnull
@@ -445,7 +445,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     private static void Apply<T>(
-        IDurableListOperationCodec<T> codec,
+        IListOperationCodec<T> codec,
         Action<JournalStreamWriter> write,
         RecordingListOperationHandler<T> consumer)
     {
@@ -453,7 +453,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     private static void Apply<T>(
-        IDurableQueueOperationCodec<T> codec,
+        IQueueOperationCodec<T> codec,
         Action<JournalStreamWriter> write,
         RecordingQueueOperationHandler<T> consumer)
     {
@@ -461,7 +461,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     private static void Apply<T>(
-        IDurableSetOperationCodec<T> codec,
+        ISetOperationCodec<T> codec,
         Action<JournalStreamWriter> write,
         RecordingSetOperationHandler<T> consumer)
     {
@@ -469,7 +469,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     private static void Apply<T>(
-        IDurableValueOperationCodec<T> codec,
+        IValueOperationCodec<T> codec,
         Action<JournalStreamWriter> write,
         RecordingValueOperationHandler<T> consumer)
     {
@@ -477,7 +477,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     private static void Apply<T>(
-        IDurableStateOperationCodec<T> codec,
+        IStateOperationCodec<T> codec,
         Action<JournalStreamWriter> write,
         RecordingStateOperationHandler<T> consumer)
     {
@@ -485,7 +485,7 @@ public sealed class OrleansBinaryOperationCodecTests : JournalingTestBase
     }
 
     private static void Apply<T>(
-        IDurableTaskCompletionSourceOperationCodec<T> codec,
+        ITaskCompletionSourceOperationCodec<T> codec,
         Action<JournalStreamWriter> write,
         RecordingTaskCompletionSourceOperationHandler<T> consumer)
     {

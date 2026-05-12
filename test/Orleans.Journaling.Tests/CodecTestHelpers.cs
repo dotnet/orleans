@@ -67,26 +67,26 @@ public static class CodecTestHelpers
 
     public static void AssertOperationCodecRegistrations(IServiceProvider serviceProvider, string journalFormatKey)
     {
-        AssertOperationCodec<IDurableDictionaryOperationCodec<string, int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodec<IDurableDictionaryOperationCodec<string, ulong>>(serviceProvider, journalFormatKey);
-        AssertOperationCodec<IDurableListOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodec<IDurableQueueOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodec<IDurableSetOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodec<IDurableValueOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodec<IDurableStateOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodec<IDurableTaskCompletionSourceOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDictionaryOperationCodec<string, int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IDictionaryOperationCodec<string, ulong>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IListOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IQueueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<ISetOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IValueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<IStateOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodec<ITaskCompletionSourceOperationCodec<int>>(serviceProvider, journalFormatKey);
     }
 
     public static void AssertOperationCodecServiceRegistrations(IServiceProvider serviceProvider, string journalFormatKey)
     {
-        AssertOperationCodecService<IDurableDictionaryOperationCodec<string, int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodecService<IDurableDictionaryOperationCodec<string, ulong>>(serviceProvider, journalFormatKey);
-        AssertOperationCodecService<IDurableListOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodecService<IDurableQueueOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodecService<IDurableSetOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodecService<IDurableValueOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodecService<IDurableStateOperationCodec<int>>(serviceProvider, journalFormatKey);
-        AssertOperationCodecService<IDurableTaskCompletionSourceOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDictionaryOperationCodec<string, int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IDictionaryOperationCodec<string, ulong>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IListOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IQueueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<ISetOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IValueOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<IStateOperationCodec<int>>(serviceProvider, journalFormatKey);
+        AssertOperationCodecService<ITaskCompletionSourceOperationCodec<int>>(serviceProvider, journalFormatKey);
     }
 
     private static void AssertOperationCodec<TCodec>(IServiceProvider serviceProvider, string journalFormatKey)
@@ -129,7 +129,7 @@ public sealed class MiscountedReadOnlyCollection<T>(int count, IReadOnlyCollecti
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }
 
-public sealed class RecordingDictionaryOperationHandler<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue>
+public sealed class RecordingDictionaryOperationHandler<TKey, TValue> : IDictionaryOperationHandler<TKey, TValue>
     where TKey : notnull
 {
     public List<string> Commands { get; } = [];
@@ -153,7 +153,7 @@ public sealed class RecordingDictionaryOperationHandler<TKey, TValue> : IDurable
     }
 }
 
-public sealed class RecordingListOperationHandler<T> : IDurableListOperationHandler<T>
+public sealed class RecordingListOperationHandler<T> : IListOperationHandler<T>
 {
     public List<string> Commands { get; } = [];
 
@@ -170,7 +170,7 @@ public sealed class RecordingListOperationHandler<T> : IDurableListOperationHand
     public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
 }
 
-public sealed class RecordingQueueOperationHandler<T> : IDurableQueueOperationHandler<T>
+public sealed class RecordingQueueOperationHandler<T> : IQueueOperationHandler<T>
 {
     public List<string> Commands { get; } = [];
 
@@ -183,7 +183,7 @@ public sealed class RecordingQueueOperationHandler<T> : IDurableQueueOperationHa
     public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
 }
 
-public sealed class RecordingSetOperationHandler<T> : IDurableSetOperationHandler<T>
+public sealed class RecordingSetOperationHandler<T> : ISetOperationHandler<T>
 {
     public List<string> Commands { get; } = [];
 
@@ -196,14 +196,14 @@ public sealed class RecordingSetOperationHandler<T> : IDurableSetOperationHandle
     public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
 }
 
-public sealed class RecordingValueOperationHandler<T> : IDurableValueOperationHandler<T>
+public sealed class RecordingValueOperationHandler<T> : IValueOperationHandler<T>
 {
     public T? Value { get; private set; }
 
     public void ApplySet(T value) => Value = value;
 }
 
-public sealed class RecordingStateOperationHandler<T> : IDurableStateOperationHandler<T>
+public sealed class RecordingStateOperationHandler<T> : IStateOperationHandler<T>
 {
     public List<string> Commands { get; } = [];
 
@@ -221,7 +221,7 @@ public sealed class RecordingStateOperationHandler<T> : IDurableStateOperationHa
     public void ApplyClear() => Commands.Add("clear");
 }
 
-public sealed class RecordingTaskCompletionSourceOperationHandler<T> : IDurableTaskCompletionSourceOperationHandler<T>
+public sealed class RecordingTaskCompletionSourceOperationHandler<T> : ITaskCompletionSourceOperationHandler<T>
 {
     public List<string> Commands { get; } = [];
 

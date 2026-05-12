@@ -8,7 +8,7 @@ namespace Orleans.Journaling.Json;
 /// JSON codec for durable list journal entries.
 /// </summary>
 public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableListOperationCodec<T>, IJsonJournalEntryCodec
+    : IListOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
@@ -38,13 +38,13 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer)
+    public void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, IDurableListOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IListOperationHandler<T> consumer)
     {
         var command = operation.Command;
         switch (command)
@@ -91,7 +91,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
 
     void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (state is not IDurableListOperationHandler<T> consumer)
+        if (state is not IListOperationHandler<T> consumer)
         {
             throw new InvalidOperationException(
                 $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
@@ -186,7 +186,7 @@ public sealed class JsonListOperationCodec<T>(JsonSerializerOptions? options = n
 /// JSON codec for durable queue journal entries.
 /// </summary>
 public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableQueueOperationCodec<T>, IJsonJournalEntryCodec
+    : IQueueOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
@@ -210,13 +210,13 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer)
+    public void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, IDurableQueueOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, IQueueOperationHandler<T> consumer)
     {
         var command = operation.Command;
         switch (command)
@@ -251,7 +251,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
 
     void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (state is not IDurableQueueOperationHandler<T> consumer)
+        if (state is not IQueueOperationHandler<T> consumer)
         {
             throw new InvalidOperationException(
                 $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");
@@ -311,7 +311,7 @@ public sealed class JsonQueueOperationCodec<T>(JsonSerializerOptions? options = 
 /// JSON codec for durable set journal entries.
 /// </summary>
 public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IDurableSetOperationCodec<T>, IJsonJournalEntryCodec
+    : ISetOperationCodec<T>, IJsonJournalEntryCodec
 {
     private readonly JsonTypeInfo<T> _itemTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
@@ -335,13 +335,13 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer)
+    public void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, IDurableSetOperationHandler<T> consumer)
+    private void Apply(ref JsonOperationReader operation, ISetOperationHandler<T> consumer)
     {
         var command = operation.Command;
         switch (command)
@@ -376,7 +376,7 @@ public sealed class JsonSetOperationCodec<T>(JsonSerializerOptions? options = nu
 
     void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (state is not IDurableSetOperationHandler<T> consumer)
+        if (state is not ISetOperationHandler<T> consumer)
         {
             throw new InvalidOperationException(
                 $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");

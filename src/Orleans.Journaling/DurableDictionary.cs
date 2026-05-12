@@ -11,13 +11,13 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDurableDictionaryOperationHandler<K, V> where K : notnull
+internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDictionaryOperationHandler<K, V> where K : notnull
 {
-    private readonly IDurableDictionaryOperationCodec<K, V> _codec;
+    private readonly IDictionaryOperationCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
     private JournalStreamWriter _storage;
 
-    protected DurableDictionary(IDurableDictionaryOperationCodec<K, V> codec)
+    protected DurableDictionary(IDictionaryOperationCodec<K, V> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
@@ -28,13 +28,13 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         IStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
-        : this(JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<K, V>>(serviceProvider, shared.JournalFormatKey))
+        : this(JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<K, V>>(serviceProvider, shared.JournalFormatKey))
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
     }
 
-    internal DurableDictionary(string key, IStateManager manager, IDurableDictionaryOperationCodec<K, V> codec) : this(codec)
+    internal DurableDictionary(string key, IStateManager manager, IDictionaryOperationCodec<K, V> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
@@ -61,7 +61,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     object IJournaledState.OperationCodec => _codec;
 
-    Type IJournaledState.OperationCodecServiceType => typeof(IDurableDictionaryOperationCodec<K, V>);
+    Type IJournaledState.OperationCodecServiceType => typeof(IDictionaryOperationCodec<K, V>);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -121,10 +121,10 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     internal bool ApplyRemove(K key) => _items.Remove(key);
     private void ApplyClear() => _items.Clear();
-    void IDurableDictionaryOperationHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
-    void IDurableDictionaryOperationHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
-    void IDurableDictionaryOperationHandler<K, V>.ApplyClear() => ApplyClear();
-    void IDurableDictionaryOperationHandler<K, V>.Reset(int capacityHint)
+    void IDictionaryOperationHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
+    void IDictionaryOperationHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
+    void IDictionaryOperationHandler<K, V>.ApplyClear() => ApplyClear();
+    void IDictionaryOperationHandler<K, V>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);

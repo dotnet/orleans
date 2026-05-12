@@ -9,7 +9,7 @@ using Microsoft.Extensions.Logging;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
+internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 {
     internal const string FormatMetadataKey = "format";
 
@@ -27,7 +27,7 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
     private readonly AppendBlobClient _client;
     private readonly string? _mimeType;
     private readonly string? _journalFormatKey;
-    private readonly ILogger<AzureAppendBlobJournalStorage> _logger;
+    private readonly ILogger<AzureBlobJournalStorage> _logger;
     private readonly Func<AppendBlobClient, string, AppendBlobClient> _snapshotClientFactory;
     private readonly Func<AppendBlobClient, CancellationToken, IAsyncEnumerable<string>> _snapshotEnumerator;
     private readonly AppendBlobAppendBlockOptions _appendOptions;
@@ -36,25 +36,25 @@ internal sealed partial class AzureAppendBlobJournalStorage : IJournalStorage
 
     public bool IsCompactionRequested => _numBlocks > 10;
 
-    public AzureAppendBlobJournalStorage(AppendBlobClient client, ILogger<AzureAppendBlobJournalStorage> logger)
+    public AzureBlobJournalStorage(AppendBlobClient client, ILogger<AzureBlobJournalStorage> logger)
         : this(client, mimeType: null, logger)
     {
     }
 
-    internal AzureAppendBlobJournalStorage(AppendBlobClient client, ILogger<AzureAppendBlobJournalStorage> logger, Func<AppendBlobClient, string, AppendBlobClient> snapshotClientFactory)
+    internal AzureBlobJournalStorage(AppendBlobClient client, ILogger<AzureBlobJournalStorage> logger, Func<AppendBlobClient, string, AppendBlobClient> snapshotClientFactory)
         : this(client, mimeType: null, logger, snapshotClientFactory)
     {
     }
 
-    internal AzureAppendBlobJournalStorage(AppendBlobClient client, string? mimeType, ILogger<AzureAppendBlobJournalStorage> logger)
+    internal AzureBlobJournalStorage(AppendBlobClient client, string? mimeType, ILogger<AzureBlobJournalStorage> logger)
         : this(client, mimeType, logger, static (client, snapshot) => client.WithSnapshot(snapshot))
     {
     }
 
-    internal AzureAppendBlobJournalStorage(
+    internal AzureBlobJournalStorage(
         AppendBlobClient client,
         string? mimeType,
-        ILogger<AzureAppendBlobJournalStorage> logger,
+        ILogger<AzureBlobJournalStorage> logger,
         Func<AppendBlobClient, string, AppendBlobClient> snapshotClientFactory,
         Func<AppendBlobClient, CancellationToken, IAsyncEnumerable<string>>? snapshotEnumerator = null,
         string? journalFormatKey = null)

@@ -165,7 +165,7 @@ public class JournalValueCodecTests
         Assert.Contains("did not match", exception.Message);
     }
 
-    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull
+    private sealed class DictionaryConsumer<TKey, TValue> : IDictionaryOperationHandler<TKey, TValue> where TKey : notnull
     {
         public TKey? LastSetKey { get; private set; }
         public TValue? LastSetValue { get; private set; }
@@ -183,7 +183,7 @@ public class JournalValueCodecTests
         public void Reset(int capacityHint) => Items.Clear();
     }
 
-    private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
+    private sealed class ListConsumer<T> : IListOperationHandler<T>
     {
         public void ApplyAdd(T item) { }
         public void ApplySet(int index, T item) { }

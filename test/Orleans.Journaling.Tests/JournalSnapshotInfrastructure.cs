@@ -240,12 +240,12 @@ public sealed class SingleStreamResolver : IStateResolver
 /// state contract (so the journal readers will dispatch into it) and the dictionary operation handler
 /// (so the codec accepts it via <c>state is THandler</c>).
 /// </summary>
-public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, IDurableDictionaryOperationHandler<TKey, TValue>
+public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, IDictionaryOperationHandler<TKey, TValue>
     where TKey : notnull
 {
     private readonly RecordingDictionaryOperationHandler<TKey, TValue> _handler = new();
 
-    public RecordingDictionaryState(IDurableDictionaryOperationCodec<TKey, TValue> codec)
+    public RecordingDictionaryState(IDictionaryOperationCodec<TKey, TValue> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         OperationCodec = codec;
@@ -275,11 +275,11 @@ public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, ID
 }
 
 /// <summary>Recording state for list-codec snapshot tests.</summary>
-public sealed class RecordingListState<T> : IJournaledState, IDurableListOperationHandler<T>
+public sealed class RecordingListState<T> : IJournaledState, IListOperationHandler<T>
 {
     private readonly RecordingListOperationHandler<T> _handler = new();
 
-    public RecordingListState(IDurableListOperationCodec<T> codec)
+    public RecordingListState(IListOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         OperationCodec = codec;
@@ -311,11 +311,11 @@ public sealed class RecordingListState<T> : IJournaledState, IDurableListOperati
 }
 
 /// <summary>Recording state for queue-codec snapshot tests.</summary>
-public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueOperationHandler<T>
+public sealed class RecordingQueueState<T> : IJournaledState, IQueueOperationHandler<T>
 {
     private readonly RecordingQueueOperationHandler<T> _handler = new();
 
-    public RecordingQueueState(IDurableQueueOperationCodec<T> codec)
+    public RecordingQueueState(IQueueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         OperationCodec = codec;
@@ -343,11 +343,11 @@ public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueOpera
 }
 
 /// <summary>Recording state for set-codec snapshot tests.</summary>
-public sealed class RecordingSetState<T> : IJournaledState, IDurableSetOperationHandler<T>
+public sealed class RecordingSetState<T> : IJournaledState, ISetOperationHandler<T>
 {
     private readonly RecordingSetOperationHandler<T> _handler = new();
 
-    public RecordingSetState(IDurableSetOperationCodec<T> codec)
+    public RecordingSetState(ISetOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         OperationCodec = codec;
@@ -375,11 +375,11 @@ public sealed class RecordingSetState<T> : IJournaledState, IDurableSetOperation
 }
 
 /// <summary>Recording state for value-codec snapshot tests.</summary>
-public sealed class RecordingValueState<T> : IJournaledState, IDurableValueOperationHandler<T>
+public sealed class RecordingValueState<T> : IJournaledState, IValueOperationHandler<T>
 {
     private readonly RecordingValueOperationHandler<T> _handler = new();
 
-    public RecordingValueState(IDurableValueOperationCodec<T> codec)
+    public RecordingValueState(IValueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         OperationCodec = codec;
@@ -407,11 +407,11 @@ public sealed class RecordingValueState<T> : IJournaledState, IDurableValueOpera
 }
 
 /// <summary>Recording state for state-codec snapshot tests.</summary>
-public sealed class RecordingStateState<T> : IJournaledState, IDurableStateOperationHandler<T>
+public sealed class RecordingStateState<T> : IJournaledState, IStateOperationHandler<T>
 {
     private readonly RecordingStateOperationHandler<T> _handler = new();
 
-    public RecordingStateState(IDurableStateOperationCodec<T> codec)
+    public RecordingStateState(IStateOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         OperationCodec = codec;
@@ -439,11 +439,11 @@ public sealed class RecordingStateState<T> : IJournaledState, IDurableStateOpera
 }
 
 /// <summary>Recording state for task-completion-source codec snapshot tests.</summary>
-public sealed class RecordingTcsState<T> : IJournaledState, IDurableTaskCompletionSourceOperationHandler<T>
+public sealed class RecordingTcsState<T> : IJournaledState, ITaskCompletionSourceOperationHandler<T>
 {
     private readonly RecordingTaskCompletionSourceOperationHandler<T> _handler = new();
 
-    public RecordingTcsState(IDurableTaskCompletionSourceOperationCodec<T> codec)
+    public RecordingTcsState(ITaskCompletionSourceOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         OperationCodec = codec;

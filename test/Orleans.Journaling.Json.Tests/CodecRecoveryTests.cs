@@ -371,7 +371,7 @@ public class CodecRecoveryTests : JournalingTestBase
             OrleansBinaryJournalFormat.JournalFormatKey,
             (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
         services.AddKeyedSingleton(
-            typeof(IDurableDictionaryOperationCodec<,>),
+            typeof(IDictionaryOperationCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
             typeof(OrleansBinaryDictionaryOperationCodec<,>));
 
@@ -379,7 +379,7 @@ public class CodecRecoveryTests : JournalingTestBase
         services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
-            typeof(IDurableDictionaryOperationCodec<,>),
+            typeof(IDictionaryOperationCodec<,>),
             JsonJournalExtensions.JournalFormatKey,
             typeof(JsonDictionaryOperationCodecService<,>));
 
@@ -409,7 +409,7 @@ public class CodecRecoveryTests : JournalingTestBase
         => new(
             name,
             system.Manager,
-            JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, int>>(
+            JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, int>>(
                 system.ServiceProvider,
                 writeJournalFormatKey));
 

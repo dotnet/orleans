@@ -15,7 +15,7 @@ namespace Orleans.Journaling;
 internal sealed class OrleansBinaryTcsOperationCodec<T>(
     IJournalValueCodec<T> codec,
     IJournalValueCodec<Exception> exceptionCodec,
-    SerializerSessionPool sessionPool) : IDurableTaskCompletionSourceOperationCodec<T>, IOrleansBinaryJournalEntryCodec
+    SerializerSessionPool sessionPool) : ITaskCompletionSourceOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
 
@@ -62,7 +62,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    public void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
@@ -76,9 +76,9 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
-        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableTaskCompletionSourceOperationHandler<T>>(state, this));
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<ITaskCompletionSourceOperationHandler<T>>(state, this));
 
-    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, ITaskCompletionSourceOperationHandler<T> consumer)
     {
         OrleansBinaryOperationApplier.ReadVersion(ref reader);
         if (reader.Position >= reader.Length)

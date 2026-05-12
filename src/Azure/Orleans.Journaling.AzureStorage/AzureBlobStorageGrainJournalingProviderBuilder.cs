@@ -13,8 +13,8 @@ internal sealed class AzureBlobStorageGrainJournalingProviderBuilder : IProvider
 {
     public void Configure(ISiloBuilder builder, string? name, IConfigurationSection configurationSection)
     {
-        builder.AddAzureAppendBlobJournalStorage();
-        var optionsBuilder = builder.Services.AddOptions<AzureAppendBlobJournalStorageOptions>();
+        builder.AddAzureBlobJournalStorage();
+        var optionsBuilder = builder.Services.AddOptions<AzureBlobJournalStorageOptions>();
         optionsBuilder.Configure<IServiceProvider>((options, services) =>
         {
             var containerName = configurationSection["ContainerName"];

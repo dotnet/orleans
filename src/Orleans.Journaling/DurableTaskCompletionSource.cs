@@ -15,9 +15,9 @@ public interface IDurableTaskCompletionSource<T>
 }
 
 [DebuggerDisplay("Status = {Status}")]
-internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, IDurableTaskCompletionSourceOperationHandler<T>
+internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSource<T>, IJournaledState, ITaskCompletionSourceOperationHandler<T>
 {
-    private readonly IDurableTaskCompletionSourceOperationCodec<T> _codec;
+    private readonly ITaskCompletionSourceOperationCodec<T> _codec;
     private readonly DeepCopier<T> _copier;
     private readonly DeepCopier<Exception> _exceptionCopier;
 
@@ -35,7 +35,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         DeepCopier<Exception> exceptionCopier)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableTaskCompletionSourceOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<ITaskCompletionSourceOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         _copier = copier;
         _exceptionCopier = exceptionCopier;
         manager.RegisterState(key, this);
@@ -44,7 +44,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
     internal DurableTaskCompletionSource(
         string key,
         IStateManager manager,
-        IDurableTaskCompletionSourceOperationCodec<T> codec,
+        ITaskCompletionSourceOperationCodec<T> codec,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
     {
@@ -103,7 +103,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     object IJournaledState.OperationCodec => _codec;
 
-    Type IJournaledState.OperationCodecServiceType => typeof(IDurableTaskCompletionSourceOperationCodec<T>);
+    Type IJournaledState.OperationCodecServiceType => typeof(ITaskCompletionSourceOperationCodec<T>);
 
     private void OnValuePersisted()
     {
@@ -168,20 +168,20 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         }
     }
 
-    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
-    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyCompleted(T value)
+    void ITaskCompletionSourceOperationHandler<T>.ApplyPending() => _status = DurableTaskCompletionSourceStatus.Pending;
+    void ITaskCompletionSourceOperationHandler<T>.ApplyCompleted(T value)
     {
         _status = DurableTaskCompletionSourceStatus.Completed;
         _value = value;
     }
 
-    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyFaulted(Exception exception)
+    void ITaskCompletionSourceOperationHandler<T>.ApplyFaulted(Exception exception)
     {
         _status = DurableTaskCompletionSourceStatus.Faulted;
         _exception = exception;
     }
 
-    void IDurableTaskCompletionSourceOperationHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
+    void ITaskCompletionSourceOperationHandler<T>.ApplyCanceled() => _status = DurableTaskCompletionSourceStatus.Canceled;
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();
 }

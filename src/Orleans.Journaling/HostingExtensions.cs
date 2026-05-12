@@ -40,12 +40,12 @@ public static class HostingExtensions
         services.TryAddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
         services.TryAddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<OrleansBinaryJournalFormat>());
 
-        services.TryAddKeyedSingleton(typeof(IDurableDictionaryOperationCodec<,>), key, typeof(OrleansBinaryDictionaryOperationCodec<,>));
-        services.TryAddKeyedSingleton(typeof(IDurableListOperationCodec<>), key, typeof(OrleansBinaryListOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IDurableQueueOperationCodec<>), key, typeof(OrleansBinaryQueueOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IDurableSetOperationCodec<>), key, typeof(OrleansBinarySetOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IDurableValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IDurableStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IDurableTaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDictionaryOperationCodec<,>), key, typeof(OrleansBinaryDictionaryOperationCodec<,>));
+        services.TryAddKeyedSingleton(typeof(IListOperationCodec<>), key, typeof(OrleansBinaryListOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IQueueOperationCodec<>), key, typeof(OrleansBinaryQueueOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(ISetOperationCodec<>), key, typeof(OrleansBinarySetOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(ITaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
     }
 }

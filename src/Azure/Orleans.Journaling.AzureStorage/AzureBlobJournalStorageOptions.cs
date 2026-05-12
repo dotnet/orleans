@@ -7,9 +7,9 @@ using Orleans.Runtime;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Options for configuring the Azure Append Blob state storage provider.
+/// Options for configuring the Azure Blob state storage provider.
 /// </summary>
-public sealed class AzureAppendBlobJournalStorageOptions
+public sealed class AzureBlobJournalStorageOptions
 {
     private BlobServiceClient? _blobServiceClient;
 
@@ -60,7 +60,7 @@ public sealed class AzureAppendBlobJournalStorageOptions
     /// <summary>
     /// A function for building container factory instances.
     /// </summary>
-    public Func<IServiceProvider, AzureAppendBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get; set; }
+    public Func<IServiceProvider, AzureBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get; set; }
         = static (provider, options) => new DefaultBlobContainerFactory(options);
 
     /// <summary>

@@ -11,7 +11,7 @@ namespace Orleans.Journaling;
 internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     IJournalValueCodec<TKey> keyCodec,
     IJournalValueCodec<TValue> valueCodec,
-    SerializerSessionPool sessionPool) : IDurableDictionaryOperationCodec<TKey, TValue>, IOrleansBinaryJournalEntryCodec where TKey : notnull
+    SerializerSessionPool sessionPool) : IDictionaryOperationCodec<TKey, TValue>, IOrleansBinaryJournalEntryCodec where TKey : notnull
 {
     private const byte FormatVersion = 0;
     private const uint SetCommand = 0;
@@ -85,7 +85,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
@@ -99,9 +99,9 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
     }
 
     void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
-        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableDictionaryOperationHandler<TKey, TValue>>(state, this));
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDictionaryOperationHandler<TKey, TValue>>(state, this));
 
-    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         OrleansBinaryOperationApplier.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
@@ -128,7 +128,7 @@ internal sealed class OrleansBinaryDictionaryOperationCodec<TKey, TValue>(
         }
     }
 
-    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
 

@@ -99,7 +99,7 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
-    private sealed class TrackingStateOperationCodec<T>(IJournalValueCodec<T> valueCodec, SerializerSessionPool sessionPool) : IDurableStateOperationCodec<T>
+    private sealed class TrackingStateOperationCodec<T>(IJournalValueCodec<T> valueCodec, SerializerSessionPool sessionPool) : IStateOperationCodec<T>
     {
         private readonly OrleansBinaryStateOperationCodec<T> _inner = new(valueCodec, sessionPool);
 
@@ -113,6 +113,6 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             _inner.WriteClear(writer);
         }
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);
+        public void Apply(ReadOnlySequence<byte> input, IStateOperationHandler<T> consumer) => _inner.Apply(input, consumer);
     }
 }

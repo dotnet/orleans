@@ -22,12 +22,12 @@ public sealed class AzureStorageJournalBatchTests : JournalBatchTests
 
     protected override void ConfigureServices(IServiceCollection services)
     {
-        services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
+        services.Configure<AzureBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
-        services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
+        services.AddSingleton<AzureBlobJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
     }
 }
 

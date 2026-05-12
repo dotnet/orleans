@@ -5,7 +5,7 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Serializes one durable dictionary command and applies one decoded command.
 /// </summary>
-public interface IDurableDictionaryOperationCodec<TKey, TValue> where TKey : notnull
+public interface IDictionaryOperationCodec<TKey, TValue> where TKey : notnull
 {
     /// <summary>Writes a set command.</summary>
     void WriteSet(TKey key, TValue value, JournalStreamWriter writer);
@@ -20,13 +20,13 @@ public interface IDurableDictionaryOperationCodec<TKey, TValue> where TKey : not
     void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer);
+    void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer);
 }
 
 /// <summary>
 /// Serializes one durable list command and applies one decoded command.
 /// </summary>
-public interface IDurableListOperationCodec<T>
+public interface IListOperationCodec<T>
 {
     /// <summary>Writes an add command.</summary>
     void WriteAdd(T item, JournalStreamWriter writer);
@@ -47,13 +47,13 @@ public interface IDurableListOperationCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer);
+    void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer);
 }
 
 /// <summary>
 /// Serializes one durable queue command and applies one decoded command.
 /// </summary>
-public interface IDurableQueueOperationCodec<T>
+public interface IQueueOperationCodec<T>
 {
     /// <summary>Writes an enqueue command.</summary>
     void WriteEnqueue(T item, JournalStreamWriter writer);
@@ -68,13 +68,13 @@ public interface IDurableQueueOperationCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer);
+    void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer);
 }
 
 /// <summary>
 /// Serializes one durable set command and applies one decoded command.
 /// </summary>
-public interface IDurableSetOperationCodec<T>
+public interface ISetOperationCodec<T>
 {
     /// <summary>Writes an add command.</summary>
     void WriteAdd(T item, JournalStreamWriter writer);
@@ -89,25 +89,25 @@ public interface IDurableSetOperationCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer);
+    void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer);
 }
 
 /// <summary>
 /// Serializes one durable value command and applies one decoded command.
 /// </summary>
-public interface IDurableValueOperationCodec<T>
+public interface IValueOperationCodec<T>
 {
     /// <summary>Writes a set command.</summary>
     void WriteSet(T value, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer);
+    void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<T> consumer);
 }
 
 /// <summary>
 /// Serializes one durable persistent state command and applies one decoded command.
 /// </summary>
-public interface IDurableStateOperationCodec<T>
+public interface IStateOperationCodec<T>
 {
     /// <summary>Writes a set command.</summary>
     void WriteSet(T state, ulong version, JournalStreamWriter writer);
@@ -116,13 +116,13 @@ public interface IDurableStateOperationCodec<T>
     void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDurableStateOperationHandler<T> consumer);
+    void Apply(ReadOnlySequence<byte> input, IStateOperationHandler<T> consumer);
 }
 
 /// <summary>
 /// Serializes one durable task completion source command and applies one decoded command.
 /// </summary>
-public interface IDurableTaskCompletionSourceOperationCodec<T>
+public interface ITaskCompletionSourceOperationCodec<T>
 {
     /// <summary>Writes a pending command.</summary>
     void WritePending(JournalStreamWriter writer);
@@ -137,13 +137,13 @@ public interface IDurableTaskCompletionSourceOperationCodec<T>
     void WriteCanceled(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(ReadOnlySequence<byte> input, IDurableTaskCompletionSourceOperationHandler<T> consumer);
+    void Apply(ReadOnlySequence<byte> input, ITaskCompletionSourceOperationHandler<T> consumer);
 }
 
 /// <summary>
 /// Receives decoded durable dictionary commands from a codec implementation.
 /// </summary>
-public interface IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull
+public interface IDictionaryOperationHandler<TKey, TValue> where TKey : notnull
 {
     /// <summary>Applies a set command.</summary>
     void ApplySet(TKey key, TValue value);
@@ -161,7 +161,7 @@ public interface IDurableDictionaryOperationHandler<TKey, TValue> where TKey : n
 /// <summary>
 /// Receives decoded durable list commands from a codec implementation.
 /// </summary>
-public interface IDurableListOperationHandler<T>
+public interface IListOperationHandler<T>
 {
     /// <summary>Applies an add command.</summary>
     void ApplyAdd(T item);
@@ -185,7 +185,7 @@ public interface IDurableListOperationHandler<T>
 /// <summary>
 /// Receives decoded durable queue commands from a codec implementation.
 /// </summary>
-public interface IDurableQueueOperationHandler<T>
+public interface IQueueOperationHandler<T>
 {
     /// <summary>Applies an enqueue command.</summary>
     void ApplyEnqueue(T item);
@@ -203,7 +203,7 @@ public interface IDurableQueueOperationHandler<T>
 /// <summary>
 /// Receives decoded durable set commands from a codec implementation.
 /// </summary>
-public interface IDurableSetOperationHandler<T>
+public interface ISetOperationHandler<T>
 {
     /// <summary>Applies an add command.</summary>
     void ApplyAdd(T item);
@@ -221,7 +221,7 @@ public interface IDurableSetOperationHandler<T>
 /// <summary>
 /// Receives decoded durable value commands from a codec implementation.
 /// </summary>
-public interface IDurableValueOperationHandler<T>
+public interface IValueOperationHandler<T>
 {
     /// <summary>Applies a set command.</summary>
     void ApplySet(T value);
@@ -230,7 +230,7 @@ public interface IDurableValueOperationHandler<T>
 /// <summary>
 /// Receives decoded durable persistent state commands from a codec implementation.
 /// </summary>
-public interface IDurableStateOperationHandler<T>
+public interface IStateOperationHandler<T>
 {
     /// <summary>Applies a set command.</summary>
     void ApplySet(T state, ulong version);
@@ -242,7 +242,7 @@ public interface IDurableStateOperationHandler<T>
 /// <summary>
 /// Receives decoded durable task completion source commands from a codec implementation.
 /// </summary>
-public interface IDurableTaskCompletionSourceOperationHandler<T>
+public interface ITaskCompletionSourceOperationHandler<T>
 {
     /// <summary>Applies a pending command.</summary>
     void ApplyPending();

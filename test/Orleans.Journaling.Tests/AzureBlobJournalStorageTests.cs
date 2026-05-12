@@ -11,13 +11,13 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 [TestCategory("BVT")]
-public sealed class AzureAppendBlobJournalStorageTests
+public sealed class AzureBlobJournalStorageTests
 {
     [Fact]
     public async Task DeleteAsync_AllowsNextAppendToRecreateBlob()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.DeleteAsync(CancellationToken.None);
@@ -31,7 +31,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task AppendAsync_WhenMimeTypeConfigured_SetsBlobContentType()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(client, "application/jsonl", NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, "application/jsonl", NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
@@ -42,7 +42,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task AppendAsync_WhenMimeTypeUnavailable_LeavesBlobContentTypeUnset()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(client, mimeType: null, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, mimeType: null, NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
@@ -52,7 +52,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     [Fact]
     public void GetBlobNameForJournal_UsesConfiguredBlobNameWithoutAppendingFormatExtension()
     {
-        var options = new AzureAppendBlobJournalStorageOptions
+        var options = new AzureBlobJournalStorageOptions
         {
             GetBlobName = _ => "journals/test-grain"
         };
@@ -65,7 +65,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     [Fact]
     public void GetBlobNameForJournal_ReturnsConfiguredBlobNameVerbatim()
     {
-        var options = new AzureAppendBlobJournalStorageOptions
+        var options = new AzureBlobJournalStorageOptions
         {
             GetBlobName = _ => "journals/test-grain.jsonl"
         };
@@ -82,7 +82,7 @@ public sealed class AzureAppendBlobJournalStorageTests
         var client = new FakeAppendBlobClient();
         client.Downloads.Enqueue(new DownloadResult([], emptyBlobETag, new Dictionary<string, string> { ["snapshot"] = "snapshot-1" }));
         client.Downloads.Enqueue(new DownloadResult([1, 2, 3], new ETag("\"restored\""), new Dictionary<string, string>()));
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
 
@@ -97,7 +97,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task ReplaceAsync_CreatesRecoverableSnapshotAndDeletesItAfterAppend()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(client, "application/jsonl", NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, "application/jsonl", NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([2, 3]), CancellationToken.None);
@@ -127,7 +127,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     {
         var client = new FakeAppendBlobClient { CopyStatus = CopyStatus.Failed };
         client.Downloads.Enqueue(new DownloadResult([], new ETag("\"empty\""), new Dictionary<string, string> { ["snapshot"] = "snapshot-1" }));
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None).AsTask());
@@ -142,7 +142,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     {
         var client = new FakeAppendBlobClient();
         client.Downloads.Enqueue(new DownloadResult([1], new ETag("\"read\""), new Dictionary<string, string>(), BlobCommittedBlockCount: 11));
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
 
@@ -170,10 +170,10 @@ public sealed class AzureAppendBlobJournalStorageTests
             yield return "orphan-3";
         }
 
-        var storage = new AzureAppendBlobJournalStorage(
+        var storage = new AzureBlobJournalStorage(
             client,
             mimeType: null,
-            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            NullLogger<AzureBlobJournalStorage>.Instance,
             static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
             EnumerateOrphans);
 
@@ -198,10 +198,10 @@ public sealed class AzureAppendBlobJournalStorageTests
 #pragma warning restore CS0162
         }
 
-        var storage = new AzureAppendBlobJournalStorage(
+        var storage = new AzureBlobJournalStorage(
             client,
             mimeType: null,
-            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            NullLogger<AzureBlobJournalStorage>.Instance,
             static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
             ThrowingEnumerator);
 
@@ -215,10 +215,10 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task AppendAsync_WhenJournalFormatKeyConfigured_StampsBlobMetadata()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(
+        var storage = new AzureBlobJournalStorage(
             client,
             mimeType: null,
-            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            NullLogger<AzureBlobJournalStorage>.Instance,
             static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
@@ -226,7 +226,7 @@ public sealed class AzureAppendBlobJournalStorageTests
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
 
         var create = client.CreateCalls.Single();
-        Assert.True(create.Metadata.TryGetValue(AzureAppendBlobJournalStorage.FormatMetadataKey, out var stamped));
+        Assert.True(create.Metadata.TryGetValue(AzureBlobJournalStorage.FormatMetadataKey, out var stamped));
         Assert.Equal("json-lines", stamped);
     }
 
@@ -234,10 +234,10 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task ReplaceAsync_WhenJournalFormatKeyConfigured_PreservesFormatKeyMetadata()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(
+        var storage = new AzureBlobJournalStorage(
             client,
             mimeType: null,
-            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            NullLogger<AzureBlobJournalStorage>.Instance,
             static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
@@ -247,7 +247,7 @@ public sealed class AzureAppendBlobJournalStorageTests
 
         var replaceCreate = client.CreateCalls[1];
         Assert.Equal("snapshot-1", replaceCreate.Metadata["snapshot"]);
-        Assert.Equal("json-lines", replaceCreate.Metadata[AzureAppendBlobJournalStorage.FormatMetadataKey]);
+        Assert.Equal("json-lines", replaceCreate.Metadata[AzureBlobJournalStorage.FormatMetadataKey]);
     }
 
     [Fact]
@@ -257,12 +257,12 @@ public sealed class AzureAppendBlobJournalStorageTests
         client.Downloads.Enqueue(new DownloadResult(
             [1, 2, 3],
             new ETag("\"read\""),
-            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatMetadataKey] = "orleans-binary" },
+            new Dictionary<string, string> { [AzureBlobJournalStorage.FormatMetadataKey] = "orleans-binary" },
             BlobCommittedBlockCount: 1));
-        var storage = new AzureAppendBlobJournalStorage(
+        var storage = new AzureBlobJournalStorage(
             client,
             mimeType: null,
-            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            NullLogger<AzureBlobJournalStorage>.Instance,
             static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
@@ -280,12 +280,12 @@ public sealed class AzureAppendBlobJournalStorageTests
         client.Downloads.Enqueue(new DownloadResult(
             [1, 2, 3],
             new ETag("\"read\""),
-            new Dictionary<string, string> { [AzureAppendBlobJournalStorage.FormatMetadataKey] = "json-lines" },
+            new Dictionary<string, string> { [AzureBlobJournalStorage.FormatMetadataKey] = "json-lines" },
             BlobCommittedBlockCount: 1));
-        var storage = new AzureAppendBlobJournalStorage(
+        var storage = new AzureBlobJournalStorage(
             client,
             mimeType: null,
-            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            NullLogger<AzureBlobJournalStorage>.Instance,
             static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
@@ -301,10 +301,10 @@ public sealed class AzureAppendBlobJournalStorageTests
     {
         var client = new FakeAppendBlobClient();
         client.Downloads.Enqueue(new DownloadResult([1, 2, 3], new ETag("\"read\""), new Dictionary<string, string>(), BlobCommittedBlockCount: 1));
-        var storage = new AzureAppendBlobJournalStorage(
+        var storage = new AzureBlobJournalStorage(
             client,
             mimeType: null,
-            NullLogger<AzureAppendBlobJournalStorage>.Instance,
+            NullLogger<AzureBlobJournalStorage>.Instance,
             static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot),
             snapshotEnumerator: null,
             journalFormatKey: "json-lines");
@@ -319,7 +319,7 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task AppendAsync_WhenAppendFails_DoesNotAdvanceAppendCondition()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (client, snapshot) => ((FakeAppendBlobClient)client).CreateSnapshotClient(snapshot));
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         client.FailNextAppend = true;
@@ -337,9 +337,9 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task AppendAsync_WhenBatchExceedsMaxAppendBlockBytes_ThrowsBeforeRoundTrip()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
 
-        var oversize = OversizedSequence(AzureAppendBlobJournalStorage.MaxAppendBlockBytes + 1);
+        var oversize = OversizedSequence(AzureBlobJournalStorage.MaxAppendBlockBytes + 1);
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => storage.AppendAsync(oversize, CancellationToken.None).AsTask());
 
@@ -353,14 +353,14 @@ public sealed class AzureAppendBlobJournalStorageTests
     public async Task ReplaceAsync_WhenBatchExceedsMaxAppendBlockBytes_ThrowsBeforeRoundTrip()
     {
         var client = new FakeAppendBlobClient();
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
 
         // Establish a successful create + append baseline so ReplaceAsync has a snapshot precondition to use.
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
         var baselineCreates = client.CreateCallCount;
         var baselineAppends = client.AppendCallCount;
 
-        var oversize = OversizedSequence(AzureAppendBlobJournalStorage.MaxAppendBlockBytes + 1);
+        var oversize = OversizedSequence(AzureBlobJournalStorage.MaxAppendBlockBytes + 1);
         var ex = await Assert.ThrowsAsync<InvalidOperationException>(
             () => storage.ReplaceAsync(oversize, CancellationToken.None).AsTask());
 
@@ -373,8 +373,8 @@ public sealed class AzureAppendBlobJournalStorageTests
     [Fact]
     public async Task AppendAsync_WhenApproachingBlockCeiling_Throws()
     {
-        var client = new FakeAppendBlobClient { OverrideCommittedBlockCount = AzureAppendBlobJournalStorage.MaxAppendBlobBlocks - 50 };
-        var storage = new AzureAppendBlobJournalStorage(client, NullLogger<AzureAppendBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
+        var client = new FakeAppendBlobClient { OverrideCommittedBlockCount = AzureBlobJournalStorage.MaxAppendBlobBlocks - 50 };
+        var storage = new AzureBlobJournalStorage(client, NullLogger<AzureBlobJournalStorage>.Instance, static (c, s) => ((FakeAppendBlobClient)c).CreateSnapshotClient(s));
 
         // Prime the block counter via a successful append.
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);

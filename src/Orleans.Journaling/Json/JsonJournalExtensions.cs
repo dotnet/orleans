@@ -129,13 +129,13 @@ public static class JsonJournalExtensions
             services.TryAddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<JsonLinesJournalFormat>());
             services.TryAddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<JsonLinesJournalFormat>());
 
-            services.TryAddKeyedSingleton(typeof(IDurableDictionaryOperationCodec<,>), key, typeof(JsonDictionaryOperationCodecService<,>));
-            services.TryAddKeyedSingleton(typeof(IDurableListOperationCodec<>), key, typeof(JsonListOperationCodecService<>));
-            services.TryAddKeyedSingleton(typeof(IDurableQueueOperationCodec<>), key, typeof(JsonQueueOperationCodecService<>));
-            services.TryAddKeyedSingleton(typeof(IDurableSetOperationCodec<>), key, typeof(JsonSetOperationCodecService<>));
-            services.TryAddKeyedSingleton(typeof(IDurableValueOperationCodec<>), key, typeof(JsonValueOperationCodecService<>));
-            services.TryAddKeyedSingleton(typeof(IDurableStateOperationCodec<>), key, typeof(JsonStateOperationCodecService<>));
-            services.TryAddKeyedSingleton(typeof(IDurableTaskCompletionSourceOperationCodec<>), key, typeof(JsonTcsOperationCodecService<>));
+            services.TryAddKeyedSingleton(typeof(IDictionaryOperationCodec<,>), key, typeof(JsonDictionaryOperationCodecService<,>));
+            services.TryAddKeyedSingleton(typeof(IListOperationCodec<>), key, typeof(JsonListOperationCodecService<>));
+            services.TryAddKeyedSingleton(typeof(IQueueOperationCodec<>), key, typeof(JsonQueueOperationCodecService<>));
+            services.TryAddKeyedSingleton(typeof(ISetOperationCodec<>), key, typeof(JsonSetOperationCodecService<>));
+            services.TryAddKeyedSingleton(typeof(IValueOperationCodec<>), key, typeof(JsonValueOperationCodecService<>));
+            services.TryAddKeyedSingleton(typeof(IStateOperationCodec<>), key, typeof(JsonStateOperationCodecService<>));
+            services.TryAddKeyedSingleton(typeof(ITaskCompletionSourceOperationCodec<>), key, typeof(JsonTcsOperationCodecService<>));
         }
         else
         {
@@ -144,13 +144,13 @@ public static class JsonJournalExtensions
             services.AddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<JsonLinesJournalFormat>());
             services.AddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<JsonLinesJournalFormat>());
 
-            services.AddKeyedSingleton(typeof(IDurableDictionaryOperationCodec<,>), key, typeof(JsonDictionaryOperationCodecService<,>));
-            services.AddKeyedSingleton(typeof(IDurableListOperationCodec<>), key, typeof(JsonListOperationCodecService<>));
-            services.AddKeyedSingleton(typeof(IDurableQueueOperationCodec<>), key, typeof(JsonQueueOperationCodecService<>));
-            services.AddKeyedSingleton(typeof(IDurableSetOperationCodec<>), key, typeof(JsonSetOperationCodecService<>));
-            services.AddKeyedSingleton(typeof(IDurableValueOperationCodec<>), key, typeof(JsonValueOperationCodecService<>));
-            services.AddKeyedSingleton(typeof(IDurableStateOperationCodec<>), key, typeof(JsonStateOperationCodecService<>));
-            services.AddKeyedSingleton(typeof(IDurableTaskCompletionSourceOperationCodec<>), key, typeof(JsonTcsOperationCodecService<>));
+            services.AddKeyedSingleton(typeof(IDictionaryOperationCodec<,>), key, typeof(JsonDictionaryOperationCodecService<,>));
+            services.AddKeyedSingleton(typeof(IListOperationCodec<>), key, typeof(JsonListOperationCodecService<>));
+            services.AddKeyedSingleton(typeof(IQueueOperationCodec<>), key, typeof(JsonQueueOperationCodecService<>));
+            services.AddKeyedSingleton(typeof(ISetOperationCodec<>), key, typeof(JsonSetOperationCodecService<>));
+            services.AddKeyedSingleton(typeof(IValueOperationCodec<>), key, typeof(JsonValueOperationCodecService<>));
+            services.AddKeyedSingleton(typeof(IStateOperationCodec<>), key, typeof(JsonStateOperationCodecService<>));
+            services.AddKeyedSingleton(typeof(ITaskCompletionSourceOperationCodec<>), key, typeof(JsonTcsOperationCodecService<>));
         }
 
         return services;

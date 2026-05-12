@@ -32,7 +32,7 @@ var builder = Host.CreateApplicationBuilder(args)
     {
         siloBuilder
             .UseLocalhostClustering()
-            .AddAzureAppendBlobJournalStorage()
+            .AddAzureBlobJournalStorage()
             .UseJsonJournalFormat(JournalJsonContext.Default);
     });
 
@@ -43,7 +43,7 @@ If you need to customize `JsonSerializerOptions`, add the generated context thro
 
 ```csharp
 siloBuilder
-    .AddAzureAppendBlobJournalStorage()
+    .AddAzureBlobJournalStorage()
     .UseJsonJournalFormat(options =>
     {
         options.SerializerOptions.PropertyNamingPolicy = JsonNamingPolicy.CamelCase;

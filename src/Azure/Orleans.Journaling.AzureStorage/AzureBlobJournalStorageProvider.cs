@@ -6,15 +6,15 @@ using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureAppendBlobJournalStorageProvider(
-    IOptions<AzureAppendBlobJournalStorageOptions> options,
+internal sealed class AzureBlobJournalStorageProvider(
+    IOptions<AzureBlobJournalStorageOptions> options,
     IOptions<JournaledStateManagerOptions> managerOptions,
     IServiceProvider serviceProvider,
-    ILogger<AzureAppendBlobJournalStorage> logger) : IJournalStorageProvider, ILifecycleParticipant<ISiloLifecycle>
+    ILogger<AzureBlobJournalStorage> logger) : IJournalStorageProvider, ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly IBlobContainerFactory _containerFactory = options.Value.BuildContainerFactory(serviceProvider, options.Value);
     private readonly string _journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
-    private readonly AzureAppendBlobJournalStorageOptions _options = options.Value;
+    private readonly AzureBlobJournalStorageOptions _options = options.Value;
 
     private async Task Initialize(CancellationToken cancellationToken)
     {
@@ -42,7 +42,7 @@ internal sealed class AzureAppendBlobJournalStorageProvider(
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
         var blobName = _options.GetBlobNameForJournal(grainContext.GrainId);
         var blobClient = container.GetAppendBlobClient(blobName);
-        return new AzureAppendBlobJournalStorage(
+        return new AzureBlobJournalStorage(
             blobClient,
             journalFormat.MimeType,
             logger,
@@ -54,7 +54,7 @@ internal sealed class AzureAppendBlobJournalStorageProvider(
     public void Participate(ISiloLifecycle observer)
     {
         observer.Subscribe(
-            nameof(AzureAppendBlobJournalStorageProvider),
+            nameof(AzureBlobJournalStorageProvider),
             ServiceLifecycleStage.RuntimeInitialize,
             onStart: Initialize);
     }

@@ -10,7 +10,7 @@ namespace Orleans.Journaling;
 /// </summary>
 internal sealed class OrleansBinaryQueueOperationCodec<T>(
     IJournalValueCodec<T> codec,
-    SerializerSessionPool sessionPool) : IDurableQueueOperationCodec<T>, IOrleansBinaryJournalEntryCodec
+    SerializerSessionPool sessionPool) : IQueueOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
     private const uint EnqueueCommand = 0;
@@ -62,7 +62,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer)
+    public void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
@@ -76,9 +76,9 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     }
 
     void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
-        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableQueueOperationHandler<T>>(state, this));
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IQueueOperationHandler<T>>(state, this));
 
-    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableQueueOperationHandler<T> consumer)
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, IQueueOperationHandler<T> consumer)
     {
         OrleansBinaryOperationApplier.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
@@ -101,7 +101,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         }
     }
 
-    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IDurableQueueOperationHandler<T> consumer)
+    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IQueueOperationHandler<T> consumer)
     {
         var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
 

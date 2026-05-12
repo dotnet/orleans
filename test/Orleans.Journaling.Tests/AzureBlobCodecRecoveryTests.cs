@@ -13,13 +13,13 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 [TestCategory("AzureStorage"), TestCategory("Functional")]
-public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsyncLifetime
+public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLifetime
 {
     private ServiceProvider _azureServiceProvider = null!;
     private SiloLifecycleSubject _siloLifecycle = null!;
     private IJournalStorageProvider _storageProvider = null!;
 
-    public AzureAppendBlobCodecRecoveryTests()
+    public AzureBlobCodecRecoveryTests()
     {
         JournalingAzureStorageTestConfiguration.CheckPreconditionsOrThrow();
     }
@@ -28,13 +28,13 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.Configure<AzureAppendBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
+        services.Configure<AzureBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         services.AddSerializer();
         ConfigureFormatServices(services);
-        services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
+        services.AddSingleton<AzureBlobJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
 
         _azureServiceProvider = services.BuildServiceProvider();
         _storageProvider = _azureServiceProvider.GetRequiredService<IJournalStorageProvider>();
@@ -50,7 +50,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     }
 
     [SkippableFact]
-    public async Task AzureAppendBlobStorage_BinaryJournal_MigratesToJsonOnFirstWrite()
+    public async Task AzureBlobStorage_BinaryJournal_MigratesToJsonOnFirstWrite()
     {
         var blobName = $"journaling-codec-migration/{Guid.NewGuid():N}";
         var grainId = GrainId.Create("journaling-codec-migration", "0");
@@ -103,7 +103,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     }
 
     [SkippableFact]
-    public async Task AzureAppendBlobStorage_AllDurableTypes_RecoverWithBinaryCodec()
+    public async Task AzureBlobStorage_AllDurableTypes_RecoverWithBinaryCodec()
     {
         var grainId = GrainId.Create("journaling-codec-recovery", Guid.NewGuid().ToString("N"));
         var storage = _storageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
@@ -189,7 +189,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
             OrleansBinaryJournalFormat.JournalFormatKey,
             (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
         services.AddKeyedSingleton(
-            typeof(IDurableDictionaryOperationCodec<,>),
+            typeof(IDictionaryOperationCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
             typeof(OrleansBinaryDictionaryOperationCodec<,>));
 
@@ -197,7 +197,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
-            typeof(IDurableDictionaryOperationCodec<,>),
+            typeof(IDictionaryOperationCodec<,>),
             JsonJournalExtensions.JournalFormatKey,
             typeof(JsonDictionaryOperationCodecService<,>));
     }
@@ -206,7 +206,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
     {
         var services = new ServiceCollection();
         services.AddLogging();
-        services.Configure<AzureAppendBlobJournalStorageOptions>(options =>
+        services.Configure<AzureBlobJournalStorageOptions>(options =>
         {
             JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options);
             options.GetBlobName = _ => blobName;
@@ -214,9 +214,9 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = journalFormatKey);
         services.AddSerializer();
         ConfigureFormatServices(services);
-        services.AddSingleton<AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageProvider, AzureAppendBlobJournalStorageProvider>();
-        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureAppendBlobJournalStorageProvider>();
+        services.AddSingleton<AzureBlobJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
+        services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
 
         var serviceProvider = services.BuildServiceProvider();
         var lifecycle = new SiloLifecycleSubject(serviceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());
@@ -243,7 +243,7 @@ public sealed class AzureAppendBlobCodecRecoveryTests : JournalingTestBase, IAsy
         => new(
             "dict",
             manager,
-            JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, int>>(
+            JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, int>>(
                 serviceProvider,
                 journalFormatKey));
 

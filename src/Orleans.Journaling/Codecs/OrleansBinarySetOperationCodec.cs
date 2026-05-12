@@ -10,7 +10,7 @@ namespace Orleans.Journaling;
 /// </summary>
 internal sealed class OrleansBinarySetOperationCodec<T>(
     IJournalValueCodec<T> codec,
-    SerializerSessionPool sessionPool) : IDurableSetOperationCodec<T>, IOrleansBinaryJournalEntryCodec
+    SerializerSessionPool sessionPool) : ISetOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
     private const uint AddCommand = 0;
@@ -65,7 +65,7 @@ internal sealed class OrleansBinarySetOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer)
+    public void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
@@ -79,9 +79,9 @@ internal sealed class OrleansBinarySetOperationCodec<T>(
     }
 
     void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
-        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableSetOperationHandler<T>>(state, this));
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<ISetOperationHandler<T>>(state, this));
 
-    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableSetOperationHandler<T> consumer)
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, ISetOperationHandler<T> consumer)
     {
         OrleansBinaryOperationApplier.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
@@ -104,7 +104,7 @@ internal sealed class OrleansBinarySetOperationCodec<T>(
         }
     }
 
-    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IDurableSetOperationHandler<T> consumer)
+    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, ISetOperationHandler<T> consumer)
     {
         var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
 

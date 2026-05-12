@@ -24,7 +24,7 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var queue = new DurableQueue<int>("queue", new TestJournalManager(writer), new ThrowingQueueCodec<int>(throwOnDequeue: true));
-        ((IDurableQueueOperationHandler<int>)queue).ApplyEnqueue(1);
+        ((IQueueOperationHandler<int>)queue).ApplyEnqueue(1);
 
         Assert.Throws<InvalidOperationException>(() => queue.Dequeue());
 
@@ -38,8 +38,8 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var queue = new DurableQueue<int>("queue", new TestJournalManager(writer), new ThrowingQueueCodec<int>(throwOnClear: true));
-        ((IDurableQueueOperationHandler<int>)queue).ApplyEnqueue(1);
-        ((IDurableQueueOperationHandler<int>)queue).ApplyEnqueue(2);
+        ((IQueueOperationHandler<int>)queue).ApplyEnqueue(1);
+        ((IQueueOperationHandler<int>)queue).ApplyEnqueue(2);
 
         Assert.Throws<InvalidOperationException>(queue.Clear);
 
@@ -65,7 +65,7 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnRemove: true));
-        ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
+        ((ISetOperationHandler<int>)set).ApplyAdd(1);
 
         Assert.Throws<InvalidOperationException>(() => set.Remove(1));
 
@@ -78,8 +78,8 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnClear: true));
-        ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
-        ((IDurableSetOperationHandler<int>)set).ApplyAdd(2);
+        ((ISetOperationHandler<int>)set).ApplyAdd(1);
+        ((ISetOperationHandler<int>)set).ApplyAdd(2);
 
         Assert.Throws<InvalidOperationException>(set.Clear);
 
@@ -92,8 +92,8 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnSnapshot: true));
-        ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
-        ((IDurableSetOperationHandler<int>)set).ApplyAdd(2);
+        ((ISetOperationHandler<int>)set).ApplyAdd(1);
+        ((ISetOperationHandler<int>)set).ApplyAdd(2);
 
         Assert.Throws<InvalidOperationException>(() => set.IntersectWith([2, 3]));
 
@@ -107,8 +107,8 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnSnapshot: true));
-        ((IDurableSetOperationHandler<int>)set).ApplyAdd(1);
-        ((IDurableSetOperationHandler<int>)set).ApplyAdd(2);
+        ((ISetOperationHandler<int>)set).ApplyAdd(1);
+        ((ISetOperationHandler<int>)set).ApplyAdd(2);
 
         Assert.Throws<InvalidOperationException>(() => set.SymmetricExceptWith([2, 3]));
 
@@ -133,7 +133,7 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestJournalManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnSet: true));
-        ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
+        ((IDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
 
         Assert.Throws<InvalidOperationException>(() => dictionary[1] = 2);
 
@@ -146,7 +146,7 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestJournalManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnRemove: true));
-        ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
+        ((IDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
 
         Assert.Throws<InvalidOperationException>(() => dictionary.Remove(1));
 
@@ -159,8 +159,8 @@ public sealed class DurableCollectionDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestJournalManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnClear: true));
-        ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
-        ((IDurableDictionaryOperationHandler<int, int>)dictionary).ApplySet(2, 2);
+        ((IDictionaryOperationHandler<int, int>)dictionary).ApplySet(1, 1);
+        ((IDictionaryOperationHandler<int, int>)dictionary).ApplySet(2, 2);
 
         Assert.Throws<InvalidOperationException>(dictionary.Clear);
 
@@ -261,7 +261,7 @@ public sealed class DurableCollectionDirectWriteTests
         }
     }
 
-    private abstract class TestQueueCodec<T> : IDurableQueueOperationCodec<T>
+    private abstract class TestQueueCodec<T> : IQueueOperationCodec<T>
     {
         public virtual void WriteEnqueue(T item, JournalStreamWriter writer) => throw new NotSupportedException();
 
@@ -271,7 +271,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableQueueOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(ReadOnlySequence<byte> input, IQueueOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectSetCodec<T> : TestSetCodec<T>
@@ -332,7 +332,7 @@ public sealed class DurableCollectionDirectWriteTests
         }
     }
 
-    private abstract class TestSetCodec<T> : IDurableSetOperationCodec<T>
+    private abstract class TestSetCodec<T> : ISetOperationCodec<T>
     {
         public virtual void WriteAdd(T item, JournalStreamWriter writer) => throw new NotSupportedException();
 
@@ -342,7 +342,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public virtual void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableSetOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(ReadOnlySequence<byte> input, ISetOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectDictionaryCodec<TKey, TValue> : TestDictionaryCodec<TKey, TValue> where TKey : notnull
@@ -391,7 +391,7 @@ public sealed class DurableCollectionDirectWriteTests
         }
     }
 
-    private abstract class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue> where TKey : notnull
+    private abstract class TestDictionaryCodec<TKey, TValue> : IDictionaryOperationCodec<TKey, TValue> where TKey : notnull
     {
         public virtual void WriteSet(TKey key, TValue value, JournalStreamWriter writer) => throw new NotSupportedException();
 
@@ -401,7 +401,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
+        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
 
     private static void WriteCommittedByte(JournalStreamWriter writer)

@@ -46,8 +46,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _shared = shared;
         _serviceProvider = serviceProvider;
         _writeJournalFormat = JournalFormatServices.GetRequiredJournalFormat(serviceProvider, WriteJournalFormatKey);
-        var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
-        var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDurableDictionaryOperationCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
+        var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
+        var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
         // This allows us to recover the list of states ids without having to store it separately.
@@ -63,8 +63,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     internal JournaledStateManager(
         IJournalStorage storage,
         JournaledStateManagerShared shared,
-        IDurableDictionaryOperationCodec<string, ulong> journalStreamIdsCodec,
-        IDurableDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
+        IDictionaryOperationCodec<string, ulong> journalStreamIdsCodec,
+        IDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
         IJournalFormat journalFormat)
     {
         ArgumentNullException.ThrowIfNull(shared);
@@ -807,12 +807,12 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDurableDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDurableDictionaryOperationHandler<string, ulong>
+        IDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDictionaryOperationHandler<string, ulong>
     {
         public const int Id = 0;
 
         private readonly JournaledStateManager _manager = manager;
-        private readonly IDurableDictionaryOperationCodec<string, ulong> _codec = codec;
+        private readonly IDictionaryOperationCodec<string, ulong> _codec = codec;
         private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
         private JournalStreamWriter _storage;
 
@@ -820,7 +820,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         object IJournaledState.OperationCodec => _codec;
 
-        Type IJournaledState.OperationCodecServiceType => typeof(IDurableDictionaryOperationCodec<string, ulong>);
+        Type IJournaledState.OperationCodecServiceType => typeof(IDictionaryOperationCodec<string, ulong>);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
@@ -848,13 +848,13 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
-        void IDurableDictionaryOperationHandler<string, ulong>.ApplySet(string key, ulong value) => ApplySet(key, value);
+        void IDictionaryOperationHandler<string, ulong>.ApplySet(string key, ulong value) => ApplySet(key, value);
 
-        void IDurableDictionaryOperationHandler<string, ulong>.ApplyRemove(string key) => ApplyRemove(key);
+        void IDictionaryOperationHandler<string, ulong>.ApplyRemove(string key) => ApplyRemove(key);
 
-        void IDurableDictionaryOperationHandler<string, ulong>.ApplyClear() => _ids.Clear();
+        void IDictionaryOperationHandler<string, ulong>.ApplyClear() => _ids.Clear();
 
-        void IDurableDictionaryOperationHandler<string, ulong>.Reset(int capacityHint)
+        void IDictionaryOperationHandler<string, ulong>.Reset(int capacityHint)
         {
             _ids.Clear();
             _ids.EnsureCapacity(capacityHint);
@@ -878,7 +878,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     /// </summary>
     /// <remarks>Resurrecting of retired states is supported.</remarks>
     private sealed class RetiredStateTracker(
-        JournaledStateManager manager, IDurableDictionaryOperationCodec<string, DateTime> codec)
+        JournaledStateManager manager, IDictionaryOperationCodec<string, DateTime> codec)
             : DurableDictionary<string, DateTime>(codec)
     {
         public const int Id = 1;

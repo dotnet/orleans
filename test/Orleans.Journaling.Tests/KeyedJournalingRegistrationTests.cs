@@ -75,9 +75,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddScoped<IStateManager, JournaledStateManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, new TestJournalFormat());
-        services.AddKeyedSingleton<IDurableDictionaryOperationCodec<string, ulong>>(CustomFormatKey, new TestDictionaryCodec<string, ulong>());
-        services.AddKeyedSingleton<IDurableDictionaryOperationCodec<string, DateTime>>(CustomFormatKey, new TestDictionaryCodec<string, DateTime>());
-        services.AddKeyedSingleton<IDurableValueOperationCodec<int>>(CustomFormatKey, (_, _) =>
+        services.AddKeyedSingleton<IDictionaryOperationCodec<string, ulong>>(CustomFormatKey, new TestDictionaryCodec<string, ulong>());
+        services.AddKeyedSingleton<IDictionaryOperationCodec<string, DateTime>>(CustomFormatKey, new TestDictionaryCodec<string, DateTime>());
+        services.AddKeyedSingleton<IValueOperationCodec<int>>(CustomFormatKey, (_, _) =>
         {
             wasUsed = true;
             return new TestValueCodec<int>();
@@ -109,7 +109,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         public void Read(JournalReadBuffer input, IStateResolver resolver) => throw new NotSupportedException();
     }
 
-    private sealed class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryOperationCodec<TKey, TValue>
+    private sealed class TestDictionaryCodec<TKey, TValue> : IDictionaryOperationCodec<TKey, TValue>
         where TKey : notnull
     {
         public void WriteSet(TKey key, TValue value, JournalStreamWriter writer) => throw new NotSupportedException();
@@ -120,13 +120,13 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
+        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
 
-    private sealed class TestValueCodec<T> : IDurableValueOperationCodec<T>
+    private sealed class TestValueCodec<T> : IValueOperationCodec<T>
     {
         public void WriteSet(T value, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableValueOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(ReadOnlySequence<byte> input, IValueOperationHandler<T> consumer) => throw new NotSupportedException();
     }
 }

@@ -10,9 +10,9 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDurableValueOperationHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IValueOperationHandler<T>
 {
-    private readonly IDurableValueOperationCodec<T> _codec;
+    private readonly IValueOperationCodec<T> _codec;
     private T? _value;
     private bool _isDirty;
 
@@ -23,11 +23,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableValueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IValueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 
-    internal DurableValue(string key, IStateManager manager, IDurableValueOperationCodec<T> codec)
+    internal DurableValue(string key, IStateManager manager, IValueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -52,7 +52,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
 
     object IJournaledState.OperationCodec => _codec;
 
-    Type IJournaledState.OperationCodecServiceType => typeof(IDurableValueOperationCodec<T>);
+    Type IJournaledState.OperationCodecServiceType => typeof(IValueOperationCodec<T>);
 
     void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
     void IJournaledState.OnWriteCompleted() => OnValuePersisted();
@@ -81,5 +81,5 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
         _codec.WriteSet(_value!, writer);
     }
 
-    void IDurableValueOperationHandler<T>.ApplySet(T value) => _value = value;
+    void IValueOperationHandler<T>.ApplySet(T value) => _value = value;
 }

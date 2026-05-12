@@ -19,9 +19,9 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDurableQueueOperationHandler<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueueOperationHandler<T>
 {
-    private readonly IDurableQueueOperationCodec<T> _codec;
+    private readonly IQueueOperationCodec<T> _codec;
     private readonly Queue<T> _items = new();
     private JournalStreamWriter _storage;
 
@@ -32,11 +32,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableQueueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IQueueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 
-    internal DurableQueue(string key, IStateManager manager, IDurableQueueOperationCodec<T> codec)
+    internal DurableQueue(string key, IStateManager manager, IQueueOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -47,7 +47,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
 
     object IJournaledState.OperationCodec => _codec;
 
-    Type IJournaledState.OperationCodecServiceType => typeof(IDurableQueueOperationCodec<T>);
+    Type IJournaledState.OperationCodecServiceType => typeof(IQueueOperationCodec<T>);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -108,10 +108,10 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
     protected T ApplyDequeue() => _items.Dequeue();
     protected bool ApplyTryDequeue([MaybeNullWhen(false)] out T value) => _items.TryDequeue(out value);
     protected void ApplyClear() => _items.Clear();
-    void IDurableQueueOperationHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
-    void IDurableQueueOperationHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
-    void IDurableQueueOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IDurableQueueOperationHandler<T>.Reset(int capacityHint)
+    void IQueueOperationHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
+    void IQueueOperationHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
+    void IQueueOperationHandler<T>.ApplyClear() => ApplyClear();
+    void IQueueOperationHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);

@@ -14,9 +14,9 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurableListOperationHandler<T>
+internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOperationHandler<T>
 {
-    private readonly IDurableListOperationCodec<T> _codec;
+    private readonly IListOperationCodec<T> _codec;
     private readonly List<T> _items = [];
     private JournalStreamWriter _storage;
 
@@ -27,11 +27,11 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IDurableListOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredOperationCodec<IListOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 
-    internal DurableList(string key, IStateManager manager, IDurableListOperationCodec<T> codec)
+    internal DurableList(string key, IStateManager manager, IListOperationCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -60,7 +60,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
 
     object IJournaledState.OperationCodec => _codec;
 
-    Type IJournaledState.OperationCodecServiceType => typeof(IDurableListOperationCodec<T>);
+    Type IJournaledState.OperationCodecServiceType => typeof(IListOperationCodec<T>);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -135,12 +135,12 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
     protected void ApplyInsert(int index, T item) => _items.Insert(index, item);
     protected void ApplyRemoveAt(int index) => _items.RemoveAt(index);
     protected void ApplyClear() => _items.Clear();
-    void IDurableListOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
-    void IDurableListOperationHandler<T>.ApplySet(int index, T item) => ApplySet(index, item);
-    void IDurableListOperationHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
-    void IDurableListOperationHandler<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
-    void IDurableListOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IDurableListOperationHandler<T>.Reset(int capacityHint)
+    void IListOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
+    void IListOperationHandler<T>.ApplySet(int index, T item) => ApplySet(index, item);
+    void IListOperationHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
+    void IListOperationHandler<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
+    void IListOperationHandler<T>.ApplyClear() => ApplyClear();
+    void IListOperationHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);

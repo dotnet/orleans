@@ -1485,7 +1485,7 @@ public class StateManagerTests : JournalingTestBase
         public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class ThrowingDictionarySetCodec<K, V> : IDurableDictionaryOperationCodec<K, V> where K : notnull
+    private sealed class ThrowingDictionarySetCodec<K, V> : IDictionaryOperationCodec<K, V> where K : notnull
     {
         public void WriteSet(K key, V value, JournalStreamWriter writer)
         {
@@ -1501,10 +1501,10 @@ public class StateManagerTests : JournalingTestBase
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
+        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<K, V> consumer) => throw new NotSupportedException();
     }
 
-    private sealed class ToggleThrowingDictionarySetCodec<K, V>(IDurableDictionaryOperationCodec<K, V> inner) : IDurableDictionaryOperationCodec<K, V>
+    private sealed class ToggleThrowingDictionarySetCodec<K, V>(IDictionaryOperationCodec<K, V> inner) : IDictionaryOperationCodec<K, V>
         where K : notnull
     {
         public bool ThrowOnSet { get; set; }
@@ -1529,6 +1529,6 @@ public class StateManagerTests : JournalingTestBase
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<K, V>> items, JournalStreamWriter writer) => inner.WriteSnapshot(items, writer);
 
-        public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<K, V> consumer) => inner.Apply(input, consumer);
+        public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<K, V> consumer) => inner.Apply(input, consumer);
     }
 }

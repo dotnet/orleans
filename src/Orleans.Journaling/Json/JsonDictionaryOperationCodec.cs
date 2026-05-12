@@ -14,7 +14,7 @@ namespace Orleans.Journaling.Json;
 /// </code>
 /// </example>
 public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOptions? options = null)
-    : IDurableDictionaryOperationCodec<TKey, TValue>, IJsonJournalEntryCodec where TKey : notnull
+    : IDictionaryOperationCodec<TKey, TValue>, IJsonJournalEntryCodec where TKey : notnull
 {
     private readonly JsonTypeInfo<TKey> _keyTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TKey>(options);
     private readonly JsonTypeInfo<TValue> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TValue>(options);
@@ -58,13 +58,13 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    public void Apply(ReadOnlySequence<byte> input, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         var operation = new JsonOperationReader(input);
         Apply(ref operation, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+    private void Apply(ref JsonOperationReader operation, IDictionaryOperationHandler<TKey, TValue> consumer)
     {
         var command = operation.Command;
         switch (command)
@@ -102,7 +102,7 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
 
     void IJsonJournalEntryCodec.Apply(ref JsonOperationReader reader, IJournaledState state)
     {
-        if (state is not IDurableDictionaryOperationHandler<TKey, TValue> consumer)
+        if (state is not IDictionaryOperationHandler<TKey, TValue> consumer)
         {
             throw new InvalidOperationException(
                 $"State '{state.GetType().FullName}' is not compatible with codec '{GetType().FullName}'.");

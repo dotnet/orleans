@@ -39,7 +39,7 @@ public class JsonCodecTests
         builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
         using var serviceProvider = builder.Services.BuildServiceProvider();
         Assert.IsType<JsonLinesJournalFormat>(serviceProvider.GetRequiredKeyedService<IJournalFormat>(JsonJournalExtensions.JournalFormatKey));
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
+        var codec = serviceProvider.GetRequiredKeyedService<IValueOperationCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
         var consumer = new ValueConsumer<JsonCodecTestValue>();
@@ -55,7 +55,7 @@ public class JsonCodecTests
         builder.AddJournalStorage();
         builder.UseJsonJournalFormat(JsonCodecTestJsonContext.Default);
         using var serviceProvider = builder.Services.BuildServiceProvider();
-        var codec = serviceProvider.GetRequiredKeyedService<IDurableValueOperationCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
+        var codec = serviceProvider.GetRequiredKeyedService<IValueOperationCodec<JsonCodecTestValue>>(JsonJournalExtensions.JournalFormatKey);
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new("test", 1), writer));
         var consumer = new ValueConsumer<JsonCodecTestValue>();
@@ -718,27 +718,27 @@ public class JsonCodecTests
         Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
     }
 
-    private static void Apply<T>(IDurableListOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableListOperationHandler<T> consumer)
+    private static void Apply<T>(IListOperationCodec<T> codec, Action<JournalStreamWriter> write, IListOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableQueueOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableQueueOperationHandler<T> consumer)
+    private static void Apply<T>(IQueueOperationCodec<T> codec, Action<JournalStreamWriter> write, IQueueOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableSetOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableSetOperationHandler<T> consumer)
+    private static void Apply<T>(ISetOperationCodec<T> codec, Action<JournalStreamWriter> write, ISetOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableStateOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableStateOperationHandler<T> consumer)
+    private static void Apply<T>(IStateOperationCodec<T> codec, Action<JournalStreamWriter> write, IStateOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
 
-    private static void Apply<T>(IDurableTaskCompletionSourceOperationCodec<T> codec, Action<JournalStreamWriter> write, IDurableTaskCompletionSourceOperationHandler<T> consumer)
+    private static void Apply<T>(ITaskCompletionSourceOperationCodec<T> codec, Action<JournalStreamWriter> write, ITaskCompletionSourceOperationHandler<T> consumer)
     {
         codec.Apply(CodecTestHelpers.WriteEntry(write), consumer);
     }
@@ -913,7 +913,7 @@ public class JsonCodecTests
         public void Apply(IJournaledState state) => throw new NotSupportedException();
     }
 
-    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryOperationHandler<TKey, TValue> where TKey : notnull
+    private sealed class DictionaryConsumer<TKey, TValue> : IDictionaryOperationHandler<TKey, TValue> where TKey : notnull
     {
         public TKey? LastSetKey { get; private set; }
         public TValue? LastSetValue { get; private set; }
@@ -930,7 +930,7 @@ public class JsonCodecTests
         public void Reset(int capacityHint) => Items.Clear();
     }
 
-    private sealed class ListConsumer<T> : IDurableListOperationHandler<T>
+    private sealed class ListConsumer<T> : IListOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -941,7 +941,7 @@ public class JsonCodecTests
         public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
-    private sealed class QueueConsumer<T> : IDurableQueueOperationHandler<T>
+    private sealed class QueueConsumer<T> : IQueueOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyEnqueue(T item) => Commands.Add($"enqueue:{item}");
@@ -950,7 +950,7 @@ public class JsonCodecTests
         public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
-    private sealed class SetConsumer<T> : IDurableSetOperationHandler<T>
+    private sealed class SetConsumer<T> : ISetOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyAdd(T item) => Commands.Add($"add:{item}");
@@ -959,20 +959,20 @@ public class JsonCodecTests
         public void Reset(int capacityHint) => Commands.Add($"reset:{capacityHint}");
     }
 
-    private sealed class ValueConsumer<T> : IDurableValueOperationHandler<T>
+    private sealed class ValueConsumer<T> : IValueOperationHandler<T>
     {
         public T? Value { get; private set; }
         public void ApplySet(T value) => Value = value;
     }
 
-    private sealed class StateConsumer<T> : IDurableStateOperationHandler<T>
+    private sealed class StateConsumer<T> : IStateOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplySet(T state, ulong version) => Commands.Add($"set:{state}:{version}");
         public void ApplyClear() => Commands.Add("clear");
     }
 
-    private sealed class TcsConsumer<T> : IDurableTaskCompletionSourceOperationHandler<T>
+    private sealed class TcsConsumer<T> : ITaskCompletionSourceOperationHandler<T>
     {
         public List<string> Commands { get; } = [];
         public void ApplyPending() => Commands.Add("pending");

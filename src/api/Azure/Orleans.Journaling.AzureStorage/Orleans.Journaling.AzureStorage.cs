@@ -8,12 +8,12 @@
 //------------------------------------------------------------------------------
 namespace Orleans.Journaling
 {
-    public sealed partial class AzureAppendBlobJournalStorageOptions
+    public sealed partial class AzureBlobJournalStorageOptions
     {
         public const string DEFAULT_CONTAINER_NAME = "state";
         public Azure.Storage.Blobs.BlobServiceClient? BlobServiceClient { get { throw null; } set { } }
 
-        public System.Func<System.IServiceProvider, AzureAppendBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }
+        public System.Func<System.IServiceProvider, AzureBlobJournalStorageOptions, IBlobContainerFactory> BuildContainerFactory { get { throw null; } set { } }
 
         public Azure.Storage.Blobs.BlobClientOptions? ClientOptions { get { throw null; } set { } }
 
@@ -36,9 +36,9 @@ namespace Orleans.Journaling
 
     public static partial class AzureBlobStorageHostingExtensions
     {
-        public static Hosting.ISiloBuilder AddAzureAppendBlobJournalStorage(this Hosting.ISiloBuilder builder, System.Action<AzureAppendBlobJournalStorageOptions>? configure) { throw null; }
+        public static Hosting.ISiloBuilder AddAzureBlobJournalStorage(this Hosting.ISiloBuilder builder, System.Action<AzureBlobJournalStorageOptions>? configure) { throw null; }
 
-        public static Hosting.ISiloBuilder AddAzureAppendBlobJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
+        public static Hosting.ISiloBuilder AddAzureBlobJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
     public partial interface IBlobContainerFactory

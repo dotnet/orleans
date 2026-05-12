@@ -10,7 +10,7 @@ namespace Orleans.Journaling;
 /// </summary>
 internal sealed class OrleansBinaryListOperationCodec<T>(
     IJournalValueCodec<T> codec,
-    SerializerSessionPool sessionPool) : IDurableListOperationCodec<T>, IOrleansBinaryJournalEntryCodec
+    SerializerSessionPool sessionPool) : IListOperationCodec<T>, IOrleansBinaryJournalEntryCodec
 {
     private const byte FormatVersion = 0;
     private const uint AddCommand = 0;
@@ -84,7 +84,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(ReadOnlySequence<byte> input, IDurableListOperationHandler<T> consumer)
+    public void Apply(ReadOnlySequence<byte> input, IListOperationHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var arcBuffer = OrleansBinaryOperationApplier.Materialize(input);
@@ -98,9 +98,9 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     }
 
     void IOrleansBinaryJournalEntryCodec.Apply(ref Reader<ArcBufferReaderInput> reader, IJournaledState state) =>
-        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IDurableListOperationHandler<T>>(state, this));
+        Apply(ref reader, DurableOperationHandler.GetRequiredHandler<IListOperationHandler<T>>(state, this));
 
-    private void Apply(ref Reader<ArcBufferReaderInput> reader, IDurableListOperationHandler<T> consumer)
+    private void Apply(ref Reader<ArcBufferReaderInput> reader, IListOperationHandler<T> consumer)
     {
         OrleansBinaryOperationApplier.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
@@ -137,7 +137,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         }
     }
 
-    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IDurableListOperationHandler<T> consumer)
+    private void ApplySnapshot(ref Reader<ArcBufferReaderInput> reader, IListOperationHandler<T> consumer)
     {
         var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
 

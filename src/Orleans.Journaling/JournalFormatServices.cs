@@ -107,12 +107,12 @@ internal static class JournalFormatServices
         }
 
         var definition = type.GetGenericTypeDefinition();
-        return definition == typeof(IDurableDictionaryOperationCodec<,>)
-            || definition == typeof(IDurableListOperationCodec<>)
-            || definition == typeof(IDurableQueueOperationCodec<>)
-            || definition == typeof(IDurableSetOperationCodec<>)
-            || definition == typeof(IDurableValueOperationCodec<>)
-            || definition == typeof(IDurableStateOperationCodec<>)
-            || definition == typeof(IDurableTaskCompletionSourceOperationCodec<>);
+        return definition == typeof(IDictionaryOperationCodec<,>)
+            || definition == typeof(IListOperationCodec<>)
+            || definition == typeof(IQueueOperationCodec<>)
+            || definition == typeof(ISetOperationCodec<>)
+            || definition == typeof(IValueOperationCodec<>)
+            || definition == typeof(IStateOperationCodec<>)
+            || definition == typeof(ITaskCompletionSourceOperationCodec<>);
     }
 }
