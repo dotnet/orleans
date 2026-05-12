@@ -24,29 +24,51 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     protected JournalBatchWriterBase() => _target = new(this);
 
     /// <inheritdoc/>
-    public abstract long Length { get; }
-
-    /// <summary>
-    /// Gets a value indicating whether a journal entry is currently active.
-    /// </summary>
-    protected bool IsEntryActive => _entryWriter.IsActive;
-
-    /// <summary>
-    /// Gets the stream id for the currently active entry.
-    /// </summary>
-    protected JournalStreamId ActiveStreamId => _activeStreamId;
+    public long Length => checked(CommittedLength + (_entryWriter.IsActive ? ActivePayloadLength : 0));
 
     /// <inheritdoc/>
     public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, _target);
 
     /// <inheritdoc/>
-    public abstract ArcBuffer GetCommittedBuffer();
+    public ArcBuffer GetCommittedBuffer()
+    {
+        ThrowIfEntryActive();
+        return GetCommittedBufferCore();
+    }
 
     /// <inheritdoc/>
-    public abstract void Reset();
+    public void Reset()
+    {
+        ThrowIfEntryActive();
+        ResetCore();
+    }
 
     /// <inheritdoc/>
     public abstract void Dispose();
+
+    /// <summary>
+    /// Gets the number of bytes committed to the batch, excluding any active entry payload.
+    /// </summary>
+    protected abstract long CommittedLength { get; }
+
+    /// <summary>
+    /// Gets the number of payload bytes written to the active entry.
+    /// </summary>
+    /// <remarks>Only consulted while an entry is active.</remarks>
+    protected abstract long ActivePayloadLength { get; }
+
+    /// <summary>
+    /// Returns a borrowed buffer containing the committed bytes of the batch.
+    /// </summary>
+    /// <remarks>Called by <see cref="GetCommittedBuffer"/> after verifying that no entry is active.</remarks>
+    /// <returns>An <see cref="ArcBuffer"/> containing the committed bytes. The caller owns and must dispose the returned buffer.</returns>
+    protected abstract ArcBuffer GetCommittedBufferCore();
+
+    /// <summary>
+    /// Discards all buffered data so the writer can be reused.
+    /// </summary>
+    /// <remarks>Called by <see cref="Reset"/> after verifying that no entry is active.</remarks>
+    protected abstract void ResetCore();
 
     /// <summary>
     /// Called before an entry scope becomes active.
@@ -197,6 +219,14 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     {
         _activeEntryStart = 0;
         _activeStreamId = default;
+    }
+
+    private void ThrowIfEntryActive()
+    {
+        if (_entryWriter.IsActive)
+        {
+            throw new InvalidOperationException("The journal batch has an active entry.");
+        }
     }
 
     private sealed class Target(JournalBatchWriterBase owner) : IJournalStreamWriterTarget, IJournalEntryWriterTarget

@@ -153,25 +153,14 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         private readonly ArcBufferWriter _buffer = new();
         private readonly ArcBufferWriter _payload = new();
 
-        public override long Length => checked(_buffer.Length + (IsEntryActive ? _payload.Length : 0));
+        protected override long CommittedLength => _buffer.Length;
 
-        public override ArcBuffer GetCommittedBuffer()
+        protected override long ActivePayloadLength => _payload.Length;
+
+        protected override ArcBuffer GetCommittedBufferCore() => _buffer.PeekSlice(_buffer.Length);
+
+        protected override void ResetCore()
         {
-            if (IsEntryActive)
-            {
-                throw new InvalidOperationException("The JSON Lines journal segment has an active entry.");
-            }
-
-            return _buffer.PeekSlice(_buffer.Length);
-        }
-
-        public override void Reset()
-        {
-            if (IsEntryActive)
-            {
-                throw new InvalidOperationException("The JSON Lines journal segment cannot be reset while an entry is active.");
-            }
-
             _payload.Reset();
             _buffer.Reset();
         }

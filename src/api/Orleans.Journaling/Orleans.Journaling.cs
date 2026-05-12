@@ -305,11 +305,10 @@ namespace Orleans.Journaling
 
     public abstract partial class JournalBatchWriterBase : IJournalBatchWriter, System.IDisposable
     {
-        protected JournalStreamId ActiveStreamId { get { throw null; } }
+        protected abstract long ActivePayloadLength { get; }
+        protected abstract long CommittedLength { get; }
 
-        protected bool IsEntryActive { get { throw null; } }
-
-        public abstract long Length { get; }
+        public long Length { get { throw null; } }
 
         protected abstract void AbortEntry(JournalStreamId streamId, int entryStart);
         protected abstract void AdvancePayload(int count);
@@ -317,7 +316,9 @@ namespace Orleans.Journaling
         public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) { throw null; }
 
         public abstract void Dispose();
-        public abstract Serialization.Buffers.ArcBuffer GetCommittedBuffer();
+        public Serialization.Buffers.ArcBuffer GetCommittedBuffer() { throw null; }
+
+        protected abstract Serialization.Buffers.ArcBuffer GetCommittedBufferCore();
         protected abstract int GetEntryStart(JournalStreamId streamId);
         protected abstract System.Memory<byte> GetPayloadMemory(int sizeHint);
         protected abstract System.Span<byte> GetPayloadSpan(int sizeHint);
@@ -327,7 +328,9 @@ namespace Orleans.Journaling
 
         protected virtual bool OnTryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) { throw null; }
 
-        public abstract void Reset();
+        public void Reset() { }
+
+        protected abstract void ResetCore();
         protected abstract void WritePayload(System.Buffers.ReadOnlySequence<byte> value);
         protected abstract void WritePayload(System.ReadOnlySpan<byte> value);
     }
