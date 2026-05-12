@@ -73,27 +73,6 @@ namespace Orleans.Journaling
     {
     }
 
-    public partial interface IListOperationCodec<T>
-    {
-        void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer);
-        void WriteAdd(T item, JournalStreamWriter writer);
-        void WriteClear(JournalStreamWriter writer);
-        void WriteInsert(int index, T item, JournalStreamWriter writer);
-        void WriteRemoveAt(int index, JournalStreamWriter writer);
-        void WriteSet(int index, T item, JournalStreamWriter writer);
-        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
-    }
-
-    public partial interface IListOperationHandler<T>
-    {
-        void ApplyAdd(T item);
-        void ApplyClear();
-        void ApplyInsert(int index, T item);
-        void ApplyRemoveAt(int index);
-        void ApplySet(int index, T item);
-        void Reset(int capacityHint);
-    }
-
     public partial interface IDurableList<T> : System.Collections.Generic.IList<T>, System.Collections.Generic.ICollection<T>, System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable
     {
         void AddRange(System.Collections.Generic.IEnumerable<T> collection);
@@ -102,23 +81,6 @@ namespace Orleans.Journaling
 
     public partial interface IDurableNothing
     {
-    }
-
-    public partial interface IQueueOperationCodec<T>
-    {
-        void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer);
-        void WriteClear(JournalStreamWriter writer);
-        void WriteDequeue(JournalStreamWriter writer);
-        void WriteEnqueue(T item, JournalStreamWriter writer);
-        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
-    }
-
-    public partial interface IQueueOperationHandler<T>
-    {
-        void ApplyClear();
-        void ApplyDequeue();
-        void ApplyEnqueue(T item);
-        void Reset(int capacityHint);
     }
 
     public partial interface IDurableQueue<T> : System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable, System.Collections.Generic.IReadOnlyCollection<T>
@@ -131,23 +93,6 @@ namespace Orleans.Journaling
         T Peek();
         bool TryDequeue(out T item);
         bool TryPeek(out T item);
-    }
-
-    public partial interface ISetOperationCodec<T>
-    {
-        void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer);
-        void WriteAdd(T item, JournalStreamWriter writer);
-        void WriteClear(JournalStreamWriter writer);
-        void WriteRemove(T item, JournalStreamWriter writer);
-        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
-    }
-
-    public partial interface ISetOperationHandler<T>
-    {
-        void ApplyAdd(T item);
-        void ApplyClear();
-        void ApplyRemove(T item);
-        void Reset(int capacityHint);
     }
 
     public partial interface IDurableSet<T> : System.Collections.Generic.ISet<T>, System.Collections.Generic.ICollection<T>, System.Collections.Generic.IEnumerable<T>, System.Collections.IEnumerable, System.Collections.Generic.IReadOnlyCollection<T>, System.Collections.Generic.IReadOnlySet<T>
@@ -164,36 +109,6 @@ namespace Orleans.Journaling
         bool SetEquals(System.Collections.Generic.IEnumerable<T> other);
     }
 
-    public partial interface IStateOperationCodec<T>
-    {
-        void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer);
-        void WriteClear(JournalStreamWriter writer);
-        void WriteSet(T state, ulong version, JournalStreamWriter writer);
-    }
-
-    public partial interface IStateOperationHandler<T>
-    {
-        void ApplyClear();
-        void ApplySet(T state, ulong version);
-    }
-
-    public partial interface ITaskCompletionSourceOperationCodec<T>
-    {
-        void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer);
-        void WriteCanceled(JournalStreamWriter writer);
-        void WriteCompleted(T value, JournalStreamWriter writer);
-        void WriteFaulted(System.Exception exception, JournalStreamWriter writer);
-        void WritePending(JournalStreamWriter writer);
-    }
-
-    public partial interface ITaskCompletionSourceOperationHandler<T>
-    {
-        void ApplyCanceled();
-        void ApplyCompleted(T value);
-        void ApplyFaulted(System.Exception exception);
-        void ApplyPending();
-    }
-
     public partial interface IDurableTaskCompletionSource<T>
     {
         DurableTaskCompletionSourceState<T> State { get; }
@@ -203,17 +118,6 @@ namespace Orleans.Journaling
         bool TrySetCanceled();
         bool TrySetException(System.Exception exception);
         bool TrySetResult(T value);
-    }
-
-    public partial interface IValueOperationCodec<T>
-    {
-        void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer);
-        void WriteSet(T value, JournalStreamWriter writer);
-    }
-
-    public partial interface IValueOperationHandler<T>
-    {
-        void ApplySet(T value);
     }
 
     public partial interface IDurableValue<T>
@@ -248,6 +152,11 @@ namespace Orleans.Journaling
         void Reset(JournalStreamWriter writer);
     }
 
+    public partial interface IJournalFileMetadata
+    {
+        string? Format { get; }
+    }
+
     public partial interface IJournalFormat
     {
         string FormatKey { get; }
@@ -273,11 +182,6 @@ namespace Orleans.Journaling
         void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata);
     }
 
-    public partial interface IJournalFileMetadata
-    {
-        string? Format { get; }
-    }
-
     public partial interface IJournalStorageProvider
     {
         IJournalStorage Create(Runtime.IGrainContext grainContext);
@@ -289,6 +193,61 @@ namespace Orleans.Journaling
         void Write(T value, System.Buffers.IBufferWriter<byte> output);
     }
 
+    public partial interface IListOperationCodec<T>
+    {
+        void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer);
+        void WriteAdd(T item, JournalStreamWriter writer);
+        void WriteClear(JournalStreamWriter writer);
+        void WriteInsert(int index, T item, JournalStreamWriter writer);
+        void WriteRemoveAt(int index, JournalStreamWriter writer);
+        void WriteSet(int index, T item, JournalStreamWriter writer);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
+    }
+
+    public partial interface IListOperationHandler<T>
+    {
+        void ApplyAdd(T item);
+        void ApplyClear();
+        void ApplyInsert(int index, T item);
+        void ApplyRemoveAt(int index);
+        void ApplySet(int index, T item);
+        void Reset(int capacityHint);
+    }
+
+    public partial interface IQueueOperationCodec<T>
+    {
+        void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer);
+        void WriteClear(JournalStreamWriter writer);
+        void WriteDequeue(JournalStreamWriter writer);
+        void WriteEnqueue(T item, JournalStreamWriter writer);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
+    }
+
+    public partial interface IQueueOperationHandler<T>
+    {
+        void ApplyClear();
+        void ApplyDequeue();
+        void ApplyEnqueue(T item);
+        void Reset(int capacityHint);
+    }
+
+    public partial interface ISetOperationCodec<T>
+    {
+        void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer);
+        void WriteAdd(T item, JournalStreamWriter writer);
+        void WriteClear(JournalStreamWriter writer);
+        void WriteRemove(T item, JournalStreamWriter writer);
+        void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
+    }
+
+    public partial interface ISetOperationHandler<T>
+    {
+        void ApplyAdd(T item);
+        void ApplyClear();
+        void ApplyRemove(T item);
+        void Reset(int capacityHint);
+    }
+
     public partial interface IStateManager
     {
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
@@ -298,9 +257,50 @@ namespace Orleans.Journaling
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);
     }
 
+    public partial interface IStateOperationCodec<T>
+    {
+        void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer);
+        void WriteClear(JournalStreamWriter writer);
+        void WriteSet(T state, ulong version, JournalStreamWriter writer);
+    }
+
+    public partial interface IStateOperationHandler<T>
+    {
+        void ApplyClear();
+        void ApplySet(T state, ulong version);
+    }
+
     public partial interface IStateResolver
     {
         IJournaledState ResolveState(JournalStreamId streamId);
+    }
+
+    public partial interface ITaskCompletionSourceOperationCodec<T>
+    {
+        void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer);
+        void WriteCanceled(JournalStreamWriter writer);
+        void WriteCompleted(T value, JournalStreamWriter writer);
+        void WriteFaulted(System.Exception exception, JournalStreamWriter writer);
+        void WritePending(JournalStreamWriter writer);
+    }
+
+    public partial interface ITaskCompletionSourceOperationHandler<T>
+    {
+        void ApplyCanceled();
+        void ApplyCompleted(T value);
+        void ApplyFaulted(System.Exception exception);
+        void ApplyPending();
+    }
+
+    public partial interface IValueOperationCodec<T>
+    {
+        void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer);
+        void WriteSet(T value, JournalStreamWriter writer);
+    }
+
+    public partial interface IValueOperationHandler<T>
+    {
+        void ApplySet(T value);
     }
 
     public abstract partial class JournalBatchWriterBase : IJournalBatchWriter, System.IDisposable
@@ -332,10 +332,31 @@ namespace Orleans.Journaling
         protected abstract void WritePayload(System.ReadOnlySpan<byte> value);
     }
 
+    public sealed partial class JournaledStateManagerOptions
+    {
+        public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
+        public string JournalFormatKey { get { throw null; } set { } }
+
+        public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
+    }
+
+    public readonly ref partial struct JournaledStateReplayContext
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public JournaledStateReplayContext(string writeJournalFormatKey, System.IServiceProvider serviceProvider) { }
+
+        public System.IServiceProvider ServiceProvider { get { throw null; } }
+
+        public string WriteJournalFormatKey { get { throw null; } }
+
+        public readonly TCodec GetRequiredOperationCodec<TCodec>(string operationFormatKey, TCodec writeOperationCodec) { throw null; }
+    }
+
     public ref partial struct JournalEntry : System.IDisposable
     {
         private object _dummy;
-        private readonly int _dummyPrimitive;
+        private int _dummyPrimitive;
         public JournalEntryWriter Writer { get { throw null; } }
 
         public void Commit() { }
@@ -358,10 +379,29 @@ namespace Orleans.Journaling
         public void Write(System.ReadOnlySpan<byte> value) { }
     }
 
-    public readonly partial struct JournalReadBuffer
+    public sealed partial class JournalFileMetadata : IJournalFileMetadata
+    {
+        public JournalFileMetadata(string? format) { }
+
+        public static IJournalFileMetadata Empty { get { throw null; } }
+
+        public string? Format { get { throw null; } }
+    }
+
+    public readonly ref partial struct JournalOperation
     {
         private readonly object _dummy;
-        private int _dummyPrimitive;
+        private readonly int _dummyPrimitive;
+        public JournalOperation(string formatKey, JournalReadBuffer payload) { }
+
+        public string FormatKey { get { throw null; } }
+
+        public JournalReadBuffer Payload { get { throw null; } }
+    }
+
+    public readonly partial struct JournalReadBuffer
+    {
+        private readonly int _dummyPrimitive;
         public JournalReadBuffer(Serialization.Buffers.ArcBufferReader reader, bool isCompleted) { }
 
         public bool IsCompleted { get { throw null; } }
@@ -402,35 +442,6 @@ namespace Orleans.Journaling
         public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class JournalFileMetadata : IJournalFileMetadata
-    {
-        public static IJournalFileMetadata Empty { get { throw null; } }
-
-        public JournalFileMetadata(string? format) { }
-
-        public string? Format { get { throw null; } }
-    }
-
-    public readonly ref partial struct JournalOperation
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public JournalOperation(string formatKey, JournalReadBuffer payload) { }
-        public string FormatKey { get { throw null; } }
-        public JournalReadBuffer Payload { get { throw null; } }
-    }
-
-    public readonly ref partial struct JournaledStateReplayContext
-    {
-        private readonly object _dummy;
-        private readonly int _dummyPrimitive;
-        public JournaledStateReplayContext(string writeJournalFormatKey, System.IServiceProvider serviceProvider) { }
-        public System.IServiceProvider ServiceProvider { get { throw null; } }
-        public string WriteJournalFormatKey { get { throw null; } }
-        public TCodec GetRequiredOperationCodec<TCodec>(string operationFormatKey, TCodec writeOperationCodec)
-            where TCodec : notnull { throw null; }
-    }
-
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>
     {
         private readonly int _dummyPrimitive;
@@ -469,21 +480,13 @@ namespace Orleans.Journaling
         public readonly bool TryAppendFormattedEntry(IFormattedJournalEntry entry) { throw null; }
     }
 
-    public sealed partial class JournaledStateManagerOptions
-    {
-        public static readonly System.TimeSpan DEFAULT_RETIREMENT_GRACE_PERIOD;
-        public string JournalFormatKey { get { throw null; } set { } }
-
-        public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
-    }
-
     public sealed partial class VolatileJournalStorage : IJournalStorage
     {
-        public bool IsCompactionRequested { get { throw null; } }
+        public VolatileJournalStorage() { }
 
         public VolatileJournalStorage(string? journalFormatKey) { }
 
-        public VolatileJournalStorage() { }
+        public bool IsCompactionRequested { get { throw null; } }
 
         public System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> segment, System.Threading.CancellationToken cancellationToken) { throw null; }
 
