@@ -107,11 +107,11 @@ namespace Orleans.Runtime.GrainDirectory
 
             DirectoryInstruments.RegisterDirectoryPartitionSizeObserve(() => DirectoryPartition.Count);
             DirectoryInstruments.RegisterMyPortionRingDistanceObserve(() => RingDistanceToSuccessor());
-            DirectoryInstruments.RegisterMyPortionRingPercentageObserve(() => (((float)this.RingDistanceToSuccessor()) / ((float)(int.MaxValue * 2L))) * 100);
+            DirectoryInstruments.RegisterMyPortionRingPercentageObserve(() => this.RingDistanceToSuccessor() / (float)(int.MaxValue * 2L) * 100);
             DirectoryInstruments.RegisterMyPortionAverageRingPercentageObserve(() =>
             {
                 var ring = this.directoryMembership.MembershipRingList;
-                return ring.Count == 0 ? 0 : ((float)100 / (float)ring.Count);
+                return ring.Count == 0 ? 0 : (100 / (float)ring.Count);
             });
             DirectoryInstruments.RegisterRingSizeObserve(() => this.directoryMembership.MembershipRingList.Count);
             _serviceProvider = serviceProvider;
@@ -157,17 +157,16 @@ namespace Orleans.Runtime.GrainDirectory
 
         private async Task ProcessMembershipUpdates(CancellationToken cancellationToken)
         {
-            var snapshot = clusterMembershipService.CurrentSnapshot;
             while (!cancellationToken.IsCancellationRequested)
             {
                 try
                 {
-                    await ApplyMembershipSnapshot(snapshot);
+                    await ApplyMembershipSnapshot();
 
-                    await foreach (var update in clusterMembershipService.MembershipUpdates.WithCancellation(cancellationToken))
+                    await foreach (var _ in clusterMembershipService.MembershipUpdates.WithCancellation(cancellationToken))
                     {
-                        snapshot = update;
-                        await ApplyMembershipSnapshot(snapshot);
+                        // Always apply the latest snapshot.
+                        await ApplyMembershipSnapshot();
                     }
                 }
                 catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
@@ -191,58 +190,58 @@ namespace Orleans.Runtime.GrainDirectory
                         LogWarningRefreshingClusterMembershipFailed(refreshException);
                     }
 
-                    snapshot = clusterMembershipService.CurrentSnapshot;
                     await Task.Delay(RETRY_DELAY, cancellationToken).SuppressThrowing();
                 }
             }
         }
 
-        private Task ApplyMembershipSnapshot(ClusterMembershipSnapshot snapshot)
+        private Task ApplyMembershipSnapshot()
         {
             return CacheValidator.RunOrQueueTask(() =>
             {
-                ApplyMembershipSnapshotCore(snapshot);
+                ApplyMembershipSnapshotCore();
                 return Task.CompletedTask;
             });
-        }
 
-        private void ApplyMembershipSnapshotCore(ClusterMembershipSnapshot snapshot)
-        {
-            if (!Running)
+            void ApplyMembershipSnapshotCore()
             {
-                return;
+                if (!Running)
+                {
+                    return;
+                }
+
+                var snapshot = clusterMembershipService.CurrentSnapshot;
+                var previousSnapshot = hasAppliedClusterMembershipSnapshot ? appliedClusterMembershipSnapshot : ClusterMembershipSnapshot.Default;
+                if (hasAppliedClusterMembershipSnapshot && snapshot.Version <= previousSnapshot.Version)
+                {
+                    return;
+                }
+
+                var previousMembership = CreateDirectoryMembership(previousSnapshot);
+                var targetMembership = CreateDirectoryMembership(snapshot);
+                this.directoryMembership = targetMembership;
+
+                var removedSilos = GetMembershipDifference(previousMembership, targetMembership);
+                var addedSilos = GetMembershipDifference(targetMembership, previousMembership);
+
+                ProcessSiloStatusChanges(snapshot, previousSnapshot, previousMembership);
+                AdjustLocalDirectory(snapshot);
+                AdjustLocalCache(snapshot, targetMembership);
+
+                foreach (var silo in removedSilos)
+                {
+                    LogDebugSiloRemovedSilo(MyAddress, silo);
+                }
+
+                foreach (var silo in addedSilos)
+                {
+                    HandoffManager.ProcessSiloAddEvent(silo);
+                    LogDebugSiloAddedSilo(MyAddress, silo);
+                }
+
+                appliedClusterMembershipSnapshot = snapshot;
+                hasAppliedClusterMembershipSnapshot = true;
             }
-
-            var previousSnapshot = hasAppliedClusterMembershipSnapshot ? appliedClusterMembershipSnapshot : ClusterMembershipSnapshot.Default;
-            if (hasAppliedClusterMembershipSnapshot && snapshot.Version <= previousSnapshot.Version)
-            {
-                return;
-            }
-
-            var previousMembership = CreateDirectoryMembership(previousSnapshot);
-            var targetMembership = CreateDirectoryMembership(snapshot);
-            this.directoryMembership = targetMembership;
-
-            var removedSilos = GetMembershipDifference(previousMembership, targetMembership);
-            var addedSilos = GetMembershipDifference(targetMembership, previousMembership);
-
-            ProcessSiloStatusChanges(snapshot, previousSnapshot, previousMembership);
-            AdjustLocalDirectory(snapshot);
-            AdjustLocalCache(snapshot, targetMembership);
-
-            foreach (var silo in removedSilos)
-            {
-                LogDebugSiloRemovedSilo(MyAddress, silo);
-            }
-
-            foreach (var silo in addedSilos)
-            {
-                HandoffManager.ProcessSiloAddEvent(silo);
-                LogDebugSiloAddedSilo(MyAddress, silo);
-            }
-
-            appliedClusterMembershipSnapshot = snapshot;
-            hasAppliedClusterMembershipSnapshot = true;
         }
 
         private void ProcessSiloStatusChanges(
@@ -336,14 +335,12 @@ namespace Orleans.Runtime.GrainDirectory
                 return;
             }
 
-            var snapshot = clusterMembershipService.CurrentSnapshot;
-            if (targetVersion > snapshot.Version)
+            if (targetVersion > clusterMembershipService.CurrentSnapshot.Version)
             {
                 await clusterMembershipService.Refresh(targetVersion);
-                snapshot = clusterMembershipService.CurrentSnapshot;
             }
 
-            await ApplyMembershipSnapshot(snapshot);
+            await ApplyMembershipSnapshot();
         }
 
         private void OnSiloStatusChange(DirectoryMembership previousMembership, SiloAddress updatedSilo, SiloStatus status)
@@ -456,7 +453,7 @@ namespace Orleans.Runtime.GrainDirectory
 
             if (snapshot.Members.TryGetValue(silo, out var member))
             {
-                return member.Status.IsTerminating();
+                return member.Status == SiloStatus.Dead;
             }
 
             return address.MembershipVersion < snapshot.Version;
@@ -747,7 +744,6 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
-
         public async Task UnregisterManyAsync(List<GrainAddress> addresses, UnregistrationCause cause, int hopCount)
         {
             if (hopCount > 0)
@@ -1005,11 +1001,6 @@ namespace Orleans.Runtime.GrainDirectory
             return hashComparison != 0 ? hashComparison : left.CompareTo(right);
         }
 
-        public bool IsSiloInCluster(SiloAddress silo)
-        {
-            return this.directoryMembership.MembershipCache.Contains(silo);
-        }
-
         public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
         public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
@@ -1193,27 +1184,21 @@ namespace Orleans.Runtime.GrainDirectory
         )]
         private partial void LogWarningDeleteGrainAsyncNotOwner(GrainId grainId, SiloAddress? forwardAddress, int hopCount);
 
-        private class DirectoryMembership
+        private class DirectoryMembership(ImmutableList<SiloAddress> membershipRingList, ImmutableHashSet<SiloAddress> membershipCache)
         {
-            public DirectoryMembership(ImmutableList<SiloAddress> membershipRingList, ImmutableHashSet<SiloAddress> membershipCache)
-            {
-                this.MembershipRingList = membershipRingList;
-                this.MembershipCache = membershipCache;
-            }
-
-            public static DirectoryMembership Default { get; } = new DirectoryMembership(ImmutableList<SiloAddress>.Empty, ImmutableHashSet<SiloAddress>.Empty);
+            public static DirectoryMembership Default { get; } = new DirectoryMembership([], []);
 
             public static DirectoryMembership Create(IEnumerable<SiloAddress> members)
             {
                 var builder = ImmutableList.CreateBuilder<SiloAddress>();
                 builder.AddRange(members);
-                builder.Sort(LocalGrainDirectory.CompareSiloAddress);
+                builder.Sort(CompareSiloAddress);
                 var ring = builder.ToImmutable();
-                return new DirectoryMembership(ring, ring.ToImmutableHashSet());
+                return new DirectoryMembership(ring, [.. ring]);
             }
 
-            public ImmutableList<SiloAddress> MembershipRingList { get; }
-            public ImmutableHashSet<SiloAddress> MembershipCache { get; }
+            public ImmutableList<SiloAddress> MembershipRingList { get; } = membershipRingList;
+            public ImmutableHashSet<SiloAddress> MembershipCache { get; } = membershipCache;
         }
     }
 }

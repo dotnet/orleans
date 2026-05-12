@@ -95,12 +95,5 @@ namespace Orleans.Runtime.GrainDirectory
         /// Attempts to find the specified grain in the directory cache.
         /// </summary>
         bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address);
-
-        /// <summary>
-        /// For determining message forwarding logic, we sometimes check if a silo is part of this cluster or not
-        /// </summary>
-        /// <param name="silo">the address of the silo</param>
-        /// <returns>true if the silo is known to be part of this cluster</returns>
-        bool IsSiloInCluster(SiloAddress silo);
     }
 }
