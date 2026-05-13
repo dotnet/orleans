@@ -348,7 +348,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         {
             var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
@@ -369,7 +369,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         {
             var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
 
         Assert.Contains($"byte offset {entryBytes.Length}", exception.Message, StringComparison.Ordinal);
@@ -402,7 +402,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         writer.Write(data.AsReadOnlySequence());
         var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(streamIds));
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         Assert.Equal(0, reader.Length);
     }
 
@@ -444,7 +444,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         private sealed class StreamConsumer(CollectingConsumer owner, JournalStreamId streamId) : IJournaledState
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
                 owner.Entries.Add((streamId.Value, entry.Reader.ToArray()));
 
             public void Reset(JournalStreamWriter writer) { }
@@ -484,7 +484,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         private sealed class StreamConsumer(BufferingConsumer owner, JournalStreamId streamId) : IJournaledState
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context)
+            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context)
             {
                 var preservedEntry = new TestPreservedJournalEntry(entry.FormatKey, entry.Reader.ToArray());
                 owner._preservedEntries.Add(preservedEntry);

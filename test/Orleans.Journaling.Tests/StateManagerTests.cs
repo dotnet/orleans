@@ -1111,7 +1111,7 @@ public class StateManagerTests : JournalingTestBase
         var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
         var consumer = new CapturingJournalEntrySink();
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(ReadStreamIds(bytes)));
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
@@ -1168,7 +1168,7 @@ public class StateManagerTests : JournalingTestBase
 
         private sealed class StreamSink(CapturingJournalEntrySink owner, JournalStreamId streamId) : IJournaledState
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
                 owner.Entries.Add(new(streamId, entry.Reader.ToArray()));
 
             public void Reset(JournalStreamWriter writer) { }
@@ -1199,7 +1199,7 @@ public class StateManagerTests : JournalingTestBase
 
         public JournalBufferWriter CreateWriter() => _writerFormat.CreateWriter();
 
-        public void Replay(JournalBufferReader input, in JournalReplayContext context)
+        public void Replay(JournalBufferReader input, JournalReplayContext context)
         {
             if (input.Length == 0)
             {
@@ -1208,7 +1208,7 @@ public class StateManagerTests : JournalingTestBase
 
             var callbackPayload = _payload.ToArray();
             var state = context.ResolveState(_streamId);
-            state.ReplayEntry(new JournalEntry(FormatKey, CodecTestHelpers.ReadBuffer(callbackPayload)), in context);
+            state.ReplayEntry(new JournalEntry(FormatKey, CodecTestHelpers.ReadBuffer(callbackPayload)), context);
 
             Array.Fill(callbackPayload, byte.MaxValue);
             input.Skip(input.Length);
@@ -1231,7 +1231,7 @@ public class StateManagerTests : JournalingTestBase
 
         public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-        public void Replay(JournalBufferReader input, in JournalReplayContext context)
+        public void Replay(JournalBufferReader input, JournalReplayContext context)
         {
         }
     }
@@ -1255,10 +1255,10 @@ public class StateManagerTests : JournalingTestBase
             return writer;
         }
 
-        public void Replay(JournalBufferReader input, in JournalReplayContext context)
+        public void Replay(JournalBufferReader input, JournalReplayContext context)
         {
             ReadCount++;
-            ((IJournalFormat)_inner).Replay(input, in context);
+            ((IJournalFormat)_inner).Replay(input, context);
         }
     }
 
@@ -1549,7 +1549,7 @@ public class StateManagerTests : JournalingTestBase
 
         public void MarkEntryClosing() => _entryOpen = false;
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) { }
+        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
 
         public void Reset(JournalStreamWriter writer) => _writer = writer;
 
@@ -1567,7 +1567,7 @@ public class StateManagerTests : JournalingTestBase
     {
         public int AppendEntriesCount { get; private set; }
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) { }
+        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
 
         public void Reset(JournalStreamWriter writer) { }
 

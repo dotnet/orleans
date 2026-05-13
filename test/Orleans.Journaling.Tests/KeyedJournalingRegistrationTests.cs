@@ -108,7 +108,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-        public void Replay(JournalBufferReader input, in JournalReplayContext context) => throw new NotSupportedException();
+        public void Replay(JournalBufferReader input, JournalReplayContext context) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryCommandCodec<TKey, TValue>

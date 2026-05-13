@@ -158,7 +158,7 @@ public sealed class StorageStreamingTests
         {
             var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
@@ -173,7 +173,7 @@ public sealed class StorageStreamingTests
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
 
         Assert.Equal(3, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -191,7 +191,7 @@ public sealed class StorageStreamingTests
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((uint)8, entry.StreamId.Value);
@@ -343,7 +343,7 @@ public sealed class StorageStreamingTests
 
         private sealed class StreamSink(CapturingJournalEntrySink owner, JournalStreamId streamId) : IJournaledState
         {
-            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
                 owner.Entries.Add(new(streamId, entry.Reader.ToArray()));
 
             public void Reset(JournalStreamWriter writer) { }

@@ -37,7 +37,7 @@ internal static class JournalReplayContextFactory
 
         public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-        public void Replay(JournalBufferReader input, in JournalReplayContext context) => throw new NotSupportedException();
+        public void Replay(JournalBufferReader input, JournalReplayContext context) => throw new NotSupportedException();
     }
 
     private sealed class UnsupportedDictionaryCommandCodec<TValue> : IDurableDictionaryCommandCodec<string, TValue>

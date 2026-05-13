@@ -55,7 +55,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.OnWriteCompleted()

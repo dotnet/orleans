@@ -121,7 +121,7 @@ public class DurableListJournalBenchmarks
         _recoveryBuffer.Reset();
         _recoveryBuffer.Write(_encodedJournalData.AsReadOnlySequence());
         var reader = new JournalBufferReader(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
-        _journalFormat.Replay(reader, in _replayContext);
+        _journalFormat.Replay(reader, _replayContext);
     }
 
     private sealed class BenchmarkJournalManager(OrleansBinaryJournalBufferWriter buffer, JournalStreamId streamId) : IJournaledStateManager
@@ -153,7 +153,7 @@ public class DurableListJournalBenchmarks
 
         void IJournaledState.Reset(JournalStreamWriter storage) => Reset();
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
 
         void IJournaledState.AppendEntries(JournalStreamWriter writer) { }

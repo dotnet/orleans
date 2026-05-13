@@ -22,7 +22,7 @@ internal sealed class DurableNothing : IDurableNothing, IJournaledState
 
     void IJournaledState.Reset(JournalStreamWriter writer) { }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) { }
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) { }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
 

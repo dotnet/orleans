@@ -101,7 +101,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     private void OnValuePersisted()

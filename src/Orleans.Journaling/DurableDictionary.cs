@@ -59,7 +59,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)

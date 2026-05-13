@@ -73,7 +73,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     {
                         using var buffer = new ArcBufferWriter();
                         buffer.Write(entry.Payload.Span);
-                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true)), in replayContext);
+                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true)), replayContext);
                     }
 
                     var id = _journalStreamDirectory[name];
@@ -552,7 +552,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
             var journalFormat = GetJournalFormat(journalFormatKey);
             var replayContext = new JournalReplayContext(this);
-            journalFormat.Replay(buffer, in replayContext);
+            journalFormat.Replay(buffer, replayContext);
 
             if (buffer.IsCompleted && buffer.Length > 0)
             {
@@ -707,7 +707,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         public uint this[string name] => _ids[name];
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
@@ -805,7 +805,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
             _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Reader));
 
         void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)

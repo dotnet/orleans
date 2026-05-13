@@ -35,5 +35,5 @@ public interface IJournalFormat
     /// there is insufficient data to read another complete journal entry. If <see cref="JournalBufferReader.IsCompleted"/>
     /// is <see langword="true"/>, this method throws if the remaining data does not contain complete journal entries.
     /// </remarks>
-    void Replay(JournalBufferReader input, in JournalReplayContext context);
+    void Replay(JournalBufferReader input, JournalReplayContext context);
 }

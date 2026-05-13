@@ -245,7 +245,7 @@ public static class JournalTestReplayContext
 
         public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-        public void Replay(JournalBufferReader input, in JournalReplayContext context) => throw new NotSupportedException();
+        public void Replay(JournalBufferReader input, JournalReplayContext context) => throw new NotSupportedException();
     }
 
     private sealed class UnsupportedDictionaryCommandCodec<TValue> : IDurableDictionaryCommandCodec<string, TValue>
@@ -292,7 +292,7 @@ public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, ID
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -328,7 +328,7 @@ public sealed class RecordingListState<T> : IJournaledState, IDurableListCommand
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -366,7 +366,7 @@ public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueComma
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -400,7 +400,7 @@ public sealed class RecordingSetState<T> : IJournaledState, IDurableSetCommandHa
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -434,7 +434,7 @@ public sealed class RecordingValueState<T> : IJournaledState, IDurableValueComma
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public T? Value => _handler.Value;
@@ -468,7 +468,7 @@ public sealed class RecordingStateState<T> : IJournaledState, IPersistentStateCo
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
@@ -502,7 +502,7 @@ public sealed class RecordingTcsState<T> : IJournaledState, IDurableTaskCompleti
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;

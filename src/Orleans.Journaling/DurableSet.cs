@@ -46,7 +46,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
     public int Count => _items.Count;
     public bool IsReadOnly => false;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+    void IJournaledState.ReplayEntry(JournalEntry entry, JournalReplayContext context) =>
         context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)

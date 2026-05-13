@@ -17,15 +17,15 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public JournalBufferWriter CreateWriter() => new JsonLinesJournalBufferWriter();
 
-    public void Replay(JournalBufferReader input, in JournalReplayContext context)
+    public void Replay(JournalBufferReader input, JournalReplayContext context)
     {
         var offset = 0L;
-        while (TryReadLine(input, in context, ref offset))
+        while (TryReadLine(input, context, ref offset))
         {
         }
     }
 
-    private static bool TryReadLine(JournalBufferReader input, in JournalReplayContext context, ref long offset)
+    private static bool TryReadLine(JournalBufferReader input, JournalReplayContext context, ref long offset)
     {
         if (input.Length == 0)
         {
@@ -64,13 +64,13 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {lineOffset}: blank lines are not valid journal entries.");
             }
 
-            ReadLine(line, lineOffset, in context);
+            ReadLine(line, lineOffset, context);
         }
 
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, in JournalReplayContext context)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, JournalReplayContext context)
     {
         var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
         try
@@ -97,7 +97,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             WriteEntryPayload(line, payloadContent, payloadBuffer);
             var entry = new JournalEntry(JsonJournalExtensions.JournalFormatKey, new JournalBufferReader(new ArcBufferReader(payloadBuffer), isCompleted: true));
             _ = new JsonCommandReader(entry.Reader);
-            state.ReplayEntry(entry, in context);
+            state.ReplayEntry(entry, context);
         }
         catch (JsonException exception)
         {

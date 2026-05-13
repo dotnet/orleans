@@ -136,7 +136,7 @@ namespace Orleans.Journaling
     {
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
-        void ReplayEntry(JournalEntry entry, in JournalReplayContext context);
+        void ReplayEntry(JournalEntry entry, JournalReplayContext context);
         IJournaledState DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
@@ -155,7 +155,7 @@ namespace Orleans.Journaling
         string? MimeType { get; }
 
         JournalBufferWriter CreateWriter();
-        void Replay(JournalBufferReader input, in JournalReplayContext context);
+        void Replay(JournalBufferReader input, JournalReplayContext context);
     }
 
     public partial interface IJournalStorage

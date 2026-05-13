@@ -48,7 +48,7 @@ public interface IJournaledState
     /// Implementations must not retain <see cref="JournalEntry.Reader"/> or references to its
     /// backing storage after this method returns unless they copy the data.
     /// </remarks>
-    void ReplayEntry(JournalEntry entry, in JournalReplayContext context);
+    void ReplayEntry(JournalEntry entry, JournalReplayContext context);
 
     /// <summary>
     /// Resets the state.
