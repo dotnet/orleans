@@ -11,8 +11,7 @@ namespace Orleans.Journaling;
 /// </remarks>
 public sealed class JournalEntryWriter : IBufferWriter<byte>
 {
-    private IJournalEntryWriterTarget? _target;
-    private IJournalEntryWriterCompletion? _completion;
+    private JournalBatchWriterBase? _target;
     private int _entryStart;
     private bool _completed;
 
@@ -21,25 +20,25 @@ public sealed class JournalEntryWriter : IBufferWriter<byte>
     }
 
     /// <inheritdoc/>
-    public void Advance(int count) => GetTarget().Advance(count);
+    public void Advance(int count) => GetTarget().AdvanceEntryPayload(count);
 
     /// <inheritdoc/>
-    public Memory<byte> GetMemory(int sizeHint = 0) => GetTarget().GetMemory(sizeHint);
+    public Memory<byte> GetMemory(int sizeHint = 0) => GetTarget().GetEntryPayloadMemory(sizeHint);
 
     /// <inheritdoc/>
-    public Span<byte> GetSpan(int sizeHint = 0) => GetTarget().GetSpan(sizeHint);
+    public Span<byte> GetSpan(int sizeHint = 0) => GetTarget().GetEntryPayloadSpan(sizeHint);
 
     /// <summary>
     /// Writes the provided bytes to the current journal entry.
     /// </summary>
-    public void Write(ReadOnlySpan<byte> value) => GetTarget().Write(value);
+    public void Write(ReadOnlySpan<byte> value) => GetTarget().WriteEntryPayload(value);
 
     /// <summary>
     /// Writes the provided bytes to the current journal entry.
     /// </summary>
-    public void Write(ReadOnlySequence<byte> value) => GetTarget().Write(value);
+    public void Write(ReadOnlySequence<byte> value) => GetTarget().WriteEntryPayload(value);
 
-    internal void Initialize(IJournalEntryWriterTarget target, int entryStart, IJournalEntryWriterCompletion? completion = null)
+    internal void Initialize(JournalBatchWriterBase target, int entryStart)
     {
         if (_target is not null)
         {
@@ -48,7 +47,6 @@ public sealed class JournalEntryWriter : IBufferWriter<byte>
 
         _target = target;
         _entryStart = entryStart;
-        _completion = completion;
         _completed = false;
     }
 
@@ -57,7 +55,7 @@ public sealed class JournalEntryWriter : IBufferWriter<byte>
     internal void Commit()
     {
         var target = GetTarget();
-        target.CommitEntry(_entryStart);
+        target.CommitEntryWrite(_entryStart);
         Complete();
     }
 
@@ -66,7 +64,7 @@ public sealed class JournalEntryWriter : IBufferWriter<byte>
         var target = GetTarget();
         try
         {
-            target.AbortEntry(_entryStart);
+            target.AbortEntryWrite(_entryStart);
         }
         finally
         {
@@ -74,7 +72,7 @@ public sealed class JournalEntryWriter : IBufferWriter<byte>
         }
     }
 
-    private IJournalEntryWriterTarget GetTarget()
+    private JournalBatchWriterBase GetTarget()
     {
         if (_target is null)
         {
@@ -91,24 +89,8 @@ public sealed class JournalEntryWriter : IBufferWriter<byte>
 
     private void Complete()
     {
-        var completion = _completion;
         _target = null;
-        _completion = null;
         _entryStart = 0;
         _completed = true;
-        completion?.CompleteEntryWrite();
     }
-}
-
-internal interface IJournalEntryWriterTarget : IBufferWriter<byte>
-{
-    void Write(ReadOnlySpan<byte> value);
-    void Write(ReadOnlySequence<byte> value);
-    void CommitEntry(int entryStart);
-    void AbortEntry(int entryStart);
-}
-
-internal interface IJournalEntryWriterCompletion
-{
-    void CompleteEntryWrite();
 }

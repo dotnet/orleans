@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Buffers.Text;
 using System.Text.Json;
 using Orleans.Journaling.Json;
 using Orleans.Serialization.Buffers;
@@ -94,28 +95,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             var stream = new JournalStreamId(streamId);
             var state = resolver.ResolveState(stream);
-            var journalEntry = ParseJournalEntry(line, offset);
-            var payload = JsonFormattedJournalEntry.Create(new JsonOperationEntry(journalEntry, offset: 1, journalEntry.GetArrayLength() - 1)).Payload;
+            var payloadContent = ReadArrayContent(ref reader);
             using var payloadBuffer = new ArcBufferWriter();
-            payloadBuffer.Write(payload.Span);
+            WriteOperationPayload(line, payloadContent, payloadBuffer);
             var operation = new JournalOperation(JsonJournalExtensions.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true));
             _ = new JsonOperationReader(operation.Payload);
             state.ApplyOperation(operation, in context);
-        }
-        catch (JsonException exception)
-        {
-            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: invalid JSON journal entry. {exception.Message}", exception);
-        }
-    }
-
-    private static JsonElement ParseJournalEntry(ReadOnlySequence<byte> line, long offset)
-    {
-        try
-        {
-            // Use JsonDocument.Parse + Clone so the returned element does not retain a
-            // reference to the pooled JsonDocument backing array.
-            using var document = JsonDocument.Parse(line);
-            return document.RootElement.Clone();
         }
         catch (JsonException exception)
         {
@@ -148,99 +133,175 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         return true;
     }
 
+    private readonly struct JsonArrayContent(long start, long length, bool hasElements)
+    {
+        public long Start { get; } = start;
+
+        public long Length { get; } = length;
+
+        public bool HasElements { get; } = hasElements;
+    }
+
+    private static JsonArrayContent ReadArrayContent(ref Utf8JsonReader reader)
+    {
+        if (!reader.Read())
+        {
+            throw new JsonException("JSON array is incomplete.");
+        }
+
+        if (reader.TokenType is JsonTokenType.EndArray)
+        {
+            EnsureNoTrailingTokens(ref reader);
+            return default;
+        }
+
+        var start = reader.TokenStartIndex;
+        var nestedDepth = 0;
+        while (true)
+        {
+            switch (reader.TokenType)
+            {
+                case JsonTokenType.StartArray:
+                case JsonTokenType.StartObject:
+                    nestedDepth++;
+                    break;
+                case JsonTokenType.EndArray:
+                    if (nestedDepth == 0)
+                    {
+                        EnsureNoTrailingTokens(ref reader);
+                        return new(start, reader.TokenStartIndex - start, hasElements: true);
+                    }
+
+                    nestedDepth--;
+                    break;
+                case JsonTokenType.EndObject:
+                    if (nestedDepth == 0)
+                    {
+                        throw new JsonException("JSON array is malformed.");
+                    }
+
+                    nestedDepth--;
+                    break;
+            }
+
+            if (!reader.Read())
+            {
+                throw new JsonException("JSON array is incomplete.");
+            }
+        }
+    }
+
+    private static void EnsureNoTrailingTokens(ref Utf8JsonReader reader)
+    {
+        if (reader.Read())
+        {
+            throw new JsonException("Additional JSON content was found after the journal entry.");
+        }
+    }
+
+    private static void WriteOperationPayload(ReadOnlySequence<byte> line, JsonArrayContent payloadContent, ArcBufferWriter buffer)
+    {
+        buffer.Write("["u8);
+        if (payloadContent.HasElements)
+        {
+            buffer.Write(line.Slice(payloadContent.Start, payloadContent.Length));
+        }
+
+        buffer.Write("]"u8);
+    }
+
     private sealed class JsonLinesJournalBatchWriter : JournalBatchWriterBase
     {
         private readonly ArcBufferWriter _buffer = new();
-        private readonly ArcBufferWriter _payload = new();
+        private int _activeEntryStart;
+        private int _activePayloadStart;
+        private bool _hasActiveEntry;
 
-        protected override long CommittedLength => _buffer.Length;
+        protected override long CommittedLength => _hasActiveEntry ? _activeEntryStart : _buffer.Length;
 
-        protected override long ActivePayloadLength => _payload.Length;
+        protected override long ActivePayloadLength => _hasActiveEntry ? _buffer.Length - _activeEntryStart : 0;
 
         protected override ArcBuffer GetCommittedBufferCore() => _buffer.PeekSlice(_buffer.Length);
 
         protected override void ResetCore()
         {
-            _payload.Reset();
+            _activeEntryStart = 0;
+            _activePayloadStart = 0;
+            _hasActiveEntry = false;
             _buffer.Reset();
         }
 
-        public override void Dispose()
+        public override void Dispose() => _buffer.Dispose();
+
+        protected override void OnBeginEntry(JournalStreamId streamId)
         {
-            _payload.Dispose();
-            _buffer.Dispose();
+            _activeEntryStart = _buffer.Length;
+            WriteJournalEntryPrefix(streamId, _buffer);
+            _activePayloadStart = _buffer.Length;
+            _hasActiveEntry = true;
         }
 
-        protected override void OnBeginEntry(JournalStreamId streamId) => _payload.Reset();
+        protected override int GetEntryStart(JournalStreamId streamId) => _activeEntryStart;
 
-        protected override int GetEntryStart(JournalStreamId streamId) => _buffer.Length;
+        protected override void AdvancePayload(int count) => _buffer.AdvanceWriter(count);
 
-        protected override void AdvancePayload(int count) => _payload.AdvanceWriter(count);
+        protected override Memory<byte> GetPayloadMemory(int sizeHint) => _buffer.GetMemory(sizeHint);
 
-        protected override Memory<byte> GetPayloadMemory(int sizeHint) => _payload.GetMemory(sizeHint);
+        protected override Span<byte> GetPayloadSpan(int sizeHint) => _buffer.GetSpan(sizeHint);
 
-        protected override Span<byte> GetPayloadSpan(int sizeHint) => _payload.GetSpan(sizeHint);
+        protected override void WritePayload(ReadOnlySpan<byte> value) => _buffer.Write(value);
 
-        protected override void WritePayload(ReadOnlySpan<byte> value) => _payload.Write(value);
-
-        protected override void WritePayload(ReadOnlySequence<byte> value) => _payload.Write(value);
+        protected override void WritePayload(ReadOnlySequence<byte> value) => _buffer.Write(value);
 
         protected override void CommitEntry(JournalStreamId streamId, int entryStart)
         {
-            if (_payload.Length == 0)
+            if (_buffer.Length == _activePayloadStart)
             {
                 throw new InvalidOperationException("The JSON Lines journal entry has no entry payload.");
             }
 
-            using var payload = _payload.PeekSlice(_payload.Length);
-            WriteJournalEntry(streamId, payload.AsReadOnlySequence(), _buffer);
-            _payload.Reset();
+            try
+            {
+                _buffer.WriteAt(_activePayloadStart, ","u8);
+                _buffer.Write("\n"u8);
+                _activeEntryStart = 0;
+                _activePayloadStart = 0;
+                _hasActiveEntry = false;
+            }
+            catch
+            {
+                _buffer.Truncate(entryStart);
+                throw;
+            }
         }
 
-        protected override void AbortEntry(JournalStreamId streamId, int entryStart) => _payload.Reset();
+        protected override void AbortEntry(JournalStreamId streamId, int entryStart)
+        {
+            _buffer.Truncate(entryStart);
+            _activeEntryStart = 0;
+            _activePayloadStart = 0;
+            _hasActiveEntry = false;
+        }
 
         protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
         {
-            if (!OnTryAppendFormattedEntry(streamId, entry))
+            if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
                     $"The JSON journal writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
             }
-        }
 
-        protected override bool OnTryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
-        {
-            if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
-            {
-                return false;
-            }
-
-            if (entry is JsonFormattedJournalEntry jsonEntry)
-            {
-                WriteJournalEntry(streamId, jsonEntry, _buffer);
-            }
-            else
-            {
-                WriteJournalEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), _buffer);
-            }
-
-            return true;
+            WriteJournalEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), _buffer);
         }
 
         private static void WriteJournalEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, ArcBufferWriter buffer)
         {
             var entryStart = buffer.Length;
-            using var payloadDocument = JsonDocument.Parse(payload);
-            if (payloadDocument.RootElement.ValueKind is not JsonValueKind.Array)
-            {
-                throw new InvalidOperationException("The JSON Lines journal entry payload must be a JSON operation array.");
-            }
-
             try
             {
-                using var jsonWriter = new Utf8JsonWriter(buffer);
-                WriteJournalEntry(jsonWriter, streamId, payloadDocument.RootElement);
-                jsonWriter.Flush();
+                WriteJournalEntryPrefix(streamId, buffer);
+                buffer.Write(","u8);
+                buffer.Write(payload.Slice(1, payload.Length - 1));
                 buffer.Write("\n"u8);
             }
             catch
@@ -250,95 +311,17 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             }
         }
 
-        private static void WriteJournalEntry(JournalStreamId streamId, JsonFormattedJournalEntry entry, ArcBufferWriter buffer)
+        private static void WriteJournalEntryPrefix(JournalStreamId streamId, ArcBufferWriter buffer)
         {
-            var entryStart = buffer.Length;
-            try
+            Span<byte> prefix = stackalloc byte[22];
+            prefix[0] = (byte)'[';
+            if (!Utf8Formatter.TryFormat(streamId.Value, prefix[1..], out var streamIdLength))
             {
-                using var jsonWriter = new Utf8JsonWriter(buffer);
-                jsonWriter.WriteStartArray();
-                jsonWriter.WriteNumberValue(streamId.Value);
-                entry.WriteArrayElementsTo(jsonWriter);
-                jsonWriter.WriteEndArray();
-                jsonWriter.Flush();
-                buffer.Write("\n"u8);
-            }
-            catch
-            {
-                buffer.Truncate(entryStart);
-                throw;
-            }
-        }
-
-        private static void WriteJournalEntry(Utf8JsonWriter writer, JournalStreamId streamId, JsonElement entry)
-        {
-            writer.WriteStartArray();
-            writer.WriteNumberValue(streamId.Value);
-            foreach (var element in entry.EnumerateArray())
-            {
-                element.WriteTo(writer);
+                throw new InvalidOperationException("Unable to format the JSON Lines journal stream id.");
             }
 
-            writer.WriteEndArray();
+            var prefixLength = 1 + streamIdLength;
+            buffer.Write(prefix[..prefixLength]);
         }
     }
-}
-
-internal abstract class JsonFormattedJournalEntry : IFormattedJournalEntry
-{
-    private byte[]? _payload;
-
-    public static JsonFormattedJournalEntry Create(JsonOperationEntry payload) => new JsonOperationEntryFormattedJournalEntry(payload);
-
-    public static JsonFormattedJournalEntry Create<TArg>(TArg argument, Action<Utf8JsonWriter, TArg> writeArrayElementsTo)
-    {
-        ArgumentNullException.ThrowIfNull(writeArrayElementsTo);
-        return new JsonFormattedJournalEntry<TArg>(argument, writeArrayElementsTo);
-    }
-
-    public ReadOnlyMemory<byte> Payload => _payload ??= SerializePayload();
-
-    public string FormatKey => JsonJournalExtensions.JournalFormatKey;
-
-    public abstract void WriteTo(Utf8JsonWriter writer);
-
-    public abstract void WriteArrayElementsTo(Utf8JsonWriter writer);
-
-    private byte[] SerializePayload()
-    {
-        var buffer = new ArrayBufferWriter<byte>();
-        using var writer = new Utf8JsonWriter(buffer);
-        WriteTo(writer);
-        writer.Flush();
-        return buffer.WrittenMemory.ToArray();
-    }
-
-    private sealed class JsonOperationEntryFormattedJournalEntry(JsonOperationEntry entry) : JsonFormattedJournalEntry
-    {
-        public override void WriteTo(Utf8JsonWriter writer) => entry.WriteTo(writer);
-
-        public override void WriteArrayElementsTo(Utf8JsonWriter writer) => entry.WriteArrayElementsTo(writer);
-    }
-}
-
-internal sealed class JsonFormattedJournalEntry<TArg> : JsonFormattedJournalEntry
-{
-    private readonly TArg _argument;
-    private readonly Action<Utf8JsonWriter, TArg> _writeArrayElementsTo;
-
-    public JsonFormattedJournalEntry(TArg argument, Action<Utf8JsonWriter, TArg> writeArrayElementsTo)
-    {
-        ArgumentNullException.ThrowIfNull(writeArrayElementsTo);
-        _argument = argument;
-        _writeArrayElementsTo = writeArrayElementsTo;
-    }
-
-    public override void WriteTo(Utf8JsonWriter writer)
-    {
-        writer.WriteStartArray();
-        _writeArrayElementsTo(writer, _argument);
-        writer.WriteEndArray();
-    }
-
-    public override void WriteArrayElementsTo(Utf8JsonWriter writer) => _writeArrayElementsTo(writer, _argument);
 }

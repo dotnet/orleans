@@ -3,47 +3,48 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEntryWriterTarget, IJournalBatchWriter, IJournalStreamWriterTarget
+internal class OrleansBinaryJournalBatchWriter : JournalBatchWriterBase
 {
     private readonly ArcBufferWriter _buffer = new();
     private readonly ArcBufferWriter _entryBuffer = new();
-    private readonly JournalEntryWriter _entryWriter = new();
 
-    public int Length => checked(_buffer.Length + (_entryWriter.IsActive ? _entryBuffer.Length : 0));
+    public new int Length => checked((int)base.Length);
 
-    long IJournalBatchWriter.Length => Length;
+    protected override long CommittedLength => _buffer.Length;
+
+    protected override long ActivePayloadLength => _entryBuffer.Length;
 
     public bool IsEmpty => Length == 0;
 
-    public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
+    protected override ArcBuffer GetCommittedBufferCore() => _buffer.PeekSlice(_buffer.Length);
 
-    public void Advance(int count) => GetWriteBuffer().AdvanceWriter(count);
-
-    public Memory<byte> GetMemory(int sizeHint = 0) => GetWriteBuffer().GetMemory(sizeHint);
-
-    public Span<byte> GetSpan(int sizeHint = 0) => GetWriteBuffer().GetSpan(sizeHint);
-
-    public void Write(ReadOnlySpan<byte> value) => GetWriteBuffer().Write(value);
-
-    public void Write(ReadOnlySequence<byte> value) => GetWriteBuffer().Write(value);
-
-    public JournalEntryWriter BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion = null)
+    protected override void ResetCore()
     {
-        if (_entryWriter.IsActive)
-        {
-            throw new InvalidOperationException("The journal batch already has an active entry.");
-        }
+        _buffer.Reset();
+        _entryBuffer.Reset();
+    }
 
-        var entryStart = Length;
+    protected override void OnBeginEntry(JournalStreamId streamId)
+    {
         _entryBuffer.Reset();
         var streamIdWriter = Writer.Create(_entryBuffer, session: null!);
         streamIdWriter.WriteVarUInt64(streamId.Value);
         streamIdWriter.Commit();
-        _entryWriter.Initialize(this, entryStart, completion);
-        return _entryWriter;
     }
 
-    public void CommitEntry(int entryStart)
+    protected override int GetEntryStart(JournalStreamId streamId) => _buffer.Length;
+
+    protected override void AdvancePayload(int count) => _entryBuffer.AdvanceWriter(count);
+
+    protected override Memory<byte> GetPayloadMemory(int sizeHint) => _entryBuffer.GetMemory(sizeHint);
+
+    protected override Span<byte> GetPayloadSpan(int sizeHint) => _entryBuffer.GetSpan(sizeHint);
+
+    protected override void WritePayload(ReadOnlySpan<byte> value) => _entryBuffer.Write(value);
+
+    protected override void WritePayload(ReadOnlySequence<byte> value) => _entryBuffer.Write(value);
+
+    protected override void CommitEntry(JournalStreamId streamId, int entryStart)
     {
         ValidateEntryStart(entryStart);
         var length = checked((uint)_entryBuffer.Length);
@@ -55,7 +56,7 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
         _entryBuffer.Reset();
     }
 
-    public void AbortEntry(int entryStart)
+    protected override void AbortEntry(JournalStreamId streamId, int entryStart)
     {
         ValidateEntryStart(entryStart);
         _entryBuffer.Reset();
@@ -63,66 +64,26 @@ internal sealed class OrleansBinaryJournalBatchWriter : IDisposable, IJournalEnt
 
     public ArcBuffer PeekSlice() => _buffer.PeekSlice(_buffer.Length);
 
-    public ArcBuffer GetCommittedBuffer()
-    {
-        if (_entryWriter.IsActive)
-        {
-            throw new InvalidOperationException("The journal batch has an active entry.");
-        }
-
-        return _buffer.PeekSlice(_buffer.Length);
-    }
-
     public Stream AsReadOnlyStream() => new ReadOnlyStream(PeekSlice());
 
-    public void Reset()
-    {
-        if (_entryWriter.IsActive)
-        {
-            throw new InvalidOperationException("The journal batch cannot be reset while an entry is active.");
-        }
-
-        _buffer.Reset();
-        _entryBuffer.Reset();
-    }
-
-    public void Dispose()
+    public override void Dispose()
     {
         _entryBuffer.Dispose();
         _buffer.Dispose();
     }
 
-    JournalEntryWriter IJournalStreamWriterTarget.BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion) => BeginEntry(streamId, completion);
-
-    void IJournalStreamWriterTarget.AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+    protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
     {
-        ArgumentNullException.ThrowIfNull(entry);
         if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"The Orleans binary journal batch writer cannot append formatted entry for journal format key '{entry.FormatKey}'.");
-        }
+            }
 
-        using var journalEntry = new JournalEntry(BeginEntry(streamId));
+        using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();
         journalEntry.Writer.Write(entry.Payload.Span);
         journalEntry.Commit();
     }
-
-    bool IJournalStreamWriterTarget.TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
-    {
-        ArgumentNullException.ThrowIfNull(entry);
-        if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
-        {
-            return false;
-        }
-
-        using var journalEntry = new JournalEntry(BeginEntry(streamId));
-        journalEntry.Writer.Write(entry.Payload.Span);
-        journalEntry.Commit();
-        return true;
-    }
-
-    private ArcBufferWriter GetWriteBuffer() => _entryWriter.IsActive ? _entryBuffer : _buffer;
 
     private void ValidateEntryStart(int entryStart)
     {

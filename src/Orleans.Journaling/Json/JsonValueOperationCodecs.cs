@@ -14,26 +14,14 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void WriteSet(T value, JournalStreamWriter writer)
     {
-        var formattedEntry = JsonFormattedJournalEntry.Create(
+        JsonOperationWriter.Write(
+            writer,
             (typeInfo: _valueTypeInfo, value),
             static (jsonWriter, operation) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
                 JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
             });
-        if (writer.TryAppendFormattedEntry(formattedEntry))
-        {
-            return;
-        }
-
-        using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
-        {
-            formattedEntry.WriteTo(jsonWriter);
-            jsonWriter.Flush();
-        }
-
-        entry.Commit();
     }
 
     /// <inheritdoc/>
@@ -58,7 +46,6 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
         }
     }
 }
-
 /// <summary>
 /// JSON codec for durable persistent state journal entries.
 /// </summary>
@@ -70,7 +57,8 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
     /// <inheritdoc/>
     public void WriteSet(T state, ulong version, JournalStreamWriter writer)
     {
-        var formattedEntry = JsonFormattedJournalEntry.Create(
+        JsonOperationWriter.Write(
+            writer,
             (typeInfo: _stateTypeInfo, state, version),
             static (jsonWriter, operation) =>
             {
@@ -78,40 +66,15 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
                 JsonSerializer.Serialize(jsonWriter, operation.state, operation.typeInfo);
                 jsonWriter.WriteNumberValue(operation.version);
             });
-        if (writer.TryAppendFormattedEntry(formattedEntry))
-        {
-            return;
-        }
-
-        using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
-        {
-            formattedEntry.WriteTo(jsonWriter);
-            jsonWriter.Flush();
-        }
-
-        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer)
     {
-        var formattedEntry = JsonFormattedJournalEntry.Create(
+        JsonOperationWriter.Write(
+            writer,
             JsonJournalEntryCommands.Clear,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-        if (writer.TryAppendFormattedEntry(formattedEntry))
-        {
-            return;
-        }
-
-        using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
-        {
-            formattedEntry.WriteTo(jsonWriter);
-            jsonWriter.Flush();
-        }
-
-        entry.Commit();
     }
 
     /// <inheritdoc/>
@@ -155,93 +118,45 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     /// <inheritdoc/>
     public void WritePending(JournalStreamWriter writer)
     {
-        var formattedEntry = JsonFormattedJournalEntry.Create(
+        JsonOperationWriter.Write(
+            writer,
             JsonJournalEntryCommands.Pending,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-        if (writer.TryAppendFormattedEntry(formattedEntry))
-        {
-            return;
-        }
-
-        using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
-        {
-            formattedEntry.WriteTo(jsonWriter);
-            jsonWriter.Flush();
-        }
-
-        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteCompleted(T value, JournalStreamWriter writer)
     {
-        var formattedEntry = JsonFormattedJournalEntry.Create(
+        JsonOperationWriter.Write(
+            writer,
             (typeInfo: _valueTypeInfo, value),
             static (jsonWriter, operation) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Completed);
                 JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
             });
-        if (writer.TryAppendFormattedEntry(formattedEntry))
-        {
-            return;
-        }
-
-        using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
-        {
-            formattedEntry.WriteTo(jsonWriter);
-            jsonWriter.Flush();
-        }
-
-        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteFaulted(Exception exception, JournalStreamWriter writer)
     {
-        var formattedEntry = JsonFormattedJournalEntry.Create(
+        JsonOperationWriter.Write(
+            writer,
             exception.Message,
             static (jsonWriter, message) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Faulted);
                 jsonWriter.WriteStringValue(message);
             });
-        if (writer.TryAppendFormattedEntry(formattedEntry))
-        {
-            return;
-        }
-
-        using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
-        {
-            formattedEntry.WriteTo(jsonWriter);
-            jsonWriter.Flush();
-        }
-
-        entry.Commit();
     }
 
     /// <inheritdoc/>
     public void WriteCanceled(JournalStreamWriter writer)
     {
-        var formattedEntry = JsonFormattedJournalEntry.Create(
+        JsonOperationWriter.Write(
+            writer,
             JsonJournalEntryCommands.Canceled,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
-        if (writer.TryAppendFormattedEntry(formattedEntry))
-        {
-            return;
-        }
-
-        using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
-        {
-            formattedEntry.WriteTo(jsonWriter);
-            jsonWriter.Flush();
-        }
-
-        entry.Commit();
     }
 
     /// <inheritdoc/>

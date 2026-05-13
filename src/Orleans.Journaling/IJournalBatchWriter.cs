@@ -29,6 +29,9 @@ public interface IJournalBatchWriter : IDisposable
     /// <summary>
     /// Gets a borrowed buffer containing only committed bytes which are safe to persist.
     /// </summary>
+    /// <remarks>
+    /// The returned buffer must remain valid for the caller's lifetime even if <see cref="Reset"/> is subsequently called.
+    /// </remarks>
     /// <returns>An <see cref="ArcBuffer"/> containing the committed journal bytes. The caller owns and must dispose the returned buffer.</returns>
     /// <exception cref="InvalidOperationException">An entry is currently active and has not been committed or aborted.</exception>
     ArcBuffer GetCommittedBuffer();
@@ -36,5 +39,6 @@ public interface IJournalBatchWriter : IDisposable
     /// <summary>
     /// Clears all buffered data so the writer can be reused for another batch.
     /// </summary>
+    /// <remarks>This must not invalidate buffers previously returned by <see cref="GetCommittedBuffer"/>.</remarks>
     void Reset();
 }

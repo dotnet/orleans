@@ -9,25 +9,28 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// Derived classes own the physical framing and committed buffer. This base class only
 /// connects <see cref="JournalStreamWriter"/> and <see cref="JournalEntryWriter"/> to the
-/// derived payload writer and entry completion hooks.
+/// derived payload writer and entry lifecycle hooks. Buffers returned by <see cref="GetCommittedBuffer"/>
+/// must remain valid for the caller's lifetime even if <see cref="Reset"/> is called before the caller
+/// disposes the returned buffer.
 /// </remarks>
 public abstract class JournalBatchWriterBase : IJournalBatchWriter
 {
     private readonly JournalEntryWriter _entryWriter = new();
-    private readonly Target _target;
     private JournalStreamId _activeStreamId;
     private int _activeEntryStart;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JournalBatchWriterBase"/> class.
     /// </summary>
-    protected JournalBatchWriterBase() => _target = new(this);
+    protected JournalBatchWriterBase()
+    {
+    }
 
     /// <inheritdoc/>
     public long Length => checked(CommittedLength + (_entryWriter.IsActive ? ActivePayloadLength : 0));
 
     /// <inheritdoc/>
-    public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, _target);
+    public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
 
     /// <inheritdoc/>
     public ArcBuffer GetCommittedBuffer()
@@ -60,7 +63,10 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     /// <summary>
     /// Returns a borrowed buffer containing the committed bytes of the batch.
     /// </summary>
-    /// <remarks>Called by <see cref="GetCommittedBuffer"/> after verifying that no entry is active.</remarks>
+    /// <remarks>
+    /// Called by <see cref="GetCommittedBuffer"/> after verifying that no entry is active. The returned buffer
+    /// must remain valid for the caller's lifetime even if <see cref="Reset"/> is subsequently called.
+    /// </remarks>
     /// <returns>An <see cref="ArcBuffer"/> containing the committed bytes. The caller owns and must dispose the returned buffer.</returns>
     protected abstract ArcBuffer GetCommittedBufferCore();
 
@@ -129,14 +135,6 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     }
 
     /// <summary>
-    /// Attempts to append a format-owned entry without first converting it to payload bytes.
-    /// </summary>
-    /// <param name="streamId">The durable state id.</param>
-    /// <param name="entry">The format-owned entry.</param>
-    /// <returns><see langword="true"/> if <paramref name="entry"/> was appended; otherwise, <see langword="false"/>.</returns>
-    protected virtual bool OnTryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) => false;
-
-    /// <summary>
     /// Commits the active entry.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
@@ -150,7 +148,7 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     /// <param name="entryStart">The entry start marker returned by <see cref="GetEntryStart"/>.</param>
     protected abstract void AbortEntry(JournalStreamId streamId, int entryStart);
 
-    private JournalEntryWriter BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion)
+    internal JournalEntryWriter BeginEntry(JournalStreamId streamId)
     {
         if (_entryWriter.IsActive)
         {
@@ -161,11 +159,25 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
         var entryStart = GetEntryStart(streamId);
         _activeStreamId = streamId;
         _activeEntryStart = entryStart;
-        _entryWriter.Initialize(_target, entryStart, completion);
+        _entryWriter.Initialize(this, entryStart);
         return _entryWriter;
     }
 
-    private void AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+    internal void AdvanceEntryPayload(int count) => AdvancePayload(count);
+
+    internal Memory<byte> GetEntryPayloadMemory(int sizeHint) => GetPayloadMemory(sizeHint);
+
+    internal Span<byte> GetEntryPayloadSpan(int sizeHint) => GetPayloadSpan(sizeHint);
+
+    internal void WriteEntryPayload(ReadOnlySpan<byte> value) => WritePayload(value);
+
+    internal void WriteEntryPayload(ReadOnlySequence<byte> value) => WritePayload(value);
+
+    internal void CommitEntryWrite(int entryStart) => CommitActiveEntry(entryStart);
+
+    internal void AbortEntryWrite(int entryStart) => AbortActiveEntry(entryStart);
+
+    internal void AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
         if (_entryWriter.IsActive)
@@ -174,17 +186,6 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
         }
 
         OnAppendFormattedEntry(streamId, entry);
-    }
-
-    private bool TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
-    {
-        ArgumentNullException.ThrowIfNull(entry);
-        if (_entryWriter.IsActive)
-        {
-            throw new InvalidOperationException("The journal batch already has an active entry.");
-        }
-
-        return OnTryAppendFormattedEntry(streamId, entry);
     }
 
     private void CommitActiveEntry(int entryStart)
@@ -227,31 +228,5 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
         {
             throw new InvalidOperationException("The journal batch has an active entry.");
         }
-    }
-
-    private sealed class Target(JournalBatchWriterBase owner) : IJournalStreamWriterTarget, IJournalEntryWriterTarget
-    {
-        public void Advance(int count) => owner.AdvancePayload(count);
-
-        public Memory<byte> GetMemory(int sizeHint = 0) => owner.GetPayloadMemory(sizeHint);
-
-        public Span<byte> GetSpan(int sizeHint = 0) => owner.GetPayloadSpan(sizeHint);
-
-        public void Write(ReadOnlySpan<byte> value) => owner.WritePayload(value);
-
-        public void Write(ReadOnlySequence<byte> value) => owner.WritePayload(value);
-
-        public void CommitEntry(int entryStart) => owner.CommitActiveEntry(entryStart);
-
-        public void AbortEntry(int entryStart) => owner.AbortActiveEntry(entryStart);
-
-        JournalEntryWriter IJournalStreamWriterTarget.BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion) =>
-            owner.BeginEntry(streamId, completion);
-
-        void IJournalStreamWriterTarget.AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) =>
-            owner.AppendFormattedEntry(streamId, entry);
-
-        bool IJournalStreamWriterTarget.TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) =>
-            owner.TryAppendFormattedEntry(streamId, entry);
     }
 }

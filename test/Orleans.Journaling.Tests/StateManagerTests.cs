@@ -1106,7 +1106,7 @@ public class StateManagerTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
+        public IJournalBatchWriter CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
         public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
         {
@@ -1139,10 +1139,8 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class TrackingJournalBatchWriter : IJournalBatchWriter
+    private sealed class TrackingJournalBatchWriter : OrleansBinaryJournalBatchWriter, IJournalBatchWriter
     {
-        private readonly OrleansBinaryJournalBatchWriter _inner = new();
-
         public List<ulong> CreatedJournalStreamWriterIds { get; } = [];
 
         public List<ulong> BeganEntryIds { get; } = [];
@@ -1151,49 +1149,35 @@ public class StateManagerTests : JournalingTestBase
 
         public int ResetCount { get; private set; }
 
-        public long Length => _inner.Length;
-
-        public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId)
+        JournalStreamWriter IJournalBatchWriter.CreateJournalStreamWriter(JournalStreamId streamId)
         {
             CreatedJournalStreamWriterIds.Add(streamId.Value);
-            return new(streamId, new TrackingJournalStreamWriterTarget(this));
+            return CreateJournalStreamWriter(streamId);
         }
 
-        public ArcBuffer GetCommittedBuffer()
+        ArcBuffer IJournalBatchWriter.GetCommittedBuffer()
         {
             GetCommittedBufferCount++;
-            return _inner.GetCommittedBuffer();
+            return GetCommittedBuffer();
         }
 
-        public void Reset()
+        void IJournalBatchWriter.Reset()
         {
             ResetCount++;
-            _inner.Reset();
+            Reset();
         }
 
-        public void Dispose() => _inner.Dispose();
-
-        private sealed class TrackingJournalStreamWriterTarget(TrackingJournalBatchWriter owner) : IJournalStreamWriterTarget
+        protected override void OnBeginEntry(JournalStreamId streamId)
         {
-            public JournalEntryWriter BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion)
-            {
-                owner.BeganEntryIds.Add(streamId.Value);
-                return owner._inner.BeginEntry(streamId, completion);
-            }
+            BeganEntryIds.Add(streamId.Value);
+            base.OnBeginEntry(streamId);
+        }
 
-            public void AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
-            {
-                owner.BeganEntryIds.Add(streamId.Value);
-                using var journalEntry = new JournalEntry(owner._inner.BeginEntry(streamId));
-                journalEntry.Writer.Write(entry.Payload.Span);
-                journalEntry.Commit();
-            }
-
-            public bool TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
-            {
-                AppendFormattedEntry(streamId, entry);
-                return true;
-            }
+        protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+        {
+            using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();
+            journalEntry.Writer.Write(entry.Payload.Span);
+            journalEntry.Commit();
         }
     }
 

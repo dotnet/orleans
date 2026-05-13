@@ -326,8 +326,6 @@ namespace Orleans.Journaling
 
         protected virtual void OnBeginEntry(JournalStreamId streamId) { }
 
-        protected virtual bool OnTryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) { throw null; }
-
         public void Reset() { }
 
         protected abstract void ResetCore();
@@ -480,7 +478,6 @@ namespace Orleans.Journaling
         private readonly int _dummyPrimitive;
         public readonly JournalEntry BeginEntry() { throw null; }
 
-        public readonly bool TryAppendFormattedEntry(IFormattedJournalEntry entry) { throw null; }
     }
 
     public sealed partial class VolatileJournalStorage : IJournalStorage

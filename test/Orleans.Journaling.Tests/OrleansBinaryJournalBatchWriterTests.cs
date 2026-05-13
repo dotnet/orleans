@@ -265,6 +265,21 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     }
 
     [Fact]
+    public void GetCommittedBuffer_RemainsReadableAfterResetAndReuse()
+    {
+        using var buffer = new OrleansBinaryJournalBatchWriter();
+        AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [1, 2, 3]);
+        using var committed = buffer.GetCommittedBuffer();
+        var expectedCommitted = committed.ToArray();
+
+        buffer.Reset();
+        AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(2)), [4, 5]);
+
+        Assert.Equal(expectedCommitted, committed.ToArray());
+        Assert.NotEqual(expectedCommitted, ToArray(buffer));
+    }
+
+    [Fact]
     public void Reset_ThrowsWhenEntryIsActive()
     {
         using var buffer = new OrleansBinaryJournalBatchWriter();

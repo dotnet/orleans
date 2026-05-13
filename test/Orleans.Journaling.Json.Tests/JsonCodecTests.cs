@@ -271,23 +271,7 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesJournalFormat_TryAppendFormattedEntry_WritesEntryDirectly()
-    {
-        var format = new JsonLinesJournalFormat();
-        using var writer = format.CreateWriter();
-
-        var accepted = writer.CreateJournalStreamWriter(new JournalStreamId(8)).TryAppendFormattedEntry(JsonFormattedJournalEntry.Create(42, static (jsonWriter, value) =>
-        {
-            jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
-            jsonWriter.WriteNumberValue(value);
-        }));
-
-        Assert.True(accepted);
-        Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
-    }
-
-    [Fact]
-    public void JsonValueCodec_JournalStreamWriterOverload_UsesFormattedEntryForJsonWriter()
+    public void JsonValueCodec_JournalStreamWriterOverload_WritesJsonLines()
     {
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
@@ -299,7 +283,7 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonListCodec_JournalStreamWriterOverload_WritesAddDirectlyForJsonWriter()
+    public void JsonListCodec_JournalStreamWriterOverload_WritesAddForJsonWriter()
     {
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
@@ -311,7 +295,7 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonOperationCodecs_JournalStreamWriterOverload_WriteDirectJsonLinesForOperationFamilies()
+    public void JsonOperationCodecs_JournalStreamWriterOverload_WriteJsonLinesForOperationFamilies()
     {
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
@@ -330,7 +314,7 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesJournalFormat_TryAppendFormattedEntry_RollsBackWhenJsonWriteThrows()
+    public void JsonLinesJournalFormat_Writer_RollsBackWhenJsonWriteThrows()
     {
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
@@ -347,7 +331,7 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonValueCodec_JournalStreamWriterOverload_FallsBackToPayloadBytesForNonJsonWriter()
+    public void JsonValueCodec_JournalStreamWriterOverload_WritesPayloadBytesForNonJsonWriter()
     {
         using var writer = new CapturingNonJsonJournalWriter();
         var codec = new JsonValueOperationCodec<int>(Options);
@@ -362,7 +346,7 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonOperationCodecWriter_FallbackPath_AbortsEntryWhenJsonWriteThrows()
+    public void JsonOperationWriter_AbortsEntryWhenJsonWriteThrows()
     {
         using var writer = new CapturingNonJsonJournalWriter();
         var valueCodec = new JsonValueOperationCodec<int>(Options);
@@ -404,6 +388,19 @@ public class JsonCodecTests
             """[8,"set",42]""" + "\n" +
             """[10,"set",43]""" + "\n",
             GetString(writer));
+    }
+
+    [Fact]
+    public void JsonLinesJournalFormat_Writer_AppendsEntryPayloadWithoutReformatting()
+    {
+        var format = new JsonLinesJournalFormat();
+        using var writer = format.CreateWriter();
+        using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(8)).BeginEntry();
+
+        entry.Writer.Write("""["set" , { "value" : 42 }]"""u8);
+        entry.Commit();
+
+        Assert.Equal("""[8,"set" , { "value" : 42 }]""" + "\n", GetString(writer));
     }
 
     [Fact]
@@ -665,30 +662,15 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesJournalFormat_Read_FormattedEntryPath_RejectsTrailingTokensAfterArray()
+    public void JsonLinesJournalFormat_Read_RejectsTrailingTokensAfterArray()
     {
         var format = new JsonLinesJournalFormat();
 
-        // Formatted-entry path: ParseJournalEntry -> JsonDocument.Parse must reject trailing JSON.
+        // The dispatch parser must reject trailing JSON after the entry array.
         var exception = Assert.Throws<InvalidOperationException>(() =>
             Read(format, """[8,"set",42][9,"set",43]""" + "\n"));
 
         Assert.Contains("invalid JSON", exception.Message);
-    }
-
-    [Fact]
-    public void JsonFormattedJournalEntry_StoresPayload()
-    {
-        var entry = JsonFormattedJournalEntry.Create(
-            42,
-            static (writer, value) =>
-            {
-                writer.WriteStringValue(JsonJournalEntryCommands.Set);
-                writer.WriteNumberValue(value);
-            });
-
-        Assert.Equal(JsonJournalExtensions.JournalFormatKey, entry.FormatKey);
-        Assert.Equal("""["set",42]""", Encoding.UTF8.GetString(entry.Payload.Span));
     }
 
     [Fact]
@@ -704,6 +686,21 @@ public class JsonCodecTests
 
         using var slice = writer.GetCommittedBuffer();
         Assert.Equal("""[8,"set",42]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
+    }
+
+    [Fact]
+    public void JsonLinesJournalFormat_Writer_AppendsFormattedEntryPayloadWithoutReformatting()
+    {
+        var format = new JsonLinesJournalFormat();
+        using var writer = format.CreateWriter();
+        var journalWriter = writer.CreateJournalStreamWriter(new JournalStreamId(8));
+
+        journalWriter.AppendFormattedEntry(new TestFormattedJournalEntry(
+            JsonJournalExtensions.JournalFormatKey,
+            Encoding.UTF8.GetBytes("""["set" , { "value" : 42 }]""")));
+
+        using var slice = writer.GetCommittedBuffer();
+        Assert.Equal("""[8,"set" , { "value" : 42 }]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
     }
 
     [Fact]
@@ -797,54 +794,45 @@ public class JsonCodecTests
 
     private sealed record RecordedJournalEntry(JournalStreamId StreamId, byte[] Payload);
 
-    private sealed class CapturingNonJsonJournalWriter : IJournalStreamWriterTarget, IJournalEntryWriterTarget, IDisposable
+    private sealed class CapturingNonJsonJournalWriter : JournalBatchWriterBase
     {
         private readonly ArcBufferWriter _payload = new();
-        private readonly JournalEntryWriter _entryWriter = new();
-        private JournalStreamId _streamId;
 
         public List<RecordedJournalEntry> Entries { get; } = [];
 
-        public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
+        protected override long CommittedLength => 0;
 
-        public void Advance(int count) => _payload.AdvanceWriter(count);
+        protected override long ActivePayloadLength => _payload.Length;
 
-        public Memory<byte> GetMemory(int sizeHint = 0) => _payload.GetMemory(sizeHint);
+        protected override ArcBuffer GetCommittedBufferCore() => _payload.PeekSlice(0);
 
-        public Span<byte> GetSpan(int sizeHint = 0) => _payload.GetSpan(sizeHint);
+        protected override void ResetCore() => _payload.Reset();
 
-        public void Write(ReadOnlySpan<byte> value) => _payload.Write(value);
+        protected override int GetEntryStart(JournalStreamId streamId) => Entries.Count;
 
-        public void Write(ReadOnlySequence<byte> value) => _payload.Write(value);
+        protected override void AdvancePayload(int count) => _payload.AdvanceWriter(count);
 
-        public void CommitEntry(int entryStart)
+        protected override Memory<byte> GetPayloadMemory(int sizeHint) => _payload.GetMemory(sizeHint);
+
+        protected override Span<byte> GetPayloadSpan(int sizeHint) => _payload.GetSpan(sizeHint);
+
+        protected override void WritePayload(ReadOnlySpan<byte> value) => _payload.Write(value);
+
+        protected override void WritePayload(ReadOnlySequence<byte> value) => _payload.Write(value);
+
+        protected override void CommitEntry(JournalStreamId streamId, int entryStart)
         {
             using var payload = _payload.PeekSlice(_payload.Length);
-            Entries.Add(new(_streamId, payload.ToArray()));
+            Entries.Add(new(streamId, payload.ToArray()));
             _payload.Reset();
         }
 
-        public void AbortEntry(int entryStart) => _payload.Reset();
+        protected override void AbortEntry(JournalStreamId streamId, int entryStart) => _payload.Reset();
 
-        public void Dispose() => _payload.Dispose();
+        public override void Dispose() => _payload.Dispose();
 
-        JournalEntryWriter IJournalStreamWriterTarget.BeginEntry(JournalStreamId streamId, IJournalEntryWriterCompletion? completion)
-        {
-            if (_entryWriter.IsActive)
-            {
-                throw new InvalidOperationException("The test writer already has an active entry.");
-            }
-
-            _streamId = streamId;
-            _payload.Reset();
-            _entryWriter.Initialize(this, Entries.Count, completion);
-            return _entryWriter;
-        }
-
-        void IJournalStreamWriterTarget.AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) =>
+        protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) =>
             throw new InvalidOperationException("This test writer does not accept formatted entries.");
-
-        bool IJournalStreamWriterTarget.TryAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) => false;
     }
 
     private sealed class RecordingJournalEntrySink : IStateResolver, IJournaledState
