@@ -576,10 +576,12 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
-    /// Returns a slice of the provided length without marking the data referred to it as consumed.
+    /// Returns a pinned slice of the provided length without marking the data referred to it as consumed.
     /// </summary>
     /// <param name="count">The number of bytes to consume.</param>
-    /// <returns>A slice of unconsumed data.</returns>
+    /// <returns>
+    /// A pinned slice of unconsumed data. The caller owns the returned buffer and must dispose it.
+    /// </returns>
     public ArcBuffer PeekSlice(int count)
     {
         ThrowIfDisposed();
@@ -603,7 +605,9 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     /// Consumes a slice of the provided length.
     /// </summary>
     /// <param name="count">The number of bytes to consume.</param>
-    /// <returns>A buffer representing the consumed data.</returns>
+    /// <returns>
+    /// A pinned buffer representing the consumed data. The caller owns the returned buffer and must dispose it.
+    /// </returns>
     public ArcBuffer ConsumeSlice(int count)
     {
         ThrowIfDisposed();
@@ -1061,10 +1065,12 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     public ReadOnlySpan<byte> Peek(scoped in Span<byte> destination) => writer.Peek(in destination);
 
     /// <summary>
-    /// Returns a slice of the provided length without marking the data referred to it as consumed.
+    /// Returns a pinned slice of the provided length without marking the data referred to it as consumed.
     /// </summary>
     /// <param name="count">The number of bytes to consume.</param>
-    /// <returns>A slice of unconsumed data.</returns>
+    /// <returns>
+    /// A pinned slice of unconsumed data. The caller owns the returned buffer and must dispose it.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ArcBuffer PeekSlice(int count) => writer.PeekSlice(count);
 
@@ -1072,14 +1078,18 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// Consumes a slice of the provided length.
     /// </summary>
     /// <param name="count">The number of bytes to consume.</param>
-    /// <returns>A buffer representing the consumed data.</returns>
+    /// <returns>
+    /// A pinned buffer representing the consumed data. The caller owns the returned buffer and must dispose it.
+    /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
     public ArcBuffer ConsumeSlice(int count) => writer.ConsumeSlice(count);
 
     /// <summary>
     /// Reads bytes until <paramref name="delimiter"/> is found.
     /// </summary>
-    /// <param name="slice">The bytes before the delimiter, if it was found.</param>
+    /// <param name="slice">
+    /// The pinned bytes before the delimiter, if it was found. The caller owns the returned buffer and must dispose it.
+    /// </param>
     /// <param name="delimiter">The delimiter to search for.</param>
     /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
     /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>

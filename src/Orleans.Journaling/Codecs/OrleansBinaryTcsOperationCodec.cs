@@ -21,7 +21,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     public void WritePending(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var span = output.GetSpan(2);
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Pending;
@@ -33,7 +33,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     public void WriteCompleted(T value, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var span = output.GetSpan(2);
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Completed;
@@ -46,7 +46,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     public void WriteFaulted(Exception exception, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var span = output.GetSpan(2);
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Faulted;
@@ -59,7 +59,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     public void WriteCanceled(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var span = output.GetSpan(2);
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Canceled;

@@ -17,7 +17,7 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
     public void WriteSet(T value, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(SetValueCommand);

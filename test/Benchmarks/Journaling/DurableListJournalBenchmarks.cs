@@ -21,8 +21,8 @@ public class DurableListJournalBenchmarks
     private IJournalFormat _journalFormat;
     private DurableList<int> _list;
     private IJournaledState _state;
-    private OrleansBinaryJournalBatchWriter _writeBuffer;
-    private OrleansBinaryJournalBatchWriter _encodedJournalStreamWriter;
+    private OrleansBinaryJournalWriter _writeBuffer;
+    private OrleansBinaryJournalWriter _encodedJournalStreamWriter;
     private ArcBuffer _encodedJournalData;
     private ArcBufferWriter _recoveryBuffer;
     private RecoveryConsumer _recoveryConsumer;
@@ -34,7 +34,7 @@ public class DurableListJournalBenchmarks
         _sessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
         _codec = new OrleansBinaryListOperationCodec<int>(RawInt32JournalValueCodec.Instance, _sessionPool);
         _journalFormat = new OrleansBinaryJournalFormat(_sessionPool);
-        _writeBuffer = new OrleansBinaryJournalBatchWriter();
+        _writeBuffer = new OrleansBinaryJournalWriter();
         _list = new DurableList<int>("list", new BenchmarkJournalManager(_writeBuffer, ListJournalStreamId), _codec);
         _state = _list;
         _recoveryConsumer = new RecoveryConsumer(ListJournalStreamId, _codec, OperationsPerInvocation);
@@ -93,7 +93,7 @@ public class DurableListJournalBenchmarks
 
     private ArcBuffer CreateEncodedJournalData()
     {
-        _encodedJournalStreamWriter = new OrleansBinaryJournalBatchWriter();
+        _encodedJournalStreamWriter = new OrleansBinaryJournalWriter();
         var writer = _encodedJournalStreamWriter.CreateJournalStreamWriter(ListJournalStreamId);
         for (var i = 0; i < OperationsPerInvocation; i++)
         {
@@ -142,7 +142,7 @@ public class DurableListJournalBenchmarks
         }
     }
 
-    private sealed class BenchmarkJournalManager(OrleansBinaryJournalBatchWriter buffer, JournalStreamId streamId) : IStateManager
+    private sealed class BenchmarkJournalManager(OrleansBinaryJournalWriter buffer, JournalStreamId streamId) : IStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 

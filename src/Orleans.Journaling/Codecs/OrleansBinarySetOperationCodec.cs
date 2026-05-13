@@ -20,7 +20,7 @@ internal sealed class OrleansBinarySetOperationCodec<T>(
     public void WriteAdd(T item, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(AddCommand);
@@ -33,7 +33,7 @@ internal sealed class OrleansBinarySetOperationCodec<T>(
     public void WriteRemove(T item, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(RemoveCommand);
@@ -46,7 +46,7 @@ internal sealed class OrleansBinarySetOperationCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(ClearCommand);
         payloadWriter.Commit();
@@ -57,7 +57,7 @@ internal sealed class OrleansBinarySetOperationCodec<T>(
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);

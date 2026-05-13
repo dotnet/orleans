@@ -9,16 +9,16 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 [TestCategory("BVT")]
-public sealed class OrleansBinaryJournalBatchWriterTests
+public sealed class OrleansBinaryJournalWriterTests
 {
     private static readonly SerializerSessionPool SessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
     [Fact]
     public void Commit_WritesLegacyVarUIntFramedEntry()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
 
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(42)).BeginEntry();
-        entry.Writer.Write(new byte[] { 1, 2, 3 });
+        entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
         entry.Commit();
 
         var bytes = ToArray(buffer);
@@ -28,7 +28,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void Commit_WritesMultipleEntries()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
 
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [10]);
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(300)), [20, 21]);
@@ -50,7 +50,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void BinaryFormat_Read_ParsesConcatenatedEntries()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [10]);
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(300)), [20, 21]);
         using var data = buffer.GetCommittedBuffer();
@@ -73,9 +73,9 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     }
 
     [Fact]
-    public void BinaryFormat_Read_BuffersFormattedEntriesForRetiredStates()
+    public void BinaryFormat_Read_BuffersPreservedOperationsForRetiredStates()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [0xAA, 0xBB]);
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [0xCC]);
         using var data = buffer.GetCommittedBuffer();
@@ -88,7 +88,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
             entry => Assert.Equal([0xAA, 0xBB], entry.Payload),
             entry => Assert.Equal([0xCC], entry.Payload));
 
-        using var replay = new OrleansBinaryJournalBatchWriter();
+        using var replay = new OrleansBinaryJournalWriter();
         bufferingConsumer.AppendSnapshot(replay.CreateJournalStreamWriter(new JournalStreamId(8)));
         using var replayed = replay.GetCommittedBuffer();
         var activeConsumer = new CollectingConsumer();
@@ -110,12 +110,12 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     }
 
     [Fact]
-    public void BinaryFormattedJournalEntry_StoresPayload()
+    public void BinaryPreservedJournalOperation_StoresPayload()
     {
         using var writer = new ArcBufferWriter();
         writer.Write(new byte[] { 0xAA, 0xBB });
         using var slice = writer.PeekSlice(writer.Length);
-        var entry = new OrleansBinaryFormattedJournalEntry(slice, SessionPool);
+        var entry = new OrleansBinaryPreservedJournalOperation(slice, SessionPool);
 
         Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, entry.FormatKey);
         Assert.Equal([0xAA, 0xBB], entry.Payload.ToArray());
@@ -124,7 +124,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void BinaryFormat_Read_HandlesSegmentedFrames()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         var payload = Enumerable.Repeat((byte)0xAA, ArcBufferWriter.MinimumPageSize - 7).ToArray();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), payload);
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(300)), [20, 21]);
@@ -150,16 +150,16 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void DisposeWithoutCommit_TruncatesPendingEntry()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
 
         using var committed = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        committed.Writer.Write(new byte[] { 1 });
+        committed.PayloadWriter.Write(new byte[] { 1 });
         committed.Commit();
         var committedBytes = ToArray(buffer);
 
         using (var aborted = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry())
         {
-            aborted.Writer.Write(new byte[] { 2, 3, 4 });
+            aborted.PayloadWriter.Write(new byte[] { 2, 3, 4 });
         }
 
         Assert.Equal(committedBytes, ToArray(buffer));
@@ -168,9 +168,9 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void GetCommittedBuffer_ThrowsWhenEntryIsActive()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write(new byte[] { 1 });
+        entry.PayloadWriter.Write(new byte[] { 1 });
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
@@ -184,22 +184,22 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     }
 
     [Fact]
-    public void AppendFormattedEntry_RejectsWrongFormattedEntryFormat()
+    public void AppendPreservedOperation_RejectsWrongFormat()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         var journalStreamWriter = buffer.CreateJournalStreamWriter(new JournalStreamId(1));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => journalStreamWriter.AppendFormattedEntry(new TestFormattedJournalEntry("other", new byte[] { 1, 2, 3 })));
+        var exception = Assert.Throws<InvalidOperationException>(() => journalStreamWriter.AppendPreservedOperation(new TestPreservedJournalOperation("other", new byte[] { 1, 2, 3 })));
 
-        Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("cannot append preserved operation", exception.Message, StringComparison.Ordinal);
     }
 
     [Fact]
     public void Commit_ThrowsOnDoubleCommit()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write(new byte[] { 1 });
+        entry.PayloadWriter.Write(new byte[] { 1 });
         entry.Commit();
         var committedBytes = ToArray(buffer);
 
@@ -221,9 +221,9 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void CommitAfterDispose_ThrowsAndKeepsEntryAborted()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write(new byte[] { 1 });
+        entry.PayloadWriter.Write(new byte[] { 1 });
         entry.Dispose();
 
         InvalidOperationException? exception = null;
@@ -244,15 +244,15 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void Reset_ReusesBuffer()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
 
         using var first = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        first.Writer.Write(new byte[] { 1 });
+        first.PayloadWriter.Write(new byte[] { 1 });
         first.Commit();
         buffer.Reset();
 
         using var second = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
-        second.Writer.Write(new byte[] { 2 });
+        second.PayloadWriter.Write(new byte[] { 2 });
         second.Commit();
 
         using var data = buffer.PeekSlice();
@@ -267,7 +267,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void GetCommittedBuffer_RemainsReadableAfterResetAndReuse()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [1, 2, 3]);
         using var committed = buffer.GetCommittedBuffer();
         var expectedCommitted = committed.ToArray();
@@ -282,9 +282,9 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void Reset_ThrowsWhenEntryIsActive()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write(new byte[] { 1 });
+        entry.PayloadWriter.Write(new byte[] { 1 });
 
         var exception = Assert.Throws<InvalidOperationException>(buffer.Reset);
 
@@ -296,11 +296,11 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void Commit_WritesVariableLengthFrameAcrossSegments()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         var payload = Enumerable.Repeat((byte)42, ArcBufferWriter.MinimumPageSize).ToArray();
 
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write(payload);
+        entry.PayloadWriter.Write(payload);
         entry.Commit();
 
         using var data = buffer.PeekSlice();
@@ -316,9 +316,9 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void ReadOnlyStream_ReadsCommittedBytes()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(7)).BeginEntry();
-        entry.Writer.Write(new byte[] { 8, 9 });
+        entry.PayloadWriter.Write(new byte[] { 8, 9 });
         entry.Commit();
         var expected = ToArray(buffer);
 
@@ -358,7 +358,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     [Fact]
     public void BinaryFormat_Read_ReportsMalformedFrameOffsetAfterCompleteEntries()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [1, 2, 3]);
         using var committed = buffer.GetCommittedBuffer();
         var entryBytes = committed.ToArray();
@@ -376,7 +376,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         Assert.Single(consumer.Entries);
     }
 
-    private static byte[] ToArray(OrleansBinaryJournalBatchWriter buffer)
+    private static byte[] ToArray(OrleansBinaryJournalWriter buffer)
     {
         using var slice = buffer.PeekSlice();
         return slice.ToArray();
@@ -385,7 +385,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     private static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
-        entry.Writer.Write(payload);
+        entry.PayloadWriter.Write(payload);
         entry.Commit();
     }
 
@@ -443,12 +443,12 @@ public sealed class OrleansBinaryJournalBatchWriterTests
 
     private sealed class BufferingConsumer : IStateResolver, IJournaledState
     {
-        private readonly List<IFormattedJournalEntry> _formattedEntries = [];
+        private readonly List<IPreservedJournalOperation> _preservedOperations = [];
         private JournalStreamId _streamId;
 
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
+        public IReadOnlyList<IPreservedJournalOperation> PreservedOperations => _preservedOperations;
 
         public IJournaledState ResolveState(JournalStreamId streamId)
         {
@@ -458,32 +458,32 @@ public sealed class OrleansBinaryJournalBatchWriterTests
 
         void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context)
         {
-            var entry = new TestFormattedJournalEntry(operation.FormatKey, operation.Payload.ToArray());
-            _formattedEntries.Add(entry);
+            var entry = new TestPreservedJournalOperation(operation.FormatKey, operation.Payload.ToArray());
+            _preservedOperations.Add(entry);
             Entries.Add((_streamId.Value, entry.Payload.ToArray()));
         }
 
-        public void Reset(JournalStreamWriter writer) => _formattedEntries.Clear();
+        public void Reset(JournalStreamWriter writer) => _preservedOperations.Clear();
         public void AppendEntries(JournalStreamWriter writer) { }
         public void AppendSnapshot(JournalStreamWriter writer)
         {
-            foreach (var entry in _formattedEntries)
+            foreach (var entry in _preservedOperations)
             {
-                writer.AppendFormattedEntry(entry);
+                writer.AppendPreservedOperation(entry);
             }
         }
 
         public IJournaledState DeepCopy() => throw new NotSupportedException();
     }
 
-    private sealed class TestFormattedJournalEntry : IFormattedJournalEntry
+    private sealed class TestPreservedJournalOperation : IPreservedJournalOperation
     {
-        public TestFormattedJournalEntry()
+        public TestPreservedJournalOperation()
             : this(OrleansBinaryJournalFormat.JournalFormatKey, new byte[] { 1, 2, 3 })
         {
         }
 
-        public TestFormattedJournalEntry(string formatKey, ReadOnlyMemory<byte> payload)
+        public TestPreservedJournalOperation(string formatKey, ReadOnlyMemory<byte> payload)
         {
             FormatKey = formatKey;
             Payload = payload.ToArray();

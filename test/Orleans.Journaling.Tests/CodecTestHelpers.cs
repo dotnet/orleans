@@ -17,7 +17,7 @@ public static class CodecTestHelpers
 
     public static byte[] WriteEntry(Action<JournalStreamWriter> write)
     {
-        using var batch = new OrleansBinaryJournalBatchWriter();
+        using var batch = new OrleansBinaryJournalWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
         using var committed = batch.PeekSlice();
         var sequence = committed.AsReadOnlySequence();
@@ -66,7 +66,7 @@ public static class CodecTestHelpers
     public static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
-        entry.Writer.Write(payload);
+        entry.PayloadWriter.Write(payload);
         entry.Commit();
     }
 

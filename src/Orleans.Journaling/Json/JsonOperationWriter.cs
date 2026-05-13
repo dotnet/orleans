@@ -8,7 +8,7 @@ internal static class JsonOperationWriter
     {
         ArgumentNullException.ThrowIfNull(writeArrayElementsTo);
         using var entry = writer.BeginEntry();
-        using (var jsonWriter = new Utf8JsonWriter(entry.Writer))
+        using (var jsonWriter = new Utf8JsonWriter(entry.PayloadWriter))
         {
             jsonWriter.WriteStartArray();
             writeArrayElementsTo(jsonWriter, argument);

@@ -21,10 +21,10 @@ A reusable `IBufferWriter<byte>` used inside a `ref struct` lexical scope to enc
 _Avoid_: Per-entry writer allocation
 
 **Journal Format**:
-A narrow physical-format service which creates **Journal Batch** writers and reads stored journal bytes.
+A narrow physical-format service which creates **Journal Writers** and reads stored journal bytes.
 _Avoid_: Public codec-family abstraction
 
-**Journal Batch Writer**:
+**Journal Writer**:
 A reusable, format-owned writer for one pending **Journal Batch**. The manager owns it and storage may consume its read-only view only for the duration of an append or replace operation.
 _Avoid_: Storage-owned writer
 
@@ -116,7 +116,7 @@ _Avoid_: Per-operation undo
 - **Journal Format** readers parse physical framing and dispatch ids and payloads; they do not interpret runtime id semantics.
 - A **Journal Entry** contains exactly one **Durable Operation** payload.
 - A **Journal Format** owns physical journal byte framing but does not by itself define a full **Codec Family**.
-- A **Journal Batch Writer** is caller-owned; storage must not retain the `GetCommittedBuffer()` view after an append or replace operation returns.
+- A **Journal Writer** is caller-owned; storage must not retain the `GetCommittedBuffer()` view after an append or replace operation returns.
 - **Journal Storage** stores and returns encoded bytes; the manager uses the selected **Journal Format** to decode those bytes into **Journal Entries**.
 - A **Journal Storage Id** identifies exactly one **Journal Storage** instance.
 - A **Journal Storage Id** is logical; providers map it to physical storage names.

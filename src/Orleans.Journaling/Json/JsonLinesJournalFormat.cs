@@ -16,7 +16,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public string? MimeType => "application/jsonl";
 
-    public JournalWriter CreateWriter() => new JsonLinesJournalBatchWriter();
+    public JournalWriter CreateWriter() => new JsonLinesJournalWriter();
 
     public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
     {
@@ -216,7 +216,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         buffer.Write(line.Slice(payloadContent.Start, payloadContent.Length));
     }
 
-    private sealed class JsonLinesJournalBatchWriter : JournalWriter
+    private sealed class JsonLinesJournalWriter : JournalWriter
     {
         private readonly ArcBufferWriter _buffer = new();
         private int _activeEntryStart;
@@ -285,12 +285,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             _hasActiveEntry = false;
         }
 
-        protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+        protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry)
         {
             if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"The JSON journal writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
+                    $"The JSON journal writer cannot append preserved operation of type '{entry.GetType().FullName}'.");
             }
 
             WriteJournalEntry(streamId, entry.Payload, _buffer);

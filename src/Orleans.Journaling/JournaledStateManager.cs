@@ -22,7 +22,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private readonly IJournalStorage _storage;
     private readonly IServiceProvider _serviceProvider;
     private readonly JournaledStateManagerShared _shared;
-    private readonly JournalWriter _journalBatchWriter;
+    private readonly JournalWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
@@ -43,7 +43,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _storage = storage;
         _shared = shared;
         _serviceProvider = serviceProvider;
-        _journalBatchWriter = _shared.JournalFormat.CreateWriter();
+        _journalWriter = _shared.JournalFormat.CreateWriter();
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
@@ -77,7 +77,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     // We also make sure to apply any buffered data that could have occured while the vessel took this state's place.
                     state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
                     var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _serviceProvider);
-                    foreach (var entry in vessel.FormattedEntries)
+                    foreach (var entry in vessel.PreservedOperations)
                     {
                         using var buffer = new ArcBufferWriter();
                         buffer.Write(entry.Payload.Span);
@@ -182,7 +182,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                 {
                                     // If there are pending writes, reset them since they will be captured by the snapshot instead.
                                     // If we did not do this, the journal would begin with some writes which would be followed by a snapshot which also included those writes.
-                                    _journalBatchWriter.Reset();
+                                    _journalWriter.Reset();
 
                                     if (_retirementTracker.Count > 0)
                                     {
@@ -198,7 +198,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                 // The map of state ids is itself stored as a durable state with the id 0.
                                 // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
                                 // If we removed retired states, this snapshot will persist that change.
-                                AppendUpdatesOrSnapshotState(_journalBatchWriter, isSnapshot, StateDirectory.Id, _journalStreamDirectory);
+                                AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot, StateDirectory.Id, _journalStreamDirectory);
 
                                 foreach (var (id, state) in _statesMap)
                                 {
@@ -207,10 +207,10 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                         continue;
                                     }
 
-                                    AppendUpdatesOrSnapshotState(_journalBatchWriter, isSnapshot, id, state);
+                                    AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot, id, state);
                                 }
 
-                                committedBuffer = _journalBatchWriter.GetCommittedBuffer();
+                                committedBuffer = _journalWriter.GetCommittedBuffer();
                                 if (committedBuffer.Length == 0)
                                 {
                                     committedBuffer.Dispose();
@@ -220,7 +220,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                     hasCommittedBuffer = true;
                                     // The returned ArcBuffer pins the committed pages, so the writer can be reset
                                     // and accept new direct writes while storage persists the pinned buffer.
-                                    _journalBatchWriter.Reset();
+                                    _journalWriter.Reset();
                                 }
                             }
 
@@ -394,7 +394,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         foreach (var state in _statesMap.Values)
         {
-            if (state is RetiredState { FormattedEntries.Count: > 0 } retiredState)
+            if (state is RetiredState { PreservedOperations.Count: > 0 } retiredState)
             {
                 throw new InvalidOperationException(
                     $"Cannot migrate journal to format key '{WriteJournalFormatKey}' because stream " +
@@ -404,11 +404,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         }
     }
 
-    private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => _journalBatchWriter.CreateJournalStreamWriter(streamId);
+    private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => _journalWriter.CreateJournalStreamWriter(streamId);
 
-    private static void AppendUpdatesOrSnapshotState(JournalWriter journalBatchWriter, bool isSnapshot, ulong id, IJournaledState state)
+    private static void AppendUpdatesOrSnapshotState(JournalWriter journalWriter, bool isSnapshot, ulong id, IJournaledState state)
     {
-        var writer = journalBatchWriter.CreateJournalStreamWriter(new(id));
+        var writer = journalWriter.CreateJournalStreamWriter(new(id));
         if (isSnapshot)
         {
             state.AppendSnapshot(writer);
@@ -463,7 +463,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private void ResetForRecovery()
     {
-        _journalBatchWriter.Reset();
+        _journalWriter.Reset();
         _migrationSnapshotRequired = false;
         _statesMap.Clear();
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
@@ -634,7 +634,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     void IDisposable.Dispose()
     {
         _shutdownCancellation.Dispose();
-        _journalBatchWriter.Dispose();
+        _journalWriter.Dispose();
     }
 
     private readonly struct WorkItem(WorkItemType type, TaskCompletionSource? completion)
@@ -769,24 +769,24 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     [DebuggerDisplay("RetiredState Id = {StreamId.Value}")]
     private sealed class RetiredState(JournalStreamId streamId) : IJournaledState
     {
-        private readonly List<IFormattedJournalEntry> _formattedEntries = [];
+        private readonly List<IPreservedJournalOperation> _preservedOperations = [];
 
         public JournalStreamId StreamId { get; } = streamId;
 
-        public IReadOnlyList<IFormattedJournalEntry> FormattedEntries => _formattedEntries;
+        public IReadOnlyList<IPreservedJournalOperation> PreservedOperations => _preservedOperations;
 
         void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-            _formattedEntries.Add(new FormattedJournalEntry(operation.FormatKey, operation.Payload));
+            _preservedOperations.Add(new PreservedJournalOperation(operation.FormatKey, operation.Payload));
 
         void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
         {
-            foreach (var entry in _formattedEntries)
+            foreach (var entry in _preservedOperations)
             {
-                snapshotWriter.AppendFormattedEntry(entry);
+                snapshotWriter.AppendPreservedOperation(entry);
             }
         }
 
-        void IJournaledState.Reset(JournalStreamWriter writer) => _formattedEntries.Clear();
+        void IJournaledState.Reset(JournalStreamWriter writer) => _preservedOperations.Clear();
         void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
         IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
     }

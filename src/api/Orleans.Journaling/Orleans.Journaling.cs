@@ -125,7 +125,7 @@ namespace Orleans.Journaling
         T? Value { get; set; }
     }
 
-    public partial interface IFormattedJournalEntry
+    public partial interface IPreservedJournalOperation
     {
         string FormatKey { get; }
 
@@ -313,7 +313,7 @@ namespace Orleans.Journaling
         protected abstract int GetEntryStart(JournalStreamId streamId);
         protected abstract System.Memory<byte> GetPayloadMemory(int sizeHint);
         protected abstract System.Span<byte> GetPayloadSpan(int sizeHint);
-        protected virtual void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) { }
+        protected virtual void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry) { }
 
         protected virtual void OnBeginEntry(JournalStreamId streamId) { }
 
@@ -347,7 +347,7 @@ namespace Orleans.Journaling
     {
         private object _dummy;
         private int _dummyPrimitive;
-        public System.Buffers.IBufferWriter<byte> Writer { get { throw null; } }
+        public System.Buffers.IBufferWriter<byte> PayloadWriter { get { throw null; } }
 
         public void Commit() { }
 

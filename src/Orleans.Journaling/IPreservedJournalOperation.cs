@@ -3,38 +3,38 @@ using System.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// A format-owned journal entry which can be copied forward without interpreting it.
+/// A format-owned journal operation which can be copied forward without interpreting it.
 /// </summary>
-public interface IFormattedJournalEntry
+public interface IPreservedJournalOperation
 {
     /// <summary>
-    /// Gets the journal format key for this formatted entry.
+    /// Gets the journal format key for this preserved operation.
     /// </summary>
     string FormatKey { get; }
 
     /// <summary>
-    /// Gets the operation payload bytes for the formatted entry.
+    /// Gets the operation payload bytes for the preserved operation.
     /// </summary>
     ReadOnlyMemory<byte> Payload { get; }
 }
 
-internal sealed class FormattedJournalEntry : IFormattedJournalEntry
+internal sealed class PreservedJournalOperation : IPreservedJournalOperation
 {
     private readonly byte[] _payload;
 
-    public FormattedJournalEntry(string formatKey, ReadOnlySequence<byte> payload)
+    public PreservedJournalOperation(string formatKey, ReadOnlySequence<byte> payload)
     {
         FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);
         _payload = payload.ToArray();
     }
 
-    public FormattedJournalEntry(string formatKey, JournalReadBuffer payload)
+    public PreservedJournalOperation(string formatKey, JournalReadBuffer payload)
     {
         FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);
         _payload = payload.ToArray();
     }
 
-    public FormattedJournalEntry(string formatKey, ReadOnlyMemory<byte> payload)
+    public PreservedJournalOperation(string formatKey, ReadOnlyMemory<byte> payload)
     {
         FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);
         _payload = payload.ToArray();

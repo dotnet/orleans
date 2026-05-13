@@ -182,7 +182,7 @@ public sealed class StorageStreamingTests
     [Fact]
     public void BinaryFormatRead_ConsumesCompletePrefixAndWaitsForPartialSuffix()
     {
-        using var buffer = new OrleansBinaryJournalBatchWriter();
+        using var buffer = new OrleansBinaryJournalWriter();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [1, 2, 3]);
         using var committed = buffer.GetCommittedBuffer();
         var entryBytes = committed.ToArray();
@@ -202,7 +202,7 @@ public sealed class StorageStreamingTests
     private static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
-        entry.Writer.Write(payload);
+        entry.PayloadWriter.Write(payload);
         entry.Commit();
     }
 

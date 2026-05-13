@@ -107,7 +107,7 @@ public sealed class DurableListDirectWriteTests
 
     private sealed class TestJournalStreamWriter
     {
-        private readonly OrleansBinaryJournalBatchWriter _buffer = new();
+        private readonly OrleansBinaryJournalWriter _buffer = new();
 
         public long Length => _buffer.Length;
 
@@ -152,7 +152,7 @@ public sealed class DurableListDirectWriteTests
         public override void WriteAdd(T item, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             entry.Commit();
         }
     }
@@ -177,7 +177,7 @@ public sealed class DurableListDirectWriteTests
     private static void WriteOrThrow(JournalStreamWriter writer, bool shouldThrow)
     {
         using var entry = writer.BeginEntry();
-        WriteByte(entry.Writer);
+        WriteByte(entry.PayloadWriter);
         if (shouldThrow)
         {
             throw new InvalidOperationException("Expected test exception.");

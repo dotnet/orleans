@@ -208,7 +208,7 @@ public sealed class DurableCollectionDirectWriteTests
 
     private sealed class TestJournalStreamWriter
     {
-        private readonly OrleansBinaryJournalBatchWriter _buffer = new();
+        private readonly OrleansBinaryJournalWriter _buffer = new();
 
         public long Length => _buffer.Length;
 
@@ -227,7 +227,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteEnqueue(T item, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnEnqueue)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -239,7 +239,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteDequeue(JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnDequeue)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -251,7 +251,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteClear(JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnClear)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -286,7 +286,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteAdd(T item, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnAdd)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -298,7 +298,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteRemove(T item, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnRemove)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -310,7 +310,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteClear(JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnClear)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -322,7 +322,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnSnapshot)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -357,7 +357,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteSet(TKey key, TValue value, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnSet)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -369,7 +369,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteRemove(TKey key, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnRemove)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -381,7 +381,7 @@ public sealed class DurableCollectionDirectWriteTests
         public override void WriteClear(JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.Writer);
+            WriteByte(entry.PayloadWriter);
             if (throwOnClear)
             {
                 throw new InvalidOperationException("Expected test exception.");
@@ -407,7 +407,7 @@ public sealed class DurableCollectionDirectWriteTests
     private static void WriteCommittedByte(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        WriteByte(entry.Writer);
+        WriteByte(entry.PayloadWriter);
         entry.Commit();
     }
 

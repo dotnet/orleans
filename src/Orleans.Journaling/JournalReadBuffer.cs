@@ -85,16 +85,20 @@ public readonly struct JournalReadBuffer
     }
 
     /// <summary>
-    /// Returns a slice of the provided length without consuming the data.
+    /// Returns a pinned slice of the provided length without consuming the data.
     /// </summary>
     /// <param name="count">The number of bytes to read.</param>
-    /// <returns>A slice of unconsumed data.</returns>
+    /// <returns>
+    /// A pinned slice of unconsumed data. The caller owns the returned buffer and must dispose it.
+    /// </returns>
     public readonly ArcBuffer PeekSlice(int count) => Reader.PeekSlice(count);
 
     /// <summary>
     /// Reads bytes until <paramref name="delimiter"/> is found.
     /// </summary>
-    /// <param name="slice">The bytes before the delimiter, if it was found.</param>
+    /// <param name="slice">
+    /// The pinned bytes before the delimiter, if it was found. The caller owns the returned buffer and must dispose it.
+    /// </param>
     /// <param name="delimiter">The delimiter to search for.</param>
     /// <param name="advancePastDelimiter">Whether to advance past the delimiter when it is found.</param>
     /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>

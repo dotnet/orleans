@@ -22,7 +22,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     public void WriteAdd(T item, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(AddCommand);
@@ -35,7 +35,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     public void WriteSet(int index, T item, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(SetCommand);
@@ -49,7 +49,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     public void WriteInsert(int index, T item, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(InsertCommand);
@@ -63,7 +63,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     public void WriteRemoveAt(int index, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(RemoveCommand);
         payloadWriter.WriteVarUInt32((uint)index);
@@ -75,7 +75,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.Writer, session: null!);
+        var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(ClearCommand);
         payloadWriter.Commit();
@@ -86,7 +86,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.Writer;
+        var output = entry.PayloadWriter;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteByte(FormatVersion);

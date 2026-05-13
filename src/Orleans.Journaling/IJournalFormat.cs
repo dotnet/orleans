@@ -22,7 +22,7 @@ public interface IJournalFormat
     /// <summary>
     /// Creates a writer for a new mutable journal batch.
     /// </summary>
-    /// <returns>A new journal batch writer.</returns>
+    /// <returns>A new Journal Writer.</returns>
     JournalWriter CreateWriter();
 
     /// <summary>

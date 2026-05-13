@@ -3,7 +3,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal class OrleansBinaryJournalBatchWriter : JournalWriter
+internal class OrleansBinaryJournalWriter : JournalWriter
 {
     private readonly ArcBufferWriter _buffer = new();
     private readonly ArcBufferWriter _entryBuffer = new();
@@ -60,6 +60,9 @@ internal class OrleansBinaryJournalBatchWriter : JournalWriter
 
     public ArcBuffer PeekSlice() => _buffer.PeekSlice(_buffer.Length);
 
+    /// <summary>
+    /// Returns a read-only stream over a pinned snapshot of the current committed bytes.
+    /// </summary>
     public Stream AsReadOnlyStream() => new ReadOnlyStream(PeekSlice());
 
     public override void Dispose()
@@ -68,16 +71,16 @@ internal class OrleansBinaryJournalBatchWriter : JournalWriter
         _buffer.Dispose();
     }
 
-    protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+    protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry)
     {
         if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"The Orleans binary journal batch writer cannot append formatted entry for journal format key '{entry.FormatKey}'.");
+                $"The Orleans binary journal writer cannot append preserved operation for journal format key '{entry.FormatKey}'.");
             }
 
         using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();
-        journalEntry.Writer.Write(entry.Payload.Span);
+        journalEntry.PayloadWriter.Write(entry.Payload.Span);
         journalEntry.Commit();
     }
 

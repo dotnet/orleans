@@ -25,8 +25,7 @@ public ref struct JournalEntryScope : IDisposable
     /// <summary>
     /// Gets the payload writer for this entry.
     /// </summary>
-    public readonly IBufferWriter<byte> Writer
-        => _writer ?? throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
+    public readonly IBufferWriter<byte> PayloadWriter => _writer ?? throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
 
     /// <summary>
     /// Commits the pending entry, making it visible to storage.

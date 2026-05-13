@@ -4,14 +4,14 @@ using Orleans.Serialization.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Base class for format-owned state journal batch writers.
+/// Base class for format-owned state journal writers.
 /// </summary>
 /// <remarks>
 /// Derived classes own the physical framing and committed buffer. This base class only
 /// connects <see cref="JournalStreamWriter"/> and active entry payload writes to the derived
 /// payload writer and entry lifecycle hooks. Buffers returned by <see cref="GetCommittedBuffer"/>
-/// must remain valid for the caller's lifetime even if <see cref="Reset"/> is called before the caller
-/// disposes the returned buffer.
+/// are pinned, caller-owned snapshots which must remain valid for the caller's lifetime even if
+/// <see cref="Reset"/> or <see cref="Dispose"/> is called before the caller disposes the returned buffer.
 /// </remarks>
 public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
 {
@@ -40,12 +40,15 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
 
     /// <summary>
-    /// Gets a borrowed buffer containing only committed bytes which are safe to persist.
+    /// Gets a pinned buffer containing only committed bytes which are safe to persist.
     /// </summary>
     /// <remarks>
-    /// The returned buffer must remain valid for the caller's lifetime even if <see cref="Reset"/> is subsequently called.
+    /// The returned buffer must remain valid for the caller's lifetime even if <see cref="Reset"/> or
+    /// <see cref="Dispose"/> is subsequently called.
     /// </remarks>
-    /// <returns>An <see cref="ArcBuffer"/> containing the committed journal bytes. The caller owns and must dispose the returned buffer.</returns>
+    /// <returns>
+    /// An <see cref="ArcBuffer"/> containing the committed journal bytes. The caller owns and must dispose the returned buffer.
+    /// </returns>
     /// <exception cref="InvalidOperationException">An entry is currently active and has not been committed or aborted.</exception>
     public ArcBuffer GetCommittedBuffer()
     {
@@ -89,13 +92,15 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     protected abstract long ActivePayloadLength { get; }
 
     /// <summary>
-    /// Returns a borrowed buffer containing the committed bytes of the batch.
+    /// Returns a pinned buffer containing the committed bytes of the batch.
     /// </summary>
     /// <remarks>
     /// Called by <see cref="GetCommittedBuffer"/> after verifying that no entry is active. The returned buffer
-    /// must remain valid for the caller's lifetime even if <see cref="Reset"/> is subsequently called.
+    /// must remain valid for the caller's lifetime even if <see cref="Reset"/> or <see cref="Dispose"/> is subsequently called.
     /// </remarks>
-    /// <returns>An <see cref="ArcBuffer"/> containing the committed bytes. The caller owns and must dispose the returned buffer.</returns>
+    /// <returns>
+    /// An <see cref="ArcBuffer"/> containing the committed bytes. The caller owns and must dispose the returned buffer.
+    /// </returns>
     protected abstract ArcBuffer GetCommittedBufferCore();
 
     /// <summary>
@@ -143,11 +148,11 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
-    /// <param name="entry">The format-owned entry.</param>
-    protected virtual void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+    /// <param name="operation">The preserved operation.</param>
+    protected virtual void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation operation)
     {
         throw new InvalidOperationException(
-            $"The journal batch writer '{GetType().FullName}' cannot append formatted entry of type '{entry.GetType().FullName}'.");
+            $"The journal writer '{GetType().FullName}' cannot append preserved operation of type '{operation.GetType().FullName}'.");
     }
 
     /// <summary>
@@ -168,7 +173,7 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     {
         if (_entryIsActive)
         {
-            throw new InvalidOperationException("The journal batch already has an active entry.");
+            throw new InvalidOperationException("The journal writer already has an active entry.");
         }
 
         OnBeginEntry(streamId);
@@ -184,15 +189,15 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
 
     internal void AbortEntryWrite(int entryStart) => AbortActiveEntry(entryStart);
 
-    internal void AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+    internal void AppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation operation)
     {
-        ArgumentNullException.ThrowIfNull(entry);
+        ArgumentNullException.ThrowIfNull(operation);
         if (_entryIsActive)
         {
-            throw new InvalidOperationException("The journal batch already has an active entry.");
+            throw new InvalidOperationException("The journal writer already has an active entry.");
         }
 
-        OnAppendFormattedEntry(streamId, entry);
+        OnAppendPreservedOperation(streamId, operation);
     }
 
     private void CommitActiveEntry(int entryStart)
@@ -235,7 +240,7 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     {
         if (_entryIsActive)
         {
-            throw new InvalidOperationException("The journal batch has an active entry.");
+            throw new InvalidOperationException("The journal writer has an active entry.");
         }
     }
 

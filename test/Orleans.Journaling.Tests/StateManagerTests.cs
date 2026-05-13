@@ -85,10 +85,10 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_Recovery_PreservesUnknownStateEntry()
     {
         var storage = new VolatileJournalStorage();
-        using var segment = new OrleansBinaryJournalBatchWriter();
+        using var segment = new OrleansBinaryJournalWriter();
         using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
         {
-            entry.Writer.Write(new byte[] { 1, 2, 3 });
+            entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
             entry.Commit();
         }
 
@@ -396,7 +396,7 @@ public class StateManagerTests : JournalingTestBase
         var entry = state.BeginEntry();
         try
         {
-            entry.Writer.Write(new byte[] { 1, 2, 3 });
+            entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
             writeTask = Task.Run(async () =>
             {
                 writeStarted.Set();
@@ -486,7 +486,7 @@ public class StateManagerTests : JournalingTestBase
     {
         var storage = new CapturingStorage();
         var recoveredStreamId = new JournalStreamId(12);
-        using (var segment = new OrleansBinaryJournalBatchWriter())
+        using (var segment = new OrleansBinaryJournalWriter())
         {
             AppendDirectorySet(segment, "existing", recoveredStreamId);
             CreateValueCodec<int>().WriteSet(42, segment.CreateJournalStreamWriter(recoveredStreamId));
@@ -558,11 +558,11 @@ public class StateManagerTests : JournalingTestBase
     public async Task StateManager_Recovery_RejectsMalformedTrailingData()
     {
         byte[] bytes;
-        using (var segment = new OrleansBinaryJournalBatchWriter())
+        using (var segment = new OrleansBinaryJournalWriter())
         {
             using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
             {
-                entry.Writer.Write(new byte[] { 1, 2, 3 });
+                entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
                 entry.Commit();
             }
 
@@ -990,7 +990,7 @@ public class StateManagerTests : JournalingTestBase
 
     private byte[] CreatePersistedValueBytes(string name, int value)
     {
-        using var segment = new OrleansBinaryJournalBatchWriter();
+        using var segment = new OrleansBinaryJournalWriter();
         AppendDirectorySet(segment, name, new JournalStreamId(8));
         var codec = CreateValueCodec<int>();
         codec.WriteSet(value, segment.CreateJournalStreamWriter(new JournalStreamId(8)));
@@ -1001,10 +1001,10 @@ public class StateManagerTests : JournalingTestBase
 
     private byte[] CreateUnknownStreamBytes(JournalStreamId streamId, ReadOnlySpan<byte> payload)
     {
-        using var segment = new OrleansBinaryJournalBatchWriter();
+        using var segment = new OrleansBinaryJournalWriter();
         using (var entry = segment.CreateJournalStreamWriter(streamId).BeginEntry())
         {
-            entry.Writer.Write(payload);
+            entry.PayloadWriter.Write(payload);
             entry.Commit();
         }
 
@@ -1014,11 +1014,11 @@ public class StateManagerTests : JournalingTestBase
 
     private byte[] CreateNamedUnknownStreamBytes(string name, JournalStreamId streamId, ReadOnlySpan<byte> payload)
     {
-        using var segment = new OrleansBinaryJournalBatchWriter();
+        using var segment = new OrleansBinaryJournalWriter();
         AppendDirectorySet(segment, name, streamId);
         using (var entry = segment.CreateJournalStreamWriter(streamId).BeginEntry())
         {
-            entry.Writer.Write(payload);
+            entry.PayloadWriter.Write(payload);
             entry.Commit();
         }
 
@@ -1026,7 +1026,7 @@ public class StateManagerTests : JournalingTestBase
         return committed.ToArray();
     }
 
-    private void AppendDirectorySet(OrleansBinaryJournalBatchWriter segment, string name, JournalStreamId streamId)
+    private void AppendDirectorySet(OrleansBinaryJournalWriter segment, string name, JournalStreamId streamId)
     {
         var codec = CreateDictionaryCodec<string, ulong>();
         codec.WriteSet(name, streamId.Value, segment.CreateJournalStreamWriter(new JournalStreamId(0)));
@@ -1094,7 +1094,7 @@ public class StateManagerTests : JournalingTestBase
             _writerFormat = new TrackingJournalFormat(sessionPool);
         }
 
-        public List<TrackingJournalBatchWriter> Writers => _writerFormat.Writers;
+        public List<TrackingJournalWriter> Writers => _writerFormat.Writers;
 
         public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
 
@@ -1118,7 +1118,7 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class TestFormattedJournalEntry(ReadOnlyMemory<byte> payload) : IFormattedJournalEntry
+    private sealed class TestPreservedJournalOperation(ReadOnlyMemory<byte> payload) : IPreservedJournalOperation
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
 
@@ -1132,7 +1132,7 @@ public class StateManagerTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public JournalWriter CreateWriter() => new OrleansBinaryJournalBatchWriter();
+        public JournalWriter CreateWriter() => new OrleansBinaryJournalWriter();
 
         public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
         {
@@ -1143,7 +1143,7 @@ public class StateManagerTests : JournalingTestBase
     {
         private readonly OrleansBinaryJournalFormat _inner = new(sessionPool);
 
-        public List<TrackingJournalBatchWriter> Writers { get; } = [];
+        public List<TrackingJournalWriter> Writers { get; } = [];
 
         public int ReadCount { get; private set; }
 
@@ -1153,7 +1153,7 @@ public class StateManagerTests : JournalingTestBase
 
         public JournalWriter CreateWriter()
         {
-            var writer = new TrackingJournalBatchWriter();
+            var writer = new TrackingJournalWriter();
             Writers.Add(writer);
             return writer;
         }
@@ -1165,7 +1165,7 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class TrackingJournalBatchWriter : OrleansBinaryJournalBatchWriter
+    private sealed class TrackingJournalWriter : OrleansBinaryJournalWriter
     {
         public List<ulong> BeganEntryIds { get; } = [];
 
@@ -1191,10 +1191,10 @@ public class StateManagerTests : JournalingTestBase
             base.OnBeginEntry(streamId);
         }
 
-        protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
+        protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry)
         {
             using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();
-            journalEntry.Writer.Write(entry.Payload.Span);
+            journalEntry.PayloadWriter.Write(entry.Payload.Span);
             journalEntry.Commit();
         }
     }
@@ -1460,8 +1460,8 @@ public class StateManagerTests : JournalingTestBase
         public void WriteSet(K key, V value, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            entry.Writer.GetSpan(1)[0] = 1;
-            entry.Writer.Advance(1);
+            entry.PayloadWriter.GetSpan(1)[0] = 1;
+            entry.PayloadWriter.Advance(1);
             throw new InvalidOperationException("Expected test exception.");
         }
 
@@ -1488,8 +1488,8 @@ public class StateManagerTests : JournalingTestBase
             }
 
             using var entry = writer.BeginEntry();
-            entry.Writer.GetSpan(1)[0] = 1;
-            entry.Writer.Advance(1);
+            entry.PayloadWriter.GetSpan(1)[0] = 1;
+            entry.PayloadWriter.Advance(1);
             throw new InvalidOperationException("Expected test exception.");
         }
 

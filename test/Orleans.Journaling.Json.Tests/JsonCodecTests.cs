@@ -379,7 +379,7 @@ public class JsonCodecTests
         AppendValueSet(writer, 8, 42);
         using (var aborted = writer.CreateJournalStreamWriter(new JournalStreamId(9)).BeginEntry())
         {
-            aborted.Writer.Write("""["set",100"""u8);
+            aborted.PayloadWriter.Write("""["set",100"""u8);
         }
 
         AppendValueSet(writer, 10, 43);
@@ -397,7 +397,7 @@ public class JsonCodecTests
         using var writer = format.CreateWriter();
         using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(8)).BeginEntry();
 
-        entry.Writer.Write("""["set" , { "value" : 42 }]"""u8);
+        entry.PayloadWriter.Write("""["set" , { "value" : 42 }]"""u8);
         entry.Commit();
 
         Assert.Equal("""[8,["set" , { "value" : 42 }]]""" + "\n", GetString(writer));
@@ -674,13 +674,13 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesJournalFormat_Writer_AppendsDataOnlyFormattedEntry()
+    public void JsonLinesJournalFormat_Writer_AppendsDataOnlyPreservedOperation()
     {
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var journalWriter = writer.CreateJournalStreamWriter(new JournalStreamId(8));
 
-        journalWriter.AppendFormattedEntry(new TestFormattedJournalEntry(
+        journalWriter.AppendPreservedOperation(new TestPreservedJournalOperation(
             JsonJournalExtensions.JournalFormatKey,
             Encoding.UTF8.GetBytes("""["set",42]""")));
 
@@ -689,14 +689,14 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesJournalFormat_Writer_AppendsRecoveredFormattedEntryPayloadAsEntryElements()
+    public void JsonLinesJournalFormat_Writer_AppendsRecoveredPreservedOperationPayloadAsEntryElements()
     {
         var format = new JsonLinesJournalFormat();
         var recoveredEntry = Assert.Single(Read(format, """[8,["set",42]]""" + "\n"));
         using var writer = format.CreateWriter();
         var journalWriter = writer.CreateJournalStreamWriter(new JournalStreamId(9));
 
-        journalWriter.AppendFormattedEntry(new TestFormattedJournalEntry(
+        journalWriter.AppendPreservedOperation(new TestPreservedJournalOperation(
             JsonJournalExtensions.JournalFormatKey,
             recoveredEntry.Payload));
 
@@ -705,13 +705,13 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesJournalFormat_Writer_AppendsFormattedEntryPayloadWithoutReformatting()
+    public void JsonLinesJournalFormat_Writer_AppendsPreservedOperationPayloadWithoutReformatting()
     {
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var journalWriter = writer.CreateJournalStreamWriter(new JournalStreamId(8));
 
-        journalWriter.AppendFormattedEntry(new TestFormattedJournalEntry(
+        journalWriter.AppendPreservedOperation(new TestPreservedJournalOperation(
             JsonJournalExtensions.JournalFormatKey,
             Encoding.UTF8.GetBytes("""["set" , { "value" : 42 }]""")));
 
@@ -720,17 +720,17 @@ public class JsonCodecTests
     }
 
     [Fact]
-    public void JsonLinesJournalFormat_Writer_RejectsWrongFormattedEntryFormat()
+    public void JsonLinesJournalFormat_Writer_RejectsWrongPreservedOperationFormat()
     {
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var journalWriter = writer.CreateJournalStreamWriter(new JournalStreamId(8));
 
-        var exception = Assert.Throws<InvalidOperationException>(() => journalWriter.AppendFormattedEntry(new TestFormattedJournalEntry(
+        var exception = Assert.Throws<InvalidOperationException>(() => journalWriter.AppendPreservedOperation(new TestPreservedJournalOperation(
             "other",
             Encoding.UTF8.GetBytes("""["set",42]"""))));
 
-        Assert.Contains("cannot append formatted entry", exception.Message, StringComparison.Ordinal);
+        Assert.Contains("cannot append preserved operation", exception.Message, StringComparison.Ordinal);
     }
 
     private static void Apply<T>(IListOperationCodec<T> codec, Action<JournalStreamWriter> write, IListOperationHandler<T> consumer)
@@ -843,8 +843,8 @@ public class JsonCodecTests
 
         public override void Dispose() => _payload.Dispose();
 
-        protected override void OnAppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry) =>
-            throw new InvalidOperationException("This test writer does not accept formatted entries.");
+        protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry) =>
+            throw new InvalidOperationException("This test writer does not accept preserved operations.");
     }
 
     private sealed class RecordingJournalEntrySink : IStateResolver, IJournaledState
@@ -927,7 +927,7 @@ public class JsonCodecTests
         }
     }
 
-    private sealed class TestFormattedJournalEntry(string formatKey, ReadOnlyMemory<byte> payload) : IFormattedJournalEntry
+    private sealed class TestPreservedJournalOperation(string formatKey, ReadOnlyMemory<byte> payload) : IPreservedJournalOperation
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
 

@@ -498,7 +498,7 @@ public sealed class JsonCodecSnapshotTests
     {
         // No operations written → committed buffer is the empty UTF-8 string. JSONL has no per-batch
         // header, so this should be byte-empty — pinning that explicitly catches accidental "always emit
-        // a BOM/header" regressions in JsonLinesJournalBatchWriter.
+        // a BOM/header" regressions in JsonLinesJournalWriter.
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var bytes = SnapshotBytes(writer);
