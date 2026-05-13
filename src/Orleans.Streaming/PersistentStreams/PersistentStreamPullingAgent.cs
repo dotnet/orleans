@@ -764,6 +764,11 @@ namespace Orleans.Streams
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
                                 deliveryBackoffProvider);
+
+                            // Notify the cache that this batch was delivered so it can
+                            // advance the checkpoint based on actual delivery progress.
+                            queueCache?.NotifyBatchDelivered(consumerData.StreamId.StreamId, consumerData.SubscriptionId, batch.SequenceToken);
+
                             if (newToken != null)
                             {
                                 consumerData.LastToken = newToken;

@@ -32,5 +32,15 @@ namespace Orleans.Streams
         /// </summary>
         /// <returns><see langword="true" /> if this cache is under pressure; otherwise, <see langword="false" />.</returns>
         bool IsUnderPressure();
+
+        /// <summary>
+        /// Notifies the cache that a batch with the given sequence token has been successfully
+        /// delivered to a specific subscription on the specified stream. Implementations can use
+        /// this to advance checkpoints based on delivery rather than cache eviction.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        /// <param name="token">The sequence token of the delivered batch.</param>
+        void NotifyBatchDelivered(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token) { }
     }
 }
