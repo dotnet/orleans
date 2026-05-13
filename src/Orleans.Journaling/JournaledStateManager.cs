@@ -7,7 +7,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournaledStateManager : IJournaledStateManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationJournalStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -453,8 +453,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IL
             ResetForRecovery();
         }
 
-        var recoveryConsumer = new RecoveryJournalStorageConsumer(this);
-        await _shared.Storage.ReadAsync(recoveryConsumer, cancellationToken).ConfigureAwait(true);
+        await _shared.Storage.ReadAsync(this, cancellationToken).ConfigureAwait(true);
 
         lock (_lock)
         {
@@ -565,6 +564,8 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IL
             throw CreateRecoveryFormatException(exception, journalFormatKey);
         }
     }
+
+    void IJournalStorageConsumer.Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) => ProcessRecoveryBuffer(buffer, metadata);
 
     private static bool ShouldWrapRecoveryFormatException(Exception exception) =>
         exception is not OperationCanceledException && !IsRecoveryFormatException(exception);
@@ -691,11 +692,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IL
     {
         Unknown,
         Ready
-    }
-
-    private sealed class RecoveryJournalStorageConsumer(JournaledStateManager manager) : IJournalStorageConsumer
-    {
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) => manager.ProcessRecoveryBuffer(buffer, metadata);
     }
 
     private sealed class StateDirectory(
