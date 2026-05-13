@@ -19,9 +19,9 @@ public interface IDurableQueue<T> : IEnumerable<T>, IReadOnlyCollection<T>
 
 [DebuggerTypeProxy(typeof(DurableQueueDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueueOperationHandler<T>
+internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDurableQueueCommandHandler<T>
 {
-    private readonly IQueueOperationCodec<T> _codec;
+    private readonly IDurableQueueCommandCodec<T> _codec;
     private readonly Queue<T> _items = new();
     private JournalStreamWriter _writer;
 
@@ -32,11 +32,11 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IQueueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableQueueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 
-    internal DurableQueue(string key, IStateManager manager, IQueueOperationCodec<T> codec)
+    internal DurableQueue(string key, IStateManager manager, IDurableQueueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -45,8 +45,8 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
 
     public int Count => _items.Count;
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -107,10 +107,10 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
     protected T ApplyDequeue() => _items.Dequeue();
     protected bool ApplyTryDequeue([MaybeNullWhen(false)] out T value) => _items.TryDequeue(out value);
     protected void ApplyClear() => _items.Clear();
-    void IQueueOperationHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
-    void IQueueOperationHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
-    void IQueueOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IQueueOperationHandler<T>.Reset(int capacityHint)
+    void IDurableQueueCommandHandler<T>.ApplyEnqueue(T item) => ApplyEnqueue(item);
+    void IDurableQueueCommandHandler<T>.ApplyDequeue() => _ = ApplyDequeue();
+    void IDurableQueueCommandHandler<T>.ApplyClear() => ApplyClear();
+    void IDurableQueueCommandHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);

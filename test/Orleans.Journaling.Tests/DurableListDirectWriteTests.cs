@@ -24,8 +24,8 @@ public sealed class DurableListDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnSet: true));
-        ((IListOperationHandler<int>)list).ApplyAdd(1);
-        ((IListOperationHandler<int>)list).ApplyAdd(2);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
 
         Assert.Throws<InvalidOperationException>(() => list[0] = 10);
 
@@ -38,8 +38,8 @@ public sealed class DurableListDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnInsert: true));
-        ((IListOperationHandler<int>)list).ApplyAdd(1);
-        ((IListOperationHandler<int>)list).ApplyAdd(2);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
 
         Assert.Throws<InvalidOperationException>(() => list.Insert(1, 10));
 
@@ -52,8 +52,8 @@ public sealed class DurableListDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnRemoveAt: true));
-        ((IListOperationHandler<int>)list).ApplyAdd(1);
-        ((IListOperationHandler<int>)list).ApplyAdd(2);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
 
         Assert.Throws<InvalidOperationException>(() => list.RemoveAt(0));
 
@@ -66,8 +66,8 @@ public sealed class DurableListDirectWriteTests
     {
         var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnClear: true));
-        ((IListOperationHandler<int>)list).ApplyAdd(1);
-        ((IListOperationHandler<int>)list).ApplyAdd(2);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
+        ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
 
         Assert.Throws<InvalidOperationException>(list.Clear);
 
@@ -157,7 +157,7 @@ public sealed class DurableListDirectWriteTests
         }
     }
 
-    private abstract class TestListCodec<T> : IListOperationCodec<T>
+    private abstract class TestListCodec<T> : IDurableListCommandCodec<T>
     {
         public virtual void WriteAdd(T item, JournalStreamWriter writer) => throw new NotSupportedException();
 
@@ -171,7 +171,7 @@ public sealed class DurableListDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalReadBuffer input, IDurableListCommandHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private static void WriteOrThrow(JournalStreamWriter writer, bool shouldThrow)

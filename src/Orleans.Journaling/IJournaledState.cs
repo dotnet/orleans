@@ -11,7 +11,7 @@ namespace Orleans.Journaling;
 /// <list type="bullet">
 /// <item>
 /// User code mutates in-memory state synchronously (typically by invoking codec helpers that
-/// both apply the mutation locally and emit the corresponding operation to the journal).
+/// both apply the mutation locally and emit the corresponding command to the journal).
 /// </item>
 /// <item>
 /// At the end of the grain turn, the journaled state manager calls
@@ -40,15 +40,15 @@ namespace Orleans.Journaling;
 public interface IJournaledState
 {
     /// <summary>
-    /// Applies one operation during journal recovery.
+    /// Replays one entry during journal recovery.
     /// </summary>
-    /// <param name="operation">The operation to apply.</param>
+    /// <param name="entry">The entry to replay.</param>
     /// <param name="context">The replay context.</param>
     /// <remarks>
-    /// Implementations must not retain <see cref="JournalOperation.Payload"/> or references to its
+    /// Implementations must not retain <see cref="JournalEntry.Payload"/> or references to its
     /// backing storage after this method returns unless they copy the payload.
     /// </remarks>
-    void ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context);
+    void ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context);
 
     /// <summary>
     /// Resets the state.

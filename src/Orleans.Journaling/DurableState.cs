@@ -5,9 +5,9 @@ using Orleans.Core;
 namespace Orleans.Journaling;
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IStateOperationHandler<T>
+internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IPersistentStateCommandHandler<T>
 {
-    private readonly IStateOperationCodec<T> _codec;
+    private readonly IPersistentStateCommandCodec<T> _codec;
     private readonly IStateManager _manager;
     private T? _value;
     private ulong _version;
@@ -23,12 +23,12 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IS
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IStateOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredCommandCodec<IPersistentStateCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
         _manager = manager;
     }
 
-    internal DurableState(string key, IStateManager manager, IStateOperationCodec<T> codec)
+    internal DurableState(string key, IStateManager manager, IPersistentStateCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -55,8 +55,8 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IS
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     void IJournaledState.OnWriteCompleted()
     {
@@ -131,7 +131,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IS
         _pendingVersion = 0;
     }
 
-    void IStateOperationHandler<T>.ApplySet(T state, ulong version)
+    void IPersistentStateCommandHandler<T>.ApplySet(T state, ulong version)
     {
         _value = state;
         _version = version;
@@ -139,7 +139,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IS
         _clearRequested = false;
     }
 
-    void IStateOperationHandler<T>.ApplyClear()
+    void IPersistentStateCommandHandler<T>.ApplyClear()
     {
         _value = default;
         _version = 0;

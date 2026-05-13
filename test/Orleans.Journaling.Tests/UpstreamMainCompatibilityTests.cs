@@ -81,21 +81,21 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
         return new DurableStates(
             manager,
             new DurableDictionary<string, int>("dict", manager,
-                new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool)),
+                new OrleansBinaryDurableDictionaryCommandCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool)),
             new DurableList<string>("list", manager,
-                new OrleansBinaryListOperationCodec<string>(ValueCodec<string>(), SessionPool)),
+                new OrleansBinaryDurableListCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableQueue<int>("queue", manager,
-                new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>(), SessionPool)),
+                new OrleansBinaryDurableQueueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
             new DurableSet<string>("set", manager,
-                new OrleansBinarySetOperationCodec<string>(ValueCodec<string>(), SessionPool)),
+                new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableValue<int>("value", manager,
-                new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>(), SessionPool)),
+                new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
             new DurableState<string>("state", manager,
-                new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>(), SessionPool)),
+                new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,
-                new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
+                new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
                 Copier<int>(),
                 Copier<Exception>()));
     }

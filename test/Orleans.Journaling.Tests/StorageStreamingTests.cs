@@ -158,7 +158,7 @@ public sealed class StorageStreamingTests
         {
             var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
         });
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
@@ -173,7 +173,7 @@ public sealed class StorageStreamingTests
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
 
         Assert.Equal(3, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -191,7 +191,7 @@ public sealed class StorageStreamingTests
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(reader, consumer, in context);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -337,8 +337,8 @@ public sealed class StorageStreamingTests
             return this;
         }
 
-        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-            Entries.Add(new(_streamId, operation.Payload.ToArray()));
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+            Entries.Add(new(_streamId, entry.Payload.ToArray()));
 
         public void Reset(JournalStreamWriter writer) { }
         public void AppendEntries(JournalStreamWriter writer) { }

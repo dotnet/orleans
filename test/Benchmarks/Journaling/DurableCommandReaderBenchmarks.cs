@@ -8,9 +8,9 @@ using Orleans.Serialization.Session;
 
 namespace Benchmarks.Journaling;
 
-[BenchmarkCategory("Journaling", "OperationReaders")]
+[BenchmarkCategory("Journaling", "CommandReaders")]
 [MemoryDiagnoser(displayGenColumns: false)]
-public class DurableOperationReaderBenchmarks
+public class DurableCommandReaderBenchmarks
 {
     private const int SmallOperationCount = 4_096;
     private const int SmallItemCount = SmallOperationCount / 2;
@@ -19,7 +19,7 @@ public class DurableOperationReaderBenchmarks
     private static readonly int[] SnapshotItems = Enumerable.Range(0, SnapshotItemCount).ToArray();
 
     private IJournalFormat _journalFormat;
-    private IListOperationCodec<int> _codec;
+    private IDurableListCommandCodec<int> _codec;
     private EncodedJournalData _smallOperations;
     private EncodedJournalData _snapshotOperation;
     private ArcBufferWriter _readBuffer;
@@ -72,7 +72,7 @@ public class DurableOperationReaderBenchmarks
         _readBuffer.Write(data.Buffer.AsReadOnlySequence());
         var reader = new JournalReadBuffer(new ArcBufferReader(_readBuffer), isCompleted: true);
         var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
-        _journalFormat.Read(reader, _consumer, in context);
+        _journalFormat.Replay(reader, _consumer, in context);
     }
 
     private void ValidateEncodedJournalData(EncodedJournalData data, int expectedCount)
@@ -84,7 +84,7 @@ public class DurableOperationReaderBenchmarks
         }
     }
 
-    private static EncodedJournalData CreateSmallOperations(IJournalFormat journalFormat, IListOperationCodec<int> codec)
+    private static EncodedJournalData CreateSmallOperations(IJournalFormat journalFormat, IDurableListCommandCodec<int> codec)
     {
         var writer = journalFormat.CreateWriter();
         var streamWriter = writer.CreateJournalStreamWriter(ListJournalStreamId);
@@ -101,7 +101,7 @@ public class DurableOperationReaderBenchmarks
         return new EncodedJournalData(writer);
     }
 
-    private static EncodedJournalData CreateSnapshotOperation(IJournalFormat journalFormat, IListOperationCodec<int> codec)
+    private static EncodedJournalData CreateSnapshotOperation(IJournalFormat journalFormat, IDurableListCommandCodec<int> codec)
     {
         var writer = journalFormat.CreateWriter();
         codec.WriteSnapshot(SnapshotItems, writer.CreateJournalStreamWriter(ListJournalStreamId));
@@ -124,7 +124,7 @@ public class DurableOperationReaderBenchmarks
         var codecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
         return new CodecFamilyServices(
             new OrleansBinaryJournalFormat(sessionPool),
-            new OrleansBinaryListOperationCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
+            new OrleansBinaryDurableListCommandCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
     }
 
     public enum CodecFamily
@@ -132,10 +132,10 @@ public class DurableOperationReaderBenchmarks
         OrleansBinary
     }
 
-    private sealed class CodecFamilyServices(IJournalFormat journalFormat, IListOperationCodec<int> codec)
+    private sealed class CodecFamilyServices(IJournalFormat journalFormat, IDurableListCommandCodec<int> codec)
     {
         public IJournalFormat JournalFormat { get; } = journalFormat;
-        public IListOperationCodec<int> Codec { get; } = codec;
+        public IDurableListCommandCodec<int> Codec { get; } = codec;
     }
 
     private sealed class EncodedJournalData : IDisposable
@@ -159,8 +159,8 @@ public class DurableOperationReaderBenchmarks
 
     private sealed class ListReplayConsumer(
         JournalStreamId expectedStreamId,
-        IListOperationCodec<int> codec,
-        int capacity) : IStateResolver, IJournaledState, IListOperationHandler<int>
+        IDurableListCommandCodec<int> codec,
+        int capacity) : IStateResolver, IJournaledState, IDurableListCommandHandler<int>
     {
         private readonly List<int> _items = new(capacity);
         private long _checksum;
@@ -187,8 +187,8 @@ public class DurableOperationReaderBenchmarks
 
         void IJournaledState.Reset(JournalStreamWriter storage) => ResetForReplay();
 
-        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-            context.GetRequiredOperationCodec(operation.FormatKey, codec).Apply(operation.Payload, this);
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Payload, this);
 
         void IJournaledState.AppendEntries(JournalStreamWriter writer)
         {

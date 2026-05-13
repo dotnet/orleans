@@ -32,7 +32,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut = CreateTestSystem(storage);
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -44,7 +44,7 @@ public class CodecRecoveryTests : JournalingTestBase
         var sut2 = CreateTestSystem(storage);
         var keyCodec2 = CodecProvider.GetCodec<string>();
         var valueCodec2 = CodecProvider.GetCodec<int>();
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec2, valueCodec2, SessionPool));
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec2, valueCodec2, SessionPool));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, dict2.Count);
@@ -65,7 +65,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new JsonDictionaryOperationCodec<string, int>(jsonOptions));
+        var dict = new DurableDictionary<string, int>("dict", sut.Manager, new JsonDurableDictionaryCommandCodec<string, int>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         dict.Add("alpha", 1);
@@ -80,7 +80,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new JsonDictionaryOperationCodec<string, int>(jsonOptions));
+        var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new JsonDurableDictionaryCommandCodec<string, int>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(2, dict2.Count);
@@ -99,7 +99,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var list = new DurableList<string>("list", sut.Manager, new JsonListOperationCodec<string>(jsonOptions));
+        var list = new DurableList<string>("list", sut.Manager, new JsonDurableListCommandCodec<string>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         list.Add("one");
@@ -109,7 +109,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var list2 = new DurableList<string>("list", sut2.Manager, new JsonListOperationCodec<string>(jsonOptions));
+        var list2 = new DurableList<string>("list", sut2.Manager, new JsonDurableListCommandCodec<string>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(3, list2.Count);
@@ -129,7 +129,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Write phase
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var value = new DurableValue<int>("val", sut.Manager, new JsonValueOperationCodec<int>(jsonOptions));
+        var value = new DurableValue<int>("val", sut.Manager, new JsonDurableValueCommandCodec<int>(jsonOptions));
         await sut.Lifecycle.OnStart();
 
         value.Value = 42;
@@ -137,7 +137,7 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Recovery phase
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var value2 = new DurableValue<int>("val", sut2.Manager, new JsonValueOperationCodec<int>(jsonOptions));
+        var value2 = new DurableValue<int>("val", sut2.Manager, new JsonDurableValueCommandCodec<int>(jsonOptions));
         await sut2.Lifecycle.OnStart();
 
         Assert.Equal(42, value2.Value);
@@ -150,13 +150,13 @@ public class CodecRecoveryTests : JournalingTestBase
         var jsonOptions = CreateJsonOptions();
 
         var sut = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var queue = new DurableQueue<string>("queue", sut.Manager, new JsonQueueOperationCodec<string>(jsonOptions));
-        var set = new DurableSet<string>("set", sut.Manager, new JsonSetOperationCodec<string>(jsonOptions));
-        var state = new DurableState<string>("state", sut.Manager, new JsonStateOperationCodec<string>(jsonOptions));
+        var queue = new DurableQueue<string>("queue", sut.Manager, new JsonDurableQueueCommandCodec<string>(jsonOptions));
+        var set = new DurableSet<string>("set", sut.Manager, new JsonDurableSetCommandCodec<string>(jsonOptions));
+        var state = new DurableState<string>("state", sut.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions));
         var tcs = new DurableTaskCompletionSource<int>(
             "tcs",
             sut.Manager,
-            new JsonTcsOperationCodec<int>(jsonOptions),
+            new JsonDurableTaskCompletionSourceCommandCodec<int>(jsonOptions),
             Copier<int>(),
             Copier<Exception>());
         await sut.Lifecycle.OnStart();
@@ -170,13 +170,13 @@ public class CodecRecoveryTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         var sut2 = CreateTestSystemWithJsonCodec(storage, jsonOptions);
-        var queue2 = new DurableQueue<string>("queue", sut2.Manager, new JsonQueueOperationCodec<string>(jsonOptions));
-        var set2 = new DurableSet<string>("set", sut2.Manager, new JsonSetOperationCodec<string>(jsonOptions));
-        var state2 = new DurableState<string>("state", sut2.Manager, new JsonStateOperationCodec<string>(jsonOptions));
+        var queue2 = new DurableQueue<string>("queue", sut2.Manager, new JsonDurableQueueCommandCodec<string>(jsonOptions));
+        var set2 = new DurableSet<string>("set", sut2.Manager, new JsonDurableSetCommandCodec<string>(jsonOptions));
+        var state2 = new DurableState<string>("state", sut2.Manager, new JsonPersistentStateCommandCodec<string>(jsonOptions));
         var tcs2 = new DurableTaskCompletionSource<int>(
             "tcs",
             sut2.Manager,
-            new JsonTcsOperationCodec<int>(jsonOptions),
+            new JsonDurableTaskCompletionSourceCommandCodec<int>(jsonOptions),
             Copier<int>(),
             Copier<Exception>());
         await sut2.Lifecycle.OnStart();
@@ -368,9 +368,9 @@ public class CodecRecoveryTests : JournalingTestBase
         services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
-            typeof(IDictionaryOperationCodec<,>),
+            typeof(IDurableDictionaryCommandCodec<,>),
             JsonJournalExtensions.JournalFormatKey,
-            typeof(JsonDictionaryOperationCodecService<,>));
+            typeof(JsonDurableDictionaryCommandCodecService<,>));
         return services.BuildServiceProvider();
     }
 
@@ -385,17 +385,17 @@ public class CodecRecoveryTests : JournalingTestBase
             OrleansBinaryJournalFormat.JournalFormatKey,
             (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
         services.AddKeyedSingleton(
-            typeof(IDictionaryOperationCodec<,>),
+            typeof(IDurableDictionaryCommandCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
-            typeof(OrleansBinaryDictionaryOperationCodec<,>));
+            typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
 
         var jsonOptions = CreateJsonOptions();
         services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
-            typeof(IDictionaryOperationCodec<,>),
+            typeof(IDurableDictionaryCommandCodec<,>),
             JsonJournalExtensions.JournalFormatKey,
-            typeof(JsonDictionaryOperationCodecService<,>));
+            typeof(JsonDurableDictionaryCommandCodecService<,>));
 
         var serviceProvider = services.BuildServiceProvider();
         var managerOptions = new JournaledStateManagerOptions
@@ -422,11 +422,11 @@ public class CodecRecoveryTests : JournalingTestBase
         => new(
             name,
             system.Manager,
-            JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, int>>(
+            JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>(
                 system.ServiceProvider,
                 writeJournalFormatKey));
 
-    private OrleansBinaryDictionaryOperationCodec<TKey, TValue> CreateBinaryDictionaryCodec<TKey, TValue>()
+    private OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue> CreateBinaryDictionaryCodec<TKey, TValue>()
         where TKey : notnull
         => new(ValueCodec<TKey>(), ValueCodec<TValue>(), SessionPool);
 

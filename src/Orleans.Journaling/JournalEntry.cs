@@ -1,7 +1,7 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Represents one persisted journal operation payload.
+/// Represents one persisted journal entry payload.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -10,20 +10,20 @@ namespace Orleans.Journaling;
 /// </para>
 /// <para>
 /// The payload is only guaranteed to remain valid for the duration of the synchronous replay call
-/// which supplies this operation. Implementations which need to retain the payload must copy it.
+/// which supplies this entry. Implementations which need to retain the payload must copy it.
 /// </para>
 /// </remarks>
 /// <param name="formatKey">The journal format key for <paramref name="payload"/>.</param>
-/// <param name="payload">The operation payload buffer.</param>
-public readonly ref struct JournalOperation(string formatKey, JournalReadBuffer payload)
+/// <param name="payload">The entry payload buffer.</param>
+public readonly ref struct JournalEntry(string formatKey, JournalReadBuffer payload)
 {
     /// <summary>
-    /// Gets the journal format key for this operation.
+    /// Gets the journal format key for this entry.
     /// </summary>
     public string FormatKey { get; } = JournalFormatServices.ValidateJournalFormatKey(formatKey);
 
     /// <summary>
-    /// Gets the operation payload buffer.
+    /// Gets the entry payload buffer.
     /// </summary>
     public JournalReadBuffer Payload { get; } = payload;
 }

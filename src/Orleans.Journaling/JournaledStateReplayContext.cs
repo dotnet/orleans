@@ -30,23 +30,23 @@ public readonly ref struct JournaledStateReplayContext
     public IServiceProvider ServiceProvider { get; }
 
     /// <summary>
-    /// Gets the operation codec for <paramref name="operationFormatKey"/>.
+    /// Gets the command codec for <paramref name="entryFormatKey"/>.
     /// </summary>
-    /// <typeparam name="TCodec">The operation codec service type.</typeparam>
-    /// <param name="operationFormatKey">The journal format key for the operation being replayed.</param>
-    /// <param name="writeOperationCodec">The operation codec for the configured write journal format.</param>
-    /// <returns>The operation codec for <paramref name="operationFormatKey"/>.</returns>
-    public TCodec GetRequiredOperationCodec<TCodec>(string operationFormatKey, TCodec writeOperationCodec)
+    /// <typeparam name="TCodec">The command codec service type.</typeparam>
+    /// <param name="entryFormatKey">The journal format key for the entry being replayed.</param>
+    /// <param name="writeCommandCodec">The command codec for the configured write journal format.</param>
+    /// <returns>The command codec for <paramref name="entryFormatKey"/>.</returns>
+    public TCodec GetRequiredCommandCodec<TCodec>(string entryFormatKey, TCodec writeCommandCodec)
         where TCodec : notnull
     {
-        ArgumentNullException.ThrowIfNull(writeOperationCodec);
-        operationFormatKey = JournalFormatServices.ValidateJournalFormatKey(operationFormatKey);
+        ArgumentNullException.ThrowIfNull(writeCommandCodec);
+        entryFormatKey = JournalFormatServices.ValidateJournalFormatKey(entryFormatKey);
 
-        if (string.Equals(operationFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
+        if (string.Equals(entryFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
         {
-            return writeOperationCodec;
+            return writeCommandCodec;
         }
 
-        return JournalFormatServices.GetRequiredKeyedService<TCodec>(ServiceProvider, operationFormatKey);
+        return JournalFormatServices.GetRequiredKeyedService<TCodec>(ServiceProvider, entryFormatKey);
     }
 }

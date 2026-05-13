@@ -91,11 +91,11 @@ public abstract class JournalWriter : IDisposable
     /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
-    /// <param name="operation">The preserved operation.</param>
-    protected virtual void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation operation)
+    /// <param name="entry">The preserved entry.</param>
+    protected virtual void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
     {
         throw new InvalidOperationException(
-            $"The journal writer '{GetType().FullName}' cannot append preserved operation of type '{operation.GetType().FullName}'.");
+            $"The journal writer '{GetType().FullName}' cannot append preserved entry of type '{entry.GetType().FullName}'.");
     }
 
     /// <summary>
@@ -123,15 +123,15 @@ public abstract class JournalWriter : IDisposable
         return new(this, streamId, payloadWriter);
     }
 
-    internal void AppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation operation)
+    internal void AppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
     {
-        ArgumentNullException.ThrowIfNull(operation);
+        ArgumentNullException.ThrowIfNull(entry);
         if (_hasActiveEntry)
         {
             throw new InvalidOperationException("The journal writer already has an active entry.");
         }
 
-        OnAppendPreservedOperation(streamId, operation);
+        OnAppendPreservedEntry(streamId, entry);
     }
 
     internal void CommitActiveEntry(JournalStreamId streamId)

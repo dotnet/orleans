@@ -52,16 +52,16 @@ namespace Orleans.Journaling
         public static Hosting.ISiloBuilder AddJournalStorage(this Hosting.ISiloBuilder builder) { throw null; }
     }
 
-    public partial interface IDictionaryOperationCodec<TKey, TValue>
+    public partial interface IDurableDictionaryCommandCodec<TKey, TValue>
     {
-        void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer);
+        void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer);
         void WriteClear(JournalStreamWriter writer);
         void WriteRemove(TKey key, JournalStreamWriter writer);
         void WriteSet(TKey key, TValue value, JournalStreamWriter writer);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer);
     }
 
-    public partial interface IDictionaryOperationHandler<TKey, TValue>
+    public partial interface IDurableDictionaryCommandHandler<TKey, TValue>
     {
         void ApplyClear();
         void ApplyRemove(TKey key);
@@ -125,7 +125,7 @@ namespace Orleans.Journaling
         T? Value { get; set; }
     }
 
-    public partial interface IPreservedJournalOperation
+    public partial interface IPreservedJournalEntry
     {
         string FormatKey { get; }
 
@@ -136,7 +136,7 @@ namespace Orleans.Journaling
     {
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
-        void ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context);
+        void ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context);
         IJournaledState DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
@@ -155,7 +155,7 @@ namespace Orleans.Journaling
         string? MimeType { get; }
 
         JournalWriter CreateWriter();
-        void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context);
+        void Replay(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context);
     }
 
     public partial interface IJournalStorage
@@ -178,9 +178,9 @@ namespace Orleans.Journaling
         IJournalStorage Create(Runtime.IGrainContext grainContext);
     }
 
-    public partial interface IListOperationCodec<T>
+    public partial interface IDurableListCommandCodec<T>
     {
-        void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer);
+        void Apply(JournalReadBuffer input, IDurableListCommandHandler<T> consumer);
         void WriteAdd(T item, JournalStreamWriter writer);
         void WriteClear(JournalStreamWriter writer);
         void WriteInsert(int index, T item, JournalStreamWriter writer);
@@ -189,7 +189,7 @@ namespace Orleans.Journaling
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
     }
 
-    public partial interface IListOperationHandler<T>
+    public partial interface IDurableListCommandHandler<T>
     {
         void ApplyAdd(T item);
         void ApplyClear();
@@ -199,16 +199,16 @@ namespace Orleans.Journaling
         void Reset(int capacityHint);
     }
 
-    public partial interface IQueueOperationCodec<T>
+    public partial interface IDurableQueueCommandCodec<T>
     {
-        void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer);
+        void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer);
         void WriteClear(JournalStreamWriter writer);
         void WriteDequeue(JournalStreamWriter writer);
         void WriteEnqueue(T item, JournalStreamWriter writer);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
     }
 
-    public partial interface IQueueOperationHandler<T>
+    public partial interface IDurableQueueCommandHandler<T>
     {
         void ApplyClear();
         void ApplyDequeue();
@@ -216,16 +216,16 @@ namespace Orleans.Journaling
         void Reset(int capacityHint);
     }
 
-    public partial interface ISetOperationCodec<T>
+    public partial interface IDurableSetCommandCodec<T>
     {
-        void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer);
+        void Apply(JournalReadBuffer input, IDurableSetCommandHandler<T> consumer);
         void WriteAdd(T item, JournalStreamWriter writer);
         void WriteClear(JournalStreamWriter writer);
         void WriteRemove(T item, JournalStreamWriter writer);
         void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer);
     }
 
-    public partial interface ISetOperationHandler<T>
+    public partial interface IDurableSetCommandHandler<T>
     {
         void ApplyAdd(T item);
         void ApplyClear();
@@ -242,14 +242,14 @@ namespace Orleans.Journaling
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);
     }
 
-    public partial interface IStateOperationCodec<T>
+    public partial interface IPersistentStateCommandCodec<T>
     {
-        void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer);
+        void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer);
         void WriteClear(JournalStreamWriter writer);
         void WriteSet(T state, ulong version, JournalStreamWriter writer);
     }
 
-    public partial interface IStateOperationHandler<T>
+    public partial interface IPersistentStateCommandHandler<T>
     {
         void ApplyClear();
         void ApplySet(T state, ulong version);
@@ -260,16 +260,16 @@ namespace Orleans.Journaling
         IJournaledState ResolveState(JournalStreamId streamId);
     }
 
-    public partial interface ITaskCompletionSourceOperationCodec<T>
+    public partial interface IDurableTaskCompletionSourceCommandCodec<T>
     {
-        void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer);
+        void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer);
         void WriteCanceled(JournalStreamWriter writer);
         void WriteCompleted(T value, JournalStreamWriter writer);
         void WriteFaulted(System.Exception exception, JournalStreamWriter writer);
         void WritePending(JournalStreamWriter writer);
     }
 
-    public partial interface ITaskCompletionSourceOperationHandler<T>
+    public partial interface IDurableTaskCompletionSourceCommandHandler<T>
     {
         void ApplyCanceled();
         void ApplyCompleted(T value);
@@ -277,13 +277,13 @@ namespace Orleans.Journaling
         void ApplyPending();
     }
 
-    public partial interface IValueOperationCodec<T>
+    public partial interface IDurableValueCommandCodec<T>
     {
-        void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer);
+        void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer);
         void WriteSet(T value, JournalStreamWriter writer);
     }
 
-    public partial interface IValueOperationHandler<T>
+    public partial interface IDurableValueCommandHandler<T>
     {
         void ApplySet(T value);
     }
@@ -299,7 +299,7 @@ namespace Orleans.Journaling
         public Serialization.Buffers.ArcBuffer GetCommittedBuffer() { throw null; }
 
         protected abstract Serialization.Buffers.ArcBuffer GetCommittedBufferCore();
-        protected virtual void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry) { }
+        protected virtual void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) { }
 
         public void Reset() { }
 
@@ -324,7 +324,7 @@ namespace Orleans.Journaling
 
         public string WriteJournalFormatKey { get { throw null; } }
 
-        public readonly TCodec GetRequiredOperationCodec<TCodec>(string operationFormatKey, TCodec writeOperationCodec) { throw null; }
+        public readonly TCodec GetRequiredCommandCodec<TCodec>(string entryFormatKey, TCodec writeCommandCodec) { throw null; }
     }
 
     public ref partial struct JournalEntryScope : System.IDisposable
@@ -347,11 +347,11 @@ namespace Orleans.Journaling
         public string? Format { get { throw null; } }
     }
 
-    public readonly ref partial struct JournalOperation
+    public readonly ref partial struct JournalEntry
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public JournalOperation(string formatKey, JournalReadBuffer payload) { }
+        public JournalEntry(string formatKey, JournalReadBuffer payload) { }
 
         public string FormatKey { get { throw null; } }
 
@@ -467,11 +467,11 @@ namespace Orleans.Journaling
 
 namespace Orleans.Journaling.Json
 {
-    public sealed partial class JsonDictionaryOperationCodec<TKey, TValue> : IDictionaryOperationCodec<TKey, TValue>
+    public sealed partial class JsonDurableDictionaryCommandCodec<TKey, TValue> : IDurableDictionaryCommandCodec<TKey, TValue>
     {
-        public JsonDictionaryOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonDurableDictionaryCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer) { }
+        public void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer) { }
 
         public void WriteClear(JournalStreamWriter writer) { }
 
@@ -497,11 +497,11 @@ namespace Orleans.Journaling.Json
         public JsonJournalOptions AddTypeInfoResolver(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
     }
 
-    public sealed partial class JsonListOperationCodec<T> : IListOperationCodec<T>
+    public sealed partial class JsonDurableListCommandCodec<T> : IDurableListCommandCodec<T>
     {
-        public JsonListOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonDurableListCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer) { }
+        public void Apply(JournalReadBuffer input, IDurableListCommandHandler<T> consumer) { }
 
         public void WriteAdd(T item, JournalStreamWriter writer) { }
 
@@ -516,11 +516,11 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
     }
 
-    public sealed partial class JsonQueueOperationCodec<T> : IQueueOperationCodec<T>
+    public sealed partial class JsonDurableQueueCommandCodec<T> : IDurableQueueCommandCodec<T>
     {
-        public JsonQueueOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonDurableQueueCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer) { }
+        public void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer) { }
 
         public void WriteClear(JournalStreamWriter writer) { }
 
@@ -531,11 +531,11 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
     }
 
-    public sealed partial class JsonSetOperationCodec<T> : ISetOperationCodec<T>
+    public sealed partial class JsonDurableSetCommandCodec<T> : IDurableSetCommandCodec<T>
     {
-        public JsonSetOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonDurableSetCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(JournalReadBuffer input, ISetOperationHandler<T> consumer) { }
+        public void Apply(JournalReadBuffer input, IDurableSetCommandHandler<T> consumer) { }
 
         public void WriteAdd(T item, JournalStreamWriter writer) { }
 
@@ -546,22 +546,22 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<T> items, JournalStreamWriter writer) { }
     }
 
-    public sealed partial class JsonStateOperationCodec<T> : IStateOperationCodec<T>
+    public sealed partial class JsonPersistentStateCommandCodec<T> : IPersistentStateCommandCodec<T>
     {
-        public JsonStateOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonPersistentStateCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer) { }
+        public void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer) { }
 
         public void WriteClear(JournalStreamWriter writer) { }
 
         public void WriteSet(T state, ulong version, JournalStreamWriter writer) { }
     }
 
-    public sealed partial class JsonTcsOperationCodec<T> : ITaskCompletionSourceOperationCodec<T>
+    public sealed partial class JsonDurableTaskCompletionSourceCommandCodec<T> : IDurableTaskCompletionSourceCommandCodec<T>
     {
-        public JsonTcsOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonDurableTaskCompletionSourceCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer) { }
+        public void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer) { }
 
         public void WriteCanceled(JournalStreamWriter writer) { }
 
@@ -572,11 +572,11 @@ namespace Orleans.Journaling.Json
         public void WritePending(JournalStreamWriter writer) { }
     }
 
-    public sealed partial class JsonValueOperationCodec<T> : IValueOperationCodec<T>
+    public sealed partial class JsonDurableValueCommandCodec<T> : IDurableValueCommandCodec<T>
     {
-        public JsonValueOperationCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
+        public JsonDurableValueCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
 
-        public void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer) { }
+        public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer) { }
 
         public void WriteSet(T value, JournalStreamWriter writer) { }
     }

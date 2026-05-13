@@ -25,13 +25,13 @@ internal static class JournalFormatServices
         {
             throw new InvalidOperationException(
                 $"Journal format key '{journalFormatKey}' requires keyed service '{typeof(T).FullName}', but none was registered. "
-                + "Register the physical journal format and keyed durable operation codecs using the same journal format key.");
+                + "Register the physical journal format and keyed durable command codecs using the same journal format key.");
         }
 
         return service;
     }
 
-    public static T GetRequiredOperationCodec<T>(IServiceProvider serviceProvider, string journalFormatKey)
+    public static T GetRequiredCommandCodec<T>(IServiceProvider serviceProvider, string journalFormatKey)
         where T : notnull
         => GetRequiredKeyedService<T>(serviceProvider, journalFormatKey);
 

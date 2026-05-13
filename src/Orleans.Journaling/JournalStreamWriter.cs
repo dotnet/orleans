@@ -30,7 +30,7 @@ public readonly struct JournalStreamWriter
     /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>
     /// <param name="entry">The format-owned entry.</param>
-    internal void AppendPreservedOperation(IPreservedJournalOperation entry) => GetWriter().AppendPreservedOperation(_id, entry);
+    internal void AppendPreservedEntry(IPreservedJournalEntry entry) => GetWriter().AppendPreservedEntry(_id, entry);
 
     private JournalWriter GetWriter()
     {

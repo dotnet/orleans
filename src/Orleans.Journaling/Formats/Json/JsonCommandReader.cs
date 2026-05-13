@@ -4,36 +4,36 @@ using System.Text.Json.Serialization.Metadata;
 
 namespace Orleans.Journaling.Json;
 
-internal ref struct JsonOperationReader
+internal ref struct JsonCommandReader
 {
     private Utf8JsonReader _reader;
     private int _nextIndex;
 
-    public JsonOperationReader(ReadOnlySequence<byte> input)
+    public JsonCommandReader(ReadOnlySequence<byte> input)
     {
         _reader = new Utf8JsonReader(input, isFinalBlock: true, state: default);
         _nextIndex = 0;
         if (!_reader.Read() || _reader.TokenType is not JsonTokenType.StartArray)
         {
-            throw new JsonException("A JSON journal operation must be an array.");
+            throw new JsonException("A JSON journal command must be an array.");
         }
 
         Command = ReadCommandCore();
     }
 
-    public JsonOperationReader(JournalReadBuffer input)
+    public JsonCommandReader(JournalReadBuffer input)
     {
         _reader = new Utf8JsonReader(input.AsReadOnlySequence(), isFinalBlock: true, state: default);
         _nextIndex = 0;
         if (!_reader.Read() || _reader.TokenType is not JsonTokenType.StartArray)
         {
-            throw new JsonException("A JSON journal operation must be an array.");
+            throw new JsonException("A JSON journal command must be an array.");
         }
 
         Command = ReadCommandCore();
     }
 
-    public JsonOperationReader(ref Utf8JsonReader reader)
+    public JsonCommandReader(ref Utf8JsonReader reader)
     {
         _reader = reader;
         _nextIndex = 0;
@@ -53,7 +53,7 @@ internal ref struct JsonOperationReader
         var value = Deserialize(index, operandName, typeInfo);
         if (value is null)
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' must not be null.");
+            throw new JsonException($"JSON journal command operand '{operandName}' must not be null.");
         }
 
         return value;
@@ -66,7 +66,7 @@ internal ref struct JsonOperationReader
         var value = DeserializeCurrent(typeInfo);
         if (value is null)
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' must not be null.");
+            throw new JsonException($"JSON journal command operand '{operandName}' must not be null.");
         }
 
         return value;
@@ -77,7 +77,7 @@ internal ref struct JsonOperationReader
         ReadOperand(index, operandName);
         if (!_reader.TryGetInt32(out var value))
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' must be a 32-bit integer.");
+            throw new JsonException($"JSON journal command operand '{operandName}' must be a 32-bit integer.");
         }
 
         return value;
@@ -88,7 +88,7 @@ internal ref struct JsonOperationReader
         ReadOperand(index, operandName);
         if (!_reader.TryGetUInt64(out var value))
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' must be an unsigned integer.");
+            throw new JsonException($"JSON journal command operand '{operandName}' must be an unsigned integer.");
         }
 
         return value;
@@ -104,7 +104,7 @@ internal ref struct JsonOperationReader
 
         if (_reader.TokenType is not JsonTokenType.String)
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' must be a string.");
+            throw new JsonException($"JSON journal command operand '{operandName}' must be a string.");
         }
 
         return _reader.GetString();
@@ -115,7 +115,7 @@ internal ref struct JsonOperationReader
         ReadOperand(index, operandName);
         if (_reader.TokenType is not JsonTokenType.StartArray)
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' must be an array.");
+            throw new JsonException($"JSON journal command operand '{operandName}' must be an array.");
         }
 
         return CountCurrentArray(operandName);
@@ -125,7 +125,7 @@ internal ref struct JsonOperationReader
     {
         if (!_reader.Read())
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' array is incomplete.");
+            throw new JsonException($"JSON journal command operand '{operandName}' array is incomplete.");
         }
 
         return _reader.TokenType is not JsonTokenType.EndArray;
@@ -143,24 +143,24 @@ internal ref struct JsonOperationReader
 
         if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
         {
-            throw new JsonException($"JSON journal operation is missing operand '{JsonJournalEntryFields.Key}'.");
+            throw new JsonException($"JSON journal command is missing operand '{JsonJournalEntryFields.Key}'.");
         }
 
         var first = JsonSerializer.Deserialize(ref _reader, firstTypeInfo);
         if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
         {
-            throw new JsonException($"JSON journal operation is missing operand '{JsonJournalEntryFields.Value}'.");
+            throw new JsonException($"JSON journal command is missing operand '{JsonJournalEntryFields.Value}'.");
         }
 
         var second = JsonSerializer.Deserialize(ref _reader, secondTypeInfo);
         if (!_reader.Read())
         {
-            throw new JsonException($"JSON journal operation operand '{operandName}' array is incomplete.");
+            throw new JsonException($"JSON journal command operand '{operandName}' array is incomplete.");
         }
 
         if (_reader.TokenType is not JsonTokenType.EndArray)
         {
-            throw new JsonException("JSON journal operation contains unexpected extra elements.");
+            throw new JsonException("JSON journal command contains unexpected extra elements.");
         }
 
         return (first, second);
@@ -174,12 +174,12 @@ internal ref struct JsonOperationReader
         var (first, second) = ReadCurrentPair(operandName, firstTypeInfo, secondTypeInfo);
         if (first is null)
         {
-            throw new JsonException($"JSON journal operation operand '{JsonJournalEntryFields.Key}' must not be null.");
+            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Key}' must not be null.");
         }
 
         if (second is null)
         {
-            throw new JsonException($"JSON journal operation operand '{JsonJournalEntryFields.Value}' must not be null.");
+            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Value}' must not be null.");
         }
 
         return (first, second);
@@ -189,17 +189,17 @@ internal ref struct JsonOperationReader
     {
         if (nextIndex != _nextIndex)
         {
-            throw new InvalidOperationException("JSON journal operation operands must be read in order.");
+            throw new InvalidOperationException("JSON journal command operands must be read in order.");
         }
 
         if (!_reader.Read())
         {
-            throw new JsonException("JSON journal operation array is incomplete.");
+            throw new JsonException("JSON journal command array is incomplete.");
         }
 
         if (_reader.TokenType is not JsonTokenType.EndArray)
         {
-            throw new JsonException("JSON journal operation contains unexpected extra elements.");
+            throw new JsonException("JSON journal command contains unexpected extra elements.");
         }
 
         if (_reader.Read())
@@ -225,24 +225,24 @@ internal ref struct JsonOperationReader
             _reader.Skip();
         }
 
-        throw new JsonException("JSON journal operation array is incomplete.");
+        throw new JsonException("JSON journal command array is incomplete.");
     }
 
     private string? ReadCommandCore()
     {
         if (!_reader.Read())
         {
-            throw new JsonException("A JSON journal operation array is incomplete.");
+            throw new JsonException("A JSON journal command array is incomplete.");
         }
 
         if (_reader.TokenType is JsonTokenType.EndArray)
         {
-            throw new JsonException("A JSON journal operation array must include an operation command string.");
+            throw new JsonException("A JSON journal command array must include a command string.");
         }
 
         if (_reader.TokenType is not JsonTokenType.String)
         {
-            throw new JsonException("The first JSON journal operation element must be an operation command string.");
+            throw new JsonException("The first JSON journal command element must be a command string.");
         }
 
         _nextIndex = 1;
@@ -253,12 +253,12 @@ internal ref struct JsonOperationReader
     {
         if (index != _nextIndex)
         {
-            throw new InvalidOperationException("JSON journal operation operands must be read in order.");
+            throw new InvalidOperationException("JSON journal command operands must be read in order.");
         }
 
         if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
         {
-            throw new JsonException($"JSON journal operation is missing operand '{operandName}'.");
+            throw new JsonException($"JSON journal command is missing operand '{operandName}'.");
         }
 
         _nextIndex++;
@@ -279,6 +279,6 @@ internal ref struct JsonOperationReader
             reader.Skip();
         }
 
-        throw new JsonException($"JSON journal operation operand '{operandName}' array is incomplete.");
+        throw new JsonException($"JSON journal command operand '{operandName}' array is incomplete.");
     }
 }

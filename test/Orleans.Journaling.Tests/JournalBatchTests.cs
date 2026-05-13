@@ -101,9 +101,9 @@ public abstract class JournalBatchTests : IAsyncLifetime
             OrleansBinaryJournalFormat.JournalFormatKey,
             static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
         services.AddKeyedSingleton(
-            typeof(IDictionaryOperationCodec<,>),
+            typeof(IDurableDictionaryCommandCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
-            typeof(OrleansBinaryDictionaryOperationCodec<,>));
+            typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
     }
 
     private (JournaledStateManager Manager, DurableList<T> List, IJournalStorage Storage) CreateTestComponents<T>(string listName, GrainId grainId)
@@ -113,7 +113,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var grainContext = new TestGrainContext(grainId); // Use provided GrainId
         var storage = _storageProvider.Create(grainContext);
         var manager = new JournaledStateManager(CreateShared(storage));
-        var list = new DurableList<T>(listName, manager, new OrleansBinaryListOperationCodec<T>(codecProvider.GetCodec<T>(), sessionPool));
+        var list = new DurableList<T>(listName, manager, new OrleansBinaryDurableListCommandCodec<T>(codecProvider.GetCodec<T>(), sessionPool));
         return (manager, list, storage);
     }
 
@@ -171,7 +171,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var manager2 = new JournaledStateManager(CreateShared(storage));
-        var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListOperationCodec<string>(codecProvider.GetCodec<string>(), sessionPool));
+        var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryDurableListCommandCodec<string>(codecProvider.GetCodec<string>(), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(3, list2.Count);
@@ -370,7 +370,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var manager2 = new JournaledStateManager(CreateShared(storage)); // Reuses the storage object linked via grainId
-        var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListOperationCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
+        var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryDurableListCommandCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(itemCount, list2.Count);

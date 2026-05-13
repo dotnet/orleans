@@ -7,9 +7,9 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Binary codec for durable value journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
-internal sealed class OrleansBinaryValueOperationCodec<T>(
+internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
     IFieldCodec<T> codec,
-    SerializerSessionPool sessionPool) : IValueOperationCodec<T>
+    SerializerSessionPool sessionPool) : IDurableValueCommandCodec<T>
 {
     private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
@@ -23,12 +23,12 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(SetValueCommand);
         payloadWriter.Commit();
-        OrleansBinaryOperationCodecHelpers.WriteValue(codec, value, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(codec, value, output, sessionPool);
         entry.Commit();
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);
@@ -37,18 +37,18 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
-            throw new InvalidOperationException("Unexpected trailing data after binary journal operation.");
+            throw new InvalidOperationException("Unexpected trailing data after binary journal command.");
         }
     }
 
-    private void Apply<TInput>(ref Reader<TInput> reader, IValueOperationHandler<T> consumer)
+    private void Apply<TInput>(ref Reader<TInput> reader, IDurableValueCommandHandler<T> consumer)
     {
-        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
+        OrleansBinaryCommandCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {
             case SetValueCommand:
-                consumer.ApplySet(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
+                consumer.ApplySet(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");

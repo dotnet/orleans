@@ -29,11 +29,11 @@ public class JournalValueCodecTests
     }
 
     [Fact]
-    public void BinaryDictionaryOperationCodec_RoundTrips_Set()
+    public void BinaryDictionaryCommandCodec_RoundTrips_Set()
     {
         var keyCodec = ValueCodec<string>();
         var valueCodec = ValueCodec<int>();
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, _sessionPool);
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("key1", 42, writer));
 
@@ -45,11 +45,11 @@ public class JournalValueCodecTests
     }
 
     [Fact]
-    public void BinaryDictionaryOperationCodec_RoundTrips_Snapshot()
+    public void BinaryDictionaryCommandCodec_RoundTrips_Snapshot()
     {
         var keyCodec = ValueCodec<string>();
         var valueCodec = ValueCodec<int>();
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, _sessionPool);
 
         var items = new List<KeyValuePair<string, int>>
         {
@@ -67,10 +67,10 @@ public class JournalValueCodecTests
     }
 
     [Fact]
-    public void BinaryListOperationCodec_Rejects_Overflowed_SnapshotCount()
+    public void BinaryListCommandCodec_Rejects_Overflowed_SnapshotCount()
     {
         var valueCodec = ValueCodec<int>();
-        var codec = new OrleansBinaryListOperationCodec<int>(valueCodec, _sessionPool);
+        var codec = new OrleansBinaryDurableListCommandCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
         WriteVersionAndCommand(buffer, 5, 0x80000000);
@@ -82,10 +82,10 @@ public class JournalValueCodecTests
     }
 
     [Fact]
-    public void BinaryListOperationCodec_Rejects_Overflowed_Index()
+    public void BinaryListCommandCodec_Rejects_Overflowed_Index()
     {
         var valueCodec = ValueCodec<int>();
-        var codec = new OrleansBinaryListOperationCodec<int>(valueCodec, _sessionPool);
+        var codec = new OrleansBinaryDurableListCommandCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
         WriteVersionAndCommand(buffer, 3, 0x80000000);
@@ -97,11 +97,11 @@ public class JournalValueCodecTests
     }
 
     [Fact]
-    public void BinaryDictionaryOperationCodec_WriteSnapshot_Rejects_MismatchedCollectionCount()
+    public void BinaryDictionaryCommandCodec_WriteSnapshot_Rejects_MismatchedCollectionCount()
     {
         var keyCodec = ValueCodec<string>();
         var valueCodec = ValueCodec<int>();
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, int>(keyCodec, valueCodec, _sessionPool);
         var items = new MiscountedReadOnlyCollection<KeyValuePair<string, int>>(
             1,
             new[]
@@ -118,7 +118,7 @@ public class JournalValueCodecTests
 
     private IFieldCodec<T> ValueCodec<T>() => _codecProvider.GetCodec<T>();
 
-    private sealed class DictionaryConsumer<TKey, TValue> : IDictionaryOperationHandler<TKey, TValue> where TKey : notnull
+    private sealed class DictionaryConsumer<TKey, TValue> : IDurableDictionaryCommandHandler<TKey, TValue> where TKey : notnull
     {
         public TKey? LastSetKey { get; private set; }
         public TValue? LastSetValue { get; private set; }
@@ -136,7 +136,7 @@ public class JournalValueCodecTests
         public void Reset(int capacityHint) => Items.Clear();
     }
 
-    private sealed class ListConsumer<T> : IListOperationHandler<T>
+    private sealed class ListConsumer<T> : IDurableListCommandHandler<T>
     {
         public void ApplyAdd(T item) { }
         public void ApplySet(int index, T item) { }

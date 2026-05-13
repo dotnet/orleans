@@ -36,12 +36,12 @@ public static class HostingExtensions
         services.TryAddKeyedSingleton<IJournalFormat>(key, static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
         services.TryAddSingleton<IJournalFormat>(static sp => sp.GetRequiredService<OrleansBinaryJournalFormat>());
 
-        services.TryAddKeyedSingleton(typeof(IDictionaryOperationCodec<,>), key, typeof(OrleansBinaryDictionaryOperationCodec<,>));
-        services.TryAddKeyedSingleton(typeof(IListOperationCodec<>), key, typeof(OrleansBinaryListOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IQueueOperationCodec<>), key, typeof(OrleansBinaryQueueOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(ISetOperationCodec<>), key, typeof(OrleansBinarySetOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IValueOperationCodec<>), key, typeof(OrleansBinaryValueOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(IStateOperationCodec<>), key, typeof(OrleansBinaryStateOperationCodec<>));
-        services.TryAddKeyedSingleton(typeof(ITaskCompletionSourceOperationCodec<>), key, typeof(OrleansBinaryTcsOperationCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableDictionaryCommandCodec<,>), key, typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
+        services.TryAddKeyedSingleton(typeof(IDurableListCommandCodec<>), key, typeof(OrleansBinaryDurableListCommandCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableQueueCommandCodec<>), key, typeof(OrleansBinaryDurableQueueCommandCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableSetCommandCodec<>), key, typeof(OrleansBinaryDurableSetCommandCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableValueCommandCodec<>), key, typeof(OrleansBinaryDurableValueCommandCodec<>));
+        services.TryAddKeyedSingleton(typeof(IPersistentStateCommandCodec<>), key, typeof(OrleansBinaryPersistentStateCommandCodec<>));
+        services.TryAddKeyedSingleton(typeof(IDurableTaskCompletionSourceCommandCodec<>), key, typeof(OrleansBinaryDurableTaskCompletionSourceCommandCodec<>));
     }
 }

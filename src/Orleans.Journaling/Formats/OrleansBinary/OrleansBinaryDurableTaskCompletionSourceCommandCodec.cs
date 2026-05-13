@@ -11,10 +11,10 @@ namespace Orleans.Journaling;
 /// Unlike other durable type codecs, the TCS format uses a status byte instead of a
 /// VarUInt32 command discriminator after the version byte.
 /// </remarks>
-internal sealed class OrleansBinaryTcsOperationCodec<T>(
+internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     IFieldCodec<T> codec,
     IFieldCodec<Exception> exceptionCodec,
-    SerializerSessionPool sessionPool) : ITaskCompletionSourceOperationCodec<T>
+    SerializerSessionPool sessionPool) : IDurableTaskCompletionSourceCommandCodec<T>
 {
     private const byte FormatVersion = 0;
 
@@ -39,7 +39,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Completed;
         output.Advance(2);
-        OrleansBinaryOperationCodecHelpers.WriteValue(codec, value, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(codec, value, output, sessionPool);
         entry.Commit();
     }
 
@@ -52,7 +52,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Faulted;
         output.Advance(2);
-        OrleansBinaryOperationCodecHelpers.WriteValue(exceptionCodec, exception, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(exceptionCodec, exception, output, sessionPool);
         entry.Commit();
     }
 
@@ -69,7 +69,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);
@@ -78,13 +78,13 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
-            throw new InvalidOperationException("Unexpected trailing data after binary journal operation.");
+            throw new InvalidOperationException("Unexpected trailing data after binary journal command.");
         }
     }
 
-    private void Apply<TInput>(ref Reader<TInput> reader, ITaskCompletionSourceOperationHandler<T> consumer)
+    private void Apply<TInput>(ref Reader<TInput> reader, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
-        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
+        OrleansBinaryCommandCodecHelpers.ReadVersion(ref reader);
         if (reader.Position >= reader.Length)
         {
             throw new InvalidOperationException("Missing TCS status byte.");
@@ -97,10 +97,10 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
                 consumer.ApplyPending();
                 break;
             case DurableTaskCompletionSourceStatus.Completed:
-                consumer.ApplyCompleted(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
+                consumer.ApplyCompleted(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Faulted:
-                consumer.ApplyFaulted(OrleansBinaryOperationCodecHelpers.ReadValue(exceptionCodec, ref reader));
+                consumer.ApplyFaulted(OrleansBinaryCommandCodecHelpers.ReadValue(exceptionCodec, ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Canceled:
                 consumer.ApplyCanceled();

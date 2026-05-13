@@ -9,9 +9,9 @@ public interface IDurableValue<T>
 }
 
 [DebuggerDisplay("{Value}")]
-internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IValueOperationHandler<T>
+internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDurableValueCommandHandler<T>
 {
-    private readonly IValueOperationCodec<T> _codec;
+    private readonly IDurableValueCommandCodec<T> _codec;
     private T? _value;
     private bool _isDirty;
 
@@ -22,11 +22,11 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IValu
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IValueOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableValueCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 
-    internal DurableValue(string key, IStateManager manager, IValueOperationCodec<T> codec)
+    internal DurableValue(string key, IStateManager manager, IDurableValueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -49,8 +49,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IValu
 
     public void OnModified() => _isDirty = true;
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
     void IJournaledState.OnWriteCompleted() => OnValuePersisted();
@@ -79,5 +79,5 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IValu
         _codec.WriteSet(_value!, writer);
     }
 
-    void IValueOperationHandler<T>.ApplySet(T value) => _value = value;
+    void IDurableValueCommandHandler<T>.ApplySet(T value) => _value = value;
 }

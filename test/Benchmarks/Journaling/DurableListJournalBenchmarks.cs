@@ -16,7 +16,7 @@ public class DurableListJournalBenchmarks
     private const int OperationsPerInvocation = 4_096;
     private static readonly JournalStreamId ListJournalStreamId = new(8);
 
-    private IListOperationCodec<int> _codec;
+    private IDurableListCommandCodec<int> _codec;
     private IJournalFormat _journalFormat;
     private DurableList<int> _list;
     private IJournaledState _state;
@@ -32,7 +32,7 @@ public class DurableListJournalBenchmarks
     {
         var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
         _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
-        _codec = new OrleansBinaryListOperationCodec<int>(serviceProvider.GetRequiredService<ICodecProvider>().GetCodec<int>(), _sessionPool);
+        _codec = new OrleansBinaryDurableListCommandCodec<int>(serviceProvider.GetRequiredService<ICodecProvider>().GetCodec<int>(), _sessionPool);
         _journalFormat = new OrleansBinaryJournalFormat(_sessionPool);
         _writeBuffer = new OrleansBinaryJournalWriter();
         _list = new DurableList<int>("list", new BenchmarkJournalManager(_writeBuffer, ListJournalStreamId), _codec);
@@ -120,7 +120,7 @@ public class DurableListJournalBenchmarks
         _recoveryBuffer.Write(_encodedJournalData.AsReadOnlySequence());
         var reader = new JournalReadBuffer(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
         var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
-        _journalFormat.Read(reader, _recoveryConsumer, in context);
+        _journalFormat.Replay(reader, _recoveryConsumer, in context);
     }
 
     private sealed class BenchmarkJournalManager(OrleansBinaryJournalWriter buffer, JournalStreamId streamId) : IStateManager
@@ -142,8 +142,8 @@ public class DurableListJournalBenchmarks
 
     private sealed class RecoveryConsumer(
         JournalStreamId expectedStreamId,
-        IListOperationCodec<int> codec,
-        int capacity) : IStateResolver, IJournaledState, IListOperationHandler<int>
+        IDurableListCommandCodec<int> codec,
+        int capacity) : IStateResolver, IJournaledState, IDurableListCommandHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -163,8 +163,8 @@ public class DurableListJournalBenchmarks
 
         void IJournaledState.Reset(JournalStreamWriter storage) => Reset();
 
-        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-            context.GetRequiredOperationCodec(operation.FormatKey, codec).Apply(operation.Payload, this);
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Payload, this);
 
         void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
         void IJournaledState.AppendSnapshot(JournalStreamWriter writer) { }

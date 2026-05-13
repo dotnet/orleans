@@ -23,7 +23,7 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
 
     JournalWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalWriter();
 
-    void IJournalFormat.Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) =>
+    void IJournalFormat.Replay(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) =>
         OrleansBinaryJournalReader.Read(input, resolver, _sessionPool, in context);
 }
 
@@ -116,17 +116,17 @@ internal static class OrleansBinaryJournalReader
             var streamId = new JournalStreamId(streamIdValue);
             var state = resolver.ResolveState(streamId);
 
-            // Slice the operation payload (post-streamId) so the state receives exactly one operation body.
-            var operationStart = (int)reader.Position;
-            var operationLength = frameLength - operationStart;
-            using var operationSlice = batchSlice.Slice(operationStart, operationLength);
-            using var operationBuffer = new ArcBufferWriter();
-            operationBuffer.AppendPinned(operationSlice);
+            // Slice the entry payload (post-streamId) so the state receives exactly one command body.
+            var payloadStart = (int)reader.Position;
+            var payloadLength = frameLength - payloadStart;
+            using var payloadSlice = batchSlice.Slice(payloadStart, payloadLength);
+            using var payloadBuffer = new ArcBufferWriter();
+            payloadBuffer.AppendPinned(payloadSlice);
 
             try
             {
-                state.ApplyOperation(
-                    new JournalOperation(OrleansBinaryJournalFormat.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(operationBuffer), isCompleted: true)),
+                state.ReplayEntry(
+                    new JournalEntry(OrleansBinaryJournalFormat.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true)),
                     in context);
             }
             catch (Exception exception) when (exception is not InvalidOperationException ioe || !ioe.Message.StartsWith("Malformed binary journal entry stream", StringComparison.Ordinal))

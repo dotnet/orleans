@@ -250,20 +250,20 @@ public static class JournalTestReplayContext
 /// state contract (so the journal readers will dispatch into it) and the dictionary operation handler
 /// (so the codec accepts it via <c>state is THandler</c>).
 /// </summary>
-public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, IDictionaryOperationHandler<TKey, TValue>
+public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, IDurableDictionaryCommandHandler<TKey, TValue>
     where TKey : notnull
 {
-    private readonly IDictionaryOperationCodec<TKey, TValue> _codec;
-    private readonly RecordingDictionaryOperationHandler<TKey, TValue> _handler = new();
+    private readonly IDurableDictionaryCommandCodec<TKey, TValue> _codec;
+    private readonly RecordingDictionaryCommandHandler<TKey, TValue> _handler = new();
 
-    public RecordingDictionaryState(IDictionaryOperationCodec<TKey, TValue> codec)
+    public RecordingDictionaryState(IDurableDictionaryCommandCodec<TKey, TValue> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
     }
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -287,19 +287,19 @@ public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, ID
 }
 
 /// <summary>Recording state for list-codec snapshot tests.</summary>
-public sealed class RecordingListState<T> : IJournaledState, IListOperationHandler<T>
+public sealed class RecordingListState<T> : IJournaledState, IDurableListCommandHandler<T>
 {
-    private readonly IListOperationCodec<T> _codec;
-    private readonly RecordingListOperationHandler<T> _handler = new();
+    private readonly IDurableListCommandCodec<T> _codec;
+    private readonly RecordingListCommandHandler<T> _handler = new();
 
-    public RecordingListState(IListOperationCodec<T> codec)
+    public RecordingListState(IDurableListCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
     }
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -325,19 +325,19 @@ public sealed class RecordingListState<T> : IJournaledState, IListOperationHandl
 }
 
 /// <summary>Recording state for queue-codec snapshot tests.</summary>
-public sealed class RecordingQueueState<T> : IJournaledState, IQueueOperationHandler<T>
+public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueCommandHandler<T>
 {
-    private readonly IQueueOperationCodec<T> _codec;
-    private readonly RecordingQueueOperationHandler<T> _handler = new();
+    private readonly IDurableQueueCommandCodec<T> _codec;
+    private readonly RecordingQueueCommandHandler<T> _handler = new();
 
-    public RecordingQueueState(IQueueOperationCodec<T> codec)
+    public RecordingQueueState(IDurableQueueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
     }
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -359,19 +359,19 @@ public sealed class RecordingQueueState<T> : IJournaledState, IQueueOperationHan
 }
 
 /// <summary>Recording state for set-codec snapshot tests.</summary>
-public sealed class RecordingSetState<T> : IJournaledState, ISetOperationHandler<T>
+public sealed class RecordingSetState<T> : IJournaledState, IDurableSetCommandHandler<T>
 {
-    private readonly ISetOperationCodec<T> _codec;
-    private readonly RecordingSetOperationHandler<T> _handler = new();
+    private readonly IDurableSetCommandCodec<T> _codec;
+    private readonly RecordingSetCommandHandler<T> _handler = new();
 
-    public RecordingSetState(ISetOperationCodec<T> codec)
+    public RecordingSetState(IDurableSetCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
     }
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -393,19 +393,19 @@ public sealed class RecordingSetState<T> : IJournaledState, ISetOperationHandler
 }
 
 /// <summary>Recording state for value-codec snapshot tests.</summary>
-public sealed class RecordingValueState<T> : IJournaledState, IValueOperationHandler<T>
+public sealed class RecordingValueState<T> : IJournaledState, IDurableValueCommandHandler<T>
 {
-    private readonly IValueOperationCodec<T> _codec;
-    private readonly RecordingValueOperationHandler<T> _handler = new();
+    private readonly IDurableValueCommandCodec<T> _codec;
+    private readonly RecordingValueCommandHandler<T> _handler = new();
 
-    public RecordingValueState(IValueOperationCodec<T> codec)
+    public RecordingValueState(IDurableValueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
     }
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     public T? Value => _handler.Value;
 
@@ -427,19 +427,19 @@ public sealed class RecordingValueState<T> : IJournaledState, IValueOperationHan
 }
 
 /// <summary>Recording state for state-codec snapshot tests.</summary>
-public sealed class RecordingStateState<T> : IJournaledState, IStateOperationHandler<T>
+public sealed class RecordingStateState<T> : IJournaledState, IPersistentStateCommandHandler<T>
 {
-    private readonly IStateOperationCodec<T> _codec;
-    private readonly RecordingStateOperationHandler<T> _handler = new();
+    private readonly IPersistentStateCommandCodec<T> _codec;
+    private readonly RecordingPersistentStateCommandHandler<T> _handler = new();
 
-    public RecordingStateState(IStateOperationCodec<T> codec)
+    public RecordingStateState(IPersistentStateCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
     }
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -461,19 +461,19 @@ public sealed class RecordingStateState<T> : IJournaledState, IStateOperationHan
 }
 
 /// <summary>Recording state for task-completion-source codec snapshot tests.</summary>
-public sealed class RecordingTcsState<T> : IJournaledState, ITaskCompletionSourceOperationHandler<T>
+public sealed class RecordingTcsState<T> : IJournaledState, IDurableTaskCompletionSourceCommandHandler<T>
 {
-    private readonly ITaskCompletionSourceOperationCodec<T> _codec;
-    private readonly RecordingTaskCompletionSourceOperationHandler<T> _handler = new();
+    private readonly IDurableTaskCompletionSourceCommandCodec<T> _codec;
+    private readonly RecordingTaskCompletionSourceCommandHandler<T> _handler = new();
 
-    public RecordingTcsState(ITaskCompletionSourceOperationCodec<T> codec)
+    public RecordingTcsState(IDurableTaskCompletionSourceCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
     }
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 

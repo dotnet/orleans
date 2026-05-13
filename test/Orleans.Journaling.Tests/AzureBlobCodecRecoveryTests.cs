@@ -149,16 +149,16 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         var manager = CreateManager(storage);
         return new DurableStates(
             manager,
-            new DurableDictionary<string, int>("dict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool)),
-            new DurableList<string>("list", manager, new OrleansBinaryListOperationCodec<string>(ValueCodec<string>(), SessionPool)),
-            new DurableQueue<string>("queue", manager, new OrleansBinaryQueueOperationCodec<string>(ValueCodec<string>(), SessionPool)),
-            new DurableSet<string>("set", manager, new OrleansBinarySetOperationCodec<string>(ValueCodec<string>(), SessionPool)),
-            new DurableValue<int>("value", manager, new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>(), SessionPool)),
-            new DurableState<string>("state", manager, new OrleansBinaryStateOperationCodec<string>(ValueCodec<string>(), SessionPool)),
+            new DurableDictionary<string, int>("dict", manager, new OrleansBinaryDurableDictionaryCommandCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool)),
+            new DurableList<string>("list", manager, new OrleansBinaryDurableListCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+            new DurableQueue<string>("queue", manager, new OrleansBinaryDurableQueueCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+            new DurableSet<string>("set", manager, new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool)),
+            new DurableValue<int>("value", manager, new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool)),
+            new DurableState<string>("state", manager, new OrleansBinaryPersistentStateCommandCodec<string>(ValueCodec<string>(), SessionPool)),
             new DurableTaskCompletionSource<int>(
                 "tcs",
                 manager,
-                new OrleansBinaryTcsOperationCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
+                new OrleansBinaryDurableTaskCompletionSourceCommandCodec<int>(ValueCodec<int>(), ValueCodec<Exception>(), SessionPool),
                 Copier<int>(),
                 Copier<Exception>()));
     }
@@ -185,17 +185,17 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             OrleansBinaryJournalFormat.JournalFormatKey,
             (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
         services.AddKeyedSingleton(
-            typeof(IDictionaryOperationCodec<,>),
+            typeof(IDurableDictionaryCommandCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
-            typeof(OrleansBinaryDictionaryOperationCodec<,>));
+            typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
 
         var jsonOptions = new System.Text.Json.JsonSerializerOptions { TypeInfoResolver = JournalingTestsJsonContext.Default };
         services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
         services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
         services.AddKeyedSingleton(
-            typeof(IDictionaryOperationCodec<,>),
+            typeof(IDurableDictionaryCommandCodec<,>),
             JsonJournalExtensions.JournalFormatKey,
-            typeof(JsonDictionaryOperationCodecService<,>));
+            typeof(JsonDurableDictionaryCommandCodecService<,>));
     }
 
     private async Task<AzureProviderFixture> CreateAzureProviderAsync(string journalFormatKey, string blobName, CancellationToken cancellationToken)
@@ -241,7 +241,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         => new(
             "dict",
             manager,
-            JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, int>>(
+            JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, int>>(
                 serviceProvider,
                 journalFormatKey));
 

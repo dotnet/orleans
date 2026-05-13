@@ -34,8 +34,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _shared = shared;
         _journalWriter = _shared.JournalFormat.CreateWriter();
         var serviceProvider = _shared.ServiceProvider;
-        var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
-        var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
+        var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
+        var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
         // This allows us to recover the list of states ids without having to store it separately.
@@ -67,11 +67,11 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     // We also make sure to apply any buffered data that could have occured while the vessel took this state's place.
                     state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
                     var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _shared.ServiceProvider);
-                    foreach (var entry in vessel.PreservedOperations)
+                    foreach (var entry in vessel.PreservedEntries)
                     {
                         using var buffer = new ArcBufferWriter();
                         buffer.Write(entry.Payload.Span);
-                        state.ApplyOperation(new JournalOperation(entry.FormatKey, new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true)), in replayContext);
+                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true)), in replayContext);
                     }
 
                     var id = _journalStreamDirectory[name];
@@ -402,7 +402,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         foreach (var state in _statesMap.Values)
         {
-            if (state is RetiredState { PreservedOperations.Count: > 0 } retiredState)
+            if (state is RetiredState { PreservedEntries.Count: > 0 } retiredState)
             {
                 throw new InvalidOperationException(
                     $"Cannot migrate journal to format key '{WriteJournalFormatKey}' because stream " +
@@ -544,7 +544,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
             var journalFormat = GetJournalFormat(journalFormatKey);
             var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _shared.ServiceProvider);
-            journalFormat.Read(buffer, this, in replayContext);
+            journalFormat.Replay(buffer, this, in replayContext);
 
             if (buffer.IsCompleted && buffer.Length > 0)
             {
@@ -691,19 +691,19 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDictionaryOperationCodec<string, ulong> codec) : IJournaledState, IDictionaryOperationHandler<string, ulong>
+        IDurableDictionaryCommandCodec<string, ulong> codec) : IJournaledState, IDurableDictionaryCommandHandler<string, ulong>
     {
         public const int Id = 0;
 
         private readonly JournaledStateManager _manager = manager;
-        private readonly IDictionaryOperationCodec<string, ulong> _codec = codec;
+        private readonly IDurableDictionaryCommandCodec<string, ulong> _codec = codec;
         private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
         private JournalStreamWriter _writer;
 
         public ulong this[string name] => _ids[name];
 
-        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-            context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
@@ -745,13 +745,13 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
-        void IDictionaryOperationHandler<string, ulong>.ApplySet(string key, ulong value) => ApplySet(key, value);
+        void IDurableDictionaryCommandHandler<string, ulong>.ApplySet(string key, ulong value) => ApplySet(key, value);
 
-        void IDictionaryOperationHandler<string, ulong>.ApplyRemove(string key) => ApplyRemove(key);
+        void IDurableDictionaryCommandHandler<string, ulong>.ApplyRemove(string key) => ApplyRemove(key);
 
-        void IDictionaryOperationHandler<string, ulong>.ApplyClear() => _ids.Clear();
+        void IDurableDictionaryCommandHandler<string, ulong>.ApplyClear() => _ids.Clear();
 
-        void IDictionaryOperationHandler<string, ulong>.Reset(int capacityHint)
+        void IDurableDictionaryCommandHandler<string, ulong>.Reset(int capacityHint)
         {
             _ids.Clear();
             _ids.EnsureCapacity(capacityHint);
@@ -775,7 +775,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     /// </summary>
     /// <remarks>Resurrecting of retired states is supported.</remarks>
     private sealed class RetiredStateTracker(
-        JournaledStateManager manager, IDictionaryOperationCodec<string, DateTime> codec)
+        JournaledStateManager manager, IDurableDictionaryCommandCodec<string, DateTime> codec)
             : DurableDictionary<string, DateTime>(codec)
     {
         public const int Id = 1;
@@ -794,24 +794,24 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     [DebuggerDisplay("RetiredState Id = {StreamId.Value}")]
     private sealed class RetiredState(JournalStreamId streamId) : IJournaledState
     {
-        private readonly List<IPreservedJournalOperation> _preservedOperations = [];
+        private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 
         public JournalStreamId StreamId { get; } = streamId;
 
-        public IReadOnlyList<IPreservedJournalOperation> PreservedOperations => _preservedOperations;
+        public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
-        void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-            _preservedOperations.Add(new PreservedJournalOperation(operation.FormatKey, operation.Payload));
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+            _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Payload));
 
         void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
         {
-            foreach (var entry in _preservedOperations)
+            foreach (var entry in _preservedEntries)
             {
-                snapshotWriter.AppendPreservedOperation(entry);
+                snapshotWriter.AppendPreservedEntry(entry);
             }
         }
 
-        void IJournaledState.Reset(JournalStreamWriter writer) => _preservedOperations.Clear();
+        void IJournaledState.Reset(JournalStreamWriter writer) => _preservedEntries.Clear();
         void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
         IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
     }

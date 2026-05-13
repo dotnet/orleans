@@ -12,8 +12,8 @@ namespace Orleans.Journaling.Json;
 /// ["snapshot",[["alice",42]]]
 /// </code>
 /// </example>
-public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOptions? options = null)
-    : IDictionaryOperationCodec<TKey, TValue> where TKey : notnull
+public sealed class JsonDurableDictionaryCommandCodec<TKey, TValue>(JsonSerializerOptions? options = null)
+    : IDurableDictionaryCommandCodec<TKey, TValue> where TKey : notnull
 {
     private readonly JsonTypeInfo<TKey> _keyTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TKey>(options);
     private readonly JsonTypeInfo<TValue> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<TValue>(options);
@@ -21,34 +21,34 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     /// <inheritdoc/>
     public void WriteSet(TKey key, TValue value, JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             (keyTypeInfo: _keyTypeInfo, valueTypeInfo: _valueTypeInfo, key, value),
-            static (jsonWriter, operation) =>
+            static (jsonWriter, command) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
-                JsonSerializer.Serialize(jsonWriter, operation.key, operation.keyTypeInfo);
-                JsonSerializer.Serialize(jsonWriter, operation.value, operation.valueTypeInfo);
+                JsonSerializer.Serialize(jsonWriter, command.key, command.keyTypeInfo);
+                JsonSerializer.Serialize(jsonWriter, command.value, command.valueTypeInfo);
             });
     }
 
     /// <inheritdoc/>
     public void WriteRemove(TKey key, JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             (keyTypeInfo: _keyTypeInfo, key),
-            static (jsonWriter, operation) =>
+            static (jsonWriter, command) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Remove);
-                JsonSerializer.Serialize(jsonWriter, operation.key, operation.keyTypeInfo);
+                JsonSerializer.Serialize(jsonWriter, command.key, command.keyTypeInfo);
             });
     }
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             JsonJournalEntryCommands.Clear,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
@@ -59,22 +59,22 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     {
         ArgumentNullException.ThrowIfNull(items);
 
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             (keyTypeInfo: _keyTypeInfo, valueTypeInfo: _valueTypeInfo, items),
-            static (jsonWriter, operation) =>
+            static (jsonWriter, command) =>
             {
-                var count = CollectionCodecHelpers.GetSnapshotCount(operation.items);
+                var count = CollectionCodecHelpers.GetSnapshotCount(command.items);
 
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Snapshot);
                 jsonWriter.WriteStartArray();
                 var written = 0;
-                foreach (var (key, value) in operation.items)
+                foreach (var (key, value) in command.items)
                 {
                     CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
                     jsonWriter.WriteStartArray();
-                    JsonSerializer.Serialize(jsonWriter, key, operation.keyTypeInfo);
-                    JsonSerializer.Serialize(jsonWriter, value, operation.valueTypeInfo);
+                    JsonSerializer.Serialize(jsonWriter, key, command.keyTypeInfo);
+                    JsonSerializer.Serialize(jsonWriter, value, command.valueTypeInfo);
                     jsonWriter.WriteEndArray();
                     written++;
                 }
@@ -85,44 +85,44 @@ public sealed class JsonDictionaryOperationCodec<TKey, TValue>(JsonSerializerOpt
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDictionaryOperationHandler<TKey, TValue> consumer)
+    public void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
     {
-        var operation = new JsonOperationReader(input);
-        Apply(ref operation, consumer);
+        var reader = new JsonCommandReader(input);
+        Apply(ref reader, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, IDictionaryOperationHandler<TKey, TValue> consumer)
+    private void Apply(ref JsonCommandReader reader, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
     {
-        var command = operation.Command;
+        var command = reader.Command;
         switch (command)
         {
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.DeserializeRequired(1, JsonJournalEntryFields.Key, _keyTypeInfo),
-                    operation.DeserializeRequired(2, JsonJournalEntryFields.Value, _valueTypeInfo));
-                operation.EnsureEnd(3);
+                    reader.DeserializeRequired(1, JsonJournalEntryFields.Key, _keyTypeInfo),
+                    reader.DeserializeRequired(2, JsonJournalEntryFields.Value, _valueTypeInfo));
+                reader.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.Remove:
-                consumer.ApplyRemove(operation.DeserializeRequired(1, JsonJournalEntryFields.Key, _keyTypeInfo));
-                operation.EnsureEnd(2);
+                consumer.ApplyRemove(reader.DeserializeRequired(1, JsonJournalEntryFields.Key, _keyTypeInfo));
+                reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Clear:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
             case JsonJournalEntryCommands.Snapshot:
-                var count = operation.StartArray(1, JsonJournalEntryFields.Items);
+                var count = reader.StartArray(1, JsonJournalEntryFields.Items);
                 consumer.Reset(count);
-                while (operation.ReadArrayItem(JsonJournalEntryFields.Items))
+                while (reader.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    var (key, value) = operation.ReadCurrentPairRequired(JsonJournalEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
+                    var (key, value) = reader.ReadCurrentPairRequired(JsonJournalEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
                     consumer.ApplySet(key, value);
                 }
 
-                operation.EnsureEnd(2);
+                reader.EnsureEnd(2);
                 break;
             default:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }

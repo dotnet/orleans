@@ -6,9 +6,9 @@ using Orleans.Serialization.Session;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Helpers shared by the Orleans binary durable operation codecs.
+/// Helpers shared by the Orleans binary durable command codecs.
 /// </summary>
-internal static class OrleansBinaryOperationCodecHelpers
+internal static class OrleansBinaryCommandCodecHelpers
 {
     private const byte FormatVersion = 0;
 

@@ -333,7 +333,7 @@ internal class Program
         {
             _ = BenchmarkSwitcher.FromTypes([
                 typeof(DurableListJournalBenchmarks),
-                typeof(DurableOperationReaderBenchmarks)
+                typeof(DurableCommandReaderBenchmarks)
             ]).Run(args);
         },
         ["suite"] = args =>

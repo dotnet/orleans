@@ -63,12 +63,12 @@ internal class OrleansBinaryJournalWriter : JournalWriter
         _buffer.Dispose();
     }
 
-    protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry)
+    protected override void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
     {
         if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"The Orleans binary journal writer cannot append preserved operation for journal format key '{entry.FormatKey}'.");
+                $"The Orleans binary journal writer cannot append preserved entry for journal format key '{entry.FormatKey}'.");
             }
 
         using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();

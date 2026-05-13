@@ -14,9 +14,9 @@ public interface IDurableList<T> : IList<T>
 
 [DebuggerTypeProxy(typeof(IDurableCollectionDebugView<>))]
 [DebuggerDisplay("Count = {Count}")]
-internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOperationHandler<T>
+internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurableListCommandHandler<T>
 {
-    private readonly IListOperationCodec<T> _codec;
+    private readonly IDurableListCommandCodec<T> _codec;
     private readonly List<T> _items = [];
     private JournalStreamWriter _writer;
 
@@ -27,11 +27,11 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
-        _codec = JournalFormatServices.GetRequiredOperationCodec<IListOperationCodec<T>>(serviceProvider, shared.JournalFormatKey);
+        _codec = JournalFormatServices.GetRequiredCommandCodec<IDurableListCommandCodec<T>>(serviceProvider, shared.JournalFormatKey);
         manager.RegisterState(key, this);
     }
 
-    internal DurableList(string key, IStateManager manager, IListOperationCodec<T> codec)
+    internal DurableList(string key, IStateManager manager, IDurableListCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -58,8 +58,8 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
 
     bool ICollection<T>.IsReadOnly => false;
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -134,12 +134,12 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
     protected void ApplyInsert(int index, T item) => _items.Insert(index, item);
     protected void ApplyRemoveAt(int index) => _items.RemoveAt(index);
     protected void ApplyClear() => _items.Clear();
-    void IListOperationHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
-    void IListOperationHandler<T>.ApplySet(int index, T item) => ApplySet(index, item);
-    void IListOperationHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
-    void IListOperationHandler<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
-    void IListOperationHandler<T>.ApplyClear() => ApplyClear();
-    void IListOperationHandler<T>.Reset(int capacityHint)
+    void IDurableListCommandHandler<T>.ApplyAdd(T item) => ApplyAdd(item);
+    void IDurableListCommandHandler<T>.ApplySet(int index, T item) => ApplySet(index, item);
+    void IDurableListCommandHandler<T>.ApplyInsert(int index, T item) => ApplyInsert(index, item);
+    void IDurableListCommandHandler<T>.ApplyRemoveAt(int index) => ApplyRemoveAt(index);
+    void IDurableListCommandHandler<T>.ApplyClear() => ApplyClear();
+    void IDurableListCommandHandler<T>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);

@@ -9,7 +9,7 @@ namespace Orleans.Journaling.Tests;
 
 /// <summary>
 /// Snapshot tests pinning the OrleansBinary on-disk wire format produced by the
-/// <c>OrleansBinary*OperationCodec</c> implementations under <see cref="Orleans.Journaling"/>.
+/// <c>OrleansBinary*CommandCodec</c> implementations under <see cref="Orleans.Journaling"/>.
 /// </summary>
 /// <remarks>
 /// <para>
@@ -114,7 +114,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     [Fact]
     public Task Dictionary_MultiOperation_Sequence()
     {
-        var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool);
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, int>(ValueCodec<string>(), ValueCodec<int>(), SessionPool);
         return SnapshotMultiOp(
             codec,
             new RecordingDictionaryState<string, int>(codec),
@@ -217,7 +217,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     [Fact]
     public Task List_MultiOperation_Sequence()
     {
-        var codec = new OrleansBinaryListOperationCodec<string>(ValueCodec<string>(), SessionPool);
+        var codec = new OrleansBinaryDurableListCommandCodec<string>(ValueCodec<string>(), SessionPool);
         return SnapshotMultiOp(
             codec,
             new RecordingListState<string>(codec),
@@ -298,7 +298,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     [Fact]
     public Task Queue_MultiOperation_Sequence()
     {
-        var codec = new OrleansBinaryQueueOperationCodec<int>(ValueCodec<int>(), SessionPool);
+        var codec = new OrleansBinaryDurableQueueCommandCodec<int>(ValueCodec<int>(), SessionPool);
         return SnapshotMultiOp(
             codec,
             new RecordingQueueState<int>(codec),
@@ -377,7 +377,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     [Fact]
     public Task Set_MultiOperation_Sequence()
     {
-        var codec = new OrleansBinarySetOperationCodec<string>(ValueCodec<string>(), SessionPool);
+        var codec = new OrleansBinaryDurableSetCommandCodec<string>(ValueCodec<string>(), SessionPool);
         return SnapshotMultiOp(
             codec,
             new RecordingSetState<string>(codec),
@@ -396,7 +396,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     [Fact]
     public Task Value_Set_Primitives()
     {
-        var codec = new OrleansBinaryValueOperationCodec<int>(ValueCodec<int>(), SessionPool);
+        var codec = new OrleansBinaryDurableValueCommandCodec<int>(ValueCodec<int>(), SessionPool);
         var state = new RecordingValueState<int>(codec);
         return SnapshotSingleOp(
             codec,
@@ -408,7 +408,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     [Fact]
     public Task Value_Set_Record()
     {
-        var codec = new OrleansBinaryValueOperationCodec<JournalingSnapshotRecord>(ValueCodec<JournalingSnapshotRecord>(), SessionPool);
+        var codec = new OrleansBinaryDurableValueCommandCodec<JournalingSnapshotRecord>(ValueCodec<JournalingSnapshotRecord>(), SessionPool);
         var state = new RecordingValueState<JournalingSnapshotRecord>(codec);
         return SnapshotSingleOp(
             codec,
@@ -518,7 +518,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
 
         byte[] WriteOnce()
         {
-            var codec = new OrleansBinaryDictionaryOperationCodec<string, JournalingSnapshotRecord>(
+            var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, JournalingSnapshotRecord>(
                 ValueCodec<string>(), ValueCodec<JournalingSnapshotRecord>(), SessionPool);
             using var batch = new OrleansBinaryJournalWriter();
             codec.WriteSet("alpha", SampleRecord, batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
@@ -538,13 +538,13 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     private static InvalidOperationException MakeStableFault() => new("snapshot-faulted-message");
 
     private Task SnapshotDictionaryOperation<TKey, TValue>(
-        Action<OrleansBinaryDictionaryOperationCodec<TKey, TValue>, JournalStreamWriter> write,
+        Action<OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>, JournalStreamWriter> write,
         string[] expectedCommands)
         where TKey : notnull
     {
         var keyCodec = ValueCodec<TKey>();
         var valueCodec = ValueCodec<TValue>();
-        var codec = new OrleansBinaryDictionaryOperationCodec<TKey, TValue>(keyCodec, valueCodec, SessionPool);
+        var codec = new OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(keyCodec, valueCodec, SessionPool);
         var state = new RecordingDictionaryState<TKey, TValue>(codec);
         return SnapshotSingleOp(
             codec,
@@ -554,11 +554,11 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     }
 
     private Task SnapshotListOperation<T>(
-        Action<OrleansBinaryListOperationCodec<T>, JournalStreamWriter> write,
+        Action<OrleansBinaryDurableListCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
         var elementCodec = ValueCodec<T>();
-        var codec = new OrleansBinaryListOperationCodec<T>(elementCodec, SessionPool);
+        var codec = new OrleansBinaryDurableListCommandCodec<T>(elementCodec, SessionPool);
         var state = new RecordingListState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -568,11 +568,11 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     }
 
     private Task SnapshotQueueOperation<T>(
-        Action<OrleansBinaryQueueOperationCodec<T>, JournalStreamWriter> write,
+        Action<OrleansBinaryDurableQueueCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
         var elementCodec = ValueCodec<T>();
-        var codec = new OrleansBinaryQueueOperationCodec<T>(elementCodec, SessionPool);
+        var codec = new OrleansBinaryDurableQueueCommandCodec<T>(elementCodec, SessionPool);
         var state = new RecordingQueueState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -582,11 +582,11 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     }
 
     private Task SnapshotSetOperation<T>(
-        Action<OrleansBinarySetOperationCodec<T>, JournalStreamWriter> write,
+        Action<OrleansBinaryDurableSetCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
         var elementCodec = ValueCodec<T>();
-        var codec = new OrleansBinarySetOperationCodec<T>(elementCodec, SessionPool);
+        var codec = new OrleansBinaryDurableSetCommandCodec<T>(elementCodec, SessionPool);
         var state = new RecordingSetState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -596,11 +596,11 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     }
 
     private Task SnapshotStateOperation<T>(
-        Action<OrleansBinaryStateOperationCodec<T>, JournalStreamWriter> write,
+        Action<OrleansBinaryPersistentStateCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
         var elementCodec = ValueCodec<T>();
-        var codec = new OrleansBinaryStateOperationCodec<T>(elementCodec, SessionPool);
+        var codec = new OrleansBinaryPersistentStateCommandCodec<T>(elementCodec, SessionPool);
         var state = new RecordingStateState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -610,12 +610,12 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     }
 
     private Task SnapshotTcsOperation<T>(
-        Action<OrleansBinaryTcsOperationCodec<T>, JournalStreamWriter> write,
+        Action<OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
         var valueCodec = ValueCodec<T>();
         var exceptionCodec = ValueCodec<Exception>();
-        var codec = new OrleansBinaryTcsOperationCodec<T>(valueCodec, exceptionCodec, SessionPool);
+        var codec = new OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(valueCodec, exceptionCodec, SessionPool);
         var state = new RecordingTcsState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -677,7 +677,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         var buffer = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var resolver = new SingleStreamResolver(new JournalStreamId(SnapshotStreamId), state);
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Read(buffer, resolver, in context);
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(buffer, resolver, in context);
         Assert.Equal(0, buffer.Length);
         assertCommands();
     }

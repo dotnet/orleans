@@ -11,13 +11,13 @@ public interface IDurableDictionary<K, V> : IDictionary<K, V> where K : notnull
 
 [DebuggerTypeProxy(typeof(IDurableDictionaryDebugView<,>))]
 [DebuggerDisplay("Count = {Count}")]
-internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDictionaryOperationHandler<K, V> where K : notnull
+internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledState, IDurableDictionaryCommandHandler<K, V> where K : notnull
 {
-    private readonly IDictionaryOperationCodec<K, V> _codec;
+    private readonly IDurableDictionaryCommandCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
     private JournalStreamWriter _writer;
 
-    protected DurableDictionary(IDictionaryOperationCodec<K, V> codec)
+    protected DurableDictionary(IDurableDictionaryCommandCodec<K, V> codec)
     {
         ArgumentNullException.ThrowIfNull(codec);
         _codec = codec;
@@ -28,13 +28,13 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         IStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
-        : this(JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<K, V>>(serviceProvider, shared.JournalFormatKey))
+        : this(JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<K, V>>(serviceProvider, shared.JournalFormatKey))
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
     }
 
-    internal DurableDictionary(string key, IStateManager manager, IDictionaryOperationCodec<K, V> codec) : this(codec)
+    internal DurableDictionary(string key, IStateManager manager, IDurableDictionaryCommandCodec<K, V> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
@@ -59,8 +59,8 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
 
-    void IJournaledState.ApplyOperation(JournalOperation operation, in JournaledStateReplayContext context) =>
-        context.GetRequiredOperationCodec(operation.FormatKey, _codec).Apply(operation.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
@@ -120,10 +120,10 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     internal bool ApplyRemove(K key) => _items.Remove(key);
     private void ApplyClear() => _items.Clear();
-    void IDictionaryOperationHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
-    void IDictionaryOperationHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
-    void IDictionaryOperationHandler<K, V>.ApplyClear() => ApplyClear();
-    void IDictionaryOperationHandler<K, V>.Reset(int capacityHint)
+    void IDurableDictionaryCommandHandler<K, V>.ApplySet(K key, V value) => ApplySet(key, value);
+    void IDurableDictionaryCommandHandler<K, V>.ApplyRemove(K key) => ApplyRemove(key);
+    void IDurableDictionaryCommandHandler<K, V>.ApplyClear() => ApplyClear();
+    void IDurableDictionaryCommandHandler<K, V>.Reset(int capacityHint)
     {
         ApplyClear();
         _items.EnsureCapacity(capacityHint);

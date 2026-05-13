@@ -6,42 +6,42 @@ namespace Orleans.Journaling.Json;
 /// <summary>
 /// JSON codec for durable value journal entries.
 /// </summary>
-public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IValueOperationCodec<T>
+public sealed class JsonDurableValueCommandCodec<T>(JsonSerializerOptions? options = null)
+    : IDurableValueCommandCodec<T>
 {
     private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
     public void WriteSet(T value, JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             (typeInfo: _valueTypeInfo, value),
-            static (jsonWriter, operation) =>
+            static (jsonWriter, command) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
-                JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
+                JsonSerializer.Serialize(jsonWriter, command.value, command.typeInfo);
             });
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IValueOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer)
     {
-        var operation = new JsonOperationReader(input);
-        Apply(ref operation, consumer);
+        var reader = new JsonCommandReader(input);
+        Apply(ref reader, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, IValueOperationHandler<T> consumer)
+    private void Apply(ref JsonCommandReader reader, IDurableValueCommandHandler<T> consumer)
     {
-        var command = operation.Command;
+        var command = reader.Command;
         switch (command)
         {
             case JsonJournalEntryCommands.Set:
-                consumer.ApplySet(operation.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
-                operation.EnsureEnd(2);
+                consumer.ApplySet(reader.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
+                reader.EnsureEnd(2);
                 break;
             default:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
@@ -49,58 +49,58 @@ public sealed class JsonValueOperationCodec<T>(JsonSerializerOptions? options = 
 /// <summary>
 /// JSON codec for durable persistent state journal entries.
 /// </summary>
-public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = null)
-    : IStateOperationCodec<T>
+public sealed class JsonPersistentStateCommandCodec<T>(JsonSerializerOptions? options = null)
+    : IPersistentStateCommandCodec<T>
 {
     private readonly JsonTypeInfo<T> _stateTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
     public void WriteSet(T state, ulong version, JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             (typeInfo: _stateTypeInfo, state, version),
-            static (jsonWriter, operation) =>
+            static (jsonWriter, command) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Set);
-                JsonSerializer.Serialize(jsonWriter, operation.state, operation.typeInfo);
-                jsonWriter.WriteNumberValue(operation.version);
+                JsonSerializer.Serialize(jsonWriter, command.state, command.typeInfo);
+                jsonWriter.WriteNumberValue(command.version);
             });
     }
 
     /// <inheritdoc/>
     public void WriteClear(JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             JsonJournalEntryCommands.Clear,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer)
     {
-        var operation = new JsonOperationReader(input);
-        Apply(ref operation, consumer);
+        var reader = new JsonCommandReader(input);
+        Apply(ref reader, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, IStateOperationHandler<T> consumer)
+    private void Apply(ref JsonCommandReader reader, IPersistentStateCommandHandler<T> consumer)
     {
-        var command = operation.Command;
+        var command = reader.Command;
         switch (command)
         {
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    operation.DeserializeRequired(1, JsonJournalEntryFields.State, _stateTypeInfo),
-                    operation.ReadUInt64(2, JsonJournalEntryFields.Version));
-                operation.EnsureEnd(3);
+                    reader.DeserializeRequired(1, JsonJournalEntryFields.State, _stateTypeInfo),
+                    reader.ReadUInt64(2, JsonJournalEntryFields.Version));
+                reader.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.Clear:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 consumer.ApplyClear();
                 break;
             default:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }
@@ -110,15 +110,15 @@ public sealed class JsonStateOperationCodec<T>(JsonSerializerOptions? options = 
 /// <summary>
 /// JSON codec for durable task completion source journal entries.
 /// </summary>
-public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = null)
-    : ITaskCompletionSourceOperationCodec<T>
+public sealed class JsonDurableTaskCompletionSourceCommandCodec<T>(JsonSerializerOptions? options = null)
+    : IDurableTaskCompletionSourceCommandCodec<T>
 {
     private readonly JsonTypeInfo<T> _valueTypeInfo = JsonTypeInfoHelpers.GetTypeInfo<T>(options);
 
     /// <inheritdoc/>
     public void WritePending(JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             JsonJournalEntryCommands.Pending,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
@@ -127,20 +127,20 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     /// <inheritdoc/>
     public void WriteCompleted(T value, JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             (typeInfo: _valueTypeInfo, value),
-            static (jsonWriter, operation) =>
+            static (jsonWriter, command) =>
             {
                 jsonWriter.WriteStringValue(JsonJournalEntryCommands.Completed);
-                JsonSerializer.Serialize(jsonWriter, operation.value, operation.typeInfo);
+                JsonSerializer.Serialize(jsonWriter, command.value, command.typeInfo);
             });
     }
 
     /// <inheritdoc/>
     public void WriteFaulted(Exception exception, JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             exception.Message,
             static (jsonWriter, message) =>
@@ -153,42 +153,42 @@ public sealed class JsonTcsOperationCodec<T>(JsonSerializerOptions? options = nu
     /// <inheritdoc/>
     public void WriteCanceled(JournalStreamWriter writer)
     {
-        JsonOperationWriter.Write(
+        JsonCommandWriter.Write(
             writer,
             JsonJournalEntryCommands.Canceled,
             static (jsonWriter, command) => jsonWriter.WriteStringValue(command));
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, ITaskCompletionSourceOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
-        var operation = new JsonOperationReader(input);
-        Apply(ref operation, consumer);
+        var reader = new JsonCommandReader(input);
+        Apply(ref reader, consumer);
     }
 
-    private void Apply(ref JsonOperationReader operation, ITaskCompletionSourceOperationHandler<T> consumer)
+    private void Apply(ref JsonCommandReader reader, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
-        var command = operation.Command;
+        var command = reader.Command;
         switch (command)
         {
             case JsonJournalEntryCommands.Pending:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 consumer.ApplyPending();
                 break;
             case JsonJournalEntryCommands.Completed:
-                consumer.ApplyCompleted(operation.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
-                operation.EnsureEnd(2);
+                consumer.ApplyCompleted(reader.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
+                reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Faulted:
-                consumer.ApplyFaulted(new Exception(operation.ReadString(1, JsonJournalEntryFields.Message)));
-                operation.EnsureEnd(2);
+                consumer.ApplyFaulted(new Exception(reader.ReadString(1, JsonJournalEntryFields.Message)));
+                reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Canceled:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 consumer.ApplyCanceled();
                 break;
             default:
-                operation.EnsureEnd(1);
+                reader.EnsureEnd(1);
                 throw new NotSupportedException($"Command type '{command}' is not supported");
         }
     }

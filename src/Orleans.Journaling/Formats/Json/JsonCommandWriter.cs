@@ -2,7 +2,7 @@ using System.Text.Json;
 
 namespace Orleans.Journaling.Json;
 
-internal static class JsonOperationWriter
+internal static class JsonCommandWriter
 {
     public static void Write<TArg>(JournalStreamWriter writer, TArg argument, Action<Utf8JsonWriter, TArg> writeArrayElementsTo)
     {

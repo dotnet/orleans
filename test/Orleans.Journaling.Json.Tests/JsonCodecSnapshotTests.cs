@@ -10,7 +10,7 @@ using static VerifyXunit.Verifier;
 namespace Orleans.Journaling.Json.Tests;
 
 /// <summary>
-/// Snapshot tests pinning the JSONL on-disk wire format produced by the new <c>Json*OperationCodec</c>
+/// Snapshot tests pinning the JSONL on-disk wire format produced by the new <c>Json*CommandCodec</c>
 /// implementations under <see cref="Orleans.Journaling.Json"/>.
 /// </summary>
 /// <remarks>
@@ -104,7 +104,7 @@ public sealed class JsonCodecSnapshotTests
     [Fact]
     public Task Dictionary_MultiOperation_Sequence()
     {
-        var codec = new JsonDictionaryOperationCodec<string, int>(Options);
+        var codec = new JsonDurableDictionaryCommandCodec<string, int>(Options);
         var state = new RecordingDictionaryState<string, int>(codec);
         return SnapshotMultiOp(
             codec,
@@ -209,7 +209,7 @@ public sealed class JsonCodecSnapshotTests
     [Fact]
     public Task List_MultiOperation_Sequence()
     {
-        var codec = new JsonListOperationCodec<string>(Options);
+        var codec = new JsonDurableListCommandCodec<string>(Options);
         var state = new RecordingListState<string>(codec);
         return SnapshotMultiOp(
             codec,
@@ -292,7 +292,7 @@ public sealed class JsonCodecSnapshotTests
     [Fact]
     public Task Queue_MultiOperation_Sequence()
     {
-        var codec = new JsonQueueOperationCodec<int>(Options);
+        var codec = new JsonDurableQueueCommandCodec<int>(Options);
         var state = new RecordingQueueState<int>(codec);
         return SnapshotMultiOp(
             codec,
@@ -373,7 +373,7 @@ public sealed class JsonCodecSnapshotTests
     [Fact]
     public Task Set_MultiOperation_Sequence()
     {
-        var codec = new JsonSetOperationCodec<string>(Options);
+        var codec = new JsonDurableSetCommandCodec<string>(Options);
         var state = new RecordingSetState<string>(codec);
         return SnapshotMultiOp(
             codec,
@@ -394,7 +394,7 @@ public sealed class JsonCodecSnapshotTests
     [Fact]
     public Task Value_Set_Primitives()
     {
-        var codec = new JsonValueOperationCodec<int>(Options);
+        var codec = new JsonDurableValueCommandCodec<int>(Options);
         var state = new RecordingValueState<int>(codec);
         return SnapshotSingleOp(
             codec,
@@ -406,7 +406,7 @@ public sealed class JsonCodecSnapshotTests
     [Fact]
     public Task Value_Set_Record()
     {
-        var codec = new JsonValueOperationCodec<JournalingSnapshotRecord>(Options);
+        var codec = new JsonDurableValueCommandCodec<JournalingSnapshotRecord>(Options);
         var state = new RecordingValueState<JournalingSnapshotRecord>(codec);
         return SnapshotSingleOp(
             codec,
@@ -518,7 +518,7 @@ public sealed class JsonCodecSnapshotTests
 
         string WriteOnce()
         {
-            var codec = new JsonDictionaryOperationCodec<string, JournalingSnapshotRecord>(Options);
+            var codec = new JsonDurableDictionaryCommandCodec<string, JournalingSnapshotRecord>(Options);
             var format = new JsonLinesJournalFormat();
             using var writer = format.CreateWriter();
             codec.WriteSet("alpha", SampleRecord, writer.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
@@ -535,11 +535,11 @@ public sealed class JsonCodecSnapshotTests
     private static InvalidOperationException MakeStableFault() => new("snapshot-faulted-message");
 
     private Task SnapshotDictionaryOperation<TKey, TValue>(
-        Action<JsonDictionaryOperationCodec<TKey, TValue>, JournalStreamWriter> write,
+        Action<JsonDurableDictionaryCommandCodec<TKey, TValue>, JournalStreamWriter> write,
         string[] expectedCommands)
         where TKey : notnull
     {
-        var codec = new JsonDictionaryOperationCodec<TKey, TValue>(Options);
+        var codec = new JsonDurableDictionaryCommandCodec<TKey, TValue>(Options);
         var state = new RecordingDictionaryState<TKey, TValue>(codec);
         return SnapshotSingleOp(
             codec,
@@ -549,10 +549,10 @@ public sealed class JsonCodecSnapshotTests
     }
 
     private Task SnapshotListOperation<T>(
-        Action<JsonListOperationCodec<T>, JournalStreamWriter> write,
+        Action<JsonDurableListCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
-        var codec = new JsonListOperationCodec<T>(Options);
+        var codec = new JsonDurableListCommandCodec<T>(Options);
         var state = new RecordingListState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -562,10 +562,10 @@ public sealed class JsonCodecSnapshotTests
     }
 
     private Task SnapshotQueueOperation<T>(
-        Action<JsonQueueOperationCodec<T>, JournalStreamWriter> write,
+        Action<JsonDurableQueueCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
-        var codec = new JsonQueueOperationCodec<T>(Options);
+        var codec = new JsonDurableQueueCommandCodec<T>(Options);
         var state = new RecordingQueueState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -575,10 +575,10 @@ public sealed class JsonCodecSnapshotTests
     }
 
     private Task SnapshotSetOperation<T>(
-        Action<JsonSetOperationCodec<T>, JournalStreamWriter> write,
+        Action<JsonDurableSetCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
-        var codec = new JsonSetOperationCodec<T>(Options);
+        var codec = new JsonDurableSetCommandCodec<T>(Options);
         var state = new RecordingSetState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -588,10 +588,10 @@ public sealed class JsonCodecSnapshotTests
     }
 
     private Task SnapshotStateOperation<T>(
-        Action<JsonStateOperationCodec<T>, JournalStreamWriter> write,
+        Action<JsonPersistentStateCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
-        var codec = new JsonStateOperationCodec<T>(Options);
+        var codec = new JsonPersistentStateCommandCodec<T>(Options);
         var state = new RecordingStateState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -601,10 +601,10 @@ public sealed class JsonCodecSnapshotTests
     }
 
     private Task SnapshotTcsOperation<T>(
-        Action<JsonTcsOperationCodec<T>, JournalStreamWriter> write,
+        Action<JsonDurableTaskCompletionSourceCommandCodec<T>, JournalStreamWriter> write,
         string[] expectedCommands)
     {
-        var codec = new JsonTcsOperationCodec<T>(Options);
+        var codec = new JsonDurableTaskCompletionSourceCommandCodec<T>(Options);
         var state = new RecordingTcsState<T>(codec);
         return SnapshotSingleOp(
             codec,
@@ -672,7 +672,7 @@ public sealed class JsonCodecSnapshotTests
         var buffer = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
         var resolver = new SingleStreamResolver(new JournalStreamId(SnapshotStreamId), state, JsonJournalExtensions.JournalFormatKey);
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
-        ((IJournalFormat)format).Read(buffer, resolver, in context);
+        ((IJournalFormat)format).Replay(buffer, resolver, in context);
         Assert.Equal(0, buffer.Length);
         assertCommands();
     }

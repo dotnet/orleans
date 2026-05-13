@@ -7,9 +7,9 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Binary codec for durable queue journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
-internal sealed class OrleansBinaryQueueOperationCodec<T>(
+internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     IFieldCodec<T> codec,
-    SerializerSessionPool sessionPool) : IQueueOperationCodec<T>
+    SerializerSessionPool sessionPool) : IDurableQueueCommandCodec<T>
 {
     private const byte FormatVersion = 0;
     private const uint EnqueueCommand = 0;
@@ -26,7 +26,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(EnqueueCommand);
         payloadWriter.Commit();
-        OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
+        OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -67,7 +67,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         foreach (var item in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
+            OrleansBinaryCommandCodecHelpers.WriteValue(codec, item, output, sessionPool);
             written++;
         }
 
@@ -76,7 +76,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IQueueOperationHandler<T> consumer)
+    public void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);
@@ -85,18 +85,18 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
-            throw new InvalidOperationException("Unexpected trailing data after binary journal operation.");
+            throw new InvalidOperationException("Unexpected trailing data after binary journal command.");
         }
     }
 
-    private void Apply<TInput>(ref Reader<TInput> reader, IQueueOperationHandler<T> consumer)
+    private void Apply<TInput>(ref Reader<TInput> reader, IDurableQueueCommandHandler<T> consumer)
     {
-        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
+        OrleansBinaryCommandCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {
             case EnqueueCommand:
-                consumer.ApplyEnqueue(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
+                consumer.ApplyEnqueue(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case DequeueCommand:
                 consumer.ApplyDequeue();
@@ -112,14 +112,14 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         }
     }
 
-    private void ApplySnapshot<TInput>(ref Reader<TInput> reader, IQueueOperationHandler<T> consumer)
+    private void ApplySnapshot<TInput>(ref Reader<TInput> reader, IDurableQueueCommandHandler<T> consumer)
     {
         var count = OrleansBinaryCollectionWireHelpers.ReadSnapshotCount(ref reader);
 
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            consumer.ApplyEnqueue(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
+            consumer.ApplyEnqueue(OrleansBinaryCommandCodecHelpers.ReadValue(codec, ref reader));
         }
     }
 

@@ -17,7 +17,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public JournalWriter CreateWriter() => new JsonLinesJournalWriter();
 
-    public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
+    public void Replay(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -94,12 +94,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             var stream = new JournalStreamId(streamId);
             var state = resolver.ResolveState(stream);
-            var payloadContent = ReadOperationPayload(ref reader, offset);
+            var payloadContent = ReadEntryPayload(ref reader, offset);
             using var payloadBuffer = new ArcBufferWriter();
-            WriteOperationPayload(line, payloadContent, payloadBuffer);
-            var operation = new JournalOperation(JsonJournalExtensions.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true));
-            _ = new JsonOperationReader(operation.Payload);
-            state.ApplyOperation(operation, in context);
+            WriteEntryPayload(line, payloadContent, payloadBuffer);
+            var entry = new JournalEntry(JsonJournalExtensions.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true));
+            _ = new JsonCommandReader(entry.Payload);
+            state.ReplayEntry(entry, in context);
         }
         catch (JsonException exception)
         {
@@ -139,7 +139,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         public long Length { get; } = length;
     }
 
-    private static JsonPayloadContent ReadOperationPayload(ref Utf8JsonReader reader, long offset)
+    private static JsonPayloadContent ReadEntryPayload(ref Utf8JsonReader reader, long offset)
     {
         if (!reader.Read())
         {
@@ -148,12 +148,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         if (reader.TokenType is JsonTokenType.EndArray)
         {
-            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: each line must include an operation payload.");
+            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: each line must include an entry payload.");
         }
 
         if (reader.TokenType is not JsonTokenType.StartArray)
         {
-            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: element 1 must be a JSON operation payload array.");
+            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: element 1 must be a JSON entry payload array.");
         }
 
         var start = reader.TokenStartIndex;
@@ -178,7 +178,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
                         if (reader.TokenType is not JsonTokenType.EndArray)
                         {
-                            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: each line must contain exactly a stream id and an operation payload.");
+                            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: each line must contain exactly a stream id and an entry payload.");
                         }
 
                         EnsureNoTrailingTokens(ref reader);
@@ -210,7 +210,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         }
     }
 
-    private static void WriteOperationPayload(ReadOnlySequence<byte> line, JsonPayloadContent payloadContent, ArcBufferWriter buffer)
+    private static void WriteEntryPayload(ReadOnlySequence<byte> line, JsonPayloadContent payloadContent, ArcBufferWriter buffer)
     {
         buffer.Write(line.Slice(payloadContent.Start, payloadContent.Length));
     }
@@ -268,12 +268,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             _activePayloadStart = 0;
         }
 
-        protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry)
+        protected override void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
         {
             if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"The JSON journal writer cannot append preserved operation of type '{entry.GetType().FullName}'.");
+                    $"The JSON journal writer cannot append preserved entry of type '{entry.GetType().FullName}'.");
             }
 
             WriteJournalEntry(streamId, entry.Payload, _buffer);

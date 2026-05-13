@@ -3,14 +3,14 @@ using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
-internal sealed class OrleansBinaryPreservedJournalOperation : IPreservedJournalOperation
+internal sealed class OrleansBinaryPreservedJournalEntry : IPreservedJournalEntry
 {
     private readonly byte[] _payload;
 
-    public OrleansBinaryPreservedJournalOperation(ArcBuffer payload, SerializerSessionPool sessionPool)
+    public OrleansBinaryPreservedJournalEntry(ArcBuffer payload, SerializerSessionPool sessionPool)
     {
         ArgumentNullException.ThrowIfNull(sessionPool);
-        // Retired states retain preserved operations after the read buffer is released; copy the bytes.
+        // Retired states retain preserved entries after the read buffer is released; copy the bytes.
         _payload = payload.ToArray();
     }
 

@@ -86,7 +86,7 @@ public abstract class JournalingTestBase
         if (journalFormat is not null && !string.Equals(customKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             services.AddKeyedSingleton<IJournalFormat>(customKey!, journalFormat);
-            services.AddKeyedSingleton(typeof(IDictionaryOperationCodec<,>), customKey!, typeof(OrleansBinaryDictionaryOperationCodec<,>));
+            services.AddKeyedSingleton(typeof(IDurableDictionaryCommandCodec<,>), customKey!, typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
         }
 
         return services.BuildServiceProvider();
@@ -107,9 +107,9 @@ public abstract class JournalingTestBase
         }
 
         services.AddKeyedSingleton(
-            typeof(IDictionaryOperationCodec<,>),
+            typeof(IDurableDictionaryCommandCodec<,>),
             OrleansBinaryJournalFormat.JournalFormatKey,
-            typeof(OrleansBinaryDictionaryOperationCodec<,>));
+            typeof(OrleansBinaryDurableDictionaryCommandCodec<,>));
     }
 
     private class GrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle
