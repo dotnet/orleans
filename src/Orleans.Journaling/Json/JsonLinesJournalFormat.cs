@@ -16,7 +16,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public string? MimeType => "application/jsonl";
 
-    public IJournalBatchWriter CreateWriter() => new JsonLinesJournalBatchWriter();
+    public JournalWriter CreateWriter() => new JsonLinesJournalBatchWriter();
 
     public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
     {
@@ -216,7 +216,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         buffer.Write(line.Slice(payloadContent.Start, payloadContent.Length));
     }
 
-    private sealed class JsonLinesJournalBatchWriter : JournalBatchWriterBase
+    private sealed class JsonLinesJournalBatchWriter : JournalWriter
     {
         private readonly ArcBufferWriter _buffer = new();
         private int _activeEntryStart;
@@ -254,10 +254,6 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         protected override Memory<byte> GetPayloadMemory(int sizeHint) => _buffer.GetMemory(sizeHint);
 
         protected override Span<byte> GetPayloadSpan(int sizeHint) => _buffer.GetSpan(sizeHint);
-
-        protected override void WritePayload(ReadOnlySpan<byte> value) => _buffer.Write(value);
-
-        protected override void WritePayload(ReadOnlySequence<byte> value) => _buffer.Write(value);
 
         protected override void CommitEntry(JournalStreamId streamId, int entryStart)
         {

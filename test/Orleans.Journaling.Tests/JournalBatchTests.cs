@@ -58,7 +58,8 @@ public abstract class JournalBatchTests : IAsyncLifetime
         => new(
             _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             ManagerOptions,
-            TimeProvider.System);
+            TimeProvider.System,
+            _serviceProvider);
 
     public virtual async Task InitializeAsync()
     {

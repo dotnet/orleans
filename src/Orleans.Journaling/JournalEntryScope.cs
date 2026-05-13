@@ -1,4 +1,4 @@
-using System.Diagnostics.CodeAnalysis;
+using System.Buffers;
 
 namespace Orleans.Journaling;
 
@@ -9,25 +9,24 @@ namespace Orleans.Journaling;
 /// Call <see cref="Commit"/> after successfully writing the entry payload. If the scope is
 /// disposed before it is committed, the pending entry is aborted.
 /// </remarks>
-public ref struct JournalEntry : IDisposable
+public ref struct JournalEntryScope : IDisposable
 {
+    private JournalWriter? _writer;
+    private int _entryStart;
     private bool _completed;
 
-    internal JournalEntry(JournalEntryWriter writer)
+    internal JournalEntryScope(JournalWriter writer, int entryStart)
     {
-        Writer = writer;
+        _writer = writer;
+        _entryStart = entryStart;
         _completed = false;
     }
 
     /// <summary>
     /// Gets the payload writer for this entry.
     /// </summary>
-    [AllowNull]
-    public JournalEntryWriter Writer
-    {
-        readonly get => field ?? throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
-        private set;
-    }
+    public readonly IBufferWriter<byte> Writer
+        => _writer ?? throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
 
     /// <summary>
     /// Commits the pending entry, making it visible to storage.
@@ -40,10 +39,12 @@ public ref struct JournalEntry : IDisposable
             throw new InvalidOperationException("The journal entry has already completed.");
         }
 
-        var writer = Writer;
-        writer.Commit();
+        var writer = GetWriter();
+        var entryStart = _entryStart;
+        writer.CommitEntryWrite(entryStart);
         _completed = true;
-        Writer = null;
+        _writer = null;
+        _entryStart = 0;
     }
 
     /// <summary>
@@ -56,9 +57,21 @@ public ref struct JournalEntry : IDisposable
             return;
         }
 
-        var writer = Writer;
+        var writer = GetWriter();
+        var entryStart = _entryStart;
         _completed = true;
-        Writer = null;
-        writer.Abort();
+        _writer = null;
+        _entryStart = 0;
+        writer.AbortEntryWrite(entryStart);
+    }
+
+    private readonly JournalWriter GetWriter()
+    {
+        if (_writer is null)
+        {
+            throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
+        }
+
+        return _writer;
     }
 }

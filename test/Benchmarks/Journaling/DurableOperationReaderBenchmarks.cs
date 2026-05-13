@@ -139,9 +139,9 @@ public class DurableOperationReaderBenchmarks
 
     private sealed class EncodedJournalData : IDisposable
     {
-        private readonly IJournalBatchWriter _writer;
+        private readonly JournalWriter _writer;
 
-        public EncodedJournalData(IJournalBatchWriter writer)
+        public EncodedJournalData(JournalWriter writer)
         {
             _writer = writer;
             Buffer = writer.GetCommittedBuffer();

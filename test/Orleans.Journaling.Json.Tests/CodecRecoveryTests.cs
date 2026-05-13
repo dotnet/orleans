@@ -345,7 +345,8 @@ public class CodecRecoveryTests : JournalingTestBase
         var shared = new JournaledStateManagerShared(
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Microsoft.Extensions.Options.Options.Create(managerOptions),
-            TimeProvider.System);
+            TimeProvider.System,
+            serviceProvider);
         var manager = new JournaledStateManager(
             storage,
             shared,
@@ -406,7 +407,8 @@ public class CodecRecoveryTests : JournalingTestBase
         var shared = new JournaledStateManagerShared(
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Microsoft.Extensions.Options.Options.Create(managerOptions),
-            TimeProvider.System);
+            TimeProvider.System,
+            serviceProvider);
 
         var manager = new JournaledStateManager(
             storage,

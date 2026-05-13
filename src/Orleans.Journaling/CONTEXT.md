@@ -152,16 +152,16 @@ _Avoid_: Per-operation undo
 - A **State Manager Handle** owns shutdown and disposal for a **State Manager** created by services such as DurableJobs.
 - **Journal Format** keys are separate from storage provider names or storage identity.
 - Malformed recovery data is a hard failure. The next recovery attempt resets volatile state and replays from storage.
-- A **Journal Entry Writer** is reused across entries and must not be retained by codecs after the write call returns.
+- A **Journal Writer** is reused across entries and must not be retained by codecs after the write call returns.
 - A pending **Journal Entry** should not escape the lexical scope which began it.
-- Durable operation codecs synchronously encode one operation and must not store **Journal Entry Writers**.
-- The lexical entry scope type is `JournalEntry`.
+- Durable operation codecs synchronously encode one operation and must not store payload writers.
+- The lexical entry scope type is `JournalEntryScope`.
 - A pending **Journal Entry** can complete only once. `Commit` finalizes it; `Dispose` aborts it only if it was not committed; double completion is invalid.
-- `JournalEntryWriter` is payload-only. Entry lifecycle operations belong to the lexical scope, not to durable operation codecs.
-- Aborting a pending **Journal Entry** truncates the caller-owned **Journal Batch Writer** to its pre-entry state; aborted data must never affect stored data or later writes.
-- Successful **Journal Entries** are batched in the manager-owned pending **Journal Batch Writer** until `WriteStateAsync` flushes them.
+- `JournalWriter` implements `IBufferWriter<byte>` for the active entry payload only. Entry lifecycle operations belong to the lexical scope, not to durable operation codecs.
+- Aborting a pending **Journal Entry** truncates the caller-owned **Journal Writer** to its pre-entry state; aborted data must never affect stored data or later writes.
+- Successful **Journal Entries** are batched in the manager-owned pending **Journal Writer** until `WriteStateAsync` flushes them.
 - A **State Manager** may flush **Journal Entries** from multiple callers in one **Journal Batch** when each caller waits for the flush containing its changes.
-- After a successful flush, a **Journal Batch Writer** should be reset and reused when the format supports safe reuse.
+- After a successful flush, a **Journal Writer** should be reset and reused when the format supports safe reuse.
 - A **Durable Operation** may contain values encoded by a **Value Codec**.
 - A **Codec Family** owns the **Journal Batch**, **Journal Entry**, **Durable Operation**, and **Value Codec** choices together.
 - **Steady-state Journaling Overhead** excludes allocations caused by the in-memory collection or the journaled value itself.

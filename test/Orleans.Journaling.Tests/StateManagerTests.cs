@@ -88,7 +88,7 @@ public class StateManagerTests : JournalingTestBase
         using var segment = new OrleansBinaryJournalBatchWriter();
         using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
         {
-            entry.Writer.Write([1, 2, 3]);
+            entry.Writer.Write(new byte[] { 1, 2, 3 });
             entry.Commit();
         }
 
@@ -176,8 +176,8 @@ public class StateManagerTests : JournalingTestBase
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
         Assert.Empty(storage.Replaces);
-        Assert.Contains(0UL, writer.CreatedJournalStreamWriterIds);
-        Assert.Contains(writer.CreatedJournalStreamWriterIds, id => id >= 8);
+        Assert.Contains(0UL, writer.BeganEntryIds);
+        Assert.Contains(writer.BeganEntryIds, id => id >= 8);
         Assert.True(writer.GetCommittedBufferCount > 0);
         Assert.True(writer.ResetCount > 0);
     }
@@ -196,7 +196,7 @@ public class StateManagerTests : JournalingTestBase
 
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
-        Assert.Contains(writer.CreatedJournalStreamWriterIds, id => id >= 8);
+        Assert.Contains(writer.BeganEntryIds, id => id >= 8);
         Assert.True(storage.Appends[0].Length > 0);
     }
 
@@ -396,7 +396,7 @@ public class StateManagerTests : JournalingTestBase
         var entry = state.BeginEntry();
         try
         {
-            entry.Writer.Write([1, 2, 3]);
+            entry.Writer.Write(new byte[] { 1, 2, 3 });
             writeTask = Task.Run(async () =>
             {
                 writeStarted.Set();
@@ -482,6 +482,32 @@ public class StateManagerTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task StateManager_RegisterState_AfterRecovery_AllocatesAboveRecoveredStreamIds()
+    {
+        var storage = new CapturingStorage();
+        var recoveredStreamId = new JournalStreamId(12);
+        using (var segment = new OrleansBinaryJournalBatchWriter())
+        {
+            AppendDirectorySet(segment, "existing", recoveredStreamId);
+            CreateValueCodec<int>().WriteSet(42, segment.CreateJournalStreamWriter(recoveredStreamId));
+            using var committed = segment.GetCommittedBuffer();
+            await storage.AppendAsync(committed.AsReadOnlySequence(), CancellationToken.None);
+        }
+
+        var sut = CreateTestSystem(storage: storage);
+        var existing = new DurableValue<int>("existing", sut.Manager, CreateValueCodec<int>());
+        var next = new DurableValue<int>("next", sut.Manager, CreateValueCodec<int>());
+
+        await sut.Lifecycle.OnStart();
+        next.Value = 99;
+        await sut.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(42, existing.Value);
+        var entries = ReadBinaryEntries(storage.Appends[^1]);
+        Assert.Contains(entries, entry => entry.StreamId.Value == recoveredStreamId.Value + 1);
+    }
+
+    [Fact]
     public async Task StateManager_Recovery_ReadsConcatenatedJournalData()
     {
         var storage = new CapturingStorage();
@@ -536,7 +562,7 @@ public class StateManagerTests : JournalingTestBase
         {
             using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
             {
-                entry.Writer.Write([1, 2, 3]);
+                entry.Writer.Write(new byte[] { 1, 2, 3 });
                 entry.Commit();
             }
 
@@ -1074,7 +1100,7 @@ public class StateManagerTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public IJournalBatchWriter CreateWriter() => _writerFormat.CreateWriter();
+        public JournalWriter CreateWriter() => _writerFormat.CreateWriter();
 
         public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
         {
@@ -1106,7 +1132,7 @@ public class StateManagerTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public IJournalBatchWriter CreateWriter() => new OrleansBinaryJournalBatchWriter();
+        public JournalWriter CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
         public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
         {
@@ -1125,7 +1151,7 @@ public class StateManagerTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public IJournalBatchWriter CreateWriter()
+        public JournalWriter CreateWriter()
         {
             var writer = new TrackingJournalBatchWriter();
             Writers.Add(writer);
@@ -1139,32 +1165,24 @@ public class StateManagerTests : JournalingTestBase
         }
     }
 
-    private sealed class TrackingJournalBatchWriter : OrleansBinaryJournalBatchWriter, IJournalBatchWriter
+    private sealed class TrackingJournalBatchWriter : OrleansBinaryJournalBatchWriter
     {
-        public List<ulong> CreatedJournalStreamWriterIds { get; } = [];
-
         public List<ulong> BeganEntryIds { get; } = [];
 
         public int GetCommittedBufferCount { get; private set; }
 
         public int ResetCount { get; private set; }
 
-        JournalStreamWriter IJournalBatchWriter.CreateJournalStreamWriter(JournalStreamId streamId)
-        {
-            CreatedJournalStreamWriterIds.Add(streamId.Value);
-            return CreateJournalStreamWriter(streamId);
-        }
-
-        ArcBuffer IJournalBatchWriter.GetCommittedBuffer()
+        protected override ArcBuffer GetCommittedBufferCore()
         {
             GetCommittedBufferCount++;
-            return GetCommittedBuffer();
+            return base.GetCommittedBufferCore();
         }
 
-        void IJournalBatchWriter.Reset()
+        protected override void ResetCore()
         {
             ResetCount++;
-            Reset();
+            base.ResetCore();
         }
 
         protected override void OnBeginEntry(JournalStreamId streamId)
@@ -1415,7 +1433,7 @@ public class StateManagerTests : JournalingTestBase
 
         public bool AppendEntriesObservedOpenEntry { get; private set; }
 
-        public JournalEntry BeginEntry()
+        public JournalEntryScope BeginEntry()
         {
             _entryOpen = true;
             return _writer.BeginEntry();

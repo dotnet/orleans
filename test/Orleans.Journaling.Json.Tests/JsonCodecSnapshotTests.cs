@@ -646,7 +646,7 @@ public sealed class JsonCodecSnapshotTests
         return VerifyJsonSnapshot(text);
     }
 
-    private static byte[] SnapshotBytes(IJournalBatchWriter writer)
+    private static byte[] SnapshotBytes(JournalWriter writer)
     {
         using var slice = writer.GetCommittedBuffer();
         return slice.ToArray();

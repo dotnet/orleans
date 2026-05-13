@@ -23,7 +23,7 @@ public interface IJournalFormat
     /// Creates a writer for a new mutable journal batch.
     /// </summary>
     /// <returns>A new journal batch writer.</returns>
-    IJournalBatchWriter CreateWriter();
+    JournalWriter CreateWriter();
 
     /// <summary>
     /// Reads as many complete journal entries as possible from <paramref name="input"/> and applies them to resolved states.

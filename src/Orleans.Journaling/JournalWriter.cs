@@ -8,46 +8,74 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// Derived classes own the physical framing and committed buffer. This base class only
-/// connects <see cref="JournalStreamWriter"/> and <see cref="JournalEntryWriter"/> to the
-/// derived payload writer and entry lifecycle hooks. Buffers returned by <see cref="GetCommittedBuffer"/>
+/// connects <see cref="JournalStreamWriter"/> and active entry payload writes to the derived
+/// payload writer and entry lifecycle hooks. Buffers returned by <see cref="GetCommittedBuffer"/>
 /// must remain valid for the caller's lifetime even if <see cref="Reset"/> is called before the caller
 /// disposes the returned buffer.
 /// </remarks>
-public abstract class JournalBatchWriterBase : IJournalBatchWriter
+public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
 {
-    private readonly JournalEntryWriter _entryWriter = new();
     private JournalStreamId _activeStreamId;
     private int _activeEntryStart;
+    private bool _entryIsActive;
+    private bool _entryCompleted;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="JournalBatchWriterBase"/> class.
+    /// Initializes a new instance of the <see cref="JournalWriter"/> class.
     /// </summary>
-    protected JournalBatchWriterBase()
+    protected JournalWriter()
     {
     }
 
-    /// <inheritdoc/>
-    public long Length => checked(CommittedLength + (_entryWriter.IsActive ? ActivePayloadLength : 0));
+    /// <summary>
+    /// Gets the number of bytes currently buffered by this writer, including any active uncommitted entry payload.
+    /// </summary>
+    public long Length => checked(CommittedLength + (_entryIsActive ? ActivePayloadLength : 0));
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Creates a writer for entries belonging to <paramref name="streamId"/>.
+    /// </summary>
+    /// <param name="streamId">The durable state id.</param>
+    /// <returns>A journal stream writer for the specified state.</returns>
     public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Gets a borrowed buffer containing only committed bytes which are safe to persist.
+    /// </summary>
+    /// <remarks>
+    /// The returned buffer must remain valid for the caller's lifetime even if <see cref="Reset"/> is subsequently called.
+    /// </remarks>
+    /// <returns>An <see cref="ArcBuffer"/> containing the committed journal bytes. The caller owns and must dispose the returned buffer.</returns>
+    /// <exception cref="InvalidOperationException">An entry is currently active and has not been committed or aborted.</exception>
     public ArcBuffer GetCommittedBuffer()
     {
         ThrowIfEntryActive();
         return GetCommittedBufferCore();
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Clears all buffered data so the writer can be reused for another batch.
+    /// </summary>
+    /// <remarks>This must not invalidate buffers previously returned by <see cref="GetCommittedBuffer"/>.</remarks>
     public void Reset()
     {
         ThrowIfEntryActive();
         ResetCore();
     }
 
-    /// <inheritdoc/>
+    /// <summary>
+    /// Releases resources used by this writer.
+    /// </summary>
     public abstract void Dispose();
+
+    /// <inheritdoc/>
+    void IBufferWriter<byte>.Advance(int count) => GetActiveEntryWriter().AdvancePayload(count);
+
+    /// <inheritdoc/>
+    Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => GetActiveEntryWriter().GetPayloadMemory(sizeHint);
+
+    /// <inheritdoc/>
+    Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint) => GetActiveEntryWriter().GetPayloadSpan(sizeHint);
 
     /// <summary>
     /// Gets the number of bytes committed to the batch, excluding any active entry payload.
@@ -112,18 +140,6 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     protected abstract Span<byte> GetPayloadSpan(int sizeHint);
 
     /// <summary>
-    /// Writes payload bytes.
-    /// </summary>
-    /// <param name="value">The bytes to write.</param>
-    protected abstract void WritePayload(ReadOnlySpan<byte> value);
-
-    /// <summary>
-    /// Writes payload bytes.
-    /// </summary>
-    /// <param name="value">The bytes to write.</param>
-    protected abstract void WritePayload(ReadOnlySequence<byte> value);
-
-    /// <summary>
     /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
@@ -148,9 +164,9 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     /// <param name="entryStart">The entry start marker returned by <see cref="GetEntryStart"/>.</param>
     protected abstract void AbortEntry(JournalStreamId streamId, int entryStart);
 
-    internal JournalEntryWriter BeginEntry(JournalStreamId streamId)
+    internal JournalEntryScope BeginEntry(JournalStreamId streamId)
     {
-        if (_entryWriter.IsActive)
+        if (_entryIsActive)
         {
             throw new InvalidOperationException("The journal batch already has an active entry.");
         }
@@ -159,19 +175,10 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
         var entryStart = GetEntryStart(streamId);
         _activeStreamId = streamId;
         _activeEntryStart = entryStart;
-        _entryWriter.Initialize(this, entryStart);
-        return _entryWriter;
+        _entryIsActive = true;
+        _entryCompleted = false;
+        return new(this, entryStart);
     }
-
-    internal void AdvanceEntryPayload(int count) => AdvancePayload(count);
-
-    internal Memory<byte> GetEntryPayloadMemory(int sizeHint) => GetPayloadMemory(sizeHint);
-
-    internal Span<byte> GetEntryPayloadSpan(int sizeHint) => GetPayloadSpan(sizeHint);
-
-    internal void WriteEntryPayload(ReadOnlySpan<byte> value) => WritePayload(value);
-
-    internal void WriteEntryPayload(ReadOnlySequence<byte> value) => WritePayload(value);
 
     internal void CommitEntryWrite(int entryStart) => CommitActiveEntry(entryStart);
 
@@ -180,7 +187,7 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     internal void AppendFormattedEntry(JournalStreamId streamId, IFormattedJournalEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        if (_entryWriter.IsActive)
+        if (_entryIsActive)
         {
             throw new InvalidOperationException("The journal batch already has an active entry.");
         }
@@ -220,13 +227,30 @@ public abstract class JournalBatchWriterBase : IJournalBatchWriter
     {
         _activeEntryStart = 0;
         _activeStreamId = default;
+        _entryIsActive = false;
+        _entryCompleted = true;
     }
 
     private void ThrowIfEntryActive()
     {
-        if (_entryWriter.IsActive)
+        if (_entryIsActive)
         {
             throw new InvalidOperationException("The journal batch has an active entry.");
         }
+    }
+
+    private JournalWriter GetActiveEntryWriter()
+    {
+        if (!_entryIsActive)
+        {
+            if (_entryCompleted)
+            {
+                throw new InvalidOperationException("The journal entry has already completed.");
+            }
+
+            throw new InvalidOperationException("The journal writer is not writing an entry.");
+        }
+
+        return this;
     }
 }

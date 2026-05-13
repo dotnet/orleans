@@ -132,15 +132,6 @@ namespace Orleans.Journaling
         System.ReadOnlyMemory<byte> Payload { get; }
     }
 
-    public partial interface IJournalBatchWriter : System.IDisposable
-    {
-        long Length { get; }
-
-        JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId);
-        Serialization.Buffers.ArcBuffer GetCommittedBuffer();
-        void Reset();
-    }
-
     public partial interface IJournaledState
     {
         void AppendEntries(JournalStreamWriter writer);
@@ -163,7 +154,7 @@ namespace Orleans.Journaling
 
         string? MimeType { get; }
 
-        IJournalBatchWriter CreateWriter();
+        JournalWriter CreateWriter();
         void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context);
     }
 
@@ -303,7 +294,7 @@ namespace Orleans.Journaling
         void ApplySet(T value);
     }
 
-    public abstract partial class JournalBatchWriterBase : IJournalBatchWriter, System.IDisposable
+    public abstract partial class JournalWriter : System.Buffers.IBufferWriter<byte>, System.IDisposable
     {
         protected abstract long ActivePayloadLength { get; }
         protected abstract long CommittedLength { get; }
@@ -329,8 +320,6 @@ namespace Orleans.Journaling
         public void Reset() { }
 
         protected abstract void ResetCore();
-        protected abstract void WritePayload(System.Buffers.ReadOnlySequence<byte> value);
-        protected abstract void WritePayload(System.ReadOnlySpan<byte> value);
     }
 
     public sealed partial class JournaledStateManagerOptions
@@ -354,30 +343,15 @@ namespace Orleans.Journaling
         public readonly TCodec GetRequiredOperationCodec<TCodec>(string operationFormatKey, TCodec writeOperationCodec) { throw null; }
     }
 
-    public ref partial struct JournalEntry : System.IDisposable
+    public ref partial struct JournalEntryScope : System.IDisposable
     {
         private object _dummy;
         private int _dummyPrimitive;
-        public JournalEntryWriter Writer { get { throw null; } }
+        public System.Buffers.IBufferWriter<byte> Writer { get { throw null; } }
 
         public void Commit() { }
 
         public void Dispose() { }
-    }
-
-    public sealed partial class JournalEntryWriter : System.Buffers.IBufferWriter<byte>
-    {
-        internal JournalEntryWriter() { }
-
-        public void Advance(int count) { }
-
-        public System.Memory<byte> GetMemory(int sizeHint = 0) { throw null; }
-
-        public System.Span<byte> GetSpan(int sizeHint = 0) { throw null; }
-
-        public void Write(System.Buffers.ReadOnlySequence<byte> value) { }
-
-        public void Write(System.ReadOnlySpan<byte> value) { }
     }
 
     public sealed partial class JournalFileMetadata : IJournalFileMetadata
@@ -476,7 +450,7 @@ namespace Orleans.Journaling
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public readonly JournalEntry BeginEntry() { throw null; }
+        public readonly JournalEntryScope BeginEntry() { throw null; }
 
     }
 

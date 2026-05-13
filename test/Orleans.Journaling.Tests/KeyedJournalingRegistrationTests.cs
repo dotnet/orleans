@@ -46,15 +46,19 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
             JournalFormatKey = CustomFormatKey,
             RetirementGracePeriod = ManagerOptions.RetirementGracePeriod
         };
-        var shared = new JournaledStateManagerShared(
-            logger,
-            Options.Create(options),
-            TimeProvider.System);
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            var shared = new JournaledStateManagerShared(
+                logger,
+                Options.Create(options),
+                TimeProvider.System,
+                serviceProvider);
 
-        var exception = Assert.Throws<InvalidOperationException>(() => new JournaledStateManager(
-            storage,
-            shared,
-            serviceProvider));
+            _ = new JournaledStateManager(
+                storage,
+                shared,
+                serviceProvider);
+        });
 
         Assert.Contains(CustomFormatKey, exception.Message);
         Assert.Contains(nameof(IJournalFormat), exception.Message);
@@ -104,7 +108,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public IJournalBatchWriter CreateWriter() => new OrleansBinaryJournalBatchWriter();
+        public JournalWriter CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
         public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) => throw new NotSupportedException();
     }

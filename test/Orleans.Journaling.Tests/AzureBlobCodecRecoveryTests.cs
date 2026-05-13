@@ -167,7 +167,8 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         var shared = new JournaledStateManagerShared(
             LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
-            TimeProvider.System);
+            TimeProvider.System,
+            ServiceProvider);
 
         return new(storage, shared, ServiceProvider);
     }
@@ -228,7 +229,8 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         var shared = new JournaledStateManagerShared(
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
-            TimeProvider.System);
+            TimeProvider.System,
+            serviceProvider);
 
         return new(storage, shared, serviceProvider);
     }

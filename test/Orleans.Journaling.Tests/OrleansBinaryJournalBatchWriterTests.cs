@@ -18,7 +18,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         using var buffer = new OrleansBinaryJournalBatchWriter();
 
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(42)).BeginEntry();
-        entry.Writer.Write([1, 2, 3]);
+        entry.Writer.Write(new byte[] { 1, 2, 3 });
         entry.Commit();
 
         var bytes = ToArray(buffer);
@@ -153,13 +153,13 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         using var buffer = new OrleansBinaryJournalBatchWriter();
 
         using var committed = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        committed.Writer.Write([1]);
+        committed.Writer.Write(new byte[] { 1 });
         committed.Commit();
         var committedBytes = ToArray(buffer);
 
         using (var aborted = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry())
         {
-            aborted.Writer.Write([2, 3, 4]);
+            aborted.Writer.Write(new byte[] { 2, 3, 4 });
         }
 
         Assert.Equal(committedBytes, ToArray(buffer));
@@ -170,7 +170,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     {
         using var buffer = new OrleansBinaryJournalBatchWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write([1]);
+        entry.Writer.Write(new byte[] { 1 });
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
@@ -199,7 +199,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     {
         using var buffer = new OrleansBinaryJournalBatchWriter();
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write([1]);
+        entry.Writer.Write(new byte[] { 1 });
         entry.Commit();
         var committedBytes = ToArray(buffer);
 
@@ -223,7 +223,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     {
         using var buffer = new OrleansBinaryJournalBatchWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write([1]);
+        entry.Writer.Write(new byte[] { 1 });
         entry.Dispose();
 
         InvalidOperationException? exception = null;
@@ -247,12 +247,12 @@ public sealed class OrleansBinaryJournalBatchWriterTests
         using var buffer = new OrleansBinaryJournalBatchWriter();
 
         using var first = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        first.Writer.Write([1]);
+        first.Writer.Write(new byte[] { 1 });
         first.Commit();
         buffer.Reset();
 
         using var second = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
-        second.Writer.Write([2]);
+        second.Writer.Write(new byte[] { 2 });
         second.Commit();
 
         using var data = buffer.PeekSlice();
@@ -284,7 +284,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     {
         using var buffer = new OrleansBinaryJournalBatchWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.Writer.Write([1]);
+        entry.Writer.Write(new byte[] { 1 });
 
         var exception = Assert.Throws<InvalidOperationException>(buffer.Reset);
 
@@ -318,7 +318,7 @@ public sealed class OrleansBinaryJournalBatchWriterTests
     {
         using var buffer = new OrleansBinaryJournalBatchWriter();
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(7)).BeginEntry();
-        entry.Writer.Write([8, 9]);
+        entry.Writer.Write(new byte[] { 8, 9 });
         entry.Commit();
         var expected = ToArray(buffer);
 

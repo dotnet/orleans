@@ -104,7 +104,8 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
         var shared = new JournaledStateManagerShared(
             LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
-            TimeProvider.System);
+            TimeProvider.System,
+            ServiceProvider);
 
         return new(storage, shared, ServiceProvider);
     }

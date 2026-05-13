@@ -769,13 +769,13 @@ public class JsonCodecTests
 
     private static string GetString(ReadOnlyMemory<byte> payload) => Encoding.UTF8.GetString(payload.Span);
 
-    private static string GetString(IJournalBatchWriter writer)
+    private static string GetString(JournalWriter writer)
     {
         using var buffer = writer.GetCommittedBuffer();
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private static void AppendValueSet(IJournalBatchWriter writer, ulong streamId, int value)
+    private static void AppendValueSet(JournalWriter writer, ulong streamId, int value)
     {
         var codec = new JsonValueOperationCodec<int>(Options);
         codec.WriteSet(value, writer.CreateJournalStreamWriter(new JournalStreamId(streamId)));
@@ -810,7 +810,7 @@ public class JsonCodecTests
 
     private sealed record RecordedJournalEntry(JournalStreamId StreamId, byte[] Payload);
 
-    private sealed class CapturingNonJsonJournalWriter : JournalBatchWriterBase
+    private sealed class CapturingNonJsonJournalWriter : JournalWriter
     {
         private readonly ArcBufferWriter _payload = new();
 
@@ -831,10 +831,6 @@ public class JsonCodecTests
         protected override Memory<byte> GetPayloadMemory(int sizeHint) => _payload.GetMemory(sizeHint);
 
         protected override Span<byte> GetPayloadSpan(int sizeHint) => _payload.GetSpan(sizeHint);
-
-        protected override void WritePayload(ReadOnlySpan<byte> value) => _payload.Write(value);
-
-        protected override void WritePayload(ReadOnlySequence<byte> value) => _payload.Write(value);
 
         protected override void CommitEntry(JournalStreamId streamId, int entryStart)
         {

@@ -22,8 +22,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private readonly IJournalStorage _storage;
     private readonly IServiceProvider _serviceProvider;
     private readonly JournaledStateManagerShared _shared;
-    private readonly IJournalFormat _format;
-    private readonly IJournalBatchWriter _journalBatchWriter;
+    private readonly JournalWriter _journalBatchWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
@@ -32,7 +31,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private Task? _workLoop;
     private ManagerState _state;
     private Task? _pendingWrite;
-    private ulong _nextJournalStreamId = MinApplicationJournalStreamId;
     private bool _migrationSnapshotRequired;
 
     public JournaledStateManager(
@@ -45,8 +43,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _storage = storage;
         _shared = shared;
         _serviceProvider = serviceProvider;
-        _format = JournalFormatServices.GetRequiredJournalFormat(serviceProvider, WriteJournalFormatKey);
-        _journalBatchWriter = _format.CreateWriter();
+        _journalBatchWriter = _shared.JournalFormat.CreateWriter();
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
@@ -290,10 +287,9 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
                                 // Allocate new state ids for each state.
                                 // Doing so will trigger a reset, since _journalStreamDirectory will bind the state in question.
-                                _nextJournalStreamId = MinApplicationJournalStreamId;
                                 foreach (var (name, state) in _states)
                                 {
-                                    var id = _nextJournalStreamId++;
+                                    var id = _journalStreamDirectory.GetNextJournalStreamId();
                                     _journalStreamDirectory.Set(name, id);
                                 }
                             }
@@ -318,7 +314,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                 if (!_journalStreamDirectory.ContainsKey(name))
                                 {
                                     // Doing so will trigger a reset, since _journalStreamDirectory will bind the state in question.
-                                    _journalStreamDirectory.Set(name, _nextJournalStreamId++);
+                                    _journalStreamDirectory.Set(name, _journalStreamDirectory.GetNextJournalStreamId());
                                 }
                             }
                         }
@@ -410,7 +406,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => _journalBatchWriter.CreateJournalStreamWriter(streamId);
 
-    private static void AppendUpdatesOrSnapshotState(IJournalBatchWriter journalBatchWriter, bool isSnapshot, ulong id, IJournaledState state)
+    private static void AppendUpdatesOrSnapshotState(JournalWriter journalBatchWriter, bool isSnapshot, ulong id, IJournaledState state)
     {
         var writer = journalBatchWriter.CreateJournalStreamWriter(new(id));
         if (isSnapshot)
@@ -472,7 +468,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _statesMap.Clear();
         _statesMap[StateDirectory.Id] = _journalStreamDirectory;
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
-        _nextJournalStreamId = MinApplicationJournalStreamId;
 
         List<string>? retiredNames = null;
         foreach (var (name, state) in _states)
@@ -513,7 +508,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         if (string.Equals(journalFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
         {
-            return _format;
+            return _shared.JournalFormat;
         }
 
         return JournalFormatServices.GetRequiredJournalFormat(_serviceProvider, journalFormatKey);
@@ -604,11 +599,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         lock (_lock)
         {
-            if (id >= _nextJournalStreamId)
-            {
-                _nextJournalStreamId = id + 1;
-            }
-
             if (_states.TryGetValue(name, out var state))
             {
                 _statesMap[id] = state;
@@ -693,6 +683,20 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
         public bool TryGetValue(string name, out ulong id) => _ids.TryGetValue(name, out id);
+
+        public ulong GetNextJournalStreamId()
+        {
+            var maxId = (ulong)MinApplicationJournalStreamId - 1;
+            foreach (var id in _ids.Values)
+            {
+                if (id > maxId)
+                {
+                    maxId = id;
+                }
+            }
+
+            return checked(maxId + 1);
+        }
 
         public void Set(string name, ulong id)
         {

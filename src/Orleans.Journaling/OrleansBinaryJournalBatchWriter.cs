@@ -3,7 +3,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal class OrleansBinaryJournalBatchWriter : JournalBatchWriterBase
+internal class OrleansBinaryJournalBatchWriter : JournalWriter
 {
     private readonly ArcBufferWriter _buffer = new();
     private readonly ArcBufferWriter _entryBuffer = new();
@@ -39,10 +39,6 @@ internal class OrleansBinaryJournalBatchWriter : JournalBatchWriterBase
     protected override Memory<byte> GetPayloadMemory(int sizeHint) => _entryBuffer.GetMemory(sizeHint);
 
     protected override Span<byte> GetPayloadSpan(int sizeHint) => _entryBuffer.GetSpan(sizeHint);
-
-    protected override void WritePayload(ReadOnlySpan<byte> value) => _entryBuffer.Write(value);
-
-    protected override void WritePayload(ReadOnlySequence<byte> value) => _entryBuffer.Write(value);
 
     protected override void CommitEntry(JournalStreamId streamId, int entryStart)
     {

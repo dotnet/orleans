@@ -23,7 +23,7 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
 
     internal SerializerSessionPool SessionPool => _sessionPool;
 
-    IJournalBatchWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalBatchWriter();
+    JournalWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
     void IJournalFormat.Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) =>
         OrleansBinaryJournalReader.Read(input, resolver, _sessionPool, in context);
