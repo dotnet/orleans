@@ -101,7 +101,7 @@ public sealed class JsonDurableListCommandCodec<T>(JsonSerializerOptions? option
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableListCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableListCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
         Apply(ref reader, consumer);
@@ -218,7 +218,7 @@ public sealed class JsonDurableQueueCommandCodec<T>(JsonSerializerOptions? optio
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableQueueCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
         Apply(ref reader, consumer);
@@ -328,7 +328,7 @@ public sealed class JsonDurableSetCommandCodec<T>(JsonSerializerOptions? options
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableSetCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableSetCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
         Apply(ref reader, consumer);

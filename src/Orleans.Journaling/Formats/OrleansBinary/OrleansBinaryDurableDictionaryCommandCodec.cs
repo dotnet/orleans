@@ -82,7 +82,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
+    public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);

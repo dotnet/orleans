@@ -17,7 +17,7 @@ public static class CodecTestHelpers
 
     public static byte[] WriteEntry(Action<JournalStreamWriter> write)
     {
-        using var batch = new OrleansBinaryJournalWriter();
+        using var batch = new OrleansBinaryJournalBufferWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
         using var committed = batch.Peek();
         var sequence = committed.AsReadOnlySequence();
@@ -32,11 +32,11 @@ public static class CodecTestHelpers
         return payload.ToArray();
     }
 
-    public static JournalReadBuffer ReadBuffer(ReadOnlyMemory<byte> bytes)
+    public static JournalBufferReader ReadBuffer(ReadOnlyMemory<byte> bytes)
     {
         var writer = new ArcBufferWriter();
         writer.Write(bytes.Span);
-        return new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        return new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
     }
 
     public static ReadOnlySequence<byte> SegmentedSequence(params byte[][] segments)

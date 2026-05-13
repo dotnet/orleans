@@ -11,12 +11,12 @@ namespace Orleans.Journaling;
 /// </remarks>
 public ref struct JournalEntryScope : IDisposable
 {
-    private JournalWriter? _writer;
+    private JournalBufferWriter? _writer;
     private JournalStreamId _streamId;
     private IBufferWriter<byte>? _payloadWriter;
     private bool _completed;
 
-    internal JournalEntryScope(JournalWriter writer, JournalStreamId streamId, IBufferWriter<byte> payloadWriter)
+    internal JournalEntryScope(JournalBufferWriter writer, JournalStreamId streamId, IBufferWriter<byte> payloadWriter)
     {
         _writer = writer;
         _streamId = streamId;
@@ -67,7 +67,7 @@ public ref struct JournalEntryScope : IDisposable
         writer.AbortActiveEntry(streamId);
     }
 
-    private readonly JournalWriter GetWriter()
+    private readonly JournalBufferWriter GetWriter()
     {
         if (_writer is null)
         {

@@ -107,7 +107,7 @@ public sealed class DurableListDirectWriteTests
 
     private sealed class TestJournalStreamWriter
     {
-        private readonly OrleansBinaryJournalWriter _buffer = new();
+        private readonly OrleansBinaryJournalBufferWriter _buffer = new();
 
         public long Length => _buffer.Length;
 
@@ -171,7 +171,7 @@ public sealed class DurableListDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IDurableListCommandHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalBufferReader input, IDurableListCommandHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private static void WriteOrThrow(JournalStreamWriter writer, bool shouldThrow)

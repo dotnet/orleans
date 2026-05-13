@@ -15,7 +15,7 @@ namespace Orleans.Journaling;
 /// </remarks>
 /// <param name="formatKey">The journal format key for <paramref name="payload"/>.</param>
 /// <param name="payload">The entry payload buffer.</param>
-public readonly ref struct JournalEntry(string formatKey, JournalReadBuffer payload)
+public readonly ref struct JournalEntry(string formatKey, JournalBufferReader payload)
 {
     /// <summary>
     /// Gets the journal format key for this entry.
@@ -25,5 +25,5 @@ public readonly ref struct JournalEntry(string formatKey, JournalReadBuffer payl
     /// <summary>
     /// Gets the entry payload buffer.
     /// </summary>
-    public JournalReadBuffer Payload { get; } = payload;
+    public JournalBufferReader Payload { get; } = payload;
 }

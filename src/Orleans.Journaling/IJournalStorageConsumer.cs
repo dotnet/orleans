@@ -10,7 +10,7 @@ public interface IJournalStorageConsumer
     /// </summary>
     /// <param name="buffer">The buffered journal data available to the consumer.</param>
     /// <param name="metadata">The metadata associated with the journal file being read, or <see langword="null"/> if no metadata is available.</param>
-    void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata);
+    void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata);
 }
 
 /// <summary>

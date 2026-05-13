@@ -498,7 +498,7 @@ public sealed class JsonCodecSnapshotTests
     {
         // No operations written → committed buffer is the empty UTF-8 string. JSONL has no per-batch
         // header, so this should be byte-empty — pinning that explicitly catches accidental "always emit
-        // a BOM/header" regressions in JsonLinesJournalWriter.
+        // a BOM/header" regressions in JsonLinesJournalBufferWriter.
         var format = new JsonLinesJournalFormat();
         using var writer = format.CreateWriter();
         var bytes = SnapshotBytes(writer);
@@ -646,9 +646,9 @@ public sealed class JsonCodecSnapshotTests
         return VerifyJsonSnapshot(text);
     }
 
-    private static byte[] SnapshotBytes(JournalWriter writer)
+    private static byte[] SnapshotBytes(JournalBufferWriter writer)
     {
-        using var slice = writer.GetCommittedBuffer();
+        using var slice = writer.GetBuffer();
         return slice.ToArray();
     }
 
@@ -669,7 +669,7 @@ public sealed class JsonCodecSnapshotTests
 
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        var buffer = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        var buffer = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
         var resolver = new SingleStreamResolver(new JournalStreamId(SnapshotStreamId), state, JsonJournalExtensions.JournalFormatKey);
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
         ((IJournalFormat)format).Replay(buffer, resolver, in context);

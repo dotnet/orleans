@@ -20,8 +20,8 @@ public class DurableListJournalBenchmarks
     private IJournalFormat _journalFormat;
     private DurableList<int> _list;
     private IJournaledState _state;
-    private OrleansBinaryJournalWriter _writeBuffer;
-    private OrleansBinaryJournalWriter _encodedJournalStreamWriter;
+    private OrleansBinaryJournalBufferWriter _writeBuffer;
+    private OrleansBinaryJournalBufferWriter _encodedJournalStreamWriter;
     private ArcBuffer _encodedJournalData;
     private ArcBufferWriter _recoveryBuffer;
     private RecoveryConsumer _recoveryConsumer;
@@ -34,7 +34,7 @@ public class DurableListJournalBenchmarks
         _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
         _codec = new OrleansBinaryDurableListCommandCodec<int>(serviceProvider.GetRequiredService<ICodecProvider>().GetCodec<int>(), _sessionPool);
         _journalFormat = new OrleansBinaryJournalFormat(_sessionPool);
-        _writeBuffer = new OrleansBinaryJournalWriter();
+        _writeBuffer = new OrleansBinaryJournalBufferWriter();
         _list = new DurableList<int>("list", new BenchmarkJournalManager(_writeBuffer, ListJournalStreamId), _codec);
         _state = _list;
         _recoveryConsumer = new RecoveryConsumer(ListJournalStreamId, _codec, OperationsPerInvocation);
@@ -93,14 +93,14 @@ public class DurableListJournalBenchmarks
 
     private ArcBuffer CreateEncodedJournalData()
     {
-        _encodedJournalStreamWriter = new OrleansBinaryJournalWriter();
+        _encodedJournalStreamWriter = new OrleansBinaryJournalBufferWriter();
         var writer = _encodedJournalStreamWriter.CreateJournalStreamWriter(ListJournalStreamId);
         for (var i = 0; i < OperationsPerInvocation; i++)
         {
             _codec.WriteAdd(i, writer);
         }
 
-        return _encodedJournalStreamWriter.GetCommittedBuffer();
+        return _encodedJournalStreamWriter.GetBuffer();
     }
 
     private void ValidateEncodedJournalData()
@@ -118,12 +118,12 @@ public class DurableListJournalBenchmarks
     {
         _recoveryBuffer.Reset();
         _recoveryBuffer.Write(_encodedJournalData.AsReadOnlySequence());
-        var reader = new JournalReadBuffer(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
+        var reader = new JournalBufferReader(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
         var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
         _journalFormat.Replay(reader, _recoveryConsumer, in context);
     }
 
-    private sealed class BenchmarkJournalManager(OrleansBinaryJournalWriter buffer, JournalStreamId streamId) : IStateManager
+    private sealed class BenchmarkJournalManager(OrleansBinaryJournalBufferWriter buffer, JournalStreamId streamId) : IStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 

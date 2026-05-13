@@ -156,7 +156,7 @@ public sealed class StorageStreamingTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
-            var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+            var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
         });
@@ -169,7 +169,7 @@ public sealed class StorageStreamingTests
     public void BinaryFormatRead_WaitsForIncompleteFrameWhenInputIsNotCompleted()
     {
         using var writer = CreateWriter([0x15, 1, 2]);
-        var reader = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: false);
+        var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
@@ -182,12 +182,12 @@ public sealed class StorageStreamingTests
     [Fact]
     public void BinaryFormatRead_ConsumesCompletePrefixAndWaitsForPartialSuffix()
     {
-        using var buffer = new OrleansBinaryJournalWriter();
+        using var buffer = new OrleansBinaryJournalBufferWriter();
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(8)), [1, 2, 3]);
-        using var committed = buffer.GetCommittedBuffer();
+        using var committed = buffer.GetBuffer();
         var entryBytes = committed.ToArray();
         using var data = CreateWriter([.. entryBytes, 10, 0]);
-        var reader = new JournalReadBuffer(new ArcBufferReader(data), isCompleted: false);
+        var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
@@ -224,7 +224,7 @@ public sealed class StorageStreamingTests
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
         {
             if (buffer.IsCompleted || buffer.Length == 0)
             {
@@ -241,7 +241,7 @@ public sealed class StorageStreamingTests
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
         {
             var temp = new byte[2];
             while (buffer.TryPeek(temp))
@@ -267,7 +267,7 @@ public sealed class StorageStreamingTests
 
         public int CompletedLength { get; private set; }
 
-        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
         {
             IsCompleted = buffer.IsCompleted;
             CompletedLength = buffer.Length;
@@ -276,7 +276,7 @@ public sealed class StorageStreamingTests
 
     private sealed class LeavingJournalStorageConsumer : IJournalStorageConsumer
     {
-        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata) { }
+        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) { }
     }
 
     private sealed class ChunkedReadStream(byte[] data, int chunkSize) : Stream

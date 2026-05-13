@@ -18,7 +18,7 @@ public interface IDurableDictionaryCommandCodec<TKey, TValue> where TKey : notnu
     void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer);
+    void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer);
 }
 
 /// <summary>
@@ -45,7 +45,7 @@ public interface IDurableListCommandCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(JournalReadBuffer input, IDurableListCommandHandler<T> consumer);
+    void Apply(JournalBufferReader input, IDurableListCommandHandler<T> consumer);
 }
 
 /// <summary>
@@ -66,7 +66,7 @@ public interface IDurableQueueCommandCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer);
+    void Apply(JournalBufferReader input, IDurableQueueCommandHandler<T> consumer);
 }
 
 /// <summary>
@@ -87,7 +87,7 @@ public interface IDurableSetCommandCodec<T>
     void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(JournalReadBuffer input, IDurableSetCommandHandler<T> consumer);
+    void Apply(JournalBufferReader input, IDurableSetCommandHandler<T> consumer);
 }
 
 /// <summary>
@@ -99,7 +99,7 @@ public interface IDurableValueCommandCodec<T>
     void WriteSet(T value, JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer);
+    void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer);
 }
 
 /// <summary>
@@ -114,7 +114,7 @@ public interface IPersistentStateCommandCodec<T>
     void WriteClear(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer);
+    void Apply(JournalBufferReader input, IPersistentStateCommandHandler<T> consumer);
 }
 
 /// <summary>
@@ -135,7 +135,7 @@ public interface IDurableTaskCompletionSourceCommandCodec<T>
     void WriteCanceled(JournalStreamWriter writer);
 
     /// <summary>Reads one encoded command and applies it to <paramref name="consumer"/>.</summary>
-    void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer);
+    void Apply(JournalBufferReader input, IDurableTaskCompletionSourceCommandHandler<T> consumer);
 }
 
 /// <summary>

@@ -8,14 +8,14 @@ namespace Orleans.Journaling;
 /// <remarks>
 /// Instances are temporary cursors over pooled buffer pages and must not be retained beyond the synchronous call which supplied them.
 /// </remarks>
-public readonly struct JournalReadBuffer
+public readonly struct JournalBufferReader
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="JournalReadBuffer"/> struct.
+    /// Initializes a new instance of the <see cref="JournalBufferReader"/> struct.
     /// </summary>
     /// <param name="reader">The underlying buffer reader.</param>
     /// <param name="isCompleted">A value indicating whether no more data will be appended to this buffer.</param>
-    public JournalReadBuffer(ArcBufferReader reader, bool isCompleted)
+    public JournalBufferReader(ArcBufferReader reader, bool isCompleted)
     {
         Reader = reader;
         IsCompleted = isCompleted;

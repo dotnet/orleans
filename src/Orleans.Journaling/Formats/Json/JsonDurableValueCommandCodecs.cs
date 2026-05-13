@@ -25,7 +25,7 @@ public sealed class JsonDurableValueCommandCodec<T>(JsonSerializerOptions? optio
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
         Apply(ref reader, consumer);
@@ -78,7 +78,7 @@ public sealed class JsonPersistentStateCommandCodec<T>(JsonSerializerOptions? op
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IPersistentStateCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
         Apply(ref reader, consumer);
@@ -160,7 +160,7 @@ public sealed class JsonDurableTaskCompletionSourceCommandCodec<T>(JsonSerialize
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
         Apply(ref reader, consumer);

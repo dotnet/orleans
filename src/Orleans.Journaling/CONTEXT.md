@@ -21,12 +21,24 @@ A reusable `IBufferWriter<byte>` used inside a `ref struct` lexical scope to enc
 _Avoid_: Per-entry writer allocation
 
 **Journal Format**:
-A narrow physical-format service which creates **Journal Writers** and reads stored journal bytes.
+A narrow physical-format service which creates **Journal Buffer Writers** and reads stored journal bytes.
 _Avoid_: Public codec-family abstraction
 
-**Journal Writer**:
-A reusable, format-owned writer for one pending **Journal Batch**. The manager owns it and storage may consume its read-only view only for the duration of an append or replace operation.
-_Avoid_: Storage-owned writer
+**Journal Buffer Writer**:
+A reusable, format-owned, in-memory write buffer for one pending **Journal Batch**. The manager owns it and storage may consume its read-only view only for the duration of an append or replace operation. Despite the suffix, it does not perform storage I/O; it accumulates encoded **Journal Entries** until they are handed off to **Journal Storage**.
+_Avoid_: Journal Writer (ambiguous with storage I/O), Storage-owned writer
+
+**Journal Buffer Reader**:
+An in-memory cursor over buffered **Journal Batch** bytes supplied by **Journal Storage** for replay. Despite the suffix, it does not perform storage I/O; the bytes are already in memory when it is constructed.
+_Avoid_: Journal Reader (ambiguous with storage I/O)
+
+**Journal Stream**:
+The subset of **Journal Entries** within a journal that belong to one durable state. Identified by a **Journal Stream Id**.
+_Avoid_: Per-state journal
+
+**Journal Stream Writer**:
+A small per-stream handle that pairs a **Journal Stream Id** with a **Journal Buffer Writer** so callers can begin **Journal Entries** for one durable state without repeating the id.
+_Avoid_: Standalone writer object
 
 **Journal Storage**:
 Opaque persistence for encoded **Journal Entries**. It exposes the selected **Journal Format** key but does not own the format implementation or decode **Journal Entries**.
@@ -116,8 +128,10 @@ _Avoid_: Per-operation undo
 - **Journal Format** readers parse physical framing and dispatch ids and payloads; they do not interpret runtime id semantics.
 - A **Journal Entry** contains exactly one **Durable Operation** payload.
 - A **Journal Format** owns physical journal byte framing but does not by itself define a full **Codec Family**.
-- A **Journal Writer** is caller-owned; storage must not retain the `GetCommittedBuffer()` view after an append or replace operation returns.
-- **Journal Storage** stores and returns encoded bytes; the manager uses the selected **Journal Format** to decode those bytes into **Journal Entries**.
+- A **Journal Buffer Writer** is caller-owned; storage must not retain the `GetBuffer()` view after an append or replace operation returns.
+- **Journal Storage** stores and returns encoded bytes; the manager uses the selected **Journal Format** to decode those bytes into **Journal Entries**, supplied through a **Journal Buffer Reader**.
+- A **Journal Buffer Reader** is a transient cursor; callers must not retain it past the synchronous call which supplied it.
+- A **Journal Stream Writer** writes entries into the underlying **Journal Buffer Writer**; it does not own any bytes itself.
 - A **Journal Storage Id** identifies exactly one **Journal Storage** instance.
 - A **Journal Storage Id** is logical; providers map it to physical storage names.
 - A **Journal Storage Id** is separate from a **Journal Format** key.
@@ -152,16 +166,16 @@ _Avoid_: Per-operation undo
 - A **State Manager Handle** owns shutdown and disposal for a **State Manager** created by services such as DurableJobs.
 - **Journal Format** keys are separate from storage provider names or storage identity.
 - Malformed recovery data is a hard failure. The next recovery attempt resets volatile state and replays from storage.
-- A **Journal Writer** is reused across entries and must not be retained by codecs after the write call returns.
+- A **Journal Buffer Writer** is reused across entries and must not be retained by codecs after the write call returns.
 - A pending **Journal Entry** should not escape the lexical scope which began it.
 - Durable operation codecs synchronously encode one operation and must not store payload writers.
 - The lexical entry scope type is `JournalEntryScope`.
 - A pending **Journal Entry** can complete only once. `Commit` finalizes it; `Dispose` aborts it only if it was not committed; double completion is invalid.
-- `JournalWriter` implements `IBufferWriter<byte>` for the active entry payload only. Entry lifecycle operations belong to the lexical scope, not to durable operation codecs.
-- Aborting a pending **Journal Entry** truncates the caller-owned **Journal Writer** to its pre-entry state; aborted data must never affect stored data or later writes.
-- Successful **Journal Entries** are batched in the manager-owned pending **Journal Writer** until `WriteStateAsync` flushes them.
+- `JournalBufferWriter` implements `IBufferWriter<byte>` for the active entry payload only. Entry lifecycle operations belong to the lexical scope, not to durable operation codecs.
+- Aborting a pending **Journal Entry** truncates the caller-owned **Journal Buffer Writer** to its pre-entry state; aborted data must never affect stored data or later writes.
+- Successful **Journal Entries** are batched in the manager-owned pending **Journal Buffer Writer** until `WriteStateAsync` flushes them.
 - A **State Manager** may flush **Journal Entries** from multiple callers in one **Journal Batch** when each caller waits for the flush containing its changes.
-- After a successful flush, a **Journal Writer** should be reset and reused when the format supports safe reuse.
+- After a successful flush, a **Journal Buffer Writer** should be reset and reused when the format supports safe reuse.
 - A **Durable Operation** may contain values encoded by a **Value Codec**.
 - A **Codec Family** owns the **Journal Batch**, **Journal Entry**, **Durable Operation**, and **Value Codec** choices together.
 - **Steady-state Journaling Overhead** excludes allocations caused by the in-memory collection or the journaled value itself.

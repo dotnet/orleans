@@ -333,7 +333,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonValueCodec_JournalStreamWriterOverload_WritesPayloadFragmentBytesForNonJsonWriter()
     {
-        using var writer = new CapturingNonJsonJournalWriter();
+        using var writer = new CapturingNonJsonJournalBufferWriter();
         var codec = new JsonDurableValueCommandCodec<int>(Options);
 
         codec.WriteSet(42, writer.CreateJournalStreamWriter(new JournalStreamId(8)));
@@ -348,7 +348,7 @@ public class JsonCodecTests
     [Fact]
     public void JsonCommandWriter_AbortsEntryWhenJsonWriteThrows()
     {
-        using var writer = new CapturingNonJsonJournalWriter();
+        using var writer = new CapturingNonJsonJournalBufferWriter();
         var valueCodec = new JsonDurableValueCommandCodec<int>(Options);
         var throwingCodec = new JsonDurableValueCommandCodec<ThrowingJsonValue>(Options);
 
@@ -523,7 +523,7 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes("""[8,["set",42]]""");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
@@ -545,7 +545,7 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes(line + "\n");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
@@ -567,7 +567,7 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
+        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
@@ -684,7 +684,7 @@ public class JsonCodecTests
             JsonJournalExtensions.JournalFormatKey,
             Encoding.UTF8.GetBytes("""["set",42]""")));
 
-        using var slice = writer.GetCommittedBuffer();
+        using var slice = writer.GetBuffer();
         Assert.Equal("""[8,["set",42]]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
     }
 
@@ -700,7 +700,7 @@ public class JsonCodecTests
             JsonJournalExtensions.JournalFormatKey,
             recoveredEntry.Payload));
 
-        using var slice = writer.GetCommittedBuffer();
+        using var slice = writer.GetBuffer();
         Assert.Equal("""[9,["set",42]]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
     }
 
@@ -715,7 +715,7 @@ public class JsonCodecTests
             JsonJournalExtensions.JournalFormatKey,
             Encoding.UTF8.GetBytes("""["set" , { "value" : 42 }]""")));
 
-        using var slice = writer.GetCommittedBuffer();
+        using var slice = writer.GetBuffer();
         Assert.Equal("""[8,["set" , { "value" : 42 }]]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
     }
 
@@ -769,13 +769,13 @@ public class JsonCodecTests
 
     private static string GetString(ReadOnlyMemory<byte> payload) => Encoding.UTF8.GetString(payload.Span);
 
-    private static string GetString(JournalWriter writer)
+    private static string GetString(JournalBufferWriter writer)
     {
-        using var buffer = writer.GetCommittedBuffer();
+        using var buffer = writer.GetBuffer();
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private static void AppendValueSet(JournalWriter writer, ulong streamId, int value)
+    private static void AppendValueSet(JournalBufferWriter writer, ulong streamId, int value)
     {
         var codec = new JsonDurableValueCommandCodec<int>(Options);
         codec.WriteSet(value, writer.CreateJournalStreamWriter(new JournalStreamId(streamId)));
@@ -789,7 +789,7 @@ public class JsonCodecTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
+        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true);
         var consumer = new RecordingJournalEntrySink();
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
         format.Replay(reader, consumer, in context);
@@ -802,7 +802,7 @@ public class JsonCodecTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
-        var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true);
+        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true);
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
         format.Replay(reader, resolver, in context);
         Assert.Equal(0, reader.Length);
@@ -810,13 +810,13 @@ public class JsonCodecTests
 
     private sealed record RecordedJournalEntry(JournalStreamId StreamId, byte[] Payload);
 
-    private sealed class CapturingNonJsonJournalWriter : JournalWriter
+    private sealed class CapturingNonJsonJournalBufferWriter : JournalBufferWriter
     {
         private readonly ArcBufferWriter _payload = new();
 
         public List<RecordedJournalEntry> Entries { get; } = [];
 
-        protected override ArcBuffer GetCommittedBufferCore() => _payload.PeekSlice(0);
+        protected override ArcBuffer GetBufferCore() => _payload.PeekSlice(0);
 
         protected override void ResetCore() => _payload.Reset();
 
@@ -907,7 +907,7 @@ public class JsonCodecTests
 
         public void WriteSet(int value, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<int> consumer)
+        public void Apply(JournalBufferReader input, IDurableValueCommandHandler<int> consumer)
         {
             var reader = new JsonCommandReader(input);
             Consumer = consumer;

@@ -21,7 +21,7 @@ internal ref struct JsonCommandReader
         Command = ReadCommandCore();
     }
 
-    public JsonCommandReader(JournalReadBuffer input)
+    public JsonCommandReader(JournalBufferReader input)
     {
         _reader = new Utf8JsonReader(input.AsReadOnlySequence(), isFinalBlock: true, state: default);
         _nextIndex = 0;

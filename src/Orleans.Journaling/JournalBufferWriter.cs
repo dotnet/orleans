@@ -4,22 +4,24 @@ using Orleans.Serialization.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Base class for format-owned state journal writers.
+/// Base class for format-owned in-memory journal buffers used to assemble a pending journal batch.
 /// </summary>
 /// <remarks>
-/// Derived classes own the physical framing and committed buffer. This base class only
-/// connects <see cref="JournalStreamWriter"/> to entry lifecycle hooks. Buffers returned by <see cref="GetCommittedBuffer"/>
+/// Derived classes own the physical framing and underlying byte buffer. This base class only
+/// connects <see cref="JournalStreamWriter"/> to entry lifecycle hooks. Buffers returned by <see cref="GetBuffer"/>
 /// are pinned, caller-owned snapshots which must remain valid for the caller's lifetime even if
 /// <see cref="Reset"/> or <see cref="Dispose"/> is called before the caller disposes the returned buffer.
+/// Despite the name, this type does not perform storage I/O; it accumulates encoded journal entries until
+/// callers hand the buffer off to <see cref="IJournalStorage"/>.
 /// </remarks>
-public abstract class JournalWriter : IDisposable
+public abstract class JournalBufferWriter : IDisposable
 {
     private bool _hasActiveEntry;
 
     /// <summary>
-    /// Initializes a new instance of the <see cref="JournalWriter"/> class.
+    /// Initializes a new instance of the <see cref="JournalBufferWriter"/> class.
     /// </summary>
-    protected JournalWriter()
+    protected JournalBufferWriter()
     {
     }
 
@@ -31,26 +33,27 @@ public abstract class JournalWriter : IDisposable
     public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => new(streamId, this);
 
     /// <summary>
-    /// Gets a pinned buffer containing only committed bytes which are safe to persist.
+    /// Gets a pinned snapshot of the accumulated journal bytes which are safe to persist.
     /// </summary>
     /// <remarks>
     /// The returned buffer must remain valid for the caller's lifetime even if <see cref="Reset"/> or
-    /// <see cref="Dispose"/> is subsequently called.
+    /// <see cref="Dispose"/> is subsequently called. Throws if an entry is currently in flight, so the snapshot
+    /// always reflects a complete sequence of committed journal entries.
     /// </remarks>
     /// <returns>
-    /// An <see cref="ArcBuffer"/> containing the committed journal bytes. The caller owns and must dispose the returned buffer.
+    /// An <see cref="ArcBuffer"/> containing the accumulated journal bytes. The caller owns and must dispose the returned buffer.
     /// </returns>
     /// <exception cref="InvalidOperationException">An entry is currently active and has not been committed or aborted.</exception>
-    public ArcBuffer GetCommittedBuffer()
+    public ArcBuffer GetBuffer()
     {
         ThrowIfEntryActive();
-        return GetCommittedBufferCore();
+        return GetBufferCore();
     }
 
     /// <summary>
     /// Clears all buffered data so the writer can be reused for another batch.
     /// </summary>
-    /// <remarks>This must not invalidate buffers previously returned by <see cref="GetCommittedBuffer"/>.</remarks>
+    /// <remarks>This must not invalidate buffers previously returned by <see cref="GetBuffer"/>.</remarks>
     public void Reset()
     {
         ThrowIfEntryActive();
@@ -63,16 +66,16 @@ public abstract class JournalWriter : IDisposable
     public abstract void Dispose();
 
     /// <summary>
-    /// Returns a pinned buffer containing the committed bytes of the batch.
+    /// Returns a pinned snapshot of the accumulated bytes of the batch.
     /// </summary>
     /// <remarks>
-    /// Called by <see cref="GetCommittedBuffer"/> after verifying that no entry is active. The returned buffer
+    /// Called by <see cref="GetBuffer"/> after verifying that no entry is active. The returned buffer
     /// must remain valid for the caller's lifetime even if <see cref="Reset"/> or <see cref="Dispose"/> is subsequently called.
     /// </remarks>
     /// <returns>
-    /// An <see cref="ArcBuffer"/> containing the committed bytes. The caller owns and must dispose the returned buffer.
+    /// An <see cref="ArcBuffer"/> containing the accumulated bytes. The caller owns and must dispose the returned buffer.
     /// </returns>
-    protected abstract ArcBuffer GetCommittedBufferCore();
+    protected abstract ArcBuffer GetBufferCore();
 
     /// <summary>
     /// Discards all buffered data so the writer can be reused.
@@ -95,7 +98,7 @@ public abstract class JournalWriter : IDisposable
     protected virtual void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
     {
         throw new InvalidOperationException(
-            $"The journal writer '{GetType().FullName}' cannot append preserved entry of type '{entry.GetType().FullName}'.");
+            $"The journal buffer writer '{GetType().FullName}' cannot append preserved entry of type '{entry.GetType().FullName}'.");
     }
 
     /// <summary>
@@ -114,11 +117,11 @@ public abstract class JournalWriter : IDisposable
     {
         if (_hasActiveEntry)
         {
-            throw new InvalidOperationException("The journal writer already has an active entry.");
+            throw new InvalidOperationException("The journal buffer writer already has an active entry.");
         }
 
         var payloadWriter = BeginEntryCore(streamId) ?? throw new InvalidOperationException(
-            $"The journal writer '{GetType().FullName}' returned a null payload writer.");
+            $"The journal buffer writer '{GetType().FullName}' returned a null payload writer.");
         _hasActiveEntry = true;
         return new(this, streamId, payloadWriter);
     }
@@ -128,7 +131,7 @@ public abstract class JournalWriter : IDisposable
         ArgumentNullException.ThrowIfNull(entry);
         if (_hasActiveEntry)
         {
-            throw new InvalidOperationException("The journal writer already has an active entry.");
+            throw new InvalidOperationException("The journal buffer writer already has an active entry.");
         }
 
         OnAppendPreservedEntry(streamId, entry);
@@ -164,7 +167,7 @@ public abstract class JournalWriter : IDisposable
     {
         if (_hasActiveEntry)
         {
-            throw new InvalidOperationException("The journal writer has an active entry.");
+            throw new InvalidOperationException("The journal buffer writer has an active entry.");
         }
     }
 
@@ -172,7 +175,7 @@ public abstract class JournalWriter : IDisposable
     {
         if (!_hasActiveEntry)
         {
-            throw new InvalidOperationException("The journal writer is not writing an entry.");
+            throw new InvalidOperationException("The journal buffer writer is not writing an entry.");
         }
     }
 }

@@ -76,7 +76,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableQueueCommandHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);

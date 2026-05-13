@@ -114,6 +114,6 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
             _inner.WriteClear(writer);
         }
 
-        public void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+        public void Apply(JournalBufferReader input, IPersistentStateCommandHandler<T> consumer) => _inner.Apply(input, consumer);
     }
 }

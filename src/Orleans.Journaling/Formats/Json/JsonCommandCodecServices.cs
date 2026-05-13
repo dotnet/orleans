@@ -13,7 +13,7 @@ internal sealed class JsonDurableDictionaryCommandCodecService<TKey, TValue>(Jso
 
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -34,7 +34,7 @@ internal sealed class JsonDurableListCommandCodecService<T>(JsonJournalOptions o
 
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(JournalReadBuffer input, IDurableListCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalBufferReader input, IDurableListCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -51,7 +51,7 @@ internal sealed class JsonDurableQueueCommandCodecService<T>(JsonJournalOptions 
 
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalBufferReader input, IDurableQueueCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -68,7 +68,7 @@ internal sealed class JsonDurableSetCommandCodecService<T>(JsonJournalOptions op
 
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => _inner.WriteSnapshot(items, writer);
 
-    public void Apply(JournalReadBuffer input, IDurableSetCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalBufferReader input, IDurableSetCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -79,7 +79,7 @@ internal sealed class JsonDurableValueCommandCodecService<T>(JsonJournalOptions 
 
     public void WriteSet(T value, JournalStreamWriter writer) => _inner.WriteSet(value, writer);
 
-    public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -92,7 +92,7 @@ internal sealed class JsonPersistentStateCommandCodecService<T>(JsonJournalOptio
 
     public void WriteClear(JournalStreamWriter writer) => _inner.WriteClear(writer);
 
-    public void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalBufferReader input, IPersistentStateCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }
 
@@ -109,6 +109,6 @@ internal sealed class JsonDurableTaskCompletionSourceCommandCodecService<T>(Json
 
     public void WriteCanceled(JournalStreamWriter writer) => _inner.WriteCanceled(writer);
 
-    public void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer) => _inner.Apply(input, consumer);
+    public void Apply(JournalBufferReader input, IDurableTaskCompletionSourceCommandHandler<T> consumer) => _inner.Apply(input, consumer);
 
 }

@@ -5,14 +5,14 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// This type does not write to storage directly. Entries are buffered by the owning
-/// <see cref="JournalWriter"/>.
+/// <see cref="JournalBufferWriter"/>.
 /// </remarks>
 public readonly struct JournalStreamWriter
 {
     private readonly JournalStreamId _id;
-    private readonly JournalWriter? _writer;
+    private readonly JournalBufferWriter? _writer;
 
-    internal JournalStreamWriter(JournalStreamId id, JournalWriter writer)
+    internal JournalStreamWriter(JournalStreamId id, JournalBufferWriter writer)
     {
         _id = id;
         _writer = writer;
@@ -32,7 +32,7 @@ public readonly struct JournalStreamWriter
     /// <param name="entry">The format-owned entry.</param>
     internal void AppendPreservedEntry(IPreservedJournalEntry entry) => GetWriter().AppendPreservedEntry(_id, entry);
 
-    private JournalWriter GetWriter()
+    private JournalBufferWriter GetWriter()
     {
         if (_writer is null)
         {

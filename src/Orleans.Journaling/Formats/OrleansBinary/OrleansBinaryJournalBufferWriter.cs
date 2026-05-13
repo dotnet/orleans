@@ -3,7 +3,7 @@ using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
 
-internal class OrleansBinaryJournalWriter : JournalWriter
+internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
 {
     private readonly ArcBufferWriter _buffer = new();
     private readonly ArcBufferWriter _entryBuffer = new();
@@ -11,7 +11,7 @@ internal class OrleansBinaryJournalWriter : JournalWriter
 
     public int Length => checked(_buffer.Length + _entryBuffer.Length);
 
-    protected override ArcBuffer GetCommittedBufferCore() => _buffer.PeekSlice(_buffer.Length);
+    protected override ArcBuffer GetBufferCore() => _buffer.PeekSlice(_buffer.Length);
 
     protected override void ResetCore()
     {
@@ -68,7 +68,7 @@ internal class OrleansBinaryJournalWriter : JournalWriter
         if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
-                $"The Orleans binary journal writer cannot append preserved entry for journal format key '{entry.FormatKey}'.");
+                $"The Orleans binary journal buffer writer cannot append preserved entry for journal format key '{entry.FormatKey}'.");
             }
 
         using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();

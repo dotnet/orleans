@@ -208,7 +208,7 @@ public sealed class DurableCollectionDirectWriteTests
 
     private sealed class TestJournalStreamWriter
     {
-        private readonly OrleansBinaryJournalWriter _buffer = new();
+        private readonly OrleansBinaryJournalBufferWriter _buffer = new();
 
         public long Length => _buffer.Length;
 
@@ -271,7 +271,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IDurableQueueCommandHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalBufferReader input, IDurableQueueCommandHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectSetCodec<T> : TestSetCodec<T>
@@ -342,7 +342,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public virtual void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IDurableSetCommandHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalBufferReader input, IDurableSetCommandHandler<T> consumer) => throw new NotSupportedException();
     }
 
     private sealed class DirectDictionaryCodec<TKey, TValue> : TestDictionaryCodec<TKey, TValue> where TKey : notnull
@@ -401,7 +401,7 @@ public sealed class DurableCollectionDirectWriteTests
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer) => throw new NotSupportedException();
+        public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
 
     private static void WriteCommittedByte(JournalStreamWriter writer)

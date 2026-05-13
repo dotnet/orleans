@@ -18,7 +18,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, IJournaledState> _statesMap = [];
     private readonly JournaledStateManagerShared _shared;
-    private readonly JournalWriter _journalWriter;
+    private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
     private readonly CancellationTokenSource _shutdownCancellation = new();
@@ -71,7 +71,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     {
                         using var buffer = new ArcBufferWriter();
                         buffer.Write(entry.Payload.Span);
-                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: true)), in replayContext);
+                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true)), in replayContext);
                     }
 
                     var id = _journalStreamDirectory[name];
@@ -207,7 +207,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                     AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot, id, state);
                                 }
 
-                                committedBuffer = _journalWriter.GetCommittedBuffer();
+                                committedBuffer = _journalWriter.GetBuffer();
                                 if (committedBuffer.Length == 0)
                                 {
                                     committedBuffer.Dispose();
@@ -414,7 +414,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => _journalWriter.CreateJournalStreamWriter(streamId);
 
-    private static void AppendUpdatesOrSnapshotState(JournalWriter journalWriter, bool isSnapshot, ulong id, IJournaledState state)
+    private static void AppendUpdatesOrSnapshotState(JournalBufferWriter journalWriter, bool isSnapshot, ulong id, IJournaledState state)
     {
         var writer = journalWriter.CreateJournalStreamWriter(new(id));
         if (isSnapshot)
@@ -525,7 +525,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         return JournalFormatServices.GetRequiredJournalFormat(_shared.ServiceProvider, journalFormatKey);
     }
 
-    private void ProcessRecoveryBuffer(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
+    private void ProcessRecoveryBuffer(JournalBufferReader buffer, IJournalFileMetadata? metadata)
     {
         if (buffer.Length == 0)
         {
@@ -686,7 +686,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private sealed class RecoveryJournalStorageConsumer(JournaledStateManager manager) : IJournalStorageConsumer
     {
-        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata) => manager.ProcessRecoveryBuffer(buffer, metadata);
+        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) => manager.ProcessRecoveryBuffer(buffer, metadata);
     }
 
     private sealed class StateDirectory(

@@ -85,7 +85,7 @@ public sealed class JsonDurableDictionaryCommandCodec<TKey, TValue>(JsonSerializ
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
+    public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
     {
         var reader = new JsonCommandReader(input);
         Apply(ref reader, consumer);

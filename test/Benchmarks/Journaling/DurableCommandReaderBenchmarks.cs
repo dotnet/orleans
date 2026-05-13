@@ -70,7 +70,7 @@ public class DurableCommandReaderBenchmarks
         _consumer.ResetForReplay();
         _readBuffer.Reset();
         _readBuffer.Write(data.Buffer.AsReadOnlySequence());
-        var reader = new JournalReadBuffer(new ArcBufferReader(_readBuffer), isCompleted: true);
+        var reader = new JournalBufferReader(new ArcBufferReader(_readBuffer), isCompleted: true);
         var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
         _journalFormat.Replay(reader, _consumer, in context);
     }
@@ -140,12 +140,12 @@ public class DurableCommandReaderBenchmarks
 
     private sealed class EncodedJournalData : IDisposable
     {
-        private readonly JournalWriter _writer;
+        private readonly JournalBufferWriter _writer;
 
-        public EncodedJournalData(JournalWriter writer)
+        public EncodedJournalData(JournalBufferWriter writer)
         {
             _writer = writer;
-            Buffer = writer.GetCommittedBuffer();
+            Buffer = writer.GetBuffer();
         }
 
         public ArcBuffer Buffer;

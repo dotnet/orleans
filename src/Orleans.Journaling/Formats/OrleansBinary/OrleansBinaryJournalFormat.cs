@@ -21,9 +21,9 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
 
     internal SerializerSessionPool SessionPool => _sessionPool;
 
-    JournalWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalWriter();
+    JournalBufferWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-    void IJournalFormat.Replay(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) =>
+    void IJournalFormat.Replay(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context) =>
         OrleansBinaryJournalReader.Read(input, resolver, _sessionPool, in context);
 }
 
@@ -31,7 +31,7 @@ internal static class OrleansBinaryJournalReader
 {
     internal const byte FormatVersion = 0;
 
-    public static void Read(JournalReadBuffer input, IStateResolver resolver, SerializerSessionPool sessionPool, in JournaledStateReplayContext context)
+    public static void Read(JournalBufferReader input, IStateResolver resolver, SerializerSessionPool sessionPool, in JournaledStateReplayContext context)
     {
         ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(sessionPool);
@@ -126,7 +126,7 @@ internal static class OrleansBinaryJournalReader
             try
             {
                 state.ReplayEntry(
-                    new JournalEntry(OrleansBinaryJournalFormat.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true)),
+                    new JournalEntry(OrleansBinaryJournalFormat.JournalFormatKey, new JournalBufferReader(new ArcBufferReader(payloadBuffer), isCompleted: true)),
                     in context);
             }
             catch (Exception exception) when (exception is not InvalidOperationException ioe || !ioe.Message.StartsWith("Malformed binary journal entry stream", StringComparison.Ordinal))

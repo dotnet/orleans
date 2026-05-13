@@ -20,7 +20,7 @@ namespace Orleans.Journaling.Tests;
 /// </para>
 /// <para>
 /// Since this branch flips the default journal format from OrleansBinary to JSONL, the tests below
-/// explicitly construct <see cref="OrleansBinaryJournalFormat"/>/<see cref="OrleansBinaryJournalWriter"/>
+/// explicitly construct <see cref="OrleansBinaryJournalFormat"/>/<see cref="OrleansBinaryJournalBufferWriter"/>
 /// to opt into the binary path. Each scenario:
 /// 1. writes a single operation through a real codec into a binary batch,
 /// 2. round-trips the produced bytes through <see cref="OrleansBinaryJournalFormat"/> against a recording
@@ -499,8 +499,8 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     public Task EmptyBatch()
     {
         // No operations written → committed buffer is the empty byte sequence. Pinning the empty-batch
-        // shape catches accidental "always emit a header" regressions in OrleansBinaryJournalWriter.
-        using var batch = new OrleansBinaryJournalWriter();
+        // shape catches accidental "always emit a header" regressions in OrleansBinaryJournalBufferWriter.
+        using var batch = new OrleansBinaryJournalBufferWriter();
         var bytes = SnapshotBytes(batch);
         Assert.Empty(bytes);
         return VerifyBinarySnapshot(bytes);
@@ -520,7 +520,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         {
             var codec = new OrleansBinaryDurableDictionaryCommandCodec<string, JournalingSnapshotRecord>(
                 ValueCodec<string>(), ValueCodec<JournalingSnapshotRecord>(), SessionPool);
-            using var batch = new OrleansBinaryJournalWriter();
+            using var batch = new OrleansBinaryJournalBufferWriter();
             codec.WriteSet("alpha", SampleRecord, batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
             return SnapshotBytes(batch);
         }
@@ -630,7 +630,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         Action<JournalStreamWriter> write,
         Action assertCommands)
     {
-        using var batch = new OrleansBinaryJournalWriter();
+        using var batch = new OrleansBinaryJournalBufferWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
         var bytes = SnapshotBytes(batch);
         ReadAndAssert(bytes, state, assertCommands);
@@ -643,7 +643,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         Action<JournalStreamWriter> writeSequence,
         string[] expectedCommands)
     {
-        using var batch = new OrleansBinaryJournalWriter();
+        using var batch = new OrleansBinaryJournalBufferWriter();
         writeSequence(batch.CreateJournalStreamWriter(new JournalStreamId(SnapshotStreamId)));
         var bytes = SnapshotBytes(batch);
         ReadAndAssert(bytes, state, () => AssertCommandsEqual(expectedCommands, state));
@@ -664,7 +664,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
         Assert.Equal(expected, commands);
     }
 
-    private static byte[] SnapshotBytes(OrleansBinaryJournalWriter batch)
+    private static byte[] SnapshotBytes(OrleansBinaryJournalBufferWriter batch)
     {
         using var slice = batch.Peek();
         return slice.ToArray();
@@ -674,7 +674,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        var buffer = new JournalReadBuffer(new ArcBufferReader(writer), isCompleted: true);
+        var buffer = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
         var resolver = new SingleStreamResolver(new JournalStreamId(SnapshotStreamId), state);
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
         ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(buffer, resolver, in context);

@@ -69,7 +69,7 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);

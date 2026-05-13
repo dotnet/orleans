@@ -43,7 +43,7 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IPersistentStateCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IPersistentStateCommandHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);

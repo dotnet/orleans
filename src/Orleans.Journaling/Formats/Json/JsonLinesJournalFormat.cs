@@ -15,9 +15,9 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public string? MimeType => "application/jsonl";
 
-    public JournalWriter CreateWriter() => new JsonLinesJournalWriter();
+    public JournalBufferWriter CreateWriter() => new JsonLinesJournalBufferWriter();
 
-    public void Replay(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context)
+    public void Replay(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context)
     {
         ArgumentNullException.ThrowIfNull(resolver);
 
@@ -27,7 +27,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         }
     }
 
-    private static bool TryReadLine(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context, ref long offset)
+    private static bool TryReadLine(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context, ref long offset)
     {
         if (input.Length == 0)
         {
@@ -97,7 +97,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             var payloadContent = ReadEntryPayload(ref reader, offset);
             using var payloadBuffer = new ArcBufferWriter();
             WriteEntryPayload(line, payloadContent, payloadBuffer);
-            var entry = new JournalEntry(JsonJournalExtensions.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true));
+            var entry = new JournalEntry(JsonJournalExtensions.JournalFormatKey, new JournalBufferReader(new ArcBufferReader(payloadBuffer), isCompleted: true));
             _ = new JsonCommandReader(entry.Payload);
             state.ReplayEntry(entry, in context);
         }
@@ -215,13 +215,13 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         buffer.Write(line.Slice(payloadContent.Start, payloadContent.Length));
     }
 
-    private sealed class JsonLinesJournalWriter : JournalWriter
+    private sealed class JsonLinesJournalBufferWriter : JournalBufferWriter
     {
         private readonly ArcBufferWriter _buffer = new();
         private int _activeEntryStart;
         private int _activePayloadStart;
 
-        protected override ArcBuffer GetCommittedBufferCore() => _buffer.PeekSlice(_buffer.Length);
+        protected override ArcBuffer GetBufferCore() => _buffer.PeekSlice(_buffer.Length);
 
         protected override void ResetCore()
         {
@@ -273,7 +273,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
             {
                 throw new InvalidOperationException(
-                    $"The JSON journal writer cannot append preserved entry of type '{entry.GetType().FullName}'.");
+                    $"The JSON journal buffer writer cannot append preserved entry of type '{entry.GetType().FullName}'.");
             }
 
             WriteJournalEntry(streamId, entry.Payload, _buffer);

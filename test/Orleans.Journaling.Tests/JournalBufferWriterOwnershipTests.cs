@@ -6,7 +6,7 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 [TestCategory("BVT")]
-public sealed class JournalWriterBufferOwnershipTests
+public sealed class JournalBufferWriterOwnershipTests
 {
     private const string BinaryFormat = OrleansBinaryJournalFormat.JournalFormatKey;
     private const string JsonFormat = JsonJournalExtensions.JournalFormatKey;
@@ -14,11 +14,11 @@ public sealed class JournalWriterBufferOwnershipTests
     [Theory]
     [InlineData(BinaryFormat)]
     [InlineData(JsonFormat)]
-    public void GetCommittedBuffer_RemainsReadableAfterResetAndReuse(string format)
+    public void GetBuffer_RemainsReadableAfterResetAndReuse(string format)
     {
         using var writer = CreateWriter(format);
         AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
-        using var committed = writer.GetCommittedBuffer();
+        using var committed = writer.GetBuffer();
         var expected = committed.ToArray();
 
         writer.Reset();
@@ -31,11 +31,11 @@ public sealed class JournalWriterBufferOwnershipTests
     [Theory]
     [InlineData(BinaryFormat)]
     [InlineData(JsonFormat)]
-    public void GetCommittedBuffer_RemainsReadableAfterWriterDispose(string format)
+    public void GetBuffer_RemainsReadableAfterWriterDispose(string format)
     {
         var writer = CreateWriter(format);
         AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
-        var committed = writer.GetCommittedBuffer();
+        var committed = writer.GetBuffer();
         var expected = committed.ToArray();
 
         writer.Dispose();
@@ -46,9 +46,9 @@ public sealed class JournalWriterBufferOwnershipTests
         }
     }
 
-    private static JournalWriter CreateWriter(string format) => format switch
+    private static JournalBufferWriter CreateWriter(string format) => format switch
     {
-        BinaryFormat => new OrleansBinaryJournalWriter(),
+        BinaryFormat => new OrleansBinaryJournalBufferWriter(),
         JsonFormat => new JsonLinesJournalFormat().CreateWriter(),
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
     };
@@ -74,9 +74,9 @@ public sealed class JournalWriterBufferOwnershipTests
         entry.Commit();
     }
 
-    private static byte[] ToArray(JournalWriter writer)
+    private static byte[] ToArray(JournalBufferWriter writer)
     {
-        using var committed = writer.GetCommittedBuffer();
+        using var committed = writer.GetBuffer();
         return committed.ToArray();
     }
 }

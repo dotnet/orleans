@@ -28,7 +28,7 @@ internal sealed class PreservedJournalEntry : IPreservedJournalEntry
         _payload = payload.ToArray();
     }
 
-    public PreservedJournalEntry(string formatKey, JournalReadBuffer payload)
+    public PreservedJournalEntry(string formatKey, JournalBufferReader payload)
     {
         FormatKey = JournalFormatServices.ValidateJournalFormatKey(formatKey);
         _payload = payload.ToArray();

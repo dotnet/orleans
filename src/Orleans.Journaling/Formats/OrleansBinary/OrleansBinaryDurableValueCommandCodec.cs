@@ -28,7 +28,7 @@ internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
     }
 
     /// <inheritdoc/>
-    public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer)
+    public void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.Peek(input.Length);

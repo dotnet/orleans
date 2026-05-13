@@ -106,9 +106,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public JournalWriter CreateWriter() => new OrleansBinaryJournalWriter();
+        public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-        public void Replay(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) => throw new NotSupportedException();
+        public void Replay(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryCommandCodec<TKey, TValue>
@@ -122,13 +122,13 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IDurableDictionaryCommandHandler<TKey, TValue> consumer) => throw new NotSupportedException();
+        public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer) => throw new NotSupportedException();
     }
 
     private sealed class TestValueCodec<T> : IDurableValueCommandCodec<T>
     {
         public void WriteSet(T value, JournalStreamWriter writer) => throw new NotSupportedException();
 
-        public void Apply(JournalReadBuffer input, IDurableValueCommandHandler<T> consumer) => throw new NotSupportedException();
+        public void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer) => throw new NotSupportedException();
     }
 }
