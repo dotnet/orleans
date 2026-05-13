@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Threading;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
@@ -16,6 +17,7 @@ namespace Orleans.Journaling;
 /// </remarks>
 public abstract class JournalBufferWriter : IDisposable
 {
+    private readonly object _lock = new();
     private bool _hasActiveEntry;
 
     /// <summary>
@@ -46,8 +48,11 @@ public abstract class JournalBufferWriter : IDisposable
     /// <exception cref="InvalidOperationException">An entry is currently active and has not been committed or aborted.</exception>
     public ArcBuffer GetBuffer()
     {
-        ThrowIfEntryActive();
-        return GetBufferCore();
+        lock (_lock)
+        {
+            ThrowIfEntryActive();
+            return GetBufferCore();
+        }
     }
 
     /// <summary>
@@ -56,8 +61,11 @@ public abstract class JournalBufferWriter : IDisposable
     /// <remarks>This must not invalidate buffers previously returned by <see cref="GetBuffer"/>.</remarks>
     public void Reset()
     {
-        ThrowIfEntryActive();
-        ResetCore();
+        lock (_lock)
+        {
+            ThrowIfEntryActive();
+            ResetCore();
+        }
     }
 
     /// <summary>
@@ -113,54 +121,100 @@ public abstract class JournalBufferWriter : IDisposable
     /// <param name="streamId">The durable state id.</param>
     protected abstract void AbortEntry(JournalStreamId streamId);
 
+    internal event Action? ActiveEntryCompleted;
+
     internal JournalEntryScope BeginEntry(JournalStreamId streamId)
     {
-        if (_hasActiveEntry)
+        lock (_lock)
         {
-            throw new InvalidOperationException("The journal buffer writer already has an active entry.");
-        }
+            if (_hasActiveEntry)
+            {
+                throw new InvalidOperationException("The journal buffer writer already has an active entry.");
+            }
 
-        var payloadWriter = BeginEntryCore(streamId) ?? throw new InvalidOperationException(
-            $"The journal buffer writer '{GetType().FullName}' returned a null payload writer.");
-        _hasActiveEntry = true;
-        return new(this, streamId, payloadWriter);
+            var payloadWriter = BeginEntryCore(streamId) ?? throw new InvalidOperationException(
+                $"The journal buffer writer '{GetType().FullName}' returned a null payload writer.");
+            _hasActiveEntry = true;
+            return new(this, streamId, payloadWriter);
+        }
     }
 
     internal void AppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
     {
         ArgumentNullException.ThrowIfNull(entry);
-        if (_hasActiveEntry)
+        lock (_lock)
         {
-            throw new InvalidOperationException("The journal buffer writer already has an active entry.");
-        }
+            if (_hasActiveEntry)
+            {
+                throw new InvalidOperationException("The journal buffer writer already has an active entry.");
+            }
 
-        OnAppendPreservedEntry(streamId, entry);
+            OnAppendPreservedEntry(streamId, entry);
+        }
     }
 
     internal void CommitActiveEntry(JournalStreamId streamId)
     {
-        ThrowIfNoActiveEntry();
-        try
+        lock (_lock)
         {
-            CommitEntry(streamId);
+            ThrowIfNoActiveEntry();
+            try
+            {
+                CommitEntry(streamId);
+            }
+            finally
+            {
+                _hasActiveEntry = false;
+            }
         }
-        finally
-        {
-            _hasActiveEntry = false;
-        }
+
+        ActiveEntryCompleted?.Invoke();
     }
 
     internal void AbortActiveEntry(JournalStreamId streamId)
     {
-        ThrowIfNoActiveEntry();
-        try
+        lock (_lock)
         {
-            AbortEntry(streamId);
+            ThrowIfNoActiveEntry();
+            try
+            {
+                AbortEntry(streamId);
+            }
+            finally
+            {
+                _hasActiveEntry = false;
+            }
         }
-        finally
+
+        ActiveEntryCompleted?.Invoke();
+    }
+
+    internal bool TryEnterFlushScope(out FlushScope scope)
+    {
+        Monitor.Enter(_lock);
+        if (_hasActiveEntry)
         {
-            _hasActiveEntry = false;
+            Monitor.Exit(_lock);
+            scope = default;
+            return false;
         }
+
+        scope = new(this);
+        return true;
+    }
+
+    private void ExitFlushScope() => Monitor.Exit(_lock);
+
+    internal readonly struct FlushScope : IDisposable
+    {
+        private readonly JournalBufferWriter? _writer;
+
+        public FlushScope(JournalBufferWriter writer)
+        {
+            _writer = writer;
+        }
+
+        public void Dispose() => _writer?.ExitFlushScope();
     }
 
     private void ThrowIfEntryActive()
