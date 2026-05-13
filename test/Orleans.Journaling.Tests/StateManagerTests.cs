@@ -1185,10 +1185,10 @@ public class StateManagerTests : JournalingTestBase
             base.ResetCore();
         }
 
-        protected override void OnBeginEntry(JournalStreamId streamId)
+        protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId)
         {
             BeganEntryIds.Add(streamId.Value);
-            base.OnBeginEntry(streamId);
+            return base.BeginEntryCore(streamId);
         }
 
         protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry)

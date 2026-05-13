@@ -8,17 +8,13 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// Derived classes own the physical framing and committed buffer. This base class only
-/// connects <see cref="JournalStreamWriter"/> and active entry payload writes to the derived
-/// payload writer and entry lifecycle hooks. Buffers returned by <see cref="GetCommittedBuffer"/>
+/// connects <see cref="JournalStreamWriter"/> to entry lifecycle hooks. Buffers returned by <see cref="GetCommittedBuffer"/>
 /// are pinned, caller-owned snapshots which must remain valid for the caller's lifetime even if
 /// <see cref="Reset"/> or <see cref="Dispose"/> is called before the caller disposes the returned buffer.
 /// </remarks>
-public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
+public abstract class JournalWriter : IDisposable
 {
-    private JournalStreamId _activeStreamId;
-    private int _activeEntryStart;
-    private bool _entryIsActive;
-    private bool _entryCompleted;
+    private bool _hasActiveEntry;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="JournalWriter"/> class.
@@ -26,11 +22,6 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     protected JournalWriter()
     {
     }
-
-    /// <summary>
-    /// Gets the number of bytes currently buffered by this writer, including any active uncommitted entry payload.
-    /// </summary>
-    public long Length => checked(CommittedLength + (_entryIsActive ? ActivePayloadLength : 0));
 
     /// <summary>
     /// Creates a writer for entries belonging to <paramref name="streamId"/>.
@@ -71,26 +62,6 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     /// </summary>
     public abstract void Dispose();
 
-    /// <inheritdoc/>
-    void IBufferWriter<byte>.Advance(int count) => GetActiveEntryWriter().AdvancePayload(count);
-
-    /// <inheritdoc/>
-    Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint) => GetActiveEntryWriter().GetPayloadMemory(sizeHint);
-
-    /// <inheritdoc/>
-    Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint) => GetActiveEntryWriter().GetPayloadSpan(sizeHint);
-
-    /// <summary>
-    /// Gets the number of bytes committed to the batch, excluding any active entry payload.
-    /// </summary>
-    protected abstract long CommittedLength { get; }
-
-    /// <summary>
-    /// Gets the number of payload bytes written to the active entry.
-    /// </summary>
-    /// <remarks>Only consulted while an entry is active.</remarks>
-    protected abstract long ActivePayloadLength { get; }
-
     /// <summary>
     /// Returns a pinned buffer containing the committed bytes of the batch.
     /// </summary>
@@ -110,39 +81,11 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     protected abstract void ResetCore();
 
     /// <summary>
-    /// Called before an entry scope becomes active.
+    /// Begins a format-owned entry and returns the entry payload writer.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
-    protected virtual void OnBeginEntry(JournalStreamId streamId)
-    {
-    }
-
-    /// <summary>
-    /// Gets the format-owned entry start marker used to validate completion.
-    /// </summary>
-    /// <param name="streamId">The durable state id.</param>
-    /// <returns>The entry start marker.</returns>
-    protected abstract int GetEntryStart(JournalStreamId streamId);
-
-    /// <summary>
-    /// Advances the payload writer.
-    /// </summary>
-    /// <param name="count">The number of bytes written.</param>
-    protected abstract void AdvancePayload(int count);
-
-    /// <summary>
-    /// Gets writable memory for the payload.
-    /// </summary>
-    /// <param name="sizeHint">The requested minimum size.</param>
-    /// <returns>Writable memory.</returns>
-    protected abstract Memory<byte> GetPayloadMemory(int sizeHint);
-
-    /// <summary>
-    /// Gets a writable span for the payload.
-    /// </summary>
-    /// <param name="sizeHint">The requested minimum size.</param>
-    /// <returns>A writable span.</returns>
-    protected abstract Span<byte> GetPayloadSpan(int sizeHint);
+    /// <returns>The entry payload writer.</returns>
+    protected abstract IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId);
 
     /// <summary>
     /// Appends a format-owned entry for retired or unknown state preservation.
@@ -159,40 +102,31 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
     /// Commits the active entry.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
-    /// <param name="entryStart">The entry start marker returned by <see cref="GetEntryStart"/>.</param>
-    protected abstract void CommitEntry(JournalStreamId streamId, int entryStart);
+    protected abstract void CommitEntry(JournalStreamId streamId);
 
     /// <summary>
     /// Aborts the active entry.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
-    /// <param name="entryStart">The entry start marker returned by <see cref="GetEntryStart"/>.</param>
-    protected abstract void AbortEntry(JournalStreamId streamId, int entryStart);
+    protected abstract void AbortEntry(JournalStreamId streamId);
 
     internal JournalEntryScope BeginEntry(JournalStreamId streamId)
     {
-        if (_entryIsActive)
+        if (_hasActiveEntry)
         {
             throw new InvalidOperationException("The journal writer already has an active entry.");
         }
 
-        OnBeginEntry(streamId);
-        var entryStart = GetEntryStart(streamId);
-        _activeStreamId = streamId;
-        _activeEntryStart = entryStart;
-        _entryIsActive = true;
-        _entryCompleted = false;
-        return new(this, entryStart);
+        var payloadWriter = BeginEntryCore(streamId) ?? throw new InvalidOperationException(
+            $"The journal writer '{GetType().FullName}' returned a null payload writer.");
+        _hasActiveEntry = true;
+        return new(this, streamId, payloadWriter);
     }
-
-    internal void CommitEntryWrite(int entryStart) => CommitActiveEntry(entryStart);
-
-    internal void AbortEntryWrite(int entryStart) => AbortActiveEntry(entryStart);
 
     internal void AppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation operation)
     {
         ArgumentNullException.ThrowIfNull(operation);
-        if (_entryIsActive)
+        if (_hasActiveEntry)
         {
             throw new InvalidOperationException("The journal writer already has an active entry.");
         }
@@ -200,62 +134,45 @@ public abstract class JournalWriter : IDisposable, IBufferWriter<byte>
         OnAppendPreservedOperation(streamId, operation);
     }
 
-    private void CommitActiveEntry(int entryStart)
+    internal void CommitActiveEntry(JournalStreamId streamId)
     {
-        ValidateEntryStart(entryStart);
-        CommitEntry(_activeStreamId, entryStart);
-        ClearActiveEntry();
-    }
-
-    private void AbortActiveEntry(int entryStart)
-    {
-        ValidateEntryStart(entryStart);
+        ThrowIfNoActiveEntry();
         try
         {
-            AbortEntry(_activeStreamId, entryStart);
+            CommitEntry(streamId);
         }
         finally
         {
-            ClearActiveEntry();
+            _hasActiveEntry = false;
         }
     }
 
-    private void ValidateEntryStart(int entryStart)
+    internal void AbortActiveEntry(JournalStreamId streamId)
     {
-        if (entryStart != _activeEntryStart)
+        ThrowIfNoActiveEntry();
+        try
         {
-            throw new InvalidOperationException("The journal entry start does not match the active entry.");
+            AbortEntry(streamId);
         }
-    }
-
-    private void ClearActiveEntry()
-    {
-        _activeEntryStart = 0;
-        _activeStreamId = default;
-        _entryIsActive = false;
-        _entryCompleted = true;
+        finally
+        {
+            _hasActiveEntry = false;
+        }
     }
 
     private void ThrowIfEntryActive()
     {
-        if (_entryIsActive)
+        if (_hasActiveEntry)
         {
             throw new InvalidOperationException("The journal writer has an active entry.");
         }
     }
 
-    private JournalWriter GetActiveEntryWriter()
+    private void ThrowIfNoActiveEntry()
     {
-        if (!_entryIsActive)
+        if (!_hasActiveEntry)
         {
-            if (_entryCompleted)
-            {
-                throw new InvalidOperationException("The journal entry has already completed.");
-            }
-
             throw new InvalidOperationException("The journal writer is not writing an entry.");
         }
-
-        return this;
     }
 }

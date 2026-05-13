@@ -816,30 +816,20 @@ public class JsonCodecTests
 
         public List<RecordedJournalEntry> Entries { get; } = [];
 
-        protected override long CommittedLength => 0;
-
-        protected override long ActivePayloadLength => _payload.Length;
-
         protected override ArcBuffer GetCommittedBufferCore() => _payload.PeekSlice(0);
 
         protected override void ResetCore() => _payload.Reset();
 
-        protected override int GetEntryStart(JournalStreamId streamId) => Entries.Count;
+        protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId) => _payload;
 
-        protected override void AdvancePayload(int count) => _payload.AdvanceWriter(count);
-
-        protected override Memory<byte> GetPayloadMemory(int sizeHint) => _payload.GetMemory(sizeHint);
-
-        protected override Span<byte> GetPayloadSpan(int sizeHint) => _payload.GetSpan(sizeHint);
-
-        protected override void CommitEntry(JournalStreamId streamId, int entryStart)
+        protected override void CommitEntry(JournalStreamId streamId)
         {
             using var payload = _payload.PeekSlice(_payload.Length);
             Entries.Add(new(streamId, payload.ToArray()));
             _payload.Reset();
         }
 
-        protected override void AbortEntry(JournalStreamId streamId, int entryStart) => _payload.Reset();
+        protected override void AbortEntry(JournalStreamId streamId) => _payload.Reset();
 
         public override void Dispose() => _payload.Dispose();
 

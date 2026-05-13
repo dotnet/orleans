@@ -12,20 +12,22 @@ namespace Orleans.Journaling;
 public ref struct JournalEntryScope : IDisposable
 {
     private JournalWriter? _writer;
-    private int _entryStart;
+    private JournalStreamId _streamId;
+    private IBufferWriter<byte>? _payloadWriter;
     private bool _completed;
 
-    internal JournalEntryScope(JournalWriter writer, int entryStart)
+    internal JournalEntryScope(JournalWriter writer, JournalStreamId streamId, IBufferWriter<byte> payloadWriter)
     {
         _writer = writer;
-        _entryStart = entryStart;
+        _streamId = streamId;
+        _payloadWriter = payloadWriter;
         _completed = false;
     }
 
     /// <summary>
     /// Gets the payload writer for this entry.
     /// </summary>
-    public readonly IBufferWriter<byte> PayloadWriter => _writer ?? throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
+    public readonly IBufferWriter<byte> PayloadWriter => _payloadWriter ?? throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
 
     /// <summary>
     /// Commits the pending entry, making it visible to storage.
@@ -39,11 +41,11 @@ public ref struct JournalEntryScope : IDisposable
         }
 
         var writer = GetWriter();
-        var entryStart = _entryStart;
-        writer.CommitEntryWrite(entryStart);
+        writer.CommitActiveEntry(_streamId);
         _completed = true;
         _writer = null;
-        _entryStart = 0;
+        _streamId = default;
+        _payloadWriter = null;
     }
 
     /// <summary>
@@ -57,11 +59,12 @@ public ref struct JournalEntryScope : IDisposable
         }
 
         var writer = GetWriter();
-        var entryStart = _entryStart;
+        var streamId = _streamId;
         _completed = true;
         _writer = null;
-        _entryStart = 0;
-        writer.AbortEntryWrite(entryStart);
+        _streamId = default;
+        _payloadWriter = null;
+        writer.AbortActiveEntry(streamId);
     }
 
     private readonly JournalWriter GetWriter()

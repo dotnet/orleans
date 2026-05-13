@@ -294,28 +294,18 @@ namespace Orleans.Journaling
         void ApplySet(T value);
     }
 
-    public abstract partial class JournalWriter : System.Buffers.IBufferWriter<byte>, System.IDisposable
+    public abstract partial class JournalWriter : System.IDisposable
     {
-        protected abstract long ActivePayloadLength { get; }
-        protected abstract long CommittedLength { get; }
-
-        public long Length { get { throw null; } }
-
-        protected abstract void AbortEntry(JournalStreamId streamId, int entryStart);
-        protected abstract void AdvancePayload(int count);
-        protected abstract void CommitEntry(JournalStreamId streamId, int entryStart);
+        protected abstract void AbortEntry(JournalStreamId streamId);
+        protected abstract System.Buffers.IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId);
+        protected abstract void CommitEntry(JournalStreamId streamId);
         public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) { throw null; }
 
         public abstract void Dispose();
         public Serialization.Buffers.ArcBuffer GetCommittedBuffer() { throw null; }
 
         protected abstract Serialization.Buffers.ArcBuffer GetCommittedBufferCore();
-        protected abstract int GetEntryStart(JournalStreamId streamId);
-        protected abstract System.Memory<byte> GetPayloadMemory(int sizeHint);
-        protected abstract System.Span<byte> GetPayloadSpan(int sizeHint);
         protected virtual void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry) { }
-
-        protected virtual void OnBeginEntry(JournalStreamId streamId) { }
 
         public void Reset() { }
 

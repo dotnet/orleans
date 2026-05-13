@@ -221,11 +221,6 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         private readonly ArcBufferWriter _buffer = new();
         private int _activeEntryStart;
         private int _activePayloadStart;
-        private bool _hasActiveEntry;
-
-        protected override long CommittedLength => _hasActiveEntry ? _activeEntryStart : _buffer.Length;
-
-        protected override long ActivePayloadLength => _hasActiveEntry ? _buffer.Length - _activeEntryStart : 0;
 
         protected override ArcBuffer GetCommittedBufferCore() => _buffer.PeekSlice(_buffer.Length);
 
@@ -233,29 +228,20 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         {
             _activeEntryStart = 0;
             _activePayloadStart = 0;
-            _hasActiveEntry = false;
             _buffer.Reset();
         }
 
         public override void Dispose() => _buffer.Dispose();
 
-        protected override void OnBeginEntry(JournalStreamId streamId)
+        protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId)
         {
             _activeEntryStart = _buffer.Length;
             WriteJournalEntryPrefix(streamId, _buffer);
             _activePayloadStart = _buffer.Length;
-            _hasActiveEntry = true;
+            return _buffer;
         }
 
-        protected override int GetEntryStart(JournalStreamId streamId) => _activeEntryStart;
-
-        protected override void AdvancePayload(int count) => _buffer.AdvanceWriter(count);
-
-        protected override Memory<byte> GetPayloadMemory(int sizeHint) => _buffer.GetMemory(sizeHint);
-
-        protected override Span<byte> GetPayloadSpan(int sizeHint) => _buffer.GetSpan(sizeHint);
-
-        protected override void CommitEntry(JournalStreamId streamId, int entryStart)
+        protected override void CommitEntry(JournalStreamId streamId)
         {
             if (_buffer.Length == _activePayloadStart)
             {
@@ -268,21 +254,19 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 _buffer.Write("\n"u8);
                 _activeEntryStart = 0;
                 _activePayloadStart = 0;
-                _hasActiveEntry = false;
             }
             catch
             {
-                _buffer.Truncate(entryStart);
+                _buffer.Truncate(_activeEntryStart);
                 throw;
             }
         }
 
-        protected override void AbortEntry(JournalStreamId streamId, int entryStart)
+        protected override void AbortEntry(JournalStreamId streamId)
         {
-            _buffer.Truncate(entryStart);
+            _buffer.Truncate(_activeEntryStart);
             _activeEntryStart = 0;
             _activePayloadStart = 0;
-            _hasActiveEntry = false;
         }
 
         protected override void OnAppendPreservedOperation(JournalStreamId streamId, IPreservedJournalOperation entry)

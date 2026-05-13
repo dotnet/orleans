@@ -7,54 +7,46 @@ internal class OrleansBinaryJournalWriter : JournalWriter
 {
     private readonly ArcBufferWriter _buffer = new();
     private readonly ArcBufferWriter _entryBuffer = new();
+    private int _activeEntryStart;
 
-    public new int Length => checked((int)base.Length);
-
-    protected override long CommittedLength => _buffer.Length;
-
-    protected override long ActivePayloadLength => _entryBuffer.Length;
-
-    public bool IsEmpty => Length == 0;
+    public int Length => checked(_buffer.Length + _entryBuffer.Length);
 
     protected override ArcBuffer GetCommittedBufferCore() => _buffer.PeekSlice(_buffer.Length);
 
     protected override void ResetCore()
     {
+        _activeEntryStart = 0;
         _buffer.Reset();
         _entryBuffer.Reset();
     }
 
-    protected override void OnBeginEntry(JournalStreamId streamId)
+    protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId)
     {
+        _activeEntryStart = _buffer.Length;
         _entryBuffer.Reset();
         var streamIdWriter = Writer.Create(_entryBuffer, session: null!);
         streamIdWriter.WriteVarUInt64(streamId.Value);
         streamIdWriter.Commit();
+        return _entryBuffer;
     }
 
-    protected override int GetEntryStart(JournalStreamId streamId) => _buffer.Length;
-
-    protected override void AdvancePayload(int count) => _entryBuffer.AdvanceWriter(count);
-
-    protected override Memory<byte> GetPayloadMemory(int sizeHint) => _entryBuffer.GetMemory(sizeHint);
-
-    protected override Span<byte> GetPayloadSpan(int sizeHint) => _entryBuffer.GetSpan(sizeHint);
-
-    protected override void CommitEntry(JournalStreamId streamId, int entryStart)
+    protected override void CommitEntry(JournalStreamId streamId)
     {
-        ValidateEntryStart(entryStart);
+        ValidateEntryStart();
         var length = checked((uint)_entryBuffer.Length);
         var lengthWriter = Writer.Create(_buffer, session: null!);
         lengthWriter.WriteVarUInt32(length);
         lengthWriter.Commit();
         using var body = _entryBuffer.PeekSlice(_entryBuffer.Length);
         _buffer.Write(body.AsReadOnlySequence());
+        _activeEntryStart = 0;
         _entryBuffer.Reset();
     }
 
-    protected override void AbortEntry(JournalStreamId streamId, int entryStart)
+    protected override void AbortEntry(JournalStreamId streamId)
     {
-        ValidateEntryStart(entryStart);
+        ValidateEntryStart();
+        _activeEntryStart = 0;
         _entryBuffer.Reset();
     }
 
@@ -84,9 +76,9 @@ internal class OrleansBinaryJournalWriter : JournalWriter
         journalEntry.Commit();
     }
 
-    private void ValidateEntryStart(int entryStart)
+    private void ValidateEntryStart()
     {
-        if (entryStart != _buffer.Length)
+        if (_activeEntryStart != _buffer.Length)
         {
             throw new InvalidOperationException("The journal entry start does not match the active entry.");
         }
