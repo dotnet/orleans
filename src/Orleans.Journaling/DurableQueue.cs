@@ -23,7 +23,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
 {
     private readonly IQueueOperationCodec<T> _codec;
     private readonly Queue<T> _items = new();
-    private JournalStreamWriter _storage;
+    private JournalStreamWriter _writer;
 
     public DurableQueue(
         [ServiceKey] string key,
@@ -51,7 +51,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
-        _storage = writer;
+        _writer = writer;
     }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
@@ -66,7 +66,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
 
     public void Clear()
     {
-        _codec.WriteClear(GetStorage());
+        _codec.WriteClear(GetWriter());
         ApplyClear();
     }
 
@@ -77,14 +77,14 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
     public IEnumerator<T> GetEnumerator() => _items.GetEnumerator();
     public void Enqueue(T item)
     {
-        _codec.WriteEnqueue(item, GetStorage());
+        _codec.WriteEnqueue(item, GetWriter());
         ApplyEnqueue(item);
     }
 
     public T Dequeue()
     {
         var result = _items.Peek();
-        _codec.WriteDequeue(GetStorage());
+        _codec.WriteDequeue(GetWriter());
         _ = ApplyDequeue();
         return result;
     }
@@ -96,7 +96,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
             return false;
         }
 
-        _codec.WriteDequeue(GetStorage());
+        _codec.WriteDequeue(GetWriter());
         _ = ApplyTryDequeue(out _);
         return true;
     }
@@ -116,10 +116,10 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IQueu
         _items.EnsureCapacity(capacityHint);
     }
 
-    private JournalStreamWriter GetStorage()
+    private JournalStreamWriter GetWriter()
     {
-        Debug.Assert(_storage.IsInitialized);
-        return _storage;
+        Debug.Assert(_writer.IsInitialized);
+        return _writer;
     }
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();

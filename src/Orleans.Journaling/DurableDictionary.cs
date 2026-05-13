@@ -15,7 +15,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 {
     private readonly IDictionaryOperationCodec<K, V> _codec;
     private readonly Dictionary<K, V> _items = [];
-    private JournalStreamWriter _storage;
+    private JournalStreamWriter _writer;
 
     protected DurableDictionary(IDictionaryOperationCodec<K, V> codec)
     {
@@ -65,7 +65,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
-        _storage = writer;
+        _writer = writer;
     }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
@@ -80,7 +80,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     public void Clear()
     {
-        _codec.WriteClear(GetStorage());
+        _codec.WriteClear(GetWriter());
         ApplyClear();
     }
 
@@ -100,14 +100,14 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     private void WriteRemove(K key)
     {
-        _codec.WriteRemove(key, GetStorage());
+        _codec.WriteRemove(key, GetWriter());
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
 
     private void WriteSet(K key, V value)
     {
-        _codec.WriteSet(key, value, GetStorage());
+        _codec.WriteSet(key, value, GetWriter());
     }
 
     protected virtual void OnSet(K key, V value) { }
@@ -129,10 +129,10 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         _items.EnsureCapacity(capacityHint);
     }
 
-    protected virtual JournalStreamWriter GetStorage()
+    protected virtual JournalStreamWriter GetWriter()
     {
-        Debug.Assert(_storage.IsInitialized);
-        return _storage;
+        Debug.Assert(_writer.IsInitialized);
+        return _writer;
     }
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();

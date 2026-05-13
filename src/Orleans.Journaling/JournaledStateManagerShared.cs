@@ -9,8 +9,9 @@ internal sealed class JournaledStateManagerShared
         ILogger<JournaledStateManager> logger,
         IOptions<JournaledStateManagerOptions> options,
         TimeProvider timeProvider,
+        IJournalStorage storage,
         IServiceProvider serviceProvider)
-        : this(logger, CreateOptions(options), timeProvider, serviceProvider)
+        : this(logger, CreateOptions(options), timeProvider, storage, serviceProvider)
     {
     }
 
@@ -18,16 +19,20 @@ internal sealed class JournaledStateManagerShared
         ILogger<JournaledStateManager> logger,
         JournaledStateManagerOptions options,
         TimeProvider timeProvider,
+        IJournalStorage storage,
         IServiceProvider serviceProvider)
     {
         ArgumentNullException.ThrowIfNull(logger);
         ArgumentNullException.ThrowIfNull(options);
         ArgumentNullException.ThrowIfNull(timeProvider);
+        ArgumentNullException.ThrowIfNull(storage);
         ArgumentNullException.ThrowIfNull(serviceProvider);
 
         Logger = logger;
         Options = options;
         TimeProvider = timeProvider;
+        Storage = storage;
+        ServiceProvider = serviceProvider;
         JournalFormat = JournalFormatServices.GetRequiredJournalFormat(serviceProvider, options.JournalFormatKey);
     }
 
@@ -36,6 +41,10 @@ internal sealed class JournaledStateManagerShared
     public JournaledStateManagerOptions Options { get; }
 
     public TimeProvider TimeProvider { get; }
+
+    public IJournalStorage Storage { get; }
+
+    public IServiceProvider ServiceProvider { get; }
 
     public IJournalFormat JournalFormat { get; }
 

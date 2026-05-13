@@ -1,6 +1,5 @@
 using System.Collections;
 using System.Diagnostics;
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Orleans.Journaling;
@@ -24,7 +23,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOpera
 {
     private readonly ISetOperationCodec<T> _codec;
     private readonly HashSet<T> _items = [];
-    private JournalStreamWriter _storage;
+    private JournalStreamWriter _writer;
 
     public DurableSet(
         [ServiceKey] string key,
@@ -53,7 +52,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOpera
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
-        _storage = writer;
+        _writer = writer;
     }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
@@ -68,7 +67,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOpera
 
     public void Clear()
     {
-        _codec.WriteClear(GetStorage());
+        _codec.WriteClear(GetWriter());
         ApplyClear();
     }
 
@@ -82,7 +81,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOpera
             return false;
         }
 
-        _codec.WriteAdd(item, GetStorage());
+        _codec.WriteAdd(item, GetWriter());
         _ = ApplyAdd(item);
         return true;
     }
@@ -94,14 +93,14 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOpera
             return false;
         }
 
-        _codec.WriteRemove(item, GetStorage());
+        _codec.WriteRemove(item, GetWriter());
         _ = ApplyRemove(item);
         return true;
     }
 
     private void WriteSnapshot(IReadOnlyCollection<T> items)
     {
-        _codec.WriteSnapshot(items, GetStorage());
+        _codec.WriteSnapshot(items, GetWriter());
     }
 
     IEnumerator IEnumerable.GetEnumerator() => _items.GetEnumerator();
@@ -118,10 +117,10 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, ISetOpera
         _items.EnsureCapacity(capacityHint);
     }
 
-    private JournalStreamWriter GetStorage()
+    private JournalStreamWriter GetWriter()
     {
-        Debug.Assert(_storage.IsInitialized);
-        return _storage;
+        Debug.Assert(_writer.IsInitialized);
+        return _writer;
     }
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();

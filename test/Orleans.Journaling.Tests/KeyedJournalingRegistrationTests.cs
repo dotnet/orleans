@@ -52,12 +52,10 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
                 logger,
                 Options.Create(options),
                 TimeProvider.System,
+                storage,
                 serviceProvider);
 
-            _ = new JournaledStateManager(
-                storage,
-                shared,
-                serviceProvider);
+            _ = new JournaledStateManager(shared);
         });
 
         Assert.Contains(CustomFormatKey, exception.Message);

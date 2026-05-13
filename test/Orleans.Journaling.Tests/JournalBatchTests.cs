@@ -54,11 +54,12 @@ public abstract class JournalBatchTests : IAsyncLifetime
         JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey
     });
 
-    private JournaledStateManagerShared CreateShared()
+    private JournaledStateManagerShared CreateShared(IJournalStorage storage)
         => new(
             _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             ManagerOptions,
             TimeProvider.System,
+            storage,
             _serviceProvider);
 
     public virtual async Task InitializeAsync()
@@ -112,7 +113,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var grainContext = new TestGrainContext(grainId); // Use provided GrainId
         var storage = _storageProvider.Create(grainContext);
-        var manager = new JournaledStateManager(storage, CreateShared(), _serviceProvider);
+        var manager = new JournaledStateManager(CreateShared(storage));
         var list = new DurableList<T>(listName, manager, new OrleansBinaryListOperationCodec<T>(new OrleansJournalValueCodec<T>(codecProvider.GetCodec<T>(), sessionPool), sessionPool));
         return (manager, list, storage);
     }
@@ -170,7 +171,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
 
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new JournaledStateManager(storage, CreateShared(), _serviceProvider);
+        var manager2 = new JournaledStateManager(CreateShared(storage));
         var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
@@ -369,7 +370,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         // Test recovery (potentially from snapshot)
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new JournaledStateManager(storage, CreateShared(), _serviceProvider); // Reuses the storage object linked via grainId
+        var manager2 = new JournaledStateManager(CreateShared(storage)); // Reuses the storage object linked via grainId
         var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListOperationCodec<int>(new OrleansJournalValueCodec<int>(codecProvider.GetCodec<int>(), sessionPool), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 

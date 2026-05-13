@@ -18,7 +18,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
 {
     private readonly IListOperationCodec<T> _codec;
     private readonly List<T> _items = [];
-    private JournalStreamWriter _storage;
+    private JournalStreamWriter _writer;
 
     public DurableList(
         [ServiceKey] string key,
@@ -49,7 +49,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
                 ThrowIndexOutOfRange();
             }
 
-            _codec.WriteSet(index, value, GetStorage());
+            _codec.WriteSet(index, value, GetWriter());
             ApplySet(index, value);
         }
     }
@@ -64,7 +64,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
         _items.Clear();
-        _storage = writer;
+        _writer = writer;
     }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer)
@@ -79,13 +79,13 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
 
     public void Add(T item)
     {
-        _codec.WriteAdd(item, GetStorage());
+        _codec.WriteAdd(item, GetWriter());
         ApplyAdd(item);
     }
 
     public void Clear()
     {
-        _codec.WriteClear(GetStorage());
+        _codec.WriteClear(GetWriter());
         ApplyClear();
     }
 
@@ -100,7 +100,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
             ThrowIndexOutOfRange();
         }
 
-        _codec.WriteInsert(index, item, GetStorage());
+        _codec.WriteInsert(index, item, GetWriter());
         ApplyInsert(index, item);
     }
 
@@ -123,7 +123,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
             ThrowIndexOutOfRange();
         }
 
-        _codec.WriteRemoveAt(index, GetStorage());
+        _codec.WriteRemoveAt(index, GetWriter());
         ApplyRemoveAt(index);
     }
 
@@ -148,10 +148,10 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IListOp
     [DoesNotReturn]
     private static void ThrowIndexOutOfRange() => throw new ArgumentOutOfRangeException("index", "Index was out of range. Must be non-negative and less than the size of the collection");
 
-    private JournalStreamWriter GetStorage()
+    private JournalStreamWriter GetWriter()
     {
-        Debug.Assert(_storage.IsInitialized);
-        return _storage;
+        Debug.Assert(_writer.IsInitialized);
+        return _writer;
     }
 
     public IJournaledState DeepCopy() => throw new NotImplementedException();

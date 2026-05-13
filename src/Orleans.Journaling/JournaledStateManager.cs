@@ -1,8 +1,6 @@
 using System.Buffers;
 using System.Diagnostics;
 using System.Diagnostics.CodeAnalysis;
-using System.Threading;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
@@ -19,8 +17,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 #endif
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<ulong, IJournaledState> _statesMap = [];
-    private readonly IJournalStorage _storage;
-    private readonly IServiceProvider _serviceProvider;
     private readonly JournaledStateManagerShared _shared;
     private readonly JournalWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -30,20 +26,14 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private readonly RetiredStateTracker _retirementTracker;
     private Task? _workLoop;
     private ManagerState _state;
-    private Task? _pendingWrite;
     private bool _migrationSnapshotRequired;
 
-    public JournaledStateManager(
-        IJournalStorage storage,
-        JournaledStateManagerShared shared,
-        IServiceProvider serviceProvider)
+    public JournaledStateManager(JournaledStateManagerShared shared)
     {
         ArgumentNullException.ThrowIfNull(shared);
-        ArgumentNullException.ThrowIfNull(serviceProvider);
-        _storage = storage;
         _shared = shared;
-        _serviceProvider = serviceProvider;
         _journalWriter = _shared.JournalFormat.CreateWriter();
+        var serviceProvider = _shared.ServiceProvider;
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
@@ -76,7 +66,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this state's place.
                     state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
-                    var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _serviceProvider);
+                    var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _shared.ServiceProvider);
                     foreach (var entry in vessel.PreservedOperations)
                     {
                         using var buffer = new ArcBufferWriter();
@@ -99,10 +89,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                 _states.Add(name, state);
             }
 
-            _workQueue.Enqueue(new WorkItem(WorkItemType.RegisterState, completion: null)
-            {
-                Context = name
-            });
+            _workQueue.Enqueue(new RegisterStateWorkItem(name));
         }
 
         _workSignal.Signal();
@@ -112,18 +99,23 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         cancellationToken.ThrowIfCancellationRequested();
         _shutdownCancellation.Token.ThrowIfCancellationRequested();
-        Debug.Assert(_workLoop is null, "InitializeAsync should only be called once.");
-        _workLoop = Start();
-
         Task task;
+        bool didEnqueue;
         lock (_lock)
         {
-            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            task = completion.Task;
-            _workQueue.Enqueue(new WorkItem(WorkItemType.Initialize, completion));
+            if (_workLoop is null)
+            {
+                _workLoop = Start();
+            }
+
+            task = EnqueueOrGetPendingWorkItem<InitializeWorkItem>(out didEnqueue);
         }
 
-        _workSignal.Signal();
+        if (didEnqueue)
+        {
+            _workSignal.Signal();
+        }
+
         await task;
     }
 
@@ -135,44 +127,49 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private async Task WorkLoop()
     {
-        var cancellationToken = _shutdownCancellation.Token;
-        using var cancellationRegistration = cancellationToken.Register(state => ((JournaledStateManager)state!)._workSignal.Signal(), this);
         await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
         var needsRecovery = true;
-        while (true)
+        while (!_shutdownCancellation.Token.IsCancellationRequested)
         {
             try
             {
                 await _workSignal.WaitAsync().ConfigureAwait(true);
-                cancellationToken.ThrowIfCancellationRequested();
+                _shutdownCancellation.Token.ThrowIfCancellationRequested();
 
                 while (true)
                 {
                     if (needsRecovery)
                     {
-                        await RecoverAsync(cancellationToken).ConfigureAwait(true);
+                        await RecoverAsync(_shutdownCancellation.Token).ConfigureAwait(true);
                         needsRecovery = false;
                     }
 
                     WorkItem workItem;
                     lock (_lock)
                     {
-                        if (!_workQueue.TryDequeue(out workItem))
+                        if (!_workQueue.TryDequeue(out var dequeuedWorkItem))
                         {
                             // Wait for the queue to be signaled again.
                             break;
                         }
+
+                        workItem = dequeuedWorkItem;
                     }
 
                     try
                     {
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
-                        if (workItem.Type is WorkItemType.AppendJournal or WorkItemType.WriteSnapshot)
+                        switch (workItem)
+                        {
+                        case AppendJournalWorkItem:
+                        case WriteSnapshotWorkItem:
                         {
                             // TODO: decide whether it's best to snapshot or append. Eg, by summing the size of the most recent snapshots and the current journal length.
                             //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
-                            var isSnapshot = workItem.Type is WorkItemType.WriteSnapshot;
+                            var isSnapshot = workItem is WriteSnapshotWorkItem
+                                || _migrationSnapshotRequired
+                                || _shared.Storage.IsCompactionRequested;
                             ArcBuffer committedBuffer = default;
                             var hasCommittedBuffer = false;
 
@@ -231,7 +228,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                 // Defensive: copy the sequence into a pooled buffer so we can poison it
                                 // after the storage call returns. Any IJournalStorage implementation that
                                 // retains the sequence past task completion (a violation of the documented
-                                // contract on AppendAsync/ReplaceAsync) will read 0xCC bytes when it next
+                                // contract on AppendAsync/ReplaceAsync) will read 0x67 bytes when it next
                                 // touches the buffer, surfacing the bug loudly in tests instead of letting
                                 // recycled pool data hide it.
                                 var debugPoisonLength = checked((int)writeSequence.Length);
@@ -244,18 +241,18 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                 {
                                     if (isSnapshot)
                                     {
-                                        await _storage.ReplaceAsync(writeSequence, cancellationToken).ConfigureAwait(true);
+                                        await _shared.Storage.ReplaceAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                     }
                                     else
                                     {
-                                        await _storage.AppendAsync(writeSequence, cancellationToken).ConfigureAwait(true);
+                                        await _shared.Storage.AppendAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                     }
                                 }
                                 finally
                                 {
                                     committedBuffer.Dispose();
 #if DEBUG
-                                    debugPoisonBuffer.AsSpan(0, debugPoisonLength).Fill(0xCC);
+                                    debugPoisonBuffer.AsSpan(0, debugPoisonLength).Fill(0x67);
                                     ArrayPool<byte>.Shared.Return(debugPoisonBuffer);
 #endif
                                 }
@@ -274,11 +271,13 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                     }
                                 }
                             }
+                            break;
                         }
-                        else if (workItem.Type is WorkItemType.DeleteState)
+
+                        case DeleteStateWorkItem:
                         {
                             // Clear storage.
-                            await _storage.DeleteAsync(cancellationToken).ConfigureAwait(true);
+                            await _shared.Storage.DeleteAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
                             lock (_lock)
                             {
@@ -293,15 +292,19 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                     _journalStreamDirectory.Set(name, id);
                                 }
                             }
+                            break;
                         }
-                        else if (workItem.Type is WorkItemType.Initialize)
+
+                        case InitializeWorkItem:
                         {
                             lock (_lock)
                             {
                                 _state = ManagerState.Ready;
                             }
+                            break;
                         }
-                        else if (workItem.Type is WorkItemType.RegisterState)
+
+                        case RegisterStateWorkItem registerState:
                         {
                             lock (_lock)
                             {
@@ -310,24 +313,28 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                                     throw new NotSupportedException("Registering a state after activation is not supported.");
                                 }
 
-                                var name = (string)workItem.Context!;
+                                var name = registerState.Name;
                                 if (!_journalStreamDirectory.ContainsKey(name))
                                 {
                                     // Doing so will trigger a reset, since _journalStreamDirectory will bind the state in question.
                                     _journalStreamDirectory.Set(name, _journalStreamDirectory.GetNextJournalStreamId());
                                 }
                             }
-                        }
-                        else
-                        {
-                            Debug.Fail($"The command {workItem.Type} is unsupported");
+                            break;
                         }
 
-                        workItem.CompletionSource?.SetResult();
+                        default:
+                        {
+                            Debug.Fail($"The command {workItem.GetType().FullName} is unsupported");
+                            break;
+                        }
+                        }
+
+                        workItem.SetResult();
                     }
                     catch (Exception exception)
                     {
-                        workItem.CompletionSource?.SetException(exception);
+                        workItem.SetException(exception);
                         needsRecovery = true;
                     }
                 }
@@ -335,7 +342,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             catch (Exception exception)
             {
                 needsRecovery = true;
-                if (cancellationToken.IsCancellationRequested)
+                if (_shutdownCancellation.Token.IsCancellationRequested)
                 {
                     return;
                 }
@@ -352,8 +359,9 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         {
             while (_workQueue.TryDequeue(out var workItem))
             {
-                workItem.CompletionSource?.TrySetException(exception);
+                workItem.TrySetException(exception);
             }
+
         }
     }
 
@@ -422,14 +430,17 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     public async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
     {
         Task task;
+        bool didEnqueue;
         lock (_lock)
         {
-            var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-            task = completion.Task;
-            _workQueue.Enqueue(new WorkItem(WorkItemType.DeleteState, completion));
+            task = EnqueueOrGetPendingWorkItem<DeleteStateWorkItem>(out didEnqueue);
         }
 
-        _workSignal.Signal();
+        if (didEnqueue)
+        {
+            _workSignal.Signal();
+        }
+
         await task;
     }
 
@@ -441,7 +452,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         }
 
         var recoveryConsumer = new RecoveryJournalStorageConsumer(this);
-        await _storage.ReadAsync(recoveryConsumer, cancellationToken).ConfigureAwait(true);
+        await _shared.Storage.ReadAsync(recoveryConsumer, cancellationToken).ConfigureAwait(true);
 
         lock (_lock)
         {
@@ -511,7 +522,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             return _shared.JournalFormat;
         }
 
-        return JournalFormatServices.GetRequiredJournalFormat(_serviceProvider, journalFormatKey);
+        return JournalFormatServices.GetRequiredJournalFormat(_shared.ServiceProvider, journalFormatKey);
     }
 
     private void ProcessRecoveryBuffer(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
@@ -532,7 +543,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             }
 
             var journalFormat = GetJournalFormat(journalFormatKey);
-            var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _serviceProvider);
+            var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _shared.ServiceProvider);
             journalFormat.Read(buffer, this, in replayContext);
 
             if (buffer.IsCompleted && buffer.Length > 0)
@@ -563,25 +574,13 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         cancellationToken.ThrowIfCancellationRequested();
 
-        Task? pendingWrite;
-        var didEnqueue = false;
+        Task pendingWrite;
+        bool didEnqueue;
         lock (_lock)
         {
-            // If the pending write is faulted, recovery will need to be performed.
-            // For now, await it so that we can propagate the exception consistently.
-            if (_pendingWrite is not { IsFaulted: true })
-            {
-                var completion = new TaskCompletionSource(TaskCreationOptions.RunContinuationsAsynchronously);
-                _pendingWrite = completion.Task;
-                var workItemType = _migrationSnapshotRequired || _storage.IsCompactionRequested
-                    ? WorkItemType.WriteSnapshot
-                    : WorkItemType.AppendJournal;
-
-                _workQueue.Enqueue(new WorkItem(workItemType, completion));
-                didEnqueue = true;
-            }
-
-            pendingWrite = _pendingWrite;
+            pendingWrite = _migrationSnapshotRequired || _shared.Storage.IsCompactionRequested
+                ? EnqueueOrGetPendingWorkItem<WriteSnapshotWorkItem>(out didEnqueue)
+                : EnqueueOrGetPendingWorkItem<AppendJournalWorkItem>(out didEnqueue);
         }
 
         if (didEnqueue)
@@ -589,10 +588,27 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             _workSignal.Signal();
         }
 
-        if (pendingWrite is { } task)
+        await pendingWrite.WaitAsync(cancellationToken);
+    }
+
+    private Task EnqueueOrGetPendingWorkItem<TWorkItem>(out bool didEnqueue)
+        where TWorkItem : WorkItem, new()
+    {
+        foreach (var workItem in _workQueue)
         {
-            await task.WaitAsync(cancellationToken);
+            if (workItem.GetType() != typeof(TWorkItem))
+            {
+                continue;
+            }
+
+            didEnqueue = false;
+            return workItem.Task;
         }
+
+        var newWorkItem = new TWorkItem();
+        _workQueue.Enqueue(newWorkItem);
+        didEnqueue = true;
+        return newWorkItem.Task;
     }
 
     private void BindState(string name, ulong id)
@@ -637,23 +653,32 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _journalWriter.Dispose();
     }
 
-    private readonly struct WorkItem(WorkItemType type, TaskCompletionSource? completion)
+    private abstract class WorkItem : TaskCompletionSource
     {
-        public WorkItemType Type { get; } = type;
-        public TaskCompletionSource? CompletionSource { get; } = completion;
-        public object? Context { get; init; }
+        protected WorkItem() : base(TaskCreationOptions.RunContinuationsAsynchronously)
+        {
+        }
+
+        protected WorkItem(object? context) : base(context, TaskCreationOptions.RunContinuationsAsynchronously)
+        {
+        }
+
     }
 
-    private enum WorkItemType
+    private sealed class InitializeWorkItem : WorkItem;
+
+    private sealed class AppendJournalWorkItem : WorkItem;
+
+    private sealed class WriteSnapshotWorkItem : WorkItem;
+
+    private sealed class DeleteStateWorkItem : WorkItem;
+
+    private sealed class RegisterStateWorkItem(string name) : WorkItem(name)
     {
-        Initialize,
-        AppendJournal,
-        WriteSnapshot,
-        DeleteState,
-        RegisterState
+        public string Name => (string)Task.AsyncState!;
     }
 
-    private enum ManagerState
+    private enum ManagerState : byte
     {
         Unknown,
         Ready
@@ -673,7 +698,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         private readonly JournaledStateManager _manager = manager;
         private readonly IDictionaryOperationCodec<string, ulong> _codec = codec;
         private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
-        private JournalStreamWriter _storage;
+        private JournalStreamWriter _writer;
 
         public ulong this[string name] => _ids[name];
 
@@ -700,7 +725,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         public void Set(string name, ulong id)
         {
-            _codec.WriteSet(name, id, GetStorage());
+            _codec.WriteSet(name, id, GetWriter());
             ApplySet(name, id);
         }
 
@@ -711,7 +736,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         void IJournaledState.Reset(JournalStreamWriter writer)
         {
             _ids.Clear();
-            _storage = writer;
+            _writer = writer;
         }
 
         void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
@@ -738,10 +763,10 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             _manager.BindState(name, id);
         }
 
-        private JournalStreamWriter GetStorage()
+        private JournalStreamWriter GetWriter()
         {
-            Debug.Assert(_storage.IsInitialized);
-            return _storage;
+            Debug.Assert(_writer.IsInitialized);
+            return _writer;
         }
     }
 
@@ -759,7 +784,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         public void ResetVolatileState() => ((IJournaledState)this).Reset(_journalWriter);
 
-        protected override JournalStreamWriter GetStorage() => _journalWriter;
+        protected override JournalStreamWriter GetWriter() => _journalWriter;
     }
 
     /// <summary>

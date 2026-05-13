@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Buffers.Text;
 using System.Text.Json;
-using Orleans.Journaling.Json;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Json;

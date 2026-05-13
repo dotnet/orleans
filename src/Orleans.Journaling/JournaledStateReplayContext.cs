@@ -5,17 +5,15 @@ namespace Orleans.Journaling;
 /// </summary>
 public readonly ref struct JournaledStateReplayContext
 {
-    private readonly IServiceProvider _serviceProvider;
-
     /// <summary>
     /// Initializes a new instance of the <see cref="JournaledStateReplayContext"/> struct.
     /// </summary>
     /// <param name="writeJournalFormatKey">The configured write journal format key.</param>
-    /// <param name="serviceProvider">The service provider used to resolve codecs for journal formats.</param>
+    /// <param name="serviceProvider">The application-level service provider used to resolve codecs for journal formats.</param>
     public JournaledStateReplayContext(string writeJournalFormatKey, IServiceProvider serviceProvider)
     {
         WriteJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(writeJournalFormatKey);
-        _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     }
 
     /// <summary>
@@ -24,9 +22,12 @@ public readonly ref struct JournaledStateReplayContext
     public string WriteJournalFormatKey { get; } = string.Empty;
 
     /// <summary>
-    /// Gets the service provider used to resolve journal services.
+    /// Gets the application-level service provider used to resolve journal services.
     /// </summary>
-    public IServiceProvider ServiceProvider => _serviceProvider;
+    /// <remarks>
+    /// This provider is not scoped to a grain activation or replay operation.
+    /// </remarks>
+    public IServiceProvider ServiceProvider { get; }
 
     /// <summary>
     /// Gets the operation codec for <paramref name="operationFormatKey"/>.
@@ -46,6 +47,6 @@ public readonly ref struct JournaledStateReplayContext
             return writeOperationCodec;
         }
 
-        return JournalFormatServices.GetRequiredKeyedService<TCodec>(_serviceProvider, operationFormatKey);
+        return JournalFormatServices.GetRequiredKeyedService<TCodec>(ServiceProvider, operationFormatKey);
     }
 }
