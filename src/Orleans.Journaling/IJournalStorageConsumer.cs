@@ -1,16 +1,16 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Consumes raw journal data read from an <see cref="IJournalStorage"/> instance.
+/// Reads raw journal data from an <see cref="IJournalStorage"/> instance.
 /// </summary>
 public interface IJournalStorageConsumer
 {
     /// <summary>
-    /// Consumes buffered raw journal data.
+    /// Reads buffered raw journal data.
     /// </summary>
     /// <param name="buffer">The buffered journal data available to the consumer.</param>
     /// <param name="metadata">The metadata associated with the journal file being read, or <see langword="null"/> if no metadata is available.</param>
-    void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata);
+    void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata);
 }
 
 /// <summary>

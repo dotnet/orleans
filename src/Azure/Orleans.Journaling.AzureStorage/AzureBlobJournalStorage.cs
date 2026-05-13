@@ -165,7 +165,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
         await using (var rawStream = result.Value.Content)
         {
-            var totalBytesRead = await consumer.ConsumeAsync(rawStream, metadata, cancellationToken).ConfigureAwait(false);
+            var totalBytesRead = await consumer.ReadAsync(rawStream, metadata, cancellationToken).ConfigureAwait(false);
             LogRead(_logger, totalBytesRead, _client.BlobContainerName, _client.Name);
         }
 

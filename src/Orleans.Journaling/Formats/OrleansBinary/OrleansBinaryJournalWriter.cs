@@ -50,12 +50,12 @@ internal class OrleansBinaryJournalWriter : JournalWriter
         _entryBuffer.Reset();
     }
 
-    public ArcBuffer PeekSlice() => _buffer.PeekSlice(_buffer.Length);
+    public ArcBuffer Peek() => _buffer.PeekSlice(_buffer.Length);
 
     /// <summary>
     /// Returns a read-only stream over a pinned snapshot of the current committed bytes.
     /// </summary>
-    public Stream AsReadOnlyStream() => new ReadOnlyStream(PeekSlice());
+    public Stream AsReadOnlyStream() => new ReadOnlyStream(Peek());
 
     public override void Dispose()
     {

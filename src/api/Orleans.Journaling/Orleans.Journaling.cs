@@ -170,7 +170,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournalStorageConsumer
     {
-        void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata);
+        void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata);
     }
 
     public partial interface IJournalStorageProvider
@@ -367,19 +367,19 @@ namespace Orleans.Journaling
 
         public int Length { get { throw null; } }
 
-        public readonly void Consume(System.Span<byte> destination) { }
+        public readonly void Read(System.Span<byte> destination) { }
 
         public readonly bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
 
         public readonly System.ReadOnlySpan<byte> Peek(int count, System.Span<byte> destination) { throw null; }
 
-        public readonly Serialization.Buffers.ArcBuffer PeekSlice(int count) { throw null; }
+        public readonly Serialization.Buffers.ArcBuffer Peek(int count) { throw null; }
 
         public readonly void Skip(int count) { }
 
         public readonly byte[] ToArray() { throw null; }
 
-        public readonly bool TryConsume(System.Span<byte> destination) { throw null; }
+        public readonly bool TryRead(System.Span<byte> destination) { throw null; }
 
         public readonly bool TryPeek(System.Span<byte> destination) { throw null; }
 
@@ -392,13 +392,13 @@ namespace Orleans.Journaling
     {
         public static void Complete(this IJournalStorageConsumer consumer, IJournalFileMetadata? metadata) { }
 
-        public static void Consume(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, IJournalFileMetadata? metadata, bool complete) { }
+        public static void Read(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, IJournalFileMetadata? metadata, bool complete) { }
 
-        public static void Consume(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, IJournalFileMetadata? metadata, bool complete) { }
+        public static void Read(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, IJournalFileMetadata? metadata, bool complete) { }
 
-        public static void Consume(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalFileMetadata? metadata, bool complete) { }
+        public static void Read(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalFileMetadata? metadata, bool complete) { }
 
-        public static System.Threading.Tasks.ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>

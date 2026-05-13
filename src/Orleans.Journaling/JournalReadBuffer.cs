@@ -29,12 +29,12 @@ public readonly struct JournalReadBuffer
     public bool IsCompleted { get; }
 
     /// <summary>
-    /// Gets the number of unconsumed bytes.
+    /// Gets the number of unread bytes.
     /// </summary>
     public readonly int Length => Reader.Length;
 
     /// <summary>
-    /// Gets a span containing the next <paramref name="count"/> bytes without consuming them.
+    /// Gets a span containing the next <paramref name="count"/> bytes without reading them.
     /// </summary>
     /// <param name="count">The number of bytes to read.</param>
     /// <param name="destination">Temporary storage used if the requested bytes are not contiguous.</param>
@@ -58,7 +58,7 @@ public readonly struct JournalReadBuffer
     }
 
     /// <summary>
-    /// Attempts to copy the next bytes into <paramref name="destination"/> without consuming them.
+    /// Attempts to copy the next bytes into <paramref name="destination"/> without reading them.
     /// </summary>
     /// <param name="destination">The destination to copy to.</param>
     /// <returns><see langword="true"/> if enough bytes were available; otherwise, <see langword="false"/>.</returns>
@@ -74,7 +74,7 @@ public readonly struct JournalReadBuffer
     }
 
     /// <summary>
-    /// Copies the remaining bytes into a new array without consuming them.
+    /// Copies the remaining bytes into a new array without reading them.
     /// </summary>
     /// <returns>A byte array containing the remaining bytes.</returns>
     public readonly byte[] ToArray()
@@ -85,13 +85,13 @@ public readonly struct JournalReadBuffer
     }
 
     /// <summary>
-    /// Returns a pinned slice of the provided length without consuming the data.
+    /// Returns a pinned slice of the provided length without reading the data.
     /// </summary>
     /// <param name="count">The number of bytes to read.</param>
     /// <returns>
-    /// A pinned slice of unconsumed data. The caller owns the returned buffer and must dispose it.
+    /// A pinned slice of unread data. The caller owns the returned buffer and must dispose it.
     /// </returns>
-    public readonly ArcBuffer PeekSlice(int count) => Reader.PeekSlice(count);
+    public readonly ArcBuffer Peek(int count) => Reader.PeekSlice(count);
 
     /// <summary>
     /// Reads bytes until <paramref name="delimiter"/> is found.
@@ -114,17 +114,17 @@ public readonly struct JournalReadBuffer
     public readonly bool IsNext(ReadOnlySpan<byte> next, bool advancePast = false) => Reader.IsNext(next, advancePast);
 
     /// <summary>
-    /// Copies the next bytes into <paramref name="destination"/> and consumes them.
+    /// Copies the next bytes into <paramref name="destination"/> and reads them.
     /// </summary>
     /// <param name="destination">The destination to copy to.</param>
-    public readonly void Consume(Span<byte> destination) => Reader.Consume(destination);
+    public readonly void Read(Span<byte> destination) => Reader.Consume(destination);
 
     /// <summary>
-    /// Attempts to copy the next bytes into <paramref name="destination"/> and consume them.
+    /// Attempts to copy the next bytes into <paramref name="destination"/> and read them.
     /// </summary>
     /// <param name="destination">The destination to copy to.</param>
     /// <returns><see langword="true"/> if enough bytes were available; otherwise, <see langword="false"/>.</returns>
-    public readonly bool TryConsume(Span<byte> destination)
+    public readonly bool TryRead(Span<byte> destination)
     {
         if (!TryPeek(destination))
         {
@@ -136,15 +136,15 @@ public readonly struct JournalReadBuffer
     }
 
     /// <summary>
-    /// Consumes the next <paramref name="count"/> bytes.
+    /// Skips the next <paramref name="count"/> bytes.
     /// </summary>
-    /// <param name="count">The number of bytes to consume.</param>
+    /// <param name="count">The number of bytes to skip.</param>
     public readonly void Skip(int count) => Reader.Skip(count);
 
     /// <summary>
-    /// Attempts to consume the next <paramref name="count"/> bytes.
+    /// Attempts to skip the next <paramref name="count"/> bytes.
     /// </summary>
-    /// <param name="count">The number of bytes to consume.</param>
+    /// <param name="count">The number of bytes to skip.</param>
     /// <returns><see langword="true"/> if enough bytes were available; otherwise, <see langword="false"/>.</returns>
     public readonly bool TrySkip(int count)
     {
@@ -160,7 +160,7 @@ public readonly struct JournalReadBuffer
 
     internal readonly System.Buffers.ReadOnlySequence<byte> AsReadOnlySequence()
     {
-        using var slice = PeekSlice(Length);
+        using var slice = Peek(Length);
         return slice.AsReadOnlySequence();
     }
 }

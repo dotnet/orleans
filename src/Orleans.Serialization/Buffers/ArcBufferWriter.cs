@@ -706,7 +706,7 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
 internal sealed class ArcBufferPagePool
 {
     public static ArcBufferPagePool Shared { get; } = new();
-    public const int MinimumPageSize = 16 * 1024;
+    public const int MinimumPageSize = 1024;
     private readonly ConcurrentQueue<ArcBufferPage> _pages = new();
     private readonly ConcurrentQueue<ArcBufferPage> _largePages = new();
 

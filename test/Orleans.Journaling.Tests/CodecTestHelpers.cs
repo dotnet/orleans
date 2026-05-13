@@ -19,7 +19,7 @@ public static class CodecTestHelpers
     {
         using var batch = new OrleansBinaryJournalWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
-        using var committed = batch.PeekSlice();
+        using var committed = batch.Peek();
         var sequence = committed.AsReadOnlySequence();
 
         // Strip the [varuint32 body length][varuint64 stream id] framing and return the operation payload.

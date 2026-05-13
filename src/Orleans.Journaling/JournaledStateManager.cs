@@ -548,7 +548,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
             if (buffer.IsCompleted && buffer.Length > 0)
             {
-                throw new InvalidOperationException("The journal format did not consume the completed journal data.");
+                throw new InvalidOperationException("The journal format did not read the completed journal data.");
             }
         }
         catch (Exception exception) when (ShouldWrapRecoveryFormatException(exception))
@@ -686,7 +686,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private sealed class RecoveryJournalStorageConsumer(JournaledStateManager manager) : IJournalStorageConsumer
     {
-        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata) => manager.ProcessRecoveryBuffer(buffer, metadata);
+        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata) => manager.ProcessRecoveryBuffer(buffer, metadata);
     }
 
     private sealed class StateDirectory(

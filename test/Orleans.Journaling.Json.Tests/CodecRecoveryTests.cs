@@ -485,7 +485,7 @@ public class CodecRecoveryTests : JournalingTestBase
             }
             else
             {
-                consumer.Consume(ReadSegments(cancellationToken), metadata, complete: true);
+                consumer.Read(ReadSegments(cancellationToken), metadata, complete: true);
             }
 
             return default;

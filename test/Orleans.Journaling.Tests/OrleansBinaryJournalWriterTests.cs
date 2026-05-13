@@ -33,7 +33,7 @@ public sealed class OrleansBinaryJournalWriterTests
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [10]);
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(300)), [20, 21]);
 
-        using var data = buffer.PeekSlice();
+        using var data = buffer.Peek();
         var reader = new SequenceReader<byte>(data.AsReadOnlySequence());
         var firstEntry = ReadEntry(ref reader);
         var secondEntry = ReadEntry(ref reader);
@@ -255,7 +255,7 @@ public sealed class OrleansBinaryJournalWriterTests
         second.PayloadWriter.Write(new byte[] { 2 });
         second.Commit();
 
-        using var data = buffer.PeekSlice();
+        using var data = buffer.Peek();
         var reader = new SequenceReader<byte>(data.AsReadOnlySequence());
         var entry = ReadEntry(ref reader);
 
@@ -303,7 +303,7 @@ public sealed class OrleansBinaryJournalWriterTests
         entry.PayloadWriter.Write(payload);
         entry.Commit();
 
-        using var data = buffer.PeekSlice();
+        using var data = buffer.Peek();
         var reader = new SequenceReader<byte>(data.AsReadOnlySequence());
         var written = ReadEntry(ref reader);
 
@@ -378,7 +378,7 @@ public sealed class OrleansBinaryJournalWriterTests
 
     private static byte[] ToArray(OrleansBinaryJournalWriter buffer)
     {
-        using var slice = buffer.PeekSlice();
+        using var slice = buffer.Peek();
         return slice.ToArray();
     }
 

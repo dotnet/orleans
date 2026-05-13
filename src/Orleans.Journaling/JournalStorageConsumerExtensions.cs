@@ -4,7 +4,7 @@ using Orleans.Serialization.Buffers;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Helper methods for consuming journal storage data.
+/// Helper methods for reading journal storage data.
 /// </summary>
 public static class JournalStorageConsumerExtensions
 {
@@ -19,17 +19,17 @@ public static class JournalStorageConsumerExtensions
         metadata ??= JournalFileMetadata.Empty;
 
         using var buffer = new ArcBufferWriter();
-        ConsumeBuffer(consumer, buffer, metadata, isCompleted: true);
+        ReadBuffer(consumer, buffer, metadata, isCompleted: true);
     }
 
     /// <summary>
     /// Supplies <paramref name="input"/> to <paramref name="consumer"/>.
     /// </summary>
     /// <param name="consumer">The journal storage consumer.</param>
-    /// <param name="input">The bytes to consume.</param>
+    /// <param name="input">The bytes to read.</param>
     /// <param name="metadata">The metadata associated with the journal data being read, or <see langword="null"/> if no metadata is available.</param>
-    /// <param name="complete">Whether to notify the consumer that no more data will be supplied. If <see langword="false"/>, the consumer must consume all supplied bytes.</param>
-    public static void Consume(this IJournalStorageConsumer consumer, ReadOnlyMemory<byte> input, IJournalFileMetadata? metadata, bool complete)
+    /// <param name="complete">Whether to notify the consumer that no more data will be supplied. If <see langword="false"/>, the consumer must read all supplied bytes.</param>
+    public static void Read(this IJournalStorageConsumer consumer, ReadOnlyMemory<byte> input, IJournalFileMetadata? metadata, bool complete)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         metadata ??= JournalFileMetadata.Empty;
@@ -38,20 +38,20 @@ public static class JournalStorageConsumerExtensions
         if (!input.IsEmpty)
         {
             buffer.Write(input.Span);
-            ConsumeBuffer(consumer, buffer, metadata, isCompleted: false);
+            ReadBuffer(consumer, buffer, metadata, isCompleted: false);
         }
 
-        CompleteOrThrowIfUnconsumed(consumer, buffer, metadata, complete);
+        CompleteOrThrowIfUnread(consumer, buffer, metadata, complete);
     }
 
     /// <summary>
     /// Supplies <paramref name="input"/> to <paramref name="consumer"/>.
     /// </summary>
     /// <param name="consumer">The journal storage consumer.</param>
-    /// <param name="input">The bytes to consume.</param>
+    /// <param name="input">The bytes to read.</param>
     /// <param name="metadata">The metadata associated with the journal data being read, or <see langword="null"/> if no metadata is available.</param>
-    /// <param name="complete">Whether to notify the consumer that no more data will be supplied. If <see langword="false"/>, the consumer must consume all supplied bytes.</param>
-    public static void Consume(this IJournalStorageConsumer consumer, ReadOnlySequence<byte> input, IJournalFileMetadata? metadata, bool complete)
+    /// <param name="complete">Whether to notify the consumer that no more data will be supplied. If <see langword="false"/>, the consumer must read all supplied bytes.</param>
+    public static void Read(this IJournalStorageConsumer consumer, ReadOnlySequence<byte> input, IJournalFileMetadata? metadata, bool complete)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         metadata ??= JournalFileMetadata.Empty;
@@ -65,20 +65,20 @@ public static class JournalStorageConsumerExtensions
             }
 
             buffer.Write(segment.Span);
-            ConsumeBuffer(consumer, buffer, metadata, isCompleted: false);
+            ReadBuffer(consumer, buffer, metadata, isCompleted: false);
         }
 
-        CompleteOrThrowIfUnconsumed(consumer, buffer, metadata, complete);
+        CompleteOrThrowIfUnread(consumer, buffer, metadata, complete);
     }
 
     /// <summary>
     /// Supplies ordered <paramref name="segments"/> to <paramref name="consumer"/>.
     /// </summary>
     /// <param name="consumer">The journal storage consumer.</param>
-    /// <param name="segments">The ordered bytes to consume.</param>
+    /// <param name="segments">The ordered bytes to read.</param>
     /// <param name="metadata">The metadata associated with the journal data being read, or <see langword="null"/> if no metadata is available.</param>
-    /// <param name="complete">Whether to notify the consumer that no more data will be supplied. If <see langword="false"/>, the consumer must consume all supplied bytes.</param>
-    public static void Consume(this IJournalStorageConsumer consumer, IEnumerable<ReadOnlyMemory<byte>> segments, IJournalFileMetadata? metadata, bool complete)
+    /// <param name="complete">Whether to notify the consumer that no more data will be supplied. If <see langword="false"/>, the consumer must read all supplied bytes.</param>
+    public static void Read(this IJournalStorageConsumer consumer, IEnumerable<ReadOnlyMemory<byte>> segments, IJournalFileMetadata? metadata, bool complete)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         ArgumentNullException.ThrowIfNull(segments);
@@ -93,22 +93,22 @@ public static class JournalStorageConsumerExtensions
             }
 
             buffer.Write(segment.Span);
-            ConsumeBuffer(consumer, buffer, metadata, isCompleted: false);
+            ReadBuffer(consumer, buffer, metadata, isCompleted: false);
         }
 
-        CompleteOrThrowIfUnconsumed(consumer, buffer, metadata, complete);
+        CompleteOrThrowIfUnread(consumer, buffer, metadata, complete);
     }
 
-    private static void CompleteOrThrowIfUnconsumed(IJournalStorageConsumer consumer, ArcBufferWriter buffer, IJournalFileMetadata metadata, bool complete)
+    private static void CompleteOrThrowIfUnread(IJournalStorageConsumer consumer, ArcBufferWriter buffer, IJournalFileMetadata metadata, bool complete)
     {
         if (complete)
         {
-            ConsumeBuffer(consumer, buffer, metadata, isCompleted: true);
+            ReadBuffer(consumer, buffer, metadata, isCompleted: true);
         }
 
         if (buffer.Length > 0)
         {
-            throw new InvalidOperationException("The journal storage consumer did not consume all supplied journal data.");
+            throw new InvalidOperationException("The journal storage consumer did not read all supplied journal data.");
         }
     }
 
@@ -120,7 +120,7 @@ public static class JournalStorageConsumerExtensions
     /// <param name="metadata">The metadata associated with the journal data being read, or <see langword="null"/> if no metadata is available.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The number of bytes read from <paramref name="input"/>.</returns>
-    public static async ValueTask<long> ConsumeAsync(this IJournalStorageConsumer consumer, Stream input, IJournalFileMetadata? metadata, CancellationToken cancellationToken)
+    public static async ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, Stream input, IJournalFileMetadata? metadata, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         ArgumentNullException.ThrowIfNull(input);
@@ -134,10 +134,10 @@ public static class JournalStorageConsumerExtensions
             var bytesRead = await input.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
             if (bytesRead == 0)
             {
-                ConsumeBuffer(consumer, buffer, metadata, isCompleted: true);
+                ReadBuffer(consumer, buffer, metadata, isCompleted: true);
                 if (buffer.Length > 0)
                 {
-                    throw new InvalidOperationException("The journal storage consumer did not consume all supplied journal data.");
+                    throw new InvalidOperationException("The journal storage consumer did not read all supplied journal data.");
                 }
 
                 return totalBytesRead;
@@ -146,13 +146,13 @@ public static class JournalStorageConsumerExtensions
             buffer.AdvanceWriter(bytesRead);
             totalBytesRead += bytesRead;
 
-            ConsumeBuffer(consumer, buffer, metadata, isCompleted: false);
+            ReadBuffer(consumer, buffer, metadata, isCompleted: false);
         }
     }
 
-    private static void ConsumeBuffer(IJournalStorageConsumer consumer, ArcBufferWriter buffer, IJournalFileMetadata metadata, bool isCompleted)
+    private static void ReadBuffer(IJournalStorageConsumer consumer, ArcBufferWriter buffer, IJournalFileMetadata metadata, bool isCompleted)
     {
         var readBuffer = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted);
-        consumer.Consume(readBuffer, metadata);
+        consumer.Read(readBuffer, metadata);
     }
 }

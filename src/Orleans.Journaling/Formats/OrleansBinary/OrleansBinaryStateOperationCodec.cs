@@ -46,7 +46,7 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
     public void Apply(JournalReadBuffer input, IStateOperationHandler<T> consumer)
     {
         ArgumentNullException.ThrowIfNull(consumer);
-        using var slice = input.PeekSlice(input.Length);
+        using var slice = input.Peek(input.Length);
         using var session = sessionPool.GetSession();
         var reader = Reader.Create(slice, session);
         Apply(ref reader, consumer);

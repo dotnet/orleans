@@ -78,7 +78,7 @@ public class StateManagerTests : JournalingTestBase
             sut.Lifecycle.OnStart().WaitAsync(TimeSpan.FromSeconds(10)));
 
         Assert.NotNull(exception.InnerException);
-        Assert.Contains("did not consume the completed journal data", exception.InnerException.Message, StringComparison.Ordinal);
+        Assert.Contains("did not read the completed journal data", exception.InnerException.Message, StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1306,7 +1306,7 @@ public class StateManagerTests : JournalingTestBase
                     }
 
                     ReadConsumeCount++;
-                    consumer.Consume(concatenated, metadata: null, complete: true);
+                    consumer.Read(concatenated, metadata: null, complete: true);
                 }
                 else
                 {
@@ -1316,7 +1316,7 @@ public class StateManagerTests : JournalingTestBase
                 return default;
             }
 
-            consumer.Consume(GetSegments(), metadata: null, complete: true);
+            consumer.Read(GetSegments(), metadata: null, complete: true);
             return default;
 
             IEnumerable<ReadOnlyMemory<byte>> GetSegments()
@@ -1372,7 +1372,7 @@ public class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            consumer.Consume(bytes, metadata: null, complete: true);
+            consumer.Read(bytes, metadata: null, complete: true);
             return default;
         }
 
@@ -1395,7 +1395,7 @@ public class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            consumer.Consume(Bytes, metadata: null, complete: true);
+            consumer.Read(Bytes, metadata: null, complete: true);
             return default;
         }
 
@@ -1449,7 +1449,7 @@ public class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
 
-            consumer.Consume(GetChunks(), metadata: null, complete: true);
+            consumer.Read(GetChunks(), metadata: null, complete: true);
             return default;
 
             IEnumerable<ReadOnlyMemory<byte>> GetChunks()

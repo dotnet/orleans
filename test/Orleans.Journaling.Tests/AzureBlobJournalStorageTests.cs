@@ -423,14 +423,14 @@ public sealed class AzureBlobJournalStorageTests
     {
         public static DiscardingJournalStorageConsumer Instance { get; } = new();
 
-        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata) => buffer.Skip(buffer.Length);
+        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata) => buffer.Skip(buffer.Length);
     }
 
     private sealed class CapturingJournalStorageConsumer : IJournalStorageConsumer
     {
         public string? JournalFormatKey { get; private set; }
 
-        public void Consume(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalReadBuffer buffer, IJournalFileMetadata? metadata)
         {
             JournalFormatKey = metadata?.Format;
             buffer.Skip(buffer.Length);

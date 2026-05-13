@@ -49,7 +49,7 @@ internal static class OrleansBinaryJournalReader
             // Snapshot all currently-buffered bytes as a pinned ArcBuffer that the reader walks
             // for this iteration. Successful entries are committed by Skip()ing the underlying
             // ArcBufferReader; truncated tails leave bytes for a subsequent call.
-            using var batchSlice = input.PeekSlice(input.Length);
+            using var batchSlice = input.Peek(input.Length);
             var reader = Reader.Create(batchSlice, session);
 
             uint bodyLength;
