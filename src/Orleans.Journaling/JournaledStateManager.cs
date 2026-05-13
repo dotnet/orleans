@@ -27,14 +27,12 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private Task? _workLoop;
     private ManagerState _state;
     private bool _migrationSnapshotRequired;
-    private bool _isWriteDeferredUntilActiveEntryCompletes;
 
     public JournaledStateManager(JournaledStateManagerShared shared)
     {
         ArgumentNullException.ThrowIfNull(shared);
         _shared = shared;
         _journalWriter = _shared.JournalFormat.CreateWriter();
-        _journalWriter.ActiveEntryCompleted += OnJournalWriterActiveEntryCompleted;
         var serviceProvider = _shared.ServiceProvider;
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
@@ -162,7 +160,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                     try
                     {
-                        var isWorkItemDeferred = false;
                         // Note that the implementation of each command is inlined to avoid allocating unnecessary async states.
                         // We are ok sacrificing some code organization for performance in the inner loop.
                         switch (workItem)
@@ -180,67 +177,50 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
                             lock (_lock)
                             {
-                                _isWriteDeferredUntilActiveEntryCompletes = true;
-                                if (!_journalWriter.TryEnterFlushScope(out var flushScope))
+                                if (isSnapshot)
                                 {
-                                    RequeueWorkItem(workItem);
-                                    isWorkItemDeferred = true;
-                                    break;
+                                    // If there are pending writes, reset them since they will be captured by the snapshot instead.
+                                    // If we did not do this, the journal would begin with some writes which would be followed by a snapshot which also included those writes.
+                                    _journalWriter.Reset();
+
+                                    if (_retirementTracker.Count > 0)
+                                    {
+                                        RetireOrResurectStates();
+                                    }
+
+                                    if (_migrationSnapshotRequired)
+                                    {
+                                        ThrowIfMigrationBlockedByRetiredStates();
+                                    }
                                 }
 
-                                _isWriteDeferredUntilActiveEntryCompletes = false;
-                                using (flushScope)
+                                // The map of state ids is itself stored as a durable state with the id 0.
+                                // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
+                                // If we removed retired states, this snapshot will persist that change.
+                                AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot, StateDirectory.Id, _journalStreamDirectory);
+
+                                foreach (var (id, state) in _statesMap)
                                 {
-                                    if (isSnapshot)
+                                    if (id is 0 || state is null)
                                     {
-                                        // If there are pending writes, reset them since they will be captured by the snapshot instead.
-                                        // If we did not do this, the journal would begin with some writes which would be followed by a snapshot which also included those writes.
-                                        _journalWriter.Reset();
-
-                                        if (_retirementTracker.Count > 0)
-                                        {
-                                            RetireOrResurectStates();
-                                        }
-
-                                        if (_migrationSnapshotRequired)
-                                        {
-                                            ThrowIfMigrationBlockedByRetiredStates();
-                                        }
+                                        continue;
                                     }
 
-                                    // The map of state ids is itself stored as a durable state with the id 0.
-                                    // This must be stored first, since it includes the identities of all other states, which are needed when replaying the journal.
-                                    // If we removed retired states, this snapshot will persist that change.
-                                    AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot, StateDirectory.Id, _journalStreamDirectory);
-
-                                    foreach (var (id, state) in _statesMap)
-                                    {
-                                        if (id is 0 || state is null)
-                                        {
-                                            continue;
-                                        }
-
-                                        AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot, id, state);
-                                    }
-
-                                    committedBuffer = _journalWriter.GetBuffer();
-                                    if (committedBuffer.Length == 0)
-                                    {
-                                        committedBuffer.Dispose();
-                                    }
-                                    else
-                                    {
-                                        hasCommittedBuffer = true;
-                                        // The returned ArcBuffer pins the committed pages, so the writer can be reset
-                                        // and accept new direct writes while storage persists the pinned buffer.
-                                        _journalWriter.Reset();
-                                    }
+                                    AppendUpdatesOrSnapshotState(_journalWriter, isSnapshot, id, state);
                                 }
-                            }
 
-                            if (isWorkItemDeferred)
-                            {
-                                break;
+                                committedBuffer = _journalWriter.GetBuffer();
+                                if (committedBuffer.Length == 0)
+                                {
+                                    committedBuffer.Dispose();
+                                }
+                                else
+                                {
+                                    hasCommittedBuffer = true;
+                                    // The returned ArcBuffer pins the committed pages, so the writer can be reset
+                                    // and accept new direct writes while storage persists the pinned buffer.
+                                    _journalWriter.Reset();
+                                }
                             }
 
                             if (hasCommittedBuffer)
@@ -352,11 +332,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         }
                         }
 
-                        if (isWorkItemDeferred)
-                        {
-                            break;
-                        }
-
                         workItem.SetResult();
                     }
                     catch (Exception exception)
@@ -377,32 +352,6 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                 FaultQueuedWorkItems(exception);
                 LogErrorProcessingWorkItems(_shared.Logger, exception);
             }
-        }
-    }
-
-    private void OnJournalWriterActiveEntryCompleted()
-    {
-        bool shouldSignal;
-        lock (_lock)
-        {
-            shouldSignal = _isWriteDeferredUntilActiveEntryCompletes;
-            _isWriteDeferredUntilActiveEntryCompletes = false;
-        }
-
-        if (shouldSignal)
-        {
-            _workSignal.Signal();
-        }
-    }
-
-    private void RequeueWorkItem(WorkItem workItem)
-    {
-        var pendingWorkItems = _workQueue.ToArray();
-        _workQueue.Clear();
-        _workQueue.Enqueue(workItem);
-        foreach (var pendingWorkItem in pendingWorkItems)
-        {
-            _workQueue.Enqueue(pendingWorkItem);
         }
     }
 
