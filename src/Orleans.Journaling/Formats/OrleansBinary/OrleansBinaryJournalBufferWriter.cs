@@ -17,6 +17,22 @@ internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
         WriteSequence(output, payload);
     }
 
+    protected override void WriteEntry(JournalStreamId streamId, ArcBufferWriter payload, ArcBufferWriter output)
+    {
+        if (GetType() != typeof(OrleansBinaryJournalBufferWriter))
+        {
+            base.WriteEntry(streamId, payload, output);
+            return;
+        }
+
+        var length = checked((uint)(GetVarUInt32ByteCount(streamId.Value) + payload.Length));
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteVarUInt32(length);
+        writer.WriteVarUInt32(streamId.Value);
+        writer.Commit();
+        output.AppendAndReset(payload);
+    }
+
     public ArcBuffer Peek() => GetCommittedBuffer();
 
     /// <summary>

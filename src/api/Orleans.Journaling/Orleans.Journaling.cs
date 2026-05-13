@@ -291,6 +291,7 @@ namespace Orleans.Journaling
         public void Reset() { }
 
         protected abstract void WriteEntry(JournalStreamId streamId, System.Buffers.ReadOnlySequence<byte> payload, System.Buffers.IBufferWriter<byte> output);
+        protected virtual void WriteEntry(JournalStreamId streamId, Serialization.Buffers.ArcBufferWriter payload, Serialization.Buffers.ArcBufferWriter output) { }
         protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, System.Buffers.IBufferWriter<byte> output) { }
     }
 

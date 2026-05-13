@@ -141,6 +141,18 @@ public abstract class JournalBufferWriter : IDisposable
     protected abstract void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output);
 
     /// <summary>
+    /// Encodes a complete journal entry into <paramref name="output"/>.
+    /// </summary>
+    /// <param name="streamId">The durable state id.</param>
+    /// <param name="payload">The active entry payload buffer.</param>
+    /// <param name="output">The committed output buffer.</param>
+    protected virtual void WriteEntry(JournalStreamId streamId, ArcBufferWriter payload, ArcBufferWriter output)
+    {
+        using var payloadBuffer = payload.PeekSlice(payload.Length);
+        WriteEntry(streamId, payloadBuffer.AsReadOnlySequence(), output);
+    }
+
+    /// <summary>
     /// Appends a format-owned entry for retired or unknown state preservation.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
@@ -232,8 +244,7 @@ public abstract class JournalBufferWriter : IDisposable
             var committedLength = _committedBuffer.Length;
             try
             {
-                using var payload = _activeEntryBuffer.PeekSlice(_activeEntryBuffer.Length);
-                WriteEntry(streamId, payload.AsReadOnlySequence(), _committedBuffer);
+                WriteEntry(streamId, _activeEntryBuffer, _committedBuffer);
             }
             catch
             {
@@ -242,7 +253,11 @@ public abstract class JournalBufferWriter : IDisposable
             }
             finally
             {
-                _activeEntryBuffer.Reset();
+                if (_activeEntryBuffer.Length > 0)
+                {
+                    _activeEntryBuffer.Reset();
+                }
+
                 _hasActiveEntry = false;
             }
         }

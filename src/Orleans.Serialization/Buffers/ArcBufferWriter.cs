@@ -541,6 +541,74 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
         _hasPinnedPages = true;
     }
 
+    /// <summary>
+    /// Appends the unconsumed bytes from <paramref name="source"/> to this writer by transferring ownership of
+    /// <paramref name="source"/>'s pages to this writer, then resets <paramref name="source"/>.
+    /// </summary>
+    /// <param name="source">The source writer to append and reset.</param>
+    /// <remarks>
+    /// Unlike <see cref="AppendPinned"/>, this method transfers page ownership, so this writer remains mutable after
+    /// the append. The source writer must not have outstanding slices of its unconsumed data because later mutations
+    /// to this writer could otherwise alter bytes observed through those slices. If <paramref name="source"/> has no
+    /// unconsumed bytes, this method does not modify either writer.
+    /// </remarks>
+    public void AppendAndReset(ArcBufferWriter source)
+    {
+        ThrowIfDisposed();
+        if (source is null)
+        {
+            throw new ArgumentNullException(nameof(source));
+        }
+
+        source.ThrowIfDisposed();
+
+        if (ReferenceEquals(this, source))
+        {
+            throw new InvalidOperationException("A buffer writer cannot append itself.");
+        }
+
+        ThrowIfPinnedPages();
+        source.ThrowIfPinnedPages();
+
+        var sourceLength = source.Length;
+        if (sourceLength == 0)
+        {
+            return;
+        }
+
+        if (Length != 0 && source._readIndex != 0)
+        {
+            throw new InvalidOperationException("A partially consumed source buffer can only be transferred to an empty destination buffer.");
+        }
+
+        source.ThrowIfPagesNotExclusivelyOwned();
+
+        var newSourcePage = ArcBufferPagePool.Shared.Rent();
+        Debug.Assert(newSourcePage.ReferenceCount == 0);
+        newSourcePage.Pin(newSourcePage.Version);
+
+        if (Length == 0)
+        {
+            UnpinAll();
+            _readPage = source._readPage;
+            _writePage = source._writePage;
+            _tail = source._tail;
+            _readIndex = source._readIndex;
+            _totalLength = source._totalLength;
+        }
+        else
+        {
+            ReleasePagesAfterWritePage();
+            _tail.SetNext(source._readPage, _tail.Version);
+            _writePage = source._writePage;
+            _tail = source._tail;
+            _totalLength = checked(_totalLength + sourceLength);
+        }
+
+        source.ResetAfterTransfer(newSourcePage);
+        Debug.Assert(!_hasPinnedPages);
+    }
+
     private void WriteMultiSegment(in ReadOnlySpan<byte> source, Span<byte> destination)
     {
         var input = source;
@@ -573,6 +641,49 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
             current = ReferenceEquals(previous, _tail) ? null : previous.Next;
             previous.Unpin(previous.Version);
         }
+    }
+
+    private void ReleasePagesAfterWritePage()
+    {
+        var next = _writePage.Next;
+        if (next is null)
+        {
+            _tail = _writePage;
+            return;
+        }
+
+        var tail = _tail;
+        _writePage.ClearNext(_writePage.Version);
+        while (next is not null)
+        {
+            var current = next;
+            next = ReferenceEquals(current, tail) ? null : current.Next;
+            current.SetLength(0, current.Version);
+            current.Unpin(current.Version);
+        }
+
+        _tail = _writePage;
+    }
+
+    private void ThrowIfPagesNotExclusivelyOwned()
+    {
+        var current = _readPage;
+        while (current is not null)
+        {
+            if (current.ReferenceCount != 1)
+            {
+                throw new InvalidOperationException("The source buffer cannot be transferred because it has outstanding slices.");
+            }
+
+            current = ReferenceEquals(current, _tail) ? null : current.Next;
+        }
+    }
+
+    private void ResetAfterTransfer(ArcBufferPage newPage)
+    {
+        _readPage = _writePage = _tail = newPage;
+        _hasPinnedPages = false;
+        _totalLength = _readIndex = 0;
     }
 
     /// <summary>
