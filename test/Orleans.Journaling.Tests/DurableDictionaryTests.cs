@@ -28,7 +28,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
-        var dictionary = new DurableDictionary<string, int>("testDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(keyCodec, SessionPool), new OrleansJournalValueCodec<int>(valueCodec, SessionPool), SessionPool));
+        var dictionary = new DurableDictionary<string, int>("testDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
 
         // Act - Add items to the dictionary
@@ -73,7 +73,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var sut = CreateTestSystem();
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
-        var dictionary1 = new DurableDictionary<string, int>("testDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(keyCodec, SessionPool), new OrleansJournalValueCodec<int>(valueCodec, SessionPool), SessionPool));
+        var dictionary1 = new DurableDictionary<string, int>("testDict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act - Add items and persist
@@ -85,7 +85,7 @@ public class DurableDictionaryTests : JournalingTestBase
         // Create a new manager with the same storage to simulate recovery after restart
         // This tests the journaling system's ability to replay operations and restore state
         var sut2 = CreateTestSystem(storage: sut.Storage);
-        var dictionary2 = new DurableDictionary<string, int>("testDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(keyCodec, SessionPool), new OrleansJournalValueCodec<int>(valueCodec, SessionPool), SessionPool));
+        var dictionary2 = new DurableDictionary<string, int>("testDict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut2.Lifecycle.OnStart();
         
         // Assert - Dictionary should be recovered
@@ -108,7 +108,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<TestKey>();
         var valueCodec = CodecProvider.GetCodec<string>();
-        var dictionary = new DurableDictionary<TestKey, string>("complexDict", manager, new OrleansBinaryDictionaryOperationCodec<TestKey, string>(new OrleansJournalValueCodec<TestKey>(keyCodec, SessionPool), new OrleansJournalValueCodec<string>(valueCodec, SessionPool), SessionPool));
+        var dictionary = new DurableDictionary<TestKey, string>("complexDict", manager, new OrleansBinaryDictionaryOperationCodec<TestKey, string>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act
@@ -138,7 +138,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<TestPerson>();
-        var dictionary = new DurableDictionary<string, TestPerson>("peopleDict", manager, new OrleansBinaryDictionaryOperationCodec<string, TestPerson>(new OrleansJournalValueCodec<string>(keyCodec, SessionPool), new OrleansJournalValueCodec<TestPerson>(valueCodec, SessionPool), SessionPool));
+        var dictionary = new DurableDictionary<string, TestPerson>("peopleDict", manager, new OrleansBinaryDictionaryOperationCodec<string, TestPerson>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Act
@@ -174,7 +174,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
-        var dictionary = new DurableDictionary<string, int>("clearDict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(keyCodec, SessionPool), new OrleansJournalValueCodec<int>(valueCodec, SessionPool), SessionPool));
+        var dictionary = new DurableDictionary<string, int>("clearDict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Add items
@@ -204,7 +204,7 @@ public class DurableDictionaryTests : JournalingTestBase
         var manager = sut.Manager;
         var keyCodec = CodecProvider.GetCodec<string>();
         var valueCodec = CodecProvider.GetCodec<int>();
-        var dictionary = new DurableDictionary<string, int>("enumDict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(new OrleansJournalValueCodec<string>(keyCodec, SessionPool), new OrleansJournalValueCodec<int>(valueCodec, SessionPool), SessionPool));
+        var dictionary = new DurableDictionary<string, int>("enumDict", manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
         
         // Add items

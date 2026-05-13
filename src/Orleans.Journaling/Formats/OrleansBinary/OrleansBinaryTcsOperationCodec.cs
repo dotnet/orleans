@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -11,8 +12,8 @@ namespace Orleans.Journaling;
 /// VarUInt32 command discriminator after the version byte.
 /// </remarks>
 internal sealed class OrleansBinaryTcsOperationCodec<T>(
-    IJournalValueCodec<T> codec,
-    IJournalValueCodec<Exception> exceptionCodec,
+    IFieldCodec<T> codec,
+    IFieldCodec<Exception> exceptionCodec,
     SerializerSessionPool sessionPool) : ITaskCompletionSourceOperationCodec<T>
 {
     private const byte FormatVersion = 0;
@@ -38,7 +39,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Completed;
         output.Advance(2);
-        codec.Write(value, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(codec, value, output, sessionPool);
         entry.Commit();
     }
 
@@ -51,7 +52,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         span[0] = FormatVersion;
         span[1] = (byte)DurableTaskCompletionSourceStatus.Faulted;
         output.Advance(2);
-        exceptionCodec.Write(exception, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(exceptionCodec, exception, output, sessionPool);
         entry.Commit();
     }
 
@@ -73,7 +74,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.PeekSlice(input.Length);
         using var session = sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(slice, session);
+        var reader = Reader.Create(slice, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
@@ -83,7 +84,7 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, ITaskCompletionSourceOperationHandler<T> consumer)
     {
-        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
         if (reader.Position >= reader.Length)
         {
             throw new InvalidOperationException("Missing TCS status byte.");
@@ -96,10 +97,10 @@ internal sealed class OrleansBinaryTcsOperationCodec<T>(
                 consumer.ApplyPending();
                 break;
             case DurableTaskCompletionSourceStatus.Completed:
-                consumer.ApplyCompleted(codec.Read(ref reader));
+                consumer.ApplyCompleted(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Faulted:
-                consumer.ApplyFaulted(exceptionCodec.Read(ref reader));
+                consumer.ApplyFaulted(OrleansBinaryOperationCodecHelpers.ReadValue(exceptionCodec, ref reader));
                 break;
             case DurableTaskCompletionSourceStatus.Canceled:
                 consumer.ApplyCanceled();

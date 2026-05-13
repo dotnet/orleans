@@ -1,8 +1,7 @@
-using System.Buffers;
-using System.Buffers.Binary;
 using BenchmarkDotNet.Attributes;
 using Orleans.Journaling;
 using Orleans.Serialization;
+using Orleans.Serialization.Serializers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
@@ -120,10 +119,12 @@ public class DurableOperationReaderBenchmarks
 
     private static CodecFamilyServices CreateOrleansBinaryFamily()
     {
-        var sessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
+        var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
+        var codecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
         return new CodecFamilyServices(
             new OrleansBinaryJournalFormat(sessionPool),
-            new OrleansBinaryListOperationCodec<int>(RawInt32JournalValueCodec.Instance, sessionPool));
+            new OrleansBinaryListOperationCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
     }
 
     public enum CodecFamily
@@ -247,24 +248,5 @@ public class DurableOperationReaderBenchmarks
         }
 
         public object GetService(Type serviceType) => null;
-    }
-
-    private sealed class RawInt32JournalValueCodec : IJournalValueCodec<int>
-    {
-        public static RawInt32JournalValueCodec Instance { get; } = new();
-
-        public void Write(int value, IBufferWriter<byte> output)
-        {
-            var span = output.GetSpan(sizeof(int));
-            BinaryPrimitives.WriteInt32LittleEndian(span, value);
-            output.Advance(sizeof(int));
-        }
-
-        public int Read<TInput>(ref Reader<TInput> reader)
-        {
-            Span<byte> bytes = stackalloc byte[sizeof(int)];
-            reader.ReadBytes(bytes);
-            return BinaryPrimitives.ReadInt32LittleEndian(bytes);
-        }
     }
 }

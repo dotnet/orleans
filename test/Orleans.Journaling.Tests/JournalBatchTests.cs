@@ -96,7 +96,6 @@ public abstract class JournalBatchTests : IAsyncLifetime
 
     private static void ConfigureBinaryJournalingServices(IServiceCollection services)
     {
-        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
         services.AddSingleton<OrleansBinaryJournalFormat>();
         services.AddKeyedSingleton<IJournalFormat>(
             OrleansBinaryJournalFormat.JournalFormatKey,
@@ -114,7 +113,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var grainContext = new TestGrainContext(grainId); // Use provided GrainId
         var storage = _storageProvider.Create(grainContext);
         var manager = new JournaledStateManager(CreateShared(storage));
-        var list = new DurableList<T>(listName, manager, new OrleansBinaryListOperationCodec<T>(new OrleansJournalValueCodec<T>(codecProvider.GetCodec<T>(), sessionPool), sessionPool));
+        var list = new DurableList<T>(listName, manager, new OrleansBinaryListOperationCodec<T>(codecProvider.GetCodec<T>(), sessionPool));
         return (manager, list, storage);
     }
 
@@ -172,7 +171,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var manager2 = new JournaledStateManager(CreateShared(storage));
-        var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListOperationCodec<string>(new OrleansJournalValueCodec<string>(codecProvider.GetCodec<string>(), sessionPool), sessionPool));
+        var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryListOperationCodec<string>(codecProvider.GetCodec<string>(), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(3, list2.Count);
@@ -371,7 +370,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var manager2 = new JournaledStateManager(CreateShared(storage)); // Reuses the storage object linked via grainId
-        var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListOperationCodec<int>(new OrleansJournalValueCodec<int>(codecProvider.GetCodec<int>(), sessionPool), sessionPool));
+        var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryListOperationCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
         Assert.Equal(itemCount, list2.Count);

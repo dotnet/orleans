@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -7,7 +8,7 @@ namespace Orleans.Journaling;
 /// Binary codec for durable persistent state journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryStateOperationCodec<T>(
-    IJournalValueCodec<T> codec,
+    IFieldCodec<T> codec,
     SerializerSessionPool sessionPool) : IStateOperationCodec<T>
 {
     private const byte FormatVersion = 0;
@@ -23,7 +24,7 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
         headerWriter.WriteByte(FormatVersion);
         headerWriter.WriteVarUInt32(SetValueCommand);
         headerWriter.Commit();
-        codec.Write(state, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(codec, state, output, sessionPool);
         var versionWriter = Writer.Create(output, session: null!);
         versionWriter.WriteVarUInt64(version);
         versionWriter.Commit();
@@ -47,7 +48,7 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.PeekSlice(input.Length);
         using var session = sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(slice, session);
+        var reader = Reader.Create(slice, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
@@ -57,12 +58,12 @@ internal sealed class OrleansBinaryStateOperationCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IStateOperationHandler<T> consumer)
     {
-        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {
             case SetValueCommand:
-                var state = codec.Read(ref reader);
+                var state = OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader);
                 var version = reader.ReadVarUInt64();
                 consumer.ApplySet(state, version);
                 break;

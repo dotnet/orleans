@@ -13,9 +13,6 @@ public static class HostingExtensions
         builder.Services.TryAddScoped<IJournalStorage>(sp => sp.GetRequiredService<IJournalStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         builder.Services.TryAddScoped<IStateManager, JournaledStateManager>();
 
-        // Register the default data codec (Orleans IFieldCodec adapter).
-        builder.Services.TryAddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
-
         // Register JSON as the default format family and keep Orleans binary available for existing data.
         builder.Services.AddJsonJournalFormat(new JsonJournalOptions().SerializerOptions, tryAdd: true);
         TryAddOrleansBinaryJournalingFormat(builder.Services);

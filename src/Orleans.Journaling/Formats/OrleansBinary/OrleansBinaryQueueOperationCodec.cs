@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -7,7 +8,7 @@ namespace Orleans.Journaling;
 /// Binary codec for durable queue journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryQueueOperationCodec<T>(
-    IJournalValueCodec<T> codec,
+    IFieldCodec<T> codec,
     SerializerSessionPool sessionPool) : IQueueOperationCodec<T>
 {
     private const byte FormatVersion = 0;
@@ -25,7 +26,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(EnqueueCommand);
         payloadWriter.Commit();
-        codec.Write(item, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -66,7 +67,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         foreach (var item in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            codec.Write(item, output);
+            OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
             written++;
         }
 
@@ -80,7 +81,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.PeekSlice(input.Length);
         using var session = sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(slice, session);
+        var reader = Reader.Create(slice, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
@@ -90,12 +91,12 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IQueueOperationHandler<T> consumer)
     {
-        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {
             case EnqueueCommand:
-                consumer.ApplyEnqueue(codec.Read(ref reader));
+                consumer.ApplyEnqueue(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case DequeueCommand:
                 consumer.ApplyDequeue();
@@ -118,7 +119,7 @@ internal sealed class OrleansBinaryQueueOperationCodec<T>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            consumer.ApplyEnqueue(codec.Read(ref reader));
+            consumer.ApplyEnqueue(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
         }
     }
 

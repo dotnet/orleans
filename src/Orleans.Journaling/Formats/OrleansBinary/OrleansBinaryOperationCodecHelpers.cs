@@ -1,21 +1,16 @@
+using System.Buffers;
 using Orleans.Serialization.Buffers;
-using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Helpers shared by the public ROS-based <c>*OperationCodec.Apply</c> entry points.
+/// Helpers shared by the Orleans binary durable operation codecs.
 /// </summary>
-internal static class OrleansBinaryOperationApplier
+internal static class OrleansBinaryOperationCodecHelpers
 {
     private const byte FormatVersion = 0;
-
-    /// <summary>
-    /// Creates a reader directly over <paramref name="input"/>.
-    /// </summary>
-    public static Reader<ArcBufferReaderInput> CreateReader(ArcBuffer input, SerializerSession session) =>
-        Reader.Create(input, session);
 
     /// <summary>
     /// Reads and validates the format-version byte at the current reader position.
@@ -32,5 +27,23 @@ internal static class OrleansBinaryOperationApplier
         {
             throw new NotSupportedException($"Unsupported format version {version} for binary journal entry.");
         }
+    }
+
+    public static void WriteValue<T>(
+        IFieldCodec<T> codec,
+        T value,
+        IBufferWriter<byte> output,
+        SerializerSessionPool sessionPool)
+    {
+        using var session = sessionPool.GetSession();
+        var writer = Writer.Create(output, session);
+        codec.WriteField(ref writer, 0, typeof(T), value);
+        writer.Commit();
+    }
+
+    public static T ReadValue<T, TInput>(IFieldCodec<T> codec, ref Reader<TInput> reader)
+    {
+        var field = reader.ReadFieldHeader();
+        return codec.ReadValue(ref reader, field);
     }
 }

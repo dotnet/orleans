@@ -7,6 +7,7 @@ using Orleans.Journaling.Json;
 using Orleans.Journaling.Tests;
 using Orleans.Runtime;
 using Orleans.Serialization;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Xunit;
 
@@ -29,8 +30,8 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Write phase
         var sut = CreateTestSystem(storage);
-        var keyCodec = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec = new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var keyCodec = CodecProvider.GetCodec<string>();
+        var valueCodec = CodecProvider.GetCodec<int>();
         var dict = new DurableDictionary<string, int>("dict", sut.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, SessionPool));
         await sut.Lifecycle.OnStart();
 
@@ -41,8 +42,8 @@ public class CodecRecoveryTests : JournalingTestBase
 
         // Recovery phase — new manager, same storage
         var sut2 = CreateTestSystem(storage);
-        var keyCodec2 = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var valueCodec2 = new OrleansJournalValueCodec<int>(CodecProvider.GetCodec<int>(), SessionPool);
+        var keyCodec2 = CodecProvider.GetCodec<string>();
+        var valueCodec2 = CodecProvider.GetCodec<int>();
         var dict2 = new DurableDictionary<string, int>("dict", sut2.Manager, new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec2, valueCodec2, SessionPool));
         await sut2.Lifecycle.OnStart();
 
@@ -380,7 +381,6 @@ public class CodecRecoveryTests : JournalingTestBase
         var services = new ServiceCollection();
         services.AddSerializer();
         services.AddLogging();
-        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
         services.AddKeyedSingleton<IJournalFormat>(
             OrleansBinaryJournalFormat.JournalFormatKey,
             (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));
@@ -430,7 +430,7 @@ public class CodecRecoveryTests : JournalingTestBase
         where TKey : notnull
         => new(ValueCodec<TKey>(), ValueCodec<TValue>(), SessionPool);
 
-    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
     private static async Task<VolatileJournalStorage> CreateJsonStorageWithSegment(string jsonLines)
     {

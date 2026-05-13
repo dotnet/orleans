@@ -1,9 +1,8 @@
-using System.Buffers;
-using System.Buffers.Binary;
 using System.Diagnostics.CodeAnalysis;
 using BenchmarkDotNet.Attributes;
 using Orleans.Journaling;
 using Orleans.Serialization;
+using Orleans.Serialization.Serializers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
@@ -31,8 +30,9 @@ public class DurableListJournalBenchmarks
     [GlobalSetup]
     public void GlobalSetup()
     {
-        _sessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
-        _codec = new OrleansBinaryListOperationCodec<int>(RawInt32JournalValueCodec.Instance, _sessionPool);
+        var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
+        _codec = new OrleansBinaryListOperationCodec<int>(serviceProvider.GetRequiredService<ICodecProvider>().GetCodec<int>(), _sessionPool);
         _journalFormat = new OrleansBinaryJournalFormat(_sessionPool);
         _writeBuffer = new OrleansBinaryJournalWriter();
         _list = new DurableList<int>("list", new BenchmarkJournalManager(_writeBuffer, ListJournalStreamId), _codec);
@@ -121,25 +121,6 @@ public class DurableListJournalBenchmarks
         var reader = new JournalReadBuffer(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
         var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
         _journalFormat.Read(reader, _recoveryConsumer, in context);
-    }
-
-    private sealed class RawInt32JournalValueCodec : IJournalValueCodec<int>
-    {
-        public static RawInt32JournalValueCodec Instance { get; } = new();
-
-        public void Write(int value, IBufferWriter<byte> output)
-        {
-            var span = output.GetSpan(sizeof(int));
-            BinaryPrimitives.WriteInt32LittleEndian(span, value);
-            output.Advance(sizeof(int));
-        }
-
-        public int Read<TInput>(ref Reader<TInput> reader)
-        {
-            Span<byte> bytes = stackalloc byte[sizeof(int)];
-            reader.ReadBytes(bytes);
-            return BinaryPrimitives.ReadInt32LittleEndian(bytes);
-        }
     }
 
     private sealed class BenchmarkJournalManager(OrleansBinaryJournalWriter buffer, JournalStreamId streamId) : IStateManager

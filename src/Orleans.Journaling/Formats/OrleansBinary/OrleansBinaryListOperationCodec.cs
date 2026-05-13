@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -7,7 +8,7 @@ namespace Orleans.Journaling;
 /// Binary codec for durable list journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryListOperationCodec<T>(
-    IJournalValueCodec<T> codec,
+    IFieldCodec<T> codec,
     SerializerSessionPool sessionPool) : IListOperationCodec<T>
 {
     private const byte FormatVersion = 0;
@@ -27,7 +28,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(AddCommand);
         payloadWriter.Commit();
-        codec.Write(item, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -41,7 +42,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         payloadWriter.WriteVarUInt32(SetCommand);
         payloadWriter.WriteVarUInt32((uint)index);
         payloadWriter.Commit();
-        codec.Write(item, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -55,7 +56,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         payloadWriter.WriteVarUInt32(InsertCommand);
         payloadWriter.WriteVarUInt32((uint)index);
         payloadWriter.Commit();
-        codec.Write(item, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
         entry.Commit();
     }
 
@@ -97,7 +98,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         foreach (var item in items)
         {
             CollectionCodecHelpers.ThrowIfSnapshotItemCountExceeded(count, written);
-            codec.Write(item, output);
+            OrleansBinaryOperationCodecHelpers.WriteValue(codec, item, output, sessionPool);
             written++;
         }
 
@@ -111,7 +112,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.PeekSlice(input.Length);
         using var session = sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(slice, session);
+        var reader = Reader.Create(slice, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
@@ -121,24 +122,24 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IListOperationHandler<T> consumer)
     {
-        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {
             case AddCommand:
-                consumer.ApplyAdd(codec.Read(ref reader));
+                consumer.ApplyAdd(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
                 break;
             case SetCommand:
             {
                 var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
-                var item = codec.Read(ref reader);
+                var item = OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader);
                 consumer.ApplySet(index, item);
                 break;
             }
             case InsertCommand:
             {
                 var index = OrleansBinaryCollectionWireHelpers.ReadListIndex(ref reader);
-                var item = codec.Read(ref reader);
+                var item = OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader);
                 consumer.ApplyInsert(index, item);
                 break;
             }
@@ -163,7 +164,7 @@ internal sealed class OrleansBinaryListOperationCodec<T>(
         consumer.Reset(count);
         for (var i = 0; i < count; i++)
         {
-            consumer.ApplyAdd(codec.Read(ref reader));
+            consumer.ApplyAdd(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
         }
     }
 

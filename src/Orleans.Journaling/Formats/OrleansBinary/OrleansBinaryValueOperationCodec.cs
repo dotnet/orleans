@@ -1,4 +1,5 @@
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 
 namespace Orleans.Journaling;
@@ -7,7 +8,7 @@ namespace Orleans.Journaling;
 /// Binary codec for durable value journal entries, preserving the legacy Orleans binary wire format.
 /// </summary>
 internal sealed class OrleansBinaryValueOperationCodec<T>(
-    IJournalValueCodec<T> codec,
+    IFieldCodec<T> codec,
     SerializerSessionPool sessionPool) : IValueOperationCodec<T>
 {
     private const byte FormatVersion = 0;
@@ -22,7 +23,7 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
         payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(SetValueCommand);
         payloadWriter.Commit();
-        codec.Write(value, output);
+        OrleansBinaryOperationCodecHelpers.WriteValue(codec, value, output, sessionPool);
         entry.Commit();
     }
 
@@ -32,7 +33,7 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
         ArgumentNullException.ThrowIfNull(consumer);
         using var slice = input.PeekSlice(input.Length);
         using var session = sessionPool.GetSession();
-        var reader = OrleansBinaryOperationApplier.CreateReader(slice, session);
+        var reader = Reader.Create(slice, session);
         Apply(ref reader, consumer);
         if (reader.Position != reader.Length)
         {
@@ -42,12 +43,12 @@ internal sealed class OrleansBinaryValueOperationCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IValueOperationHandler<T> consumer)
     {
-        OrleansBinaryOperationApplier.ReadVersion(ref reader);
+        OrleansBinaryOperationCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {
             case SetValueCommand:
-                consumer.ApplySet(codec.Read(ref reader));
+                consumer.ApplySet(OrleansBinaryOperationCodecHelpers.ReadValue(codec, ref reader));
                 break;
             default:
                 throw new NotSupportedException($"Command type {command} is not supported");

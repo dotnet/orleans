@@ -178,12 +178,6 @@ namespace Orleans.Journaling
         IJournalStorage Create(Runtime.IGrainContext grainContext);
     }
 
-    public partial interface IJournalValueCodec<T>
-    {
-        T Read<TInput>(ref Serialization.Buffers.Reader<TInput> reader);
-        void Write(T value, System.Buffers.IBufferWriter<byte> output);
-    }
-
     public partial interface IListOperationCodec<T>
     {
         void Apply(JournalReadBuffer input, IListOperationHandler<T> consumer);

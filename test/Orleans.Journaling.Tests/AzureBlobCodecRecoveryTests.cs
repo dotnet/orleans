@@ -5,6 +5,7 @@ using Orleans.Configuration.Internal;
 using Orleans.Core;
 using Orleans.Journaling.Json;
 using Orleans.Serialization;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Orleans.Runtime;
 using TestExtensions;
@@ -174,13 +175,12 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         return new(shared);
     }
 
-    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
     private static void ConfigureFormatServices(IServiceCollection services)
     {
-        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
         services.AddKeyedSingleton<IJournalFormat>(
             OrleansBinaryJournalFormat.JournalFormatKey,
             (sp, _) => new OrleansBinaryJournalFormat(sp.GetRequiredService<SerializerSessionPool>()));

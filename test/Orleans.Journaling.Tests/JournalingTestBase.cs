@@ -94,7 +94,6 @@ public abstract class JournalingTestBase
 
     protected static void ConfigureBinaryJournalingServices(IServiceCollection services, IJournalFormat? journalFormat = null)
     {
-        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
         services.AddSingleton<OrleansBinaryJournalFormat>();
         if (journalFormat is null)
         {

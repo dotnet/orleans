@@ -5,6 +5,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Core;
 using Orleans.Serialization;
+using Orleans.Serialization.Codecs;
 using Xunit;
 using static VerifyXunit.Verifier;
 
@@ -111,7 +112,7 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
         return new(shared);
     }
 
-    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 

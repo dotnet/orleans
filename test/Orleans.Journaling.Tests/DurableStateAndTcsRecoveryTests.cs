@@ -2,6 +2,7 @@ using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Core;
 using Orleans.Serialization;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Session;
 using Xunit;
 
@@ -95,11 +96,11 @@ public sealed class DurableStateAndTcsRecoveryTests : JournalingTestBase
         Assert.True(tcs.TrySetResult(18));
     }
 
-    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
     private DeepCopier<T> Copier<T>() => ServiceProvider.GetRequiredService<DeepCopier<T>>();
 
-    private sealed class TrackingStateOperationCodec<T>(IJournalValueCodec<T> valueCodec, SerializerSessionPool sessionPool) : IStateOperationCodec<T>
+    private sealed class TrackingStateOperationCodec<T>(IFieldCodec<T> valueCodec, SerializerSessionPool sessionPool) : IStateOperationCodec<T>
     {
         private readonly OrleansBinaryStateOperationCodec<T> _inner = new(valueCodec, sessionPool);
 

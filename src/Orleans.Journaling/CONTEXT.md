@@ -183,7 +183,7 @@ _Avoid_: Per-operation undo
 - "record" was used for the framed item inside an extent, but this context uses **Journal Entry** for that concept.
 - "segment" appears in older comments and tests, but this context uses **Journal Batch** for the physical batch.
 - JSONL is a readable/debug/interchange format with best-effort allocation reduction, not the strict zero-allocation path. JSONL lines are **Journal Entries**, not **Journal Batches**.
-- `IJournalValueCodec<T>` was the earlier value serialization term, but this context uses **Value Codec** for the replacement API.
+- Orleans binary durable operation codecs use Orleans `IFieldCodec<T>` directly instead of a journaling-specific value codec wrapper.
 - Universal value codecs were considered, but **Value Codecs** are format-specific to avoid mixing JSON, protobuf, MessagePack, and Orleans binary responsibilities.
 - A public **Journal Format** is intentionally narrower than a public codec-family abstraction.
 - Storage is intentionally format-agnostic: it may expose a **Journal Format** key, but it should not inject, own, or call a **Journal Format** implementation.

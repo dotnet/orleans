@@ -1,6 +1,7 @@
 using System.Buffers;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Buffers.Adaptors;
+using Orleans.Serialization.Codecs;
 using Xunit;
 using static VerifyXunit.Verifier;
 
@@ -14,8 +15,8 @@ namespace Orleans.Journaling.Tests;
 /// <para>
 /// These tests guard against accidental wire-format changes against the byte stream that the legacy
 /// <c>DurableDictionary</c>/<c>DurableList</c>/etc. types on <c>upstream/main</c> produced before the
-/// codecs were extracted: every command writes its operands through <see cref="OrleansJournalValueCodec{T}"/>,
-/// which in turn calls <c>IFieldCodec.WriteField</c> — exactly the same chain pre-extraction.
+    /// codecs were extracted: every command writes its operands through the Orleans <c>IFieldCodec</c>
+    /// path — exactly the same chain pre-extraction.
 /// </para>
 /// <para>
 /// Since this branch flips the default journal format from OrleansBinary to JSONL, the tests below
@@ -508,8 +509,8 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     [Fact]
     public void Determinism_RepeatedWritesProduceIdenticalBytes()
     {
-        // OrleansJournalValueCodec.Write rents a fresh SerializerSessionPool session per operand call,
-        // so single-operand operations should be byte-identical across runs. Explicit smoke check guards
+        // Single-operand writes rent a fresh SerializerSessionPool session per operand call, so they
+        // should be byte-identical across runs. Explicit smoke check guards
         // against accidental session-state leakage if that contract changes.
         var first = WriteOnce();
         var second = WriteOnce();
@@ -527,7 +528,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
 
     // --- Internals -----------------------------------------------------------------------------
 
-    private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);
+    private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
 
     /// <summary>
     /// Use a fresh, NEVER-thrown exception so the snapshot never depends on a real stack trace or

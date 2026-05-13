@@ -2,6 +2,7 @@ using System.Buffers;
 using System.Collections;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Codecs;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.Session;
 using Microsoft.Extensions.DependencyInjection;
@@ -10,7 +11,7 @@ using Xunit;
 namespace Orleans.Journaling.Tests;
 
 /// <summary>
-/// Tests for the IJournalValueCodec and binary durable journal codec implementations.
+/// Tests for the binary durable journal codec implementations.
 /// </summary>
 [TestCategory("BVT")]
 public class JournalValueCodecTests
@@ -22,72 +23,16 @@ public class JournalValueCodecTests
     {
         var services = new ServiceCollection();
         services.AddSerializer();
-        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
         var serviceProvider = services.BuildServiceProvider();
         _sessionPool = serviceProvider.GetRequiredService<SerializerSessionPool>();
         _codecProvider = serviceProvider.GetRequiredService<ICodecProvider>();
     }
 
     [Fact]
-    public void OrleansJournalValueCodec_RoundTrips_Int()
-    {
-        var codec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(42, buffer);
-
-        using var session = _sessionPool.GetSession();
-        using var readerBuffer = new ArcBufferWriter();
-        readerBuffer.Write(buffer.WrittenSpan);
-        using var payload = readerBuffer.PeekSlice(readerBuffer.Length);
-        var reader = OrleansBinaryOperationApplier.CreateReader(payload, session);
-        var result = codec.Read(ref reader);
-
-        Assert.Equal(42, result);
-        Assert.True(reader.Position > 0);
-    }
-
-    [Fact]
-    public void OrleansJournalValueCodec_RoundTrips_String()
-    {
-        var codec = new OrleansJournalValueCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write("hello world", buffer);
-
-        using var session = _sessionPool.GetSession();
-        using var readerBuffer = new ArcBufferWriter();
-        readerBuffer.Write(buffer.WrittenSpan);
-        using var payload = readerBuffer.PeekSlice(readerBuffer.Length);
-        var reader = OrleansBinaryOperationApplier.CreateReader(payload, session);
-        var result = codec.Read(ref reader);
-
-        Assert.Equal("hello world", result);
-        Assert.True(reader.Position > 0);
-    }
-
-    [Fact]
-    public void OrleansJournalValueCodec_RoundTrips_DateTime()
-    {
-        var codec = new OrleansJournalValueCodec<DateTime>(_codecProvider.GetCodec<DateTime>(), _sessionPool);
-        var expected = new DateTime(2025, 6, 15, 10, 30, 0, DateTimeKind.Utc);
-        var buffer = new ArrayBufferWriter<byte>();
-        codec.Write(expected, buffer);
-
-        using var session = _sessionPool.GetSession();
-        using var readerBuffer = new ArcBufferWriter();
-        readerBuffer.Write(buffer.WrittenSpan);
-        using var payload = readerBuffer.PeekSlice(readerBuffer.Length);
-        var reader = OrleansBinaryOperationApplier.CreateReader(payload, session);
-        var result = codec.Read(ref reader);
-
-        Assert.Equal(expected, result);
-        Assert.True(reader.Position > 0);
-    }
-
-    [Fact]
     public void BinaryDictionaryOperationCodec_RoundTrips_Set()
     {
-        var keyCodec = new OrleansJournalValueCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
-        var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var keyCodec = ValueCodec<string>();
+        var valueCodec = ValueCodec<int>();
         var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
 
         var input = CodecTestHelpers.WriteEntry(writer => codec.WriteSet("key1", 42, writer));
@@ -102,8 +47,8 @@ public class JournalValueCodecTests
     [Fact]
     public void BinaryDictionaryOperationCodec_RoundTrips_Snapshot()
     {
-        var keyCodec = new OrleansJournalValueCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
-        var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var keyCodec = ValueCodec<string>();
+        var valueCodec = ValueCodec<int>();
         var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
 
         var items = new List<KeyValuePair<string, int>>
@@ -124,7 +69,7 @@ public class JournalValueCodecTests
     [Fact]
     public void BinaryListOperationCodec_Rejects_Overflowed_SnapshotCount()
     {
-        var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var valueCodec = ValueCodec<int>();
         var codec = new OrleansBinaryListOperationCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -139,7 +84,7 @@ public class JournalValueCodecTests
     [Fact]
     public void BinaryListOperationCodec_Rejects_Overflowed_Index()
     {
-        var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var valueCodec = ValueCodec<int>();
         var codec = new OrleansBinaryListOperationCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
@@ -154,8 +99,8 @@ public class JournalValueCodecTests
     [Fact]
     public void BinaryDictionaryOperationCodec_WriteSnapshot_Rejects_MismatchedCollectionCount()
     {
-        var keyCodec = new OrleansJournalValueCodec<string>(_codecProvider.GetCodec<string>(), _sessionPool);
-        var valueCodec = new OrleansJournalValueCodec<int>(_codecProvider.GetCodec<int>(), _sessionPool);
+        var keyCodec = ValueCodec<string>();
+        var valueCodec = ValueCodec<int>();
         var codec = new OrleansBinaryDictionaryOperationCodec<string, int>(keyCodec, valueCodec, _sessionPool);
         var items = new MiscountedReadOnlyCollection<KeyValuePair<string, int>>(
             1,
@@ -170,6 +115,8 @@ public class JournalValueCodecTests
 
         Assert.Contains("did not match", exception.Message);
     }
+
+    private IFieldCodec<T> ValueCodec<T>() => _codecProvider.GetCodec<T>();
 
     private sealed class DictionaryConsumer<TKey, TValue> : IDictionaryOperationHandler<TKey, TValue> where TKey : notnull
     {
