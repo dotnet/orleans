@@ -60,10 +60,24 @@ public static class JournalSnapshotFormatting
 
         while (offset < data.Length)
         {
-            // Length prefix.
-            if (!TryDecodeVarUInt(sequence.Slice(offset), out var bodyLength, out var prefixSize))
+            byte framingVersion;
+            uint bodyLength;
+            int prefixSize;
+            var hasFrameHeader = false;
+            try
             {
-                builder.Append("(unable to parse varuint32 entry length prefix at offset ")
+                hasFrameHeader = OrleansBinaryJournalReader.TryReadVersionAndLength(sequence.Slice(offset), out framingVersion, out bodyLength, out prefixSize);
+            }
+            catch
+            {
+                framingVersion = OrleansBinaryJournalReader.LegacyFramingVersion;
+                bodyLength = 0;
+                prefixSize = 0;
+            }
+
+            if (!hasFrameHeader)
+            {
+                builder.Append("(unable to parse entry version/length prefix at offset ")
                     .Append(offset)
                     .Append(")\n");
                 AppendHexAsciiDump(builder, data.AsSpan(offset));
@@ -85,8 +99,25 @@ public static class JournalSnapshotFormatting
                 return builder.ToString();
             }
 
-            // Stream id.
-            if (!TryDecodeVarUInt(sequence.Slice(entryStart, (int)bodyLength), out var streamId, out var streamIdSize))
+            ulong streamId;
+            int streamIdSize;
+            if (framingVersion == OrleansBinaryJournalReader.FramingVersion)
+            {
+                if (bodyLength < sizeof(uint))
+                {
+                    builder.Append("[entry ").Append(entryIndex)
+                        .Append("] length=").Append(bodyLength)
+                        .Append(" (missing fixed-width stream id)\n");
+                    AppendHexAsciiDump(builder, data.AsSpan(entryStart, (int)bodyLength));
+                    offset = entryEnd;
+                    entryIndex++;
+                    continue;
+                }
+
+                streamId = OrleansBinaryJournalReader.ReadUInt32LittleEndian(sequence.Slice(entryStart, sizeof(uint)));
+                streamIdSize = sizeof(uint);
+            }
+            else if (!TryDecodeVarUInt(sequence.Slice(entryStart, (int)bodyLength), out streamId, out streamIdSize))
             {
                 builder.Append("[entry ").Append(entryIndex).Append("] length=").Append(bodyLength)
                     .Append(" (unable to parse varuint32 stream id)\n");

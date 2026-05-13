@@ -13,7 +13,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 {
     private static readonly SerializerSessionPool SessionPool = new ServiceCollection().AddSerializer().BuildServiceProvider().GetRequiredService<SerializerSessionPool>();
     [Fact]
-    public void Commit_WritesLegacyVarUIntFramedEntry()
+    public void Commit_WritesV1FixedWidthFramedEntry()
     {
         using var buffer = new OrleansBinaryJournalBufferWriter();
 
@@ -22,7 +22,58 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         entry.Commit();
 
         var bytes = ToArray(buffer);
-        Assert.Equal([0x09, 0x55, 1, 2, 3], bytes);
+        Assert.Equal([1, 7, 0, 0, 0, 42, 0, 0, 0, 1, 2, 3], bytes);
+    }
+
+    [Fact]
+    public void BinaryFormat_Read_ParsesLegacyVarUIntFramedEntry()
+    {
+        using var buffer = CreateLegacyWriter(new JournalStreamId(42), [1, 2, 3]);
+        using var data = buffer.PeekSlice(buffer.Length);
+        var consumer = new CollectingConsumer();
+
+        ReadAll(data, consumer, 42);
+
+        var entry = Assert.Single(consumer.Entries);
+        Assert.Equal(42U, entry.StreamId);
+        Assert.Equal([1, 2, 3], entry.Payload);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { }, 0, 0U, 0, false)]
+    [InlineData(new byte[] { 1 }, 1, 0U, 0, false)]
+    [InlineData(new byte[] { 1, 7, 0, 0 }, 1, 0U, 0, false)]
+    [InlineData(new byte[] { 1, 7, 0, 0, 0 }, 1, 7U, 5, true)]
+    [InlineData(new byte[] { 0x02 }, 0, 0U, 0, false)]
+    [InlineData(new byte[] { 0x17 }, 0, 11U, 1, true)]
+    public void TryReadVersionAndLength_ReturnsFalseUntilPrefixIsComplete(
+        byte[] bytes,
+        byte expectedVersion,
+        uint expectedLength,
+        int expectedPrefixLength,
+        bool expectedResult)
+    {
+        var result = OrleansBinaryJournalReader.TryReadVersionAndLength(
+            new ReadOnlySequence<byte>(bytes),
+            out var version,
+            out var length,
+            out var prefixLength);
+
+        Assert.Equal(expectedResult, result);
+        Assert.Equal(expectedVersion, version);
+        Assert.Equal(expectedLength, length);
+        Assert.Equal(expectedPrefixLength, prefixLength);
+    }
+
+    [Fact]
+    public void TryReadVersionAndLength_RejectsMalformedLegacyVarUIntLength()
+    {
+        Assert.Throws<InvalidOperationException>(() =>
+            OrleansBinaryJournalReader.TryReadVersionAndLength(
+                new ReadOnlySequence<byte>(new byte[] { 0x00 }),
+                out _,
+                out _,
+                out _));
     }
 
     [Fact]
@@ -38,10 +89,10 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         var firstEntry = ReadEntry(ref reader);
         var secondEntry = ReadEntry(ref reader);
 
-        Assert.Equal(2U, firstEntry.Length);
+        Assert.Equal(5U, firstEntry.Length);
         Assert.Equal(1UL, firstEntry.StreamId);
         Assert.Equal([10], firstEntry.Payload.ToArray());
-        Assert.Equal(4U, secondEntry.Length);
+        Assert.Equal(6U, secondEntry.Length);
         Assert.Equal(300UL, secondEntry.StreamId);
         Assert.Equal([20, 21], secondEntry.Payload.ToArray());
         Assert.True(reader.End);
@@ -291,7 +342,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     }
 
     [Fact]
-    public void Commit_WritesVariableLengthFrameAcrossSegments()
+    public void Commit_WritesFixedWidthFrameAcrossSegments()
     {
         using var buffer = new OrleansBinaryJournalBufferWriter();
         var payload = Enumerable.Repeat((byte)42, ArcBufferWriter.MinimumPageSize).ToArray();
@@ -304,7 +355,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         var reader = new SequenceReader<byte>(data.AsReadOnlySequence());
         var written = ReadEntry(ref reader);
 
-        Assert.Equal((uint)payload.Length + 1, written.Length);
+        Assert.Equal((uint)payload.Length + sizeof(uint), written.Length);
         Assert.Equal(1UL, written.StreamId);
         Assert.Equal(payload, written.Payload.ToArray());
         Assert.True(reader.End);
@@ -324,19 +375,39 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         Assert.Equal(expected.Length, stream.Read(actual));
         Assert.Equal(expected, actual);
 
-        stream.Position = 1;
-        Assert.Equal(0x0F, stream.ReadByte());
+        stream.Position = 5;
+        Assert.Equal(7, stream.ReadByte());
     }
 
     [Theory]
-    [InlineData(new byte[] { 0x02 }, "truncated varuint32 entry length prefix")]
-    [InlineData(new byte[] { 0x01 }, "zero-length entries")]
+    [InlineData(new byte[] { 0x01 }, "truncated fixed-width entry header")]
+    [InlineData(new byte[] { 0x00 }, "malformed varuint32 entry length prefix")]
     [InlineData(new byte[] { 0x0B, 1, 2 }, "exceeds remaining input bytes")]
-    [InlineData(new byte[] { 0x03, 0x00 }, "truncated varuint32 state id")]
+    [InlineData(new byte[] { 0x03, 0x02 }, "truncated varuint32 state id")]
     [InlineData(
         new byte[] { 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
         "malformed varuint32 state id")]
     public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
+    {
+        using var data = CreateWriter(bytes);
+        var consumer = new CollectingConsumer();
+
+        var exception = Assert.Throws<InvalidOperationException>(() =>
+        {
+            var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
+            var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
+        });
+
+        Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
+        Assert.Empty(consumer.Entries);
+    }
+
+    [Theory]
+    [InlineData(new byte[] { 1, 0, 0, 0 }, "truncated fixed-width entry header")]
+    [InlineData(new byte[] { 1, 3, 0, 0, 0, 1, 0, 0 }, "smaller than the fixed-width state id")]
+    [InlineData(new byte[] { 1, 8, 0, 0, 0, 1, 0, 0, 0, 0xAA }, "exceeds remaining input bytes")]
+    public void BinaryFormat_Read_RejectsMalformedV1Frames(byte[] bytes, string expectedMessage)
     {
         using var data = CreateWriter(bytes);
         var consumer = new CollectingConsumer();
@@ -393,6 +464,17 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         return writer;
     }
 
+    private static ArcBufferWriter CreateLegacyWriter(JournalStreamId streamId, ReadOnlySpan<byte> payload)
+    {
+        var writer = new ArcBufferWriter();
+        var serializerWriter = Writer.Create(writer, session: null!);
+        serializerWriter.WriteVarUInt32(checked((uint)(GetVarUInt32ByteCount(streamId.Value) + payload.Length)));
+        serializerWriter.WriteVarUInt32(streamId.Value);
+        serializerWriter.Commit();
+        writer.Write(payload);
+        return writer;
+    }
+
     private static void ReadAll(ArcBuffer data, IReplayConsumer consumer, params uint[] streamIds)
     {
         using var writer = new ArcBufferWriter();
@@ -405,17 +487,37 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
     private static (uint Length, uint StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)
     {
-        var lengthReader = Reader.Create(reader.UnreadSequence, session: null!);
-        var length = lengthReader.ReadVarUInt32();
-        reader.Advance(lengthReader.Position);
+        if (!OrleansBinaryJournalReader.TryReadVersionAndLength(reader.UnreadSequence, out var version, out var length, out var lengthPrefixLength))
+        {
+            throw new InvalidOperationException("The binary journal entry stream is malformed.");
+        }
+
+        reader.Advance(lengthPrefixLength);
         var entry = reader.Sequence.Slice(reader.Consumed, length);
+        if (version == OrleansBinaryJournalReader.FramingVersion)
+        {
+            var streamId = OrleansBinaryJournalReader.ReadUInt32LittleEndian(entry);
+            var payload = entry.Slice(sizeof(uint));
+            reader.Advance(length);
+            return (length, streamId, payload);
+        }
+
         var streamIdReader = Reader.Create(entry, session: null!);
-        var streamId = streamIdReader.ReadVarUInt32();
-        var payload = entry.Slice(streamIdReader.Position);
+        var legacyStreamId = streamIdReader.ReadVarUInt32();
+        var legacyPayload = entry.Slice(streamIdReader.Position);
         reader.Advance(length);
 
-        return (length, streamId, payload);
+        return (length, legacyStreamId, legacyPayload);
     }
+
+    private static int GetVarUInt32ByteCount(uint value) => value switch
+    {
+        < 128u => 1,
+        < 16_384u => 2,
+        < 2_097_152u => 3,
+        < 268_435_456u => 4,
+        _ => 5
+    };
 
     private interface IReplayConsumer
     {

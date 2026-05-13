@@ -22,13 +22,25 @@ public static class CodecTestHelpers
         using var committed = batch.Peek();
         var sequence = committed.AsReadOnlySequence();
 
-        // Strip the [varuint32 body length][varuint32 stream id] framing and return the operation payload.
-        var lengthReader = Reader.Create(sequence, session: null!);
-        var bodyLength = lengthReader.ReadVarUInt32();
-        var entry = sequence.Slice(lengthReader.Position, bodyLength);
-        var streamIdReader = Reader.Create(entry, session: null!);
-        streamIdReader.ReadVarUInt32();
-        var payload = entry.Slice(streamIdReader.Position);
+        // Strip the OrleansBinary entry framing and return the operation payload.
+        if (!OrleansBinaryJournalReader.TryReadVersionAndLength(sequence, out var version, out var bodyLength, out var lengthPrefixLength))
+        {
+            throw new InvalidOperationException("The binary journal entry stream is malformed.");
+        }
+
+        var entry = sequence.Slice(lengthPrefixLength, bodyLength);
+        ReadOnlySequence<byte> payload;
+        if (version == OrleansBinaryJournalReader.FramingVersion)
+        {
+            payload = entry.Slice(sizeof(uint));
+        }
+        else
+        {
+            var streamIdReader = Reader.Create(entry, session: null!);
+            streamIdReader.ReadVarUInt32();
+            payload = entry.Slice(streamIdReader.Position);
+        }
+
         return payload.ToArray();
     }
 

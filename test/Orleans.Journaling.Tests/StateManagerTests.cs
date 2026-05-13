@@ -1168,9 +1168,12 @@ public class StateManagerTests : JournalingTestBase
 
         while (!reader.End)
         {
-            var lengthReader = Reader.Create(reader.UnreadSequence, session: null!);
-            var length = lengthReader.ReadVarUInt32();
-            reader.Advance(lengthReader.Position);
+            if (!OrleansBinaryJournalReader.TryReadVersionAndLength(reader.UnreadSequence, out var version, out var length, out var lengthPrefixLength))
+            {
+                throw new InvalidOperationException("The binary journal entry stream is malformed.");
+            }
+
+            reader.Advance(lengthPrefixLength);
 
             if (length == 0 || length > reader.Remaining)
             {
@@ -1178,8 +1181,9 @@ public class StateManagerTests : JournalingTestBase
             }
 
             var entry = reader.Sequence.Slice(reader.Consumed, length);
-            var streamIdReader = Reader.Create(entry, session: null!);
-            var streamIdValue = streamIdReader.ReadVarUInt32();
+            var streamIdValue = version == OrleansBinaryJournalReader.FramingVersion
+                ? OrleansBinaryJournalReader.ReadUInt32LittleEndian(entry)
+                : Reader.Create(entry, session: null!).ReadVarUInt32();
 
             var streamId = new JournalStreamId(streamIdValue);
             if (!streamIds.Contains(streamId))
@@ -1310,10 +1314,16 @@ public class StateManagerTests : JournalingTestBase
     {
         public List<uint> BeganEntryIds { get; } = [];
 
-        protected override void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output)
+        protected override void StartEntry(JournalStreamId streamId)
         {
             BeganEntryIds.Add(streamId.Value);
-            base.WriteEntry(streamId, payload, output);
+            base.StartEntry(streamId);
+        }
+
+        protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
+        {
+            BeganEntryIds.Add(streamId.Value);
+            base.WritePreservedEntry(streamId, entry);
         }
     }
 

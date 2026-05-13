@@ -13,21 +13,19 @@ public ref struct JournalEntryScope : IDisposable
 {
     private JournalBufferWriter? _writer;
     private JournalStreamId _streamId;
-    private IBufferWriter<byte>? _payloadWriter;
     private bool _completed;
 
-    internal JournalEntryScope(JournalBufferWriter writer, JournalStreamId streamId, IBufferWriter<byte> payloadWriter)
+    internal JournalEntryScope(JournalBufferWriter writer, JournalStreamId streamId)
     {
         _writer = writer;
         _streamId = streamId;
-        _payloadWriter = payloadWriter;
         _completed = false;
     }
 
     /// <summary>
     /// Gets the payload writer for this entry.
     /// </summary>
-    public readonly IBufferWriter<byte> PayloadWriter => _payloadWriter ?? throw new InvalidOperationException(_completed ? "The journal entry has already completed." : "The journal entry scope is not active.");
+    public readonly IBufferWriter<byte> PayloadWriter => GetWriter();
 
     /// <summary>
     /// Commits the pending entry, making it visible to storage.
@@ -50,7 +48,6 @@ public ref struct JournalEntryScope : IDisposable
             _completed = true;
             _writer = null;
             _streamId = default;
-            _payloadWriter = null;
         }
     }
 
@@ -69,7 +66,6 @@ public ref struct JournalEntryScope : IDisposable
         _completed = true;
         _writer = null;
         _streamId = default;
-        _payloadWriter = null;
         writer.AbortActiveEntry(streamId);
     }
 

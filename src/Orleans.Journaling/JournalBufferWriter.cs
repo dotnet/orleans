@@ -7,32 +7,27 @@ namespace Orleans.Journaling;
 /// Base class for in-memory journal buffers used to assemble a pending journal batch.
 /// </summary>
 /// <remarks>
-/// Derived classes own physical entry framing. This base class owns the committed and active-entry
-/// buffers so that callers can flush a committed prefix while another entry is being written.
+/// Derived classes own physical entry framing. This base class owns the buffer and committed-length
+/// watermark so that callers can flush a committed prefix while another entry is being written.
 /// Buffers returned by <see cref="GetBuffer"/> are pinned, caller-owned snapshots which must remain
 /// valid for the caller's lifetime even if <see cref="Reset"/> or <see cref="Dispose"/> is called
 /// before the caller disposes the returned buffer.
 /// Despite the name, this type does not perform storage I/O; it accumulates encoded journal entries until
 /// callers hand the buffer off to <see cref="IJournalStorage"/>.
 /// </remarks>
-public abstract class JournalBufferWriter : IDisposable
+public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 {
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
     private readonly object _lock = new();
 #endif
-    private readonly ArcBufferWriter _committedBuffer = new();
-    private readonly ArcBufferWriter _activeEntryBuffer = new();
+    private readonly ArcBufferWriter _buffer = new();
+    private int _committedLength;
+    private int _entryStart;
+    private int _payloadStart;
     private bool _hasActiveEntry;
     private bool _disposed;
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="JournalBufferWriter"/> class.
-    /// </summary>
-    protected JournalBufferWriter()
-    {
-    }
 
     /// <summary>
     /// Creates a writer for entries belonging to <paramref name="streamId"/>.
@@ -64,8 +59,8 @@ public abstract class JournalBufferWriter : IDisposable
         {
             ThrowIfDisposed();
             ThrowIfEntryActive();
-            _committedBuffer.Reset();
-            _activeEntryBuffer.Reset();
+            _buffer.Reset();
+            _committedLength = 0;
         }
     }
 
@@ -81,8 +76,7 @@ public abstract class JournalBufferWriter : IDisposable
                 return;
             }
 
-            _activeEntryBuffer.Dispose();
-            _committedBuffer.Dispose();
+            _buffer.Dispose();
             _disposed = true;
         }
     }
@@ -97,7 +91,7 @@ public abstract class JournalBufferWriter : IDisposable
             lock (_lock)
             {
                 ThrowIfDisposed();
-                return _committedBuffer.Length;
+                return _committedLength;
             }
         }
     }
@@ -112,7 +106,7 @@ public abstract class JournalBufferWriter : IDisposable
             lock (_lock)
             {
                 ThrowIfDisposed();
-                return _activeEntryBuffer.Length;
+                return _hasActiveEntry ? checked(_buffer.Length - _payloadStart) : 0;
             }
         }
     }
@@ -127,29 +121,82 @@ public abstract class JournalBufferWriter : IDisposable
             lock (_lock)
             {
                 ThrowIfDisposed();
-                return checked(_committedBuffer.Length + _activeEntryBuffer.Length);
+                return _buffer.Length;
             }
         }
     }
 
     /// <summary>
-    /// Encodes a complete journal entry into <paramref name="output"/>.
+    /// Gets the current output writer.
     /// </summary>
-    /// <param name="streamId">The durable state id.</param>
-    /// <param name="payload">The entry payload.</param>
-    /// <param name="output">The committed output buffer.</param>
-    protected abstract void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output);
+    /// <remarks>This writer is only safe to use from journal buffer writer lifecycle methods.</remarks>
+    protected IBufferWriter<byte> Output => _buffer;
 
     /// <summary>
-    /// Encodes a complete journal entry into <paramref name="output"/>.
+    /// Gets the offset of the active entry in the current buffer.
+    /// </summary>
+    protected int ActiveEntryStart
+    {
+        get
+        {
+            lock (_lock)
+            {
+                ThrowIfDisposed();
+                ThrowIfNoActiveEntry();
+                return _entryStart;
+            }
+        }
+    }
+
+    /// <summary>
+    /// Patches bytes at the specified offset in the current buffer.
+    /// </summary>
+    /// <param name="offset">The offset into the current buffer.</param>
+    /// <param name="value">The replacement bytes.</param>
+    protected void WriteAt(int offset, ReadOnlySpan<byte> value)
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            _buffer.WriteAt(offset, value);
+        }
+    }
+
+    /// <summary>
+    /// Gets a pinned snapshot of the active entry payload.
+    /// </summary>
+    /// <returns>The active entry payload. The caller owns and must dispose the returned buffer.</returns>
+    protected ArcBuffer GetActiveEntryPayload()
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            ThrowIfNoActiveEntry();
+            using var buffer = _buffer.PeekSlice(_buffer.Length);
+            return buffer.Slice(_payloadStart, checked(_buffer.Length - _payloadStart));
+        }
+    }
+
+    /// <summary>
+    /// Writes any format-owned entry prefix and prepares the payload writer.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
-    /// <param name="payload">The active entry payload buffer.</param>
-    /// <param name="output">The committed output buffer.</param>
-    protected virtual void WriteEntry(JournalStreamId streamId, ArcBufferWriter payload, ArcBufferWriter output)
+    protected virtual void StartEntry(JournalStreamId streamId)
     {
-        using var payloadBuffer = payload.PeekSlice(payload.Length);
-        WriteEntry(streamId, payloadBuffer.AsReadOnlySequence(), output);
+    }
+
+    /// <summary>
+    /// Writes any format-owned entry suffix or patches framing bytes.
+    /// </summary>
+    /// <param name="streamId">The durable state id.</param>
+    protected abstract void FinishEntry(JournalStreamId streamId);
+
+    /// <summary>
+    /// Notifies the format that the active entry is being aborted.
+    /// </summary>
+    /// <param name="streamId">The durable state id.</param>
+    protected virtual void AbortEntry(JournalStreamId streamId)
+    {
     }
 
     /// <summary>
@@ -157,8 +204,7 @@ public abstract class JournalBufferWriter : IDisposable
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
     /// <param name="entry">The preserved entry.</param>
-    /// <param name="output">The committed output buffer.</param>
-    protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, IBufferWriter<byte> output)
+    protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
     {
         throw new InvalidOperationException(
             $"The journal buffer writer '{GetType().FullName}' cannot append preserved entry of type '{entry.GetType().FullName}'.");
@@ -181,7 +227,7 @@ public abstract class JournalBufferWriter : IDisposable
         lock (_lock)
         {
             ThrowIfDisposed();
-            return _committedBuffer.PeekSlice(_committedBuffer.Length);
+            return _buffer.PeekSlice(_committedLength);
         }
     }
 
@@ -191,7 +237,13 @@ public abstract class JournalBufferWriter : IDisposable
         {
             ThrowIfDisposed();
             ValidateCommittedPrefix(buffer);
-            _committedBuffer.AdvanceReader(buffer.Length);
+            _buffer.AdvanceReader(buffer.Length);
+            _committedLength -= buffer.Length;
+            if (_hasActiveEntry)
+            {
+                _entryStart -= buffer.Length;
+                _payloadStart -= buffer.Length;
+            }
         }
     }
 
@@ -205,9 +257,20 @@ public abstract class JournalBufferWriter : IDisposable
                 throw new InvalidOperationException("The journal buffer writer already has an active entry.");
             }
 
-            _activeEntryBuffer.Reset();
+            _entryStart = _payloadStart = _buffer.Length;
             _hasActiveEntry = true;
-            return new(this, streamId, _activeEntryBuffer);
+            try
+            {
+                StartEntry(streamId);
+                _payloadStart = _buffer.Length;
+                return new(this, streamId);
+            }
+            catch
+            {
+                _buffer.Truncate(_entryStart);
+                ClearActiveEntry();
+                throw;
+            }
         }
     }
 
@@ -222,14 +285,15 @@ public abstract class JournalBufferWriter : IDisposable
                 throw new InvalidOperationException("The journal buffer writer already has an active entry.");
             }
 
-            var committedLength = _committedBuffer.Length;
+            var committedLength = _committedLength;
             try
             {
-                WritePreservedEntry(streamId, entry, _committedBuffer);
+                WritePreservedEntry(streamId, entry);
+                _committedLength = _buffer.Length;
             }
             catch
             {
-                _committedBuffer.Truncate(committedLength);
+                _buffer.Truncate(committedLength);
                 throw;
             }
         }
@@ -241,24 +305,19 @@ public abstract class JournalBufferWriter : IDisposable
         {
             ThrowIfDisposed();
             ThrowIfNoActiveEntry();
-            var committedLength = _committedBuffer.Length;
             try
             {
-                WriteEntry(streamId, _activeEntryBuffer, _committedBuffer);
+                FinishEntry(streamId);
+                _committedLength = _buffer.Length;
             }
             catch
             {
-                _committedBuffer.Truncate(committedLength);
+                _buffer.Truncate(_entryStart);
                 throw;
             }
             finally
             {
-                if (_activeEntryBuffer.Length > 0)
-                {
-                    _activeEntryBuffer.Reset();
-                }
-
-                _hasActiveEntry = false;
+                ClearActiveEntry();
             }
         }
     }
@@ -269,14 +328,21 @@ public abstract class JournalBufferWriter : IDisposable
         {
             ThrowIfDisposed();
             ThrowIfNoActiveEntry();
-            _activeEntryBuffer.Reset();
-            _hasActiveEntry = false;
+            try
+            {
+                AbortEntry(streamId);
+            }
+            finally
+            {
+                _buffer.Truncate(_entryStart);
+                ClearActiveEntry();
+            }
         }
     }
 
     private void ValidateCommittedPrefix(ArcBuffer buffer)
     {
-        if (buffer.Length > _committedBuffer.Length)
+        if (buffer.Length > _committedLength)
         {
             throw new InvalidOperationException("The consumed journal buffer exceeds the current committed length.");
         }
@@ -286,7 +352,7 @@ public abstract class JournalBufferWriter : IDisposable
             return;
         }
 
-        using var prefix = _committedBuffer.PeekSlice(buffer.Length);
+        using var prefix = _buffer.PeekSlice(buffer.Length);
         if (!ReferenceEquals(buffer.First, prefix.First) || buffer.Offset != prefix.Offset)
         {
             throw new InvalidOperationException("The consumed journal buffer is not the current committed prefix.");
@@ -309,11 +375,47 @@ public abstract class JournalBufferWriter : IDisposable
         }
     }
 
+    private void ClearActiveEntry()
+    {
+        _entryStart = _payloadStart = 0;
+        _hasActiveEntry = false;
+    }
+
     private void ThrowIfDisposed()
     {
         if (_disposed)
         {
             throw new ObjectDisposedException(GetType().FullName);
+        }
+    }
+
+    void IBufferWriter<byte>.Advance(int count)
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            ThrowIfNoActiveEntry();
+            _buffer.AdvanceWriter(count);
+        }
+    }
+
+    Memory<byte> IBufferWriter<byte>.GetMemory(int sizeHint)
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            ThrowIfNoActiveEntry();
+            return _buffer.GetMemory(sizeHint);
+        }
+    }
+
+    Span<byte> IBufferWriter<byte>.GetSpan(int sizeHint)
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            ThrowIfNoActiveEntry();
+            return _buffer.GetSpan(sizeHint);
         }
     }
 }

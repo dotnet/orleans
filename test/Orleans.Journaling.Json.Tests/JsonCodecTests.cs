@@ -814,10 +814,13 @@ public class JsonCodecTests
     {
         public List<RecordedJournalEntry> Entries { get; } = [];
 
-        protected override void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output) =>
+        protected override void FinishEntry(JournalStreamId streamId)
+        {
+            using var payload = GetActiveEntryPayload();
             Entries.Add(new(streamId, payload.ToArray()));
+        }
 
-        protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, IBufferWriter<byte> output) =>
+        protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) =>
             throw new InvalidOperationException("This test writer does not accept preserved entries.");
     }
 

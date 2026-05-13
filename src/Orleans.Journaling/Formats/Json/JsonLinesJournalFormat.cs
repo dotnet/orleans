@@ -215,7 +215,33 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     private sealed class JsonLinesJournalBufferWriter : JournalBufferWriter
     {
-        protected override void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output)
+        protected override void StartEntry(JournalStreamId streamId)
+        {
+            WriteJournalEntryPrefix(streamId, Output);
+        }
+
+        protected override void FinishEntry(JournalStreamId streamId)
+        {
+            if (ActiveEntryLength == 0)
+            {
+                throw new InvalidOperationException("The JSON Lines journal entry has no entry payload.");
+            }
+
+            WriteBytes(Output, "]\n"u8);
+        }
+
+        protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
+        {
+            if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"The JSON journal buffer writer cannot append preserved entry of type '{entry.GetType().FullName}'.");
+            }
+
+            WriteEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), Output);
+        }
+
+        private static void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output)
         {
             if (payload.IsEmpty)
             {
@@ -225,17 +251,6 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             WriteJournalEntryPrefix(streamId, output);
             WriteSequence(output, payload);
             WriteBytes(output, "]\n"u8);
-        }
-
-        protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, IBufferWriter<byte> output)
-        {
-            if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
-            {
-                throw new InvalidOperationException(
-                    $"The JSON journal buffer writer cannot append preserved entry of type '{entry.GetType().FullName}'.");
-            }
-
-            WriteEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), output);
         }
 
         private static void WriteJournalEntryPrefix(JournalStreamId streamId, IBufferWriter<byte> output)

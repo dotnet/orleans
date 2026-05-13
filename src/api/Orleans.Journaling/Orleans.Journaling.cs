@@ -278,11 +278,13 @@ namespace Orleans.Journaling
         void ApplySet(T value);
     }
 
-    public abstract partial class JournalBufferWriter : System.IDisposable
+    public abstract partial class JournalBufferWriter : System.IDisposable, System.Buffers.IBufferWriter<byte>
     {
         protected int ActiveEntryLength { get { throw null; } }
+        protected int ActiveEntryStart { get { throw null; } }
         protected int BufferedLength { get { throw null; } }
         protected int CommittedLength { get { throw null; } }
+        protected System.Buffers.IBufferWriter<byte> Output { get { throw null; } }
         public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) { throw null; }
 
         public void Dispose() { }
@@ -290,9 +292,18 @@ namespace Orleans.Journaling
 
         public void Reset() { }
 
-        protected abstract void WriteEntry(JournalStreamId streamId, System.Buffers.ReadOnlySequence<byte> payload, System.Buffers.IBufferWriter<byte> output);
-        protected virtual void WriteEntry(JournalStreamId streamId, Serialization.Buffers.ArcBufferWriter payload, Serialization.Buffers.ArcBufferWriter output) { }
-        protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, System.Buffers.IBufferWriter<byte> output) { }
+        void System.Buffers.IBufferWriter<byte>.Advance(int count) { }
+
+        System.Memory<byte> System.Buffers.IBufferWriter<byte>.GetMemory(int sizeHint) { throw null; }
+
+        System.Span<byte> System.Buffers.IBufferWriter<byte>.GetSpan(int sizeHint) { throw null; }
+
+        protected virtual void AbortEntry(JournalStreamId streamId) { }
+        protected abstract void FinishEntry(JournalStreamId streamId);
+        protected Serialization.Buffers.ArcBuffer GetActiveEntryPayload() { throw null; }
+        protected virtual void StartEntry(JournalStreamId streamId) { }
+        protected void WriteAt(int offset, System.ReadOnlySpan<byte> value) { }
+        protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) { }
     }
 
     public sealed partial class JournaledStateManagerOptions
