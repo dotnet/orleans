@@ -5,7 +5,7 @@ using Orleans.Journaling.Json;
 
 namespace Orleans.Journaling;
 
-public sealed class VolatileJournalStorageProvider : IJournalStorageProvider
+public sealed class VolatileJournalStorageProvider
 {
     private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<GrainId, VolatileJournalStorage> _storage = new();

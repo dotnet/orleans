@@ -18,7 +18,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 {
     private ServiceProvider _azureServiceProvider = null!;
     private SiloLifecycleSubject _siloLifecycle = null!;
-    private IJournalStorageProvider _storageProvider = null!;
+    private AzureBlobJournalStorageProvider _storageProvider = null!;
 
     public AzureBlobCodecRecoveryTests()
     {
@@ -34,11 +34,10 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         services.AddSerializer();
         ConfigureFormatServices(services);
         services.AddSingleton<AzureBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
 
         _azureServiceProvider = services.BuildServiceProvider();
-        _storageProvider = _azureServiceProvider.GetRequiredService<IJournalStorageProvider>();
+        _storageProvider = _azureServiceProvider.GetRequiredService<AzureBlobJournalStorageProvider>();
         _siloLifecycle = new SiloLifecycleSubject(_azureServiceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());
 
         foreach (var participant in _azureServiceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>())
@@ -211,7 +210,6 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         services.AddSerializer();
         ConfigureFormatServices(services);
         services.AddSingleton<AzureBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
 
         var serviceProvider = services.BuildServiceProvider();
@@ -222,7 +220,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         }
 
         await lifecycle.OnStart(cancellationToken);
-        return new(serviceProvider, lifecycle, serviceProvider.GetRequiredService<IJournalStorageProvider>());
+        return new(serviceProvider, lifecycle, serviceProvider.GetRequiredService<AzureBlobJournalStorageProvider>());
     }
 
     private static JournaledStateManager CreateFormatAwareManager(IServiceProvider serviceProvider, IJournalStorage storage, string journalFormatKey)
@@ -248,11 +246,11 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
     private sealed class AzureProviderFixture(
         ServiceProvider serviceProvider,
         SiloLifecycleSubject lifecycle,
-        IJournalStorageProvider storageProvider) : IAsyncDisposable
+        AzureBlobJournalStorageProvider storageProvider) : IAsyncDisposable
     {
         public ServiceProvider ServiceProvider { get; } = serviceProvider;
 
-        public IJournalStorageProvider StorageProvider { get; } = storageProvider;
+        public AzureBlobJournalStorageProvider StorageProvider { get; } = storageProvider;
 
         public async ValueTask DisposeAsync()
         {

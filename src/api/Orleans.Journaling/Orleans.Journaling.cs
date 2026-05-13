@@ -173,11 +173,6 @@ namespace Orleans.Journaling
         void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata);
     }
 
-    public partial interface IJournalStorageProvider
-    {
-        IJournalStorage Create(Runtime.IGrainContext grainContext);
-    }
-
     public partial interface IDurableListCommandCodec<T>
     {
         void Apply(JournalBufferReader input, IDurableListCommandHandler<T> consumer);
@@ -450,7 +445,7 @@ namespace Orleans.Journaling
         public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider
+    public sealed partial class VolatileJournalStorageProvider
     {
         public VolatileJournalStorageProvider() { }
 

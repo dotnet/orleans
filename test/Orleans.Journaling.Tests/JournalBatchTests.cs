@@ -25,22 +25,27 @@ public sealed class AzureStorageJournalBatchTests : JournalBatchTests
         services.Configure<AzureBlobJournalStorageOptions>(options => JournalingAzureStorageTestConfiguration.ConfigureTestDefaults(options));
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
         services.AddSingleton<AzureBlobJournalStorageProvider>();
-        services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
         services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
     }
+
+    protected override IJournalStorage CreateStorage(IServiceProvider serviceProvider, IGrainContext grainContext) =>
+        serviceProvider.GetRequiredService<AzureBlobJournalStorageProvider>().Create(grainContext);
 }
 
 public sealed class InMemoryJournalBatchTests : JournalBatchTests
 {
     protected override void ConfigureServices(IServiceCollection services)
     {
-        services.AddSingleton<IJournalStorageProvider, VolatileJournalStorageProvider>();
+        services.AddSingleton<VolatileJournalStorageProvider>();
     }
+
+    protected override IJournalStorage CreateStorage(IServiceProvider serviceProvider, IGrainContext grainContext) =>
+        serviceProvider.GetRequiredService<VolatileJournalStorageProvider>().Create(grainContext);
 }
 
 /// <summary>
-/// Base class for testing <see cref="IJournalStorageProvider"/> implementations.
-/// Derived classes must implement <see cref="ConfigureServices"/> to register the specific storage provider.
+/// Base class for testing journal storage implementations.
+/// Derived classes must implement <see cref="ConfigureServices"/> to register the specific storage factory.
 /// This class provides a suite of common tests for validating the behavior of <see cref="DurableList{T}"/>
 /// against different storage backends.
 /// </summary>
@@ -48,7 +53,6 @@ public abstract class JournalBatchTests : IAsyncLifetime
 {
     private IServiceProvider _serviceProvider = null!;
     private SiloLifecycleSubject? _siloLifecycle;
-    private IJournalStorageProvider _storageProvider = null!;
     private static readonly IOptions<JournaledStateManagerOptions> ManagerOptions = Options.Create(new JournaledStateManagerOptions
     {
         JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey
@@ -72,7 +76,6 @@ public abstract class JournalBatchTests : IAsyncLifetime
         ConfigureServices(services);
         _serviceProvider = services.BuildServiceProvider();
         _siloLifecycle = new SiloLifecycleSubject(_serviceProvider.GetRequiredService<ILogger<SiloLifecycleSubject>>());
-        _storageProvider = _serviceProvider.GetRequiredService<IJournalStorageProvider>();
         var participants = _serviceProvider.GetServices<ILifecycleParticipant<ISiloLifecycle>>();
         foreach (var participant in participants)
         {
@@ -94,6 +97,8 @@ public abstract class JournalBatchTests : IAsyncLifetime
 
     protected abstract void ConfigureServices(IServiceCollection services);
 
+    protected abstract IJournalStorage CreateStorage(IServiceProvider serviceProvider, IGrainContext grainContext);
+
     private static void ConfigureBinaryJournalingServices(IServiceCollection services)
     {
         services.AddSingleton<OrleansBinaryJournalFormat>();
@@ -111,7 +116,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var grainContext = new TestGrainContext(grainId); // Use provided GrainId
-        var storage = _storageProvider.Create(grainContext);
+        var storage = CreateStorage(_serviceProvider, grainContext);
         var manager = new JournaledStateManager(CreateShared(storage));
         var list = new DurableList<T>(listName, manager, new OrleansBinaryDurableListCommandCodec<T>(codecProvider.GetCodec<T>(), sessionPool));
         return (manager, list, storage);

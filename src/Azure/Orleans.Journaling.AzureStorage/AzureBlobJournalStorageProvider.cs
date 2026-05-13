@@ -10,7 +10,7 @@ internal sealed class AzureBlobJournalStorageProvider(
     IOptions<AzureBlobJournalStorageOptions> options,
     IOptions<JournaledStateManagerOptions> managerOptions,
     IServiceProvider serviceProvider,
-    ILogger<AzureBlobJournalStorage> logger) : IJournalStorageProvider, ILifecycleParticipant<ISiloLifecycle>
+    ILogger<AzureBlobJournalStorage> logger) : ILifecycleParticipant<ISiloLifecycle>
 {
     private readonly IBlobContainerFactory _containerFactory = options.Value.BuildContainerFactory(serviceProvider, options.Value);
     private readonly string _journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
