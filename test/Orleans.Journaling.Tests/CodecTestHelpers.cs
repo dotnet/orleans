@@ -22,12 +22,12 @@ public static class CodecTestHelpers
         using var committed = batch.Peek();
         var sequence = committed.AsReadOnlySequence();
 
-        // Strip the [varuint32 body length][varuint64 stream id] framing and return the operation payload.
+        // Strip the [varuint32 body length][varuint32 stream id] framing and return the operation payload.
         var lengthReader = Reader.Create(sequence, session: null!);
         var bodyLength = lengthReader.ReadVarUInt32();
         var entry = sequence.Slice(lengthReader.Position, bodyLength);
         var streamIdReader = Reader.Create(entry, session: null!);
-        streamIdReader.ReadVarUInt64();
+        streamIdReader.ReadVarUInt32();
         var payload = entry.Slice(streamIdReader.Position);
         return payload.ToArray();
     }
@@ -73,7 +73,7 @@ public static class CodecTestHelpers
     public static void AssertCommandCodecRegistrations(IServiceProvider serviceProvider, string journalFormatKey)
     {
         AssertCommandCodec<IDurableDictionaryCommandCodec<string, int>>(serviceProvider, journalFormatKey);
-        AssertCommandCodec<IDurableDictionaryCommandCodec<string, ulong>>(serviceProvider, journalFormatKey);
+        AssertCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IDurableListCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IDurableQueueCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodec<IDurableSetCommandCodec<int>>(serviceProvider, journalFormatKey);
@@ -85,7 +85,7 @@ public static class CodecTestHelpers
     public static void AssertCommandCodecServiceRegistrations(IServiceProvider serviceProvider, string journalFormatKey)
     {
         AssertCommandCodecService<IDurableDictionaryCommandCodec<string, int>>(serviceProvider, journalFormatKey);
-        AssertCommandCodecService<IDurableDictionaryCommandCodec<string, ulong>>(serviceProvider, journalFormatKey);
+        AssertCommandCodecService<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IDurableListCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IDurableQueueCommandCodec<int>>(serviceProvider, journalFormatKey);
         AssertCommandCodecService<IDurableSetCommandCodec<int>>(serviceProvider, journalFormatKey);

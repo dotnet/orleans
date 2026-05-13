@@ -122,7 +122,7 @@ public sealed class JsonCommandCodecAdditionalTests
             serviceProvider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<string, int>>(key));
         Assert.NotSame(
             serviceProvider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<string, int>>(key),
-            serviceProvider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<string, ulong>>(key));
+            serviceProvider.GetRequiredKeyedService<IDurableDictionaryCommandCodec<string, uint>>(key));
         Assert.Same(
             serviceProvider.GetRequiredKeyedService<IDurableListCommandCodec<string>>(key),
             serviceProvider.GetRequiredKeyedService<IDurableListCommandCodec<string>>(key));

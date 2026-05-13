@@ -51,6 +51,7 @@ public class IntegrationTestFixture : IAsyncLifetime
 [JsonSerializable(typeof(DateTime))]
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(uint))]
 [JsonSerializable(typeof(ulong))]
 [JsonSerializable(typeof(TestDurableGrainState))]
 [JsonSerializable(typeof(TestPerson))]

@@ -7,6 +7,7 @@ namespace Orleans.Journaling.Json.Tests;
 [JsonSerializable(typeof(int))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(ThrowingJsonValue))]
+[JsonSerializable(typeof(uint))]
 [JsonSerializable(typeof(ulong))]
 [JsonSerializable(typeof(JsonCodecTestValue))]
 [JsonSerializable(typeof(JournalingSnapshotRecord))]

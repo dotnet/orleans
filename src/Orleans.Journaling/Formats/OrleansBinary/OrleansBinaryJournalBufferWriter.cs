@@ -25,7 +25,7 @@ internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
         _activeEntryStart = _buffer.Length;
         _entryBuffer.Reset();
         var streamIdWriter = Writer.Create(_entryBuffer, session: null!);
-        streamIdWriter.WriteVarUInt64(streamId.Value);
+        streamIdWriter.WriteVarUInt32(streamId.Value);
         streamIdWriter.Commit();
         return _entryBuffer;
     }

@@ -129,7 +129,7 @@ public class StateManagerTests : JournalingTestBase
         Assert.Equal(decodedPayload, preserved.Payload);
 
         var writer = Assert.Single(format.Writers);
-        Assert.Contains(99UL, writer.BeganEntryIds);
+        Assert.Contains(99u, writer.BeganEntryIds);
     }
 
     [Fact]
@@ -176,7 +176,7 @@ public class StateManagerTests : JournalingTestBase
         var writer = Assert.Single(format.Writers);
         Assert.Single(storage.Appends);
         Assert.Empty(storage.Replaces);
-        Assert.Contains(0UL, writer.BeganEntryIds);
+        Assert.Contains(0u, writer.BeganEntryIds);
         Assert.Contains(writer.BeganEntryIds, id => id >= 8);
         Assert.True(writer.GetBufferCount > 0);
         Assert.True(writer.ResetCount > 0);
@@ -1135,7 +1135,7 @@ public class StateManagerTests : JournalingTestBase
 
             var entry = reader.Sequence.Slice(reader.Consumed, length);
             var streamIdReader = Reader.Create(entry, session: null!);
-            var streamIdValue = streamIdReader.ReadVarUInt64();
+            var streamIdValue = streamIdReader.ReadVarUInt32();
 
             var streamId = new JournalStreamId(streamIdValue);
             if (!streamIds.Contains(streamId))
@@ -1264,7 +1264,7 @@ public class StateManagerTests : JournalingTestBase
 
     private sealed class TrackingJournalBufferWriter : OrleansBinaryJournalBufferWriter
     {
-        public List<ulong> BeganEntryIds { get; } = [];
+        public List<uint> BeganEntryIds { get; } = [];
 
         public int GetBufferCount { get; private set; }
 

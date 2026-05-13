@@ -94,21 +94,21 @@ internal static class OrleansBinaryJournalReader
 
             var frameLength = checked(lengthPrefixSize + (int)bodyLength);
 
-            ulong streamIdValue;
+            uint streamIdValue;
             try
             {
-                streamIdValue = reader.ReadVarUInt64();
+                streamIdValue = reader.ReadVarUInt32();
             }
             catch (InvalidOperationException exception)
             {
                 throw new InvalidOperationException(
-                    $"Malformed binary journal entry stream at byte offset {offset}: truncated varuint64 state id.",
+                    $"Malformed binary journal entry stream at byte offset {offset}: truncated varuint32 state id.",
                     exception);
             }
             catch (Exception exception)
             {
                 throw new InvalidOperationException(
-                    $"Malformed binary journal entry stream at byte offset {offset}: malformed varuint64 state id.",
+                    $"Malformed binary journal entry stream at byte offset {offset}: malformed varuint32 state id.",
                     exception);
             }
 

@@ -9,14 +9,14 @@ namespace Orleans.Journaling;
 
 internal sealed partial class JournaledStateManager : IJournaledStateManager, IJournalStorageConsumer, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
-    private const int MinApplicationJournalStreamId = 8;
+    private const uint MinApplicationJournalStreamId = 8u;
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
     private readonly object _lock = new();
 #endif
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
-    private readonly Dictionary<ulong, IJournaledState> _statesMap = [];
+    private readonly Dictionary<uint, IJournaledState> _statesMap = [];
     private readonly JournaledStateManagerShared _shared;
     private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
@@ -34,7 +34,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         _shared = shared;
         _journalWriter = _shared.JournalFormat.CreateWriter();
         var serviceProvider = _shared.ServiceProvider;
-        var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
+        var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
         // The list of known states is itself stored as a durable state with the implicit id 0.
@@ -416,7 +416,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) => _journalWriter.CreateJournalStreamWriter(streamId);
 
-    private static void AppendUpdatesOrSnapshotState(JournalBufferWriter journalWriter, bool isSnapshot, ulong id, IJournaledState state)
+    private static void AppendUpdatesOrSnapshotState(JournalBufferWriter journalWriter, bool isSnapshot, uint id, IJournaledState state)
     {
         var writer = journalWriter.CreateJournalStreamWriter(new(id));
         if (isSnapshot)
@@ -621,7 +621,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         return newWorkItem.Task;
     }
 
-    private void BindState(string name, ulong id)
+    private void BindState(string name, uint id)
     {
         lock (_lock)
         {
@@ -696,27 +696,27 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     private sealed class StateDirectory(
         JournaledStateManager manager,
-        IDurableDictionaryCommandCodec<string, ulong> codec) : IJournaledState, IDurableDictionaryCommandHandler<string, ulong>
+        IDurableDictionaryCommandCodec<string, uint> codec) : IJournaledState, IDurableDictionaryCommandHandler<string, uint>
     {
-        public const int Id = 0;
+        public const uint Id = 0u;
 
         private readonly JournaledStateManager _manager = manager;
-        private readonly IDurableDictionaryCommandCodec<string, ulong> _codec = codec;
-        private readonly Dictionary<string, ulong> _ids = new(StringComparer.Ordinal);
+        private readonly IDurableDictionaryCommandCodec<string, uint> _codec = codec;
+        private readonly Dictionary<string, uint> _ids = new(StringComparer.Ordinal);
         private JournalStreamWriter _writer;
 
-        public ulong this[string name] => _ids[name];
+        public uint this[string name] => _ids[name];
 
         void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
             context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
-        public bool TryGetValue(string name, out ulong id) => _ids.TryGetValue(name, out id);
+        public bool TryGetValue(string name, out uint id) => _ids.TryGetValue(name, out id);
 
-        public ulong GetNextJournalStreamId()
+        public uint GetNextJournalStreamId()
         {
-            var maxId = (ulong)MinApplicationJournalStreamId - 1;
+            var maxId = MinApplicationJournalStreamId - 1u;
             foreach (var id in _ids.Values)
             {
                 if (id > maxId)
@@ -728,7 +728,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             return checked(maxId + 1);
         }
 
-        public void Set(string name, ulong id)
+        public void Set(string name, uint id)
         {
             _codec.WriteSet(name, id, GetWriter());
             ApplySet(name, id);
@@ -750,19 +750,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         IJournaledState IJournaledState.DeepCopy() => throw new NotSupportedException();
 
-        void IDurableDictionaryCommandHandler<string, ulong>.ApplySet(string key, ulong value) => ApplySet(key, value);
+        void IDurableDictionaryCommandHandler<string, uint>.ApplySet(string key, uint value) => ApplySet(key, value);
 
-        void IDurableDictionaryCommandHandler<string, ulong>.ApplyRemove(string key) => ApplyRemove(key);
+        void IDurableDictionaryCommandHandler<string, uint>.ApplyRemove(string key) => ApplyRemove(key);
 
-        void IDurableDictionaryCommandHandler<string, ulong>.ApplyClear() => _ids.Clear();
+        void IDurableDictionaryCommandHandler<string, uint>.ApplyClear() => _ids.Clear();
 
-        void IDurableDictionaryCommandHandler<string, ulong>.Reset(int capacityHint)
+        void IDurableDictionaryCommandHandler<string, uint>.Reset(int capacityHint)
         {
             _ids.Clear();
             _ids.EnsureCapacity(capacityHint);
         }
 
-        private void ApplySet(string name, ulong id)
+        private void ApplySet(string name, uint id)
         {
             _ids[name] = id;
             _manager.BindState(name, id);
@@ -783,7 +783,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         JournaledStateManager manager, IDurableDictionaryCommandCodec<string, DateTime> codec)
             : DurableDictionary<string, DateTime>(codec)
     {
-        public const int Id = 1;
+        public const uint Id = 1u;
 
         private readonly JournalStreamWriter _journalWriter = manager.CreateJournalStreamWriter(new(Id));
 

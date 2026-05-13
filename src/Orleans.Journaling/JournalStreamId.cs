@@ -4,4 +4,4 @@ namespace Orleans.Journaling;
 /// Identifies a state.
 /// </summary>
 /// <param name="Value">The underlying identity value.</param>
-public readonly record struct JournalStreamId(ulong Value);
+public readonly record struct JournalStreamId(uint Value);

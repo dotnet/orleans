@@ -77,7 +77,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddScoped<IJournaledStateManager, JournaledStateManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, new TestJournalFormat());
-        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, ulong>>(CustomFormatKey, new TestDictionaryCodec<string, ulong>());
+        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, uint>>(CustomFormatKey, new TestDictionaryCodec<string, uint>());
         services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, DateTime>>(CustomFormatKey, new TestDictionaryCodec<string, DateTime>());
         services.AddKeyedSingleton<IDurableValueCommandCodec<int>>(CustomFormatKey, (_, _) =>
         {

@@ -13,7 +13,7 @@ internal static class JournalReplayContextFactory
         journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
         var services = new ServiceCollection();
         services.AddKeyedSingleton<IJournalFormat>(journalFormatKey, new TestJournalFormat(journalFormatKey));
-        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, ulong>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<ulong>());
+        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, uint>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<uint>());
         services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, DateTime>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<DateTime>());
 
         var serviceProvider = services.BuildServiceProvider();

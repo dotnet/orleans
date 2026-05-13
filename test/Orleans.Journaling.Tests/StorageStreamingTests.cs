@@ -194,7 +194,7 @@ public sealed class StorageStreamingTests
         ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
 
         var entry = Assert.Single(consumer.Entries);
-        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal((uint)8, entry.StreamId.Value);
         Assert.Equal([1, 2, 3], entry.Payload);
         Assert.Equal(2, reader.Length);
     }
@@ -329,7 +329,7 @@ public sealed class StorageStreamingTests
     {
         public List<(JournalStreamId StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds)
         {
             var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
             for (var i = 0; i < streamIds.Length; i++)

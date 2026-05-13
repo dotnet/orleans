@@ -85,9 +85,9 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: each line must include a stream id.");
             }
 
-            if (reader.TokenType is not JsonTokenType.Number || !reader.TryGetUInt64(out var streamId))
+            if (reader.TokenType is not JsonTokenType.Number || !reader.TryGetUInt32(out var streamId))
             {
-                throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: element 0 must be an unsigned integer stream id.");
+                throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: element 0 must be an unsigned 32-bit integer stream id.");
             }
 
             var stream = new JournalStreamId(streamId);
@@ -296,7 +296,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         private static void WriteJournalEntryPrefix(JournalStreamId streamId, ArcBufferWriter buffer)
         {
-            var prefix = buffer.GetSpan(22);
+            var prefix = buffer.GetSpan(12);
             prefix[0] = (byte)'[';
             if (!Utf8Formatter.TryFormat(streamId.Value, prefix[1..], out var streamIdLength))
             {

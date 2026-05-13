@@ -89,7 +89,7 @@ public static class JournalSnapshotFormatting
             if (!TryDecodeVarUInt(sequence.Slice(entryStart, (int)bodyLength), out var streamId, out var streamIdSize))
             {
                 builder.Append("[entry ").Append(entryIndex).Append("] length=").Append(bodyLength)
-                    .Append(" (unable to parse varuint64 stream id)\n");
+                    .Append(" (unable to parse varuint32 stream id)\n");
                 AppendHexAsciiDump(builder, data.AsSpan(entryStart, (int)bodyLength));
                 offset = entryEnd;
                 entryIndex++;
@@ -145,7 +145,7 @@ public static class JournalSnapshotFormatting
         try
         {
             var reader = Reader.Create(input, session: null!);
-            value = reader.ReadVarUInt64();
+            value = reader.ReadVarUInt32();
             bytesRead = (int)reader.Position;
             return true;
         }
@@ -223,7 +223,7 @@ public static class JournalTestReplayContext
         journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
         var services = new ServiceCollection();
         services.AddKeyedSingleton<IJournalFormat>(journalFormatKey, new TestJournalFormat(journalFormatKey));
-        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, ulong>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<ulong>());
+        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, uint>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<uint>());
         services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, DateTime>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<DateTime>());
 
         var serviceProvider = services.BuildServiceProvider();

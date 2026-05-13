@@ -394,12 +394,12 @@ namespace Orleans.Journaling
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>
     {
         private readonly int _dummyPrimitive;
-        public JournalStreamId(ulong Value) { }
+        public JournalStreamId(uint Value) { }
 
-        public ulong Value { get { throw null; } init { } }
+        public uint Value { get { throw null; } init { } }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
-        public readonly void Deconstruct(out ulong Value) { throw null; }
+        public readonly void Deconstruct(out uint Value) { throw null; }
 
         [System.Runtime.CompilerServices.CompilerGenerated]
         public readonly bool Equals(JournalStreamId other) { throw null; }

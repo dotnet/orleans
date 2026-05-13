@@ -25,7 +25,7 @@ namespace Orleans.Journaling.Json.Tests;
 [TestCategory("BVT")]
 public sealed class JsonCodecSnapshotTests
 {
-    private const ulong SnapshotStreamId = 8;
+    private const uint SnapshotStreamId = 8;
 
     private static readonly JsonSerializerOptions Options = new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
 

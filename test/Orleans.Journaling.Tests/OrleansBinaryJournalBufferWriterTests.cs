@@ -335,10 +335,10 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     [InlineData(new byte[] { 0x02 }, "truncated varuint32 entry length prefix")]
     [InlineData(new byte[] { 0x01 }, "zero-length entries")]
     [InlineData(new byte[] { 0x0B, 1, 2 }, "exceeds remaining input bytes")]
-    [InlineData(new byte[] { 0x03, 0x00 }, "truncated varuint64 state id")]
+    [InlineData(new byte[] { 0x03, 0x00 }, "truncated varuint32 state id")]
     [InlineData(
-        new byte[] { 0x05, 0x00, 0x00 },
-        "malformed varuint64 state id")]
+        new byte[] { 0x11, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00 },
+        "malformed varuint32 state id")]
     public void BinaryFormat_Read_RejectsMalformedFrames(byte[] bytes, string expectedMessage)
     {
         using var data = CreateWriter(bytes);
@@ -396,7 +396,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         return writer;
     }
 
-    private static void ReadAll(ArcBuffer data, IReplayConsumer consumer, params ulong[] streamIds)
+    private static void ReadAll(ArcBuffer data, IReplayConsumer consumer, params uint[] streamIds)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
@@ -406,14 +406,14 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         Assert.Equal(0, reader.Length);
     }
 
-    private static (uint Length, ulong StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)
+    private static (uint Length, uint StreamId, ReadOnlySequence<byte> Payload) ReadEntry(ref SequenceReader<byte> reader)
     {
         var lengthReader = Reader.Create(reader.UnreadSequence, session: null!);
         var length = lengthReader.ReadVarUInt32();
         reader.Advance(lengthReader.Position);
         var entry = reader.Sequence.Slice(reader.Consumed, length);
         var streamIdReader = Reader.Create(entry, session: null!);
-        var streamId = streamIdReader.ReadVarUInt64();
+        var streamId = streamIdReader.ReadVarUInt32();
         var payload = entry.Slice(streamIdReader.Position);
         reader.Advance(length);
 
@@ -422,15 +422,15 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
     private interface IReplayConsumer
     {
-        (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds);
+        (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds);
     }
 
     private sealed class CollectingConsumer : IReplayConsumer
     {
 
-        public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
+        public List<(uint StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds)
         {
             var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
             for (var i = 0; i < streamIds.Length; i++)
@@ -458,11 +458,11 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
 
-        public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
+        public List<(uint StreamId, byte[] Payload)> Entries { get; } = [];
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds)
         {
             var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
             for (var i = 0; i < streamIds.Length; i++)

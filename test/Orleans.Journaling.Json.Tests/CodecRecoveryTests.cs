@@ -315,7 +315,7 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Theory]
-    [InlineData("[8,[\"set\",42]]\n[\"8\",[\"set\",43]]\n", "unsigned integer stream id")]
+    [InlineData("[8,[\"set\",42]]\n[\"8\",[\"set\",43]]\n", "unsigned 32-bit integer stream id")]
     [InlineData("[8,[\"set\",42]]\n[9,[\"set\",43]]{}\n", "invalid JSON journal entry")]
     public async Task JsonRecovery_MalformedJournal_ThrowsFormatKeyError(string jsonLines, string expectedInnerMessage)
     {

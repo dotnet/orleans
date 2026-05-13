@@ -341,7 +341,7 @@ public class JsonCodecTests
         var payload = """["set",42]"""u8.ToArray();
         var entry = Assert.Single(writer.Entries);
 
-        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal((uint)8, entry.StreamId.Value);
         Assert.Equal(payload, entry.Payload);
     }
 
@@ -360,12 +360,12 @@ public class JsonCodecTests
             writer.Entries,
             entry =>
             {
-                Assert.Equal((ulong)8, entry.StreamId.Value);
+                Assert.Equal((uint)8, entry.StreamId.Value);
                 Assert.Equal("""["set",42]""", Encoding.UTF8.GetString(entry.Payload));
             },
             entry =>
             {
-                Assert.Equal((ulong)10, entry.StreamId.Value);
+                Assert.Equal((uint)10, entry.StreamId.Value);
                 Assert.Equal("""["set",43]""", Encoding.UTF8.GetString(entry.Payload));
             });
     }
@@ -427,7 +427,7 @@ public class JsonCodecTests
 
         valueCodec.Apply(CodecTestHelpers.ReadBuffer(entry.Payload), consumer);
 
-        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal((uint)8, entry.StreamId.Value);
         Assert.Equal(42, consumer.Value);
     }
 
@@ -437,7 +437,7 @@ public class JsonCodecTests
     [InlineData("null\n", "must be a JSON array")]
     [InlineData("[]\n", "stream id")]
     [InlineData("[8]\n", "entry payload")]
-    [InlineData("""["8",["set",42]]""" + "\n", "unsigned integer")]
+    [InlineData("""["8",["set",42]]""" + "\n", "unsigned 32-bit integer")]
     [InlineData("[8,null]\n", "entry payload array")]
     [InlineData("""[8,["set",42]]{}""" + "\n", "invalid JSON")]
     [InlineData("""[8,["set",42]""" + "\n", "invalid JSON")]
@@ -553,7 +553,7 @@ public class JsonCodecTests
 
         Assert.Equal(0, reader.Length);
         var entry = Assert.Single(consumer.Entries);
-        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal((uint)8, entry.StreamId.Value);
         Assert.Equal($$"""["set","{{text}}"]""", Encoding.UTF8.GetString(entry.Payload));
     }
 
@@ -584,7 +584,7 @@ public class JsonCodecTests
         var entries = Read(format, """[8,["set",42]]""" + "\r\n");
         var entry = Assert.Single(entries);
 
-        Assert.Equal((ulong)8, entry.StreamId.Value);
+        Assert.Equal((uint)8, entry.StreamId.Value);
         Assert.Equal("""["set",42]""", Encoding.UTF8.GetString(entry.Payload));
     }
 
@@ -775,7 +775,7 @@ public class JsonCodecTests
         return Encoding.UTF8.GetString(buffer.ToArray());
     }
 
-    private static void AppendValueSet(JournalBufferWriter writer, ulong streamId, int value)
+    private static void AppendValueSet(JournalBufferWriter writer, uint streamId, int value)
     {
         var codec = new JsonDurableValueCommandCodec<int>(Options);
         codec.WriteSet(value, writer.CreateJournalStreamWriter(new JournalStreamId(streamId)));
@@ -841,7 +841,7 @@ public class JsonCodecTests
     {
         public List<RecordedJournalEntry> Entries { get; } = [];
 
-        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params uint[] streamIds)
         {
             var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
             for (var i = 0; i < streamIds.Length; i++)

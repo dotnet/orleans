@@ -33,7 +33,7 @@ namespace Orleans.Journaling.Tests;
 [TestCategory("BVT")]
 public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
 {
-    private const ulong SnapshotStreamId = 8;
+    private const uint SnapshotStreamId = 8;
 
     private static readonly JournalingSnapshotRecord SampleRecord = new()
     {
