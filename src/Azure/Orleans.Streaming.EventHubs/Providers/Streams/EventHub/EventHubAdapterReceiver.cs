@@ -56,6 +56,13 @@ namespace Orleans.Streaming.EventHubs
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
 
+        // Per-subscription delivery tracking for low-watermark checkpointing.
+        // Tracks the max delivered EventHub offset per (stream, subscription) so we can compute
+        // the partition-wide minimum (safe checkpoint offset). This ensures a fast consumer
+        // on one subscription doesn't advance the checkpoint past a slow consumer on another.
+        private readonly Dictionary<(StreamId StreamId, GuidId SubscriptionId), (long Offset, DateTime LastUpdated)> deliveredOffsets = new();
+        private static readonly TimeSpan DeliveryTrackingExpiry = TimeSpan.FromMinutes(30);
+
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
 
@@ -184,12 +191,6 @@ namespace Orleans.Streaming.EventHubs
             {
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
             }
-            if (!this.checkpointer.CheckpointExists)
-            {
-                this.checkpointer.Update(
-                    messages[0].OffsetString,
-                    DateTime.UtcNow);
-            }
             return batches;
         }
 
@@ -206,6 +207,26 @@ namespace Orleans.Streaming.EventHubs
             //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
             if (!this.IsUnderPressure())
                 this.cache.SignalPurge();
+
+            // Clean up stale delivery tracking entries for subscriptions that are no longer active.
+            var now = DateTime.UtcNow;
+            List<(StreamId, GuidId)> staleKeys = null;
+            foreach (var kvp in deliveredOffsets)
+            {
+                if (now - kvp.Value.LastUpdated > DeliveryTrackingExpiry)
+                {
+                    staleKeys ??= new();
+                    staleKeys.Add(kvp.Key);
+                }
+            }
+            if (staleKeys is not null)
+            {
+                foreach (var key in staleKeys)
+                {
+                    deliveredOffsets.Remove(key);
+                }
+            }
+
             return false;
         }
 
@@ -224,6 +245,42 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
+        public void NotifyBatchDelivered(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token)
+        {
+            if (this.checkpointer == null || token is not IEventHubPartitionLocation location)
+            {
+                return;
+            }
+
+            if (!long.TryParse(location.EventHubOffset, out var offset))
+            {
+                return;
+            }
+
+            // Track the max delivered offset per (stream, subscription).
+            var key = (streamId, subscriptionId);
+            if (!deliveredOffsets.TryGetValue(key, out var entry) || offset > entry.Offset)
+            {
+                deliveredOffsets[key] = (offset, DateTime.UtcNow);
+            }
+
+            // Compute the partition-wide low watermark: the minimum across all subscriptions.
+            // The checkpoint only advances when ALL tracked subscriptions have delivered past it.
+            long watermark = long.MaxValue;
+            foreach (var kvp in deliveredOffsets)
+            {
+                if (kvp.Value.Offset < watermark)
+                {
+                    watermark = kvp.Value.Offset;
+                }
+            }
+
+            if (watermark != long.MaxValue)
+            {
+                this.checkpointer.Update(watermark.ToString(), DateTime.UtcNow);
+            }
+        }
+
         public async Task Shutdown(TimeSpan timeout)
         {
             var watch = Stopwatch.StartNew();
@@ -236,6 +293,13 @@ namespace Orleans.Streaming.EventHubs
                 }
 
                 LogInfoStoppingReadingFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
+
+                // Flush the checkpoint before disposing the cache or closing the receiver,
+                // so the latest processed offset is persisted and not replayed on restart.
+                if (this.checkpointer != null)
+                {
+                    await this.checkpointer.FlushAsync();
+                }
 
                 // clear cache and receiver
                 IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);

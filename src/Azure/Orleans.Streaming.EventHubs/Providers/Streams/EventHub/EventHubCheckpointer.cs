@@ -48,8 +48,9 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
 
         private EventHubPartitionCheckpointEntity entity;
-        private Task inProgressSave;
+        private Task inProgressSave = Task.CompletedTask;
         private DateTime? throttleSavesUntilUtc;
+        private string latestOffset;
 
         /// <summary>
         /// Indicates if a checkpoint exists
@@ -112,21 +113,35 @@ namespace Orleans.Streaming.EventHubs
                 entity = results.Entity;
             }
 
+            latestOffset = entity.Offset;
             return entity.Offset;
         }
 
         /// <summary>
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
+        /// The latest offset is always tracked in memory so that <see cref="FlushAsync"/> can persist it on shutdown.
         /// </summary>
         /// <param name="offset"></param>
         /// <param name="utcNow"></param>
         public void Update(string offset, DateTime utcNow)
         {
             // if offset has not changed, do nothing
-            if (string.Compare(entity.Offset, offset, StringComparison.Ordinal) == 0)
+            if (string.Compare(latestOffset, offset, StringComparison.Ordinal) == 0)
             {
                 return;
             }
+
+            // Only move the in-memory offset forward (Event Hub offsets are numeric strings).
+            // This prevents a purge-based checkpoint from regressing past a read-based checkpoint.
+            if (long.TryParse(offset, out var newOffset)
+                && long.TryParse(latestOffset, out var currentOffset)
+                && newOffset <= currentOffset)
+            {
+                return;
+            }
+
+            // Always track the latest offset in memory so FlushAsync can persist it.
+            latestOffset = offset;
 
             // if we've saved before but it's not time for another save or the last save operation has not completed, do nothing
             if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
@@ -138,6 +153,21 @@ namespace Orleans.Streaming.EventHubs
             throttleSavesUntilUtc = utcNow + persistInterval;
             inProgressSave = dataManager.UpsertTableEntryAsync(entity);
             inProgressSave.Ignore();
+        }
+
+        /// <summary>
+        /// Flushes any pending checkpoint to persistent storage.
+        /// Awaits any in-progress save, then persists the latest offset if it has advanced beyond the last saved value.
+        /// </summary>
+        public async Task FlushAsync()
+        {
+            await inProgressSave;
+            if (string.Compare(entity.Offset, latestOffset, StringComparison.Ordinal) != 0)
+            {
+                entity.Offset = latestOffset;
+                inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+                await inProgressSave;
+            }
         }
 
         [LoggerMessage(
