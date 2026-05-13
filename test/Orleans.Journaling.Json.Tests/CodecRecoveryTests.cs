@@ -251,17 +251,16 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Fact]
-    public async Task Recovery_MetadataLessJournal_UsesBinaryFallbackAndMigratesOnFirstWrite()
+    public async Task Recovery_MetadataLessJournal_UsesConfiguredFormat()
     {
-        var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
-        using var first = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
-        var dict = CreateFormatAwareDictionary(first, OrleansBinaryJournalFormat.JournalFormatKey);
+        var storage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
+        using var first = CreateFormatAwareTestSystem(storage, JsonJournalExtensions.JournalFormatKey);
+        var dict = CreateFormatAwareDictionary(first, JsonJournalExtensions.JournalFormatKey);
         await first.Lifecycle.OnStart();
         dict.Add("alpha", 1);
         await first.Manager.WriteStateAsync(CancellationToken.None);
         var metadataLessStorage = new MetadataOverridingStorage(storage, storedJournalFormatKey: null);
 
-        storage.SetConfiguredJournalFormatKey(JsonJournalExtensions.JournalFormatKey);
         using var recovered = CreateFormatAwareTestSystem(metadataLessStorage, JsonJournalExtensions.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(recovered, JsonJournalExtensions.JournalFormatKey);
         await recovered.Lifecycle.OnStart();
@@ -272,7 +271,8 @@ public class CodecRecoveryTests : JournalingTestBase
         await recovered.Manager.WriteStateAsync(CancellationToken.None);
 
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, storage.StoredJournalFormatKey);
-        Assert.Single(storage.Segments);
+        Assert.Equal(2, storage.Segments.Count);
+        Assert.Contains("""[8,["set","beta",2]]""", Encoding.UTF8.GetString(storage.Segments[^1]), StringComparison.Ordinal);
     }
 
     [Fact]

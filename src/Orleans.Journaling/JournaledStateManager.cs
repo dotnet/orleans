@@ -542,7 +542,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
         var journalFormatKey = metadata?.Format is { } storedFormatKey
             ? JournalFormatServices.ValidateJournalFormatKey(storedFormatKey)
-            : OrleansBinaryJournalFormat.JournalFormatKey;
+            : _shared.JournalFormatKey;
         try
         {
             if (!string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))
