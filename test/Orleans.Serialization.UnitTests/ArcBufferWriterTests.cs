@@ -41,8 +41,9 @@ public class ArcBufferWriterTests
         var i = 0;
         while (bufferWriter.Length < randomData.Length)
         {
+            var offset = bufferWriter.Length;
             var writeSize = Math.Min(randomData.Length - bufferWriter.Length, writeSizes[i++ % writeSizes.Length]);
-            bufferWriter.Write(randomData);
+            bufferWriter.Write(randomData.AsSpan(offset, writeSize));
         }
 
         {
@@ -87,11 +88,12 @@ public class ArcBufferWriterTests
 
         Assert.Equal(randomData.Length, bufferWriter.Length);
 
+        var sliceLength = Math.Min(3000, randomData.Length / 2);
         {
-            using var peeked = bufferWriter.PeekSlice(3000);
-            using var slice = bufferWriter.ConsumeSlice(3000);
+            using var peeked = bufferWriter.PeekSlice(sliceLength);
+            using var slice = bufferWriter.ConsumeSlice(sliceLength);
             var sliceArray = slice.ToArray();
-            Assert.Equal(randomData.AsSpan(0, 3000).ToArray(), sliceArray);
+            Assert.Equal(randomData.AsSpan(0, sliceLength).ToArray(), sliceArray);
             Assert.Equal(sliceArray, peeked.ToArray());
             Assert.Equal(sliceArray, peeked.AsReadOnlySequence().ToArray());
 
@@ -99,17 +101,17 @@ public class ArcBufferWriterTests
         }
 
         {
-            using var peeked = bufferWriter.PeekSlice(3000);
-            using var slice = bufferWriter.ConsumeSlice(3000);
+            using var peeked = bufferWriter.PeekSlice(sliceLength);
+            using var slice = bufferWriter.ConsumeSlice(sliceLength);
             var sliceArray = slice.ToArray();
-            Assert.Equal(randomData.AsSpan(3000, 3000).ToArray(), sliceArray);
+            Assert.Equal(randomData.AsSpan(sliceLength, sliceLength).ToArray(), sliceArray);
             Assert.Equal(sliceArray, peeked.ToArray());
             Assert.Equal(sliceArray, slice.AsReadOnlySequence().ToArray());
 
             Assert.Equal(randomData.Length - sliceArray.Length * 2, bufferWriter.Length);
         }
 
-        Assert.Equal(randomData.Length - 6000, bufferWriter.Length);
+        Assert.Equal(randomData.Length - sliceLength * 2, bufferWriter.Length);
     }
 
     [Fact]
@@ -390,7 +392,9 @@ public class ArcBufferWriterTests
     public void ReplenishBuffers_ProvidesSegmentsAndFreesPages()
     {
         var bufferWriter = new ArcBufferWriter();
-        var randomData = new byte[PageSize * 16];
+        int[] socketReadSizes = [256, 4096, 76, 12805, 4096, 26, 8094, 12345, 1, 0, 12345];
+        int[] messageReadSizes = [8, 1020, 8, 902, 8, 1203, 8, 8045, 0, 12034, 8, 1101, 8, 4096];
+        var randomData = new byte[socketReadSizes.Sum()];
         _random.NextBytes(randomData);
         bufferWriter.Write([0]);
         var pages = new List<ArcBufferPage>();
@@ -398,10 +402,9 @@ public class ArcBufferWriterTests
         var firstPage = firstSlice.Pages.First();
         firstSlice.Dispose();
 
-        var buffers = new List<ArraySegment<byte>>(capacity: 16);
+        var bufferCapacity = Math.Max(16, (socketReadSizes.Max() + PageSize - 1) / PageSize + 1);
+        var buffers = new List<ArraySegment<byte>>(capacity: bufferCapacity);
         var consumed = new List<ArcBuffer>();
-        int[] socketReadSizes = [256, 4096, 76, 12805, 4096, 26, 8094, 12345, 1, 0, 12345];
-        int[] messageReadSizes = [8, 1020, 8, 902, 8, 1203, 8, 8045, 0, 12034, 8, 1101, 8, 4096];
         var messageReadIndex = 0;
 
         ReadOnlySpan<byte> socket = randomData;
