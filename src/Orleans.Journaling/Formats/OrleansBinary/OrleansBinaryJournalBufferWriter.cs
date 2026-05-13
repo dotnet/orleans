@@ -5,84 +5,60 @@ namespace Orleans.Journaling;
 
 internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
 {
-    private readonly ArcBufferWriter _buffer = new();
-    private readonly ArcBufferWriter _entryBuffer = new();
-    private int _activeEntryStart;
+    public int Length => BufferedLength;
 
-    public int Length => checked(_buffer.Length + _entryBuffer.Length);
-
-    protected override ArcBuffer GetBufferCore() => _buffer.PeekSlice(_buffer.Length);
-
-    protected override void ResetCore()
+    protected override void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output)
     {
-        _activeEntryStart = 0;
-        _buffer.Reset();
-        _entryBuffer.Reset();
+        var length = checked((uint)(GetVarUInt32ByteCount(streamId.Value) + payload.Length));
+        var writer = Writer.Create(output, session: null!);
+        writer.WriteVarUInt32(length);
+        writer.WriteVarUInt32(streamId.Value);
+        writer.Commit();
+        WriteSequence(output, payload);
     }
 
-    protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId)
-    {
-        _activeEntryStart = _buffer.Length;
-        _entryBuffer.Reset();
-        var streamIdWriter = Writer.Create(_entryBuffer, session: null!);
-        streamIdWriter.WriteVarUInt32(streamId.Value);
-        streamIdWriter.Commit();
-        return _entryBuffer;
-    }
-
-    protected override void CommitEntry(JournalStreamId streamId)
-    {
-        ValidateEntryStart();
-        var length = checked((uint)_entryBuffer.Length);
-        var lengthWriter = Writer.Create(_buffer, session: null!);
-        lengthWriter.WriteVarUInt32(length);
-        lengthWriter.Commit();
-        using var body = _entryBuffer.PeekSlice(_entryBuffer.Length);
-        _buffer.AppendPinned(body);
-        _activeEntryStart = 0;
-        _entryBuffer.Reset();
-    }
-
-    protected override void AbortEntry(JournalStreamId streamId)
-    {
-        ValidateEntryStart();
-        _activeEntryStart = 0;
-        _entryBuffer.Reset();
-    }
-
-    public ArcBuffer Peek() => _buffer.PeekSlice(_buffer.Length);
+    public ArcBuffer Peek() => GetCommittedBuffer();
 
     /// <summary>
     /// Returns a read-only stream over a pinned snapshot of the current committed bytes.
     /// </summary>
     public Stream AsReadOnlyStream() => new ReadOnlyStream(Peek());
 
-    public override void Dispose()
-    {
-        _entryBuffer.Dispose();
-        _buffer.Dispose();
-    }
-
-    protected override void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
+    protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, IBufferWriter<byte> output)
     {
         if (!string.Equals(entry.FormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
         {
             throw new InvalidOperationException(
                 $"The Orleans binary journal buffer writer cannot append preserved entry for journal format key '{entry.FormatKey}'.");
-            }
+        }
 
-        using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();
-        journalEntry.PayloadWriter.Write(entry.Payload.Span);
-        journalEntry.Commit();
+        WriteEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), output);
     }
 
-    private void ValidateEntryStart()
+    private static void WriteSequence(IBufferWriter<byte> output, ReadOnlySequence<byte> input)
     {
-        if (_activeEntryStart != _buffer.Length)
+        foreach (var segment in input)
         {
-            throw new InvalidOperationException("The journal entry start does not match the active entry.");
+            var span = segment.Span;
+            while (!span.IsEmpty)
+            {
+                var destination = output.GetSpan(span.Length);
+                var length = Math.Min(destination.Length, span.Length);
+                span[..length].CopyTo(destination);
+                output.Advance(length);
+                span = span[length..];
+            }
         }
     }
+
+    private static int GetVarUInt32ByteCount(uint value) => value switch
+    {
+        < 128u => 1,
+        < 16_384u => 2,
+        < 2_097_152u => 3,
+        < 268_435_456u => 4,
+        _ => 5
+    };
 
     private sealed class ReadOnlyStream(ArcBuffer buffer) : Stream
     {

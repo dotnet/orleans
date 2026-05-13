@@ -812,28 +812,12 @@ public class JsonCodecTests
 
     private sealed class CapturingNonJsonJournalBufferWriter : JournalBufferWriter
     {
-        private readonly ArcBufferWriter _payload = new();
-
         public List<RecordedJournalEntry> Entries { get; } = [];
 
-        protected override ArcBuffer GetBufferCore() => _payload.PeekSlice(0);
-
-        protected override void ResetCore() => _payload.Reset();
-
-        protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId) => _payload;
-
-        protected override void CommitEntry(JournalStreamId streamId)
-        {
-            using var payload = _payload.PeekSlice(_payload.Length);
+        protected override void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output) =>
             Entries.Add(new(streamId, payload.ToArray()));
-            _payload.Reset();
-        }
 
-        protected override void AbortEntry(JournalStreamId streamId) => _payload.Reset();
-
-        public override void Dispose() => _payload.Dispose();
-
-        protected override void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) =>
+        protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, IBufferWriter<byte> output) =>
             throw new InvalidOperationException("This test writer does not accept preserved entries.");
     }
 

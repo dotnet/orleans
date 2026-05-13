@@ -46,6 +46,76 @@ public sealed class JournalBufferWriterOwnershipTests
         }
     }
 
+    [Theory]
+    [InlineData(BinaryFormat)]
+    [InlineData(JsonFormat)]
+    public void GetBuffer_ReturnsCommittedPrefixWhileEntryIsActive(string format)
+    {
+        using var writer = CreateWriter(format);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
+        var expectedCommittedPrefix = ToArray(writer);
+
+        using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
+        entry.PayloadWriter.Write(GetSecondPayload(format));
+
+        using var committed = writer.GetBuffer();
+        Assert.Equal(expectedCommittedPrefix, committed.ToArray());
+
+        entry.Commit();
+        Assert.Equal(GetEntriesBytes(format, (1, GetFirstPayload(format)), (2, GetSecondPayload(format))), ToArray(writer));
+    }
+
+    [Theory]
+    [InlineData(BinaryFormat)]
+    [InlineData(JsonFormat)]
+    public void Consume_RemovesCommittedPrefixAndKeepsActiveEntry(string format)
+    {
+        using var writer = CreateWriter(format);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
+
+        using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
+        entry.PayloadWriter.Write(GetSecondPayload(format));
+        using var committed = writer.GetCommittedBuffer();
+
+        writer.Consume(committed);
+
+        Assert.Empty(ToArray(writer));
+        entry.Commit();
+        Assert.Equal(GetEntriesBytes(format, (2, GetSecondPayload(format))), ToArray(writer));
+    }
+
+    [Theory]
+    [InlineData(BinaryFormat)]
+    [InlineData(JsonFormat)]
+    public void UnconsumedCommittedBufferRemainsAvailableForRetry(string format)
+    {
+        using var writer = CreateWriter(format);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
+        using (var committed = writer.GetCommittedBuffer())
+        {
+            Assert.NotEmpty(committed.ToArray());
+        }
+
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(2)), GetSecondPayload(format));
+
+        Assert.Equal(GetEntriesBytes(format, (1, GetFirstPayload(format)), (2, GetSecondPayload(format))), ToArray(writer));
+    }
+
+    [Theory]
+    [InlineData(BinaryFormat)]
+    [InlineData(JsonFormat)]
+    public void Consume_RejectsStaleCommittedBuffer(string format)
+    {
+        using var writer = CreateWriter(format);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
+        using var committed = writer.GetCommittedBuffer();
+        writer.Consume(committed);
+
+        var exception = Assert.Throws<InvalidOperationException>(() => writer.Consume(committed));
+
+        Assert.Contains("committed length", exception.Message, StringComparison.Ordinal);
+    }
+
     private static JournalBufferWriter CreateWriter(string format) => format switch
     {
         BinaryFormat => new OrleansBinaryJournalBufferWriter(),
@@ -78,5 +148,16 @@ public sealed class JournalBufferWriterOwnershipTests
     {
         using var committed = writer.GetBuffer();
         return committed.ToArray();
+    }
+
+    private static byte[] GetEntriesBytes(string format, params (uint StreamId, byte[] Payload)[] entries)
+    {
+        using var writer = CreateWriter(format);
+        foreach (var (streamId, payload) in entries)
+        {
+            AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(streamId)), payload);
+        }
+
+        return ToArray(writer);
     }
 }

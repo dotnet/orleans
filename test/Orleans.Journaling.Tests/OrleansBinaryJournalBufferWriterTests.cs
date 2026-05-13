@@ -166,21 +166,18 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     }
 
     [Fact]
-    public void GetBuffer_ThrowsWhenEntryIsActive()
+    public void GetBuffer_ReturnsCommittedBytesWhenEntryIsActive()
     {
         using var buffer = new OrleansBinaryJournalBufferWriter();
-        var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.PayloadWriter.Write(new byte[] { 1 });
+        AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [1]);
+        var committedBytes = ToArray(buffer);
+        using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
+        entry.PayloadWriter.Write(new byte[] { 2 });
 
-        var exception = Assert.Throws<InvalidOperationException>(() =>
-        {
-            using var _ = buffer.GetBuffer();
-        });
-
-        Assert.Contains("active entry", exception.Message, StringComparison.Ordinal);
-        entry.Dispose();
         using var committed = buffer.GetBuffer();
-        Assert.Equal(0, committed.Length);
+
+        Assert.Equal(committedBytes, committed.ToArray());
+        entry.Commit();
     }
 
     [Fact]

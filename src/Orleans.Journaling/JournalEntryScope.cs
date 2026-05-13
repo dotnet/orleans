@@ -41,11 +41,17 @@ public ref struct JournalEntryScope : IDisposable
         }
 
         var writer = GetWriter();
-        writer.CommitActiveEntry(_streamId);
-        _completed = true;
-        _writer = null;
-        _streamId = default;
-        _payloadWriter = null;
+        try
+        {
+            writer.CommitActiveEntry(_streamId);
+        }
+        finally
+        {
+            _completed = true;
+            _writer = null;
+            _streamId = default;
+            _payloadWriter = null;
+        }
     }
 
     /// <summary>

@@ -280,20 +280,18 @@ namespace Orleans.Journaling
 
     public abstract partial class JournalBufferWriter : System.IDisposable
     {
-        protected abstract void AbortEntry(JournalStreamId streamId);
-        protected abstract System.Buffers.IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId);
-        protected abstract void CommitEntry(JournalStreamId streamId);
+        protected int ActiveEntryLength { get { throw null; } }
+        protected int BufferedLength { get { throw null; } }
+        protected int CommittedLength { get { throw null; } }
         public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) { throw null; }
 
-        public abstract void Dispose();
+        public void Dispose() { }
         public Serialization.Buffers.ArcBuffer GetBuffer() { throw null; }
-
-        protected abstract Serialization.Buffers.ArcBuffer GetBufferCore();
-        protected virtual void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) { }
 
         public void Reset() { }
 
-        protected abstract void ResetCore();
+        protected abstract void WriteEntry(JournalStreamId streamId, System.Buffers.ReadOnlySequence<byte> payload, System.Buffers.IBufferWriter<byte> output);
+        protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, System.Buffers.IBufferWriter<byte> output) { }
     }
 
     public sealed partial class JournaledStateManagerOptions

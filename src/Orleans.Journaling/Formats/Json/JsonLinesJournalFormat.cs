@@ -215,58 +215,19 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     private sealed class JsonLinesJournalBufferWriter : JournalBufferWriter
     {
-        private readonly ArcBufferWriter _buffer = new();
-        private int _activeEntryStart;
-        private int _activePayloadStart;
-
-        protected override ArcBuffer GetBufferCore() => _buffer.PeekSlice(_buffer.Length);
-
-        protected override void ResetCore()
+        protected override void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output)
         {
-            _activeEntryStart = 0;
-            _activePayloadStart = 0;
-            _buffer.Reset();
-        }
-
-        public override void Dispose() => _buffer.Dispose();
-
-        protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId)
-        {
-            _activeEntryStart = _buffer.Length;
-            WriteJournalEntryPrefix(streamId, _buffer);
-            _activePayloadStart = _buffer.Length;
-            return _buffer;
-        }
-
-        protected override void CommitEntry(JournalStreamId streamId)
-        {
-            if (_buffer.Length == _activePayloadStart)
+            if (payload.IsEmpty)
             {
                 throw new InvalidOperationException("The JSON Lines journal entry has no entry payload.");
             }
 
-            try
-            {
-                _buffer.Write("]"u8);
-                _buffer.Write("\n"u8);
-                _activeEntryStart = 0;
-                _activePayloadStart = 0;
-            }
-            catch
-            {
-                _buffer.Truncate(_activeEntryStart);
-                throw;
-            }
+            WriteJournalEntryPrefix(streamId, output);
+            WriteSequence(output, payload);
+            WriteBytes(output, "]\n"u8);
         }
 
-        protected override void AbortEntry(JournalStreamId streamId)
-        {
-            _buffer.Truncate(_activeEntryStart);
-            _activeEntryStart = 0;
-            _activePayloadStart = 0;
-        }
-
-        protected override void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
+        protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry, IBufferWriter<byte> output)
         {
             if (!string.Equals(entry.FormatKey, JsonJournalExtensions.JournalFormatKey, StringComparison.Ordinal))
             {
@@ -274,29 +235,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                     $"The JSON journal buffer writer cannot append preserved entry of type '{entry.GetType().FullName}'.");
             }
 
-            WriteJournalEntry(streamId, entry.Payload, _buffer);
+            WriteEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), output);
         }
 
-        private static void WriteJournalEntry(JournalStreamId streamId, ReadOnlyMemory<byte> payload, ArcBufferWriter buffer)
+        private static void WriteJournalEntryPrefix(JournalStreamId streamId, IBufferWriter<byte> output)
         {
-            var entryStart = buffer.Length;
-            try
-            {
-                WriteJournalEntryPrefix(streamId, buffer);
-                buffer.Write(payload.Span);
-                buffer.Write("]"u8);
-                buffer.Write("\n"u8);
-            }
-            catch
-            {
-                buffer.Truncate(entryStart);
-                throw;
-            }
-        }
-
-        private static void WriteJournalEntryPrefix(JournalStreamId streamId, ArcBufferWriter buffer)
-        {
-            var prefix = buffer.GetSpan(12);
+            var prefix = output.GetSpan(12);
             prefix[0] = (byte)'[';
             if (!Utf8Formatter.TryFormat(streamId.Value, prefix[1..], out var streamIdLength))
             {
@@ -305,7 +249,27 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             var prefixLength = 1 + streamIdLength;
             prefix[prefixLength++] = (byte)',';
-            buffer.AdvanceWriter(prefixLength);
+            output.Advance(prefixLength);
+        }
+
+        private static void WriteSequence(IBufferWriter<byte> output, ReadOnlySequence<byte> input)
+        {
+            foreach (var segment in input)
+            {
+                WriteBytes(output, segment.Span);
+            }
+        }
+
+        private static void WriteBytes(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
+        {
+            while (!value.IsEmpty)
+            {
+                var destination = output.GetSpan(value.Length);
+                var length = Math.Min(destination.Length, value.Length);
+                value[..length].CopyTo(destination);
+                output.Advance(length);
+                value = value[length..];
+            }
         }
     }
 }

@@ -128,8 +128,7 @@ public class StateManagerTests : JournalingTestBase
         var preserved = Assert.Single(entries, entry => entry.StreamId.Value == 99);
         Assert.Equal(decodedPayload, preserved.Payload);
 
-        var writer = Assert.Single(format.Writers);
-        Assert.Contains(99u, writer.BeganEntryIds);
+        Assert.Contains(format.Writers, writer => writer.BeganEntryIds.Contains(99u));
     }
 
     [Fact]
@@ -150,8 +149,7 @@ public class StateManagerTests : JournalingTestBase
         await compacting.Lifecycle.OnStart();
         await compacting.Manager.WriteStateAsync(CancellationToken.None);
 
-        var writer = Assert.Single(format.Writers);
-        Assert.Contains(writer.BeganEntryIds, id => id >= 8);
+        Assert.Contains(format.Writers, writer => writer.BeganEntryIds.Any(id => id >= 8));
         Assert.Single(storage.Replaces);
 
         var recovered = CreateTestSystem(storage: storage);
@@ -178,8 +176,6 @@ public class StateManagerTests : JournalingTestBase
         Assert.Empty(storage.Replaces);
         Assert.Contains(0u, writer.BeganEntryIds);
         Assert.Contains(writer.BeganEntryIds, id => id >= 8);
-        Assert.True(writer.GetBufferCount > 0);
-        Assert.True(writer.ResetCount > 0);
     }
 
     [Fact]
@@ -323,10 +319,8 @@ public class StateManagerTests : JournalingTestBase
         dictionary.Add("key", 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
-        var writer = Assert.Single(format.Writers);
         Assert.Empty(storage.Appends);
         Assert.Single(storage.Replaces);
-        Assert.True(writer.ResetCount >= 2);
 
         var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat(SessionPool));
         var recoveredDictionary = new DurableDictionary<string, int>("dict", recovered.Manager, CreateDictionaryCodec<string, int>());
@@ -469,8 +463,11 @@ public class StateManagerTests : JournalingTestBase
             });
             Assert.True(writeStarted.Wait(TimeSpan.FromSeconds(10)));
 
-            Assert.False(writeTask.IsCompleted);
-            Assert.Empty(storage.Appends);
+            Assert.True(SpinWait.SpinUntil(() => writeTask.IsCompleted, TimeSpan.FromSeconds(10)));
+            Assert.True(writeTask.IsCompletedSuccessfully, writeTask.Exception?.ToString());
+            Assert.False(state.AppendEntriesObservedOpenEntry);
+            var append = Assert.Single(storage.Appends);
+            Assert.DoesNotContain(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
 
             state.MarkEntryClosing();
             entry.Commit();
@@ -481,9 +478,56 @@ public class StateManagerTests : JournalingTestBase
             entry.Dispose();
         }
 
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+        Assert.Equal(2, storage.Appends.Count);
+        Assert.Contains(ReadBinaryEntries(storage.Appends[1]), entry => entry.StreamId.Value >= 8);
+    }
+
+    [Fact]
+    public async Task StateManager_SnapshotWrite_DoesNotDiscardActiveEntry()
+    {
+        var storage = new CapturingStorage { IsCompactionRequested = true, DelayReplace = true };
+        var format = new TrackingJournalFormat(SessionPool);
+        var sut = CreateTestSystem(storage: storage, journalFormat: format);
+        var state = new ManualDirectWriteState();
+        sut.Manager.RegisterState("manual", state);
+
+        await sut.Lifecycle.OnStart();
+
+        var writeTask = StartSnapshotAndCommitActiveEntry();
+
         await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
-        Assert.False(state.AppendEntriesObservedOpenEntry);
-        Assert.Single(storage.Appends);
+        var replacement = Assert.Single(storage.Replaces);
+        Assert.DoesNotContain(ReadBinaryEntries(replacement), entry => entry.StreamId.Value >= 8);
+
+        storage.IsCompactionRequested = false;
+        await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
+
+        var append = Assert.Single(storage.Appends);
+        Assert.Contains(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
+
+        Task StartSnapshotAndCommitActiveEntry()
+        {
+            Task writeTask = Task.CompletedTask;
+            using var entry = state.BeginEntry();
+            try
+            {
+                entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
+                writeTask = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
+                Assert.True(SpinWait.SpinUntil(() => storage.ReplaceStarted.Task.IsCompleted, TimeSpan.FromSeconds(10)), writeTask.Exception?.ToString());
+                Assert.False(writeTask.IsCompleted);
+
+                state.MarkEntryClosing();
+                entry.Commit();
+                storage.AllowReplace.SetResult();
+                return writeTask;
+            }
+            finally
+            {
+                state.MarkEntryClosing();
+                entry.Dispose();
+            }
+        }
     }
 
     /// <summary>
@@ -1266,33 +1310,10 @@ public class StateManagerTests : JournalingTestBase
     {
         public List<uint> BeganEntryIds { get; } = [];
 
-        public int GetBufferCount { get; private set; }
-
-        public int ResetCount { get; private set; }
-
-        protected override ArcBuffer GetBufferCore()
-        {
-            GetBufferCount++;
-            return base.GetBufferCore();
-        }
-
-        protected override void ResetCore()
-        {
-            ResetCount++;
-            base.ResetCore();
-        }
-
-        protected override IBufferWriter<byte> BeginEntryCore(JournalStreamId streamId)
+        protected override void WriteEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, IBufferWriter<byte> output)
         {
             BeganEntryIds.Add(streamId.Value);
-            return base.BeginEntryCore(streamId);
-        }
-
-        protected override void OnAppendPreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
-        {
-            using var journalEntry = CreateJournalStreamWriter(streamId).BeginEntry();
-            journalEntry.PayloadWriter.Write(entry.Payload.Span);
-            journalEntry.Commit();
+            base.WriteEntry(streamId, payload, output);
         }
     }
 
@@ -1313,6 +1334,12 @@ public class StateManagerTests : JournalingTestBase
         public int ReadConsumeCount { get; private set; }
 
         public bool IsCompactionRequested { get; set; }
+
+        public bool DelayReplace { get; set; }
+
+        public TaskCompletionSource ReplaceStarted { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        public TaskCompletionSource AllowReplace { get; } = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
@@ -1362,14 +1389,19 @@ public class StateManagerTests : JournalingTestBase
             }
         }
 
-        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
+            if (DelayReplace)
+            {
+                ReplaceStarted.SetResult();
+                await AllowReplace.Task.WaitAsync(cancellationToken);
+            }
+
             var bytes = value.ToArray();
             Replaces.Add(bytes);
             _segments.Clear();
             _segments.Add(bytes);
-            return default;
         }
 
         public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
