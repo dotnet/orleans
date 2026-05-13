@@ -38,7 +38,7 @@ internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
         lengthWriter.WriteVarUInt32(length);
         lengthWriter.Commit();
         using var body = _entryBuffer.PeekSlice(_entryBuffer.Length);
-        _buffer.Write(body.AsReadOnlySequence());
+        _buffer.AppendPinned(body);
         _activeEntryStart = 0;
         _entryBuffer.Reset();
     }
