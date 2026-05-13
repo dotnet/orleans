@@ -22,7 +22,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private readonly IJournalStorage _storage;
     private readonly IServiceProvider _serviceProvider;
     private readonly JournaledStateManagerShared _shared;
-    private readonly IJournalFormat _writeJournalFormat;
+    private readonly IJournalFormat _format;
     private readonly IJournalBatchWriter _journalBatchWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
@@ -45,8 +45,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _storage = storage;
         _shared = shared;
         _serviceProvider = serviceProvider;
-        _writeJournalFormat = JournalFormatServices.GetRequiredJournalFormat(serviceProvider, WriteJournalFormatKey);
-        _journalBatchWriter = _writeJournalFormat.CreateWriter();
+        _format = JournalFormatServices.GetRequiredJournalFormat(serviceProvider, WriteJournalFormatKey);
+        _journalBatchWriter = _format.CreateWriter();
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, ulong>>(serviceProvider, WriteJournalFormatKey);
         var retirementTrackerCodec = JournalFormatServices.GetRequiredOperationCodec<IDictionaryOperationCodec<string, DateTime>>(serviceProvider, WriteJournalFormatKey);
 
@@ -57,30 +57,6 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         // The retirement tracker is a special internal state with a fixed id.
         // It is not stored in _journalStreamDirectory and does not participate in the general name->id mapping.
-        _retirementTracker = new RetiredStateTracker(this, retirementTrackerCodec);
-        _statesMap[RetiredStateTracker.Id] = _retirementTracker;
-    }
-
-    internal JournaledStateManager(
-        IJournalStorage storage,
-        JournaledStateManagerShared shared,
-        IServiceProvider serviceProvider,
-        IDictionaryOperationCodec<string, ulong> journalStreamIdsCodec,
-        IDictionaryOperationCodec<string, DateTime> retirementTrackerCodec,
-        IJournalFormat journalFormat)
-    {
-        ArgumentNullException.ThrowIfNull(shared);
-        ArgumentNullException.ThrowIfNull(serviceProvider);
-        ArgumentNullException.ThrowIfNull(journalFormat);
-        _storage = storage;
-        _shared = shared;
-        _serviceProvider = serviceProvider;
-        _writeJournalFormat = journalFormat;
-        _journalBatchWriter = _writeJournalFormat.CreateWriter();
-
-        _journalStreamDirectory = new StateDirectory(this, journalStreamIdsCodec);
-        _statesMap[StateDirectory.Id] = _journalStreamDirectory;
-
         _retirementTracker = new RetiredStateTracker(this, retirementTrackerCodec);
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
     }
@@ -537,7 +513,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     {
         if (string.Equals(journalFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
         {
-            return _writeJournalFormat;
+            return _format;
         }
 
         return JournalFormatServices.GetRequiredJournalFormat(_serviceProvider, journalFormatKey);

@@ -164,19 +164,12 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
     private JournaledStateManager CreateManager(IJournalStorage storage)
     {
-        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
         var shared = new JournaledStateManagerShared(
-            logger,
+            LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
             TimeProvider.System);
 
-        return new(
-            storage,
-            shared,
-            ServiceProvider,
-            new OrleansBinaryDictionaryOperationCodec<string, ulong>(ValueCodec<string>(), ValueCodec<ulong>(), SessionPool),
-            new OrleansBinaryDictionaryOperationCodec<string, DateTime>(ValueCodec<string>(), ValueCodec<DateTime>(), SessionPool),
-            new OrleansBinaryJournalFormat(SessionPool));
+        return new(storage, shared, ServiceProvider);
     }
 
     private IJournalValueCodec<T> ValueCodec<T>() => new OrleansJournalValueCodec<T>(CodecProvider.GetCodec<T>(), SessionPool);

@@ -72,9 +72,9 @@ public class CodecRecoveryTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
         var journal = Encoding.UTF8.GetString(storage.Segments.Single());
         Assert.Equal(
-            """[0,"set","dict",8]""" + "\n" +
-            """[8,"set","alpha",1]""" + "\n" +
-            """[8,"set","beta",2]""" + "\n",
+            """[0,["set","dict",8]]""" + "\n" +
+            """[8,["set","alpha",1]]""" + "\n" +
+            """[8,["set","beta",2]]""" + "\n",
             journal);
 
         // Recovery phase
@@ -287,7 +287,7 @@ public class CodecRecoveryTests : JournalingTestBase
         await system.Manager.WriteStateAsync(CancellationToken.None);
 
         Assert.Equal(JsonJournalExtensions.JournalFormatKey, storage.StoredJournalFormatKey);
-        Assert.Contains("""[8,"set","alpha",1]""", Encoding.UTF8.GetString(storage.Segments.Single()), StringComparison.Ordinal);
+        Assert.Contains("""[8,["set","alpha",1]]""", Encoding.UTF8.GetString(storage.Segments.Single()), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -314,8 +314,8 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Theory]
-    [InlineData("[8,\"set\",42]\n[\"8\",\"set\",43]\n", "unsigned integer stream id")]
-    [InlineData("[8,\"set\",42]\n[9,\"set\",43]{}\n", "invalid JSON journal entry")]
+    [InlineData("[8,[\"set\",42]]\n[\"8\",[\"set\",43]]\n", "unsigned integer stream id")]
+    [InlineData("[8,[\"set\",42]]\n[9,[\"set\",43]]{}\n", "invalid JSON journal entry")]
     public async Task JsonRecovery_MalformedJournal_ThrowsFormatKeyError(string jsonLines, string expectedInnerMessage)
     {
         var storage = await CreateJsonStorageWithSegment(jsonLines);
@@ -331,26 +331,26 @@ public class CodecRecoveryTests : JournalingTestBase
         storage ??= CreateJsonStorage();
         jsonOptions ??= CreateJsonOptions();
 
-        var journalStreamIdsCodec = new JsonDictionaryOperationCodec<string, ulong>(jsonOptions);
-        var retirementTrackerCodec = new JsonDictionaryOperationCodec<string, DateTime>(jsonOptions);
-        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
+        var serviceProvider = CreateJsonServiceProvider(jsonOptions);
         var managerOptions = new JournaledStateManagerOptions
         {
             JournalFormatKey = JsonJournalExtensions.JournalFormatKey,
             RetirementGracePeriod = ManagerOptions.RetirementGracePeriod
         };
+        if (storage is VolatileJournalStorage volatileStorage)
+        {
+            volatileStorage.SetConfiguredJournalFormatKey(managerOptions.JournalFormatKey);
+        }
+
         var shared = new JournaledStateManagerShared(
-            logger,
+            serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Microsoft.Extensions.Options.Options.Create(managerOptions),
             TimeProvider.System);
         var manager = new JournaledStateManager(
             storage,
             shared,
-            ServiceProvider,
-            journalStreamIdsCodec,
-            retirementTrackerCodec,
-            new JsonLinesJournalFormat());
-        var lifecycle = new TestGrainLifecycle(LoggerFactory.CreateLogger<TestGrainLifecycle>());
+            serviceProvider);
+        var lifecycle = new TestGrainLifecycle(serviceProvider.GetRequiredService<ILogger<TestGrainLifecycle>>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
     }
@@ -359,6 +359,20 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private static System.Text.Json.JsonSerializerOptions CreateJsonOptions()
         => new() { TypeInfoResolver = JsonCodecTestJsonContext.Default };
+
+    private static ServiceProvider CreateJsonServiceProvider(System.Text.Json.JsonSerializerOptions jsonOptions)
+    {
+        var services = new ServiceCollection();
+        services.AddSerializer();
+        services.AddLogging();
+        services.AddSingleton(new JsonJournalOptions { SerializerOptions = jsonOptions });
+        services.AddKeyedSingleton<IJournalFormat>(JsonJournalExtensions.JournalFormatKey, new JsonLinesJournalFormat());
+        services.AddKeyedSingleton(
+            typeof(IDictionaryOperationCodec<,>),
+            JsonJournalExtensions.JournalFormatKey,
+            typeof(JsonDictionaryOperationCodecService<,>));
+        return services.BuildServiceProvider();
+    }
 
     private FormatAwareTestSystem CreateFormatAwareTestSystem(
         IJournalStorage storage,

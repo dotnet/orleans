@@ -104,7 +104,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public string? MimeType => null;
 
-        public IJournalBatchWriter CreateWriter() => throw new NotSupportedException();
+        public IJournalBatchWriter CreateWriter() => new OrleansBinaryJournalBatchWriter();
 
         public void Read(JournalReadBuffer input, IStateResolver resolver, in JournaledStateReplayContext context) => throw new NotSupportedException();
     }

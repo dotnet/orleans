@@ -95,7 +95,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             var stream = new JournalStreamId(streamId);
             var state = resolver.ResolveState(stream);
-            var payloadContent = ReadArrayContent(ref reader);
+            var payloadContent = ReadOperationPayload(ref reader, offset);
             using var payloadBuffer = new ArcBufferWriter();
             WriteOperationPayload(line, payloadContent, payloadBuffer);
             var operation = new JournalOperation(JsonJournalExtensions.JournalFormatKey, new JournalReadBuffer(new ArcBufferReader(payloadBuffer), isCompleted: true));
@@ -133,16 +133,14 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         return true;
     }
 
-    private readonly struct JsonArrayContent(long start, long length, bool hasElements)
+    private readonly struct JsonPayloadContent(long start, long length)
     {
         public long Start { get; } = start;
 
         public long Length { get; } = length;
-
-        public bool HasElements { get; } = hasElements;
     }
 
-    private static JsonArrayContent ReadArrayContent(ref Utf8JsonReader reader)
+    private static JsonPayloadContent ReadOperationPayload(ref Utf8JsonReader reader, long offset)
     {
         if (!reader.Read())
         {
@@ -151,8 +149,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         if (reader.TokenType is JsonTokenType.EndArray)
         {
-            EnsureNoTrailingTokens(ref reader);
-            return default;
+            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: each line must include an operation payload.");
+        }
+
+        if (reader.TokenType is not JsonTokenType.StartArray)
+        {
+            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: element 1 must be a JSON operation payload array.");
         }
 
         var start = reader.TokenStartIndex;
@@ -166,13 +168,23 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                     nestedDepth++;
                     break;
                 case JsonTokenType.EndArray:
+                    nestedDepth--;
                     if (nestedDepth == 0)
                     {
-                        EnsureNoTrailingTokens(ref reader);
-                        return new(start, reader.TokenStartIndex - start, hasElements: true);
-                    }
+                        var length = reader.BytesConsumed - start;
+                        if (!reader.Read())
+                        {
+                            throw new JsonException("JSON array is incomplete.");
+                        }
 
-                    nestedDepth--;
+                        if (reader.TokenType is not JsonTokenType.EndArray)
+                        {
+                            throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {offset}: each line must contain exactly a stream id and an operation payload.");
+                        }
+
+                        EnsureNoTrailingTokens(ref reader);
+                        return new(start, length);
+                    }
                     break;
                 case JsonTokenType.EndObject:
                     if (nestedDepth == 0)
@@ -199,15 +211,9 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         }
     }
 
-    private static void WriteOperationPayload(ReadOnlySequence<byte> line, JsonArrayContent payloadContent, ArcBufferWriter buffer)
+    private static void WriteOperationPayload(ReadOnlySequence<byte> line, JsonPayloadContent payloadContent, ArcBufferWriter buffer)
     {
-        buffer.Write("["u8);
-        if (payloadContent.HasElements)
-        {
-            buffer.Write(line.Slice(payloadContent.Start, payloadContent.Length));
-        }
-
-        buffer.Write("]"u8);
+        buffer.Write(line.Slice(payloadContent.Start, payloadContent.Length));
     }
 
     private sealed class JsonLinesJournalBatchWriter : JournalBatchWriterBase
@@ -262,7 +268,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             try
             {
-                _buffer.WriteAt(_activePayloadStart, ","u8);
+                _buffer.Write("]"u8);
                 _buffer.Write("\n"u8);
                 _activeEntryStart = 0;
                 _activePayloadStart = 0;
@@ -291,17 +297,17 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                     $"The JSON journal writer cannot append formatted entry of type '{entry.GetType().FullName}'.");
             }
 
-            WriteJournalEntry(streamId, new ReadOnlySequence<byte>(entry.Payload), _buffer);
+            WriteJournalEntry(streamId, entry.Payload, _buffer);
         }
 
-        private static void WriteJournalEntry(JournalStreamId streamId, ReadOnlySequence<byte> payload, ArcBufferWriter buffer)
+        private static void WriteJournalEntry(JournalStreamId streamId, ReadOnlyMemory<byte> payload, ArcBufferWriter buffer)
         {
             var entryStart = buffer.Length;
             try
             {
                 WriteJournalEntryPrefix(streamId, buffer);
-                buffer.Write(","u8);
-                buffer.Write(payload.Slice(1, payload.Length - 1));
+                buffer.Write(payload.Span);
+                buffer.Write("]"u8);
                 buffer.Write("\n"u8);
             }
             catch
@@ -313,7 +319,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         private static void WriteJournalEntryPrefix(JournalStreamId streamId, ArcBufferWriter buffer)
         {
-            Span<byte> prefix = stackalloc byte[22];
+            var prefix = buffer.GetSpan(22);
             prefix[0] = (byte)'[';
             if (!Utf8Formatter.TryFormat(streamId.Value, prefix[1..], out var streamIdLength))
             {
@@ -321,7 +327,8 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             }
 
             var prefixLength = 1 + streamIdLength;
-            buffer.Write(prefix[..prefixLength]);
+            prefix[prefixLength++] = (byte)',';
+            buffer.AdvanceWriter(prefixLength);
         }
     }
 }

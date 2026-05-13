@@ -1070,7 +1070,7 @@ public class StateManagerTests : JournalingTestBase
 
         public List<TrackingJournalBatchWriter> Writers => _writerFormat.Writers;
 
-        public string FormatKey => "test";
+        public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
 
         public string? MimeType => null;
 
@@ -1096,13 +1096,13 @@ public class StateManagerTests : JournalingTestBase
     {
         public ReadOnlyMemory<byte> Payload { get; } = payload.ToArray();
 
-        public string FormatKey => "test";
+        public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
 
     }
 
     private sealed class NonConsumingJournalFormat : IJournalFormat
     {
-        public string FormatKey => "test";
+        public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
 
         public string? MimeType => null;
 
@@ -1121,7 +1121,7 @@ public class StateManagerTests : JournalingTestBase
 
         public int ReadCount { get; private set; }
 
-        public string FormatKey => "test";
+        public string FormatKey => OrleansBinaryJournalFormat.JournalFormatKey;
 
         public string? MimeType => null;
 

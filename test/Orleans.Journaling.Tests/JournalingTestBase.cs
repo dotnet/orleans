@@ -25,12 +25,7 @@ public abstract class JournalingTestBase
 
     protected JournalingTestBase()
     {
-        var services = new ServiceCollection();
-
-        services.AddSerializer();
-        services.AddLogging(builder => builder.AddConsole());
-
-        ServiceProvider = services.BuildServiceProvider();
+        ServiceProvider = CreateServiceProvider();
         SessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         CodecProvider = ServiceProvider.GetRequiredService<ICodecProvider>();
         LoggerFactory = ServiceProvider.GetRequiredService<ILoggerFactory>();
@@ -53,18 +48,67 @@ public abstract class JournalingTestBase
         storage ??= CreateStorage();
         provider ??= TimeProvider.System;
 
-        var logger = LoggerFactory.CreateLogger<JournaledStateManager>();
-        var stringCodec = new OrleansJournalValueCodec<string>(CodecProvider.GetCodec<string>(), SessionPool);
-        var uint64Codec = new OrleansJournalValueCodec<ulong>(CodecProvider.GetCodec<ulong>(), SessionPool);
-        var dateTimeCodec = new OrleansJournalValueCodec<DateTime>(CodecProvider.GetCodec<DateTime>(), SessionPool);
-        var journalStreamIdsCodec = new OrleansBinaryDictionaryOperationCodec<string, ulong>(stringCodec, uint64Codec, SessionPool);
-        var retirementTrackerCodec = new OrleansBinaryDictionaryOperationCodec<string, DateTime>(stringCodec, dateTimeCodec, SessionPool);
-        journalFormat ??= new OrleansBinaryJournalFormat(SessionPool);
-        var shared = new JournaledStateManagerShared(logger, Options.Create(ManagerOptions), provider);
-        var manager = new JournaledStateManager(storage, shared, ServiceProvider, journalStreamIdsCodec, retirementTrackerCodec, journalFormat);
-        var lifecycle = new GrainLifecycle(LoggerFactory.CreateLogger<GrainLifecycle>());
+        var serviceProvider = journalFormat is null ? ServiceProvider : CreateServiceProvider(journalFormat);
+        var options = journalFormat is null
+            ? ManagerOptions
+            : new JournaledStateManagerOptions
+            {
+                JournalFormatKey = journalFormat.FormatKey,
+                RetirementGracePeriod = ManagerOptions.RetirementGracePeriod
+            };
+        if (storage is VolatileJournalStorage volatileStorage)
+        {
+            volatileStorage.SetConfiguredJournalFormatKey(options.JournalFormatKey);
+        }
+
+        var shared = new JournaledStateManagerShared(
+            serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
+            Options.Create(options),
+            provider);
+        var manager = new JournaledStateManager(storage, shared, serviceProvider);
+        var lifecycle = new GrainLifecycle(serviceProvider.GetRequiredService<ILogger<GrainLifecycle>>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
+    }
+
+    private static ServiceProvider CreateServiceProvider(IJournalFormat? journalFormat = null)
+    {
+        var services = new ServiceCollection();
+        services.AddSerializer();
+        services.AddLogging(builder => builder.AddConsole());
+        var customKey = journalFormat is null ? null : JournalFormatServices.ValidateJournalFormatKey(journalFormat.FormatKey);
+        ConfigureBinaryJournalingServices(
+            services,
+            string.Equals(customKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal) ? journalFormat : null);
+
+        if (journalFormat is not null && !string.Equals(customKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal))
+        {
+            services.AddKeyedSingleton<IJournalFormat>(customKey!, journalFormat);
+            services.AddKeyedSingleton(typeof(IDictionaryOperationCodec<,>), customKey!, typeof(OrleansBinaryDictionaryOperationCodec<,>));
+        }
+
+        return services.BuildServiceProvider();
+    }
+
+    protected static void ConfigureBinaryJournalingServices(IServiceCollection services, IJournalFormat? journalFormat = null)
+    {
+        services.AddSingleton(typeof(IJournalValueCodec<>), typeof(OrleansJournalValueCodec<>));
+        services.AddSingleton<OrleansBinaryJournalFormat>();
+        if (journalFormat is null)
+        {
+            services.AddKeyedSingleton<IJournalFormat>(
+                OrleansBinaryJournalFormat.JournalFormatKey,
+                static (sp, _) => sp.GetRequiredService<OrleansBinaryJournalFormat>());
+        }
+        else
+        {
+            services.AddKeyedSingleton<IJournalFormat>(OrleansBinaryJournalFormat.JournalFormatKey, journalFormat);
+        }
+
+        services.AddKeyedSingleton(
+            typeof(IDictionaryOperationCodec<,>),
+            OrleansBinaryJournalFormat.JournalFormatKey,
+            typeof(OrleansBinaryDictionaryOperationCodec<,>));
     }
 
     private class GrainLifecycle(ILogger logger) : LifecycleSubject(logger), IGrainLifecycle

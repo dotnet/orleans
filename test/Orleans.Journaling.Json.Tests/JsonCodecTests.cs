@@ -265,8 +265,8 @@ public class JsonCodecTests
         AppendValueSet(writer, 9, 43);
 
         Assert.Equal(
-            """[8,"set",42]""" + "\n" +
-            """[9,"set",43]""" + "\n",
+            """[8,["set",42]]""" + "\n" +
+            """[9,["set",43]]""" + "\n",
             GetString(writer));
     }
 
@@ -279,7 +279,7 @@ public class JsonCodecTests
 
         codec.WriteSet(42, writer.CreateJournalStreamWriter(new JournalStreamId(8)));
 
-        Assert.Equal("""[8,"set",42]""" + "\n", GetString(writer));
+        Assert.Equal("""[8,["set",42]]""" + "\n", GetString(writer));
     }
 
     [Fact]
@@ -291,7 +291,7 @@ public class JsonCodecTests
 
         codec.WriteAdd("one", writer.CreateJournalStreamWriter(new JournalStreamId(8)));
 
-        Assert.Equal("""[8,"add","one"]""" + "\n", GetString(writer));
+        Assert.Equal("""[8,["add","one"]]""" + "\n", GetString(writer));
     }
 
     [Fact]
@@ -306,10 +306,10 @@ public class JsonCodecTests
         new JsonTcsOperationCodec<int>(Options).WriteCompleted(5, writer.CreateJournalStreamWriter(new JournalStreamId(14)));
 
         Assert.Equal(
-            """[11,"enqueue",10]""" + "\n" +
-            """[12,"add","a"]""" + "\n" +
-            """[13,"set","alice",42]""" + "\n" +
-            """[14,"completed",5]""" + "\n",
+            """[11,["enqueue",10]]""" + "\n" +
+            """[12,["add","a"]]""" + "\n" +
+            """[13,["set","alice",42]]""" + "\n" +
+            """[14,["completed",5]]""" + "\n",
             GetString(writer));
     }
 
@@ -325,13 +325,13 @@ public class JsonCodecTests
         AppendValueSet(writer, 10, 43);
 
         Assert.Equal(
-            """[8,"set",42]""" + "\n" +
-            """[10,"set",43]""" + "\n",
+            """[8,["set",42]]""" + "\n" +
+            """[10,["set",43]]""" + "\n",
             GetString(writer));
     }
 
     [Fact]
-    public void JsonValueCodec_JournalStreamWriterOverload_WritesPayloadBytesForNonJsonWriter()
+    public void JsonValueCodec_JournalStreamWriterOverload_WritesPayloadFragmentBytesForNonJsonWriter()
     {
         using var writer = new CapturingNonJsonJournalWriter();
         var codec = new JsonValueOperationCodec<int>(Options);
@@ -385,8 +385,8 @@ public class JsonCodecTests
         AppendValueSet(writer, 10, 43);
 
         Assert.Equal(
-            """[8,"set",42]""" + "\n" +
-            """[10,"set",43]""" + "\n",
+            """[8,["set",42]]""" + "\n" +
+            """[10,["set",43]]""" + "\n",
             GetString(writer));
     }
 
@@ -400,7 +400,7 @@ public class JsonCodecTests
         entry.Writer.Write("""["set" , { "value" : 42 }]"""u8);
         entry.Commit();
 
-        Assert.Equal("""[8,"set" , { "value" : 42 }]""" + "\n", GetString(writer));
+        Assert.Equal("""[8,["set" , { "value" : 42 }]]""" + "\n", GetString(writer));
     }
 
     [Fact]
@@ -413,14 +413,14 @@ public class JsonCodecTests
         writer.Reset();
         AppendValueSet(writer, 9, 43);
 
-        Assert.Equal("""[9,"set",43]""" + "\n", GetString(writer));
+        Assert.Equal("""[9,["set",43]]""" + "\n", GetString(writer));
     }
 
     [Fact]
     public void JsonLinesJournalFormat_Read_DispatchesEntries()
     {
         var format = new JsonLinesJournalFormat();
-        var entries = Read(format, """[8,"set",42]""" + "\n");
+        var entries = Read(format, """[8,["set",42]]""" + "\n");
         var entry = Assert.Single(entries);
         var valueCodec = new JsonValueOperationCodec<int>(Options);
         var consumer = new ValueConsumer<int>();
@@ -436,11 +436,11 @@ public class JsonCodecTests
     [InlineData("""{"streamId":8,"entry":["set",42]}""" + "\n", "must be a JSON array")]
     [InlineData("null\n", "must be a JSON array")]
     [InlineData("[]\n", "stream id")]
-    [InlineData("[8]\n", "operation command")]
-    [InlineData("""["8","set",42]""" + "\n", "unsigned integer")]
-    [InlineData("[8,null]\n", "operation command string")]
-    [InlineData("""[8,"set",42]{}""" + "\n", "invalid JSON")]
-    [InlineData("""[8,"set",42""" + "\n", "invalid JSON")]
+    [InlineData("[8]\n", "operation payload")]
+    [InlineData("""["8",["set",42]]""" + "\n", "unsigned integer")]
+    [InlineData("[8,null]\n", "operation payload array")]
+    [InlineData("""[8,["set",42]]{}""" + "\n", "invalid JSON")]
+    [InlineData("""[8,["set",42]""" + "\n", "invalid JSON")]
     public void JsonLinesJournalFormat_Read_InvalidJsonLines_Throws(string jsonLines, string expectedMessage)
     {
         var format = new JsonLinesJournalFormat();
@@ -454,7 +454,7 @@ public class JsonCodecTests
     public void JsonLinesJournalFormat_Read_Bom_Throws()
     {
         var format = new JsonLinesJournalFormat();
-        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""[8,"set",42]""" + "\n")).ToArray();
+        var bytes = new byte[] { 0xEF, 0xBB, 0xBF }.Concat(Encoding.UTF8.GetBytes("""[8,["set",42]]""" + "\n")).ToArray();
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, bytes));
 
@@ -466,8 +466,8 @@ public class JsonCodecTests
     {
         var format = new JsonLinesJournalFormat();
         var jsonLines =
-            """[8,"set",42]""" + "\n" +
-            """[9,"set",43""";
+            """[8,["set",42]]""" + "\n" +
+            """[9,["set",43]""";
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
 
@@ -478,21 +478,21 @@ public class JsonCodecTests
     public void JsonLinesJournalFormat_Read_ErrorMessageReportsByteOffsetOfFailingLine()
     {
         var format = new JsonLinesJournalFormat();
-        var firstLine = """[8,"set",42]""" + "\n";
+        var firstLine = """[8,["set",42]]""" + "\n";
         var jsonLines = firstLine + """[9,null]""" + "\n";
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
 
         var expectedOffset = Encoding.UTF8.GetByteCount(firstLine);
         Assert.Contains($"byte offset {expectedOffset}", exception.Message);
-        Assert.Contains("operation command string", exception.Message);
+        Assert.Contains("operation payload array", exception.Message);
     }
 
     [Fact]
     public void JsonLinesJournalFormat_Read_ReportsByteOffsetForBlankLineMidStream()
     {
         var format = new JsonLinesJournalFormat();
-        var firstLine = """[8,"set",42]""" + "\n";
+        var firstLine = """[8,["set",42]]""" + "\n";
         var jsonLines = firstLine + "   \n";
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
@@ -506,8 +506,8 @@ public class JsonCodecTests
     public void JsonLinesJournalFormat_Read_ReportsByteOffsetForFinalLineMissingNewline()
     {
         var format = new JsonLinesJournalFormat();
-        var firstLine = """[8,"set",42]""" + "\n";
-        var jsonLines = firstLine + """[9,"set",43""";
+        var firstLine = """[8,["set",42]]""" + "\n";
+        var jsonLines = firstLine + """[9,["set",43]""";
 
         var exception = Assert.Throws<InvalidOperationException>(() => Read(format, jsonLines));
 
@@ -520,7 +520,7 @@ public class JsonCodecTests
     public void JsonLinesJournalFormat_Read_PartialLineWaitsForNewlineWhenInputIsNotCompleted()
     {
         var format = new JsonLinesJournalFormat();
-        var bytes = Encoding.UTF8.GetBytes("""[8,"set",42]""");
+        var bytes = Encoding.UTF8.GetBytes("""[8,["set",42]]""");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
         var reader = new JournalReadBuffer(new ArcBufferReader(buffer), isCompleted: false);
@@ -537,8 +537,8 @@ public class JsonCodecTests
     public void JsonLinesJournalFormat_Read_NewlineAtArcBufferPageBoundary_Parses()
     {
         var format = new JsonLinesJournalFormat();
-        var prefix = "[8,\"set\",\"";
-        var suffix = "\"]";
+        var prefix = "[8,[\"set\",\"";
+        var suffix = "\"]]";
         var text = new string('a', ArcBufferWriter.MinimumPageSize - Encoding.UTF8.GetByteCount(prefix + suffix));
         var line = prefix + text + suffix;
         Assert.Equal(ArcBufferWriter.MinimumPageSize, Encoding.UTF8.GetByteCount(line));
@@ -561,8 +561,8 @@ public class JsonCodecTests
     public void JsonLinesJournalFormat_Read_MultiPagePartialLineWaitsForNewlineWhenInputIsNotCompleted()
     {
         var format = new JsonLinesJournalFormat();
-        var prefix = "[8,\"set\",\"";
-        var suffix = "\"]";
+        var prefix = "[8,[\"set\",\"";
+        var suffix = "\"]]";
         var text = new string('a', ArcBufferWriter.MinimumPageSize + 8 - Encoding.UTF8.GetByteCount(prefix + suffix));
         var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
         using var buffer = new ArcBufferWriter();
@@ -581,7 +581,7 @@ public class JsonCodecTests
     public void JsonLinesJournalFormat_Read_ParsesCrLfLines()
     {
         var format = new JsonLinesJournalFormat();
-        var entries = Read(format, """[8,"set",42]""" + "\r\n");
+        var entries = Read(format, """[8,["set",42]]""" + "\r\n");
         var entry = Assert.Single(entries);
 
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -595,7 +595,7 @@ public class JsonCodecTests
         var codec = new RecordingJsonValueOperationCodec();
         var state = new RecordingState(codec);
 
-        ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateResolver(state));
+        ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state));
 
         Assert.Same(state, codec.Consumer);
         Assert.Equal(42, codec.Value);
@@ -609,7 +609,7 @@ public class JsonCodecTests
         var state = new ThrowingState();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateResolver(state)));
+            ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state)));
 
         Assert.Equal("boom", exception.Message);
     }
@@ -620,7 +620,7 @@ public class JsonCodecTests
         var format = new JsonLinesJournalFormat();
         var state = new RecordingState(new JsonValueOperationCodec<int>(Options));
 
-        ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateResolver(state));
+        ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state));
 
         Assert.Equal(42, state.Value);
     }
@@ -631,7 +631,7 @@ public class JsonCodecTests
         var format = new JsonLinesJournalFormat();
         var state = new NoOpState();
 
-        ReadOne(format, """[8,"set",42]""" + "\n", new SingleStateResolver(state));
+        ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state));
     }
 
     [Fact]
@@ -643,7 +643,7 @@ public class JsonCodecTests
 
         // Dispatch path: codec.Apply -> EnsureEnd must reject any token after the closing ']'.
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """[8,"set",42][9,"set",43]""" + "\n", new SingleStateResolver(state)));
+            ReadOne(format, """[8,["set",42]][9,["set",43]]""" + "\n", new SingleStateResolver(state)));
 
         Assert.Contains("invalid JSON", exception.Message);
     }
@@ -656,7 +656,7 @@ public class JsonCodecTests
 
         // SkipToEnd for IDurableNothing must reject trailing JSON, not silently ignore it.
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """[8,"set",42][9,"set",43]""" + "\n", new SingleStateResolver(state)));
+            ReadOne(format, """[8,["set",42]][9,["set",43]]""" + "\n", new SingleStateResolver(state)));
 
         Assert.Contains("invalid JSON", exception.Message);
     }
@@ -668,7 +668,7 @@ public class JsonCodecTests
 
         // The dispatch parser must reject trailing JSON after the entry array.
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            Read(format, """[8,"set",42][9,"set",43]""" + "\n"));
+            Read(format, """[8,["set",42]][9,["set",43]]""" + "\n"));
 
         Assert.Contains("invalid JSON", exception.Message);
     }
@@ -685,7 +685,23 @@ public class JsonCodecTests
             Encoding.UTF8.GetBytes("""["set",42]""")));
 
         using var slice = writer.GetCommittedBuffer();
-        Assert.Equal("""[8,"set",42]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
+        Assert.Equal("""[8,["set",42]]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
+    }
+
+    [Fact]
+    public void JsonLinesJournalFormat_Writer_AppendsRecoveredFormattedEntryPayloadAsEntryElements()
+    {
+        var format = new JsonLinesJournalFormat();
+        var recoveredEntry = Assert.Single(Read(format, """[8,["set",42]]""" + "\n"));
+        using var writer = format.CreateWriter();
+        var journalWriter = writer.CreateJournalStreamWriter(new JournalStreamId(9));
+
+        journalWriter.AppendFormattedEntry(new TestFormattedJournalEntry(
+            JsonJournalExtensions.JournalFormatKey,
+            recoveredEntry.Payload));
+
+        using var slice = writer.GetCommittedBuffer();
+        Assert.Equal("""[9,["set",42]]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
     }
 
     [Fact]
@@ -700,7 +716,7 @@ public class JsonCodecTests
             Encoding.UTF8.GetBytes("""["set" , { "value" : 42 }]""")));
 
         using var slice = writer.GetCommittedBuffer();
-        Assert.Equal("""[8,"set" , { "value" : 42 }]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
+        Assert.Equal("""[8,["set" , { "value" : 42 }]]""" + "\n", Encoding.UTF8.GetString(slice.AsReadOnlySequence().ToArray()));
     }
 
     [Fact]
