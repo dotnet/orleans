@@ -3,23 +3,21 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Provides services used by journaled states during replay.
 /// </summary>
-public readonly ref struct JournaledStateReplayContext
+public readonly struct JournalReplayContext
 {
-    /// <summary>
-    /// Initializes a new instance of the <see cref="JournaledStateReplayContext"/> struct.
-    /// </summary>
-    /// <param name="writeJournalFormatKey">The configured write journal format key.</param>
-    /// <param name="serviceProvider">The application-level service provider used to resolve codecs for journal formats.</param>
-    public JournaledStateReplayContext(string writeJournalFormatKey, IServiceProvider serviceProvider)
+    internal JournalReplayContext(JournaledStateManager manager)
     {
-        WriteJournalFormatKey = JournalFormatServices.ValidateJournalFormatKey(writeJournalFormatKey);
-        ServiceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
+        ArgumentNullException.ThrowIfNull(manager);
+        Manager = manager;
     }
+
+    private JournaledStateManager Manager =>
+        field ?? throw new InvalidOperationException("The journal replay context is not initialized.");
 
     /// <summary>
     /// Gets the configured write journal format key.
     /// </summary>
-    public string WriteJournalFormatKey { get; } = string.Empty;
+    public string WriteJournalFormatKey => Manager.WriteJournalFormatKey;
 
     /// <summary>
     /// Gets the application-level service provider used to resolve journal services.
@@ -27,7 +25,14 @@ public readonly ref struct JournaledStateReplayContext
     /// <remarks>
     /// This provider is not scoped to a grain activation or replay operation.
     /// </remarks>
-    public IServiceProvider ServiceProvider { get; }
+    public IServiceProvider ServiceProvider => Manager.ServiceProvider;
+
+    /// <summary>
+    /// Resolves the journaled state for <paramref name="streamId"/>.
+    /// </summary>
+    /// <param name="streamId">The persisted journal stream id.</param>
+    /// <returns>The journaled state for the stream.</returns>
+    public IJournaledState ResolveState(JournalStreamId streamId) => Manager.ResolveState(streamId);
 
     /// <summary>
     /// Gets the command codec for <paramref name="entryFormatKey"/>.

@@ -45,10 +45,10 @@ public interface IJournaledState
     /// <param name="entry">The entry to replay.</param>
     /// <param name="context">The replay context.</param>
     /// <remarks>
-    /// Implementations must not retain <see cref="JournalEntry.Payload"/> or references to its
-    /// backing storage after this method returns unless they copy the payload.
+    /// Implementations must not retain <see cref="JournalEntry.Reader"/> or references to its
+    /// backing storage after this method returns unless they copy the data.
     /// </remarks>
-    void ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context);
+    void ReplayEntry(JournalEntry entry, in JournalReplayContext context);
 
     /// <summary>
     /// Resets the state.

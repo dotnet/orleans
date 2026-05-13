@@ -17,7 +17,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
 
     public DurableValue(
         [ServiceKey] string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
@@ -26,7 +26,7 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
         manager.RegisterState(key, this);
     }
 
-    internal DurableValue(string key, IStateManager manager, IDurableValueCommandCodec<T> codec)
+    internal DurableValue(string key, IJournaledStateManager manager, IDurableValueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -49,8 +49,8 @@ internal sealed class DurableValue<T> : IDurableValue<T>, IJournaledState, IDura
 
     public void OnModified() => _isDirty = true;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.OnRecoveryCompleted() => OnValuePersisted();
     void IJournaledState.OnWriteCompleted() => OnValuePersisted();

@@ -22,7 +22,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
 
     public DurableList(
         [ServiceKey] string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
@@ -31,7 +31,7 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
         manager.RegisterState(key, this);
     }
 
-    internal DurableList(string key, IStateManager manager, IDurableListCommandCodec<T> codec)
+    internal DurableList(string key, IJournaledStateManager manager, IDurableListCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -58,8 +58,8 @@ internal sealed class DurableList<T> : IDurableList<T>, IJournaledState, IDurabl
 
     bool ICollection<T>.IsReadOnly => false;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {

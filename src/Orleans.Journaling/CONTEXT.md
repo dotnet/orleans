@@ -96,12 +96,12 @@ _Avoid_: Unknown stream
 A state id in the reserved range 0-7, used by Orleans runtime journaling infrastructure. Application state ids begin at 8.
 _Avoid_: User-reserved id
 
-**State Manager**:
+**Journaled State Manager**:
 The runtime component which binds durable states to one **Journal Storage**, replays **Journal Entries**, and flushes pending **Durable Operations**.
 _Avoid_: Grain context, storage provider
 
-**State Manager Handle**:
-An owned lifecycle wrapper for a **State Manager** created outside grain activation.
+**Journaled State Manager Handle**:
+An owned lifecycle wrapper for a **Journaled State Manager** created outside grain activation.
 _Avoid_: Synthetic grain context
 
 **Transactional Journaled Grain**:
@@ -153,7 +153,7 @@ _Avoid_: Per-operation undo
 - An opened `IJournalStorage` acquires its **Journal Storage ETag** from its own read, create, append, replace, and delete operations.
 - Catalog property ETags are not injected into opened `IJournalStorage` instances.
 - `IJournalStorage.DeleteAsync` uses the storage instance's current **Journal Storage ETag** for conditional deletion where the provider supports it.
-- A **Compaction Request** is raised by **Journal Storage** and honored by the **State Manager**.
+- A **Compaction Request** is raised by **Journal Storage** and honored by the **Journaled State Manager**.
 - Grain journaling can open one **Journal Storage Id** without using a **Journal Storage Catalog**.
 - DurableJobs uses a **Journal Storage Catalog** to discover and claim shard journals.
 - The storage provider can choose a **Journal Format** key from the grain type; the manager resolves the keyed **Journal Format** service from that key.
@@ -162,8 +162,8 @@ _Avoid_: Per-operation undo
 - A grain has one active **Journal Format** key. All runtime and user durable states managed by that grain's manager must use that same key.
 - JSONL is the default built-in **Journal Format** key for new storage-provider configurations; Orleans binary remains available only when a provider explicitly selects its key.
 - Durable state services are unkeyed within a grain and resolve codecs using the grain's active **Journal Format** key.
-- A **State Manager** owns recovery and write ordering for one **Journal Storage**.
-- A **State Manager Handle** owns shutdown and disposal for a **State Manager** created by services such as DurableJobs.
+- A **Journaled State Manager** owns recovery and write ordering for one **Journal Storage**.
+- A **Journaled State Manager Handle** owns shutdown and disposal for a **Journaled State Manager** created by services such as DurableJobs.
 - **Journal Format** keys are separate from storage provider names or storage identity.
 - Malformed recovery data is a hard failure. The next recovery attempt resets volatile state and replays from storage.
 - A **Journal Buffer Writer** is reused across entries and must not be retained by codecs after the write call returns.
@@ -174,7 +174,7 @@ _Avoid_: Per-operation undo
 - `JournalBufferWriter` implements `IBufferWriter<byte>` for the active entry payload only. Entry lifecycle operations belong to the lexical scope, not to durable operation codecs.
 - Aborting a pending **Journal Entry** truncates the caller-owned **Journal Buffer Writer** to its pre-entry state; aborted data must never affect stored data or later writes.
 - Successful **Journal Entries** are batched in the manager-owned pending **Journal Buffer Writer** until `WriteStateAsync` flushes them.
-- A **State Manager** may flush **Journal Entries** from multiple callers in one **Journal Batch** when each caller waits for the flush containing its changes.
+- A **Journaled State Manager** may flush **Journal Entries** from multiple callers in one **Journal Batch** when each caller waits for the flush containing its changes.
 - After a successful flush, a **Journal Buffer Writer** should be reset and reused when the format supports safe reuse.
 - A **Durable Operation** may contain values encoded by a **Value Codec**.
 - A **Codec Family** owns the **Journal Batch**, **Journal Entry**, **Durable Operation**, and **Value Codec** choices together.
@@ -218,5 +218,5 @@ _Avoid_: Per-operation undo
 - "catalog" in new API discussions means **Journal Storage Catalog**, not a DurableJobs-specific shard manager.
 - DurableJobs shard ownership, membership version, adopted count, poisoned status, and shard time range are **Journal Storage Properties**, not **Control Journal Entries**.
 - DurableJobs shard ownership is built using **Journal Storage ETag** compare-and-swap; Journaling does not define a lease abstraction.
-- DurableJobs creates **State Managers** through **State Manager Handles**, not synthetic grain contexts.
+- DurableJobs creates **Journaled State Managers** through **Journaled State Manager Handles**, not synthetic grain contexts.
 - DurableJobs does not introduce a separate compaction policy unless a future need emerges.

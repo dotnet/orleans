@@ -74,7 +74,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddScoped<IJournalStorage>(_ => storage);
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = CustomFormatKey);
         services.AddScoped<JournaledStateManagerShared>();
-        services.AddScoped<IStateManager, JournaledStateManager>();
+        services.AddScoped<IJournaledStateManager, JournaledStateManager>();
         services.AddKeyedScoped(typeof(IDurableValue<>), KeyedService.AnyKey, typeof(DurableValue<>));
         services.AddKeyedSingleton<IJournalFormat>(CustomFormatKey, new TestJournalFormat());
         services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, ulong>>(CustomFormatKey, new TestDictionaryCodec<string, ulong>());
@@ -108,7 +108,7 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
 
         public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-        public void Replay(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context) => throw new NotSupportedException();
+        public void Replay(JournalBufferReader input, in JournalReplayContext context) => throw new NotSupportedException();
     }
 
     private sealed class TestDictionaryCodec<TKey, TValue> : IDurableDictionaryCommandCodec<TKey, TValue>

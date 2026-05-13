@@ -14,7 +14,7 @@ public interface IDurableNothing
 /// </summary>
 internal sealed class DurableNothing : IDurableNothing, IJournaledState
 {
-    public DurableNothing([ServiceKey] string key, IStateManager manager)
+    public DurableNothing([ServiceKey] string key, IJournaledStateManager manager)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
@@ -22,7 +22,7 @@ internal sealed class DurableNothing : IDurableNothing, IJournaledState
 
     void IJournaledState.Reset(JournalStreamWriter writer) { }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) { }
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) { }
 
     void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
 

@@ -6,14 +6,14 @@ public abstract class DurableGrain : Grain, IGrainBase
 {
     protected DurableGrain()
     {
-        StateManager = ServiceProvider.GetRequiredService<IStateManager>();
+        StateManager = ServiceProvider.GetRequiredService<IJournaledStateManager>();
         if (StateManager is ILifecycleParticipant<IGrainLifecycle> participant)
         {
             participant.Participate(((IGrainBase)this).GrainContext.ObservableLifecycle);
         }
     }
 
-    protected IStateManager StateManager { get; }
+    protected IJournaledStateManager StateManager { get; }
 
     protected TState GetOrCreateState<TState>(string name) where TState : class, IJournaledState
         => GetOrCreateState(name, static sp => sp.GetRequiredService<TState>(), ServiceProvider);

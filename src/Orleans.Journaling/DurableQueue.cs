@@ -27,7 +27,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
 
     public DurableQueue(
         [ServiceKey] string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
@@ -36,7 +36,7 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
         manager.RegisterState(key, this);
     }
 
-    internal DurableQueue(string key, IStateManager manager, IDurableQueueCommandCodec<T> codec)
+    internal DurableQueue(string key, IJournaledStateManager manager, IDurableQueueCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -45,8 +45,8 @@ internal sealed class DurableQueue<T> : IDurableQueue<T>, IJournaledState, IDura
 
     public int Count => _items.Count;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {

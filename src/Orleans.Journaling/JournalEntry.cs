@@ -1,21 +1,21 @@
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Represents one persisted journal entry payload.
+/// Represents one persisted journal entry.
 /// </summary>
 /// <remarks>
 /// <para>
-/// The payload is owned by the journal format identified by <see cref="FormatKey"/>. This type does
-/// not interpret the payload and has no knowledge of any specific physical format.
+/// The reader is owned by the journal format identified by <see cref="FormatKey"/>. This type does
+/// not interpret the entry data and has no knowledge of any specific physical format.
 /// </para>
 /// <para>
-/// The payload is only guaranteed to remain valid for the duration of the synchronous replay call
-/// which supplies this entry. Implementations which need to retain the payload must copy it.
+/// The reader is only guaranteed to remain valid for the duration of the synchronous replay call
+/// which supplies this entry. Implementations which need to retain the data must copy it.
 /// </para>
 /// </remarks>
-/// <param name="formatKey">The journal format key for <paramref name="payload"/>.</param>
-/// <param name="payload">The entry payload buffer.</param>
-public readonly ref struct JournalEntry(string formatKey, JournalBufferReader payload)
+/// <param name="formatKey">The journal format key for <paramref name="reader"/>.</param>
+/// <param name="reader">The entry payload reader.</param>
+public readonly ref struct JournalEntry(string formatKey, JournalBufferReader reader)
 {
     /// <summary>
     /// Gets the journal format key for this entry.
@@ -23,7 +23,7 @@ public readonly ref struct JournalEntry(string formatKey, JournalBufferReader pa
     public string FormatKey { get; } = JournalFormatServices.ValidateJournalFormatKey(formatKey);
 
     /// <summary>
-    /// Gets the entry payload buffer.
+    /// Gets the entry payload reader.
     /// </summary>
-    public JournalBufferReader Payload { get; } = payload;
+    public JournalBufferReader Reader { get; } = reader;
 }

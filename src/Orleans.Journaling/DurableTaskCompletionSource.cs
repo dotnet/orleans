@@ -28,7 +28,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     public DurableTaskCompletionSource(
         [ServiceKey] string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider,
         DeepCopier<T> copier,
@@ -43,7 +43,7 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
 
     internal DurableTaskCompletionSource(
         string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         IDurableTaskCompletionSourceCommandCodec<T> codec,
         DeepCopier<T> copier,
         DeepCopier<Exception> exceptionCopier)
@@ -101,8 +101,8 @@ internal sealed class DurableTaskCompletionSource<T> : IDurableTaskCompletionSou
         _ => throw new InvalidOperationException($"Unexpected status, \"{_status}\""),
     };
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     private void OnValuePersisted()
     {

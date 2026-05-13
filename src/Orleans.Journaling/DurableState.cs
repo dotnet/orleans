@@ -8,7 +8,7 @@ namespace Orleans.Journaling;
 internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IPersistentStateCommandHandler<T>
 {
     private readonly IPersistentStateCommandCodec<T> _codec;
-    private readonly IStateManager _manager;
+    private readonly IJournaledStateManager _manager;
     private T? _value;
     private ulong _version;
     private ulong _pendingVersion;
@@ -18,7 +18,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
 
     public DurableState(
         [ServiceKey] string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
@@ -28,7 +28,7 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
         _manager = manager;
     }
 
-    internal DurableState(string key, IStateManager manager, IPersistentStateCommandCodec<T> codec)
+    internal DurableState(string key, IJournaledStateManager manager, IPersistentStateCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -55,8 +55,8 @@ internal sealed class DurableState<T> : IPersistentState<T>, IJournaledState, IP
     string IStorage.Etag => $"{_version}";
     bool IStorage.RecordExists => _version > 0;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.OnWriteCompleted()
     {

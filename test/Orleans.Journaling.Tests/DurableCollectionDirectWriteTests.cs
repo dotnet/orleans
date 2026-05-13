@@ -189,7 +189,7 @@ public sealed class DurableCollectionDirectWriteTests
         Assert.True(writer.Length > 0);
     }
 
-    private sealed class TestJournalManager(TestJournalStreamWriter writer) : IStateManager
+    private sealed class TestJournalManager(TestJournalStreamWriter writer) : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 

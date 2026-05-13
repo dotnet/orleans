@@ -5,7 +5,7 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Manages the states for a given grain.
 /// </summary>
-public interface IStateManager
+public interface IJournaledStateManager
 {
     /// <summary>
     /// Initializes the state manager.

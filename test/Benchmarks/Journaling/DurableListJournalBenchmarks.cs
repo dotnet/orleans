@@ -25,6 +25,7 @@ public class DurableListJournalBenchmarks
     private ArcBuffer _encodedJournalData;
     private ArcBufferWriter _recoveryBuffer;
     private RecoveryConsumer _recoveryConsumer;
+    private JournalReplayContext _replayContext;
     private SerializerSessionPool _sessionPool;
 
     [GlobalSetup]
@@ -37,7 +38,8 @@ public class DurableListJournalBenchmarks
         _writeBuffer = new OrleansBinaryJournalBufferWriter();
         _list = new DurableList<int>("list", new BenchmarkJournalManager(_writeBuffer, ListJournalStreamId), _codec);
         _state = _list;
-        _recoveryConsumer = new RecoveryConsumer(ListJournalStreamId, _codec, OperationsPerInvocation);
+        _recoveryConsumer = new RecoveryConsumer(_codec, OperationsPerInvocation);
+        _replayContext = JournalReplayContextFactory.Create(OrleansBinaryJournalFormat.JournalFormatKey, ListJournalStreamId, _recoveryConsumer);
 
         WarmWritePathCapacity();
         _encodedJournalData = CreateEncodedJournalData();
@@ -119,11 +121,10 @@ public class DurableListJournalBenchmarks
         _recoveryBuffer.Reset();
         _recoveryBuffer.Write(_encodedJournalData.AsReadOnlySequence());
         var reader = new JournalBufferReader(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
-        var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
-        _journalFormat.Replay(reader, _recoveryConsumer, in context);
+        _journalFormat.Replay(reader, in _replayContext);
     }
 
-    private sealed class BenchmarkJournalManager(OrleansBinaryJournalBufferWriter buffer, JournalStreamId streamId) : IStateManager
+    private sealed class BenchmarkJournalManager(OrleansBinaryJournalBufferWriter buffer, JournalStreamId streamId) : IJournaledStateManager
     {
         public ValueTask InitializeAsync(CancellationToken cancellationToken) => default;
 
@@ -141,9 +142,8 @@ public class DurableListJournalBenchmarks
     }
 
     private sealed class RecoveryConsumer(
-        JournalStreamId expectedStreamId,
         IDurableListCommandCodec<int> codec,
-        int capacity) : IStateResolver, IJournaledState, IDurableListCommandHandler<int>
+        int capacity) : IJournaledState, IDurableListCommandHandler<int>
     {
         private readonly List<int> _items = new(capacity);
 
@@ -151,20 +151,10 @@ public class DurableListJournalBenchmarks
 
         public void Reset() => _items.Clear();
 
-        public IJournaledState ResolveState(JournalStreamId streamId)
-        {
-            if (streamId != expectedStreamId)
-            {
-                throw new InvalidOperationException("The encoded journaling benchmark data contained an unexpected stream id.");
-            }
-
-            return this;
-        }
-
         void IJournaledState.Reset(JournalStreamWriter storage) => Reset();
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Payload, this);
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
 
         void IJournaledState.AppendEntries(JournalStreamWriter writer) { }
         void IJournaledState.AppendSnapshot(JournalStreamWriter writer) { }
@@ -187,14 +177,4 @@ public class DurableListJournalBenchmarks
         }
     }
 
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public static readonly EmptyServiceProvider Instance = new();
-
-        private EmptyServiceProvider()
-        {
-        }
-
-        public object GetService(Type serviceType) => null;
-    }
 }

@@ -526,8 +526,8 @@ public class JsonCodecTests
         var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
-        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
-        format.Replay(reader, consumer, in context);
+        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8));
+        format.Replay(reader, in context);
 
         Assert.Equal(bytes.Length, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -548,8 +548,8 @@ public class JsonCodecTests
         var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
-        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
-        format.Replay(reader, consumer, in context);
+        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8));
+        format.Replay(reader, in context);
 
         Assert.Equal(0, reader.Length);
         var entry = Assert.Single(consumer.Entries);
@@ -570,8 +570,8 @@ public class JsonCodecTests
         var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
-        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
-        format.Replay(reader, consumer, in context);
+        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8));
+        format.Replay(reader, in context);
 
         Assert.Equal(bytes.Length, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -595,7 +595,7 @@ public class JsonCodecTests
         var codec = new RecordingJsonDurableValueCommandCodec();
         var state = new RecordingState(codec);
 
-        ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state));
+        ReadOne(format, """[8,["set",42]]""" + "\n", state);
 
         Assert.Same(state, codec.Consumer);
         Assert.Equal(42, codec.Value);
@@ -609,7 +609,7 @@ public class JsonCodecTests
         var state = new ThrowingState();
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state)));
+            ReadOne(format, """[8,["set",42]]""" + "\n", state));
 
         Assert.Equal("boom", exception.Message);
     }
@@ -620,7 +620,7 @@ public class JsonCodecTests
         var format = new JsonLinesJournalFormat();
         var state = new RecordingState(new JsonDurableValueCommandCodec<int>(Options));
 
-        ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state));
+        ReadOne(format, """[8,["set",42]]""" + "\n", state);
 
         Assert.Equal(42, state.Value);
     }
@@ -631,7 +631,7 @@ public class JsonCodecTests
         var format = new JsonLinesJournalFormat();
         var state = new NoOpState();
 
-        ReadOne(format, """[8,["set",42]]""" + "\n", new SingleStateResolver(state));
+        ReadOne(format, """[8,["set",42]]""" + "\n", state);
     }
 
     [Fact]
@@ -643,7 +643,7 @@ public class JsonCodecTests
 
         // Dispatch path: codec.Apply -> EnsureEnd must reject any token after the closing ']'.
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """[8,["set",42]][9,["set",43]]""" + "\n", new SingleStateResolver(state)));
+            ReadOne(format, """[8,["set",42]][9,["set",43]]""" + "\n", state));
 
         Assert.Contains("invalid JSON", exception.Message);
     }
@@ -656,7 +656,7 @@ public class JsonCodecTests
 
         // SkipToEnd for IDurableNothing must reject trailing JSON, not silently ignore it.
         var exception = Assert.Throws<InvalidOperationException>(() =>
-            ReadOne(format, """[8,["set",42]][9,["set",43]]""" + "\n", new SingleStateResolver(state)));
+            ReadOne(format, """[8,["set",42]][9,["set",43]]""" + "\n", state));
 
         Assert.Contains("invalid JSON", exception.Message);
     }
@@ -791,20 +791,20 @@ public class JsonCodecTests
         buffer.Write(bytes);
         var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true);
         var consumer = new RecordingJournalEntrySink();
-        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
-        format.Replay(reader, consumer, in context);
+        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8, 9, 10));
+        format.Replay(reader, in context);
         Assert.Equal(0, reader.Length);
 
         return consumer.Entries;
     }
 
-    private static void ReadOne(JsonLinesJournalFormat format, string jsonLines, IStateResolver resolver)
+    private static void ReadOne(JsonLinesJournalFormat format, string jsonLines, IJournaledState state)
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
         var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true);
-        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey);
-        format.Replay(reader, resolver, in context);
+        var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, (new JournalStreamId(8), state));
+        format.Replay(reader, in context);
         Assert.Equal(0, reader.Length);
     }
 
@@ -837,38 +837,40 @@ public class JsonCodecTests
             throw new InvalidOperationException("This test writer does not accept preserved entries.");
     }
 
-    private sealed class RecordingJournalEntrySink : IStateResolver, IJournaledState
+    private sealed class RecordingJournalEntrySink
     {
-        private JournalStreamId _streamId;
-
         public List<RecordedJournalEntry> Entries { get; } = [];
 
-        public IJournaledState ResolveState(JournalStreamId streamId)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
         {
-            _streamId = streamId;
-            return this;
+            var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
+            for (var i = 0; i < streamIds.Length; i++)
+            {
+                var streamId = new JournalStreamId(streamIds[i]);
+                bindings[i] = (streamId, new StreamSink(this, streamId));
+            }
+
+            return bindings;
         }
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            Entries.Add(new(_streamId, entry.Payload.ToArray()));
+        private sealed class StreamSink(RecordingJournalEntrySink owner, JournalStreamId streamId) : IJournaledState
+        {
+            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+                owner.Entries.Add(new(streamId, entry.Reader.ToArray()));
 
-        public void Reset(JournalStreamWriter storage) { }
-        public void AppendEntries(JournalStreamWriter writer) { }
-        public void AppendSnapshot(JournalStreamWriter writer) { }
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
-    }
-
-    private sealed class SingleStateResolver(IJournaledState state) : IStateResolver
-    {
-        public IJournaledState ResolveState(JournalStreamId streamId) => state;
+            public void Reset(JournalStreamWriter storage) { }
+            public void AppendEntries(JournalStreamWriter writer) { }
+            public void AppendSnapshot(JournalStreamWriter writer) { }
+            public IJournaledState DeepCopy() => throw new NotSupportedException();
+        }
     }
 
     private sealed class RecordingState(IDurableValueCommandCodec<int> codec) : IJournaledState, IDurableValueCommandHandler<int>
     {
         public int? Value { get; private set; }
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Payload, this);
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
 
         public void ApplySet(int value) => Value = value;
 
@@ -880,7 +882,7 @@ public class JsonCodecTests
 
     private sealed class NoOpState : IDurableNothing, IJournaledState
     {
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) { }
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) { }
 
         public void Reset(JournalStreamWriter storage) { }
         public void AppendEntries(JournalStreamWriter writer) { }
@@ -890,7 +892,7 @@ public class JsonCodecTests
 
     private sealed class ThrowingState : IJournaledState
     {
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
             throw new InvalidOperationException("boom");
 
         public void Reset(JournalStreamWriter storage) { }

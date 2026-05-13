@@ -25,7 +25,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     public DurableDictionary(
         [ServiceKey] string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
         : this(JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<K, V>>(serviceProvider, shared.JournalFormatKey))
@@ -34,7 +34,7 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
         manager.RegisterState(key, this);
     }
 
-    internal DurableDictionary(string key, IStateManager manager, IDurableDictionaryCommandCodec<K, V> codec) : this(codec)
+    internal DurableDictionary(string key, IJournaledStateManager manager, IDurableDictionaryCommandCodec<K, V> codec) : this(codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         manager.RegisterState(key, this);
@@ -59,8 +59,8 @@ internal class DurableDictionary<K, V> : IDurableDictionary<K, V>, IJournaledSta
 
     public bool IsReadOnly => ((ICollection<KeyValuePair<K, V>>)_items).IsReadOnly;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {

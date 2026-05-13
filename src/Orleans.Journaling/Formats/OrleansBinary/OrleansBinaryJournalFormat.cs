@@ -23,17 +23,16 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
 
     JournalBufferWriter IJournalFormat.CreateWriter() => new OrleansBinaryJournalBufferWriter();
 
-    void IJournalFormat.Replay(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context) =>
-        OrleansBinaryJournalReader.Read(input, resolver, _sessionPool, in context);
+    void IJournalFormat.Replay(JournalBufferReader input, in JournalReplayContext context) =>
+        OrleansBinaryJournalReader.Read(input, _sessionPool, in context);
 }
 
 internal static class OrleansBinaryJournalReader
 {
     internal const byte FormatVersion = 0;
 
-    public static void Read(JournalBufferReader input, IStateResolver resolver, SerializerSessionPool sessionPool, in JournaledStateReplayContext context)
+    public static void Read(JournalBufferReader input, SerializerSessionPool sessionPool, in JournalReplayContext context)
     {
-        ArgumentNullException.ThrowIfNull(resolver);
         ArgumentNullException.ThrowIfNull(sessionPool);
 
         if (input.Length == 0)
@@ -114,7 +113,7 @@ internal static class OrleansBinaryJournalReader
             }
 
             var streamId = new JournalStreamId(streamIdValue);
-            var state = resolver.ResolveState(streamId);
+            var state = context.ResolveState(streamId);
 
             // Slice the entry payload (post-streamId) so the state receives exactly one command body.
             var payloadStart = (int)reader.Position;

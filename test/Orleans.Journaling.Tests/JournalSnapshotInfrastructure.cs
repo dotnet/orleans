@@ -1,5 +1,8 @@
 using System.Buffers;
 using System.Text;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging.Abstractions;
+using Microsoft.Extensions.Options;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Tests;
@@ -202,46 +205,73 @@ public static class JournalSnapshotFormatting
     }
 }
 
-/// <summary>
-/// <see cref="IStateResolver"/> that returns a single supplied state for a single supplied stream id.
-/// </summary>
-public sealed class SingleStreamResolver : IStateResolver
-{
-    private readonly JournalStreamId _streamId;
-    private readonly IJournaledState _state;
-
-    public SingleStreamResolver(JournalStreamId streamId, IJournaledState state, string journalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey)
-    {
-        ArgumentNullException.ThrowIfNull(state);
-        _streamId = streamId;
-        _state = state;
-    }
-
-    public IJournaledState ResolveState(JournalStreamId streamId)
-    {
-        if (streamId != _streamId)
-        {
-            throw new InvalidOperationException(
-                $"SingleStreamResolver only resolves stream {_streamId.Value}, was asked for {streamId.Value}.");
-        }
-
-        return _state;
-    }
-}
-
 public static class JournalTestReplayContext
 {
-    public static JournaledStateReplayContext Create(string journalFormatKey) => new(journalFormatKey, NullServiceProvider.Instance);
-
-    private sealed class NullServiceProvider : IServiceProvider
+    public static JournalReplayContext Create(string journalFormatKey, params (JournalStreamId StreamId, IJournaledState State)[] states)
     {
-        public static readonly NullServiceProvider Instance = new();
-
-        private NullServiceProvider()
+        var manager = CreateManager(journalFormatKey);
+        foreach (var (streamId, state) in states)
         {
+            manager.BindStateForReplay(streamId, state);
         }
 
-        public object? GetService(Type serviceType) => null;
+        return new(manager);
+    }
+
+    private static JournaledStateManager CreateManager(string journalFormatKey)
+    {
+        journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(journalFormatKey);
+        var services = new ServiceCollection();
+        services.AddKeyedSingleton<IJournalFormat>(journalFormatKey, new TestJournalFormat(journalFormatKey));
+        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, ulong>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<ulong>());
+        services.AddKeyedSingleton<IDurableDictionaryCommandCodec<string, DateTime>>(journalFormatKey, new UnsupportedDictionaryCommandCodec<DateTime>());
+
+        var serviceProvider = services.BuildServiceProvider();
+        var shared = new JournaledStateManagerShared(
+            NullLogger<JournaledStateManager>.Instance,
+            Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
+            TimeProvider.System,
+            new NullJournalStorage(),
+            serviceProvider);
+
+        return new JournaledStateManager(shared);
+    }
+
+    private sealed class TestJournalFormat(string journalFormatKey) : IJournalFormat
+    {
+        public string FormatKey { get; } = journalFormatKey;
+
+        public string? MimeType => null;
+
+        public JournalBufferWriter CreateWriter() => new OrleansBinaryJournalBufferWriter();
+
+        public void Replay(JournalBufferReader input, in JournalReplayContext context) => throw new NotSupportedException();
+    }
+
+    private sealed class UnsupportedDictionaryCommandCodec<TValue> : IDurableDictionaryCommandCodec<string, TValue>
+    {
+        public void WriteSet(string key, TValue value, JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteRemove(string key, JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteClear(JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<string, TValue>> items, JournalStreamWriter writer) => throw new NotSupportedException();
+
+        public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<string, TValue> consumer) => throw new NotSupportedException();
+    }
+
+    private sealed class NullJournalStorage : IJournalStorage
+    {
+        public bool IsCompactionRequested => false;
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken) => default;
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken) => default;
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken) => default;
     }
 }
 
@@ -262,8 +292,8 @@ public sealed class RecordingDictionaryState<TKey, TValue> : IJournaledState, ID
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -298,8 +328,8 @@ public sealed class RecordingListState<T> : IJournaledState, IDurableListCommand
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -336,8 +366,8 @@ public sealed class RecordingQueueState<T> : IJournaledState, IDurableQueueComma
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -370,8 +400,8 @@ public sealed class RecordingSetState<T> : IJournaledState, IDurableSetCommandHa
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -404,8 +434,8 @@ public sealed class RecordingValueState<T> : IJournaledState, IDurableValueComma
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public T? Value => _handler.Value;
 
@@ -438,8 +468,8 @@ public sealed class RecordingStateState<T> : IJournaledState, IPersistentStateCo
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 
@@ -472,8 +502,8 @@ public sealed class RecordingTcsState<T> : IJournaledState, IDurableTaskCompleti
         _codec = codec;
     }
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     public IReadOnlyList<string> Commands => _handler.Commands;
 

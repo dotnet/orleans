@@ -17,17 +17,15 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
     public JournalBufferWriter CreateWriter() => new JsonLinesJournalBufferWriter();
 
-    public void Replay(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context)
+    public void Replay(JournalBufferReader input, in JournalReplayContext context)
     {
-        ArgumentNullException.ThrowIfNull(resolver);
-
         var offset = 0L;
-        while (TryReadLine(input, resolver, in context, ref offset))
+        while (TryReadLine(input, in context, ref offset))
         {
         }
     }
 
-    private static bool TryReadLine(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context, ref long offset)
+    private static bool TryReadLine(JournalBufferReader input, in JournalReplayContext context, ref long offset)
     {
         if (input.Length == 0)
         {
@@ -66,13 +64,13 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException($"Malformed JSON Lines journal segment at byte offset {lineOffset}: blank lines are not valid journal entries.");
             }
 
-            ReadLine(line, lineOffset, resolver, in context);
+            ReadLine(line, lineOffset, in context);
         }
 
         return true;
     }
 
-    private static void ReadLine(ReadOnlySequence<byte> line, long offset, IStateResolver resolver, in JournaledStateReplayContext context)
+    private static void ReadLine(ReadOnlySequence<byte> line, long offset, in JournalReplayContext context)
     {
         var reader = new Utf8JsonReader(line, isFinalBlock: true, state: default);
         try
@@ -93,12 +91,12 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             }
 
             var stream = new JournalStreamId(streamId);
-            var state = resolver.ResolveState(stream);
+            var state = context.ResolveState(stream);
             var payloadContent = ReadEntryPayload(ref reader, offset);
             using var payloadBuffer = new ArcBufferWriter();
             WriteEntryPayload(line, payloadContent, payloadBuffer);
             var entry = new JournalEntry(JsonJournalExtensions.JournalFormatKey, new JournalBufferReader(new ArcBufferReader(payloadBuffer), isCompleted: true));
-            _ = new JsonCommandReader(entry.Payload);
+            _ = new JsonCommandReader(entry.Reader);
             state.ReplayEntry(entry, in context);
         }
         catch (JsonException exception)

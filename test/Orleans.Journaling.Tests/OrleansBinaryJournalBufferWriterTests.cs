@@ -56,7 +56,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         using var data = buffer.GetBuffer();
         var consumer = new CollectingConsumer();
 
-        ReadAll(data, consumer);
+        ReadAll(data, consumer, 1, 300);
 
         Assert.Collection(
             consumer.Entries,
@@ -81,7 +81,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         using var data = buffer.GetBuffer();
         var bufferingConsumer = new BufferingConsumer();
 
-        ReadAll(data, bufferingConsumer);
+        ReadAll(data, bufferingConsumer, 8);
 
         Assert.Collection(
             bufferingConsumer.Entries,
@@ -93,7 +93,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         using var replayed = replay.GetBuffer();
         var activeConsumer = new CollectingConsumer();
 
-        ReadAll(replayed, activeConsumer);
+        ReadAll(replayed, activeConsumer, 8);
 
         Assert.Collection(
             activeConsumer.Entries,
@@ -131,7 +131,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         using var data = buffer.GetBuffer();
         var consumer = new CollectingConsumer();
 
-        ReadAll(data, consumer);
+        ReadAll(data, consumer, 1, 300);
 
         Assert.Collection(
             consumer.Entries,
@@ -348,7 +348,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         {
             var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
         });
 
         Assert.Contains(expectedMessage, exception.Message, StringComparison.Ordinal);
@@ -368,8 +368,8 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
             var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
-            var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
+            var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
         });
 
         Assert.Contains($"byte offset {entryBytes.Length}", exception.Message, StringComparison.Ordinal);
@@ -396,13 +396,13 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         return writer;
     }
 
-    private static void ReadAll(ArcBuffer data, IStateResolver consumer)
+    private static void ReadAll(ArcBuffer data, IReplayConsumer consumer, params ulong[] streamIds)
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
         var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
-        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(streamIds));
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
         Assert.Equal(0, reader.Length);
     }
 
@@ -420,51 +420,60 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         return (length, streamId, payload);
     }
 
-    private sealed class CollectingConsumer : IStateResolver, IJournaledState
+    private interface IReplayConsumer
     {
-        private JournalStreamId _streamId;
+        (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds);
+    }
+
+    private sealed class CollectingConsumer : IReplayConsumer
+    {
 
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public IJournaledState ResolveState(JournalStreamId streamId)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
         {
-            _streamId = streamId;
-            return this;
+            var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
+            for (var i = 0; i < streamIds.Length; i++)
+            {
+                var streamId = new JournalStreamId(streamIds[i]);
+                bindings[i] = (streamId, new StreamConsumer(this, streamId));
+            }
+
+            return bindings;
         }
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            Entries.Add((_streamId.Value, entry.Payload.ToArray()));
+        private sealed class StreamConsumer(CollectingConsumer owner, JournalStreamId streamId) : IJournaledState
+        {
+            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+                owner.Entries.Add((streamId.Value, entry.Reader.ToArray()));
 
-        public void Reset(JournalStreamWriter writer) { }
-        public void AppendEntries(JournalStreamWriter writer) { }
-        public void AppendSnapshot(JournalStreamWriter writer) { }
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
+            public void Reset(JournalStreamWriter writer) { }
+            public void AppendEntries(JournalStreamWriter writer) { }
+            public void AppendSnapshot(JournalStreamWriter writer) { }
+            public IJournaledState DeepCopy() => throw new NotSupportedException();
+        }
     }
 
-    private sealed class BufferingConsumer : IStateResolver, IJournaledState
+    private sealed class BufferingConsumer : IReplayConsumer
     {
         private readonly List<IPreservedJournalEntry> _preservedEntries = [];
-        private JournalStreamId _streamId;
 
         public List<(ulong StreamId, byte[] Payload)> Entries { get; } = [];
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
-        public IJournaledState ResolveState(JournalStreamId streamId)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
         {
-            _streamId = streamId;
-            return this;
+            var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
+            for (var i = 0; i < streamIds.Length; i++)
+            {
+                var streamId = new JournalStreamId(streamIds[i]);
+                bindings[i] = (streamId, new StreamConsumer(this, streamId));
+            }
+
+            return bindings;
         }
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context)
-        {
-            var preservedEntry = new TestPreservedJournalEntry(entry.FormatKey, entry.Payload.ToArray());
-            _preservedEntries.Add(preservedEntry);
-            Entries.Add((_streamId.Value, preservedEntry.Payload.ToArray()));
-        }
-
-        public void Reset(JournalStreamWriter writer) => _preservedEntries.Clear();
-        public void AppendEntries(JournalStreamWriter writer) { }
         public void AppendSnapshot(JournalStreamWriter writer)
         {
             foreach (var entry in _preservedEntries)
@@ -473,7 +482,20 @@ public sealed class OrleansBinaryJournalBufferWriterTests
             }
         }
 
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
+        private sealed class StreamConsumer(BufferingConsumer owner, JournalStreamId streamId) : IJournaledState
+        {
+            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context)
+            {
+                var preservedEntry = new TestPreservedJournalEntry(entry.FormatKey, entry.Reader.ToArray());
+                owner._preservedEntries.Add(preservedEntry);
+                owner.Entries.Add((streamId.Value, preservedEntry.Payload.ToArray()));
+            }
+
+            public void Reset(JournalStreamWriter writer) => owner._preservedEntries.Clear();
+            public void AppendEntries(JournalStreamWriter writer) { }
+            public void AppendSnapshot(JournalStreamWriter writer) { }
+            public IJournaledState DeepCopy() => throw new NotSupportedException();
+        }
     }
 
     private sealed class TestPreservedJournalEntry : IPreservedJournalEntry

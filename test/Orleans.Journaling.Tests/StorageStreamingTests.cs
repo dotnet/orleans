@@ -157,8 +157,8 @@ public sealed class StorageStreamingTests
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
             var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
-            var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
+            var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
+            ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
         });
 
         Assert.Contains("exceeds remaining input bytes", exception.Message, StringComparison.Ordinal);
@@ -172,8 +172,8 @@ public sealed class StorageStreamingTests
         var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
-        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
 
         Assert.Equal(3, reader.Length);
         Assert.Empty(consumer.Entries);
@@ -190,8 +190,8 @@ public sealed class StorageStreamingTests
         var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
-        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
-        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, consumer, in context);
+        var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
+        ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, in context);
 
         var entry = Assert.Single(consumer.Entries);
         Assert.Equal((ulong)8, entry.StreamId.Value);
@@ -325,25 +325,32 @@ public sealed class StorageStreamingTests
         public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException();
     }
 
-    private sealed class CapturingJournalEntrySink : IStateResolver, IJournaledState
+    private sealed class CapturingJournalEntrySink
     {
-        private JournalStreamId _streamId;
-
         public List<(JournalStreamId StreamId, byte[] Payload)> Entries { get; } = [];
 
-        public IJournaledState ResolveState(JournalStreamId streamId)
+        public (JournalStreamId StreamId, IJournaledState State)[] Bind(params ulong[] streamIds)
         {
-            _streamId = streamId;
-            return this;
+            var bindings = new (JournalStreamId StreamId, IJournaledState State)[streamIds.Length];
+            for (var i = 0; i < streamIds.Length; i++)
+            {
+                var streamId = new JournalStreamId(streamIds[i]);
+                bindings[i] = (streamId, new StreamSink(this, streamId));
+            }
+
+            return bindings;
         }
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            Entries.Add(new(_streamId, entry.Payload.ToArray()));
+        private sealed class StreamSink(CapturingJournalEntrySink owner, JournalStreamId streamId) : IJournaledState
+        {
+            void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+                owner.Entries.Add(new(streamId, entry.Reader.ToArray()));
 
-        public void Reset(JournalStreamWriter writer) { }
-        public void AppendEntries(JournalStreamWriter writer) { }
-        public void AppendSnapshot(JournalStreamWriter writer) { }
-        public IJournaledState DeepCopy() => throw new NotSupportedException();
+            public void Reset(JournalStreamWriter writer) { }
+            public void AppendEntries(JournalStreamWriter writer) { }
+            public void AppendSnapshot(JournalStreamWriter writer) { }
+            public IJournaledState DeepCopy() => throw new NotSupportedException();
+        }
     }
 
 }

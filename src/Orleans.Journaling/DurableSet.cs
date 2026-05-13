@@ -27,7 +27,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
 
     public DurableSet(
         [ServiceKey] string key,
-        IStateManager manager,
+        IJournaledStateManager manager,
         JournaledStateManagerShared shared,
         IServiceProvider serviceProvider)
     {
@@ -36,7 +36,7 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
         manager.RegisterState(key, this);
     }
 
-    internal DurableSet(string key, IStateManager manager, IDurableSetCommandCodec<T> codec)
+    internal DurableSet(string key, IJournaledStateManager manager, IDurableSetCommandCodec<T> codec)
     {
         ArgumentNullException.ThrowIfNullOrEmpty(key);
         _codec = codec;
@@ -46,8 +46,8 @@ internal sealed class DurableSet<T> : IDurableSet<T>, IJournaledState, IDurableS
     public int Count => _items.Count;
     public bool IsReadOnly => false;
 
-    void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+    void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+        context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {

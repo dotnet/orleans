@@ -7,7 +7,7 @@ using Orleans.Runtime.Internal;
 
 namespace Orleans.Journaling;
 
-internal sealed partial class JournaledStateManager : IStateManager, IStateResolver, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
+internal sealed partial class JournaledStateManager : IJournaledStateManager, ILifecycleParticipant<IGrainLifecycle>, ILifecycleObserver, IDisposable
 {
     private const int MinApplicationJournalStreamId = 8;
 #if NET9_0_OR_GREATER
@@ -48,7 +48,9 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
     }
 
-    private string WriteJournalFormatKey => _shared.JournalFormatKey;
+    internal string WriteJournalFormatKey => _shared.JournalFormatKey;
+
+    internal IServiceProvider ServiceProvider => _shared.ServiceProvider;
 
     public void RegisterState(string name, IJournaledState state)
     {
@@ -66,7 +68,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
                     // The removal from the tracker is handled within the serialized loop. This is to prevent logical race conditions with the recovery process.
                     // We also make sure to apply any buffered data that could have occured while the vessel took this state's place.
                     state.Reset(CreateJournalStreamWriter(new(_journalStreamDirectory[name])));
-                    var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _shared.ServiceProvider);
+                    var replayContext = new JournalReplayContext(this);
                     foreach (var entry in vessel.PreservedEntries)
                     {
                         using var buffer = new ArcBufferWriter();
@@ -405,7 +407,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             if (state is RetiredState { PreservedEntries.Count: > 0 } retiredState)
             {
                 throw new InvalidOperationException(
-                    $"Cannot migrate journal to format key '{WriteJournalFormatKey}' because stream " +
+                    $"Cannot migrate journal to format key '{_shared.JournalFormatKey}' because stream " +
                     $"{retiredState.StreamId.Value} belongs to a state which is not currently registered. Register the state so it can be decoded " +
                     "and snapshotted in the configured format, or keep the previous journal format configured until the state can be retired.");
             }
@@ -501,10 +503,17 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
         _retirementTracker.ResetVolatileState();
     }
 
-    IJournaledState IStateResolver.ResolveState(JournalStreamId streamId)
-        => ResolveState(streamId);
+    internal void BindStateForReplay(JournalStreamId streamId, IJournaledState state)
+    {
+        ArgumentNullException.ThrowIfNull(state);
+        lock (_lock)
+        {
+            _statesMap[streamId.Value] = state;
+            state.Reset(CreateJournalStreamWriter(streamId));
+        }
+    }
 
-    private IJournaledState ResolveState(JournalStreamId streamId)
+    internal IJournaledState ResolveState(JournalStreamId streamId)
     {
         if (!_statesMap.TryGetValue(streamId.Value, out var state))
         {
@@ -517,7 +526,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
     private IJournalFormat GetJournalFormat(string journalFormatKey)
     {
-        if (string.Equals(journalFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
+        if (string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))
         {
             return _shared.JournalFormat;
         }
@@ -537,14 +546,14 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
             : OrleansBinaryJournalFormat.JournalFormatKey;
         try
         {
-            if (!string.Equals(journalFormatKey, WriteJournalFormatKey, StringComparison.Ordinal))
+            if (!string.Equals(journalFormatKey, _shared.JournalFormatKey, StringComparison.Ordinal))
             {
                 _migrationSnapshotRequired = true;
             }
 
             var journalFormat = GetJournalFormat(journalFormatKey);
-            var replayContext = new JournaledStateReplayContext(WriteJournalFormatKey, _shared.ServiceProvider);
-            journalFormat.Replay(buffer, this, in replayContext);
+            var replayContext = new JournalReplayContext(this);
+            journalFormat.Replay(buffer, in replayContext);
 
             if (buffer.IsCompleted && buffer.Length > 0)
             {
@@ -567,7 +576,7 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
     private InvalidOperationException CreateRecoveryFormatException(Exception exception, string journalFormatKey) =>
         new(
             $"Failed to recover journaling state using journal format key '{journalFormatKey}'. " +
-            $"The configured write journal format key is '{WriteJournalFormatKey}'.",
+            $"The configured write journal format key is '{_shared.JournalFormatKey}'.",
             exception);
 
     public async ValueTask WriteStateAsync(CancellationToken cancellationToken)
@@ -702,8 +711,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         public ulong this[string name] => _ids[name];
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Payload, this);
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, _codec).Apply(entry.Reader, this);
 
         public bool ContainsKey(string name) => _ids.ContainsKey(name);
 
@@ -800,8 +809,8 @@ internal sealed partial class JournaledStateManager : IStateManager, IStateResol
 
         public IReadOnlyList<IPreservedJournalEntry> PreservedEntries => _preservedEntries;
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Payload));
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            _preservedEntries.Add(new PreservedJournalEntry(entry.FormatKey, entry.Reader));
 
         void IJournaledState.AppendSnapshot(JournalStreamWriter snapshotWriter)
         {

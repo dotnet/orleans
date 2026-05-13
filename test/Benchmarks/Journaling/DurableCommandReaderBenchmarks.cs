@@ -24,6 +24,7 @@ public class DurableCommandReaderBenchmarks
     private EncodedJournalData _snapshotOperation;
     private ArcBufferWriter _readBuffer;
     private ListReplayConsumer _consumer;
+    private JournalReplayContext _replayContext;
 
     [Params(CodecFamily.OrleansBinary)]
     public CodecFamily Family { get; set; }
@@ -35,7 +36,8 @@ public class DurableCommandReaderBenchmarks
         _journalFormat = codecFamily.JournalFormat;
         _codec = codecFamily.Codec;
         _readBuffer = new ArcBufferWriter();
-        _consumer = new ListReplayConsumer(ListJournalStreamId, _codec, SnapshotItemCount);
+        _consumer = new ListReplayConsumer(_codec, SnapshotItemCount);
+        _replayContext = JournalReplayContextFactory.Create(OrleansBinaryJournalFormat.JournalFormatKey, ListJournalStreamId, _consumer);
         _smallOperations = CreateSmallOperations(_journalFormat, _codec);
         _snapshotOperation = CreateSnapshotOperation(_journalFormat, _codec);
 
@@ -71,8 +73,7 @@ public class DurableCommandReaderBenchmarks
         _readBuffer.Reset();
         _readBuffer.Write(data.Buffer.AsReadOnlySequence());
         var reader = new JournalBufferReader(new ArcBufferReader(_readBuffer), isCompleted: true);
-        var context = new JournaledStateReplayContext(OrleansBinaryJournalFormat.JournalFormatKey, EmptyServiceProvider.Instance);
-        _journalFormat.Replay(reader, _consumer, in context);
+        _journalFormat.Replay(reader, in _replayContext);
     }
 
     private void ValidateEncodedJournalData(EncodedJournalData data, int expectedCount)
@@ -158,9 +159,8 @@ public class DurableCommandReaderBenchmarks
     }
 
     private sealed class ListReplayConsumer(
-        JournalStreamId expectedStreamId,
         IDurableListCommandCodec<int> codec,
-        int capacity) : IStateResolver, IJournaledState, IDurableListCommandHandler<int>
+        int capacity) : IJournaledState, IDurableListCommandHandler<int>
     {
         private readonly List<int> _items = new(capacity);
         private long _checksum;
@@ -168,16 +168,6 @@ public class DurableCommandReaderBenchmarks
         public int Count => _items.Count;
 
         public long Result => _checksum ^ _items.Count;
-
-        public IJournaledState ResolveState(JournalStreamId streamId)
-        {
-            if (streamId != expectedStreamId)
-            {
-                throw new InvalidOperationException($"The benchmark journal data contained unexpected stream id {streamId.Value}.");
-            }
-
-            return this;
-        }
 
         public void ResetForReplay()
         {
@@ -187,8 +177,8 @@ public class DurableCommandReaderBenchmarks
 
         void IJournaledState.Reset(JournalStreamWriter storage) => ResetForReplay();
 
-        void IJournaledState.ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context) =>
-            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Payload, this);
+        void IJournaledState.ReplayEntry(JournalEntry entry, in JournalReplayContext context) =>
+            context.GetRequiredCommandCodec(entry.FormatKey, codec).Apply(entry.Reader, this);
 
         void IJournaledState.AppendEntries(JournalStreamWriter writer)
         {
@@ -239,14 +229,4 @@ public class DurableCommandReaderBenchmarks
         }
     }
 
-    private sealed class EmptyServiceProvider : IServiceProvider
-    {
-        public static readonly EmptyServiceProvider Instance = new();
-
-        private EmptyServiceProvider()
-        {
-        }
-
-        public object GetService(Type serviceType) => null;
-    }
 }

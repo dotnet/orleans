@@ -3,7 +3,7 @@ using Orleans.Journaling.Json;
 namespace Orleans.Journaling;
 
 /// <summary>
-/// Options to configure the <see cref="IStateManager"/>.
+/// Options to configure the <see cref="IJournaledStateManager"/>.
 /// </summary>
 public sealed class JournaledStateManagerOptions
 {

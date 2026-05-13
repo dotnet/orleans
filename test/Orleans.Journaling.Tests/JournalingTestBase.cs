@@ -42,7 +42,7 @@ public abstract class JournalingTestBase
     /// <summary>
     /// Creates a journal manager with in-memory storage
     /// </summary>
-    internal (IStateManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle)
+    internal (IJournaledStateManager Manager, IJournalStorage Storage, ILifecycleSubject Lifecycle)
         CreateTestSystem(IJournalStorage? storage = null, TimeProvider? provider = null, IJournalFormat? journalFormat = null)
     {
         storage ??= CreateStorage();

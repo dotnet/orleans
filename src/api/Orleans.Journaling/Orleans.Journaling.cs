@@ -10,7 +10,7 @@ namespace Orleans.Journaling
 {
     public abstract partial class DurableGrain : Grain, IGrainBase
     {
-        protected IStateManager StateManager { get { throw null; } }
+        protected IJournaledStateManager StateManager { get { throw null; } }
 
         protected TState GetOrCreateState<TState>(string name)
             where TState : class, IJournaledState { throw null; }
@@ -136,7 +136,7 @@ namespace Orleans.Journaling
     {
         void AppendEntries(JournalStreamWriter writer);
         void AppendSnapshot(JournalStreamWriter writer);
-        void ReplayEntry(JournalEntry entry, in JournaledStateReplayContext context);
+        void ReplayEntry(JournalEntry entry, in JournalReplayContext context);
         IJournaledState DeepCopy();
         void OnRecoveryCompleted();
         void OnWriteCompleted();
@@ -155,7 +155,7 @@ namespace Orleans.Journaling
         string? MimeType { get; }
 
         JournalBufferWriter CreateWriter();
-        void Replay(JournalBufferReader input, IStateResolver resolver, in JournaledStateReplayContext context);
+        void Replay(JournalBufferReader input, in JournalReplayContext context);
     }
 
     public partial interface IJournalStorage
@@ -233,7 +233,7 @@ namespace Orleans.Journaling
         void Reset(int capacityHint);
     }
 
-    public partial interface IStateManager
+    public partial interface IJournaledStateManager
     {
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
@@ -253,11 +253,6 @@ namespace Orleans.Journaling
     {
         void ApplyClear();
         void ApplySet(T state, ulong version);
-    }
-
-    public partial interface IStateResolver
-    {
-        IJournaledState ResolveState(JournalStreamId streamId);
     }
 
     public partial interface IDurableTaskCompletionSourceCommandCodec<T>
@@ -314,17 +309,17 @@ namespace Orleans.Journaling
         public System.TimeSpan RetirementGracePeriod { get { throw null; } set { } }
     }
 
-    public readonly ref partial struct JournaledStateReplayContext
+    public readonly partial struct JournalReplayContext
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public JournaledStateReplayContext(string writeJournalFormatKey, System.IServiceProvider serviceProvider) { }
-
         public System.IServiceProvider ServiceProvider { get { throw null; } }
 
         public string WriteJournalFormatKey { get { throw null; } }
 
         public readonly TCodec GetRequiredCommandCodec<TCodec>(string entryFormatKey, TCodec writeCommandCodec) { throw null; }
+
+        public readonly IJournaledState ResolveState(JournalStreamId streamId) { throw null; }
     }
 
     public ref partial struct JournalEntryScope : System.IDisposable
@@ -351,11 +346,11 @@ namespace Orleans.Journaling
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public JournalEntry(string formatKey, JournalBufferReader payload) { }
+        public JournalEntry(string formatKey, JournalBufferReader reader) { }
 
         public string FormatKey { get { throw null; } }
 
-        public JournalBufferReader Payload { get { throw null; } }
+        public JournalBufferReader Reader { get { throw null; } }
     }
 
     public readonly partial struct JournalBufferReader
