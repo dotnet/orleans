@@ -46,8 +46,6 @@ internal sealed class AzureBlobJournalStorageProvider(
             blobClient,
             journalFormat.MimeType,
             logger,
-            static (client, snapshot) => client.WithSnapshot(snapshot),
-            snapshotEnumerator: null,
             journalFormatKey: journalFormatKey);
     }
 

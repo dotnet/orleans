@@ -57,29 +57,75 @@ public sealed class JsonCommandCodecAdditionalTests
     }
 
     [Fact]
-    public void ValueCodec_NullOperand_ThrowsClearException()
+    public void NullablePayloads_RoundTripNull()
     {
-        var codec = new JsonDurableValueCommandCodec<string>(Options);
-        var payload = """["set",null]"""u8.ToArray();
+        var valueConsumer = new RecordingValueCommandHandler<string>();
+        new JsonDurableValueCommandCodec<string>(Options).Apply(
+            CodecTestHelpers.ReadBuffer("""["set",null]"""u8.ToArray()),
+            valueConsumer);
 
-        var exception = Assert.Throws<JsonException>(
-            () => codec.Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingValueCommandHandler<string>()));
+        Assert.Null(valueConsumer.Value);
 
-        Assert.Contains("must not be null", exception.Message);
-        Assert.Contains(JsonJournalEntryFields.Value, exception.Message);
+        var listConsumer = new RecordingListCommandHandler<string>();
+        new JsonDurableListCommandCodec<string>(Options).Apply(
+            CodecTestHelpers.ReadBuffer("""["snapshot",["a",null,"c"]]"""u8.ToArray()),
+            listConsumer);
+
+        Assert.Equal(["reset:3", "add:a", "add:", "add:c"], listConsumer.Commands);
+
+        var queueConsumer = new RecordingQueueCommandHandler<string>();
+        new JsonDurableQueueCommandCodec<string>(Options).Apply(
+            CodecTestHelpers.ReadBuffer("""["snapshot",["a",null,"c"]]"""u8.ToArray()),
+            queueConsumer);
+
+        Assert.Equal(["reset:3", "enqueue:a", "enqueue:", "enqueue:c"], queueConsumer.Commands);
+
+        var setConsumer = new RecordingSetCommandHandler<string>();
+        new JsonDurableSetCommandCodec<string>(Options).Apply(
+            CodecTestHelpers.ReadBuffer("""["add",null]"""u8.ToArray()),
+            setConsumer);
+
+        Assert.Equal(["add:"], setConsumer.Commands);
+
+        var dictionaryConsumer = new RecordingDictionaryCommandHandler<string, string>();
+        new JsonDurableDictionaryCommandCodec<string, string>(Options).Apply(
+            CodecTestHelpers.ReadBuffer("""["snapshot",[["key",null]]]"""u8.ToArray()),
+            dictionaryConsumer);
+
+        Assert.Collection(
+            dictionaryConsumer.SnapshotItems,
+            item =>
+            {
+                Assert.Equal("key", item.Key);
+                Assert.Null(item.Value);
+            });
+
+        var persistentStateConsumer = new RecordingPersistentStateCommandHandler<string>();
+        new JsonPersistentStateCommandCodec<string>(Options).Apply(
+            CodecTestHelpers.ReadBuffer("""["set",null,7]"""u8.ToArray()),
+            persistentStateConsumer);
+
+        Assert.Null(persistentStateConsumer.State);
+        Assert.Equal(7UL, persistentStateConsumer.Version);
+
+        var tcsConsumer = new RecordingTaskCompletionSourceCommandHandler<string>();
+        new JsonDurableTaskCompletionSourceCommandCodec<string>(Options).Apply(
+            CodecTestHelpers.ReadBuffer("""["completed",null]"""u8.ToArray()),
+            tcsConsumer);
+
+        Assert.Equal(["completed:"], tcsConsumer.Commands);
     }
 
     [Fact]
-    public void ListCodec_NullSnapshotItem_ThrowsClearException()
+    public void NonNullableValuePayloads_NullOperand_ThrowsClearException()
     {
-        var codec = new JsonDurableListCommandCodec<string>(Options);
-        var payload = """["snapshot",["a",null,"c"]]"""u8.ToArray();
-
-        var exception = Assert.Throws<JsonException>(
-            () => codec.Apply(CodecTestHelpers.ReadBuffer(payload), new RecordingListCommandHandler<string>()));
+        var exception = Assert.Throws<JsonException>(() =>
+            new JsonDurableValueCommandCodec<int>(Options).Apply(
+                CodecTestHelpers.ReadBuffer("""["set",null]"""u8.ToArray()),
+                new RecordingValueCommandHandler<int>()));
 
         Assert.Contains("must not be null", exception.Message);
-        Assert.Contains(JsonJournalEntryFields.Item, exception.Message);
+        Assert.Contains(JsonJournalEntryFields.Value, exception.Message);
     }
 
     [Fact]

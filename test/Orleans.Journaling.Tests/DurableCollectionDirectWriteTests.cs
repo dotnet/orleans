@@ -10,7 +10,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Queue_Enqueue_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var queue = new DurableQueue<int>("queue", new TestJournalManager(writer), new ThrowingQueueCodec<int>(throwOnEnqueue: true));
 
         Assert.Throws<InvalidOperationException>(() => queue.Enqueue(1));
@@ -22,7 +22,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Queue_Dequeue_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var queue = new DurableQueue<int>("queue", new TestJournalManager(writer), new ThrowingQueueCodec<int>(throwOnDequeue: true));
         ((IDurableQueueCommandHandler<int>)queue).ApplyEnqueue(1);
 
@@ -36,7 +36,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Queue_Clear_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var queue = new DurableQueue<int>("queue", new TestJournalManager(writer), new ThrowingQueueCodec<int>(throwOnClear: true));
         ((IDurableQueueCommandHandler<int>)queue).ApplyEnqueue(1);
         ((IDurableQueueCommandHandler<int>)queue).ApplyEnqueue(2);
@@ -51,7 +51,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_Add_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnAdd: true));
 
         Assert.Throws<InvalidOperationException>(() => set.Add(1));
@@ -63,7 +63,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_Remove_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnRemove: true));
         ((IDurableSetCommandHandler<int>)set).ApplyAdd(1);
 
@@ -76,7 +76,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_Clear_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnClear: true));
         ((IDurableSetCommandHandler<int>)set).ApplyAdd(1);
         ((IDurableSetCommandHandler<int>)set).ApplyAdd(2);
@@ -90,7 +90,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_IntersectWith_DoesNotMutateWhenSnapshotEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnSnapshot: true));
         ((IDurableSetCommandHandler<int>)set).ApplyAdd(1);
         ((IDurableSetCommandHandler<int>)set).ApplyAdd(2);
@@ -105,7 +105,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Set_SymmetricExceptWith_DoesNotMutateWhenSnapshotEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var set = new DurableSet<int>("set", new TestJournalManager(writer), new ThrowingSetCodec<int>(throwOnSnapshot: true));
         ((IDurableSetCommandHandler<int>)set).ApplyAdd(1);
         ((IDurableSetCommandHandler<int>)set).ApplyAdd(2);
@@ -119,7 +119,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Dictionary_Add_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestJournalManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnSet: true));
 
         Assert.Throws<InvalidOperationException>(() => dictionary.Add(1, 1));
@@ -131,7 +131,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Dictionary_Set_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestJournalManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnSet: true));
         ((IDurableDictionaryCommandHandler<int, int>)dictionary).ApplySet(1, 1);
 
@@ -144,7 +144,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Dictionary_Remove_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestJournalManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnRemove: true));
         ((IDurableDictionaryCommandHandler<int, int>)dictionary).ApplySet(1, 1);
 
@@ -157,7 +157,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Dictionary_Clear_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var dictionary = new DurableDictionary<int, int>("dictionary", new TestJournalManager(writer), new ThrowingDictionaryCodec<int, int>(throwOnClear: true));
         ((IDurableDictionaryCommandHandler<int, int>)dictionary).ApplySet(1, 1);
         ((IDurableDictionaryCommandHandler<int, int>)dictionary).ApplySet(2, 2);
@@ -173,7 +173,7 @@ public sealed class DurableCollectionDirectWriteTests
     [Fact]
     public void Collections_UseDirectEntryWriter()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var manager = new TestJournalManager(writer);
         var queue = new DurableQueue<int>("queue", manager, new DirectQueueCodec<int>());
         var set = new DurableSet<int>("set", manager, new DirectSetCodec<int>());
@@ -206,7 +206,7 @@ public sealed class DurableCollectionDirectWriteTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class TestJournalStreamWriter
+    private sealed class TestJournalStreamWriter : IDisposable
     {
         private readonly OrleansBinaryJournalBufferWriter _buffer = new();
 
@@ -220,6 +220,8 @@ public sealed class DurableCollectionDirectWriteTests
         }
 
         public JournalStreamWriter CreateWriter() => _buffer.CreateJournalStreamWriter(new JournalStreamId(1));
+
+        public void Dispose() => _buffer.Dispose();
     }
 
     private sealed class DirectQueueCodec<T> : TestQueueCodec<T>

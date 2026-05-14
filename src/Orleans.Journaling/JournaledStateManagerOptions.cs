@@ -14,11 +14,11 @@ public sealed class JournaledStateManagerOptions
 
     /// <summary>
     /// Specifies the period of time to wait until the manager retires
-    /// a <see cref="IJournaledState"/> if its not registered in the manager anymore.
+    /// a <see cref="IJournaledState"/> if it's not registered in the manager anymore.
     /// </summary>
     /// <remarks>
     /// <para>The act of retirement removes this state from the journal.</para>
-    /// <para>If the state is reintroduced (within the grace period), than it will not be removed by the manager.</para>
+    /// <para>If the state is reintroduced (within the grace period), then it will not be removed by the manager.</para>
     /// <para>
     /// This value represents the <b>minimum</b> time the fate of the state will be postponed.
     /// The final decision can take longer - usually <see cref="RetirementGracePeriod"/> + [time until next compaction occurs].

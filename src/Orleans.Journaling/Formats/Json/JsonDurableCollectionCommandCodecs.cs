@@ -104,7 +104,14 @@ public sealed class JsonDurableListCommandCodec<T>(JsonSerializerOptions? option
     public void Apply(JournalBufferReader input, IDurableListCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
-        Apply(ref reader, consumer);
+        try
+        {
+            Apply(ref reader, consumer);
+        }
+        finally
+        {
+            reader.Dispose();
+        }
     }
 
     private void Apply(ref JsonCommandReader reader, IDurableListCommandHandler<T> consumer)
@@ -113,19 +120,19 @@ public sealed class JsonDurableListCommandCodec<T>(JsonSerializerOptions? option
         switch (command)
         {
             case JsonJournalEntryCommands.Add:
-                consumer.ApplyAdd(reader.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
+                consumer.ApplyAdd(reader.DeserializeAllowNull(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
                     reader.ReadInt32(1, JsonJournalEntryFields.Index),
-                    reader.DeserializeRequired(2, JsonJournalEntryFields.Item, _itemTypeInfo));
+                    reader.DeserializeAllowNull(2, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 reader.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.Insert:
                 consumer.ApplyInsert(
                     reader.ReadInt32(1, JsonJournalEntryFields.Index),
-                    reader.DeserializeRequired(2, JsonJournalEntryFields.Item, _itemTypeInfo));
+                    reader.DeserializeAllowNull(2, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 reader.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.RemoveAt:
@@ -141,7 +148,7 @@ public sealed class JsonDurableListCommandCodec<T>(JsonSerializerOptions? option
                 consumer.Reset(count);
                 while (reader.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    consumer.ApplyAdd(reader.DeserializeCurrentRequired(JsonJournalEntryFields.Item, _itemTypeInfo));
+                    consumer.ApplyAdd(reader.DeserializeCurrentAllowNull(JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 }
 
                 reader.EnsureEnd(2);
@@ -221,7 +228,14 @@ public sealed class JsonDurableQueueCommandCodec<T>(JsonSerializerOptions? optio
     public void Apply(JournalBufferReader input, IDurableQueueCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
-        Apply(ref reader, consumer);
+        try
+        {
+            Apply(ref reader, consumer);
+        }
+        finally
+        {
+            reader.Dispose();
+        }
     }
 
     private void Apply(ref JsonCommandReader reader, IDurableQueueCommandHandler<T> consumer)
@@ -230,7 +244,7 @@ public sealed class JsonDurableQueueCommandCodec<T>(JsonSerializerOptions? optio
         switch (command)
         {
             case JsonJournalEntryCommands.Enqueue:
-                consumer.ApplyEnqueue(reader.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
+                consumer.ApplyEnqueue(reader.DeserializeAllowNull(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Dequeue:
@@ -246,7 +260,7 @@ public sealed class JsonDurableQueueCommandCodec<T>(JsonSerializerOptions? optio
                 consumer.Reset(count);
                 while (reader.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    consumer.ApplyEnqueue(reader.DeserializeCurrentRequired(JsonJournalEntryFields.Item, _itemTypeInfo));
+                    consumer.ApplyEnqueue(reader.DeserializeCurrentAllowNull(JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 }
 
                 reader.EnsureEnd(2);
@@ -331,7 +345,14 @@ public sealed class JsonDurableSetCommandCodec<T>(JsonSerializerOptions? options
     public void Apply(JournalBufferReader input, IDurableSetCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
-        Apply(ref reader, consumer);
+        try
+        {
+            Apply(ref reader, consumer);
+        }
+        finally
+        {
+            reader.Dispose();
+        }
     }
 
     private void Apply(ref JsonCommandReader reader, IDurableSetCommandHandler<T> consumer)
@@ -340,11 +361,11 @@ public sealed class JsonDurableSetCommandCodec<T>(JsonSerializerOptions? options
         switch (command)
         {
             case JsonJournalEntryCommands.Add:
-                consumer.ApplyAdd(reader.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
+                consumer.ApplyAdd(reader.DeserializeAllowNull(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Remove:
-                consumer.ApplyRemove(reader.DeserializeRequired(1, JsonJournalEntryFields.Item, _itemTypeInfo));
+                consumer.ApplyRemove(reader.DeserializeAllowNull(1, JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Clear:
@@ -356,7 +377,7 @@ public sealed class JsonDurableSetCommandCodec<T>(JsonSerializerOptions? options
                 consumer.Reset(count);
                 while (reader.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    consumer.ApplyAdd(reader.DeserializeCurrentRequired(JsonJournalEntryFields.Item, _itemTypeInfo));
+                    consumer.ApplyAdd(reader.DeserializeCurrentAllowNull(JsonJournalEntryFields.Item, _itemTypeInfo)!);
                 }
 
                 reader.EnsureEnd(2);

@@ -96,7 +96,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             using var payloadBuffer = new ArcBufferWriter();
             WriteEntryPayload(line, payloadContent, payloadBuffer);
             var entry = new JournalEntry(JsonJournalExtensions.JournalFormatKey, new JournalBufferReader(payloadBuffer.Reader, isCompleted: true));
-            _ = new JsonCommandReader(entry.Reader);
+            using var commandReader = new JsonCommandReader(entry.Reader);
             state.ReplayEntry(entry, context);
         }
         catch (JsonException exception)

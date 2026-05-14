@@ -158,9 +158,4 @@ public readonly struct JournalBufferReader
         return true;
     }
 
-    internal readonly System.Buffers.ReadOnlySequence<byte> AsReadOnlySequence()
-    {
-        using var slice = Peek(Length);
-        return slice.AsReadOnlySequence();
-    }
 }

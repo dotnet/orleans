@@ -10,7 +10,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Add_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnAdd: true));
 
         Assert.Throws<InvalidOperationException>(() => list.Add(1));
@@ -22,7 +22,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Set_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnSet: true));
         ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
         ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
@@ -36,7 +36,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Insert_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnInsert: true));
         ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
         ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
@@ -50,7 +50,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void RemoveAt_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnRemoveAt: true));
         ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
         ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
@@ -64,7 +64,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Clear_DoesNotMutateWhenEncodingFails()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new ThrowingListCodec<int>(throwOnClear: true));
         ((IDurableListCommandHandler<int>)list).ApplyAdd(1);
         ((IDurableListCommandHandler<int>)list).ApplyAdd(2);
@@ -78,7 +78,7 @@ public sealed class DurableListDirectWriteTests
     [Fact]
     public void Add_UsesDirectEntryWriter()
     {
-        var writer = new TestJournalStreamWriter();
+        using var writer = new TestJournalStreamWriter();
         var list = new DurableList<int>("list", new TestJournalManager(writer), new DirectAddCodec<int>());
 
         list.Add(1);
@@ -105,7 +105,7 @@ public sealed class DurableListDirectWriteTests
         public ValueTask DeleteStateAsync(CancellationToken cancellationToken) => default;
     }
 
-    private sealed class TestJournalStreamWriter
+    private sealed class TestJournalStreamWriter : IDisposable
     {
         private readonly OrleansBinaryJournalBufferWriter _buffer = new();
 
@@ -119,6 +119,8 @@ public sealed class DurableListDirectWriteTests
         }
 
         public JournalStreamWriter CreateWriter() => _buffer.CreateJournalStreamWriter(new JournalStreamId(1));
+
+        public void Dispose() => _buffer.Dispose();
     }
 
     private sealed class ThrowingListCodec<T>(

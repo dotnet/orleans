@@ -28,7 +28,14 @@ public sealed class JsonDurableValueCommandCodec<T>(JsonSerializerOptions? optio
     public void Apply(JournalBufferReader input, IDurableValueCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
-        Apply(ref reader, consumer);
+        try
+        {
+            Apply(ref reader, consumer);
+        }
+        finally
+        {
+            reader.Dispose();
+        }
     }
 
     private void Apply(ref JsonCommandReader reader, IDurableValueCommandHandler<T> consumer)
@@ -37,7 +44,7 @@ public sealed class JsonDurableValueCommandCodec<T>(JsonSerializerOptions? optio
         switch (command)
         {
             case JsonJournalEntryCommands.Set:
-                consumer.ApplySet(reader.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
+                consumer.ApplySet(reader.DeserializeAllowNull(1, JsonJournalEntryFields.Value, _valueTypeInfo)!);
                 reader.EnsureEnd(2);
                 break;
             default:
@@ -81,7 +88,14 @@ public sealed class JsonPersistentStateCommandCodec<T>(JsonSerializerOptions? op
     public void Apply(JournalBufferReader input, IPersistentStateCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
-        Apply(ref reader, consumer);
+        try
+        {
+            Apply(ref reader, consumer);
+        }
+        finally
+        {
+            reader.Dispose();
+        }
     }
 
     private void Apply(ref JsonCommandReader reader, IPersistentStateCommandHandler<T> consumer)
@@ -91,7 +105,7 @@ public sealed class JsonPersistentStateCommandCodec<T>(JsonSerializerOptions? op
         {
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
-                    reader.DeserializeRequired(1, JsonJournalEntryFields.State, _stateTypeInfo),
+                    reader.DeserializeAllowNull(1, JsonJournalEntryFields.State, _stateTypeInfo)!,
                     reader.ReadUInt64(2, JsonJournalEntryFields.Version));
                 reader.EnsureEnd(3);
                 break;
@@ -163,7 +177,14 @@ public sealed class JsonDurableTaskCompletionSourceCommandCodec<T>(JsonSerialize
     public void Apply(JournalBufferReader input, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
         var reader = new JsonCommandReader(input);
-        Apply(ref reader, consumer);
+        try
+        {
+            Apply(ref reader, consumer);
+        }
+        finally
+        {
+            reader.Dispose();
+        }
     }
 
     private void Apply(ref JsonCommandReader reader, IDurableTaskCompletionSourceCommandHandler<T> consumer)
@@ -176,7 +197,7 @@ public sealed class JsonDurableTaskCompletionSourceCommandCodec<T>(JsonSerialize
                 consumer.ApplyPending();
                 break;
             case JsonJournalEntryCommands.Completed:
-                consumer.ApplyCompleted(reader.DeserializeRequired(1, JsonJournalEntryFields.Value, _valueTypeInfo));
+                consumer.ApplyCompleted(reader.DeserializeAllowNull(1, JsonJournalEntryFields.Value, _valueTypeInfo)!);
                 reader.EnsureEnd(2);
                 break;
             case JsonJournalEntryCommands.Faulted:

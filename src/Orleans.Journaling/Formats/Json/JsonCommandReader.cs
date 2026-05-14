@@ -1,18 +1,23 @@
 using System.Buffers;
 using System.Text.Json;
 using System.Text.Json.Serialization.Metadata;
+using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling.Json;
 
 internal ref struct JsonCommandReader
 {
     private Utf8JsonReader _reader;
+    private ArcBuffer _input;
     private int _nextIndex;
+    private bool _ownsInput;
 
     public JsonCommandReader(ReadOnlySequence<byte> input)
     {
+        _input = default;
         _reader = new Utf8JsonReader(input, isFinalBlock: true, state: default);
         _nextIndex = 0;
+        _ownsInput = false;
         if (!_reader.Read() || _reader.TokenType is not JsonTokenType.StartArray)
         {
             throw new JsonException("A JSON journal command must be an array.");
@@ -23,24 +28,45 @@ internal ref struct JsonCommandReader
 
     public JsonCommandReader(JournalBufferReader input)
     {
-        _reader = new Utf8JsonReader(input.AsReadOnlySequence(), isFinalBlock: true, state: default);
+        _input = input.Peek(input.Length);
+        _reader = new Utf8JsonReader(_input.AsReadOnlySequence(), isFinalBlock: true, state: default);
         _nextIndex = 0;
-        if (!_reader.Read() || _reader.TokenType is not JsonTokenType.StartArray)
+        _ownsInput = true;
+        try
         {
-            throw new JsonException("A JSON journal command must be an array.");
-        }
+            if (!_reader.Read() || _reader.TokenType is not JsonTokenType.StartArray)
+            {
+                throw new JsonException("A JSON journal command must be an array.");
+            }
 
-        Command = ReadCommandCore();
+            Command = ReadCommandCore();
+        }
+        catch
+        {
+            Dispose();
+            throw;
+        }
     }
 
     public JsonCommandReader(ref Utf8JsonReader reader)
     {
+        _input = default;
         _reader = reader;
         _nextIndex = 0;
+        _ownsInput = false;
         Command = ReadCommandCore();
     }
 
     public string? Command { get; }
+
+    public void Dispose()
+    {
+        if (_ownsInput)
+        {
+            _input.Dispose();
+            _ownsInput = false;
+        }
+    }
 
     public T? Deserialize<T>(int index, string operandName, JsonTypeInfo<T> typeInfo)
     {
@@ -48,21 +74,37 @@ internal ref struct JsonCommandReader
         return JsonSerializer.Deserialize(ref _reader, typeInfo);
     }
 
+    public T? DeserializeAllowNull<T>(int index, string operandName, JsonTypeInfo<T> typeInfo)
+    {
+        ReadOperand(index, operandName);
+        return DeserializeCurrentAllowNull(operandName, typeInfo);
+    }
+
     public T DeserializeRequired<T>(int index, string operandName, JsonTypeInfo<T> typeInfo)
     {
-        var value = Deserialize(index, operandName, typeInfo);
-        if (value is null)
-        {
-            throw new JsonException($"JSON journal command operand '{operandName}' must not be null.");
-        }
-
-        return value;
+        ReadOperand(index, operandName);
+        return DeserializeCurrentRequired(operandName, typeInfo);
     }
 
     public T? DeserializeCurrent<T>(JsonTypeInfo<T> typeInfo) => JsonSerializer.Deserialize(ref _reader, typeInfo);
 
+    public T? DeserializeCurrentAllowNull<T>(string operandName, JsonTypeInfo<T> typeInfo)
+    {
+        if (_reader.TokenType is JsonTokenType.Null && default(T) is not null)
+        {
+            throw new JsonException($"JSON journal command operand '{operandName}' must not be null.");
+        }
+
+        return JsonSerializer.Deserialize(ref _reader, typeInfo);
+    }
+
     public T DeserializeCurrentRequired<T>(string operandName, JsonTypeInfo<T> typeInfo)
     {
+        if (_reader.TokenType is JsonTokenType.Null)
+        {
+            throw new JsonException($"JSON journal command operand '{operandName}' must not be null.");
+        }
+
         var value = DeserializeCurrent(typeInfo);
         if (value is null)
         {
@@ -146,13 +188,13 @@ internal ref struct JsonCommandReader
             throw new JsonException($"JSON journal command is missing operand '{JsonJournalEntryFields.Key}'.");
         }
 
-        var first = JsonSerializer.Deserialize(ref _reader, firstTypeInfo);
+        var first = DeserializeCurrentAllowNull(JsonJournalEntryFields.Key, firstTypeInfo);
         if (!_reader.Read() || _reader.TokenType is JsonTokenType.EndArray)
         {
             throw new JsonException($"JSON journal command is missing operand '{JsonJournalEntryFields.Value}'.");
         }
 
-        var second = JsonSerializer.Deserialize(ref _reader, secondTypeInfo);
+        var second = DeserializeCurrentAllowNull(JsonJournalEntryFields.Value, secondTypeInfo);
         if (!_reader.Read())
         {
             throw new JsonException($"JSON journal command operand '{operandName}' array is incomplete.");
@@ -178,6 +220,25 @@ internal ref struct JsonCommandReader
         }
 
         if (second is null)
+        {
+            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Value}' must not be null.");
+        }
+
+        return (first, second);
+    }
+
+    public (TFirst First, TSecond? Second) ReadCurrentPairRequiredFirst<TFirst, TSecond>(
+        string operandName,
+        JsonTypeInfo<TFirst> firstTypeInfo,
+        JsonTypeInfo<TSecond> secondTypeInfo)
+    {
+        var (first, second) = ReadCurrentPair(operandName, firstTypeInfo, secondTypeInfo);
+        if (first is null)
+        {
+            throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Key}' must not be null.");
+        }
+
+        if (second is null && default(TSecond) is not null)
         {
             throw new JsonException($"JSON journal command operand '{JsonJournalEntryFields.Value}' must not be null.");
         }

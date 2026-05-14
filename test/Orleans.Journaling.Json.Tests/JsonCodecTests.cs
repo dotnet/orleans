@@ -917,7 +917,7 @@ public class JsonCodecTests
 
         public void Apply(JournalBufferReader input, IDurableValueCommandHandler<int> consumer)
         {
-            var reader = new JsonCommandReader(input);
+            using var reader = new JsonCommandReader(input);
             Consumer = consumer;
             Value = reader.Deserialize(1, JsonJournalEntryFields.Value, JsonCodecTestJsonContext.Default.Int32);
             reader.EnsureEnd(2);

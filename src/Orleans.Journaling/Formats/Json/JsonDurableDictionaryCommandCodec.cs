@@ -88,7 +88,14 @@ public sealed class JsonDurableDictionaryCommandCodec<TKey, TValue>(JsonSerializ
     public void Apply(JournalBufferReader input, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
     {
         var reader = new JsonCommandReader(input);
-        Apply(ref reader, consumer);
+        try
+        {
+            Apply(ref reader, consumer);
+        }
+        finally
+        {
+            reader.Dispose();
+        }
     }
 
     private void Apply(ref JsonCommandReader reader, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
@@ -99,7 +106,7 @@ public sealed class JsonDurableDictionaryCommandCodec<TKey, TValue>(JsonSerializ
             case JsonJournalEntryCommands.Set:
                 consumer.ApplySet(
                     reader.DeserializeRequired(1, JsonJournalEntryFields.Key, _keyTypeInfo),
-                    reader.DeserializeRequired(2, JsonJournalEntryFields.Value, _valueTypeInfo));
+                    reader.DeserializeAllowNull(2, JsonJournalEntryFields.Value, _valueTypeInfo)!);
                 reader.EnsureEnd(3);
                 break;
             case JsonJournalEntryCommands.Remove:
@@ -115,8 +122,8 @@ public sealed class JsonDurableDictionaryCommandCodec<TKey, TValue>(JsonSerializ
                 consumer.Reset(count);
                 while (reader.ReadArrayItem(JsonJournalEntryFields.Items))
                 {
-                    var (key, value) = reader.ReadCurrentPairRequired(JsonJournalEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
-                    consumer.ApplySet(key, value);
+                    var (key, value) = reader.ReadCurrentPairRequiredFirst(JsonJournalEntryFields.Items, _keyTypeInfo, _valueTypeInfo);
+                    consumer.ApplySet(key, value!);
                 }
 
                 reader.EnsureEnd(2);

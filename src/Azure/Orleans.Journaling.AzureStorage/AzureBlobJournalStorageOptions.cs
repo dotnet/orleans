@@ -14,7 +14,7 @@ public sealed class AzureBlobJournalStorageOptions
     private BlobServiceClient? _blobServiceClient;
 
     /// <summary>
-    /// Container name where state state is stored.
+    /// Container name where state is stored.
     /// </summary>
     public string ContainerName { get; set; } = DEFAULT_CONTAINER_NAME;
     public const string DEFAULT_CONTAINER_NAME = "state";
