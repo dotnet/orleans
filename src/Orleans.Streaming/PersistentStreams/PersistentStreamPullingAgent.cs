@@ -14,6 +14,7 @@ using Orleans.Runtime.Scheduler;
 using Orleans.Streaming;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
+using TagList = System.Diagnostics.TagList;
 
 namespace Orleans.Streams
 {
@@ -478,13 +479,13 @@ namespace Orleans.Streams
         /// <returns></returns>
         private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver? rcvr, int maxCacheAddCount, CancellationToken cancellationToken)
         {
-            if (rcvr == null || IsShutdown || cancellationToken.IsCancellationRequested)
+            if (rcvr is null || IsShutdown || cancellationToken.IsCancellationRequested)
             {
                 return false;
             }
 
             var now = _timeProvider.GetUtcNow().UtcDateTime;
-            System.Diagnostics.TagList? tags = null;
+            TagList? tags = null;
 
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
             if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
@@ -498,7 +499,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (queueCache != null)
+            if (queueCache is not null)
             {
                 if (queueCache.TryPurgeFromCache(out var purgedItems))
                 {
@@ -518,7 +519,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (queueCache != null && queueCache.IsUnderPressure())
+            if (queueCache is not null && queueCache.IsUnderPressure())
             {
                 // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
                 LogInfoStreamCacheUnderPressure();
@@ -548,7 +549,7 @@ namespace Orleans.Streams
 
             foreach (var group in
                 multiBatch
-                .Where(m => m != null)
+                .Where(m => m is not null)
                 .GroupBy(container => container.StreamId))
             {
                 if (IsShutdown || cancellationToken.IsCancellationRequested)
@@ -774,16 +775,16 @@ namespace Orleans.Streams
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData)
         {
-            System.Diagnostics.TagList? tags = null;
+            TagList? tags = null;
             try
             {
                 // double check in case of interleaving
                 if (consumerData.State == StreamConsumerDataState.Active ||
-                    consumerData.Cursor == null) return;
+                    consumerData.Cursor is null) return;
 
                 consumerData.State = StreamConsumerDataState.Active;
                 var deliveredAny = false;
-                while (!IsShutdown && consumerData.Cursor != null)
+                while (!IsShutdown && consumerData.Cursor is not null)
                 {
                     ConsumerBatch nextBatch = default;
                     Exception? exceptionOccured = null;
@@ -831,7 +832,7 @@ namespace Orleans.Streams
                             break;
                         }
 
-                        if (nextBatch.Batch != null)
+                        if (nextBatch.Batch is not null)
                         {
                             var batch = nextBatch.Batch;
                             StreamHandshakeToken? newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
@@ -841,8 +842,7 @@ namespace Orleans.Streams
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
                                 deliveryBackoffProvider);
-
-                            if (newToken != null)
+                            if (newToken is not null)
                             {
                                 consumerData.LastProcessedToken = newToken.Token;
                                 consumerData.LastToken = newToken;
@@ -870,7 +870,7 @@ namespace Orleans.Streams
                             : new StreamEventDeliveryFailureException(consumerData.StreamId);
                     }
                     // if we failed to deliver a batch
-                    if (exceptionOccured != null)
+                    if (exceptionOccured is not null)
                     {
                         var batch = nextBatch.Batch;
                         bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch?.SequenceToken);
