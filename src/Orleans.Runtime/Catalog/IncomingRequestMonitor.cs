@@ -123,7 +123,7 @@ namespace Orleans.Runtime
                 foreach (var activationEntry in _recentlyUsedActivations)
                 {
                     var activation = activationEntry.Key;
-                    lock (activation)
+                    lock (activation.SynchronizationLock)
                     {
                         activation.AnalyzeWorkload(now, messageCenter, _messageFactory, options);
                     }

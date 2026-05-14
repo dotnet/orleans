@@ -126,7 +126,7 @@ internal sealed partial class ActivationMigrationManager : SystemTarget, IActiva
             var allActiveOrTerminal = true;
             foreach (var activation in activations)
             {
-                lock (activation)
+                lock (activation.SynchronizationLock)
                 {
                     if (activation.State is not (ActivationState.Valid or ActivationState.Invalid))
                     {
