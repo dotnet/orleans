@@ -34,13 +34,41 @@ namespace Orleans.Streams
         bool IsUnderPressure();
 
         /// <summary>
-        /// Notifies the cache that a batch with the given sequence token has been successfully
-        /// delivered to a specific subscription on the specified stream. Implementations can use
-        /// this to advance checkpoints based on delivery rather than cache eviction.
+        /// Notifies the cache that stream registration has started and checkpoints should not advance past this stream
+        /// until registration completes.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        void NotifyStreamRegistrationStarted(StreamId streamId) { }
+
+        /// <summary>
+        /// Notifies the cache that stream registration has completed.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        void NotifyStreamRegistrationCompleted(StreamId streamId) { }
+
+        /// <summary>
+        /// Notifies the cache that a subscription is active on the specified stream.
         /// </summary>
         /// <param name="streamId">The stream identifier.</param>
         /// <param name="subscriptionId">The subscription identifier.</param>
-        /// <param name="token">The sequence token of the delivered batch.</param>
-        void NotifyBatchDelivered(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token) { }
+        /// <param name="token">The sequence token from which the subscription starts, or <see langword="null"/> if unknown.</param>
+        void NotifySubscriptionAdded(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token) { }
+
+        /// <summary>
+        /// Notifies the cache that a subscription is no longer active on the specified stream.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        void NotifySubscriptionRemoved(StreamId streamId, GuidId subscriptionId) { }
+
+        /// <summary>
+        /// Notifies the cache that a batch with the given sequence token has been successfully
+        /// processed by a specific subscription on the specified stream. Processing can mean either
+        /// delivery to the subscription or filtering/skipping by the pulling agent.
+        /// </summary>
+        /// <param name="streamId">The stream identifier.</param>
+        /// <param name="subscriptionId">The subscription identifier.</param>
+        /// <param name="token">The sequence token of the processed batch.</param>
+        void NotifyBatchProcessed(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token) { }
     }
 }

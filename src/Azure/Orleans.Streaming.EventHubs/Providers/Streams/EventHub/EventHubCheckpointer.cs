@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
@@ -131,28 +132,38 @@ namespace Orleans.Streaming.EventHubs
                 return;
             }
 
-            // Only move the in-memory offset forward (Event Hub offsets are numeric strings).
-            // This prevents a purge-based checkpoint from regressing past a read-based checkpoint.
-            if (long.TryParse(offset, out var newOffset)
-                && long.TryParse(latestOffset, out var currentOffset)
-                && newOffset <= currentOffset)
-            {
-                return;
-            }
+            var mustSaveNow = IsBefore(offset, entity.Offset);
 
             // Always track the latest offset in memory so FlushAsync can persist it.
             latestOffset = offset;
 
-            // if we've saved before but it's not time for another save or the last save operation has not completed, do nothing
-            if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
+            // If we've saved before but it's not time for another save or the last save operation has not completed,
+            // do nothing unless this update lowers the checkpoint to protect a slower subscription.
+            if (!mustSaveNow && throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
             {
                 return;
             }
 
-            entity.Offset = offset;
             throttleSavesUntilUtc = utcNow + persistInterval;
-            inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+            if (inProgressSave.IsCompleted)
+            {
+                entity.Offset = latestOffset;
+                inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+            }
+            else
+            {
+                var previousSave = inProgressSave;
+                inProgressSave = SaveLatestAfter(previousSave);
+            }
+
             inProgressSave.Ignore();
+        }
+
+        private async Task SaveLatestAfter(Task previousSave)
+        {
+            await previousSave;
+            entity.Offset = latestOffset;
+            await dataManager.UpsertTableEntryAsync(entity);
         }
 
         /// <summary>
@@ -168,6 +179,13 @@ namespace Orleans.Streaming.EventHubs
                 inProgressSave = dataManager.UpsertTableEntryAsync(entity);
                 await inProgressSave;
             }
+        }
+
+        private static bool IsBefore(string offset, string currentOffset)
+        {
+            return long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset)
+                && long.TryParse(currentOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedCurrentOffset)
+                && parsedOffset < parsedCurrentOffset;
         }
 
         [LoggerMessage(
