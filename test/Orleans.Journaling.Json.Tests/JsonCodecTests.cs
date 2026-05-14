@@ -379,7 +379,7 @@ public class JsonCodecTests
         AppendValueSet(writer, 8, 42);
         using (var aborted = writer.CreateJournalStreamWriter(new JournalStreamId(9)).BeginEntry())
         {
-            aborted.PayloadWriter.Write("""["set",100"""u8);
+            aborted.Writer.Write("""["set",100"""u8);
         }
 
         AppendValueSet(writer, 10, 43);
@@ -397,7 +397,7 @@ public class JsonCodecTests
         using var writer = format.CreateWriter();
         using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(8)).BeginEntry();
 
-        entry.PayloadWriter.Write("""["set" , { "value" : 42 }]"""u8);
+        entry.Writer.Write("""["set" , { "value" : 42 }]"""u8);
         entry.Commit();
 
         Assert.Equal("""[8,["set" , { "value" : 42 }]]""" + "\n", GetString(writer));
@@ -523,7 +523,7 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes("""[8,["set",42]]""");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
+        var reader = new JournalBufferReader(buffer.Reader, isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8));
@@ -545,7 +545,7 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes(line + "\n");
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
+        var reader = new JournalBufferReader(buffer.Reader, isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8));
@@ -567,7 +567,7 @@ public class JsonCodecTests
         var bytes = Encoding.UTF8.GetBytes(prefix + text + suffix);
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: false);
+        var reader = new JournalBufferReader(buffer.Reader, isCompleted: false);
         var consumer = new RecordingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8));
@@ -789,7 +789,7 @@ public class JsonCodecTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(bytes);
-        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true);
+        var reader = new JournalBufferReader(buffer.Reader, isCompleted: true);
         var consumer = new RecordingJournalEntrySink();
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, consumer.Bind(8, 9, 10));
         format.Replay(reader, context);
@@ -802,7 +802,7 @@ public class JsonCodecTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(Encoding.UTF8.GetBytes(jsonLines));
-        var reader = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true);
+        var reader = new JournalBufferReader(buffer.Reader, isCompleted: true);
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, (new JournalStreamId(8), state));
         format.Replay(reader, context);
         Assert.Equal(0, reader.Length);

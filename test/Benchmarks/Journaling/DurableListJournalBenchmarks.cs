@@ -120,7 +120,7 @@ public class DurableListJournalBenchmarks
     {
         _recoveryBuffer.Reset();
         _recoveryBuffer.Write(_encodedJournalData.AsReadOnlySequence());
-        var reader = new JournalBufferReader(new ArcBufferReader(_recoveryBuffer), isCompleted: true);
+        var reader = new JournalBufferReader(_recoveryBuffer.Reader, isCompleted: true);
         _journalFormat.Replay(reader, _replayContext);
     }
 

@@ -669,7 +669,7 @@ public sealed class JsonCodecSnapshotTests
 
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        var buffer = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
+        var buffer = new JournalBufferReader(writer.Reader, isCompleted: true);
         var context = JournalTestReplayContext.Create(JsonJournalExtensions.JournalFormatKey, (new JournalStreamId(SnapshotStreamId), state));
         ((IJournalFormat)format).Replay(buffer, context);
         Assert.Equal(0, buffer.Length);

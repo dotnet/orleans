@@ -17,7 +17,7 @@ internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
     public void WriteSet(T value, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SetValueCommand);
         payloadWriter.Commit();

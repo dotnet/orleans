@@ -73,7 +73,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     {
                         using var buffer = new ArcBufferWriter();
                         buffer.Write(entry.Payload.Span);
-                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalBufferReader(new ArcBufferReader(buffer), isCompleted: true)), replayContext);
+                        state.ReplayEntry(new JournalEntry(entry.FormatKey, new JournalBufferReader(buffer.Reader, isCompleted: true)), replayContext);
                     }
 
                     var id = _journalStreamDirectory[name];

@@ -753,8 +753,6 @@ namespace Orleans.Serialization.Buffers
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public ArcBufferReader(ArcBufferWriter writer) { }
-
         public int Length { get { throw null; } }
 
         public readonly void Consume(System.Span<byte> output) { }
@@ -762,6 +760,8 @@ namespace Orleans.Serialization.Buffers
         public readonly ArcBuffer ConsumeSlice(int count) { throw null; }
 
         public readonly bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
+
+        public readonly byte Peek(long offset) { throw null; }
 
         public readonly System.ReadOnlySpan<byte> Peek(scoped in System.Span<byte> destination) { throw null; }
 
@@ -777,6 +777,7 @@ namespace Orleans.Serialization.Buffers
     {
         public const int MinimumPageSize = 16384;
         public int Length { get { throw null; } }
+        public ArcBufferReader Reader { get { throw null; } }
 
         public void AdvanceReader(int count) { }
 

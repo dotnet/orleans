@@ -156,7 +156,7 @@ public sealed class StorageStreamingTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
-            var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
+            var reader = new JournalBufferReader(writer.Reader, isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
@@ -169,7 +169,7 @@ public sealed class StorageStreamingTests
     public void BinaryFormatRead_WaitsForIncompleteFrameWhenInputIsNotCompleted()
     {
         using var writer = CreateWriter([0x15, 1, 2]);
-        var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: false);
+        var reader = new JournalBufferReader(writer.Reader, isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
@@ -187,7 +187,7 @@ public sealed class StorageStreamingTests
         using var committed = buffer.GetBuffer();
         var entryBytes = committed.ToArray();
         using var data = CreateWriter([.. entryBytes, 10, 0]);
-        var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: false);
+        var reader = new JournalBufferReader(data.Reader, isCompleted: false);
         var consumer = new CapturingJournalEntrySink();
 
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
@@ -202,7 +202,7 @@ public sealed class StorageStreamingTests
     private static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
-        entry.PayloadWriter.Write(payload);
+        entry.Writer.Write(payload);
         entry.Commit();
     }
 

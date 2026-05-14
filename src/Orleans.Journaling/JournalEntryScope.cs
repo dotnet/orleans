@@ -23,9 +23,9 @@ public ref struct JournalEntryScope : IDisposable
     }
 
     /// <summary>
-    /// Gets the payload writer for this entry.
+    /// Gets the writer for this entry.
     /// </summary>
-    public readonly IBufferWriter<byte> PayloadWriter => GetWriter();
+    public readonly IBufferWriter<byte> Writer => GetWriter();
 
     /// <summary>
     /// Commits the pending entry, making it visible to storage.

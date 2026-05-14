@@ -43,7 +43,7 @@ public static class CodecTestHelpers
     {
         var writer = new ArcBufferWriter();
         writer.Write(bytes.Span);
-        return new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
+        return new JournalBufferReader(writer.Reader, isCompleted: true);
     }
 
     public static ReadOnlySequence<byte> SegmentedSequence(params byte[][] segments)
@@ -73,7 +73,7 @@ public static class CodecTestHelpers
     public static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
-        entry.PayloadWriter.Write(payload);
+        entry.Writer.Write(payload);
         entry.Commit();
     }
 

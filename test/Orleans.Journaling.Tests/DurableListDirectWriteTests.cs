@@ -159,7 +159,7 @@ public sealed class DurableListDirectWriteTests
         public override void WriteAdd(T item, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            WriteByte(entry.PayloadWriter);
+            WriteByte(entry.Writer);
             entry.Commit();
         }
     }
@@ -184,7 +184,7 @@ public sealed class DurableListDirectWriteTests
     private static void WriteOrThrow(JournalStreamWriter writer, bool shouldThrow)
     {
         using var entry = writer.BeginEntry();
-        WriteByte(entry.PayloadWriter);
+        WriteByte(entry.Writer);
         if (shouldThrow)
         {
             throw new InvalidOperationException("Expected test exception.");

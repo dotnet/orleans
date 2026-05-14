@@ -127,6 +127,26 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     }
 
     /// <summary>
+    /// Gets a byte at the specified offset in the active entry.
+    /// </summary>
+    /// <param name="offset">The offset into the active entry.</param>
+    protected byte GetEntryByte(int offset)
+    {
+        lock (_lock)
+        {
+            ThrowIfDisposed();
+            ThrowIfNoActiveEntry();
+            var activeEntryLength = checked(_buffer.Length - _committedLength);
+            if (offset < 0 || offset >= activeEntryLength)
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must be within the active entry.");
+            }
+
+            return _buffer.Reader.Peek(checked(_committedLength + offset));
+        }
+    }
+
+    /// <summary>
     /// Writes any format-owned entry prefix and prepares the payload writer.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>

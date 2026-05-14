@@ -20,7 +20,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     public void WriteEnqueue(T item, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(EnqueueCommand);
         payloadWriter.Commit();
@@ -32,7 +32,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     public void WriteDequeue(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
         payloadWriter.WriteVarUInt32(DequeueCommand);
         payloadWriter.Commit();
         entry.Commit();
@@ -42,7 +42,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
         payloadWriter.WriteVarUInt32(ClearCommand);
         payloadWriter.Commit();
         entry.Commit();
@@ -52,7 +52,7 @@ internal sealed class OrleansBinaryDurableQueueCommandCodec<T>(
     public void WriteSnapshot(IReadOnlyCollection<T> items, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SnapshotCommand);

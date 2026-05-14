@@ -178,7 +178,7 @@ public class ArcBufferWriterTests
         Assert.Equal(length, destination.Length);
         Assert.Equal(data.AsSpan(offset, length).ToArray(), ToArray(destination));
 
-        var reader = new ArcBufferReader(destination);
+        var reader = destination.Reader;
         var firstRead = new byte[PageSize - offset];
         reader.Consume(firstRead);
         Assert.Equal(data.AsSpan(offset, firstRead.Length).ToArray(), firstRead);
@@ -931,9 +931,27 @@ public class ArcBufferWriterTests
     {
         using var buffer = new ArcBufferWriter();
         buffer.Write(new byte[100]);
-        var reader = new ArcBufferReader(buffer);
+        var reader = buffer.Reader;
         reader.Skip(50);
         Assert.Equal(50, reader.Length);
+    }
+
+    [Fact]
+    public void ArcBufferReader_Peek_ReadsAtOffsetWithoutAdvancing()
+    {
+        using var buffer = new ArcBufferWriter();
+        var data = Enumerable.Repeat((byte)'x', PageSize - 1)
+            .Concat([(byte)'A', (byte)'B', (byte)'C'])
+            .ToArray();
+        buffer.Write(data);
+        var reader = buffer.Reader;
+        reader.Skip(PageSize - 1);
+
+        Assert.Equal((byte)'A', reader.Peek(0));
+        Assert.Equal((byte)'C', reader.Peek(2));
+        Assert.Equal(3, reader.Length);
+        Assert.Throws<ArgumentOutOfRangeException>(() => reader.Peek(-1));
+        Assert.Throws<ArgumentOutOfRangeException>(() => reader.Peek(3));
     }
 
     [Fact]
@@ -944,7 +962,7 @@ public class ArcBufferWriterTests
             .Concat([(byte)'\n', (byte)'b'])
             .ToArray();
         buffer.Write(data);
-        var reader = new ArcBufferReader(buffer);
+        var reader = buffer.Reader;
 
         Assert.True(reader.TryReadTo(out var line, (byte)'\n'));
         using (line)
@@ -966,7 +984,7 @@ public class ArcBufferWriterTests
         using var buffer = new ArcBufferWriter();
         var data = Enumerable.Range(0, PageSize + 1).Select(static i => (byte)((i % 250) + 1)).ToArray();
         buffer.Write(data);
-        var reader = new ArcBufferReader(buffer);
+        var reader = buffer.Reader;
 
         Assert.False(reader.TryReadTo(out var line, (byte)0));
 
@@ -982,7 +1000,7 @@ public class ArcBufferWriterTests
             .Concat([(byte)'A', (byte)'B', (byte)'C'])
             .ToArray();
         buffer.Write(data);
-        var reader = new ArcBufferReader(buffer);
+        var reader = buffer.Reader;
         reader.Skip(PageSize - 1);
 
         Assert.True(reader.IsNext([(byte)'A', (byte)'B']));

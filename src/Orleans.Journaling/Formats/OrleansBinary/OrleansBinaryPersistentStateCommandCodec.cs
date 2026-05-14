@@ -18,7 +18,7 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
     public void WriteSet(T state, ulong version, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var headerWriter = Writer.Create(output, session: null!);
         headerWriter.WriteVarUInt32(SetValueCommand);
         headerWriter.Commit();
@@ -33,7 +33,7 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
         payloadWriter.WriteVarUInt32(ClearValueCommand);
         payloadWriter.Commit();
         entry.Commit();

@@ -56,7 +56,7 @@ public sealed class JournalBufferWriterOwnershipTests
         var expectedCommittedPrefix = ToArray(writer);
 
         using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
-        entry.PayloadWriter.Write(GetSecondPayload(format));
+        entry.Writer.Write(GetSecondPayload(format));
 
         using var committed = writer.GetBuffer();
         Assert.Equal(expectedCommittedPrefix, committed.ToArray());
@@ -74,7 +74,7 @@ public sealed class JournalBufferWriterOwnershipTests
         AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
 
         using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
-        entry.PayloadWriter.Write(GetSecondPayload(format));
+        entry.Writer.Write(GetSecondPayload(format));
         using var committed = writer.GetCommittedBuffer();
 
         writer.Consume(committed);
@@ -95,7 +95,7 @@ public sealed class JournalBufferWriterOwnershipTests
         AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(2)), GetSecondPayload(format));
 
         using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(3)).BeginEntry();
-        entry.PayloadWriter.Write(GetThirdPayload(format));
+        entry.Writer.Write(GetThirdPayload(format));
         using var committed = writer.GetCommittedBuffer();
         using var consumed = committed.Slice(0, firstEntryLength);
 
@@ -118,7 +118,7 @@ public sealed class JournalBufferWriterOwnershipTests
 
         using (var entry = writer.CreateJournalStreamWriter(new JournalStreamId(3)).BeginEntry())
         {
-            entry.PayloadWriter.Write(GetThirdPayload(format));
+            entry.Writer.Write(GetThirdPayload(format));
             using var committed = writer.GetCommittedBuffer();
             using var consumed = committed.Slice(0, firstEntryLength);
             writer.Consume(consumed);
@@ -218,6 +218,40 @@ public sealed class JournalBufferWriterOwnershipTests
         Assert.Empty(ToArray(writer));
     }
 
+    [Fact]
+    public void GetEntryByte_ReadsRelativeToActiveEntry()
+    {
+        using var writer = new ActiveEntryByteReaderWriter();
+
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), [1, 2, 3]);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(2)), [4, 5]);
+
+        Assert.Equal([1, 2, 3, 1, 3, 4, 5, 4, 5], ToArray(writer));
+    }
+
+    [Fact]
+    public void GetEntryByte_RejectsReadsOutsideActiveEntry()
+    {
+        using var writer = new OutOfRangeGetEntryByteWriter();
+        using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
+
+        entry.Writer.Write(new byte[] { 1 });
+
+        ArgumentOutOfRangeException? exception = null;
+        try
+        {
+            entry.Commit();
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            exception = ex;
+        }
+
+        Assert.NotNull(exception);
+        Assert.Equal("offset", exception.ParamName);
+        Assert.Empty(ToArray(writer));
+    }
+
     private static JournalBufferWriter CreateWriter(string format) => format switch
     {
         BinaryFormat => new OrleansBinaryJournalBufferWriter(),
@@ -249,7 +283,7 @@ public sealed class JournalBufferWriterOwnershipTests
     private static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
-        entry.PayloadWriter.Write(payload);
+        entry.Writer.Write(payload);
         entry.Commit();
     }
 
@@ -317,5 +351,20 @@ public sealed class JournalBufferWriterOwnershipTests
         }
 
         protected override void FinishEntry(JournalStreamId streamId) => WriteAt(1, [0xFF]);
+    }
+
+    private sealed class ActiveEntryByteReaderWriter : JournalBufferWriter
+    {
+        protected override void FinishEntry(JournalStreamId streamId)
+        {
+            var first = GetEntryByte(0);
+            var last = GetEntryByte(ActiveEntryLength - 1);
+            Output.Write([first, last]);
+        }
+    }
+
+    private sealed class OutOfRangeGetEntryByteWriter : JournalBufferWriter
+    {
+        protected override void FinishEntry(JournalStreamId streamId) => GetEntryByte(ActiveEntryLength);
     }
 }

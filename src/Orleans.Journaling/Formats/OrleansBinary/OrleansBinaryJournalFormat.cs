@@ -79,7 +79,7 @@ internal static class OrleansBinaryJournalReader
             try
             {
                 state.ReplayEntry(
-                    new JournalEntry(OrleansBinaryJournalFormat.JournalFormatKey, new JournalBufferReader(new ArcBufferReader(payloadBuffer), isCompleted: true)),
+                    new JournalEntry(OrleansBinaryJournalFormat.JournalFormatKey, new JournalBufferReader(payloadBuffer.Reader, isCompleted: true)),
                     context);
             }
             catch (Exception exception) when (exception is not InvalidOperationException ioe || !ioe.Message.StartsWith("Malformed binary journal entry stream", StringComparison.Ordinal))

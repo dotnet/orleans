@@ -74,6 +74,15 @@ public sealed class ArcBufferWriter : IBufferWriter<byte>, IDisposable
     }
 
     /// <summary>
+    /// Gets the reader for this writer.
+    /// </summary>
+    public ArcBufferReader Reader
+    {
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        get => new(this);
+    }
+
+    /// <summary>
     /// Adds additional buffers to the destination list until the list has reached its capacity.
     /// </summary>
     /// <param name="buffers">The destination to add buffers to.</param>
@@ -1044,16 +1053,26 @@ public sealed class ArcBufferPage
 /// <summary>
 /// Provides reader access to an <see cref="ArcBufferWriter"/>.
 /// </summary>
-/// <param name="writer">The writer.</param>
-public readonly struct ArcBufferReader(ArcBufferWriter writer)
+public readonly struct ArcBufferReader
 {
+    private readonly ArcBufferWriter _writer;
+
+    /// <summary>
+    /// Initializes a new instance of the <see cref="ArcBufferReader"/> struct.
+    /// </summary>
+    /// <param name="writer">The writer.</param>
+    internal ArcBufferReader(ArcBufferWriter writer)
+    {
+        _writer = writer;
+    }
+
     /// <summary>
     /// Gets the number of unconsumed bytes.
     /// </summary>
     public int Length
     {
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
-        get => writer.Length;
+        get => _writer.Length;
     }
 
     /// <summary>
@@ -1062,7 +1081,23 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <param name="destination">The destination, which may be used to hold the requested data if the data needs to be copied.</param>
     /// <returns>A span of either zero length, if the data is unavailable, or the requested length if the data is available.</returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ReadOnlySpan<byte> Peek(scoped in Span<byte> destination) => writer.Peek(in destination);
+    public ReadOnlySpan<byte> Peek(scoped in Span<byte> destination) => _writer.Peek(in destination);
+
+    /// <summary>
+    /// Peeks at a byte at the specified offset into the unread data.
+    /// </summary>
+    /// <param name="offset">The offset into the unread data.</param>
+    /// <returns>The byte at the specified offset.</returns>
+    [MethodImpl(MethodImplOptions.AggressiveInlining)]
+    public byte Peek(long offset)
+    {
+        if (!_writer.TryPeek(offset, out var value))
+        {
+            throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must be within the unread data.");
+        }
+
+        return value;
+    }
 
     /// <summary>
     /// Returns a pinned slice of the provided length without marking the data referred to it as consumed.
@@ -1072,7 +1107,7 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// A pinned slice of unconsumed data. The caller owns the returned buffer and must dispose it.
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ArcBuffer PeekSlice(int count) => writer.PeekSlice(count);
+    public ArcBuffer PeekSlice(int count) => _writer.PeekSlice(count);
 
     /// <summary>
     /// Consumes a slice of the provided length.
@@ -1082,7 +1117,7 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// A pinned buffer representing the consumed data. The caller owns the returned buffer and must dispose it.
     /// </returns>
     [MethodImpl(MethodImplOptions.AggressiveInlining)]
-    public ArcBuffer ConsumeSlice(int count) => writer.ConsumeSlice(count);
+    public ArcBuffer ConsumeSlice(int count) => _writer.ConsumeSlice(count);
 
     /// <summary>
     /// Reads bytes until <paramref name="delimiter"/> is found.
@@ -1095,17 +1130,17 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <returns><see langword="true"/> if the delimiter was found; otherwise, <see langword="false"/>.</returns>
     public bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true)
     {
-        var index = writer.IndexOf(delimiter);
+        var index = _writer.IndexOf(delimiter);
         if (index < 0)
         {
             slice = default;
             return false;
         }
 
-        slice = writer.ConsumeSlice(index);
+        slice = _writer.ConsumeSlice(index);
         if (advancePastDelimiter)
         {
-            writer.AdvanceReader(1);
+            _writer.AdvanceReader(1);
         }
 
         return true;
@@ -1119,14 +1154,14 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <returns><see langword="true"/> if the next bytes match; otherwise, <see langword="false"/>.</returns>
     public bool IsNext(ReadOnlySpan<byte> next, bool advancePast = false)
     {
-        if (next.Length > writer.Length)
+        if (next.Length > _writer.Length)
         {
             return false;
         }
 
         for (var i = 0; i < next.Length; i++)
         {
-            if (!writer.TryPeek(i, out var value) || value != next[i])
+            if (!_writer.TryPeek(i, out var value) || value != next[i])
             {
                 return false;
             }
@@ -1134,7 +1169,7 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
 
         if (advancePast)
         {
-            writer.AdvanceReader(next.Length);
+            _writer.AdvanceReader(next.Length);
         }
 
         return true;
@@ -1146,13 +1181,13 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <param name="output"></param>
     public void Consume(Span<byte> output)
     {
-        var count = writer.Peek(output);
+        var count = _writer.Peek(output);
         if (count != output.Length)
         {
             throw new InvalidOperationException("Attempted to consume more data than is available.");
         }
 
-        writer.AdvanceReader(count);
+        _writer.AdvanceReader(count);
     }
 
     /// <summary>
@@ -1161,7 +1196,7 @@ public readonly struct ArcBufferReader(ArcBufferWriter writer)
     /// <param name="count">The number of bytes to advance.</param>
     public void Skip(int count)
     {
-        writer.AdvanceReader(count);
+        _writer.AdvanceReader(count);
     }
 }
 

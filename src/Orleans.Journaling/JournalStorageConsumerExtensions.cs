@@ -152,7 +152,7 @@ public static class JournalStorageConsumerExtensions
 
     private static void ReadBuffer(IJournalStorageConsumer consumer, ArcBufferWriter buffer, IJournalFileMetadata metadata, bool isCompleted)
     {
-        var readBuffer = new JournalBufferReader(new ArcBufferReader(buffer), isCompleted);
+        var readBuffer = new JournalBufferReader(buffer.Reader, isCompleted);
         consumer.Read(readBuffer, metadata);
     }
 }

@@ -296,6 +296,7 @@ namespace Orleans.Journaling
         System.Span<byte> System.Buffers.IBufferWriter<byte>.GetSpan(int sizeHint) { throw null; }
 
         protected abstract void FinishEntry(JournalStreamId streamId);
+        protected byte GetEntryByte(int offset) { throw null; }
         protected virtual void StartEntry(JournalStreamId streamId) { }
         protected void WriteAt(int offset, System.ReadOnlySpan<byte> value) { }
         protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) { }
@@ -326,7 +327,7 @@ namespace Orleans.Journaling
     {
         private object _dummy;
         private int _dummyPrimitive;
-        public System.Buffers.IBufferWriter<byte> PayloadWriter { get { throw null; } }
+        public System.Buffers.IBufferWriter<byte> Writer { get { throw null; } }
 
         public void Commit() { }
 

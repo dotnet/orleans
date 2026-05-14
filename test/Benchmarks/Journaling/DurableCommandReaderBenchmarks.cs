@@ -72,7 +72,7 @@ public class DurableCommandReaderBenchmarks
         _consumer.ResetForReplay();
         _readBuffer.Reset();
         _readBuffer.Write(data.Buffer.AsReadOnlySequence());
-        var reader = new JournalBufferReader(new ArcBufferReader(_readBuffer), isCompleted: true);
+        var reader = new JournalBufferReader(_readBuffer.Reader, isCompleted: true);
         _journalFormat.Replay(reader, _replayContext);
     }
 

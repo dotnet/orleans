@@ -88,7 +88,7 @@ public class StateManagerTests : JournalingTestBase
         using var segment = new OrleansBinaryJournalBufferWriter();
         using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
         {
-            entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
+            entry.Writer.Write(new byte[] { 1, 2, 3 });
             entry.Commit();
         }
 
@@ -455,7 +455,7 @@ public class StateManagerTests : JournalingTestBase
         var entry = state.BeginEntry();
         try
         {
-            entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
+            entry.Writer.Write(new byte[] { 1, 2, 3 });
             writeTask = Task.Run(async () =>
             {
                 writeStarted.Set();
@@ -512,7 +512,7 @@ public class StateManagerTests : JournalingTestBase
             using var entry = state.BeginEntry();
             try
             {
-                entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
+                entry.Writer.Write(new byte[] { 1, 2, 3 });
                 writeTask = sut.Manager.WriteStateAsync(CancellationToken.None).AsTask();
                 Assert.True(SpinWait.SpinUntil(() => storage.ReplaceStarted.Task.IsCompleted, TimeSpan.FromSeconds(10)), writeTask.Exception?.ToString());
                 Assert.False(writeTask.IsCompleted);
@@ -671,7 +671,7 @@ public class StateManagerTests : JournalingTestBase
         {
             using (var entry = segment.CreateJournalStreamWriter(new JournalStreamId(99)).BeginEntry())
             {
-                entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
+                entry.Writer.Write(new byte[] { 1, 2, 3 });
                 entry.Commit();
             }
 
@@ -1113,7 +1113,7 @@ public class StateManagerTests : JournalingTestBase
         using var segment = new OrleansBinaryJournalBufferWriter();
         using (var entry = segment.CreateJournalStreamWriter(streamId).BeginEntry())
         {
-            entry.PayloadWriter.Write(payload);
+            entry.Writer.Write(payload);
             entry.Commit();
         }
 
@@ -1127,7 +1127,7 @@ public class StateManagerTests : JournalingTestBase
         AppendDirectorySet(segment, name, streamId);
         using (var entry = segment.CreateJournalStreamWriter(streamId).BeginEntry())
         {
-            entry.PayloadWriter.Write(payload);
+            entry.Writer.Write(payload);
             entry.Commit();
         }
 
@@ -1158,7 +1158,7 @@ public class StateManagerTests : JournalingTestBase
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
+        var reader = new JournalBufferReader(writer.Reader, isCompleted: true);
         var consumer = new CapturingJournalEntrySink();
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(ReadStreamIds(bytes)));
         ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
@@ -1626,8 +1626,8 @@ public class StateManagerTests : JournalingTestBase
         {
             AppendEntriesCount++;
             using var entry = writer.BeginEntry();
-            entry.PayloadWriter.GetSpan(1)[0] = 1;
-            entry.PayloadWriter.Advance(1);
+            entry.Writer.GetSpan(1)[0] = 1;
+            entry.Writer.Advance(1);
             entry.Commit();
         }
 
@@ -1641,8 +1641,8 @@ public class StateManagerTests : JournalingTestBase
         public void WriteSet(K key, V value, JournalStreamWriter writer)
         {
             using var entry = writer.BeginEntry();
-            entry.PayloadWriter.GetSpan(1)[0] = 1;
-            entry.PayloadWriter.Advance(1);
+            entry.Writer.GetSpan(1)[0] = 1;
+            entry.Writer.Advance(1);
             throw new InvalidOperationException("Expected test exception.");
         }
 
@@ -1669,8 +1669,8 @@ public class StateManagerTests : JournalingTestBase
             }
 
             using var entry = writer.BeginEntry();
-            entry.PayloadWriter.GetSpan(1)[0] = 1;
-            entry.PayloadWriter.Advance(1);
+            entry.Writer.GetSpan(1)[0] = 1;
+            entry.Writer.Advance(1);
             throw new InvalidOperationException("Expected test exception.");
         }
 

@@ -673,7 +673,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
     {
         using var writer = new ArcBufferWriter();
         writer.Write(bytes);
-        var buffer = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
+        var buffer = new JournalBufferReader(writer.Reader, isCompleted: true);
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, (new JournalStreamId(SnapshotStreamId), state));
         ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(buffer, context);
         Assert.Equal(0, buffer.Length);

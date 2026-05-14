@@ -20,7 +20,7 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     public void WritePending(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var span = output.GetSpan(1);
         span[0] = (byte)DurableTaskCompletionSourceStatus.Pending;
         output.Advance(1);
@@ -31,7 +31,7 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     public void WriteCompleted(T value, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var span = output.GetSpan(1);
         span[0] = (byte)DurableTaskCompletionSourceStatus.Completed;
         output.Advance(1);
@@ -43,7 +43,7 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     public void WriteFaulted(Exception exception, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var span = output.GetSpan(1);
         span[0] = (byte)DurableTaskCompletionSourceStatus.Faulted;
         output.Advance(1);
@@ -55,7 +55,7 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     public void WriteCanceled(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var span = output.GetSpan(1);
         span[0] = (byte)DurableTaskCompletionSourceStatus.Canceled;
         output.Advance(1);

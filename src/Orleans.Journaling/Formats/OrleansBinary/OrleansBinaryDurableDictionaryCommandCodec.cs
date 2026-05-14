@@ -21,7 +21,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     public void WriteSet(TKey key, TValue value, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         using var session = sessionPool.GetSession();
         var payloadWriter = Writer.Create(output, session);
         payloadWriter.WriteVarUInt32(SetCommand);
@@ -35,7 +35,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     public void WriteRemove(TKey key, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(RemoveCommand);
         payloadWriter.Commit();
@@ -47,7 +47,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     public void WriteClear(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
+        var payloadWriter = Writer.Create(entry.Writer, session: null!);
         payloadWriter.WriteVarUInt32(ClearCommand);
         payloadWriter.Commit();
         entry.Commit();
@@ -57,7 +57,7 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     public void WriteSnapshot(IReadOnlyCollection<KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
-        var output = entry.PayloadWriter;
+        var output = entry.Writer;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         var payloadWriter = Writer.Create(output, session: null!);
         payloadWriter.WriteVarUInt32(SnapshotCommand);

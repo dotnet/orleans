@@ -18,7 +18,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         using var buffer = new OrleansBinaryJournalBufferWriter();
 
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(42)).BeginEntry();
-        entry.PayloadWriter.Write(new byte[] { 1, 2, 3 });
+        entry.Writer.Write(new byte[] { 1, 2, 3 });
         entry.Commit();
 
         var bytes = ToArray(buffer);
@@ -208,13 +208,13 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         using var buffer = new OrleansBinaryJournalBufferWriter();
 
         using var committed = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        committed.PayloadWriter.Write(new byte[] { 1 });
+        committed.Writer.Write(new byte[] { 1 });
         committed.Commit();
         var committedBytes = ToArray(buffer);
 
         using (var aborted = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry())
         {
-            aborted.PayloadWriter.Write(new byte[] { 2, 3, 4 });
+            aborted.Writer.Write(new byte[] { 2, 3, 4 });
         }
 
         Assert.Equal(committedBytes, ToArray(buffer));
@@ -227,7 +227,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [1]);
         var committedBytes = ToArray(buffer);
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
-        entry.PayloadWriter.Write(new byte[] { 2 });
+        entry.Writer.Write(new byte[] { 2 });
 
         using var committed = buffer.GetBuffer();
 
@@ -251,7 +251,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     {
         using var buffer = new OrleansBinaryJournalBufferWriter();
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.PayloadWriter.Write(new byte[] { 1 });
+        entry.Writer.Write(new byte[] { 1 });
         entry.Commit();
         var committedBytes = ToArray(buffer);
 
@@ -275,7 +275,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     {
         using var buffer = new OrleansBinaryJournalBufferWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.PayloadWriter.Write(new byte[] { 1 });
+        entry.Writer.Write(new byte[] { 1 });
         entry.Dispose();
 
         InvalidOperationException? exception = null;
@@ -299,12 +299,12 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         using var buffer = new OrleansBinaryJournalBufferWriter();
 
         using var first = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        first.PayloadWriter.Write(new byte[] { 1 });
+        first.Writer.Write(new byte[] { 1 });
         first.Commit();
         buffer.Reset();
 
         using var second = buffer.CreateJournalStreamWriter(new JournalStreamId(2)).BeginEntry();
-        second.PayloadWriter.Write(new byte[] { 2 });
+        second.Writer.Write(new byte[] { 2 });
         second.Commit();
 
         using var data = buffer.GetBuffer();
@@ -336,7 +336,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     {
         using var buffer = new OrleansBinaryJournalBufferWriter();
         var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.PayloadWriter.Write(new byte[] { 1 });
+        entry.Writer.Write(new byte[] { 1 });
 
         var exception = Assert.Throws<InvalidOperationException>(buffer.Reset);
 
@@ -352,7 +352,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         var payload = Enumerable.Repeat((byte)42, ArcBufferWriter.MinimumPageSize).ToArray();
 
         using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
-        entry.PayloadWriter.Write(payload);
+        entry.Writer.Write(payload);
         entry.Commit();
 
         using var data = buffer.GetBuffer();
@@ -380,7 +380,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
-            var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
+            var reader = new JournalBufferReader(data.Reader, isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
@@ -400,7 +400,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
-            var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
+            var reader = new JournalBufferReader(data.Reader, isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey);
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
@@ -421,7 +421,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
         var exception = Assert.Throws<InvalidOperationException>(() =>
         {
-            var reader = new JournalBufferReader(new ArcBufferReader(data), isCompleted: true);
+            var reader = new JournalBufferReader(data.Reader, isCompleted: true);
             var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(8));
             ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         });
@@ -439,7 +439,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     private static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
-        entry.PayloadWriter.Write(payload);
+        entry.Writer.Write(payload);
         entry.Commit();
     }
 
@@ -465,7 +465,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
     {
         using var writer = new ArcBufferWriter();
         writer.Write(data.AsReadOnlySequence());
-        var reader = new JournalBufferReader(new ArcBufferReader(writer), isCompleted: true);
+        var reader = new JournalBufferReader(writer.Reader, isCompleted: true);
         var context = JournalTestReplayContext.Create(OrleansBinaryJournalFormat.JournalFormatKey, consumer.Bind(streamIds));
         ((IJournalFormat)new OrleansBinaryJournalFormat(SessionPool)).Replay(reader, context);
         Assert.Equal(0, reader.Length);
