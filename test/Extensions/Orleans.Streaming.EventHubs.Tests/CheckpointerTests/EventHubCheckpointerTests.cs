@@ -1,3 +1,5 @@
+using Azure.Messaging.EventHubs;
+using Orleans.Providers.Streams.Common;
 using Orleans.Runtime;
 using Orleans.Streaming.EventHubs;
 using Orleans.Streaming.EventHubs.Testing;
@@ -35,6 +37,46 @@ public class EventHubCheckpointerTests
         }
     }
 
+    private sealed class TestEventHubQueueCache : IEventHubQueueCache
+    {
+        public int GetMaxAddCount() => 1_000;
+
+        public List<StreamPosition> Add(List<EventData> message, DateTime dequeueTimeUtc) => [];
+
+        public object GetCursor(StreamId streamId, StreamSequenceToken sequenceToken) => new();
+
+        public bool TryGetNextMessage(object cursorObj, out IBatchContainer message)
+        {
+            message = null;
+            return false;
+        }
+
+        public void AddCachePressureMonitor(ICachePressureMonitor monitor)
+        {
+        }
+
+        public void SignalPurge()
+        {
+        }
+
+        public void Dispose()
+        {
+        }
+    }
+
+    private sealed class TestEventHubReceiver : IEventHubReceiver
+    {
+        public Task<IEnumerable<EventData>> ReceiveAsync(int maxCount, TimeSpan waitTime)
+        {
+            return Task.FromResult<IEnumerable<EventData>>([]);
+        }
+
+        public Task CloseAsync()
+        {
+            return Task.CompletedTask;
+        }
+    }
+
     private static EventHubSequenceToken MakeToken(long offset, long sequenceNumber = 0)
     {
         return new EventHubSequenceToken(offset.ToString(), sequenceNumber, 0);
@@ -50,7 +92,7 @@ public class EventHubCheckpointerTests
         return GuidId.GetGuidId(Guid.NewGuid());
     }
 
-    private EventHubAdapterReceiver CreateReceiver(TestCheckpointer checkpointer)
+    private static async Task<EventHubAdapterReceiver> CreateReceiver(TestCheckpointer checkpointer)
     {
         var settings = new EventHubPartitionSettings
         {
@@ -61,7 +103,7 @@ public class EventHubCheckpointerTests
 
         var receiver = new EventHubAdapterReceiver(
             settings,
-            cacheFactory: (_, _, _) => throw new NotImplementedException(),
+            cacheFactory: (_, _, _) => new TestEventHubQueueCache(),
             checkpointerFactory: _ => Task.FromResult<IStreamQueueCheckpointer<string>>(checkpointer),
             loggerFactory: Microsoft.Extensions.Logging.Abstractions.NullLoggerFactory.Instance,
             monitor: new Orleans.Streaming.EventHubs.DefaultEventHubReceiverMonitor(
@@ -71,84 +113,105 @@ public class EventHubCheckpointerTests
                     EventHubPath = settings.Hub.EventHubName,
                 }),
             loadSheddingOptions: new Orleans.Configuration.LoadSheddingOptions(),
-            environmentStatisticsProvider: new Orleans.Statistics.EnvironmentStatisticsProvider());
+            environmentStatisticsProvider: new Orleans.Statistics.EnvironmentStatisticsProvider(),
+            eventHubReceiverFactory: (_, _, _) => new TestEventHubReceiver());
 
-        // Initialize the receiver so the checkpointer is created.
-        receiver.Initialize(TimeSpan.FromSeconds(5));
+        await receiver.Initialize(TimeSpan.FromSeconds(5));
 
         return receiver;
     }
 
     [Fact, TestCategory("BVT")]
-    public void SingleStream_SingleSubscription_CheckpointsDeliveredOffset()
+    public async Task SingleStream_SingleSubscription_CheckpointsProcessedOffset()
     {
         var checkpointer = new TestCheckpointer();
-        var receiver = CreateReceiver(checkpointer);
+        var receiver = await CreateReceiver(checkpointer);
 
         var stream = MakeStreamId("A");
         var sub = MakeSubscriptionId();
 
-        receiver.NotifyBatchDelivered(stream, sub, MakeToken(100));
+        receiver.NotifySubscriptionAdded(stream, sub, null);
+        Assert.Null(checkpointer.LastOffset);
+
+        receiver.NotifyBatchProcessed(stream, sub, MakeToken(100));
 
         Assert.Equal("100", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public void MultipleStreams_CheckpointsMinimumWatermark()
+    public async Task MultipleStreams_CheckpointsMinimumWatermark()
     {
         var checkpointer = new TestCheckpointer();
-        var receiver = CreateReceiver(checkpointer);
+        var receiver = await CreateReceiver(checkpointer);
 
         var streamA = MakeStreamId("A");
         var streamB = MakeStreamId("B");
         var subA = MakeSubscriptionId();
         var subB = MakeSubscriptionId();
 
-        // Stream A delivers at offset 200
-        receiver.NotifyBatchDelivered(streamA, subA, MakeToken(200));
+        receiver.NotifySubscriptionAdded(streamA, subA, MakeToken(200));
         Assert.Equal("200", checkpointer.LastOffset);
 
-        // Stream B delivers at offset 95 — watermark should drop to 95
-        receiver.NotifyBatchDelivered(streamB, subB, MakeToken(95));
+        receiver.NotifySubscriptionAdded(streamB, subB, MakeToken(95));
         Assert.Equal("95", checkpointer.LastOffset);
 
-        // Stream B advances to 210 — watermark should now be 200 (stream A's max)
-        receiver.NotifyBatchDelivered(streamB, subB, MakeToken(210));
+        receiver.NotifyBatchProcessed(streamB, subB, MakeToken(210));
         Assert.Equal("200", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public void MultipleSubscriptions_SameStream_CheckpointsMinimum()
+    public async Task PendingRegistration_BlocksCheckpointUntilSubscriptionsAreKnown()
     {
         var checkpointer = new TestCheckpointer();
-        var receiver = CreateReceiver(checkpointer);
+        var receiver = await CreateReceiver(checkpointer);
 
         var stream = MakeStreamId("A");
         var sub1 = MakeSubscriptionId();
         var sub2 = MakeSubscriptionId();
 
-        // Sub1 delivers at offset 200
-        receiver.NotifyBatchDelivered(stream, sub1, MakeToken(200));
-        Assert.Equal("200", checkpointer.LastOffset);
+        receiver.NotifyStreamRegistrationStarted(stream);
+        receiver.NotifySubscriptionAdded(stream, sub1, MakeToken(200));
+        receiver.NotifySubscriptionAdded(stream, sub2, MakeToken(50));
+        Assert.Null(checkpointer.LastOffset);
 
-        // Sub2 delivers at offset 50 — watermark drops to 50
-        receiver.NotifyBatchDelivered(stream, sub2, MakeToken(50));
+        receiver.NotifyStreamRegistrationCompleted(stream);
         Assert.Equal("50", checkpointer.LastOffset);
 
-        // Sub2 catches up to 200 — watermark should now be 200
-        receiver.NotifyBatchDelivered(stream, sub2, MakeToken(200));
+        receiver.NotifyBatchProcessed(stream, sub2, MakeToken(200));
         Assert.Equal("200", checkpointer.LastOffset);
 
-        // Sub1 advances to 300 — watermark is 200 (sub2's max)
-        receiver.NotifyBatchDelivered(stream, sub1, MakeToken(300));
+        receiver.NotifyBatchProcessed(stream, sub1, MakeToken(300));
         Assert.Equal("200", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public void MultipleStreams_MultipleSubscriptions_InterleavedDelivery()
+    public async Task RemovedSubscription_NoLongerHoldsWatermark()
     {
         var checkpointer = new TestCheckpointer();
-        var receiver = CreateReceiver(checkpointer);
+        var receiver = await CreateReceiver(checkpointer);
+
+        var stream = MakeStreamId("A");
+        var sub1 = MakeSubscriptionId();
+        var sub2 = MakeSubscriptionId();
+
+        receiver.NotifySubscriptionAdded(stream, sub1, null);
+        receiver.NotifySubscriptionAdded(stream, sub2, null);
+
+        receiver.NotifyBatchProcessed(stream, sub1, MakeToken(200));
+        Assert.Null(checkpointer.LastOffset);
+
+        receiver.NotifyBatchProcessed(stream, sub2, MakeToken(50));
+        Assert.Equal("50", checkpointer.LastOffset);
+
+        receiver.NotifySubscriptionRemoved(stream, sub2);
+        Assert.Equal("200", checkpointer.LastOffset);
+    }
+
+    [Fact, TestCategory("BVT")]
+    public async Task MultipleStreams_MultipleSubscriptions_InterleavedDelivery()
+    {
+        var checkpointer = new TestCheckpointer();
+        var receiver = await CreateReceiver(checkpointer);
 
         var streamA = MakeStreamId("A");
         var streamB = MakeStreamId("B");
@@ -156,58 +219,54 @@ public class EventHubCheckpointerTests
         var subA2 = MakeSubscriptionId();
         var subB1 = MakeSubscriptionId();
 
-        // Stream A sub1 delivers at offset 100
-        receiver.NotifyBatchDelivered(streamA, subA1, MakeToken(100));
-        Assert.Equal("100", checkpointer.LastOffset);
+        receiver.NotifySubscriptionAdded(streamA, subA1, null);
+        receiver.NotifySubscriptionAdded(streamA, subA2, null);
+        receiver.NotifySubscriptionAdded(streamB, subB1, null);
 
-        // Stream A sub2 delivers at offset 80 — watermark drops to 80 (sub2 is behind)
-        receiver.NotifyBatchDelivered(streamA, subA2, MakeToken(80));
-        Assert.Equal("80", checkpointer.LastOffset);
+        receiver.NotifyBatchProcessed(streamA, subA1, MakeToken(100));
+        Assert.Null(checkpointer.LastOffset);
 
-        // Stream B sub1 delivers at offset 50 — watermark drops to 50
-        receiver.NotifyBatchDelivered(streamB, subB1, MakeToken(50));
+        receiver.NotifyBatchProcessed(streamA, subA2, MakeToken(80));
+        Assert.Null(checkpointer.LastOffset);
+
+        receiver.NotifyBatchProcessed(streamB, subB1, MakeToken(50));
         Assert.Equal("50", checkpointer.LastOffset);
 
-        // Stream B advances to 90 — watermark is now 80 (stream A sub2 is the laggard)
-        receiver.NotifyBatchDelivered(streamB, subB1, MakeToken(90));
+        receiver.NotifyBatchProcessed(streamB, subB1, MakeToken(90));
         Assert.Equal("80", checkpointer.LastOffset);
 
-        // Stream A sub2 catches up to 120 — watermark is now 90 (stream B sub1)
-        receiver.NotifyBatchDelivered(streamA, subA2, MakeToken(120));
+        receiver.NotifyBatchProcessed(streamA, subA2, MakeToken(120));
         Assert.Equal("90", checkpointer.LastOffset);
 
-        // Stream B advances to 150 — watermark is now 100 (stream A sub1)
-        receiver.NotifyBatchDelivered(streamB, subB1, MakeToken(150));
+        receiver.NotifyBatchProcessed(streamB, subB1, MakeToken(150));
         Assert.Equal("100", checkpointer.LastOffset);
 
-        // Stream A sub1 advances to 200 — watermark is now 120 (stream A sub2)
-        receiver.NotifyBatchDelivered(streamA, subA1, MakeToken(200));
+        receiver.NotifyBatchProcessed(streamA, subA1, MakeToken(200));
         Assert.Equal("120", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public void PerSubscriptionMax_PreventsRegression()
+    public async Task PerSubscriptionMax_PreventsRegression()
     {
         var checkpointer = new TestCheckpointer();
-        var receiver = CreateReceiver(checkpointer);
+        var receiver = await CreateReceiver(checkpointer);
 
         var stream = MakeStreamId("A");
         var sub = MakeSubscriptionId();
 
-        receiver.NotifyBatchDelivered(stream, sub, MakeToken(100));
+        receiver.NotifySubscriptionAdded(stream, sub, null);
+        receiver.NotifyBatchProcessed(stream, sub, MakeToken(100));
         Assert.Equal("100", checkpointer.LastOffset);
 
-        // Same subscription reports an earlier offset (shouldn't happen normally,
-        // but the per-subscription max should prevent regression)
-        receiver.NotifyBatchDelivered(stream, sub, MakeToken(50));
+        receiver.NotifyBatchProcessed(stream, sub, MakeToken(50));
         Assert.Equal("100", checkpointer.LastOffset);
     }
 
     [Fact, TestCategory("BVT")]
-    public void NoNotifications_NoCheckpoint()
+    public async Task NoNotifications_NoCheckpoint()
     {
         var checkpointer = new TestCheckpointer();
-        _ = CreateReceiver(checkpointer);
+        _ = await CreateReceiver(checkpointer);
 
         Assert.Null(checkpointer.LastOffset);
         Assert.Equal(0, checkpointer.UpdateCount);

@@ -300,6 +300,8 @@ namespace Orleans.Streams
 
             if (await DoHandshakeWithConsumer(data, cacheToken))
             {
+                var startToken = data.LastToken?.Token ?? cacheToken ?? data.PendingStartToken;
+                queueCache?.NotifySubscriptionAdded(streamId.StreamId, subscriptionId, startToken);
                 data.PendingStartToken = null;
                 data.IsRegistered = true;
                 StreamingEvents.EmitSubscriptionAttached(streamProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, Silo);
@@ -389,6 +391,7 @@ namespace Orleans.Streams
             bool removed = streamData.RemoveConsumer(subscriptionId, logger);
             if (removed)
             {
+                queueCache?.NotifySubscriptionRemoved(streamId.StreamId, subscriptionId);
                 StreamingEvents.EmitSubscriptionDetached(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 StreamingEvents.EmitSubscriptionRemoved(streamProviderName, streamId.StreamId, subscriptionId.Guid, Silo);
                 LogDebugRemovedConsumer(subscriptionId, streamId);
@@ -534,29 +537,40 @@ namespace Orleans.Streams
 
             LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
 
-            foreach (var group in
+            var streamGroups =
                 multiBatch
                 .Where(m => m != null)
-                .GroupBy(container => container.StreamId))
+                .GroupBy(container => container.StreamId)
+                .Select(group => (StreamId: new QualifiedStreamId(queueAdapter.Name, group.Key), StartToken: group.First().SequenceToken))
+                .ToList();
+
+            foreach (var group in streamGroups)
             {
                 if (IsShutdown || cancellationToken.IsCancellationRequested)
                 {
                     return false;
                 }
 
-                var streamId = new QualifiedStreamId(queueAdapter.Name, group.Key);
-                StreamSequenceToken startToken = group.First().SequenceToken;
+                if (!pubSubCache.ContainsKey(group.StreamId))
+                {
+                    // Start all cold-stream registrations before waking any existing cursors so
+                    // delivery-based checkpointing sees pending streams before progress advances.
+                    RegisterStream(group.StreamId, group.StartToken, now);
+                }
+            }
+
+            foreach (var group in streamGroups)
+            {
+                if (IsShutdown || cancellationToken.IsCancellationRequested)
+                {
+                    return false;
+                }
+
                 StreamConsumerCollection streamData;
-                if (pubSubCache.TryGetValue(streamId, out streamData))
+                if (pubSubCache.TryGetValue(group.StreamId, out streamData))
                 {
                     streamData.RefreshActivity(now);
-                    StartInactiveCursors(streamData, startToken);
-                }
-                else
-                {
-                    // Run registration in the background so that cold-stream pubsub
-                    // calls do not stall message delivery for other streams on the same queue.
-                    RegisterStream(streamId, startToken, now);
+                    StartInactiveCursors(streamData, group.StartToken);
                 }
             }
 
@@ -570,9 +584,18 @@ namespace Orleans.Streams
                 if (tuple.Value.IsInactive(now, options.StreamInactivityPeriod))
                 {
                     pubSubCache.Remove(tuple.Key);
+                    NotifySubscriptionsRemoved(tuple.Key, tuple.Value);
                     tuple.Value.DisposeAll(logger);
                     StreamingEvents.EmitStreamInactive(streamProviderName, tuple.Key.StreamId, options.StreamInactivityPeriod, Silo);
                 }
+            }
+        }
+
+        private void NotifySubscriptionsRemoved(QualifiedStreamId streamId, StreamConsumerCollection streamData)
+        {
+            foreach (var consumerData in streamData.AllConsumers())
+            {
+                queueCache?.NotifySubscriptionRemoved(streamId.StreamId, consumerData.SubscriptionId);
             }
         }
 
@@ -590,6 +613,7 @@ namespace Orleans.Streams
             // This will help ensure the "casual consistency" between pre-existing subscripton (of a potentially new already subscribed consumer)
             // and later production.
             var pinCursor = queueCache?.GetCacheCursor(streamId, firstToken);
+            queueCache?.NotifyStreamRegistrationStarted(streamId.StreamId);
             streamData.RegistrationTask = RegisterStreamAsync();
             pubSubCache.Add(streamId, streamData);
 
@@ -597,13 +621,13 @@ namespace Orleans.Streams
             {
                 await Task.CompletedTask.ConfigureAwait(ConfigureAwaitOptions.ContinueOnCapturedContext | ConfigureAwaitOptions.ForceYielding);
 
-                if (IsShutdown)
-                {
-                    return;
-                }
-
                 try
                 {
+                    if (IsShutdown)
+                    {
+                        return;
+                    }
+
                     var subscribers = await RegisterAsStreamProducer(streamId);
 
                     if (IsShutdown)
@@ -638,6 +662,7 @@ namespace Orleans.Streams
                 finally
                 {
                     streamData.RegistrationTask = null;
+                    queueCache?.NotifyStreamRegistrationCompleted(streamId.StreamId);
 
                     // Disposed after all initial subscriber handshakes complete so the first
                     // batch stays pinned until each subscriber has its own cache cursor.
@@ -656,6 +681,7 @@ namespace Orleans.Streams
                     pubSubCache.Remove(streamId);
                 }
 
+                NotifySubscriptionsRemoved(streamId, streamData);
                 streamData.DisposeAll(logger);
             }
 
@@ -719,12 +745,12 @@ namespace Orleans.Streams
                 var deliveredAny = false;
                 while (!IsShutdown && consumerData.Cursor != null)
                 {
-                    IBatchContainer batch = null;
+                    ConsumerBatch nextBatch = default;
                     Exception exceptionOccured = null;
                     try
                     {
-                        batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
-                        if (batch == null)
+                        nextBatch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
+                        if (!nextBatch.HasProgress)
                         {
                             // Only emit cursor-drained when we transitioned from delivering to empty,
                             // not on every empty poll.
@@ -740,23 +766,28 @@ namespace Orleans.Streams
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
                     }
 
-                    if (batch != null)
+                    if (exceptionOccured is null)
                     {
                         deliveredAny = true;
-                        if (!ShouldDeliverBatch(consumerData.StreamId, batch, consumerData.FilterData))
+
+                        if (nextBatch.Batch is null)
+                        {
+                            queueCache?.NotifyBatchProcessed(consumerData.StreamId.StreamId, consumerData.SubscriptionId, nextBatch.ProgressToken);
                             continue;
+                        }
                     }
 
                     try
                     {
-                        StreamInstruments.PersistentStreamSentMessages.Add(1);
                         if (IsShutdown)
                         {
                             break;
                         }
 
-                        if (batch != null)
+                        if (nextBatch.Batch != null)
                         {
+                            var batch = nextBatch.Batch;
+                            StreamInstruments.PersistentStreamSentMessages.Add(1);
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
                                 AsyncExecutorWithRetries.INFINITE_RETRIES,
@@ -765,9 +796,9 @@ namespace Orleans.Streams
                                 this.options.MaxEventDeliveryTime,
                                 deliveryBackoffProvider);
 
-                            // Notify the cache that this batch was delivered so it can
-                            // advance the checkpoint based on actual delivery progress.
-                            queueCache?.NotifyBatchDelivered(consumerData.StreamId.StreamId, consumerData.SubscriptionId, batch.SequenceToken);
+                            // Notify the cache after successful delivery so it can advance checkpoints
+                            // based on actual subscription progress, including filtered batches.
+                            queueCache?.NotifyBatchProcessed(consumerData.StreamId.StreamId, consumerData.SubscriptionId, nextBatch.ProgressToken);
 
                             if (newToken != null)
                             {
@@ -793,6 +824,7 @@ namespace Orleans.Streams
                     // if we failed to deliver a batch
                     if (exceptionOccured != null)
                     {
+                        var batch = nextBatch.Batch;
                         bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch?.SequenceToken);
                         if (faultedSubscription) return;
                     }
@@ -808,21 +840,38 @@ namespace Orleans.Streams
             }
         }
 
-        private IBatchContainer GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string filterData)
+        private readonly struct ConsumerBatch
+        {
+            public ConsumerBatch(IBatchContainer batch, StreamSequenceToken progressToken)
+            {
+                Batch = batch;
+                ProgressToken = progressToken;
+            }
+
+            public IBatchContainer Batch { get; }
+            public StreamSequenceToken ProgressToken { get; }
+            public bool HasProgress => ProgressToken is not null;
+        }
+
+        private ConsumerBatch GetBatchForConsumer(IQueueCacheCursor cursor, StreamId streamId, string filterData)
         {
             if (this.options.BatchContainerBatchSize <= 1)
             {
                 if (!cursor.MoveNext())
                 {
-                    return null;
+                    return default;
                 }
 
-                return cursor.GetCurrent(out _);
+                var batchContainer = cursor.GetCurrent(out _);
+                return ShouldDeliverBatch(streamId, batchContainer, filterData)
+                    ? new ConsumerBatch(batchContainer, batchContainer.SequenceToken)
+                    : new ConsumerBatch(null, batchContainer.SequenceToken);
             }
             else if (this.options.BatchContainerBatchSize > 1)
             {
                 int i = 0;
                 var batchContainers = new List<IBatchContainer>();
+                StreamSequenceToken progressToken = null;
 
                 while (i < this.options.BatchContainerBatchSize)
                 {
@@ -832,6 +881,7 @@ namespace Orleans.Streams
                     }
 
                     var batchContainer = cursor.GetCurrent(out _);
+                    progressToken = batchContainer.SequenceToken;
 
                     if (!ShouldDeliverBatch(streamId, batchContainer, filterData))
                         continue;
@@ -840,15 +890,17 @@ namespace Orleans.Streams
                     i++;
                 }
 
-                if (i == 0)
+                if (progressToken is null)
                 {
-                    return null;
+                    return default;
                 }
 
-                return new BatchContainerBatch(batchContainers);
+                return i == 0
+                    ? new ConsumerBatch(null, progressToken)
+                    : new ConsumerBatch(new BatchContainerBatch(batchContainers), progressToken);
             }
 
-            return null;
+            return default;
         }
 
         private async Task<StreamHandshakeToken> DeliverBatchToConsumer(StreamConsumerData consumerData, IBatchContainer batch)
@@ -913,6 +965,7 @@ namespace Orleans.Streams
             if (exceptionOccured is ClientNotAvailableException)
             {
                 LogWarningConsumerIsDead(consumerData.StreamConsumer, consumerData.StreamId);
+                queueCache?.NotifySubscriptionRemoved(consumerData.StreamId.StreamId, consumerData.SubscriptionId);
                 pubSub.UnregisterConsumer(consumerData.SubscriptionId, consumerData.StreamId).Ignore();
                 return true;
             }
