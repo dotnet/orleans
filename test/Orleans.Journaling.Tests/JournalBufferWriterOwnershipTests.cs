@@ -87,6 +87,76 @@ public sealed class JournalBufferWriterOwnershipTests
     [Theory]
     [InlineData(BinaryFormat)]
     [InlineData(JsonFormat)]
+    public void Consume_RemovesPartialCommittedPrefixAndKeepsActiveEntry(string format)
+    {
+        using var writer = CreateWriter(format);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
+        var firstEntryLength = ToArray(writer).Length;
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(2)), GetSecondPayload(format));
+
+        using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(3)).BeginEntry();
+        entry.PayloadWriter.Write(GetThirdPayload(format));
+        using var committed = writer.GetCommittedBuffer();
+        using var consumed = committed.Slice(0, firstEntryLength);
+
+        writer.Consume(consumed);
+
+        Assert.Equal(GetEntriesBytes(format, (2, GetSecondPayload(format))), ToArray(writer));
+        entry.Commit();
+        Assert.Equal(GetEntriesBytes(format, (2, GetSecondPayload(format)), (3, GetThirdPayload(format))), ToArray(writer));
+    }
+
+    [Theory]
+    [InlineData(BinaryFormat)]
+    [InlineData(JsonFormat)]
+    public void DisposeAfterPartialConsume_KeepsRemainingCommittedPrefix(string format)
+    {
+        using var writer = CreateWriter(format);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), GetFirstPayload(format));
+        var firstEntryLength = ToArray(writer).Length;
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(2)), GetSecondPayload(format));
+
+        using (var entry = writer.CreateJournalStreamWriter(new JournalStreamId(3)).BeginEntry())
+        {
+            entry.PayloadWriter.Write(GetThirdPayload(format));
+            using var committed = writer.GetCommittedBuffer();
+            using var consumed = committed.Slice(0, firstEntryLength);
+            writer.Consume(consumed);
+        }
+
+        Assert.Equal(GetEntriesBytes(format, (2, GetSecondPayload(format))), ToArray(writer));
+    }
+
+    [Fact]
+    public void BeginEntry_WhenStartEntryThrows_RemovesPartialFrameAndAllowsRetry()
+    {
+        using var writer = new FailingStartEntryWriter();
+        var stream = writer.CreateJournalStreamWriter(new JournalStreamId(1));
+
+        InvalidOperationException? exception = null;
+        try
+        {
+            var entry = stream.BeginEntry();
+            entry.Dispose();
+        }
+        catch (InvalidOperationException ex)
+        {
+            exception = ex;
+        }
+
+        Assert.NotNull(exception);
+        Assert.Equal("start failed", exception.Message);
+        Assert.Empty(ToArray(writer));
+
+        writer.FailStart = false;
+        AppendEntry(stream, [1, 2, 3]);
+
+        Assert.Equal([1, 2, 3], ToArray(writer));
+    }
+
+    [Theory]
+    [InlineData(BinaryFormat)]
+    [InlineData(JsonFormat)]
     public void UnconsumedCommittedBufferRemainsAvailableForRetry(string format)
     {
         using var writer = CreateWriter(format);
@@ -137,6 +207,13 @@ public sealed class JournalBufferWriterOwnershipTests
         _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
     };
 
+    private static byte[] GetThirdPayload(string format) => format switch
+    {
+        BinaryFormat => [6, 7, 8],
+        JsonFormat => Encoding.UTF8.GetBytes("""["set",3]"""),
+        _ => throw new ArgumentOutOfRangeException(nameof(format), format, null)
+    };
+
     private static void AppendEntry(JournalStreamWriter writer, ReadOnlySpan<byte> payload)
     {
         using var entry = writer.BeginEntry();
@@ -159,5 +236,25 @@ public sealed class JournalBufferWriterOwnershipTests
         }
 
         return ToArray(writer);
+    }
+
+    private sealed class FailingStartEntryWriter : JournalBufferWriter
+    {
+        public bool FailStart { get; set; } = true;
+
+        protected override void StartEntry(JournalStreamId streamId)
+        {
+            if (FailStart)
+            {
+                var span = Output.GetSpan(1);
+                span[0] = 0xFF;
+                Output.Advance(1);
+                throw new InvalidOperationException("start failed");
+            }
+        }
+
+        protected override void FinishEntry(JournalStreamId streamId)
+        {
+        }
     }
 }
