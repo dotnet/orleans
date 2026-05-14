@@ -282,8 +282,6 @@ namespace Orleans.Journaling
     {
         protected int ActiveEntryLength { get { throw null; } }
         protected int ActiveEntryStart { get { throw null; } }
-        protected int BufferedLength { get { throw null; } }
-        protected int CommittedLength { get { throw null; } }
         protected System.Buffers.IBufferWriter<byte> Output { get { throw null; } }
         public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) { throw null; }
 
@@ -298,7 +296,6 @@ namespace Orleans.Journaling
 
         System.Span<byte> System.Buffers.IBufferWriter<byte>.GetSpan(int sizeHint) { throw null; }
 
-        protected virtual void AbortEntry(JournalStreamId streamId) { }
         protected abstract void FinishEntry(JournalStreamId streamId);
         protected virtual void StartEntry(JournalStreamId streamId) { }
         protected void WriteAt(int offset, System.ReadOnlySpan<byte> value) { }

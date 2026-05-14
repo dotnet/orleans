@@ -339,12 +339,12 @@ public class StateManagerTests : JournalingTestBase
 
         await sut.Lifecycle.OnStart();
         var writer = Assert.Single(format.Writers);
-        var lengthBefore = writer.Length;
+        var lengthBefore = GetCommittedLength(writer);
 
         Assert.Throws<InvalidOperationException>(() => dictionary.Add(1, 1));
 
         Assert.Empty(dictionary);
-        Assert.Equal(lengthBefore, writer.Length);
+        Assert.Equal(lengthBefore, GetCommittedLength(writer));
 
         await sut.Manager.WriteStateAsync(CancellationToken.None);
     }
@@ -1146,6 +1146,12 @@ public class StateManagerTests : JournalingTestBase
         using var writer = new ArcBufferWriter();
         writer.Write(value);
         return writer.ConsumeSlice(writer.Length);
+    }
+
+    private static int GetCommittedLength(JournalBufferWriter writer)
+    {
+        using var buffer = writer.GetBuffer();
+        return buffer.Length;
     }
 
     private List<CapturedJournalEntry> ReadBinaryEntries(ReadOnlySpan<byte> bytes)

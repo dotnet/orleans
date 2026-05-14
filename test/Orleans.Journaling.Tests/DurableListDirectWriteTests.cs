@@ -109,7 +109,14 @@ public sealed class DurableListDirectWriteTests
     {
         private readonly OrleansBinaryJournalBufferWriter _buffer = new();
 
-        public long Length => _buffer.Length;
+        public long Length
+        {
+            get
+            {
+                using var buffer = _buffer.GetBuffer();
+                return buffer.Length;
+            }
+        }
 
         public JournalStreamWriter CreateWriter() => _buffer.CreateJournalStreamWriter(new JournalStreamId(1));
     }

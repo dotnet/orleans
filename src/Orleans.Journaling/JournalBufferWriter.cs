@@ -80,21 +80,6 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     }
 
     /// <summary>
-    /// Gets the number of committed bytes.
-    /// </summary>
-    protected int CommittedLength
-    {
-        get
-        {
-            lock (_lock)
-            {
-                ThrowIfDisposed();
-                return _committedLength;
-            }
-        }
-    }
-
-    /// <summary>
     /// Gets the number of bytes in the active entry.
     /// </summary>
     protected int ActiveEntryLength
@@ -105,21 +90,6 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             {
                 ThrowIfDisposed();
                 return _hasActiveEntry ? checked(_buffer.Length - _committedLength) : 0;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Gets the total number of bytes held by this writer.
-    /// </summary>
-    protected int BufferedLength
-    {
-        get
-        {
-            lock (_lock)
-            {
-                ThrowIfDisposed();
-                return _buffer.Length;
             }
         }
     }
@@ -147,7 +117,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     }
 
     /// <summary>
-    /// Patches bytes at the specified offset in the current buffer.
+    /// Patches format-owned framing bytes at the specified offset in the current buffer.
     /// </summary>
     /// <param name="offset">The offset into the current buffer.</param>
     /// <param name="value">The replacement bytes.</param>
@@ -173,14 +143,6 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
     protected abstract void FinishEntry(JournalStreamId streamId);
-
-    /// <summary>
-    /// Notifies the format that the active entry is being aborted.
-    /// </summary>
-    /// <param name="streamId">The durable state id.</param>
-    protected virtual void AbortEntry(JournalStreamId streamId)
-    {
-    }
 
     /// <summary>
     /// Appends a format-owned entry for retired or unknown state preservation.
@@ -298,21 +260,14 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         }
     }
 
-    internal void AbortActiveEntry(JournalStreamId streamId)
+    internal void AbortActiveEntry()
     {
         lock (_lock)
         {
             ThrowIfDisposed();
             ThrowIfNoActiveEntry();
-            try
-            {
-                AbortEntry(streamId);
-            }
-            finally
-            {
-                _buffer.Truncate(_committedLength);
-                ClearActiveEntry();
-            }
+            _buffer.Truncate(_committedLength);
+            ClearActiveEntry();
         }
     }
 

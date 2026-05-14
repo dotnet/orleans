@@ -665,7 +665,7 @@ public sealed class OrleansBinaryCodecSnapshotTests : JournalingTestBase
 
     private static byte[] SnapshotBytes(OrleansBinaryJournalBufferWriter batch)
     {
-        using var slice = batch.Peek();
+        using var slice = batch.GetBuffer();
         return slice.ToArray();
     }
 

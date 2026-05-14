@@ -227,7 +227,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
                 throw new InvalidOperationException("The JSON Lines journal entry has no entry payload.");
             }
 
-            WriteBytes(Output, "]\n"u8);
+            Output.Write("]\n"u8);
         }
 
         protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
@@ -250,7 +250,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
             WriteJournalEntryPrefix(streamId, output);
             WriteSequence(output, payload);
-            WriteBytes(output, "]\n"u8);
+            output.Write("]\n"u8);
         }
 
         private static void WriteJournalEntryPrefix(JournalStreamId streamId, IBufferWriter<byte> output)
@@ -283,19 +283,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
         {
             foreach (var segment in input)
             {
-                WriteBytes(output, segment.Span);
-            }
-        }
-
-        private static void WriteBytes(IBufferWriter<byte> output, ReadOnlySpan<byte> value)
-        {
-            while (!value.IsEmpty)
-            {
-                var destination = output.GetSpan(value.Length);
-                var length = Math.Min(destination.Length, value.Length);
-                value[..length].CopyTo(destination);
-                output.Advance(length);
-                value = value[length..];
+                output.Write(segment.Span);
             }
         }
     }

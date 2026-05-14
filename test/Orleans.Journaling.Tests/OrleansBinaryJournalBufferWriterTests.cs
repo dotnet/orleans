@@ -88,7 +88,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(1)), [10]);
         AppendEntry(buffer.CreateJournalStreamWriter(new JournalStreamId(300)), [20, 21]);
 
-        using var data = buffer.Peek();
+        using var data = buffer.GetBuffer();
         var offset = 0;
         var firstEntry = ReadEntry(data, ref offset);
         var secondEntry = ReadEntry(data, ref offset);
@@ -307,7 +307,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         second.PayloadWriter.Write(new byte[] { 2 });
         second.Commit();
 
-        using var data = buffer.Peek();
+        using var data = buffer.GetBuffer();
         var offset = 0;
         var entry = ReadEntry(data, ref offset);
 
@@ -355,7 +355,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         entry.PayloadWriter.Write(payload);
         entry.Commit();
 
-        using var data = buffer.Peek();
+        using var data = buffer.GetBuffer();
         var offset = 0;
         var written = ReadEntry(data, ref offset);
 
@@ -363,24 +363,6 @@ public sealed class OrleansBinaryJournalBufferWriterTests
         Assert.Equal(1UL, written.StreamId);
         Assert.Equal(payload, written.Payload);
         Assert.Equal(data.Length, offset);
-    }
-
-    [Fact]
-    public void ReadOnlyStream_ReadsCommittedBytes()
-    {
-        using var buffer = new OrleansBinaryJournalBufferWriter();
-        using var entry = buffer.CreateJournalStreamWriter(new JournalStreamId(7)).BeginEntry();
-        entry.PayloadWriter.Write(new byte[] { 8, 9 });
-        entry.Commit();
-        var expected = ToArray(buffer);
-
-        using var stream = buffer.AsReadOnlyStream();
-        var actual = new byte[expected.Length];
-        Assert.Equal(expected.Length, stream.Read(actual));
-        Assert.Equal(expected, actual);
-
-        stream.Position = 5;
-        Assert.Equal(7, stream.ReadByte());
     }
 
     [Theory]
@@ -450,7 +432,7 @@ public sealed class OrleansBinaryJournalBufferWriterTests
 
     private static byte[] ToArray(OrleansBinaryJournalBufferWriter buffer)
     {
-        using var slice = buffer.Peek();
+        using var slice = buffer.GetBuffer();
         return slice.ToArray();
     }
 

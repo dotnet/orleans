@@ -19,7 +19,7 @@ public static class CodecTestHelpers
     {
         using var batch = new OrleansBinaryJournalBufferWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
-        using var committed = batch.Peek();
+        using var committed = batch.GetBuffer();
 
         // Strip the OrleansBinary entry framing and return the operation payload.
         if (!OrleansBinaryJournalReader.TryReadVersionAndLength(committed, out var version, out var bodyLength, out var lengthPrefixLength))

@@ -62,11 +62,10 @@ public ref struct JournalEntryScope : IDisposable
         }
 
         var writer = GetWriter();
-        var streamId = _streamId;
         _completed = true;
         _writer = null;
         _streamId = default;
-        writer.AbortActiveEntry(streamId);
+        writer.AbortActiveEntry();
     }
 
     private readonly JournalBufferWriter GetWriter()
