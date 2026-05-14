@@ -45,7 +45,7 @@ namespace Orleans.Streams
             LogDebugTryingToFindStorageProvider(providerName);
 
             var storage = _serviceProvider.GetKeyedService<IGrainStorage>(providerName);
-            if (storage == null)
+            if (storage is null)
             {
                 LogDebugFallbackToStorageProvider(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
 
@@ -207,11 +207,11 @@ namespace Orleans.Streams
             }
 
             var pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
-            if (pubSubState != null && pubSubState.IsFaulted)
+            if (pubSubState is not null && pubSubState.IsFaulted)
                 throw new FaultedSubscriptionException(subscriptionId, streamId);
             try
             {
-                if (pubSubState == null)
+                if (pubSubState is null)
                 {
                     pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer);
                     State.Consumers.Add(pubSubState);
@@ -280,7 +280,7 @@ namespace Orleans.Streams
                     }
                 }
 
-                if (exception != null)
+                if (exception is not null)
                 {
                     ExceptionDispatchInfo.Capture(exception).Throw();
                 }
