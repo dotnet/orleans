@@ -11,7 +11,6 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
     IFieldCodec<T> codec,
     SerializerSessionPool sessionPool) : IPersistentStateCommandCodec<T>
 {
-    private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
     private const uint ClearValueCommand = 1;
 
@@ -21,7 +20,6 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
         using var entry = writer.BeginEntry();
         var output = entry.PayloadWriter;
         var headerWriter = Writer.Create(output, session: null!);
-        headerWriter.WriteByte(FormatVersion);
         headerWriter.WriteVarUInt32(SetValueCommand);
         headerWriter.Commit();
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, state, output, sessionPool);
@@ -36,7 +34,6 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
-        payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(ClearValueCommand);
         payloadWriter.Commit();
         entry.Commit();
@@ -58,7 +55,6 @@ internal sealed class OrleansBinaryPersistentStateCommandCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IPersistentStateCommandHandler<T> consumer)
     {
-        OrleansBinaryCommandCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {

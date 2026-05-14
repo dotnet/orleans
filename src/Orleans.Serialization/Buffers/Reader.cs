@@ -177,6 +177,14 @@ namespace Orleans.Serialization.Buffers
     public static class Reader
     {
         /// <summary>
+        /// Gets the byte count for a variable-width integer from its first byte.
+        /// </summary>
+        /// <param name="firstByte">The first byte of the encoded variable-width integer.</param>
+        /// <returns>The encoded byte count indicated by <paramref name="firstByte"/>.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public static int GetVarIntByteCount(byte firstByte) => BitOperations.TrailingZeroCount(0x0100U | firstByte) + 1;
+
+        /// <summary>
         /// Creates a reader for the provided buffer.
         /// </summary>
         /// <param name="input">The input.</param>
@@ -705,6 +713,36 @@ namespace Orleans.Serialization.Buffers
             }
         }
 
+        /// <summary>
+        /// Returns the next byte from the input without advancing the reader.
+        /// </summary>
+        /// <returns>The next byte in the input.</returns>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
+        public byte PeekByte()
+        {
+            if (IsReadOnlySequenceInput || IsSpanInput || IsBufferSliceInput || IsArcBufferInput)
+            {
+                var reader = this;
+                return reader.ReadByte();
+            }
+            else if (_input is ReaderInput readerInput)
+            {
+                var position = readerInput.Position;
+                try
+                {
+                    return readerInput.ReadByte();
+                }
+                finally
+                {
+                    readerInput.Seek(position);
+                }
+            }
+            else
+            {
+                return ThrowNotSupportedInput<byte>();
+            }
+        }
+
         [MethodImpl(MethodImplOptions.NoInlining)]
         private static byte ReadByteSlow(ref Reader<TInput> reader)
         {
@@ -979,7 +1017,7 @@ namespace Orleans.Serialization.Buffers
         private uint ReadVarUInt32Slow()
         {
             var header = ReadByte();
-            var numBytes = BitOperations.TrailingZeroCount(0x0100U | header) + 1;
+            var numBytes = Orleans.Serialization.Buffers.Reader.GetVarIntByteCount(header);
 
             // Widen to a ulong for the 5-byte case
             ulong result = header;
@@ -1043,7 +1081,7 @@ namespace Orleans.Serialization.Buffers
         private ulong ReadVarUInt64Slow()
         {
             var header = ReadByte();
-            var numBytes = BitOperations.TrailingZeroCount(0x0100U | header) + 1;
+            var numBytes = Orleans.Serialization.Buffers.Reader.GetVarIntByteCount(header);
 
             // Widen to a ulong for the 5-byte case
             ulong result = header;

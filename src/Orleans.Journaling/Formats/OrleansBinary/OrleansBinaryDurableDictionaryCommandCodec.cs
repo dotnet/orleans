@@ -12,7 +12,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     IFieldCodec<TValue> valueCodec,
     SerializerSessionPool sessionPool) : IDurableDictionaryCommandCodec<TKey, TValue> where TKey : notnull
 {
-    private const byte FormatVersion = 0;
     private const uint SetCommand = 0;
     private const uint RemoveCommand = 1;
     private const uint ClearCommand = 2;
@@ -25,7 +24,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         var output = entry.PayloadWriter;
         using var session = sessionPool.GetSession();
         var payloadWriter = Writer.Create(output, session);
-        payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(SetCommand);
         keyCodec.WriteField(ref payloadWriter, 0, typeof(TKey), key);
         valueCodec.WriteField(ref payloadWriter, 1, typeof(TValue), value);
@@ -39,7 +37,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         using var entry = writer.BeginEntry();
         var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(RemoveCommand);
         payloadWriter.Commit();
         OrleansBinaryCommandCodecHelpers.WriteValue(keyCodec, key, output, sessionPool);
@@ -51,7 +48,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
     {
         using var entry = writer.BeginEntry();
         var payloadWriter = Writer.Create(entry.PayloadWriter, session: null!);
-        payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(ClearCommand);
         payloadWriter.Commit();
         entry.Commit();
@@ -64,7 +60,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
         var output = entry.PayloadWriter;
         var count = CollectionCodecHelpers.GetSnapshotCount(items);
         var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(SnapshotCommand);
         payloadWriter.WriteVarUInt32((uint)count);
         payloadWriter.Commit();
@@ -97,7 +92,6 @@ internal sealed class OrleansBinaryDurableDictionaryCommandCodec<TKey, TValue>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IDurableDictionaryCommandHandler<TKey, TValue> consumer)
     {
-        OrleansBinaryCommandCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {

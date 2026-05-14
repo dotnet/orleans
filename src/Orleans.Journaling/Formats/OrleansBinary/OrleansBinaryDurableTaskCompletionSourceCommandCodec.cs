@@ -9,24 +9,21 @@ namespace Orleans.Journaling;
 /// </summary>
 /// <remarks>
 /// Unlike other durable type codecs, the TCS format uses a status byte instead of a
-/// VarUInt32 command discriminator after the version byte.
+/// VarUInt32 command discriminator.
 /// </remarks>
 internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     IFieldCodec<T> codec,
     IFieldCodec<Exception> exceptionCodec,
     SerializerSessionPool sessionPool) : IDurableTaskCompletionSourceCommandCodec<T>
 {
-    private const byte FormatVersion = 0;
-
     /// <inheritdoc/>
     public void WritePending(JournalStreamWriter writer)
     {
         using var entry = writer.BeginEntry();
         var output = entry.PayloadWriter;
-        var span = output.GetSpan(2);
-        span[0] = FormatVersion;
-        span[1] = (byte)DurableTaskCompletionSourceStatus.Pending;
-        output.Advance(2);
+        var span = output.GetSpan(1);
+        span[0] = (byte)DurableTaskCompletionSourceStatus.Pending;
+        output.Advance(1);
         entry.Commit();
     }
 
@@ -35,10 +32,9 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.PayloadWriter;
-        var span = output.GetSpan(2);
-        span[0] = FormatVersion;
-        span[1] = (byte)DurableTaskCompletionSourceStatus.Completed;
-        output.Advance(2);
+        var span = output.GetSpan(1);
+        span[0] = (byte)DurableTaskCompletionSourceStatus.Completed;
+        output.Advance(1);
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, value, output, sessionPool);
         entry.Commit();
     }
@@ -48,10 +44,9 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.PayloadWriter;
-        var span = output.GetSpan(2);
-        span[0] = FormatVersion;
-        span[1] = (byte)DurableTaskCompletionSourceStatus.Faulted;
-        output.Advance(2);
+        var span = output.GetSpan(1);
+        span[0] = (byte)DurableTaskCompletionSourceStatus.Faulted;
+        output.Advance(1);
         OrleansBinaryCommandCodecHelpers.WriteValue(exceptionCodec, exception, output, sessionPool);
         entry.Commit();
     }
@@ -61,10 +56,9 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
     {
         using var entry = writer.BeginEntry();
         var output = entry.PayloadWriter;
-        var span = output.GetSpan(2);
-        span[0] = FormatVersion;
-        span[1] = (byte)DurableTaskCompletionSourceStatus.Canceled;
-        output.Advance(2);
+        var span = output.GetSpan(1);
+        span[0] = (byte)DurableTaskCompletionSourceStatus.Canceled;
+        output.Advance(1);
         entry.Commit();
     }
 
@@ -84,7 +78,6 @@ internal sealed class OrleansBinaryDurableTaskCompletionSourceCommandCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IDurableTaskCompletionSourceCommandHandler<T> consumer)
     {
-        OrleansBinaryCommandCodecHelpers.ReadVersion(ref reader);
         if (reader.Position >= reader.Length)
         {
             throw new InvalidOperationException("Missing TCS status byte.");

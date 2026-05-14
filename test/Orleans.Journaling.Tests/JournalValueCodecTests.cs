@@ -73,7 +73,7 @@ public class JournalValueCodecTests
         var codec = new OrleansBinaryDurableListCommandCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
-        WriteVersionAndCommand(buffer, 5, 0x80000000);
+        WriteCommand(buffer, 5, 0x80000000);
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(CodecTestHelpers.ReadBuffer(buffer.WrittenMemory), new ListConsumer<int>()));
@@ -88,7 +88,7 @@ public class JournalValueCodecTests
         var codec = new OrleansBinaryDurableListCommandCodec<int>(valueCodec, _sessionPool);
         var buffer = new ArrayBufferWriter<byte>();
 
-        WriteVersionAndCommand(buffer, 3, 0x80000000);
+        WriteCommand(buffer, 3, 0x80000000);
 
         var exception = Assert.Throws<InvalidOperationException>(
             () => codec.Apply(CodecTestHelpers.ReadBuffer(buffer.WrittenMemory), new ListConsumer<int>()));
@@ -153,10 +153,9 @@ public class JournalValueCodecTests
         IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
     }
 
-    private static void WriteVersionAndCommand(IBufferWriter<byte> output, uint command, uint? operand = null)
+    private static void WriteCommand(IBufferWriter<byte> output, uint command, uint? operand = null)
     {
         var writer = Writer.Create(output, session: null!);
-        writer.WriteByte(0);
         writer.WriteVarUInt32(command);
         if (operand is { } value)
         {

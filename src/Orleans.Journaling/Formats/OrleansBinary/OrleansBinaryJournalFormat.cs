@@ -1,5 +1,3 @@
-using System.Buffers;
-using System.Buffers.Binary;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Session;
 
@@ -31,13 +29,12 @@ internal sealed class OrleansBinaryJournalFormat : IJournalFormat
 
 internal static class OrleansBinaryJournalReader
 {
-    internal const byte LegacyFramingVersion = 0;
+    internal const byte LegacyFramingVersion = OrleansBinaryV0JournalReader.FramingVersion;
     internal const byte FramingVersion = 1;
 
     private const int ByteCount = sizeof(byte);
     private const int UInt32ByteCount = sizeof(uint);
     private const int VersionedLengthPrefixLength = ByteCount + UInt32ByteCount;
-    private const int MaxVarUInt32ByteCount = 5;
 
     public static void Read(JournalBufferReader input, SerializerSessionPool sessionPool, JournalReplayContext context)
     {
@@ -57,112 +54,17 @@ internal static class OrleansBinaryJournalReader
             // for this iteration. Successful entries are committed by Skip()ing the underlying
             // ArcBufferReader; truncated tails leave bytes for a subsequent call.
             using var batchSlice = input.Peek(input.Length);
-            var sequence = batchSlice.AsReadOnlySequence();
 
-            byte framingVersion;
-            uint bodyLength;
-            uint streamIdValue;
-            int frameLength;
-            int payloadStart;
-            int lengthPrefixSize;
-
-            bool hasVersionAndLength;
-            try
+            if (!TryReadEntry(
+                batchSlice,
+                input.IsCompleted,
+                session,
+                offset,
+                out var streamIdValue,
+                out var frameLength,
+                out var payloadStart))
             {
-                hasVersionAndLength = TryReadVersionAndLength(sequence, out framingVersion, out bodyLength, out lengthPrefixSize);
-            }
-            catch (InvalidOperationException exception)
-            {
-                throw new InvalidOperationException(
-                    $"Malformed binary journal entry stream at byte offset {offset}: malformed varuint32 entry length prefix.",
-                    exception);
-            }
-            catch (NotSupportedException exception)
-            {
-                throw new NotSupportedException(
-                    $"Unsupported binary journal entry format version at byte offset {offset}: {exception.Message}",
-                    exception);
-            }
-
-            if (!hasVersionAndLength)
-            {
-                if (!input.IsCompleted)
-                {
-                    return;
-                }
-
-                var message = framingVersion == FramingVersion
-                    ? "truncated fixed-width entry header"
-                    : "truncated varuint32 entry length prefix";
-                throw new InvalidOperationException($"Malformed binary journal entry stream at byte offset {offset}: {message}.");
-            }
-
-            if (framingVersion == FramingVersion)
-            {
-                if (bodyLength < UInt32ByteCount)
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed binary journal entry stream at byte offset {offset}: entry length {bodyLength} is smaller than the fixed-width state id.");
-                }
-
-                var availableBody = batchSlice.Length - lengthPrefixSize;
-                if (bodyLength > (ulong)availableBody)
-                {
-                    if (!input.IsCompleted)
-                    {
-                        return;
-                    }
-
-                    throw new InvalidOperationException(
-                        $"Malformed binary journal entry stream at byte offset {offset}: entry length {bodyLength} exceeds remaining input bytes {availableBody}.");
-                }
-
-                frameLength = checked(lengthPrefixSize + (int)bodyLength);
-                streamIdValue = ReadUInt32LittleEndian(sequence.Slice(lengthPrefixSize, UInt32ByteCount));
-                payloadStart = lengthPrefixSize + UInt32ByteCount;
-            }
-            else
-            {
-                if (bodyLength == 0)
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed binary journal entry stream at byte offset {offset}: zero-length entries are not valid.");
-                }
-
-                var availableBody = batchSlice.Length - lengthPrefixSize;
-                if (bodyLength > (ulong)availableBody)
-                {
-                    if (!input.IsCompleted)
-                    {
-                        return;
-                    }
-
-                    throw new InvalidOperationException(
-                        $"Malformed binary journal entry stream at byte offset {offset}: entry length {bodyLength} exceeds remaining input bytes {availableBody}.");
-                }
-
-                frameLength = checked(lengthPrefixSize + (int)bodyLength);
-                var entry = sequence.Slice(lengthPrefixSize, bodyLength);
-                var reader = Reader.Create(entry, session);
-
-                try
-                {
-                    streamIdValue = reader.ReadVarUInt32();
-                }
-                catch (InvalidOperationException exception)
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed binary journal entry stream at byte offset {offset}: truncated varuint32 state id.",
-                        exception);
-                }
-                catch (Exception exception)
-                {
-                    throw new InvalidOperationException(
-                        $"Malformed binary journal entry stream at byte offset {offset}: malformed varuint32 state id.",
-                        exception);
-                }
-
-                payloadStart = lengthPrefixSize + (int)reader.Position;
+                return;
             }
 
             var streamId = new JournalStreamId(streamIdValue);
@@ -192,8 +94,68 @@ internal static class OrleansBinaryJournalReader
         }
     }
 
+    private static bool TryReadEntry(
+        ArcBuffer input,
+        bool isCompleted,
+        SerializerSession session,
+        long offset,
+        out uint streamIdValue,
+        out int frameLength,
+        out int payloadStart)
+    {
+        streamIdValue = 0;
+        frameLength = 0;
+        payloadStart = 0;
+
+        byte framingVersion;
+        uint bodyLength;
+        int lengthPrefixSize;
+        bool hasVersionAndLength;
+        try
+        {
+            hasVersionAndLength = TryReadVersionAndLength(input, session, out framingVersion, out bodyLength, out lengthPrefixSize);
+        }
+        catch (InvalidOperationException exception)
+        {
+            throw new InvalidOperationException(
+                $"Malformed binary journal entry stream at byte offset {offset}: malformed varuint32 entry length prefix.",
+                exception);
+        }
+        catch (NotSupportedException exception)
+        {
+            throw new NotSupportedException(
+                $"Unsupported binary journal entry format version at byte offset {offset}: {exception.Message}",
+                exception);
+        }
+
+        if (!hasVersionAndLength)
+        {
+            if (!isCompleted)
+            {
+                return false;
+            }
+
+            var message = framingVersion == FramingVersion
+                ? "truncated fixed-width entry header"
+                : "truncated varuint32 entry length prefix";
+            throw new InvalidOperationException($"Malformed binary journal entry stream at byte offset {offset}: {message}.");
+        }
+
+        return framingVersion == FramingVersion
+            ? TryReadCurrentEntry(input, lengthPrefixSize, bodyLength, isCompleted, session, offset, out streamIdValue, out frameLength, out payloadStart)
+            : OrleansBinaryV0JournalReader.TryReadEntry(input, lengthPrefixSize, bodyLength, isCompleted, session, offset, out streamIdValue, out frameLength, out payloadStart);
+    }
+
     internal static bool TryReadVersionAndLength(
-        ReadOnlySequence<byte> input,
+        ArcBuffer input,
+        out byte version,
+        out uint length,
+        out int lengthPrefixLength) =>
+        TryReadVersionAndLength(input, session: null!, out version, out length, out lengthPrefixLength);
+
+    private static bool TryReadVersionAndLength(
+        ArcBuffer input,
+        SerializerSession session,
         out byte version,
         out uint length,
         out int lengthPrefixLength)
@@ -202,84 +164,69 @@ internal static class OrleansBinaryJournalReader
         length = 0;
         lengthPrefixLength = 0;
 
-        var reader = new SequenceReader<byte>(input);
-        if (!reader.TryRead(out var firstByte))
+        if (input.Length == 0)
         {
             return false;
         }
 
+        var reader = Reader.Create(input, session);
+        var firstByte = reader.ReadByte();
         if (firstByte == FramingVersion)
         {
             version = FramingVersion;
-            if (reader.Remaining < UInt32ByteCount)
+            if (input.Length < VersionedLengthPrefixLength)
             {
                 return false;
             }
 
-            Span<byte> lengthBytes = stackalloc byte[UInt32ByteCount];
-            reader.TryCopyTo(lengthBytes);
-            length = BinaryPrimitives.ReadUInt32LittleEndian(lengthBytes);
-            lengthPrefixLength = VersionedLengthPrefixLength;
+            length = reader.ReadUInt32();
+            lengthPrefixLength = checked((int)reader.Position);
             return true;
         }
 
-        return TryReadLegacyLength(input, out length, out lengthPrefixLength);
+        return OrleansBinaryV0JournalReader.TryReadLength(input, session, out length, out lengthPrefixLength);
     }
 
-    private static bool TryReadLegacyLength(ReadOnlySequence<byte> input, out uint length, out int bytesRead)
+    private static bool TryReadCurrentEntry(
+        ArcBuffer input,
+        int lengthPrefixSize,
+        uint bodyLength,
+        bool isCompleted,
+        SerializerSession session,
+        long offset,
+        out uint streamIdValue,
+        out int frameLength,
+        out int payloadStart)
     {
-        length = 0;
-        bytesRead = 0;
+        streamIdValue = 0;
+        frameLength = 0;
+        payloadStart = 0;
 
-        var reader = new SequenceReader<byte>(input);
-        if (!reader.TryRead(out var firstByte))
+        if (bodyLength < UInt32ByteCount)
         {
-            return false;
+            throw new InvalidOperationException(
+                $"Malformed binary journal entry stream at byte offset {offset}: entry length {bodyLength} is smaller than the fixed-width state id.");
         }
 
-        // Orleans varuints encode their width as the number of trailing zero bits in the first byte.
-        var byteCount = 1;
-        var marker = firstByte;
-        while ((marker & 1) == 0)
+        var availableBody = input.Length - lengthPrefixSize;
+        if (bodyLength > (ulong)availableBody)
         {
-            if (byteCount == MaxVarUInt32ByteCount)
+            if (!isCompleted)
             {
-                throw new InvalidOperationException("Malformed varuint32 entry length prefix.");
+                return false;
             }
 
-            byteCount++;
-            marker >>= 1;
+            throw new InvalidOperationException(
+                $"Malformed binary journal entry stream at byte offset {offset}: entry length {bodyLength} exceeds remaining input bytes {availableBody}.");
         }
 
-        if (input.Length < byteCount)
-        {
-            return false;
-        }
-
-        Span<byte> buffer = stackalloc byte[MaxVarUInt32ByteCount];
-        input.Slice(0, byteCount).CopyTo(buffer);
-
-        ulong result = 0;
-        for (var i = 0; i < byteCount; i++)
-        {
-            result |= (ulong)buffer[i] << (i * 8);
-        }
-
-        result >>= byteCount;
-        if (result > uint.MaxValue)
-        {
-            throw new InvalidOperationException("Malformed varuint32 entry length prefix.");
-        }
-
-        length = (uint)result;
-        bytesRead = byteCount;
+        frameLength = checked(lengthPrefixSize + (int)bodyLength);
+        streamIdValue = ReadUInt32LittleEndian(input.UnsafeSlice(lengthPrefixSize, UInt32ByteCount), session);
+        payloadStart = lengthPrefixSize + UInt32ByteCount;
         return true;
     }
 
-    internal static uint ReadUInt32LittleEndian(ReadOnlySequence<byte> input)
-    {
-        Span<byte> buffer = stackalloc byte[UInt32ByteCount];
-        input.Slice(0, UInt32ByteCount).CopyTo(buffer);
-        return BinaryPrimitives.ReadUInt32LittleEndian(buffer);
-    }
+    internal static uint ReadUInt32LittleEndian(ArcBuffer input) => ReadUInt32LittleEndian(input, session: null!);
+
+    private static uint ReadUInt32LittleEndian(ArcBuffer input, SerializerSession session) => Reader.Create(input, session).ReadUInt32();
 }

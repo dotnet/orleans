@@ -12,10 +12,10 @@ namespace Orleans.Journaling.Tests;
 /// </summary>
 /// <remarks>
 /// These helpers intentionally know nothing about specific command discriminators. The OrleansBinary
-/// dictionary/list/queue/set/value/state codecs use a varuint command id after the format-version byte,
-/// but the TaskCompletionSource codec uses a single status byte. Parsing only the universal framing
-/// (entry length prefix, stream id, version byte) keeps the helper applicable to every codec family
-/// while still surfacing the per-entry boundaries reviewers need to read snapshot diffs.
+/// dictionary/list/queue/set/value/state codecs use a varuint command id, but the TaskCompletionSource
+/// codec uses a single status byte. Parsing only the universal framing (entry length prefix and stream id)
+/// keeps the helper applicable to every codec family while still surfacing the per-entry boundaries
+/// reviewers need to read snapshot diffs.
 /// </remarks>
 public static class JournalSnapshotFormatting
 {
@@ -34,8 +34,8 @@ public static class JournalSnapshotFormatting
     /// <remarks>
     /// The output begins with a single <c>HEX: …</c> line (the byte-level baseline) followed by a
     /// <c>DISASSEMBLY:</c> section. For each entry the disassembly emits a header line with the
-    /// universal-framing fields the OrleansBinary readers parse (entry body length, stream id, format
-    /// version byte) and a 16-byte-per-row hex+ASCII dump of everything after the version byte. If the
+    /// universal-framing fields the OrleansBinary readers parse (entry frame version, entry body length,
+    /// and stream id) and a 16-byte-per-row hex+ASCII dump of the command payload. If the
     /// segment is malformed the disassembly falls back to a raw dump of the unparsed tail; this lets the
     /// helper be used safely even for adversarial inputs without throwing during snapshot generation.
     /// </remarks>
@@ -54,7 +54,9 @@ public static class JournalSnapshotFormatting
         // Copy to an array so we can re-use the byte[] from inside the loop without being constrained by
         // span semantics across method boundaries (StringBuilder calls, hex/ASCII dump helper).
         var data = bytes.ToArray();
-        var sequence = new ReadOnlySequence<byte>(data);
+        using var bufferWriter = new ArcBufferWriter();
+        bufferWriter.Write(data);
+        using var buffer = bufferWriter.PeekSlice(bufferWriter.Length);
         var entryIndex = 0;
         var offset = 0;
 
@@ -66,7 +68,11 @@ public static class JournalSnapshotFormatting
             var hasFrameHeader = false;
             try
             {
-                hasFrameHeader = OrleansBinaryJournalReader.TryReadVersionAndLength(sequence.Slice(offset), out framingVersion, out bodyLength, out prefixSize);
+                hasFrameHeader = OrleansBinaryJournalReader.TryReadVersionAndLength(
+                    buffer.UnsafeSlice(offset, data.Length - offset),
+                    out framingVersion,
+                    out bodyLength,
+                    out prefixSize);
             }
             catch
             {
@@ -114,10 +120,10 @@ public static class JournalSnapshotFormatting
                     continue;
                 }
 
-                streamId = OrleansBinaryJournalReader.ReadUInt32LittleEndian(sequence.Slice(entryStart, sizeof(uint)));
+                streamId = OrleansBinaryJournalReader.ReadUInt32LittleEndian(buffer.UnsafeSlice(entryStart, sizeof(uint)));
                 streamIdSize = sizeof(uint);
             }
-            else if (!TryDecodeVarUInt(sequence.Slice(entryStart, (int)bodyLength), out streamId, out streamIdSize))
+            else if (!TryDecodeVarUInt(buffer.UnsafeSlice(entryStart, (int)bodyLength), out streamId, out streamIdSize))
             {
                 builder.Append("[entry ").Append(entryIndex).Append("] length=").Append(bodyLength)
                     .Append(" (unable to parse varuint32 stream id)\n");
@@ -132,24 +138,38 @@ public static class JournalSnapshotFormatting
             if (operationLength <= 0)
             {
                 builder.Append("[entry ").Append(entryIndex)
-                    .Append("] length=").Append(bodyLength)
+                    .Append("] frame-version=").Append(framingVersion)
+                    .Append(" length=").Append(bodyLength)
                     .Append(" streamId=").Append(streamId)
-                    .Append(" (missing format version byte)\n");
+                    .Append(" (missing command payload)\n");
                 offset = entryEnd;
                 entryIndex++;
                 continue;
             }
 
-            var version = data[operationStart];
-            var payloadStart = operationStart + 1;
-            var payloadLength = operationLength - 1;
-
             builder.Append("[entry ").Append(entryIndex)
-                .Append("] length=").Append(bodyLength)
+                .Append("] frame-version=").Append(framingVersion)
+                .Append(" length=").Append(bodyLength)
                 .Append(" streamId=").Append(streamId)
-                .Append(" version=").Append(version)
-                .Append(" payload-bytes=").Append(payloadLength)
-                .Append('\n');
+                .Append(" payload-bytes=");
+
+            int payloadStart;
+            int payloadLength;
+            if (framingVersion == OrleansBinaryJournalReader.LegacyFramingVersion)
+            {
+                var legacyCommandVersion = data[operationStart];
+                payloadStart = operationStart + 1;
+                payloadLength = operationLength - 1;
+                builder.Append(payloadLength)
+                    .Append(" legacy-command-version=").Append(legacyCommandVersion)
+                    .Append('\n');
+            }
+            else
+            {
+                payloadStart = operationStart;
+                payloadLength = operationLength;
+                builder.Append(payloadLength).Append('\n');
+            }
 
             AppendHexAsciiDump(builder, data.AsSpan(payloadStart, payloadLength));
 
@@ -164,7 +184,7 @@ public static class JournalSnapshotFormatting
     /// Decodes one Orleans-format varint (variable-length unsigned integer). Returns <c>false</c> when
     /// the input does not contain a complete varint.
     /// </summary>
-    private static bool TryDecodeVarUInt(ReadOnlySequence<byte> input, out ulong value, out int bytesRead)
+    private static bool TryDecodeVarUInt(ArcBuffer input, out ulong value, out int bytesRead)
     {
         value = 0;
         bytesRead = 0;
@@ -176,7 +196,7 @@ public static class JournalSnapshotFormatting
         try
         {
             var reader = Reader.Create(input, session: null!);
-            value = reader.ReadVarUInt32();
+            value = reader.ReadVarUInt64();
             bytesRead = (int)reader.Position;
             return true;
         }

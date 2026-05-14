@@ -10,25 +10,6 @@ namespace Orleans.Journaling;
 /// </summary>
 internal static class OrleansBinaryCommandCodecHelpers
 {
-    private const byte FormatVersion = 0;
-
-    /// <summary>
-    /// Reads and validates the format-version byte at the current reader position.
-    /// </summary>
-    public static void ReadVersion<TInput>(ref Reader<TInput> reader)
-    {
-        if (reader.Position >= reader.Length)
-        {
-            throw new InvalidOperationException("Missing binary journal entry format version byte.");
-        }
-
-        var version = reader.ReadByte();
-        if (version != FormatVersion)
-        {
-            throw new NotSupportedException($"Unsupported format version {version} for binary journal entry.");
-        }
-    }
-
     public static void WriteValue<T>(
         IFieldCodec<T> codec,
         T value,

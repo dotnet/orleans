@@ -13,10 +13,9 @@ namespace Orleans.Journaling.Tests;
 /// </summary>
 /// <remarks>
 /// <para>
-/// These tests guard against accidental wire-format changes against the byte stream that the legacy
-/// <c>DurableDictionary</c>/<c>DurableList</c>/etc. types on <c>upstream/main</c> produced before the
-    /// codecs were extracted: every command writes its operands through the Orleans <c>IFieldCodec</c>
-    /// path — exactly the same chain pre-extraction.
+/// These tests guard against accidental OrleansBinary wire-format changes. Every command writes its
+/// operands through the Orleans <c>IFieldCodec</c> path, matching the legacy value encoding while the
+/// entry framing is pinned by the snapshot bytes.
 /// </para>
 /// <para>
 /// Since this branch flips the default journal format from OrleansBinary to JSONL, the tests below

@@ -16,6 +16,35 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.UnitTests
 {
+    [Trait("Category", "BVT")]
+    public sealed class ReaderTests
+    {
+        [Theory]
+        [InlineData(0x01, 1)]
+        [InlineData(0x02, 2)]
+        [InlineData(0x04, 3)]
+        [InlineData(0x08, 4)]
+        [InlineData(0x10, 5)]
+        [InlineData(0x20, 6)]
+        [InlineData(0x00, 9)]
+        public void GetVarIntByteCount_ReturnsEncodedByteCount(byte firstByte, int expected)
+        {
+            Assert.Equal(expected, Reader.GetVarIntByteCount(firstByte));
+        }
+
+        [Fact]
+        public void PeekByte_DoesNotAdvanceReader()
+        {
+            var reader = Reader.Create(new byte[] { 0x12, 0x34 }, session: null!);
+
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(0x12, reader.PeekByte());
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(0x12, reader.ReadByte());
+            Assert.Equal(1, reader.Position);
+        }
+    }
+
     /// <summary>
     /// Tests for Orleans' low-level Reader and Writer implementations.
     /// 

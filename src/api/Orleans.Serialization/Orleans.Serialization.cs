@@ -960,6 +960,8 @@ namespace Orleans.Serialization.Buffers
         public static Reader<SpanReaderInput> Create(System.ReadOnlyMemory<byte> buffer, Session.SerializerSession session) { throw null; }
 
         public static Reader<SpanReaderInput> Create(System.ReadOnlySpan<byte> buffer, Session.SerializerSession session) { throw null; }
+
+        public static int GetVarIntByteCount(byte firstByte) { throw null; }
     }
 
     public abstract partial class ReaderInput
@@ -991,6 +993,8 @@ namespace Orleans.Serialization.Buffers
         public void ForkFrom(long position, out Reader<TInput> forked) { throw null; }
 
         public byte ReadByte() { throw null; }
+
+        public byte PeekByte() { throw null; }
 
         public void ReadBytes(scoped System.Span<byte> destination) { }
 

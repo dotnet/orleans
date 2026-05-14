@@ -11,7 +11,6 @@ internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
     IFieldCodec<T> codec,
     SerializerSessionPool sessionPool) : IDurableValueCommandCodec<T>
 {
-    private const byte FormatVersion = 0;
     private const uint SetValueCommand = 0;
 
     /// <inheritdoc/>
@@ -20,7 +19,6 @@ internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
         using var entry = writer.BeginEntry();
         var output = entry.PayloadWriter;
         var payloadWriter = Writer.Create(output, session: null!);
-        payloadWriter.WriteByte(FormatVersion);
         payloadWriter.WriteVarUInt32(SetValueCommand);
         payloadWriter.Commit();
         OrleansBinaryCommandCodecHelpers.WriteValue(codec, value, output, sessionPool);
@@ -43,7 +41,6 @@ internal sealed class OrleansBinaryDurableValueCommandCodec<T>(
 
     private void Apply<TInput>(ref Reader<TInput> reader, IDurableValueCommandHandler<T> consumer)
     {
-        OrleansBinaryCommandCodecHelpers.ReadVersion(ref reader);
         var command = reader.ReadVarUInt32();
         switch (command)
         {

@@ -20,28 +20,23 @@ public static class CodecTestHelpers
         using var batch = new OrleansBinaryJournalBufferWriter();
         write(batch.CreateJournalStreamWriter(new JournalStreamId(1)));
         using var committed = batch.Peek();
-        var sequence = committed.AsReadOnlySequence();
 
         // Strip the OrleansBinary entry framing and return the operation payload.
-        if (!OrleansBinaryJournalReader.TryReadVersionAndLength(sequence, out var version, out var bodyLength, out var lengthPrefixLength))
+        if (!OrleansBinaryJournalReader.TryReadVersionAndLength(committed, out var version, out var bodyLength, out var lengthPrefixLength))
         {
             throw new InvalidOperationException("The binary journal entry stream is malformed.");
         }
 
-        var entry = sequence.Slice(lengthPrefixLength, bodyLength);
-        ReadOnlySequence<byte> payload;
+        var entry = committed.UnsafeSlice(lengthPrefixLength, checked((int)bodyLength));
         if (version == OrleansBinaryJournalReader.FramingVersion)
         {
-            payload = entry.Slice(sizeof(uint));
-        }
-        else
-        {
-            var streamIdReader = Reader.Create(entry, session: null!);
-            streamIdReader.ReadVarUInt32();
-            payload = entry.Slice(streamIdReader.Position);
+            return entry.UnsafeSlice(sizeof(uint), entry.Length - sizeof(uint)).ToArray();
         }
 
-        return payload.ToArray();
+        var streamIdReader = Reader.Create(entry, session: null!);
+        streamIdReader.ReadVarUInt64();
+        var payloadOffset = checked((int)streamIdReader.Position);
+        return entry.UnsafeSlice(payloadOffset, entry.Length - payloadOffset).ToArray();
     }
 
     public static JournalBufferReader ReadBuffer(ReadOnlyMemory<byte> bytes)

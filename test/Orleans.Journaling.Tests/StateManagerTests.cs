@@ -1164,26 +1164,29 @@ public class StateManagerTests : JournalingTestBase
     private static List<JournalStreamId> ReadStreamIds(ReadOnlySpan<byte> bytes)
     {
         var streamIds = new List<JournalStreamId>();
-        var reader = new SequenceReader<byte>(new ReadOnlySequence<byte>(bytes.ToArray()));
+        using var writer = new ArcBufferWriter();
+        writer.Write(bytes);
+        using var buffer = writer.PeekSlice(writer.Length);
+        var offset = 0;
 
-        while (!reader.End)
+        while (offset < buffer.Length)
         {
-            if (!OrleansBinaryJournalReader.TryReadVersionAndLength(reader.UnreadSequence, out var version, out var length, out var lengthPrefixLength))
+            var remaining = buffer.UnsafeSlice(offset, buffer.Length - offset);
+            if (!OrleansBinaryJournalReader.TryReadVersionAndLength(remaining, out var version, out var length, out var lengthPrefixLength))
             {
                 throw new InvalidOperationException("The binary journal entry stream is malformed.");
             }
 
-            reader.Advance(lengthPrefixLength);
-
-            if (length == 0 || length > reader.Remaining)
+            var entryStart = offset + lengthPrefixLength;
+            if (length == 0 || length > buffer.Length - entryStart)
             {
                 throw new InvalidOperationException("The binary journal entry stream is malformed.");
             }
 
-            var entry = reader.Sequence.Slice(reader.Consumed, length);
+            var entry = buffer.UnsafeSlice(entryStart, checked((int)length));
             var streamIdValue = version == OrleansBinaryJournalReader.FramingVersion
-                ? OrleansBinaryJournalReader.ReadUInt32LittleEndian(entry)
-                : Reader.Create(entry, session: null!).ReadVarUInt32();
+                ? OrleansBinaryJournalReader.ReadUInt32LittleEndian(entry.UnsafeSlice(0, sizeof(uint)))
+                : checked((uint)Reader.Create(entry, session: null!).ReadVarUInt64());
 
             var streamId = new JournalStreamId(streamIdValue);
             if (!streamIds.Contains(streamId))
@@ -1191,7 +1194,7 @@ public class StateManagerTests : JournalingTestBase
                 streamIds.Add(streamId);
             }
 
-            reader.Advance(length);
+            offset = checked(entryStart + (int)length);
         }
 
         return streamIds;
