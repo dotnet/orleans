@@ -27,6 +27,7 @@ namespace Orleans.Serialization.Serializers
         private readonly object _initializationLock = new();
 #endif
 
+        //private readonly ConcurrentDictionary<(Type, Type), Delegate> _delegateCache = new();
         private readonly ConcurrentDictionary<Type, IFieldCodec> _untypedCodecs = new();
         private readonly ConcurrentDictionary<Type, IFieldCodec> _typedCodecs = new();
         private readonly ConcurrentDictionary<Type, IBaseCodec> _typedBaseCodecs = new();
@@ -408,7 +409,7 @@ namespace Orleans.Serialization.Serializers
             object[] constructorArguments = null;
             if (_baseCopiers.TryGetValue(searchType, out var copierType))
             {
-               // Use the detected copier type. 
+               // Use the detected copier type.
                 if (copierType.IsGenericTypeDefinition)
                 {
                     copierType = copierType.MakeGenericType(concreteType.GetGenericArguments());

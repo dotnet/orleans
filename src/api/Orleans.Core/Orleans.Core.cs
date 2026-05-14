@@ -402,11 +402,6 @@ namespace Orleans
 
 namespace Orleans.Configuration
 {
-    public partial class ClientConnectionOptions
-    {
-        public void ConfigureConnection(System.Action<Microsoft.AspNetCore.Connections.IConnectionBuilder> configure) { }
-    }
-
     public partial class ClientMessagingOptions : MessagingOptions
     {
         public const int DEFAULT_CLIENT_SENDER_BUCKETS = 8192;
@@ -475,7 +470,10 @@ namespace Orleans.Configuration
 
     public partial class ConnectionOptions
     {
+        public static readonly System.TimeSpan DEFAULT_CLOSECONNECTION_TIMEOUT;
         public static readonly System.TimeSpan DEFAULT_OPENCONNECTION_TIMEOUT;
+        public System.TimeSpan CloseConnectionTimeout { get { throw null; } set { } }
+
         public System.TimeSpan ConnectionRetryDelay { get { throw null; } set { } }
 
         public int ConnectionsPerEndpoint { get { throw null; } set { } }
@@ -600,6 +598,591 @@ namespace Orleans.Configuration.Overrides
     }
 }
 
+namespace Orleans.Connections.Transport
+{
+    public partial class ConnectionAbortedException : System.Exception
+    {
+        public ConnectionAbortedException() { }
+
+        public ConnectionAbortedException(string? message, System.Exception? innerException) { }
+
+        public ConnectionAbortedException(string? message) { }
+    }
+
+    public partial class ConnectionClosedException : System.Exception
+    {
+        public ConnectionClosedException() { }
+
+        public ConnectionClosedException(string? message, System.Exception? innerException) { }
+
+        public ConnectionClosedException(string? message) { }
+    }
+
+    public partial class ConnectionResetException : System.Exception
+    {
+        public ConnectionResetException() { }
+
+        public ConnectionResetException(string? message, System.Exception? innerException) { }
+
+        public ConnectionResetException(string? message) { }
+    }
+
+    public partial class FeatureCollection : IFeatureCollection, System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<System.Type, object>>, System.Collections.IEnumerable
+    {
+        public FeatureCollection() { }
+
+        public FeatureCollection(IFeatureCollection defaults) { }
+
+        public FeatureCollection(int initialCapacity) { }
+
+        public bool IsReadOnly { get { throw null; } }
+
+        public object? this[System.Type key] { get { throw null; } set { } }
+
+        public virtual int Revision { get { throw null; } }
+
+        public TFeature? Get<TFeature>() { throw null; }
+
+        public System.Collections.Generic.IEnumerator<System.Collections.Generic.KeyValuePair<System.Type, object>> GetEnumerator() { throw null; }
+
+        public void Set<TFeature>(TFeature? instance) { }
+
+        System.Collections.IEnumerator System.Collections.IEnumerable.GetEnumerator() { throw null; }
+    }
+
+    public partial interface IConnectionEndPointFeature
+    {
+        System.Net.EndPoint? LocalEndPoint { get; set; }
+
+        System.Net.EndPoint? RemoteEndPoint { get; set; }
+    }
+
+    public partial interface IFeatureCollection : System.Collections.Generic.IEnumerable<System.Collections.Generic.KeyValuePair<System.Type, object>>, System.Collections.IEnumerable
+    {
+        bool IsReadOnly { get; }
+
+        object? this[System.Type key] { get; set; }
+
+        int Revision { get; }
+
+        TFeature? Get<TFeature>();
+        void Set<TFeature>(TFeature? instance);
+    }
+
+    public partial interface IMessageTransportConnectorMiddleware
+    {
+        MessageTransportConnector Apply(MessageTransportConnector transport);
+    }
+
+    public partial interface IMessageTransportListenerMiddleware
+    {
+        MessageTransportListener Apply(MessageTransportListener listener);
+    }
+
+    public abstract partial class MessageTransport : System.IAsyncDisposable
+    {
+        public virtual System.Threading.CancellationToken Closed { get { throw null; } }
+
+        public abstract IFeatureCollection Features { get; }
+
+        public virtual bool IsValid { get { throw null; } }
+
+        public abstract System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default);
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public abstract bool EnqueueRead(ReadRequest request);
+        public abstract bool EnqueueWrite(WriteRequest request);
+    }
+
+    public abstract partial class MessageTransportBase : MessageTransport
+    {
+        public override FeatureCollection Features { get { throw null; } }
+    }
+
+    public abstract partial class MessageTransportConnector : System.IAsyncDisposable
+    {
+        public abstract IFeatureCollection Features { get; }
+        public abstract bool IsValid { get; }
+
+        public abstract System.Threading.Tasks.ValueTask<MessageTransport> CreateAsync(System.Net.EndPoint endpoint, System.Threading.CancellationToken cancellationToken = default);
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+    }
+
+    public abstract partial class MessageTransportListener : System.IAsyncDisposable
+    {
+        public abstract IFeatureCollection Features { get; }
+        public abstract bool IsValid { get; }
+        public abstract string ListenerName { get; }
+
+        public abstract System.Threading.Tasks.ValueTask<MessageTransport?> AcceptAsync(System.Threading.CancellationToken cancellationToken = default);
+        public abstract System.Threading.Tasks.ValueTask BindAsync(System.Threading.CancellationToken cancellationToken = default);
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public abstract System.Threading.Tasks.ValueTask UnbindAsync(System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public abstract partial class ReadRequest
+    {
+        public abstract void OnCanceled();
+        public abstract void OnError(System.Exception error);
+        public abstract bool OnRead(Serialization.Buffers.ArcBufferReader buffer);
+    }
+
+    public sealed partial class TlsMessageTransportConnectorMiddleware : IMessageTransportConnectorMiddleware
+    {
+        public TlsMessageTransportConnectorMiddleware(Microsoft.Extensions.Options.IOptionsMonitor<Security.TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public MessageTransportConnector Apply(MessageTransportConnector transport) { throw null; }
+    }
+
+    public sealed partial class TlsMessageTransportListenerMiddleware : IMessageTransportListenerMiddleware
+    {
+        public TlsMessageTransportListenerMiddleware(Microsoft.Extensions.Options.IOptionsMonitor<Security.TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public MessageTransportListener Apply(MessageTransportListener input) { throw null; }
+    }
+
+    public abstract partial class WriteRequest
+    {
+        public Serialization.Buffers.ArcBufferReader Buffers { get { throw null; } protected set { } }
+
+        public abstract void SetException(System.Exception error);
+        public abstract void SetResult();
+    }
+}
+
+namespace Orleans.Connections.Transport.Security
+{
+    public static partial class CertificateLoader
+    {
+        public static System.Security.Cryptography.X509Certificates.X509Certificate2 LoadFromStoreCert(string subject, string storeName, System.Security.Cryptography.X509Certificates.StoreLocation storeLocation, bool allowInvalid, bool server) { throw null; }
+    }
+
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ClientCertificateSelectionCallback(object sender, string targetHost, System.Security.Cryptography.X509Certificates.X509CertificateCollection localCertificates, System.Security.Cryptography.X509Certificates.X509Certificate remoteCertificate, string[] acceptableIssuers);
+    public partial class ClientTlsMessageTransport : TlsMessageTransport
+    {
+        public ClientTlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!, default!, default!) { }
+
+        protected override System.Threading.Tasks.Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        protected static void EnsureCertificateIsAllowedForClientAuth(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { }
+    }
+
+    public partial interface ITlsApplicationProtocolFeature
+    {
+        System.ReadOnlyMemory<byte> ApplicationProtocol { get; }
+    }
+
+    public partial interface ITlsConnectionFeature
+    {
+        System.Security.Cryptography.X509Certificates.X509Certificate2? RemoteCertificate { get; set; }
+
+        System.Threading.Tasks.Task<System.Security.Cryptography.X509Certificates.X509Certificate2?> GetRemoteCertificateAsync(System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface ITlsHandshakeFeature
+    {
+        System.Security.Authentication.CipherAlgorithmType CipherAlgorithm { get; }
+
+        int CipherStrength { get; }
+
+        System.Security.Authentication.HashAlgorithmType HashAlgorithm { get; }
+
+        int HashStrength { get; }
+
+        string HostName { get; }
+
+        System.Security.Authentication.ExchangeAlgorithmType KeyExchangeAlgorithm { get; }
+
+        int KeyExchangeStrength { get; }
+
+        System.Net.Security.TlsCipherSuite? NegotiatedCipherSuite { get; }
+
+        System.Security.Authentication.SslProtocols Protocol { get; }
+    }
+
+    public enum RemoteCertificateMode
+    {
+        NoCertificate = 0,
+        AllowCertificate = 1,
+        RequireCertificate = 2
+    }
+
+    public delegate bool RemoteCertificateValidator(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Security.Cryptography.X509Certificates.X509Chain? chain, System.Net.Security.SslPolicyErrors policyErrors);
+    public delegate System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificateSelectionCallback(object sender, string? hostName);
+    public partial class ServerTlsMessageTransport : TlsMessageTransport
+    {
+        public ServerTlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!, default!, default!) { }
+
+        protected override System.Threading.Tasks.Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        protected static void EnsureCertificateIsAllowedForServerAuth(System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { }
+    }
+
+    public partial class TlsClientAuthenticationOptions
+    {
+        public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
+
+        public System.Security.Cryptography.X509Certificates.X509CertificateCollection? ClientCertificates { get { throw null; } set { } }
+
+        public System.Security.Authentication.SslProtocols EnabledSslProtocols { get { throw null; } set { } }
+
+        public ClientCertificateSelectionCallback? LocalCertificateSelectionCallback { get { throw null; } set { } }
+
+        public object SslClientAuthenticationOptions { get { throw null; } }
+
+        public string? TargetHost { get { throw null; } set { } }
+    }
+
+    public abstract partial class TlsMessageTransport : Streams.StreamMessageTransport
+    {
+        public TlsMessageTransport(MessageTransport transport, TlsOptions options, Microsoft.Extensions.Logging.ILogger logger) : base(default!) { }
+
+        public override FeatureCollection Features { get { throw null; } }
+
+        protected MessageTransport InnerTransport { get { throw null; } }
+
+        protected TlsOptions Options { get { throw null; } }
+
+        protected override System.Net.Security.SslStream Stream { get { throw null; } }
+
+        protected abstract System.Threading.Tasks.Task AuthenticateAsyncCore(MessageTransport transport, bool certificateRequired, System.Threading.CancellationToken cancellationToken);
+        public override System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        protected override System.Threading.Tasks.Task RunAsyncCore() { throw null; }
+
+        public override string ToString() { throw null; }
+    }
+
+    public partial class TlsMessageTransportConnector : MessageTransportConnector
+    {
+        public TlsMessageTransportConnector(MessageTransportConnector innerTransportFactory, Microsoft.Extensions.Options.IOptionsMonitor<TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public override IFeatureCollection Features { get { throw null; } }
+
+        public override bool IsValid { get { throw null; } }
+
+        public override System.Threading.Tasks.ValueTask<MessageTransport> CreateAsync(System.Net.EndPoint endPoint, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+    }
+
+    public partial class TlsMessageTransportListener : MessageTransportListener
+    {
+        public TlsMessageTransportListener(MessageTransportListener innerListener, Microsoft.Extensions.Options.IOptionsMonitor<TlsOptions> tlsOptions, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public override IFeatureCollection Features { get { throw null; } }
+
+        public override bool IsValid { get { throw null; } }
+
+        public override string ListenerName { get { throw null; } }
+
+        public override System.Threading.Tasks.ValueTask<MessageTransport?> AcceptAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask BindAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public override System.Threading.Tasks.ValueTask UnbindAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public partial class TlsOptions
+    {
+        public bool CheckCertificateRevocation { get { throw null; } set { } }
+
+        public RemoteCertificateMode ClientCertificateMode { get { throw null; } set { } }
+
+        public bool EnableTransportLayerSecurity { get { throw null; } set { } }
+
+        public System.TimeSpan HandshakeTimeout { get { throw null; } set { } }
+
+        public System.Security.Cryptography.X509Certificates.X509Certificate2? LocalCertificate { get { throw null; } set { } }
+
+        public System.Func<object, string, System.Security.Cryptography.X509Certificates.X509CertificateCollection, System.Security.Cryptography.X509Certificates.X509Certificate, string[], System.Security.Cryptography.X509Certificates.X509Certificate2>? LocalClientCertificateSelector { get { throw null; } set { } }
+
+        public System.Func<MessageTransport, string?, System.Security.Cryptography.X509Certificates.X509Certificate2?>? LocalServerCertificateSelector { get { throw null; } set { } }
+
+        public System.Buffers.MemoryPool<byte> MemoryPool { get { throw null; } set { } }
+
+        public System.Action<MessageTransport, TlsClientAuthenticationOptions>? OnAuthenticateAsClient { get { throw null; } set { } }
+
+        public System.Action<MessageTransport, TlsServerAuthenticationOptions>? OnAuthenticateAsServer { get { throw null; } set { } }
+
+        public RemoteCertificateMode RemoteCertificateMode { get { throw null; } set { } }
+
+        public RemoteCertificateValidator? RemoteCertificateValidation { get { throw null; } set { } }
+
+        public System.Security.Authentication.SslProtocols SslProtocols { get { throw null; } set { } }
+
+        public void AllowAnyRemoteCertificate() { }
+    }
+
+    public partial class TlsServerAuthenticationOptions
+    {
+        public System.Security.Cryptography.X509Certificates.X509RevocationMode CertificateRevocationCheckMode { get { throw null; } set { } }
+
+        public bool ClientCertificateRequired { get { throw null; } set { } }
+
+        public System.Security.Authentication.SslProtocols EnabledSslProtocols { get { throw null; } set { } }
+
+        public System.Security.Cryptography.X509Certificates.X509Certificate? ServerCertificate { get { throw null; } set { } }
+
+        public ServerCertificateSelectionCallback? ServerCertificateSelectionCallback { get { throw null; } set { } }
+
+        public object SslServerAuthenticationOptions { get { throw null; } }
+    }
+}
+
+namespace Orleans.Connections.Transport.Sockets
+{
+    public partial class AddressInUseException : System.Exception
+    {
+        public AddressInUseException() { }
+
+        public AddressInUseException(string? message, System.Exception? innerException) { }
+
+        public AddressInUseException(string? message) { }
+    }
+
+    public partial class SocketConnectionException : System.Exception
+    {
+        public SocketConnectionException() { }
+
+        public SocketConnectionException(string? message, System.Exception? innerException) { }
+
+        public SocketConnectionException(string? message) { }
+    }
+
+    public sealed partial class SocketMessageTransport : MessageTransportBase
+    {
+        public SocketMessageTransport(System.Net.Sockets.Socket socket, Microsoft.Extensions.Logging.ILogger logger) { }
+
+        public override System.Threading.CancellationToken Closed { get { throw null; } }
+
+        public override System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeReason, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public override bool EnqueueRead(ReadRequest request) { throw null; }
+
+        public override bool EnqueueWrite(WriteRequest request) { throw null; }
+
+        public void Start() { }
+
+        public override string ToString() { throw null; }
+    }
+
+    public partial class TcpMessageTransportConnector : MessageTransportConnector
+    {
+        public const string EndpointAddressPropertyName = "ep";
+        [System.Diagnostics.CodeAnalysis.SetsRequiredMembers]
+        public TcpMessageTransportConnector(Microsoft.Extensions.Options.IOptionsMonitor<TcpMessageTransportOptions> options, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public override IFeatureCollection Features { get { throw null; } }
+
+        public override bool IsValid { get { throw null; } }
+
+        public override System.Threading.Tasks.ValueTask<MessageTransport> CreateAsync(System.Net.EndPoint endPoint, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public sealed partial class TcpMessageTransportListener : MessageTransportListener
+    {
+        internal TcpMessageTransportListener() { }
+
+        public override FeatureCollection Features { get { throw null; } }
+
+        public override bool IsValid { get { throw null; } }
+
+        public override string ListenerName { get { throw null; } }
+
+        protected Microsoft.Extensions.Logging.ILogger Logger { get { throw null; } }
+
+        public override System.Threading.Tasks.ValueTask<MessageTransport?> AcceptAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask BindAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        protected System.Net.Sockets.Socket CreateListenSocket() { throw null; }
+
+        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        protected void OnAcceptSocket(System.Net.Sockets.Socket socket) { }
+
+        public override System.Threading.Tasks.ValueTask UnbindAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public partial class TcpMessageTransportListenerOptions
+    {
+        public bool Enabled { get { throw null; } set { } }
+
+        public System.Net.IPEndPoint? Endpoint { get { throw null; } set { } }
+    }
+
+    public partial class TcpMessageTransportOptions
+    {
+    }
+}
+
+namespace Orleans.Connections.Transport.Streams
+{
+    public partial class MessageTransportStream : System.IO.Stream
+    {
+        public MessageTransportStream(MessageTransport transport, System.Buffers.MemoryPool<byte> memoryPool) { }
+
+        public override bool CanRead { get { throw null; } }
+
+        public override bool CanSeek { get { throw null; } }
+
+        public override bool CanTimeout { get { throw null; } }
+
+        public override bool CanWrite { get { throw null; } }
+
+        public override long Length { get { throw null; } }
+
+        public System.Buffers.MemoryPool<byte> MemoryPool { get { throw null; } }
+
+        public override long Position { get { throw null; } set { } }
+
+        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public override void Flush() { }
+
+        public override System.Threading.Tasks.Task FlushAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public override int Read(byte[] buffer, int offset, int count) { throw null; }
+
+        public override int Read(System.Span<byte> buffer) { throw null; }
+
+        public override System.Threading.Tasks.Task<int> ReadAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask<int> ReadAsync(System.Memory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override long Seek(long offset, System.IO.SeekOrigin origin) { throw null; }
+
+        public override void SetLength(long value) { }
+
+        public override void Write(byte[] buffer, int offset, int count) { }
+
+        public override void Write(System.ReadOnlySpan<byte> buffer) { }
+
+        public override System.Threading.Tasks.Task WriteAsync(byte[] buffer, int offset, int count, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask WriteAsync(System.ReadOnlyMemory<byte> buffer, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+    }
+
+    public abstract partial class StreamMessageTransport : MessageTransportBase
+    {
+        protected StreamMessageTransport(Microsoft.Extensions.Logging.ILogger logger) { }
+
+        public override System.Threading.CancellationToken Closed { get { throw null; } }
+
+        protected abstract System.IO.Stream Stream { get; }
+
+        public override System.Threading.Tasks.ValueTask CloseAsync(System.Exception? closeException, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public override System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        public override bool EnqueueRead(ReadRequest request) { throw null; }
+
+        public override bool EnqueueWrite(WriteRequest request) { throw null; }
+
+        protected virtual System.Threading.Tasks.Task RunAsyncCore() { throw null; }
+
+        public virtual void Start() { }
+    }
+}
+
+namespace Orleans.Core.Diagnostics
+{
+    public static partial class ClientLifecycleEvents
+    {
+        public const string ListenerName = "Orleans.ClientLifecycle";
+        public static System.IObservable<LifecycleEvent> AllEvents { get { throw null; } }
+
+        public abstract partial class LifecycleEvent
+        {
+            public readonly Runtime.SiloAddress ClientAddress;
+            public readonly int Stage;
+            public readonly string StageName;
+            protected LifecycleEvent(int stage, string stageName, Runtime.SiloAddress clientAddress) { }
+        }
+
+        public sealed partial class ObserverCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverCompleted(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverFailed(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStarting(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopped(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class ObserverStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObserver Observer;
+            public readonly string ObserverName;
+            public ObserverStopping(string observerName, int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObserver observer) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageCompleted : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageCompleted(int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageFailed : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly System.Exception Exception;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageFailed(int stage, string stageName, Runtime.SiloAddress clientAddress, System.Exception exception, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageStarting : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStarting(int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageStopped : LifecycleEvent
+        {
+            public readonly System.TimeSpan Elapsed;
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopped(int stage, string stageName, Runtime.SiloAddress clientAddress, System.TimeSpan elapsed, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+
+        public sealed partial class StageStopping : LifecycleEvent
+        {
+            public readonly ILifecycleObservable Lifecycle;
+            public StageStopping(int stage, string stageName, Runtime.SiloAddress clientAddress, ILifecycleObservable lifecycle) : base(default, default!, default!) { }
+        }
+    }
+}
+
 namespace Orleans.GrainDirectory
 {
     public partial interface IGrainLocator
@@ -710,6 +1293,17 @@ namespace Orleans.Hosting
 
         public static IClientBuilder AddOutgoingGrainCallFilter<TImplementation>(this IClientBuilder builder)
             where TImplementation : class, IOutgoingGrainCallFilter { throw null; }
+    }
+
+    public static partial class ClientTlsHostingExtensions
+    {
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.StoreName storeName, string subject, bool allowInvalid, System.Security.Cryptography.X509Certificates.StoreLocation location, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate, System.Action<Connections.Transport.Security.TlsOptions> configureOptions) { throw null; }
+
+        public static IClientBuilder UseTls(this IClientBuilder builder, System.Security.Cryptography.X509Certificates.X509Certificate2 certificate) { throw null; }
     }
 
     public static partial class GrainCallFilterServiceCollectionExtensions
@@ -872,6 +1466,11 @@ namespace Orleans.Messaging
         System.Threading.Tasks.Task InitializeGatewayListProvider();
     }
 
+    public partial interface ITransportProtocolFeature
+    {
+        TransportProtocol Protocol { get; }
+    }
+
     public partial class StaticGatewayListProvider : IGatewayListProvider
     {
         public StaticGatewayListProvider(Microsoft.Extensions.Options.IOptions<Configuration.StaticGatewayListProviderOptions> options, Microsoft.Extensions.Options.IOptions<Configuration.GatewayOptions> gatewayOptions) { }
@@ -883,6 +1482,12 @@ namespace Orleans.Messaging
         public System.Threading.Tasks.Task<System.Collections.Generic.IList<System.Uri>> GetGateways() { throw null; }
 
         public System.Threading.Tasks.Task InitializeGatewayListProvider() { throw null; }
+    }
+
+    public enum TransportProtocol
+    {
+        Cluster = 0,
+        Gateway = 1
     }
 }
 
@@ -929,35 +1534,6 @@ namespace Orleans.Metadata
         public GrainTypeResolver(System.Collections.Generic.IEnumerable<IGrainTypeProvider> resolvers, Serialization.TypeSystem.TypeConverter argumentFormatter) { }
 
         public Runtime.GrainType GetGrainType(System.Type type) { throw null; }
-    }
-}
-
-namespace Orleans.Networking.Shared
-{
-    [GenerateSerializer]
-    public sealed partial class SocketConnectionException : Runtime.OrleansException
-    {
-        [System.Obsolete]
-        public SocketConnectionException(System.Runtime.Serialization.SerializationInfo info, System.Runtime.Serialization.StreamingContext context) { }
-
-        public SocketConnectionException(string message, System.Exception innerException) { }
-
-        public SocketConnectionException(string message) { }
-    }
-
-    public partial class SocketConnectionOptions
-    {
-        public int IOQueueCount { get { throw null; } set { } }
-
-        public bool KeepAlive { get { throw null; } set { } }
-
-        public int KeepAliveIntervalSeconds { get { throw null; } set { } }
-
-        public int KeepAliveRetryCount { get { throw null; } set { } }
-
-        public int KeepAliveTimeSeconds { get { throw null; } set { } }
-
-        public bool NoDelay { get { throw null; } set { } }
     }
 }
 
@@ -2742,35 +3318,6 @@ namespace OrleansCodeGen.Orleans.LeaseProviders
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.LeaseProviders.ResponseCode value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-}
-
-namespace OrleansCodeGen.Orleans.Networking.Shared
-{
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_SocketConnectionException : global::Orleans.Serialization.Codecs.IFieldCodec<global::Orleans.Networking.Shared.SocketConnectionException>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_SocketConnectionException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<global::Orleans.Networking.Shared.SocketConnectionException> _activator) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Networking.Shared.SocketConnectionException instance) { }
-
-        public global::Orleans.Networking.Shared.SocketConnectionException ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, global::Orleans.Networking.Shared.SocketConnectionException instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, global::Orleans.Networking.Shared.SocketConnectionException value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_SocketConnectionException : global::Orleans.Serialization.GeneratedCodeHelpers.OrleansGeneratedCodeHelper.ExceptionCopier<global::Orleans.Networking.Shared.SocketConnectionException, global::Orleans.Runtime.OrleansException>
-    {
-        public Copier_SocketConnectionException(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) : base(default(Serialization.Serializers.ICodecProvider)!) { }
     }
 }
 

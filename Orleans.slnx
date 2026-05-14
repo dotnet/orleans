@@ -61,7 +61,6 @@
   <Folder Name="/src/Extensions/">
     <Project Path="src/Orleans.Clustering.Consul/Orleans.Clustering.Consul.csproj" />
     <Project Path="src/Orleans.Clustering.ZooKeeper/Orleans.Clustering.ZooKeeper.csproj" />
-    <Project Path="src/Orleans.Connections.Security/Orleans.Connections.Security.csproj" />
     <Project Path="src/Orleans.Hosting.Kubernetes/Orleans.Hosting.Kubernetes.csproj" />
   </Folder>
   <Folder Name="/src/Extensions/AdoNet/">
