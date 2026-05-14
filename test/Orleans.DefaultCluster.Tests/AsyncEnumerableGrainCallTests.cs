@@ -694,42 +694,27 @@ public class AsyncEnumerableGrainCallTests
     /// <summary>
     /// Test fixture which uses a fake silo time provider so cleanup timers can be advanced deterministically.
     /// </summary>
-    public sealed class Fixture : BaseTestClusterFixture
+    public sealed class Fixture : BaseInProcessTestClusterFixture
     {
         private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
 
-        protected override void ConfigureTestCluster(TestClusterBuilder builder)
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
         {
-            TimeProviderSiloConfigurator.TimeProvider = _timeProvider;
-            builder.AddSiloBuilderConfigurator<DefaultClusterFixture.SiloHostConfigurator>();
-            builder.AddSiloBuilderConfigurator<TimeProviderSiloConfigurator>();
+            builder.ConfigureSilo((_, siloBuilder) =>
+            {
+                siloBuilder
+                    .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
+                    .UseInMemoryReminderService()
+                    .UseInMemoryDurableJobs()
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore");
+
+                siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_timeProvider));
+            });
         }
 
         public void AdvanceTimeByResponseTimeout() =>
-            _timeProvider.Advance(((InProcessSiloHandle)HostedCluster.Primary).ServiceProvider.GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
-
-        public override async Task DisposeAsync()
-        {
-            try
-            {
-                await base.DisposeAsync();
-            }
-            finally
-            {
-                TimeProviderSiloConfigurator.TimeProvider = null;
-            }
-        }
-
-        private sealed class TimeProviderSiloConfigurator : ISiloConfigurator
-        {
-            public static FakeTimeProvider? TimeProvider { get; set; }
-
-            public void Configure(ISiloBuilder siloBuilder)
-            {
-                var timeProvider = TimeProvider ?? throw new InvalidOperationException("The fake time provider has not been configured.");
-                siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(timeProvider));
-            }
-        }
+            _timeProvider.Advance(HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
     }
 
     /// <summary>
