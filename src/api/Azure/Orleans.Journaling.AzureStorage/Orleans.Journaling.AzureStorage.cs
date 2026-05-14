@@ -21,6 +21,8 @@ namespace Orleans.Journaling
 
         public System.Func<Runtime.GrainId, string> GetBlobName { get { throw null; } set { } }
 
+        public System.Func<AzureBlobJournalSnapshotNameContext, string> GetSnapshotBlobName { get { throw null; } set { } }
+
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 
         public void ConfigureBlobServiceClient(string connectionString) { }
@@ -32,6 +34,17 @@ namespace Orleans.Journaling
         public void ConfigureBlobServiceClient(System.Uri serviceUri, Azure.Storage.StorageSharedKeyCredential sharedKeyCredential) { }
 
         public void ConfigureBlobServiceClient(System.Uri serviceUri) { }
+    }
+
+    public sealed partial class AzureBlobJournalSnapshotNameContext
+    {
+        public AzureBlobJournalSnapshotNameContext(Runtime.GrainId grainId, string journalBlobName, string snapshotId) { }
+
+        public Runtime.GrainId GrainId { get { throw null; } }
+
+        public string JournalBlobName { get { throw null; } }
+
+        public string SnapshotId { get { throw null; } }
     }
 
     public static partial class AzureBlobStorageHostingExtensions

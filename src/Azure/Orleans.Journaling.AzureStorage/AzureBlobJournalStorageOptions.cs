@@ -27,6 +27,14 @@ public sealed class AzureBlobJournalStorageOptions
     private static readonly Func<GrainId, string> DefaultGetBlobName = static grainId => grainId.ToString();
 
     /// <summary>
+    /// Gets or sets the delegate used to generate block blob names for compacted journal snapshots.
+    /// </summary>
+    public Func<AzureBlobJournalSnapshotNameContext, string> GetSnapshotBlobName { get; set; } = DefaultGetSnapshotBlobName;
+
+    private static readonly Func<AzureBlobJournalSnapshotNameContext, string> DefaultGetSnapshotBlobName =
+        static context => $"{context.JournalBlobName}.snapshots/{context.SnapshotId}";
+
+    /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
     /// </summary>
     public BlobClientOptions? ClientOptions { get; set; }
@@ -53,6 +61,13 @@ public sealed class AzureBlobJournalStorageOptions
     internal string GetBlobNameForJournal(GrainId grainId)
     {
         var blobName = GetBlobName(grainId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
+        return blobName;
+    }
+
+    internal string GetSnapshotBlobNameForJournal(GrainId grainId, string journalBlobName, string snapshotId)
+    {
+        var blobName = GetSnapshotBlobName(new AzureBlobJournalSnapshotNameContext(grainId, journalBlobName, snapshotId));
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
@@ -118,4 +133,41 @@ public sealed class AzureBlobJournalStorageOptions
         ArgumentNullException.ThrowIfNull(sharedKeyCredential);
         CreateClient = ct => Task.FromResult(new BlobServiceClient(serviceUri, sharedKeyCredential, ClientOptions));
     }
+}
+
+/// <summary>
+/// Context used to generate an Azure Blob journal snapshot name.
+/// </summary>
+public sealed class AzureBlobJournalSnapshotNameContext
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AzureBlobJournalSnapshotNameContext"/> class.
+    /// </summary>
+    /// <param name="grainId">The grain id associated with the journal.</param>
+    /// <param name="journalBlobName">The append blob name used for the journal marker and tail.</param>
+    /// <param name="snapshotId">A generated id which is unique to the current compaction attempt.</param>
+    public AzureBlobJournalSnapshotNameContext(GrainId grainId, string journalBlobName, string snapshotId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
+
+        GrainId = grainId;
+        JournalBlobName = journalBlobName;
+        SnapshotId = snapshotId;
+    }
+
+    /// <summary>
+    /// Gets the grain id associated with the journal.
+    /// </summary>
+    public GrainId GrainId { get; }
+
+    /// <summary>
+    /// Gets the append blob name used for the journal marker and tail.
+    /// </summary>
+    public string JournalBlobName { get; }
+
+    /// <summary>
+    /// Gets a generated id which is unique to the current compaction attempt.
+    /// </summary>
+    public string SnapshotId { get; }
 }

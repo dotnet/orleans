@@ -46,7 +46,9 @@ internal sealed class AzureBlobJournalStorageProvider(
             blobClient,
             journalFormat.MimeType,
             logger,
-            journalFormatKey: journalFormatKey);
+            journalFormatKey: journalFormatKey,
+            snapshotNameFactory: () => _options.GetSnapshotBlobNameForJournal(grainContext.GrainId, blobName, Guid.NewGuid().ToString("N")),
+            snapshotClientFactory: container.GetBlockBlobClient);
     }
 
     public void Participate(ISiloLifecycle observer)

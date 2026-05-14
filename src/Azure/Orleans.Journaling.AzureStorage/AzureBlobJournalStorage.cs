@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Globalization;
 using Azure;
 using Azure.Storage.Blobs.Specialized;
 using Azure.Storage.Blobs.Models;
@@ -9,6 +10,10 @@ namespace Orleans.Journaling;
 internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 {
     internal const string FormatMetadataKey = "format";
+    internal const string SnapshotMetadataKey = "snapshot";
+    internal const string SnapshotETagMetadataKey = "snapshot-etag";
+    internal const string SnapshotFormatMetadataKey = "snapshot-format";
+    internal const string SnapshotLengthMetadataKey = "snapshot-length";
 
     // Azure Append Blob hard limits documented at:
     // https://learn.microsoft.com/azure/storage/blobs/scalability-targets#scale-targets-for-blob-storage
@@ -22,6 +27,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private const int AppendBlobBlockCeilingHeadroom = 100;
 
     private readonly AppendBlobClient _client;
+    private readonly Func<string> _snapshotNameFactory;
+    private readonly Func<string, BlockBlobClient> _snapshotClientFactory;
     private readonly string? _mimeType;
     private readonly string? _journalFormatKey;
     private readonly ILogger<AzureBlobJournalStorage> _logger;
@@ -45,11 +52,15 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         AppendBlobClient client,
         string? mimeType,
         ILogger<AzureBlobJournalStorage> logger,
-        string? journalFormatKey = null)
+        string? journalFormatKey = null,
+        Func<string>? snapshotNameFactory = null,
+        Func<string, BlockBlobClient>? snapshotClientFactory = null)
     {
         ArgumentNullException.ThrowIfNull(client);
 
         _client = client;
+        _snapshotNameFactory = snapshotNameFactory ?? CreateDefaultSnapshotNameFactory(client);
+        _snapshotClientFactory = snapshotClientFactory ?? CreateDefaultSnapshotClientFactory(client);
         _mimeType = mimeType;
         _journalFormatKey = journalFormatKey;
         _logger = logger;
@@ -133,25 +144,69 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             return;
         }
 
-        var metadata = CreateFileMetadata(result.Value.Details.Metadata);
+        await using var appendStream = result.Value.Content;
+        var metadata = result.Value.Details.Metadata;
+        var fileMetadata = CreateFileMetadata(metadata);
 
         _numBlocks = result.Value.Details.BlobCommittedBlockCount;
         _appendOptions.Conditions.IfNoneMatch = default;
         _appendOptions.Conditions.IfMatch = result.Value.Details.ETag;
         _exists = true;
 
-        await using (var rawStream = result.Value.Content)
+        var snapshot = CreateSnapshotReference(metadata);
+        if (snapshot is null)
         {
-            var totalBytesRead = await consumer.ReadAsync(rawStream, metadata, cancellationToken).ConfigureAwait(false);
+            var totalBytesRead = await consumer.ReadAsync(appendStream, fileMetadata, cancellationToken).ConfigureAwait(false);
             LogRead(_logger, totalBytesRead, _client.BlobContainerName, _client.Name);
+            return;
         }
+
+        var snapshotClient = _snapshotClientFactory(snapshot.Name);
+        if (snapshotClient is null)
+        {
+            throw new InvalidOperationException("The configured Azure Blob journal snapshot client factory returned null.");
+        }
+
+        var snapshotResult = await snapshotClient.DownloadStreamingAsync(
+            new BlobDownloadOptions
+            {
+                Conditions = new BlobRequestConditions { IfMatch = snapshot.ETag }
+            },
+            cancellationToken).ConfigureAwait(false);
+        await using var snapshotStream = snapshotResult.Value.Content;
+
+        var readMetadata = ValidateSnapshotMetadata(snapshot, snapshotResult.Value.Details, metadata);
+        await using var combinedStream = new ConcatenatedReadStream(snapshotStream, appendStream);
+        var combinedBytesRead = await consumer.ReadAsync(combinedStream, readMetadata, cancellationToken).ConfigureAwait(false);
+        LogRead(_logger, combinedBytesRead, _client.BlobContainerName, _client.Name);
     }
 
     public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
-        ThrowIfBatchTooLarge(value.Length, isReplace: true);
+        var snapshotName = _snapshotNameFactory();
+        if (string.IsNullOrWhiteSpace(snapshotName))
+        {
+            throw new InvalidOperationException("The configured Azure Blob journal snapshot name factory returned an empty blob name.");
+        }
 
-        // Open the blob for writing, overwriting existing contents.
+        var snapshotClient = _snapshotClientFactory(snapshotName);
+        if (snapshotClient is null)
+        {
+            throw new InvalidOperationException("The configured Azure Blob journal snapshot client factory returned null.");
+        }
+
+        using var snapshotStream = new ReadOnlySequenceStream(value);
+        var snapshotResult = await snapshotClient.UploadAsync(
+            snapshotStream,
+            new BlobUploadOptions
+            {
+                Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
+                HttpHeaders = CreateHttpHeaders(),
+                Metadata = CreateMetadata(),
+            },
+            cancellationToken).ConfigureAwait(false);
+
+        // Open the append blob for writing, atomically replacing it with an empty tail marker.
         var createOptions = new AppendBlobCreateOptions()
         {
             Conditions = new AppendBlobRequestConditions
@@ -159,21 +214,15 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 IfMatch = _appendOptions.Conditions.IfMatch,
                 IfNoneMatch = _appendOptions.Conditions.IfNoneMatch,
             },
-            Metadata = CreateMetadata(),
+            Metadata = CreateSnapshotMarkerMetadata(snapshotName, snapshotResult.Value.ETag, snapshotStream.Length),
             HttpHeaders = CreateHttpHeaders(),
         };
         var createResult = await _client.CreateAsync(createOptions, cancellationToken).ConfigureAwait(false);
         _appendOptions.Conditions.IfMatch = createResult.Value.ETag;
         _appendOptions.Conditions.IfNoneMatch = default;
-
-        // Write the compacted journal state.
-        using var stream = new ReadOnlySequenceStream(value);
-        var result = await _client.AppendBlockAsync(stream, _appendOptions, cancellationToken).ConfigureAwait(false);
-        LogReplace(_logger, _client.BlobContainerName, _client.Name, stream.Length);
-
-        _appendOptions.Conditions.IfNoneMatch = default;
-        _appendOptions.Conditions.IfMatch = result.Value.ETag;
-        _numBlocks = result.Value.BlobCommittedBlockCount;
+        _exists = true;
+        _numBlocks = 0;
+        LogReplace(_logger, _client.BlobContainerName, _client.Name, snapshotStream.Length);
     }
 
     private AppendBlobCreateOptions CreateOptions(AppendBlobRequestConditions conditions) => new()
@@ -188,8 +237,42 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private static BlobHttpHeaders? CreateHttpHeaders(string? contentType)
         => contentType is { Length: > 0 } ? new BlobHttpHeaders { ContentType = contentType } : null;
 
+    private static Func<string> CreateDefaultSnapshotNameFactory(AppendBlobClient client)
+        => () => $"{client.Name}.snapshots/{Guid.NewGuid():N}";
+
+    private static Func<string, BlockBlobClient> CreateDefaultSnapshotClientFactory(AppendBlobClient client)
+        => snapshotName => client.GetParentBlobContainerClient().GetBlockBlobClient(snapshotName);
+
+    private Dictionary<string, string> CreateMetadataDictionary()
+    {
+        var metadata = new Dictionary<string, string>();
+        if (_journalFormatKey is { Length: > 0 })
+        {
+            metadata[FormatMetadataKey] = _journalFormatKey;
+        }
+
+        return metadata;
+    }
+
     private Dictionary<string, string>? CreateMetadata()
-        => _journalFormatKey is { Length: > 0 } ? new Dictionary<string, string> { [FormatMetadataKey] = _journalFormatKey } : null;
+    {
+        var metadata = CreateMetadataDictionary();
+        return metadata.Count > 0 ? metadata : null;
+    }
+
+    private Dictionary<string, string> CreateSnapshotMarkerMetadata(string snapshotName, ETag snapshotETag, long snapshotLength)
+    {
+        var metadata = CreateMetadataDictionary();
+        metadata[SnapshotMetadataKey] = snapshotName;
+        metadata[SnapshotETagMetadataKey] = snapshotETag.ToString();
+        metadata[SnapshotLengthMetadataKey] = snapshotLength.ToString(CultureInfo.InvariantCulture);
+        if (_journalFormatKey is { Length: > 0 })
+        {
+            metadata[SnapshotFormatMetadataKey] = _journalFormatKey;
+        }
+
+        return metadata;
+    }
 
     private static string? GetFormatKeyMetadata(IDictionary<string, string>? metadata)
         => metadata is not null
@@ -203,6 +286,76 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             ? new JournalFileMetadata(format)
             : JournalFileMetadata.Empty;
 
+    private static SnapshotReference? CreateSnapshotReference(IDictionary<string, string>? metadata)
+    {
+        if (metadata is null || !metadata.TryGetValue(SnapshotMetadataKey, out var snapshotName) || snapshotName is not { Length: > 0 })
+        {
+            return null;
+        }
+
+        if (!metadata.TryGetValue(SnapshotETagMetadataKey, out var snapshotETag) || snapshotETag is not { Length: > 0 })
+        {
+            throw new InvalidOperationException(
+                $"Azure Blob journal marker references snapshot blob '{snapshotName}' but does not include '{SnapshotETagMetadataKey}' metadata.");
+        }
+
+        if (!metadata.TryGetValue(SnapshotLengthMetadataKey, out var snapshotLengthValue)
+            || !long.TryParse(snapshotLengthValue, NumberStyles.None, CultureInfo.InvariantCulture, out var snapshotLength)
+            || snapshotLength < 0)
+        {
+            throw new InvalidOperationException(
+                $"Azure Blob journal marker references snapshot blob '{snapshotName}' but does not include valid '{SnapshotLengthMetadataKey}' metadata.");
+        }
+
+        var snapshotFormat = metadata.TryGetValue(SnapshotFormatMetadataKey, out var storedSnapshotFormat)
+            && storedSnapshotFormat is { Length: > 0 }
+                ? storedSnapshotFormat
+                : null;
+
+        return new SnapshotReference(snapshotName, new ETag(snapshotETag), snapshotFormat, snapshotLength);
+    }
+
+    private static IJournalFileMetadata ValidateSnapshotMetadata(
+        SnapshotReference snapshot,
+        BlobDownloadDetails snapshotDetails,
+        IDictionary<string, string>? markerMetadata)
+    {
+        if (snapshotDetails.ContentLength != snapshot.Length)
+        {
+            throw new InvalidOperationException(
+                $"Azure Blob journal snapshot '{snapshot.Name}' length is {snapshotDetails.ContentLength}, but marker metadata expected {snapshot.Length}.");
+        }
+
+        var markerFormat = GetFormatKeyMetadata(markerMetadata);
+        var snapshotBlobFormat = GetFormatKeyMetadata(snapshotDetails.Metadata);
+        if (snapshot.Format is { } markerSnapshotFormat
+            && snapshotBlobFormat is { }
+            && !string.Equals(markerSnapshotFormat, snapshotBlobFormat, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Azure Blob journal snapshot '{snapshot.Name}' format metadata is '{snapshotBlobFormat}', but marker metadata expected '{markerSnapshotFormat}'.");
+        }
+
+        var effectiveSnapshotFormat = snapshot.Format ?? snapshotBlobFormat;
+        if (markerFormat is { } tailFormat
+            && effectiveSnapshotFormat is { }
+            && !string.Equals(tailFormat, effectiveSnapshotFormat, StringComparison.Ordinal))
+        {
+            throw new InvalidOperationException(
+                $"Azure Blob journal append tail format metadata is '{tailFormat}', but snapshot '{snapshot.Name}' uses format '{effectiveSnapshotFormat}'.");
+        }
+
+        if (markerFormat is { } && effectiveSnapshotFormat is null)
+        {
+            throw new InvalidOperationException(
+                $"Azure Blob journal snapshot '{snapshot.Name}' does not include format metadata.");
+        }
+
+        return effectiveSnapshotFormat is { } format
+            ? new JournalFileMetadata(format)
+            : JournalFileMetadata.Empty;
+    }
+
     [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Appended {Length} bytes to blob \"{ContainerName}/{BlobName}\"")]
@@ -215,8 +368,118 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     [LoggerMessage(
         Level = LogLevel.Debug,
-        Message = "Replaced blob \"{ContainerName}/{BlobName}\", writing {Length} bytes")]
+        Message = "Replaced blob \"{ContainerName}/{BlobName}\" with snapshot containing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
+
+    private sealed record SnapshotReference(string Name, ETag ETag, string? Format, long Length);
+
+    private sealed class ConcatenatedReadStream(Stream first, Stream second) : Stream
+    {
+        // The caller owns and disposes the underlying streams.
+        private Stream? _current = first;
+        private Stream? _next = second;
+        private bool _disposed;
+
+        public override bool CanRead => !_disposed;
+
+        public override bool CanSeek => false;
+
+        public override bool CanWrite => false;
+
+        public override long Length => throw GetSeekNotSupportedException();
+
+        public override long Position
+        {
+            get => throw GetSeekNotSupportedException();
+            set => throw GetSeekNotSupportedException();
+        }
+
+        public override void Flush()
+        {
+        }
+
+        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
+
+        public override int Read(Span<byte> buffer)
+        {
+            ThrowIfDisposed();
+            while (_current is not null)
+            {
+                var bytesRead = _current.Read(buffer);
+                if (bytesRead != 0 || _next is null)
+                {
+                    return bytesRead;
+                }
+
+                _current = _next;
+                _next = null;
+            }
+
+            return 0;
+        }
+
+        public override async ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
+        {
+            ThrowIfDisposed();
+            while (_current is not null)
+            {
+                var bytesRead = await _current.ReadAsync(buffer, cancellationToken).ConfigureAwait(false);
+                if (bytesRead != 0 || _next is null)
+                {
+                    return bytesRead;
+                }
+
+                _current = _next;
+                _next = null;
+            }
+
+            return 0;
+        }
+
+        public override long Seek(long offset, SeekOrigin origin) => throw GetSeekNotSupportedException();
+
+        public override void SetLength(long value) => throw GetReadOnlyException();
+
+        public override void Write(byte[] buffer, int offset, int count) => throw GetReadOnlyException();
+
+        public override void Write(ReadOnlySpan<byte> buffer) => throw GetReadOnlyException();
+
+        protected override void Dispose(bool disposing)
+        {
+            if (disposing && !_disposed)
+            {
+                _current = null;
+                _next = null;
+                _disposed = true;
+            }
+
+            base.Dispose(disposing);
+        }
+
+        public override async ValueTask DisposeAsync()
+        {
+            if (!_disposed)
+            {
+                _current = null;
+                _next = null;
+                _disposed = true;
+            }
+
+            await base.DisposeAsync().ConfigureAwait(false);
+        }
+
+        private void ThrowIfDisposed()
+        {
+            if (_disposed)
+            {
+                throw new ObjectDisposedException(nameof(ConcatenatedReadStream));
+            }
+        }
+
+        private static NotSupportedException GetSeekNotSupportedException() => new("This stream does not support seeking.");
+
+        private static NotSupportedException GetReadOnlyException() => new("This stream is read-only.");
+    }
 
     private sealed class ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
     {
