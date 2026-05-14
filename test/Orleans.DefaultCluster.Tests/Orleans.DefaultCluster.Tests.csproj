@@ -5,6 +5,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
     <PackageReference Include="NodaTime" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
   </ItemGroup>
