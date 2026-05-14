@@ -8,6 +8,7 @@ internal static class RedisReminderSerializer
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
+        // Preserve the legacy Newtonsoft.Json escaping used for Redis lexicographic ranges.
         Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
         WriteIndented = false
     };
