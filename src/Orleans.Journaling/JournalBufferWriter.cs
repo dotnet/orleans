@@ -101,32 +101,28 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     protected IBufferWriter<byte> Output => _buffer;
 
     /// <summary>
-    /// Gets the offset of the active entry in the current buffer.
+    /// Patches format-owned framing bytes at the specified offset in the active entry.
     /// </summary>
-    protected int ActiveEntryStart
-    {
-        get
-        {
-            lock (_lock)
-            {
-                ThrowIfDisposed();
-                ThrowIfNoActiveEntry();
-                return _committedLength;
-            }
-        }
-    }
-
-    /// <summary>
-    /// Patches format-owned framing bytes at the specified offset in the current buffer.
-    /// </summary>
-    /// <param name="offset">The offset into the current buffer.</param>
+    /// <param name="offset">The offset into the active entry.</param>
     /// <param name="value">The replacement bytes.</param>
     protected void WriteAt(int offset, ReadOnlySpan<byte> value)
     {
         lock (_lock)
         {
             ThrowIfDisposed();
-            _buffer.WriteAt(offset, value);
+            ThrowIfNoActiveEntry();
+            var activeEntryLength = checked(_buffer.Length - _committedLength);
+            if (offset < 0 || offset > activeEntryLength)
+            {
+                throw new ArgumentOutOfRangeException(nameof(offset), offset, "Offset must be within the active entry.");
+            }
+
+            if (value.Length > activeEntryLength - offset)
+            {
+                throw new ArgumentOutOfRangeException(nameof(value), "Value must fit within the active entry.");
+            }
+
+            _buffer.WriteAt(checked(_committedLength + offset), value);
         }
     }
 

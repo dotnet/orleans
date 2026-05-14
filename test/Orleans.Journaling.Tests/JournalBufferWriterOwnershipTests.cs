@@ -186,6 +186,38 @@ public sealed class JournalBufferWriterOwnershipTests
         Assert.Contains("committed length", exception.Message, StringComparison.Ordinal);
     }
 
+    [Fact]
+    public void WriteAt_PatchesRelativeToActiveEntry()
+    {
+        using var writer = new ActiveEntryPatchingWriter();
+
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(1)), [1, 2]);
+        AppendEntry(writer.CreateJournalStreamWriter(new JournalStreamId(2)), [3]);
+
+        Assert.Equal([3, 1, 2, 2, 3], ToArray(writer));
+    }
+
+    [Fact]
+    public void WriteAt_RejectsWritesOutsideActiveEntry()
+    {
+        using var writer = new OutOfRangeWriteAtWriter();
+        using var entry = writer.CreateJournalStreamWriter(new JournalStreamId(1)).BeginEntry();
+
+        ArgumentOutOfRangeException? exception = null;
+        try
+        {
+            entry.Commit();
+        }
+        catch (ArgumentOutOfRangeException ex)
+        {
+            exception = ex;
+        }
+
+        Assert.NotNull(exception);
+        Assert.Equal("value", exception.ParamName);
+        Assert.Empty(ToArray(writer));
+    }
+
     private static JournalBufferWriter CreateWriter(string format) => format switch
     {
         BinaryFormat => new OrleansBinaryJournalBufferWriter(),
@@ -256,5 +288,34 @@ public sealed class JournalBufferWriterOwnershipTests
         protected override void FinishEntry(JournalStreamId streamId)
         {
         }
+    }
+
+    private sealed class ActiveEntryPatchingWriter : JournalBufferWriter
+    {
+        protected override void StartEntry(JournalStreamId streamId)
+        {
+            var span = Output.GetSpan(1);
+            span[0] = 0;
+            Output.Advance(1);
+        }
+
+        protected override void FinishEntry(JournalStreamId streamId)
+        {
+            Span<byte> encoded = stackalloc byte[1];
+            encoded[0] = checked((byte)ActiveEntryLength);
+            WriteAt(0, encoded);
+        }
+    }
+
+    private sealed class OutOfRangeWriteAtWriter : JournalBufferWriter
+    {
+        protected override void StartEntry(JournalStreamId streamId)
+        {
+            var span = Output.GetSpan(1);
+            span[0] = 0;
+            Output.Advance(1);
+        }
+
+        protected override void FinishEntry(JournalStreamId streamId) => WriteAt(1, [0xFF]);
     }
 }

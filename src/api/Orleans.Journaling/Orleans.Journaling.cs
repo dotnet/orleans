@@ -281,7 +281,6 @@ namespace Orleans.Journaling
     public abstract partial class JournalBufferWriter : System.IDisposable, System.Buffers.IBufferWriter<byte>
     {
         protected int ActiveEntryLength { get { throw null; } }
-        protected int ActiveEntryStart { get { throw null; } }
         protected System.Buffers.IBufferWriter<byte> Output { get { throw null; } }
         public JournalStreamWriter CreateJournalStreamWriter(JournalStreamId streamId) { throw null; }
 
