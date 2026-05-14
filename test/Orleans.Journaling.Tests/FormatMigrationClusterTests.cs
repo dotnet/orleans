@@ -45,7 +45,7 @@ public sealed class FormatMigrationClusterTests
             await grain.SetTestValues("binary", 1);
             Assert.Equal("binary", await grain.GetName());
             Assert.Equal(1, await grain.GetCounter());
-            Assert.Contains(storageProvider.StoredFormatKeys, static key => key is null);
+            Assert.Contains(OrleansBinaryJournalFormat.JournalFormatKey, storageProvider.StoredFormatKeys);
 
             var jsonSilo = await cluster.StartAdditionalSiloAsync();
             await cluster.WaitForLivenessToStabilizeAsync();
@@ -82,11 +82,8 @@ public sealed class FormatMigrationClusterTests
         public IJournalStorage Create(IGrainContext grainContext, IOptions<JournaledStateManagerOptions> options)
         {
             var journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(options.Value.JournalFormatKey);
-            var storedFormatKey = string.Equals(journalFormatKey, OrleansBinaryJournalFormat.JournalFormatKey, StringComparison.Ordinal)
-                ? null
-                : journalFormatKey;
-            var storage = _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage(storedFormatKey));
-            storage.SetConfiguredJournalFormatKey(storedFormatKey);
+            var storage = _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage(journalFormatKey));
+            storage.SetConfiguredJournalFormatKey(journalFormatKey);
             return storage;
         }
 
