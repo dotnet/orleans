@@ -1468,7 +1468,28 @@ public class StateManagerTests : JournalingTestBase
 
     private sealed class MutableReadStorage(byte[] bytes) : IJournalStorage
     {
-        public byte[] Bytes { get; set; } = bytes;
+        private readonly object _lock = new();
+        private byte[] _bytes = bytes.ToArray();
+
+        public byte[] Bytes
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _bytes.ToArray();
+                }
+            }
+
+            set
+            {
+                ArgumentNullException.ThrowIfNull(value);
+                lock (_lock)
+                {
+                    _bytes = value.ToArray();
+                }
+            }
+        }
 
         public List<byte[]> Replaces { get; } = [];
 
@@ -1478,7 +1499,13 @@ public class StateManagerTests : JournalingTestBase
         {
             ArgumentNullException.ThrowIfNull(consumer);
             cancellationToken.ThrowIfCancellationRequested();
-            consumer.Read(Bytes, metadata: null, complete: true);
+            byte[] snapshot;
+            lock (_lock)
+            {
+                snapshot = _bytes.ToArray();
+            }
+
+            consumer.Read(snapshot, metadata: null, complete: true);
             return default;
         }
 
@@ -1487,14 +1514,23 @@ public class StateManagerTests : JournalingTestBase
             cancellationToken.ThrowIfCancellationRequested();
             var bytes = value.ToArray();
             Replaces.Add(bytes);
-            Bytes = bytes;
+            lock (_lock)
+            {
+                _bytes = bytes.ToArray();
+            }
+
             return default;
         }
 
         public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Bytes = [.. Bytes, .. value.ToArray()];
+            var appendBytes = value.ToArray();
+            lock (_lock)
+            {
+                _bytes = [.. _bytes, .. appendBytes];
+            }
+
             return default;
         }
 
