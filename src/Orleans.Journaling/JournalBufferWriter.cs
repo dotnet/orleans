@@ -17,8 +17,6 @@ namespace Orleans.Journaling;
 /// </remarks>
 public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 {
-    private const int NoActiveEntry = -1;
-
 #if NET9_0_OR_GREATER
     private readonly Lock _lock = new();
 #else
@@ -26,7 +24,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 #endif
     private readonly ArcBufferWriter _buffer = new();
     private int _committedLength;
-    private int _payloadStart = NoActiveEntry;
+    private bool _hasActiveEntry;
     private bool _disposed;
 
     /// <summary>
@@ -97,7 +95,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     }
 
     /// <summary>
-    /// Gets the number of bytes in the active entry payload.
+    /// Gets the number of bytes in the active entry.
     /// </summary>
     protected int ActiveEntryLength
     {
@@ -106,7 +104,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             lock (_lock)
             {
                 ThrowIfDisposed();
-                return HasActiveEntryCore ? checked(_buffer.Length - _payloadStart) : 0;
+                return _hasActiveEntry ? checked(_buffer.Length - _committedLength) : 0;
             }
         }
     }
@@ -163,21 +161,6 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
     }
 
     /// <summary>
-    /// Gets a pinned snapshot of the active entry payload.
-    /// </summary>
-    /// <returns>The active entry payload. The caller owns and must dispose the returned buffer.</returns>
-    protected ArcBuffer GetActiveEntryPayload()
-    {
-        lock (_lock)
-        {
-            ThrowIfDisposed();
-            ThrowIfNoActiveEntry();
-            using var buffer = _buffer.PeekSlice(_buffer.Length);
-            return buffer.Slice(_payloadStart, checked(_buffer.Length - _payloadStart));
-        }
-    }
-
-    /// <summary>
     /// Writes any format-owned entry prefix and prepares the payload writer.
     /// </summary>
     /// <param name="streamId">The durable state id.</param>
@@ -217,7 +200,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             lock (_lock)
             {
                 ThrowIfDisposed();
-                return HasActiveEntryCore;
+                return _hasActiveEntry;
             }
         }
     }
@@ -239,10 +222,6 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
             ValidateCommittedPrefix(buffer);
             _buffer.AdvanceReader(buffer.Length);
             _committedLength -= buffer.Length;
-            if (HasActiveEntryCore)
-            {
-                _payloadStart -= buffer.Length;
-            }
         }
     }
 
@@ -251,16 +230,15 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         lock (_lock)
         {
             ThrowIfDisposed();
-            if (HasActiveEntryCore)
+            if (_hasActiveEntry)
             {
                 throw new InvalidOperationException("The journal buffer writer already has an active entry.");
             }
 
-            _payloadStart = _buffer.Length;
+            _hasActiveEntry = true;
             try
             {
                 StartEntry(streamId);
-                _payloadStart = _buffer.Length;
                 return new(this, streamId);
             }
             catch
@@ -278,7 +256,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         lock (_lock)
         {
             ThrowIfDisposed();
-            if (HasActiveEntryCore)
+            if (_hasActiveEntry)
             {
                 throw new InvalidOperationException("The journal buffer writer already has an active entry.");
             }
@@ -359,7 +337,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 
     private void ThrowIfEntryActive()
     {
-        if (HasActiveEntryCore)
+        if (_hasActiveEntry)
         {
             throw new InvalidOperationException("The journal buffer writer has an active entry.");
         }
@@ -367,7 +345,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 
     private void ThrowIfNoActiveEntry()
     {
-        if (!HasActiveEntryCore)
+        if (!_hasActiveEntry)
         {
             throw new InvalidOperationException("The journal buffer writer is not writing an entry.");
         }
@@ -375,10 +353,8 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
 
     private void ClearActiveEntry()
     {
-        _payloadStart = NoActiveEntry;
+        _hasActiveEntry = false;
     }
-
-    private bool HasActiveEntryCore => _payloadStart != NoActiveEntry;
 
     private void ThrowIfDisposed()
     {

@@ -812,17 +812,36 @@ public class JsonCodecTests
 
     private sealed class CapturingNonJsonJournalBufferWriter : JournalBufferWriter
     {
-        public List<RecordedJournalEntry> Entries { get; } = [];
+        private readonly List<RecordedJournalEntryLength> _entries = [];
+
+        public List<RecordedJournalEntry> Entries
+        {
+            get
+            {
+                using var buffer = GetBuffer();
+                var bytes = buffer.ToArray();
+                var offset = 0;
+                var result = new List<RecordedJournalEntry>(_entries.Count);
+                foreach (var entry in _entries)
+                {
+                    result.Add(new(entry.StreamId, bytes.AsSpan(offset, entry.Length).ToArray()));
+                    offset += entry.Length;
+                }
+
+                return result;
+            }
+        }
 
         protected override void FinishEntry(JournalStreamId streamId)
         {
-            using var payload = GetActiveEntryPayload();
-            Entries.Add(new(streamId, payload.ToArray()));
+            _entries.Add(new(streamId, ActiveEntryLength));
         }
 
         protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) =>
             throw new InvalidOperationException("This test writer does not accept preserved entries.");
     }
+
+    private sealed record RecordedJournalEntryLength(JournalStreamId StreamId, int Length);
 
     private sealed class RecordingJournalEntrySink
     {

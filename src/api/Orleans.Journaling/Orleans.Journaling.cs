@@ -300,7 +300,6 @@ namespace Orleans.Journaling
 
         protected virtual void AbortEntry(JournalStreamId streamId) { }
         protected abstract void FinishEntry(JournalStreamId streamId);
-        protected Serialization.Buffers.ArcBuffer GetActiveEntryPayload() { throw null; }
         protected virtual void StartEntry(JournalStreamId streamId) { }
         protected void WriteAt(int offset, System.ReadOnlySpan<byte> value) { }
         protected virtual void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry) { }

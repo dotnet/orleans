@@ -222,7 +222,7 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
 
         protected override void FinishEntry(JournalStreamId streamId)
         {
-            if (ActiveEntryLength == 0)
+            if (ActiveEntryLength == GetJournalEntryPrefixLength(streamId))
             {
                 throw new InvalidOperationException("The JSON Lines journal entry has no entry payload.");
             }
@@ -265,6 +265,18 @@ internal sealed class JsonLinesJournalFormat : IJournalFormat
             var prefixLength = 1 + streamIdLength;
             prefix[prefixLength++] = (byte)',';
             output.Advance(prefixLength);
+        }
+
+        private static int GetJournalEntryPrefixLength(JournalStreamId streamId)
+        {
+            var value = streamId.Value;
+            var digits = 1;
+            while ((value /= 10) != 0)
+            {
+                digits++;
+            }
+
+            return digits + 2;
         }
 
         private static void WriteSequence(IBufferWriter<byte> output, ReadOnlySequence<byte> input)
