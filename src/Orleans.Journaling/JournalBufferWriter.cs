@@ -307,13 +307,7 @@ public abstract class JournalBufferWriter : IDisposable, IBufferWriter<byte>
         _hasActiveEntry = false;
     }
 
-    private void ThrowIfDisposed()
-    {
-        if (_disposed)
-        {
-            throw new ObjectDisposedException(GetType().FullName);
-        }
-    }
+    private void ThrowIfDisposed() => ObjectDisposedException.ThrowIf(_disposed, this);
 
     void IBufferWriter<byte>.Advance(int count)
     {

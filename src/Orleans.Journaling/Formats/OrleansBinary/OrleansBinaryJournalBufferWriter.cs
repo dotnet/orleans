@@ -7,16 +7,13 @@ internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
 {
     private const int ByteCount = sizeof(byte);
     private const int UInt32ByteCount = sizeof(uint);
-    private const int VersionedLengthPrefixLength = ByteCount + UInt32ByteCount;
+    private const int HeaderLength = ByteCount + UInt32ByteCount;
 
-    protected override void StartEntry(JournalStreamId streamId)
-    {
-        WriteEntryHeader(Output, streamId, 0);
-    }
+    protected override void StartEntry(JournalStreamId streamId) => WriteEntryHeader(Output, streamId, 0);
 
     protected override void FinishEntry(JournalStreamId streamId)
     {
-        var length = checked((uint)(ActiveEntryLength - VersionedLengthPrefixLength));
+        var length = checked((uint)(ActiveEntryLength - HeaderLength));
         Span<byte> encoded = stackalloc byte[UInt32ByteCount];
         BinaryPrimitives.WriteUInt32LittleEndian(encoded, length);
         WriteAt(ByteCount, encoded);
