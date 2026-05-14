@@ -5,18 +5,20 @@ namespace Orleans.Journaling;
 
 internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
 {
-    private const int ByteCount = sizeof(byte);
-    private const int UInt32ByteCount = sizeof(uint);
-    private const int HeaderLength = ByteCount + UInt32ByteCount;
+    private const int VersionHeaderLength = sizeof(byte);
+    private const int LengthFieldOffset = VersionHeaderLength;
+    private const int LengthFieldLength = sizeof(uint);
+    private const int FrameHeaderLength = VersionHeaderLength + LengthFieldLength;
+    private const int StreamIdLength = sizeof(uint);
 
     protected override void StartEntry(JournalStreamId streamId) => WriteEntryHeader(Output, streamId, 0);
 
     protected override void FinishEntry(JournalStreamId streamId)
     {
-        var length = checked((uint)(ActiveEntryLength - HeaderLength));
-        Span<byte> encoded = stackalloc byte[UInt32ByteCount];
+        var length = checked((uint)(ActiveEntryLength - FrameHeaderLength));
+        Span<byte> encoded = stackalloc byte[LengthFieldLength];
         BinaryPrimitives.WriteUInt32LittleEndian(encoded, length);
-        WriteAt(ByteCount, encoded);
+        WriteAt(LengthFieldOffset, encoded);
     }
 
     protected override void WritePreservedEntry(JournalStreamId streamId, IPreservedJournalEntry entry)
@@ -27,7 +29,7 @@ internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
                 $"The Orleans binary journal buffer writer cannot append preserved entry for journal format key '{entry.FormatKey}'.");
         }
 
-        var length = checked((uint)(UInt32ByteCount + entry.Payload.Length));
+        var length = checked((uint)(StreamIdLength + entry.Payload.Length));
         WriteEntryHeader(Output, streamId, length);
         Output.Write(entry.Payload.Span);
     }
@@ -41,15 +43,15 @@ internal class OrleansBinaryJournalBufferWriter : JournalBufferWriter
 
     private static void WriteByte(IBufferWriter<byte> output, byte value)
     {
-        var destination = output.GetSpan(ByteCount);
+        var destination = output.GetSpan(sizeof(byte));
         destination[0] = value;
-        output.Advance(ByteCount);
+        output.Advance(sizeof(byte));
     }
 
     private static void WriteUInt32(IBufferWriter<byte> output, uint value)
     {
-        var destination = output.GetSpan(UInt32ByteCount);
+        var destination = output.GetSpan(sizeof(uint));
         BinaryPrimitives.WriteUInt32LittleEndian(destination, value);
-        output.Advance(UInt32ByteCount);
+        output.Advance(sizeof(uint));
     }
 }
