@@ -722,6 +722,10 @@ public sealed class AzureBlobJournalStorageTests
 
             public override string Name => name;
 
+            public override int AppendBlobMaxAppendBlockBytes => (int)AzureBlobJournalStorage.MaxAppendBlockBytes;
+
+            public override int AppendBlobMaxBlocks => 50_000;
+
             public override Task<Response<BlobContentInfo>> CreateAsync(AppendBlobCreateOptions options, CancellationToken cancellationToken = default)
                 => store.CreateAsync(name, options, cancellationToken);
 
