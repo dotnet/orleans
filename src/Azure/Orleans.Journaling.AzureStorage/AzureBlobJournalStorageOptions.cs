@@ -33,7 +33,7 @@ public sealed class AzureBlobJournalStorageOptions
     public Func<AzureBlobJournalWalSegmentNameContext, string> GetWalSegmentBlobName { get; set; } = DefaultGetWalSegmentBlobName;
 
     private static readonly Func<AzureBlobJournalWalSegmentNameContext, string> DefaultGetWalSegmentBlobName =
-        static context => $"{context.JournalBlobName}/{context.Generation.ToString(CultureInfo.InvariantCulture)}/seg.{context.SegmentId:X8}";
+        static context => GetDefaultWalSegmentBlobName(context.JournalBlobName, context.Generation, context.SegmentId);
 
     /// <summary>
     /// Gets or sets the delegate used to generate block blob names for immutable journal checkpoints.
@@ -41,7 +41,7 @@ public sealed class AzureBlobJournalStorageOptions
     public Func<AzureBlobJournalCheckpointNameContext, string> GetCheckpointBlobName { get; set; } = DefaultGetCheckpointBlobName;
 
     private static readonly Func<AzureBlobJournalCheckpointNameContext, string> DefaultGetCheckpointBlobName =
-        static context => $"{context.JournalBlobName}/{context.Generation.ToString(CultureInfo.InvariantCulture)}/chk";
+        static context => GetDefaultCheckpointBlobName(context.JournalBlobName, context.Generation);
 
     /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
@@ -82,17 +82,27 @@ public sealed class AzureBlobJournalStorageOptions
 
     internal string GetWalSegmentBlobNameForJournal(GrainId grainId, string journalBlobName, ulong generation, uint segmentId)
     {
-        var blobName = GetWalSegmentBlobName(new AzureBlobJournalWalSegmentNameContext(grainId, journalBlobName, generation, segmentId));
+        var blobName = ReferenceEquals(GetWalSegmentBlobName, DefaultGetWalSegmentBlobName)
+            ? GetDefaultWalSegmentBlobName(journalBlobName, generation, segmentId)
+            : GetWalSegmentBlobName(new AzureBlobJournalWalSegmentNameContext(grainId, journalBlobName, generation, segmentId));
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
 
     internal string GetCheckpointBlobNameForJournal(GrainId grainId, string journalBlobName, ulong generation)
     {
-        var blobName = GetCheckpointBlobName(new AzureBlobJournalCheckpointNameContext(grainId, journalBlobName, generation));
+        var blobName = ReferenceEquals(GetCheckpointBlobName, DefaultGetCheckpointBlobName)
+            ? GetDefaultCheckpointBlobName(journalBlobName, generation)
+            : GetCheckpointBlobName(new AzureBlobJournalCheckpointNameContext(grainId, journalBlobName, generation));
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
+
+    internal static string GetDefaultWalSegmentBlobName(string journalBlobName, ulong generation, uint segmentId)
+        => $"{journalBlobName}/{generation.ToString(CultureInfo.InvariantCulture)}/seg.{segmentId:X8}";
+
+    internal static string GetDefaultCheckpointBlobName(string journalBlobName, ulong generation)
+        => $"{journalBlobName}/{generation.ToString(CultureInfo.InvariantCulture)}/chk";
 
     /// <summary>
     /// A function for building container factory instances.

@@ -47,10 +47,7 @@ internal sealed class AzureBlobJournalStorageProvider(
             journalFormat.MimeType,
             logger,
             journalFormatKey: journalFormatKey,
-            walNameFactory: (generation, segmentId) => _options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, generation, segmentId),
-            walClientFactory: (generation, segmentId) => container.GetAppendBlobClient(_options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, generation, segmentId)),
-            checkpointNameFactory: generation => _options.GetCheckpointBlobNameForJournal(grainContext.GrainId, blobName, generation),
-            checkpointClientFactory: container.GetBlockBlobClient);
+            blobClientProvider: new AzureBlobJournalStorage.OptionsBlobClientProvider(container, _options, grainContext.GrainId));
     }
 
     public IJournalStorage Create(IGrainContext grainContext) => CreateStorage(grainContext);

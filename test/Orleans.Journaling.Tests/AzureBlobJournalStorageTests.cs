@@ -401,10 +401,7 @@ public sealed class AzureBlobJournalStorageTests
             mimeType,
             NullLogger<AzureBlobJournalStorage>.Instance,
             journalFormatKey,
-            walNameFactory: (generation, segmentId) => $"blob/{generation}/seg.{segmentId:X8}",
-            walClientFactory: (generation, segmentId) => appendBlobs.GetAppendBlobClient($"blob/{generation}/seg.{segmentId:X8}"),
-            checkpointNameFactory: generation => $"blob/{generation}/chk",
-            checkpointClientFactory: checkpoints.GetBlockBlobClient);
+            blobClientProvider: new FakeBlobClientProvider(appendBlobs, checkpoints));
     }
 
     private static Dictionary<string, string> RootMetadata(ulong generation, string? format = null)
@@ -494,6 +491,23 @@ public sealed class AzureBlobJournalStorageTests
                 Bytes.Write(chunk);
             }
         }
+    }
+
+    private sealed class FakeBlobClientProvider(FakeAppendBlobStore appendBlobs, FakeBlockBlobStore blockBlobs) : AzureBlobJournalStorage.BlobClientProvider
+    {
+        public override AppendBlobClient GetWalClient(AppendBlobClient rootLogClient, ulong generation, uint segmentId)
+            => appendBlobs.GetAppendBlobClient(AzureBlobJournalStorageOptions.GetDefaultWalSegmentBlobName(GetJournalId(rootLogClient), generation, segmentId));
+
+        public override string GetCheckpointName(AppendBlobClient rootLogClient, ulong generation)
+            => AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName(GetJournalId(rootLogClient), generation);
+
+        public override BlockBlobClient GetCheckpointClient(AppendBlobClient rootLogClient, string checkpointName)
+            => blockBlobs.GetBlockBlobClient(checkpointName);
+
+        private static string GetJournalId(AppendBlobClient rootLogClient)
+            => rootLogClient.Name.EndsWith("/root", StringComparison.Ordinal)
+                ? rootLogClient.Name[..^"/root".Length]
+                : rootLogClient.Name;
     }
 
     private sealed class FakeAppendBlobStore
