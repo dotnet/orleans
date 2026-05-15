@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CodeActions;
 using Microsoft.CodeAnalysis.CodeFixes;
@@ -5,10 +6,6 @@ using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Editing;
 using Microsoft.CodeAnalysis.Simplification;
-using System;
-using System.Collections.Immutable;
-using System.Threading;
-using System.Threading.Tasks;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
@@ -23,7 +20,7 @@ namespace Orleans.Analyzers
 
         public override async Task RegisterCodeFixesAsync(CodeFixContext context)
         {
-            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken);
+            var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
             var declaration = root.FindNode(context.Span).FirstAncestorOrSelf<TypeDeclarationSyntax>();
             foreach (var diagnostic in context.Diagnostics)
             {
@@ -60,7 +57,8 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddSerializationAttributes(TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration);
 
             var nextId = analysis.NextAvailableId;
             foreach (var member in analysis.UnannotatedMembers)
@@ -78,7 +76,8 @@ namespace Orleans.Analyzers
         private static async Task<Document> AddNonSerializedAttributes(SyntaxNode root, TypeDeclarationSyntax declaration, CodeFixContext context, CancellationToken cancellationToken)
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
-            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+            var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
+            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration);
 
             foreach (var member in analysis.UnannotatedMembers)
             {

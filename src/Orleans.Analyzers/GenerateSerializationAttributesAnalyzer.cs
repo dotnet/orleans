@@ -1,9 +1,8 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Immutable;
-using System.Linq;
 
 namespace Orleans.Analyzers
 {
@@ -27,13 +26,13 @@ namespace Orleans.Analyzers
             context.RegisterSyntaxNodeAction(CheckSyntaxNode, SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration, SyntaxKind.RecordDeclaration, SyntaxKind.RecordStructDeclaration);
         }
 
-        private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+        private static void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
         {
             if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)))
             {
-                if (declaration.TryGetAttribute(Constants.GenerateSerializerAttributeName, out var attribute))
+                if (declaration.TryGetAttribute(context.SemanticModel, Constants.GenerateSerializerAttributeFullyQualifiedName, out var attribute))
                 {
-                    var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+                    var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(context.SemanticModel, declaration);
                     if (analysis.UnannotatedMembers.Count > 0)
                     {
                         // Check if GenerateFieldIds is set to PublicProperties

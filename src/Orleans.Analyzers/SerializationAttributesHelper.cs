@@ -1,8 +1,5 @@
 using Microsoft.CodeAnalysis;
-using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic;
-using System.Linq;
 
 namespace Orleans.Analyzers
 {
@@ -24,14 +21,14 @@ namespace Orleans.Analyzers
             public uint NextAvailableId { get; init; }
         }
 
-        public static TypeAnalysis AnalyzeTypeDeclaration(TypeDeclarationSyntax declaration)
+        public static TypeAnalysis AnalyzeTypeDeclaration(SemanticModel semanticModel, TypeDeclarationSyntax declaration)
         {
             uint nextId = 0;
             var unannotatedSerializableMembers = new List<MemberDeclarationSyntax>();
             foreach (var member in declaration.Members)
             {
                 // Skip members with existing [Id(x)] attributes, but record the highest value of x so that newly added attributes can begin from that value.
-                if (member.TryGetAttribute(Constants.IdAttributeName, out var attribute))
+                if (member.TryGetAttribute(semanticModel, Constants.IdAttributeFullyQualifiedName, out var attribute))
                 {
                     var args = attribute.ArgumentList?.Arguments;
                     if (args.HasValue)
@@ -51,12 +48,12 @@ namespace Orleans.Analyzers
                     continue;
                 }
 
-                if (member is ConstructorDeclarationSyntax constructorDeclaration && constructorDeclaration.HasAttribute(Constants.GenerateSerializerAttributeName))
+                if (member is ConstructorDeclarationSyntax constructorDeclaration && constructorDeclaration.HasAttribute(semanticModel, Constants.GenerateSerializerAttributeFullyQualifiedName))
                 {
                     continue;
                 }
 
-                if (!member.IsInstanceMember() || !member.IsFieldOrAutoProperty() || member.HasAttribute(Constants.NonSerializedAttribute) || member.IsAbstract())
+                if (!member.IsInstanceMember() || !member.IsFieldOrAutoProperty() || member.HasAttribute(semanticModel, Constants.NonSerializedAttributeFullyQualifiedName) || member.IsAbstract())
                 {
                     // No need to add any attribute.
                     continue;
