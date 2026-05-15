@@ -1,7 +1,6 @@
 using System.Buffers;
 using System.Globalization;
 using Azure;
-using Azure.Storage.Blobs;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.Logging;
@@ -24,18 +23,13 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     // An append blob can hold up to 50,000 committed blocks. The compaction request
     // (IsCompactionRequested) trips far earlier (at 10 blocks), so this guard exists only
     // to roll before hitting the hard Azure limit if a consumer ignores compaction requests.
-    internal const int MaxAppendBlobBlocks = 50_000;
     private const int AppendBlobBlockCeilingHeadroom = 100;
 
-    private readonly AppendBlobClient _rootLogClient;
-    private readonly BlobClientProvider _blobClientProvider;
-    private readonly string? _mimeType;
-    private readonly string? _journalFormatKey;
-    private readonly ILogger<AzureBlobJournalStorage> _logger;
     private AppendBlobClient _currentLogClient;
-    private ulong _currentGeneration;
+    private readonly SharedConfiguration _shared;
+    private readonly IGrainContext _grainContext;
+    private uint _currentGeneration;
     private uint _currentSegmentId;
-    private long _appendPosition;
     private int _numBlocks;
     private ETag _currentSegmentETag;
     private ETag _rootLogETag;
@@ -46,37 +40,22 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     public bool IsCompactionRequested => _numBlocks > 10;
 
-    public AzureBlobJournalStorage(AppendBlobClient client, ILogger<AzureBlobJournalStorage> logger)
-        : this(client, mimeType: null, logger)
-    {
-    }
-
-    internal AzureBlobJournalStorage(AppendBlobClient client, string? mimeType, ILogger<AzureBlobJournalStorage> logger)
-        : this(client, mimeType, logger, journalFormatKey: null)
-    {
-    }
-
     internal AzureBlobJournalStorage(
-        AppendBlobClient client,
-        string? mimeType,
-        ILogger<AzureBlobJournalStorage> logger,
-        string? journalFormatKey = null,
-        BlobClientProvider? blobClientProvider = null)
+        SharedConfiguration shared,
+        IGrainContext grainContext)
     {
-        ArgumentNullException.ThrowIfNull(client);
+        ArgumentNullException.ThrowIfNull(shared);
+        ArgumentNullException.ThrowIfNull(grainContext);
 
-        _rootLogClient = client;
-        _currentLogClient = client;
-        _blobClientProvider = blobClientProvider ?? DefaultBlobClientProvider.Instance;
-        _mimeType = mimeType;
-        _journalFormatKey = journalFormatKey;
-        _logger = logger;
+        _shared = shared;
+        _grainContext = grainContext;
+        _currentLogClient = GetRootClient();
     }
 
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         ThrowIfBatchTooLarge(value.Length);
-        if (CurrentSegmentExists && _numBlocks >= MaxAppendBlobBlocks - AppendBlobBlockCeilingHeadroom)
+        if (CurrentSegmentExists && _numBlocks >= _currentLogClient.AppendBlobMaxBlocks - AppendBlobBlockCeilingHeadroom)
         {
             await RollToNextSegmentAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -84,23 +63,23 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         while (true)
         {
             await EnsureCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
+            var currentLogClient = _currentLogClient;
 
             using var stream = new ReadOnlySequenceStream(value);
             try
             {
-                var result = await _currentLogClient.AppendBlockAsync(
+                var result = await currentLogClient.AppendBlockAsync(
                     stream,
                     new AppendBlobAppendBlockOptions
                     {
                         Conditions = new AppendBlobRequestConditions
                         {
-                            IfAppendPositionEqual = _appendPosition,
+                            IfMatch = _currentSegmentETag,
                         }
                     },
                     cancellationToken).ConfigureAwait(false);
 
-                LogAppend(_logger, stream.Length, _currentLogClient.BlobContainerName, _currentLogClient.Name);
-                _appendPosition += stream.Length;
+                LogAppend(_shared.Logger, stream.Length, currentLogClient.BlobContainerName, currentLogClient.Name);
                 _currentSegmentETag = result.Value.ETag;
                 _numBlocks = result.Value.BlobCommittedBlockCount;
                 if (_currentSegmentId == 0)
@@ -117,9 +96,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    private static void ThrowIfBatchTooLarge(long length)
+    private void ThrowIfBatchTooLarge(long length)
     {
-        if (length <= MaxAppendBlockBytes)
+        if (length <= _currentLogClient.AppendBlobMaxAppendBlockBytes)
         {
             return;
         }
@@ -141,7 +120,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             await SealCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        var generation = checked(_currentGeneration + 1);
+        var generation = checked(_currentGeneration + 1u);
         Response<BlobContentInfo> response;
         try
         {
@@ -157,7 +136,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
 
         _currentGeneration = generation;
-        SetCurrentSegment(segmentId: 0, exists: true, response.Value.ETag, appendPosition: 0, blockCount: 0);
+        SetCurrentSegment(segmentId: 0, exists: true, response.Value.ETag, blockCount: 0);
     }
 
     public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
@@ -167,12 +146,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         Response<BlobDownloadStreamingResult> rootResult;
         try
         {
-            rootResult = await _rootLogClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            rootResult = await GetRootLogClient().DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
             _currentGeneration = 0;
-            SetCurrentSegment(segmentId: 0, exists: false, eTag: default, appendPosition: 0, blockCount: 0);
+            SetCurrentSegment(segmentId: 0, exists: false, eTag: default, blockCount: 0);
             _rootLogETag = default;
             consumer.Complete(metadata: null);
             return;
@@ -196,7 +175,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 checkpointMetadata,
                 complete: false,
                 cancellationToken).ConfigureAwait(false);
-            LogRead(_logger, totalCheckpointBytes, checkpointClient.BlobContainerName, checkpointClient.Name);
+            LogRead(_shared.Logger, totalCheckpointBytes, checkpointClient.BlobContainerName, checkpointClient.Name);
             expectedFormat = checkpointMetadata.Format;
         }
 
@@ -216,7 +195,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
 
         var rootETag = _rootLogETag;
-        var generation = checked(_currentGeneration + 1);
+        var generation = checked(_currentGeneration + 1u);
         using var checkpointStream = new ReadOnlySequenceStream(value);
         while (true)
         {
@@ -230,7 +209,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     new BlobUploadOptions
                     {
                         Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
-                        HttpHeaders = CreateHttpHeaders(),
+                        HttpHeaders = CreateHttpHeaders(_shared.MimeType),
                         Metadata = CreateCheckpointBlobMetadata(generation),
                     },
                     cancellationToken).ConfigureAwait(false);
@@ -250,8 +229,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 }
 
                 _currentGeneration = generation;
-                SetCurrentSegment(segmentId: 0, exists: true, rootResult.Value.ETag, appendPosition: 0, blockCount: 0);
-                LogReplace(_logger, checkpointClient.BlobContainerName, checkpointClient.Name, checkpointStream.Length);
+                SetCurrentSegment(segmentId: 0, exists: true, rootResult.Value.ETag, blockCount: 0);
+                LogReplace(_shared.Logger, checkpointClient.BlobContainerName, checkpointClient.Name, checkpointStream.Length);
                 return;
             }
             catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
@@ -264,7 +243,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     throw new InvalidOperationException("Azure Blob journal checkpoint was already published; recovery is required.", exception);
                 }
 
-                generation = checked(Math.Max(generation, currentManifest?.Generation ?? _currentGeneration) + 1);
+                generation = checked(Math.Max(generation, currentManifest?.Generation ?? _currentGeneration) + 1u);
             }
         }
     }
@@ -306,7 +285,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 cancellationToken).ConfigureAwait(false);
         }
 
-        SetCurrentSegment(_currentSegmentId, exists: true, response.Value.ETag, appendPosition: 0, blockCount: 0);
+        SetCurrentSegment(_currentSegmentId, exists: true, response.Value.ETag, blockCount: 0);
     }
 
     private async ValueTask RollToNextSegmentAsync(CancellationToken cancellationToken)
@@ -316,7 +295,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             await SealCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
         }
 
-        SetCurrentSegment(checked(_currentSegmentId + 1), exists: false, eTag: default, appendPosition: 0, blockCount: 0);
+        SetCurrentSegment(checked(_currentSegmentId + 1), exists: false, eTag: default, blockCount: 0);
     }
 
     private async ValueTask SealCurrentSegmentAsync(CancellationToken cancellationToken)
@@ -351,11 +330,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 ? new JournalFileMetadata(expectedFormat)
                 : JournalFileMetadata.Empty;
         var bytesRead = await ReadStreamAsync(consumer, rootStream, metadata, complete: false, cancellationToken).ConfigureAwait(false);
-        LogRead(_logger, bytesRead, _rootLogClient.BlobContainerName, _rootLogClient.Name);
+        var rootLogClient = GetRootLogClient();
+        LogRead(_shared.Logger, bytesRead, rootLogClient.BlobContainerName, rootLogClient.Name);
 
         if (!rootDetails.IsSealed)
         {
-            SetCurrentSegment(segmentId: 0, exists: true, rootDetails.ETag, rootDetails.ContentLength, rootDetails.BlobCommittedBlockCount);
+            SetCurrentSegment(segmentId: 0, exists: true, rootDetails.ETag, rootDetails.BlobCommittedBlockCount);
             consumer.Complete(metadata);
             return;
         }
@@ -389,7 +369,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             }
             catch (RequestFailedException exception) when (exception.Status is 404)
             {
-                SetCurrentSegment(segmentId, exists: false, eTag: default, appendPosition: 0, blockCount: 0);
+                SetCurrentSegment(segmentId, exists: false, eTag: default, blockCount: 0);
                 consumer.Complete(metadata);
                 return;
             }
@@ -413,11 +393,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 }
 
                 var bytesRead = await ReadStreamAsync(consumer, stream, metadata, complete: false, cancellationToken).ConfigureAwait(false);
-                LogRead(_logger, bytesRead, _rootLogClient.BlobContainerName, client.Name);
+                LogRead(_shared.Logger, bytesRead, client.BlobContainerName, client.Name);
 
                 if (!details.IsSealed)
                 {
-                    SetCurrentSegment(segmentId, exists: true, details.ETag, details.ContentLength, details.BlobCommittedBlockCount);
+                    SetCurrentSegment(segmentId, exists: true, details.ETag, details.BlobCommittedBlockCount);
                     consumer.Complete(metadata);
                     return;
                 }
@@ -428,59 +408,71 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    private void SetCurrentSegment(uint segmentId, bool exists, ETag eTag, long appendPosition, int blockCount)
+    private void SetCurrentSegment(uint segmentId, bool exists, ETag eTag, int blockCount)
     {
         _currentSegmentId = segmentId;
-        _currentLogClient = GetWalClient(segmentId);
         _currentSegmentETag = exists ? eTag : default;
-        _appendPosition = appendPosition;
         _numBlocks = blockCount;
+        _currentLogClient = GetLogClient(segmentId);
         if (segmentId == 0)
         {
             _rootLogETag = exists ? eTag : default;
         }
     }
 
+    private AppendBlobClient GetRootLogClient() => _currentSegmentId == 0 ? _currentLogClient : GetRootClient();
+
+    private AppendBlobClient GetLogClient(uint segmentId) => segmentId == 0 ? GetRootClient() : GetWalSegmentClient(segmentId);
+
     private AppendBlobClient GetWalClient(uint segmentId)
     {
         if (segmentId == 0)
         {
-            return _rootLogClient;
+            return GetRootLogClient();
         }
 
-        var client = _blobClientProvider.GetWalClient(_rootLogClient, _currentGeneration, checked(segmentId - 1));
+        return GetWalSegmentClient(segmentId);
+    }
+
+    private AppendBlobClient GetRootClient()
+    {
+        var client = _shared.BlobClientProvider.GetRootClient(_grainContext.GrainId);
+        return client ?? throw new InvalidOperationException("The configured Azure Blob journal root client provider returned null.");
+    }
+
+    private AppendBlobClient GetWalSegmentClient(uint segmentId)
+    {
+        var client = _shared.BlobClientProvider.GetWalClient(_grainContext.GrainId, _currentGeneration, checked(segmentId - 1));
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal WAL client provider returned null.");
     }
 
     private AppendBlobCreateOptions CreateOptions(AppendBlobRequestConditions conditions) => new()
     {
         Conditions = conditions,
-        HttpHeaders = CreateHttpHeaders(),
+        HttpHeaders = CreateHttpHeaders(_shared.MimeType),
         Metadata = CreateSegmentMetadata(),
     };
 
     private async ValueTask<Response<BlobContentInfo>> CreateRootAsync(
-        ulong generation,
+        uint generation,
         string? checkpointName,
         AppendBlobRequestConditions conditions,
         CancellationToken cancellationToken)
-        => await _rootLogClient.CreateAsync(
+        => await GetRootLogClient().CreateAsync(
             new AppendBlobCreateOptions
             {
                 Conditions = conditions,
-                HttpHeaders = CreateHttpHeaders(),
+                HttpHeaders = CreateHttpHeaders(_shared.MimeType),
                 Metadata = CreateRootMetadata(generation, checkpointName),
             },
             cancellationToken).ConfigureAwait(false);
 
-    private BlobHttpHeaders? CreateHttpHeaders() => CreateHttpHeaders(_mimeType);
-
     private static BlobHttpHeaders? CreateHttpHeaders(string? contentType)
         => contentType is { Length: > 0 } ? new BlobHttpHeaders { ContentType = contentType } : null;
 
-    private string GetCheckpointName(ulong generation)
+    private string GetCheckpointName(uint generation)
     {
-        var checkpointName = _blobClientProvider.GetCheckpointName(_rootLogClient, generation);
+        var checkpointName = _shared.BlobClientProvider.GetCheckpointName(_grainContext.GrainId, generation);
         if (string.IsNullOrWhiteSpace(checkpointName))
         {
             throw new InvalidOperationException("The configured Azure Blob journal checkpoint client provider returned an empty blob name.");
@@ -491,24 +483,19 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private BlockBlobClient GetCheckpointClient(string checkpointName)
     {
-        var client = _blobClientProvider.GetCheckpointClient(_rootLogClient, checkpointName);
+        var client = _shared.BlobClientProvider.GetCheckpointClient(_grainContext.GrainId, checkpointName);
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal checkpoint client provider returned null.");
     }
 
-    private static string GetJournalId(string rootName)
-        => rootName.EndsWith("/root", StringComparison.Ordinal)
-            ? rootName[..^"/root".Length]
-            : rootName;
-
-    private Dictionary<string, string> CreateMetadataDictionary(ulong generation)
+    private Dictionary<string, string> CreateMetadataDictionary(uint generation)
     {
         var metadata = new Dictionary<string, string>
         {
             [GenerationMetadataKey] = FormatGeneration(generation),
         };
-        if (_journalFormatKey is { Length: > 0 })
+        if (_shared.JournalFormatKey is { Length: > 0 })
         {
-            metadata[FormatMetadataKey] = _journalFormatKey;
+            metadata[FormatMetadataKey] = _shared.JournalFormatKey;
         }
 
         return metadata;
@@ -516,9 +503,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private Dictionary<string, string> CreateSegmentMetadata() => CreateMetadataDictionary(_currentGeneration);
 
-    private Dictionary<string, string> CreateCheckpointBlobMetadata(ulong generation) => CreateMetadataDictionary(generation);
+    private Dictionary<string, string> CreateCheckpointBlobMetadata(uint generation) => CreateMetadataDictionary(generation);
 
-    private Dictionary<string, string> CreateRootMetadata(ulong generation, string? checkpointName)
+    private Dictionary<string, string> CreateRootMetadata(uint generation, string? checkpointName)
     {
         var metadata = CreateMetadataDictionary(generation);
         if (checkpointName is not null)
@@ -538,7 +525,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private RootManifest CreateRootManifest(IDictionary<string, string>? metadata)
     {
-        if (!TryGetUInt64Metadata(metadata, GenerationMetadataKey, out var generation))
+        if (!TryGetUInt32Metadata(metadata, GenerationMetadataKey, out var generation))
         {
             throw new InvalidOperationException(
                 $"Azure Blob journal root does not include valid '{GenerationMetadataKey}' metadata.");
@@ -562,7 +549,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     {
         try
         {
-            var result = await _rootLogClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            var result = await GetRootLogClient().DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             await using (result.Value.Content.ConfigureAwait(false))
             {
                 return CreateRootManifest(result.Value.Details.Metadata);
@@ -576,7 +563,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
     {
-        if (!TryGetUInt64Metadata(checkpointDetails.Metadata, GenerationMetadataKey, out var generation) || generation != checkpoint.Generation)
+        if (!TryGetUInt32Metadata(checkpointDetails.Metadata, GenerationMetadataKey, out var generation) || generation != checkpoint.Generation)
         {
             throw new InvalidOperationException(
                 $"Azure Blob journal checkpoint '{checkpoint.Name}' does not include the expected generation '{FormatGeneration(checkpoint.Generation)}'.");
@@ -614,17 +601,17 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             $"Azure Blob journal WAL segment {FormatUInt32(segmentId)} format metadata is '{segmentFormat}', but recovery expected '{expectedFormat}'.");
     }
 
-    private static bool TryGetUInt64Metadata(IDictionary<string, string>? metadata, string key, out ulong value)
+    private static bool TryGetUInt32Metadata(IDictionary<string, string>? metadata, string key, out uint value)
     {
         value = default;
         return metadata is not null
             && metadata.TryGetValue(key, out var text)
-            && ulong.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
+            && uint.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
     }
 
     private static string FormatUInt32(uint value) => value.ToString("X8", CultureInfo.InvariantCulture);
 
-    private static string FormatGeneration(ulong value) => value.ToString(CultureInfo.InvariantCulture);
+    private static string FormatGeneration(uint value) => value.ToString(CultureInfo.InvariantCulture);
 
     private static bool IsBlobSealed(RequestFailedException exception)
         => exception.Status == 409
@@ -718,47 +705,64 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         Message = "Wrote checkpoint blob \"{ContainerName}/{BlobName}\" containing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
 
-    private sealed record RootManifest(ulong Generation, IJournalFileMetadata Metadata, CheckpointReference? Checkpoint);
+    private sealed record RootManifest(uint Generation, IJournalFileMetadata Metadata, CheckpointReference? Checkpoint);
 
-    private sealed record CheckpointReference(string Name, ulong Generation);
+    private sealed record CheckpointReference(string Name, uint Generation);
+
+    internal sealed class SharedConfiguration
+    {
+        public SharedConfiguration(
+            ILogger<AzureBlobJournalStorage> logger,
+            BlobClientProvider blobClientProvider,
+            string? mimeType = null,
+            string? journalFormatKey = null)
+        {
+            ArgumentNullException.ThrowIfNull(logger);
+            ArgumentNullException.ThrowIfNull(blobClientProvider);
+
+            Logger = logger;
+            MimeType = mimeType;
+            JournalFormatKey = journalFormatKey;
+            BlobClientProvider = blobClientProvider;
+        }
+
+        public ILogger<AzureBlobJournalStorage> Logger { get; }
+
+        public string? MimeType { get; }
+
+        public string? JournalFormatKey { get; }
+
+        public BlobClientProvider BlobClientProvider { get; }
+    }
 
     internal abstract class BlobClientProvider
     {
-        public abstract AppendBlobClient GetWalClient(AppendBlobClient rootLogClient, ulong generation, uint segmentId);
+        public abstract AppendBlobClient GetRootClient(GrainId grainId);
 
-        public abstract string GetCheckpointName(AppendBlobClient rootLogClient, ulong generation);
+        public abstract AppendBlobClient GetWalClient(GrainId grainId, uint generation, uint segmentId);
 
-        public abstract BlockBlobClient GetCheckpointClient(AppendBlobClient rootLogClient, string checkpointName);
+        public abstract string GetCheckpointName(GrainId grainId, uint generation);
+
+        public abstract BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName);
     }
 
     internal sealed class OptionsBlobClientProvider(
-        BlobContainerClient containerClient,
-        AzureBlobJournalStorageOptions options,
-        GrainId grainId) : BlobClientProvider
+        IBlobContainerFactory containerFactory,
+        AzureBlobJournalStorageOptions options) : BlobClientProvider
     {
-        public override AppendBlobClient GetWalClient(AppendBlobClient rootLogClient, ulong generation, uint segmentId)
-            => containerClient.GetAppendBlobClient(options.GetWalSegmentBlobNameForJournal(grainId, GetJournalId(rootLogClient.Name), generation, segmentId));
+        public override AppendBlobClient GetRootClient(GrainId grainId)
+            => containerFactory.GetBlobContainerClient(grainId).GetAppendBlobClient(
+                options.GetRootBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId)));
 
-        public override string GetCheckpointName(AppendBlobClient rootLogClient, ulong generation)
-            => options.GetCheckpointBlobNameForJournal(grainId, GetJournalId(rootLogClient.Name), generation);
+        public override AppendBlobClient GetWalClient(GrainId grainId, uint generation, uint segmentId)
+            => containerFactory.GetBlobContainerClient(grainId).GetAppendBlobClient(
+                options.GetWalSegmentBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId), generation, segmentId));
 
-        public override BlockBlobClient GetCheckpointClient(AppendBlobClient rootLogClient, string checkpointName)
-            => containerClient.GetBlockBlobClient(checkpointName);
-    }
+        public override string GetCheckpointName(GrainId grainId, uint generation)
+            => options.GetCheckpointBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId), generation);
 
-    private sealed class DefaultBlobClientProvider : BlobClientProvider
-    {
-        public static DefaultBlobClientProvider Instance { get; } = new();
-
-        public override AppendBlobClient GetWalClient(AppendBlobClient rootLogClient, ulong generation, uint segmentId)
-            => rootLogClient.GetParentBlobContainerClient().GetAppendBlobClient(
-                AzureBlobJournalStorageOptions.GetDefaultWalSegmentBlobName(GetJournalId(rootLogClient.Name), generation, segmentId));
-
-        public override string GetCheckpointName(AppendBlobClient rootLogClient, ulong generation)
-            => AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName(GetJournalId(rootLogClient.Name), generation);
-
-        public override BlockBlobClient GetCheckpointClient(AppendBlobClient rootLogClient, string checkpointName)
-            => rootLogClient.GetParentBlobContainerClient().GetBlockBlobClient(checkpointName);
+        public override BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName)
+            => containerFactory.GetBlobContainerClient(grainId).GetBlockBlobClient(checkpointName);
     }
 
     private sealed class DiscardingJournalStorageConsumer : IJournalStorageConsumer

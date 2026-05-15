@@ -1,20 +1,32 @@
-using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Options;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureBlobJournalStorageProvider(
-    IOptions<AzureBlobJournalStorageOptions> options,
-    IOptions<JournaledStateManagerOptions> managerOptions,
-    IServiceProvider serviceProvider,
-    ILogger<AzureBlobJournalStorage> logger) : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider
+internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider
 {
-    private readonly IBlobContainerFactory _containerFactory = options.Value.BuildContainerFactory(serviceProvider, options.Value);
-    private readonly string _journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
-    private readonly AzureBlobJournalStorageOptions _options = options.Value;
+    private readonly IBlobContainerFactory _containerFactory;
+    private readonly AzureBlobJournalStorageOptions _options;
+    private readonly AzureBlobJournalStorage.SharedConfiguration _shared;
+
+    public AzureBlobJournalStorageProvider(
+        IOptions<AzureBlobJournalStorageOptions> options,
+        IOptions<JournaledStateManagerOptions> managerOptions,
+        IServiceProvider serviceProvider,
+        ILogger<AzureBlobJournalStorage> logger)
+    {
+        _options = options.Value;
+        _containerFactory = _options.BuildContainerFactory(serviceProvider, _options);
+        var journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
+        var journalFormat = GetJournalFormat(serviceProvider, journalFormatKey);
+        _shared = new AzureBlobJournalStorage.SharedConfiguration(
+            logger,
+            new AzureBlobJournalStorage.OptionsBlobClientProvider(_containerFactory, _options),
+            mimeType: journalFormat.MimeType,
+            journalFormatKey: journalFormatKey);
+    }
 
     private async Task Initialize(CancellationToken cancellationToken)
     {
@@ -22,9 +34,20 @@ internal sealed class AzureBlobJournalStorageProvider(
         await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
     }
 
-    public IJournalStorage CreateStorage(IGrainContext grainContext)
+    public IJournalStorage CreateStorage(IGrainContext grainContext) => new AzureBlobJournalStorage(_shared, grainContext);
+
+    public IJournalStorage Create(IGrainContext grainContext) => CreateStorage(grainContext);
+
+    public void Participate(ISiloLifecycle observer)
     {
-        var journalFormatKey = _journalFormatKey;
+        observer.Subscribe(
+            nameof(AzureBlobJournalStorageProvider),
+            ServiceLifecycleStage.RuntimeInitialize,
+            onStart: Initialize);
+    }
+
+    private static IJournalFormat GetJournalFormat(IServiceProvider serviceProvider, string journalFormatKey)
+    {
         var journalFormat = serviceProvider.GetKeyedService<IJournalFormat>(journalFormatKey);
         if (journalFormat is null)
         {
@@ -39,25 +62,7 @@ internal sealed class AzureBlobJournalStorageProvider(
                 "Register the journal format using the same key it reports.");
         }
 
-        var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
-        var blobName = _options.GetBlobNameForJournal(grainContext.GrainId);
-        var blobClient = container.GetAppendBlobClient(_options.GetRootBlobNameForJournal(grainContext.GrainId, blobName));
-        return new AzureBlobJournalStorage(
-            blobClient,
-            journalFormat.MimeType,
-            logger,
-            journalFormatKey: journalFormatKey,
-            blobClientProvider: new AzureBlobJournalStorage.OptionsBlobClientProvider(container, _options, grainContext.GrainId));
-    }
-
-    public IJournalStorage Create(IGrainContext grainContext) => CreateStorage(grainContext);
-
-    public void Participate(ISiloLifecycle observer)
-    {
-        observer.Subscribe(
-            nameof(AzureBlobJournalStorageProvider),
-            ServiceLifecycleStage.RuntimeInitialize,
-            onStart: Initialize);
+        return journalFormat;
     }
 
     private static string ValidateJournalFormatKey(string? journalFormatKey)

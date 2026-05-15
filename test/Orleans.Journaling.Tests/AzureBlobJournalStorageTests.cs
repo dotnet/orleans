@@ -343,7 +343,7 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
-    public async Task AppendAsync_WhenAppendFails_DoesNotAdvanceAppendPosition()
+    public async Task AppendAsync_WhenAppendFails_ReusesLastObservedETag()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var storage = CreateStorage(appendBlobs);
@@ -355,8 +355,8 @@ public sealed class AzureBlobJournalStorageTests
             () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
         await storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
 
-        Assert.Equal(1, appendBlobs.AppendCalls[1].AppendPosition);
-        Assert.Equal(1, appendBlobs.AppendCalls[2].AppendPosition);
+        Assert.Equal(new ETag("\"append-1\""), appendBlobs.AppendCalls[1].IfMatch);
+        Assert.Equal(new ETag("\"append-1\""), appendBlobs.AppendCalls[2].IfMatch);
         Assert.Equal([3], appendBlobs.AppendCalls[2].Payload);
     }
 
@@ -398,14 +398,15 @@ public sealed class AzureBlobJournalStorageTests
     {
         checkpoints ??= new FakeBlockBlobStore();
         return new AzureBlobJournalStorage(
-            appendBlobs.GetAppendBlobClient("blob/root"),
-            mimeType,
-            NullLogger<AzureBlobJournalStorage>.Instance,
-            journalFormatKey,
-            blobClientProvider: new FakeBlobClientProvider(appendBlobs, checkpoints));
+            new AzureBlobJournalStorage.SharedConfiguration(
+                NullLogger<AzureBlobJournalStorage>.Instance,
+                new FakeBlobClientProvider(appendBlobs, checkpoints),
+                mimeType,
+                journalFormatKey),
+            new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "0")));
     }
 
-    private static Dictionary<string, string> RootMetadata(ulong generation, string? format = null)
+    private static Dictionary<string, string> RootMetadata(uint generation, string? format = null)
     {
         var result = new Dictionary<string, string>
         {
@@ -422,7 +423,7 @@ public sealed class AzureBlobJournalStorageTests
     private static Dictionary<string, string> CheckpointMarkerMetadata(
         string checkpointName,
         string format,
-        ulong generation) => new()
+        uint generation) => new()
     {
         [AzureBlobJournalStorage.GenerationMetadataKey] = generation.ToString(System.Globalization.CultureInfo.InvariantCulture),
         [AzureBlobJournalStorage.FormatMetadataKey] = format,
@@ -491,19 +492,19 @@ public sealed class AzureBlobJournalStorageTests
 
     private sealed class FakeBlobClientProvider(FakeAppendBlobStore appendBlobs, FakeBlockBlobStore blockBlobs) : AzureBlobJournalStorage.BlobClientProvider
     {
-        public override AppendBlobClient GetWalClient(AppendBlobClient rootLogClient, ulong generation, uint segmentId)
-            => appendBlobs.GetAppendBlobClient(AzureBlobJournalStorageOptions.GetDefaultWalSegmentBlobName(GetJournalId(rootLogClient), generation, segmentId));
+        private const string JournalBlobName = "blob";
 
-        public override string GetCheckpointName(AppendBlobClient rootLogClient, ulong generation)
-            => AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName(GetJournalId(rootLogClient), generation);
+        public override AppendBlobClient GetRootClient(GrainId grainId)
+            => appendBlobs.GetAppendBlobClient($"{JournalBlobName}/root");
 
-        public override BlockBlobClient GetCheckpointClient(AppendBlobClient rootLogClient, string checkpointName)
+        public override AppendBlobClient GetWalClient(GrainId grainId, uint generation, uint segmentId)
+            => appendBlobs.GetAppendBlobClient(AzureBlobJournalStorageOptions.GetDefaultWalSegmentBlobName(JournalBlobName, generation, segmentId));
+
+        public override string GetCheckpointName(GrainId grainId, uint generation)
+            => AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName(JournalBlobName, generation);
+
+        public override BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName)
             => blockBlobs.GetBlockBlobClient(checkpointName);
-
-        private static string GetJournalId(AppendBlobClient rootLogClient)
-            => rootLogClient.Name.EndsWith("/root", StringComparison.Ordinal)
-                ? rootLogClient.Name[..^"/root".Length]
-                : rootLogClient.Name;
     }
 
     private sealed class FakeAppendBlobStore
@@ -592,7 +593,6 @@ public sealed class AzureBlobJournalStorageTests
                 name,
                 options.Conditions?.IfMatch ?? default,
                 options.Conditions?.IfNoneMatch ?? default,
-                options.Conditions?.IfAppendPositionEqual,
                 payload));
 
             if (blob.IsSealed)
@@ -713,11 +713,6 @@ public sealed class AzureBlobJournalStorageTests
             if (conditions.IfMatch is { } ifMatch && ifMatch != default && (!exists || ifMatch != blob!.ETag))
             {
                 throw new RequestFailedException(412, "ETag mismatch.");
-            }
-
-            if (conditions.IfAppendPositionEqual is { } appendPosition && (!exists || appendPosition != blob!.Content.Length))
-            {
-                throw new RequestFailedException(412, "Append position mismatch.");
             }
         }
 
@@ -842,7 +837,7 @@ public sealed class AzureBlobJournalStorageTests
 
     private sealed record CreateCall(string Name, ETag IfMatch, ETag IfNoneMatch, string? ContentType, IDictionary<string, string> Metadata);
 
-    private sealed record AppendCall(string Name, ETag IfMatch, ETag IfNoneMatch, long? AppendPosition, byte[] Payload);
+    private sealed record AppendCall(string Name, ETag IfMatch, ETag IfNoneMatch, byte[] Payload);
 
     private sealed record SealCall(string Name, ETag IfMatch);
 
