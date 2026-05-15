@@ -276,6 +276,40 @@ namespace UnitTests.Serialization
             }
         }
 
+        [Fact, TestCategory("BVT")]
+        public void MessageTest_CacheInvalidationHeader_DeserializeCapsHeaderCount()
+        {
+            var fromNew = new List<GrainAddressCacheUpdate>();
+            for (var i = 0; i < Message.MaxCacheInvalidationHeaderEntries + 1; i++)
+            {
+                var grainId = GrainId.Create("test", i.ToString());
+                fromNew.Add(new GrainAddressCacheUpdate(
+                    GrainAddress.NewActivationAddress(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 11_000 + i), 11_000 + i), grainId),
+                    GrainAddress.NewActivationAddress(SiloAddress.New(new IPEndPoint(IPAddress.Loopback, 22_000 + i), 22_000 + i), grainId)));
+            }
+
+            using var writer1Session = _serializerSessionPool.GetSession();
+            var writer = Writer.CreatePooled(writer1Session);
+            var message = new Message { CacheInvalidationHeader = fromNew };
+            messageSerializer.WriteCacheInvalidationHeaders(ref writer, message);
+            writer.WriteVarUInt32(42);
+            writer.Commit();
+
+            using var reader1Session = _serializerSessionPool.GetSession();
+            var reader = Reader.Create(writer.Output.AsReadOnlySequence(), reader1Session);
+            var toNew = messageSerializer.ReadCacheInvalidationHeaders(ref reader);
+            Assert.NotNull(toNew);
+            Assert.Equal(Message.MaxCacheInvalidationHeaderEntries, toNew.Count);
+            for (var i = 0; i < Message.MaxCacheInvalidationHeaderEntries; i++)
+            {
+                Assert.Equal(fromNew[i].InvalidGrainAddress, toNew[i].InvalidGrainAddress);
+                Assert.Equal(fromNew[i].ValidGrainAddress, toNew[i].ValidGrainAddress);
+            }
+
+            Assert.Equal(42u, reader.ReadVarUInt32());
+            writer.Dispose();
+        }
+
         private class MessageSerializerBackwardsCompatibilityStub
         {
             private readonly IFieldCodec<GrainAddress> _grainAddressCodec;
