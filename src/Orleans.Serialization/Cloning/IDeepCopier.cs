@@ -364,7 +364,7 @@ namespace Orleans.Serialization.Cloning
     /// <summary>
     /// Object pool for <see cref="CopyContext"/> instances.
     /// </summary>
-    public sealed class CopyContextPool
+    public sealed class CopyContextPool : IDisposable
     {
         private readonly ConcurrentObjectPool<CopyContext, PoolPolicy> _pool;
 
@@ -383,6 +383,9 @@ namespace Orleans.Serialization.Cloning
         /// </summary>
         /// <returns>A <see cref="CopyContext"/>.</returns>
         public CopyContext GetContext() => _pool.Get();
+
+        /// <inheritdoc/>
+        public void Dispose() => _pool.Dispose();
 
         /// <summary>
         /// Returns the specified copy context to the pool.

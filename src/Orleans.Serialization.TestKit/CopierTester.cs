@@ -26,12 +26,12 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected CopierTester(ITestOutputHelper output)
         {
+            _ = output;
 #if NET6_0_OR_GREATER
             var seed = Random.Shared.Next();
 #else
             var seed = new Random().Next();
 #endif
-            output.WriteLine($"Random seed: {seed}");
             Random = new(seed);
             var services = new ServiceCollection();
             _ = services.AddSerializer(builder => builder.Configure(config => config.Copiers.Add(typeof(TCopier))));

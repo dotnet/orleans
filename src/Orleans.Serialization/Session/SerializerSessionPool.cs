@@ -1,17 +1,17 @@
+using System;
 using Microsoft.Extensions.ObjectPool;
 using Orleans.Serialization.Invocation;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TypeSystem;
-using System;
 
 namespace Orleans.Serialization.Session
 {
     /// <summary>
     /// Pool for <see cref="SerializerSession"/> objects.
     /// </summary>
-    public sealed class SerializerSessionPool
+    public sealed class SerializerSessionPool : IDisposable
     {
-        private readonly ObjectPool<SerializerSession> _sessionPool;
+        private readonly ConcurrentObjectPool<SerializerSession, SerializerSessionPoolPolicy> _sessionPool;
 
         /// <summary>
         /// Initializes a new instance of the <see cref="SerializerSessionPool"/> class.
@@ -36,6 +36,9 @@ namespace Orleans.Serialization.Session
         /// </summary>
         /// <returns>A serializer session.</returns>
         public SerializerSession GetSession() => _sessionPool.Get();
+
+        /// <inheritdoc/>
+        public void Dispose() => _sessionPool.Dispose();
 
         /// <summary>
         /// Returns a session to the pool.
