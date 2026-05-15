@@ -400,6 +400,8 @@ namespace Orleans.Journaling
         public static void Read(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalFileMetadata? metadata, bool complete) { }
 
         public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, bool complete, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>

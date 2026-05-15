@@ -239,7 +239,7 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
-    public async Task ReplaceAsync_WhenWalETagChanges_DoesNotPublishStaleCheckpoint()
+    public async Task ReplaceAsync_WhenWalETagChanges_DoesNotUploadStaleCheckpoint()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var checkpoints = new FakeBlockBlobStore();
@@ -253,7 +253,7 @@ public sealed class AzureBlobJournalStorageTests
 
         var requestFailed = Assert.IsType<RequestFailedException>(exception.InnerException);
         Assert.Equal(412, requestFailed.Status);
-        Assert.Single(checkpoints.UploadCalls);
+        Assert.Empty(checkpoints.UploadCalls);
 
         var consumer = new CapturingJournalStorageConsumer();
         await CreateStorage(appendBlobs, checkpoints).ReadAsync(consumer, CancellationToken.None);
@@ -448,7 +448,7 @@ public sealed class AzureBlobJournalStorageTests
         await second.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
         Assert.Equal([1, 2], appendBlobs.GetContent("blob/wal"));
-        Assert.Contains(appendBlobs.DownloadCalls, static call => call.Name == "blob/wal");
+        Assert.Contains(appendBlobs.PropertiesCalls, static call => call.Name == "blob/wal");
     }
 
     [Fact]
@@ -668,6 +668,8 @@ public sealed class AzureBlobJournalStorageTests
 
         public List<DownloadCall> DownloadCalls { get; } = [];
 
+        public List<GetPropertiesCall> PropertiesCalls { get; } = [];
+
         public AppendBlobClient GetAppendBlobClient(string name) => new FakeAppendBlobClient(this, name);
 
         public byte[] GetContent(string name) => _blobs[name].Content;
@@ -838,6 +840,31 @@ public sealed class AzureBlobJournalStorageTests
             return Task.FromResult(Response.FromValue(result, TestResponse.Instance));
         }
 
+        private Task<Response<BlobProperties>> GetPropertiesAsync(string name, BlobRequestConditions? conditions, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            PropertiesCalls.Add(new(name, conditions?.IfMatch ?? default, conditions?.IfNoneMatch ?? default));
+            if (!_blobs.TryGetValue(name, out var blob))
+            {
+                throw new RequestFailedException(404, "Blob does not exist.");
+            }
+
+            ThrowIfConditionsFail(name, conditions);
+
+            var result = BlobsModelFactory.BlobProperties(
+                contentLength: blob.Content.Length,
+                contentType: blob.ContentType,
+                eTag: blob.ETag,
+                blobCommittedBlockCount: blob.CommittedBlockCount,
+                blobCopyStatus: default(CopyStatus?),
+                blobType: BlobType.Append,
+                metadata: blob.Metadata,
+                isSealed: blob.IsSealed,
+                immutabilityPolicy: null,
+                hasLegalHold: false);
+            return Task.FromResult(Response.FromValue(result, TestResponse.Instance));
+        }
+
         private void ThrowIfConditionsFail(string name, BlobRequestConditions? conditions)
         {
             if (conditions is null)
@@ -884,6 +911,9 @@ public sealed class AzureBlobJournalStorageTests
 
             public override Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(BlobDownloadOptions? options = null, CancellationToken cancellationToken = default)
                 => store.DownloadStreamingAsync(name, options, cancellationToken);
+
+            public override Task<Response<BlobProperties>> GetPropertiesAsync(BlobRequestConditions conditions = default!, CancellationToken cancellationToken = default)
+                => store.GetPropertiesAsync(name, conditions, cancellationToken);
         }
     }
 
@@ -1017,6 +1047,8 @@ public sealed class AzureBlobJournalStorageTests
     private sealed record DeleteCall(string Name, ETag IfMatch, ETag IfNoneMatch);
 
     private sealed record DownloadCall(string Name);
+
+    private sealed record GetPropertiesCall(string Name, ETag IfMatch, ETag IfNoneMatch);
 
     private sealed record BlockUploadCall(string Name, ETag IfMatch, ETag IfNoneMatch, string? ContentType, IDictionary<string, string> Metadata, byte[] Payload);
 
