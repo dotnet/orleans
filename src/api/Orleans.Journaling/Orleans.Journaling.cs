@@ -170,6 +170,7 @@ namespace Orleans.Journaling
 
     public partial interface IJournalStorageProvider
     {
+        IJournalStorage CreateStorage(JournalId journalId);
         IJournalStorage CreateStorage(Runtime.IGrainContext grainContext);
     }
 
@@ -233,13 +234,18 @@ namespace Orleans.Journaling
         void Reset(int capacityHint);
     }
 
-    public partial interface IJournaledStateManager
+    public partial interface IJournaledStateManager : System.IAsyncDisposable
     {
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
         void RegisterState(string name, IJournaledState state);
         bool TryGetState(string name, out IJournaledState? state);
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);
+    }
+
+    public partial interface IJournaledStateManagerFactory
+    {
+        IJournaledStateManager Create(JournalId journalId);
     }
 
     public partial interface IPersistentStateCommandCodec<T>
@@ -441,6 +447,31 @@ namespace Orleans.Journaling
 
     }
 
+    public readonly partial struct JournalId : System.IEquatable<JournalId>
+    {
+        private readonly object _dummy;
+        private readonly int _dummyPrimitive;
+        public JournalId(string value) { throw null; }
+
+        public bool IsDefault { get { throw null; } }
+
+        public string Value { get { throw null; } }
+
+        public bool Equals(JournalId other) { throw null; }
+
+        public override bool Equals(object? obj) { throw null; }
+
+        public static JournalId FromGrainId(Runtime.GrainId grainId) { throw null; }
+
+        public override int GetHashCode() { throw null; }
+
+        public override string ToString() { throw null; }
+
+        public static bool operator ==(JournalId left, JournalId right) { throw null; }
+
+        public static bool operator !=(JournalId left, JournalId right) { throw null; }
+    }
+
     public sealed partial class VolatileJournalStorage : IJournalStorage
     {
         public VolatileJournalStorage() { }
@@ -464,7 +495,9 @@ namespace Orleans.Journaling
 
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
+        public IJournalStorage Create(JournalId journalId) { throw null; }
         public IJournalStorage Create(Runtime.IGrainContext grainContext) { throw null; }
+        public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
         public IJournalStorage CreateStorage(Runtime.IGrainContext grainContext) { throw null; }
     }
 }

@@ -7,6 +7,8 @@ using Orleans.Hosting;
 using Orleans.Journaling.Json;
 using Orleans.Serialization;
 using Orleans.Serialization.Buffers;
+using Orleans.Serialization.Serializers;
+using Orleans.Serialization.Session;
 using Xunit;
 
 namespace Orleans.Journaling.Tests;
@@ -93,9 +95,44 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         Assert.True(wasUsed);
     }
 
+    [Fact]
+    public async Task StateManagerFactory_CreatesManagerForJournalId()
+    {
+        var storage = new VolatileJournalStorage(OrleansBinaryJournalFormat.JournalFormatKey);
+        var builder = new TestSiloBuilder();
+        builder.Services.AddSerializer();
+        builder.Services.AddLogging();
+        builder.Services.AddSingleton(TimeProvider.System);
+        builder.AddJournalStorage();
+        builder.Services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey);
+        builder.Services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));
+
+        using var serviceProvider = builder.Services.BuildServiceProvider();
+        using var scope = serviceProvider.CreateScope();
+        var manager = scope.ServiceProvider.GetRequiredService<IJournaledStateManagerFactory>()
+            .Create(new JournalId("on-demand-journal"));
+        await using (manager.ConfigureAwait(false))
+        {
+            var codecProvider = scope.ServiceProvider.GetRequiredService<ICodecProvider>();
+            var sessionPool = scope.ServiceProvider.GetRequiredService<SerializerSessionPool>();
+            var value = new DurableValue<int>(
+                "value",
+                manager,
+                new OrleansBinaryDurableValueCommandCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
+
+            await manager.InitializeAsync(CancellationToken.None);
+            value.Value = 42;
+            await manager.WriteStateAsync(CancellationToken.None);
+        }
+
+        Assert.NotEmpty(storage.Segments);
+    }
+
     private sealed class TestJournalStorageProvider(IJournalStorage storage) : IJournalStorageProvider
     {
         public IJournalStorage CreateStorage(IGrainContext grainContext) => storage;
+
+        public IJournalStorage CreateStorage(JournalId journalId) => storage;
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

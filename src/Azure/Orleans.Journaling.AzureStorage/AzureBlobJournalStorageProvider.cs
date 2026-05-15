@@ -22,6 +22,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         var journalFormat = GetJournalFormat(serviceProvider, journalFormatKey);
         _shared = new AzureBlobJournalStorage.SharedConfiguration(
             logger,
+            options,
             new AzureBlobJournalStorage.OptionsBlobClientProvider(_containerFactory, _options),
             mimeType: journalFormat.MimeType,
             journalFormatKey: journalFormatKey);
@@ -33,9 +34,25 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
     }
 
-    public IJournalStorage CreateStorage(IGrainContext grainContext) => new AzureBlobJournalStorage(_shared, grainContext);
+    public IJournalStorage CreateStorage(IGrainContext grainContext)
+    {
+        ArgumentNullException.ThrowIfNull(grainContext);
+        return CreateStorage(JournalId.FromGrainId(grainContext.GrainId));
+    }
+
+    public IJournalStorage CreateStorage(JournalId journalId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
+        return new AzureBlobJournalStorage(_shared, journalId);
+    }
 
     public IJournalStorage Create(IGrainContext grainContext) => CreateStorage(grainContext);
+
+    public IJournalStorage Create(JournalId journalId) => CreateStorage(journalId);
 
     public void Participate(ISiloLifecycle observer)
     {

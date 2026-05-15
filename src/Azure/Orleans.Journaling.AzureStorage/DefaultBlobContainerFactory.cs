@@ -17,6 +17,9 @@ internal sealed class DefaultBlobContainerFactory(AzureBlobJournalStorageOptions
     public BlobContainerClient GetBlobContainerClient(GrainId grainId) => _defaultContainer;
 
     /// <inheritdoc/>
+    public BlobContainerClient GetBlobContainerClient(JournalId journalId) => _defaultContainer;
+
+    /// <inheritdoc/>
     public async Task InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken)
     {
         _defaultContainer = client.GetBlobContainerClient(options.ContainerName);

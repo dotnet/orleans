@@ -4,6 +4,8 @@ using Azure;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Orleans.Storage;
 
 namespace Orleans.Journaling;
 
@@ -31,7 +33,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private const int RequestCompactionBlockCount = 49_000;
 
     private readonly SharedConfiguration _shared;
-    private readonly IGrainContext _grainContext;
+    private readonly JournalId _journalId;
     private readonly AppendBlobClient _walClient;
     private int _numBlocks;
     private ETag _walETag;
@@ -42,13 +44,16 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     internal AzureBlobJournalStorage(
         SharedConfiguration shared,
-        IGrainContext grainContext)
+        JournalId journalId)
     {
         ArgumentNullException.ThrowIfNull(shared);
-        ArgumentNullException.ThrowIfNull(grainContext);
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
 
         _shared = shared;
-        _grainContext = grainContext;
+        _journalId = journalId;
         _walClient = GetWalClient();
     }
 
@@ -87,11 +92,17 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         catch (RequestFailedException exception) when (IsBlobSealed(exception))
         {
-            throw new InvalidOperationException("Azure Blob journal WAL is sealed; recovery is required before appending.", exception);
+            throw CreateInconsistentWalStateException(
+                "Azure Blob journal WAL is sealed; recovery is required before appending.",
+                _walETag,
+                exception);
         }
         catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
         {
-            throw new InvalidOperationException("Azure Blob journal WAL changed while appending; recovery is required.", exception);
+            throw CreateInconsistentWalStateException(
+                "Azure Blob journal WAL changed while appending; recovery is required.",
+                _walETag,
+                exception);
         }
     }
 
@@ -106,11 +117,21 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
         {
-            throw new InvalidOperationException("Azure Blob journal WAL changed while deleting the journal; recovery is required.", exception);
+            throw CreateInconsistentWalStateException(
+                "Azure Blob journal WAL changed while deleting the journal; recovery is required.",
+                _walETag,
+                exception);
         }
 
         if (walState is null)
         {
+            if (conditions is not null)
+            {
+                throw CreateInconsistentWalStateException(
+                    "Azure Blob journal WAL changed while deleting the journal; recovery is required.",
+                    _walETag);
+            }
+
             return;
         }
 
@@ -127,7 +148,10 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
         catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
         {
-            throw new InvalidOperationException("Azure Blob journal WAL changed while deleting the journal; recovery is required.", exception);
+            throw CreateInconsistentWalStateException(
+                "Azure Blob journal WAL changed while deleting the journal; recovery is required.",
+                walState.Value.ETag,
+                exception);
         }
 
         if (checkpointName is not null)
@@ -214,24 +238,35 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         // Compaction publishes through WAL metadata, so first recover or create the WAL whose ETag will be checked.
         await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
 
-        // Snapshot the current WAL ETag, then read its manifest under that ETag before publishing a checkpoint.
-        var walETag = _walETag;
-        WalState? walState;
-        try
+        var expectedWalETag = _walETag;
+        string? previousCheckpointName = null;
+        if (_shared.Options.DeleteOldCheckpoints)
         {
-            walState = await TryLoadWalStateAsync(new BlobRequestConditions { IfMatch = walETag }, cancellationToken).ConfigureAwait(false);
-        }
-        catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
-        {
-            throw new InvalidOperationException("Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.", exception);
+            // Read the WAL manifest only when cleanup needs the previous checkpoint name, and require the cached ETag to still match.
+            WalState? walState;
+            try
+            {
+                walState = await TryLoadWalStateAsync(new BlobRequestConditions { IfMatch = expectedWalETag }, cancellationToken).ConfigureAwait(false);
+
+                if (walState is null)
+                {
+                    throw CreateInconsistentWalStateException(
+                        "Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.",
+                        expectedWalETag);
+                }
+            }
+            catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
+            {
+                throw CreateInconsistentWalStateException(
+                    "Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.",
+                    expectedWalETag,
+                    exception);
+            }
+
+            expectedWalETag = walState.Value.ETag;
+            previousCheckpointName = walState.Value.Manifest.Checkpoint?.Name;
         }
 
-        if (walState is null)
-        {
-            throw new InvalidOperationException("Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.");
-        }
-
-        var previousCheckpointName = walState.Value.Manifest.Checkpoint?.Name;
         using var checkpointStream = new ReadOnlySequenceStream(value);
         while (true)
         {
@@ -263,13 +298,16 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 // Recreate the WAL under its ETag to publish the checkpoint only if the existing WAL is unchanged.
                 var result = await CreateWalAsync(
                     checkpointName,
-                    new AppendBlobRequestConditions { IfMatch = walState.Value.ETag },
+                    new AppendBlobRequestConditions { IfMatch = expectedWalETag },
                     cancellationToken).ConfigureAwait(false);
                 SetWal(result.Value.ETag, blockCount: 0);
             }
             catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
             {
-                throw new InvalidOperationException("Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.", exception);
+                throw CreateInconsistentWalStateException(
+                    "Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.",
+                    expectedWalETag,
+                    exception);
             }
 
             if (previousCheckpointName is not null && !string.Equals(previousCheckpointName, checkpointName, StringComparison.Ordinal))
@@ -367,7 +405,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private AppendBlobClient GetWalClient()
     {
         // Resolve the provider-specific WAL client once; checkpoint clients are resolved by published name.
-        var client = _shared.BlobClientProvider.GetWalClient(_grainContext.GrainId);
+        var client = _shared.BlobClientProvider.GetWalClient(_journalId);
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal WAL client provider returned null.");
     }
 
@@ -396,7 +434,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private string GetCheckpointName(string snapshotId)
     {
         // Let the configured provider own checkpoint naming so custom layouts stay consistent with WAL naming.
-        var checkpointName = _shared.BlobClientProvider.GetCheckpointName(_grainContext.GrainId, snapshotId);
+        var checkpointName = _shared.BlobClientProvider.GetCheckpointName(_journalId, snapshotId);
         if (string.IsNullOrWhiteSpace(checkpointName))
         {
             throw new InvalidOperationException("The configured Azure Blob journal checkpoint client provider returned an empty blob name.");
@@ -408,7 +446,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private BlockBlobClient GetCheckpointClient(string checkpointName)
     {
         // Resolve by the published checkpoint name so recovery can open checkpoints created by older instances.
-        var client = _shared.BlobClientProvider.GetCheckpointClient(_grainContext.GrainId, checkpointName);
+        var client = _shared.BlobClientProvider.GetCheckpointClient(_journalId, checkpointName);
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal checkpoint client provider returned null.");
     }
 
@@ -524,6 +562,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             || exception.Status == 409 && string.Equals(exception.ErrorCode, "ConditionNotMet", StringComparison.Ordinal);
     }
 
+    private static InconsistentStateException CreateInconsistentWalStateException(string message, ETag expectedETag, Exception? exception = null)
+    {
+        var currentETag = expectedETag == default ? "Unknown" : expectedETag.ToString();
+        return exception is null
+            ? new InconsistentStateException(message, storedEtag: "Unknown", currentEtag: currentETag)
+            : new InconsistentStateException(message, storedEtag: "Unknown", currentEtag: currentETag, exception);
+    }
+
     [LoggerMessage(
         Level = LogLevel.Debug,
         Message = "Appended {Length} bytes to blob \"{ContainerName}/{BlobName}\"")]
@@ -554,20 +600,25 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     {
         public SharedConfiguration(
             ILogger<AzureBlobJournalStorage> logger,
+            IOptions<AzureBlobJournalStorageOptions> options,
             BlobClientProvider blobClientProvider,
             string? mimeType = null,
             string? journalFormatKey = null)
         {
             ArgumentNullException.ThrowIfNull(logger);
+            ArgumentNullException.ThrowIfNull(options);
             ArgumentNullException.ThrowIfNull(blobClientProvider);
 
             Logger = logger;
+            Options = options.Value;
             MimeType = mimeType;
             JournalFormatKey = journalFormatKey;
             BlobClientProvider = blobClientProvider;
         }
 
         public ILogger<AzureBlobJournalStorage> Logger { get; }
+
+        public AzureBlobJournalStorageOptions Options { get; }
 
         public string? MimeType { get; }
 
@@ -578,25 +629,25 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     internal abstract class BlobClientProvider
     {
-        public abstract AppendBlobClient GetWalClient(GrainId grainId);
+        public abstract AppendBlobClient GetWalClient(JournalId journalId);
 
-        public abstract string GetCheckpointName(GrainId grainId, string snapshotId);
+        public abstract string GetCheckpointName(JournalId journalId, string snapshotId);
 
-        public abstract BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName);
+        public abstract BlockBlobClient GetCheckpointClient(JournalId journalId, string checkpointName);
     }
 
     internal sealed class OptionsBlobClientProvider(
         IBlobContainerFactory containerFactory,
         AzureBlobJournalStorageOptions options) : BlobClientProvider
     {
-        public override AppendBlobClient GetWalClient(GrainId grainId)
-            => containerFactory.GetBlobContainerClient(grainId).GetAppendBlobClient(
-                options.GetWalBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId)));
+        public override AppendBlobClient GetWalClient(JournalId journalId)
+            => containerFactory.GetBlobContainerClient(journalId).GetAppendBlobClient(
+                AzureBlobJournalStorageOptions.GetWalBlobNameForJournal(journalId, options.GetBlobNameForJournal(journalId)));
 
-        public override string GetCheckpointName(GrainId grainId, string snapshotId)
-            => options.GetCheckpointBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId), snapshotId);
+        public override string GetCheckpointName(JournalId journalId, string snapshotId)
+            => AzureBlobJournalStorageOptions.GetCheckpointBlobNameForJournal(journalId, options.GetBlobNameForJournal(journalId), snapshotId);
 
-        public override BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName)
-            => containerFactory.GetBlobContainerClient(grainId).GetBlockBlobClient(checkpointName);
+        public override BlockBlobClient GetCheckpointClient(JournalId journalId, string checkpointName)
+            => containerFactory.GetBlobContainerClient(journalId).GetBlockBlobClient(checkpointName);
     }
 }

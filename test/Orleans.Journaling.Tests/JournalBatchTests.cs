@@ -29,7 +29,7 @@ public sealed class AzureStorageJournalBatchTests : JournalBatchTests
     }
 
     protected override IJournalStorage CreateStorage(IServiceProvider serviceProvider, IGrainContext grainContext) =>
-        serviceProvider.GetRequiredService<AzureBlobJournalStorageProvider>().Create(grainContext);
+        serviceProvider.GetRequiredService<AzureBlobJournalStorageProvider>().CreateStorage(grainContext);
 }
 
 public sealed class InMemoryJournalBatchTests : JournalBatchTests
@@ -40,7 +40,7 @@ public sealed class InMemoryJournalBatchTests : JournalBatchTests
     }
 
     protected override IJournalStorage CreateStorage(IServiceProvider serviceProvider, IGrainContext grainContext) =>
-        serviceProvider.GetRequiredService<VolatileJournalStorageProvider>().Create(grainContext);
+        serviceProvider.GetRequiredService<VolatileJournalStorageProvider>().CreateStorage(grainContext);
 }
 
 /// <summary>

@@ -4,6 +4,7 @@ using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.Logging;
 using Orleans.Serialization.Buffers;
 using Orleans.Runtime.Internal;
+using Orleans.Storage;
 
 namespace Orleans.Journaling;
 
@@ -28,9 +29,15 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private Task? _workLoop;
     private ManagerState _state;
     private bool _migrationSnapshotRequired;
+    private int _disposed;
 
     public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
         : this(shared, CreateStorage(storageProvider, grainContext))
+    {
+    }
+
+    public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, JournalId journalId)
+        : this(shared, CreateStorage(storageProvider, journalId))
     {
     }
 
@@ -61,6 +68,17 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         ArgumentNullException.ThrowIfNull(storageProvider);
         ArgumentNullException.ThrowIfNull(grainContext);
         return storageProvider.CreateStorage(grainContext) ?? throw new InvalidOperationException("The configured journal storage provider returned null.");
+    }
+
+    private static IJournalStorage CreateStorage(IJournalStorageProvider storageProvider, JournalId journalId)
+    {
+        ArgumentNullException.ThrowIfNull(storageProvider);
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
+        return storageProvider.CreateStorage(journalId) ?? throw new InvalidOperationException("The configured journal storage provider returned null.");
     }
 
     internal string WriteJournalFormatKey => _shared.JournalFormatKey;
@@ -436,7 +454,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                     catch (Exception exception)
                     {
                         workItem.SetException(exception);
-                        needsRecovery = true;
+                        if (IsRecoverySignal(exception))
+                        {
+                            needsRecovery = true;
+                        }
                     }
                 }
             }
@@ -464,6 +485,19 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             }
 
         }
+    }
+
+    private static bool IsRecoverySignal(Exception exception)
+    {
+        for (Exception? current = exception; current is not null; current = current.InnerException)
+        {
+            if (current is InconsistentStateException)
+            {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private void RetireOrResurectStates()
@@ -746,7 +780,9 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     void ILifecycleParticipant<IGrainLifecycle>.Participate(IGrainLifecycle observer) => observer.Subscribe(GrainLifecycleStage.SetupState, this);
     Task ILifecycleObserver.OnStart(CancellationToken cancellationToken) => InitializeAsync(cancellationToken).AsTask();
-    async Task ILifecycleObserver.OnStop(CancellationToken cancellationToken)
+    async Task ILifecycleObserver.OnStop(CancellationToken cancellationToken) => await StopAsync(cancellationToken).ConfigureAwait(false);
+
+    private async Task StopAsync(CancellationToken cancellationToken)
     {
         _shutdownCancellation.Cancel();
         _workSignal.Signal();
@@ -758,8 +794,21 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
 
     void IDisposable.Dispose()
     {
-        _shutdownCancellation.Dispose();
-        _journalWriter.Dispose();
+        DisposeAsync().AsTask().GetAwaiter().GetResult();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Interlocked.Exchange(ref _disposed, 1) != 0)
+        {
+            return;
+        }
+
+        await StopAsync(CancellationToken.None).ConfigureAwait(false);
+        {
+            _shutdownCancellation.Dispose();
+            _journalWriter.Dispose();
+        }
     }
 
     private abstract class WorkItem : TaskCompletionSource
