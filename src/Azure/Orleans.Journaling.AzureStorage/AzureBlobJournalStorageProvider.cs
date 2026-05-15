@@ -8,7 +8,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
 {
     private readonly IBlobContainerFactory _containerFactory;
     private readonly AzureBlobJournalStorageOptions _options;
-    private readonly AzureBlobJournalStorage.SharedConfiguration _shared;
+    private readonly AzureBlobJournalStorage.AzureBlobJournalStorageShared _shared;
 
     public AzureBlobJournalStorageProvider(
         IOptions<AzureBlobJournalStorageOptions> options,
@@ -20,7 +20,7 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         _containerFactory = _options.BuildContainerFactory(serviceProvider, _options);
         var journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
         var journalFormat = GetJournalFormat(serviceProvider, journalFormatKey);
-        _shared = new AzureBlobJournalStorage.SharedConfiguration(
+        _shared = new AzureBlobJournalStorage.AzureBlobJournalStorageShared(
             logger,
             options,
             new AzureBlobJournalStorage.OptionsBlobClientProvider(_containerFactory, _options),
@@ -49,10 +49,6 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
 
         return new AzureBlobJournalStorage(_shared, journalId);
     }
-
-    public IJournalStorage Create(IGrainContext grainContext) => CreateStorage(grainContext);
-
-    public IJournalStorage Create(JournalId journalId) => CreateStorage(journalId);
 
     public void Participate(ISiloLifecycle observer)
     {

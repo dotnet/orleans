@@ -32,7 +32,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     // IsCompactionRequested trips at this block count so callers compact before the hard append-blob limit.
     private const int RequestCompactionBlockCount = 49_000;
 
-    private readonly SharedConfiguration _shared;
+    private readonly AzureBlobJournalStorageShared _shared;
     private readonly JournalId _journalId;
     private readonly AppendBlobClient _walClient;
     private int _numBlocks;
@@ -43,7 +43,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     public bool IsCompactionRequested => _numBlocks > RequestCompactionBlockCount;
 
     internal AzureBlobJournalStorage(
-        SharedConfiguration shared,
+        AzureBlobJournalStorageShared shared,
         JournalId journalId)
     {
         ArgumentNullException.ThrowIfNull(shared);
@@ -596,9 +596,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private readonly record struct CheckpointReference(string Name, long WalOffset);
 
-    internal sealed class SharedConfiguration
+    internal sealed class AzureBlobJournalStorageShared
     {
-        public SharedConfiguration(
+        public AzureBlobJournalStorageShared(
             ILogger<AzureBlobJournalStorage> logger,
             IOptions<AzureBlobJournalStorageOptions> options,
             BlobClientProvider blobClientProvider,

@@ -554,7 +554,7 @@ public sealed class AzureBlobJournalStorageTests
     {
         checkpoints ??= new FakeBlockBlobStore();
         return new AzureBlobJournalStorage(
-            new AzureBlobJournalStorage.SharedConfiguration(
+            new AzureBlobJournalStorage.AzureBlobJournalStorageShared(
                 NullLogger<AzureBlobJournalStorage>.Instance,
                 Options.Create(new AzureBlobJournalStorageOptions { DeleteOldCheckpoints = deleteOldCheckpoints }),
                 new FakeBlobClientProvider(appendBlobs, checkpoints),

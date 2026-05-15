@@ -495,8 +495,6 @@ namespace Orleans.Journaling
 
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
-        public IJournalStorage Create(JournalId journalId) { throw null; }
-        public IJournalStorage Create(Runtime.IGrainContext grainContext) { throw null; }
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
         public IJournalStorage CreateStorage(Runtime.IGrainContext grainContext) { throw null; }
     }
