@@ -12,12 +12,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 {
     internal const string FormatMetadataKey = "format";
     internal const string CheckpointMetadataKey = "checkpoint";
-    internal const string CheckpointETagMetadataKey = "checkpoint-etag";
-    internal const string CheckpointFormatMetadataKey = "checkpoint-format";
-    internal const string CheckpointIdMetadataKey = "checkpoint-id";
-    internal const string CheckpointLengthMetadataKey = "checkpoint-length";
-    internal const string CheckpointReplaySegmentMetadataKey = "checkpoint-replay-segment";
-    internal const string CheckpointReplayOffsetMetadataKey = "checkpoint-replay-offset";
+    internal const string CheckpointETagMetadataKey = "checkpoint_etag";
+    internal const string CheckpointFormatMetadataKey = "checkpoint_format";
+    internal const string CheckpointIdMetadataKey = "checkpoint_id";
+    internal const string CheckpointLengthMetadataKey = "checkpoint_length";
+    internal const string CheckpointReplaySegmentMetadataKey = "checkpoint_replay_segment";
+    internal const string CheckpointReplayOffsetMetadataKey = "checkpoint_replay_offset";
 
     // Azure Append Blob hard limits documented at:
     // https://learn.microsoft.com/azure/storage/blobs/scalability-targets#scale-targets-for-blob-storage

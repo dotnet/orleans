@@ -89,6 +89,7 @@ public sealed class AzureBlobJournalStorageTests
         Assert.Equal(ETag.All, upload.IfNoneMatch);
         Assert.Equal([2, 3], upload.Payload);
         Assert.Equal("application/jsonl", upload.ContentType);
+        AssertAzureMetadataKeys(upload.Metadata);
         Assert.Equal("json-lines", upload.Metadata[AzureBlobJournalStorage.FormatMetadataKey]);
         Assert.Equal("00000000", upload.Metadata[AzureBlobJournalStorage.CheckpointIdMetadataKey]);
         Assert.Equal("00000001", upload.Metadata[AzureBlobJournalStorage.CheckpointReplaySegmentMetadataKey]);
@@ -96,6 +97,7 @@ public sealed class AzureBlobJournalStorageTests
 
         var metadata = appendBlobs.SetMetadataCalls.Single();
         Assert.Equal("blob.log.00000000", metadata.Name);
+        AssertAzureMetadataKeys(metadata.Metadata);
         Assert.Equal("blob.checkpoint.00000000", metadata.Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
         Assert.Equal("\"checkpoint-1\"", metadata.Metadata[AzureBlobJournalStorage.CheckpointETagMetadataKey]);
         Assert.Equal("2", metadata.Metadata[AzureBlobJournalStorage.CheckpointLengthMetadataKey]);
@@ -354,6 +356,9 @@ public sealed class AzureBlobJournalStorageTests
         [AzureBlobJournalStorage.CheckpointReplaySegmentMetadataKey] = replaySegment.ToString("X8", System.Globalization.CultureInfo.InvariantCulture),
         [AzureBlobJournalStorage.CheckpointReplayOffsetMetadataKey] = replayOffset.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
+
+    private static void AssertAzureMetadataKeys(IDictionary<string, string> metadata)
+        => Assert.All(metadata.Keys, key => Assert.Matches("^[A-Za-z_][A-Za-z0-9_]*$", key));
 
     private static ReadOnlySequence<byte> OversizedSequence(long length)
     {
