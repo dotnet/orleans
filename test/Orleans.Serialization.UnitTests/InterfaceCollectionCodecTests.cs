@@ -384,6 +384,44 @@ public class InterfaceCollectionRegressionTests
     [Fact]
     public Task ReadOnlyDictionaryInterfaceFallback_Formatted_MatchesSnapshot()
         => VerifyFallbackBitStream<IReadOnlyDictionary<string, int>>(new UnknownDictionary<string, int>(new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }), ReadOnlyDictionaryCodecAlias);
+
+    [Fact]
+    public Task EnumerableInterfaceConcreteList_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<IEnumerable<int>>(new List<int> { 2, 4, 6 }, EnumerableCodecAlias);
+
+    [Fact]
+    public Task ReadOnlyCollectionInterfaceConcreteList_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<IReadOnlyCollection<int>>(new List<int> { 2, 4, 6 }, ReadOnlyCollectionCodecAlias);
+
+    [Fact]
+    public Task ReadOnlyListInterfaceConcreteList_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<IReadOnlyList<int>>(new List<int> { 2, 4, 6 }, ReadOnlyListCodecAlias);
+
+    [Fact]
+    public Task CollectionInterfaceConcreteList_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<ICollection<int>>(new List<int> { 2, 4, 6 }, CollectionCodecAlias);
+
+    [Fact]
+    public Task ListInterfaceConcreteList_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<IList<int>>(new List<int> { 2, 4, 6 }, ListCodecAlias);
+
+    [Fact]
+    public Task SetInterfaceConcreteHashSet_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<ISet<string>>(new HashSet<string> { "a", "b" }, SetCodecAlias);
+
+#if NET5_0_OR_GREATER
+    [Fact]
+    public Task ReadOnlySetInterfaceConcreteHashSet_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<IReadOnlySet<string>>(new HashSet<string> { "a", "b" }, ReadOnlySetCodecAlias);
+#endif
+
+    [Fact]
+    public Task DictionaryInterfaceConcreteDictionary_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<IDictionary<string, int>>(new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, DictionaryCodecAlias);
+
+    [Fact]
+    public Task ReadOnlyDictionaryInterfaceConcreteDictionary_Formatted_MatchesSnapshot()
+        => VerifyConcreteRuntimeBitStream<IReadOnlyDictionary<string, int>>(new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }, ReadOnlyDictionaryCodecAlias);
 #endif
 
     private static T RoundTrip<T>(T value)
@@ -404,6 +442,17 @@ public class InterfaceCollectionRegressionTests
     {
         var formatted = FormatSerializedPayload(value);
         Assert.Contains($"TypeName \"{codecAlias}", formatted);
+        return Verify(formatted, extension: "txt").UseDirectory("snapshots");
+    }
+
+    private static Task VerifyConcreteRuntimeBitStream<T>(T value, params string[] fallbackCodecAliases)
+    {
+        var formatted = FormatSerializedPayload(value);
+        foreach (var codecAlias in fallbackCodecAliases)
+        {
+            Assert.DoesNotContain($"TypeName \"{codecAlias}", formatted);
+        }
+
         return Verify(formatted, extension: "txt").UseDirectory("snapshots");
     }
 

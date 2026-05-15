@@ -1,0 +1,7 @@
+﻿0x003E [#1 TagDelimited Id: 0 SchemaType: Encoded RuntimeType: System.Collections.Generic.Dictionary`2[System.String,System.Int32] (name: Encoded "TypeName "System.Collections.Generic.Dictionary`2[[string],[int]]" (hash ABFDFCFE)" (System.Collections.Generic.Dictionary`2[[System.String],[System.Int32]]))] Value: {
+0x003F  [#2 VarInt Id: 1 SchemaType: Expected] Value: 2 (0x2)
+0x0041  [#3 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["a"]
+0x0044  [#4 VarInt Id: 2 SchemaType: Expected] Value: 2 (0x2)
+0x0046  [#5 LengthPrefixed Id: 2 SchemaType: Expected] Value: (length: 1b) ["b"]
+0x0049  [#6 VarInt Id: 2 SchemaType: Expected] Value: 4 (0x4)
+0x004B }
