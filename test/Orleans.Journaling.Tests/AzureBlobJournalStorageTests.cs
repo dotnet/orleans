@@ -321,7 +321,7 @@ public sealed class AzureBlobJournalStorageTests
     public async Task ReadAsync_UpdatesCompactionRequestFromCommittedBlockCount()
     {
         var appendBlobs = new FakeAppendBlobStore();
-        appendBlobs.Add("blob/root", [1], metadata: RootMetadata(generation: 0), isSealed: false, committedBlockCount: 11);
+        appendBlobs.Add("blob/root", [1], metadata: RootMetadata(generation: 0), isSealed: false, committedBlockCount: 49_001);
         var storage = CreateStorage(appendBlobs);
 
         await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);

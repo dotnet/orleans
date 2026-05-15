@@ -4,7 +4,6 @@ using Azure;
 using Azure.Storage.Blobs.Models;
 using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.Logging;
-using Orleans.Runtime;
 using Orleans.Serialization.Buffers;
 
 namespace Orleans.Journaling;
@@ -21,9 +20,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     internal const long MaxAppendBlockBytes = 100L * 1024 * 1024;
 
     // An append blob can hold up to 50,000 committed blocks. The compaction request
-    // (IsCompactionRequested) trips far earlier (at 10 blocks), so this guard exists only
+    // (IsCompactionRequested) trips earlier, above 49,000 blocks, so this guard exists only
     // to roll before hitting the hard Azure limit if a consumer ignores compaction requests.
-    private const int AppendBlobBlockCeilingHeadroom = 100;
+    private const int MaxBlocksPerBlob = 50_000;
+    private const int HeadroomBlockCount = 100;
+    private const int RequestCompactionBlockCount = 49_000;
 
     private readonly SharedConfiguration _shared;
     private readonly IGrainContext _grainContext;
@@ -38,7 +39,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private bool RootExists => _rootLogETag != default;
 
-    public bool IsCompactionRequested => _numBlocks > 10;
+    public bool IsCompactionRequested => _numBlocks > RequestCompactionBlockCount;
 
     internal AzureBlobJournalStorage(
         SharedConfiguration shared,
@@ -55,7 +56,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         ThrowIfBatchTooLarge(value.Length);
-        if (CurrentSegmentExists && _numBlocks >= _currentLogClient.AppendBlobMaxBlocks - AppendBlobBlockCeilingHeadroom)
+        if (CurrentSegmentExists && _numBlocks >= MaxBlocksPerBlob - HeadroomBlockCount)
         {
             await RollToNextSegmentAsync(cancellationToken).ConfigureAwait(false);
         }
@@ -96,9 +97,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    private void ThrowIfBatchTooLarge(long length)
+    private static void ThrowIfBatchTooLarge(long length)
     {
-        if (length <= _currentLogClient.AppendBlobMaxAppendBlockBytes)
+        if (length <= MaxAppendBlockBytes)
         {
             return;
         }
@@ -523,7 +524,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 ? storedKey
                 : null;
 
-    private RootManifest CreateRootManifest(IDictionary<string, string>? metadata)
+    private static RootManifest CreateRootManifest(IDictionary<string, string>? metadata)
     {
         if (!TryGetUInt32Metadata(metadata, GenerationMetadataKey, out var generation))
         {
@@ -561,7 +562,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    private IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
+    private static IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
     {
         if (!TryGetUInt32Metadata(checkpointDetails.Metadata, GenerationMetadataKey, out var generation) || generation != checkpoint.Generation)
         {
@@ -625,7 +626,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private static bool IsRootMutationConflict(RequestFailedException exception)
         => exception.Status is 404 or 412
-            || (exception.Status == 409 && string.Equals(exception.ErrorCode, "ConditionNotMet", StringComparison.Ordinal));
+            || exception.Status == 409 && string.Equals(exception.ErrorCode, "ConditionNotMet", StringComparison.Ordinal);
 
     private static async ValueTask<long> ReadStreamAsync(
         IJournalStorageConsumer consumer,
@@ -788,7 +789,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         {
             get
             {
-                ThrowIfDisposed();
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 return _sequence.Length;
             }
         }
@@ -797,13 +798,13 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         {
             get
             {
-                ThrowIfDisposed();
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 return _position;
             }
 
             set
             {
-                ThrowIfDisposed();
+                ObjectDisposedException.ThrowIf(_disposed, this);
                 if (value < 0 || value > _sequence.Length)
                 {
                     throw new ArgumentOutOfRangeException(nameof(value));
@@ -813,16 +814,13 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             }
         }
 
-        public override void Flush()
-        {
-            ThrowIfDisposed();
-        }
+        public override void Flush() => ObjectDisposedException.ThrowIf(_disposed, this);
 
         public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
 
         public override int Read(Span<byte> buffer)
         {
-            ThrowIfDisposed();
+            ObjectDisposedException.ThrowIf(_disposed, this);
             if (buffer.IsEmpty || _position >= _sequence.Length)
             {
                 return 0;
@@ -842,7 +840,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
         public override long Seek(long offset, SeekOrigin origin)
         {
-            ThrowIfDisposed();
+            ObjectDisposedException.ThrowIf(_disposed, this);
             var newPosition = origin switch
             {
                 SeekOrigin.Begin => offset,
@@ -865,14 +863,6 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         {
             _disposed = true;
             base.Dispose(disposing);
-        }
-
-        private void ThrowIfDisposed()
-        {
-            if (_disposed)
-            {
-                throw new ObjectDisposedException(nameof(ReadOnlySequenceStream));
-            }
         }
     }
 }

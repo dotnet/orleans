@@ -3,7 +3,6 @@ using Azure;
 using Azure.Core;
 using Azure.Storage;
 using Azure.Storage.Blobs;
-using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 

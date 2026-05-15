@@ -1,5 +1,4 @@
-﻿using Azure.Storage.Blobs;
-using Orleans.Runtime;
+using Azure.Storage.Blobs;
 
 namespace Orleans.Journaling;
 
