@@ -254,7 +254,7 @@ public class StateManagerTests : JournalingTestBase
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
         var replacement = Assert.Single(storage.Replaces);
-        Assert.Empty(storage.Appends);
+        Assert.Single(storage.Appends);
         AssertContainsRuntimeAndApplicationEntries(ReadBinaryEntries(replacement));
     }
 
@@ -319,7 +319,7 @@ public class StateManagerTests : JournalingTestBase
         dictionary.Add("key", 1);
         await sut.Manager.WriteStateAsync(CancellationToken.None);
 
-        Assert.Empty(storage.Appends);
+        Assert.Single(storage.Appends);
         Assert.Single(storage.Replaces);
 
         var recovered = CreateTestSystem(storage: storage, journalFormat: new TrackingJournalFormat(SessionPool));
@@ -499,11 +499,13 @@ public class StateManagerTests : JournalingTestBase
         await writeTask.WaitAsync(TimeSpan.FromSeconds(10));
         var replacement = Assert.Single(storage.Replaces);
         Assert.DoesNotContain(ReadBinaryEntries(replacement), entry => entry.StreamId.Value >= 8);
+        Assert.Single(storage.Appends);
 
         storage.IsCompactionRequested = false;
         await sut.Manager.WriteStateAsync(CancellationToken.None).AsTask().WaitAsync(TimeSpan.FromSeconds(10));
 
-        var append = Assert.Single(storage.Appends);
+        Assert.Equal(2, storage.Appends.Count);
+        var append = storage.Appends[^1];
         Assert.Contains(ReadBinaryEntries(append), entry => entry.StreamId.Value >= 8);
 
         Task StartSnapshotAndCommitActiveEntry()

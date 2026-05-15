@@ -52,10 +52,9 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
                 logger,
                 Options.Create(options),
                 TimeProvider.System,
-                storage,
                 serviceProvider);
 
-            _ = new JournaledStateManager(shared);
+            _ = new JournaledStateManager(shared, storage);
         });
 
         Assert.Contains(CustomFormatKey, exception.Message);
@@ -71,7 +70,8 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         services.AddLogging();
         services.AddOptions();
         services.AddSingleton(TimeProvider.System);
-        services.AddScoped<IJournalStorage>(_ => storage);
+        services.AddScoped<IGrainContext>(_ => new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "keyed")));
+        services.AddScoped<IJournalStorageProvider>(_ => new TestJournalStorageProvider(storage));
         services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = CustomFormatKey);
         services.AddScoped<JournaledStateManagerShared>();
         services.AddScoped<IJournaledStateManager, JournaledStateManager>();
@@ -91,6 +91,11 @@ public sealed class KeyedJournalingRegistrationTests : JournalingTestBase
         _ = scope.ServiceProvider.GetRequiredKeyedService<IDurableValue<int>>("value");
 
         Assert.True(wasUsed);
+    }
+
+    private sealed class TestJournalStorageProvider(IJournalStorage storage) : IJournalStorageProvider
+    {
+        public IJournalStorage CreateStorage(IGrainContext grainContext) => storage;
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

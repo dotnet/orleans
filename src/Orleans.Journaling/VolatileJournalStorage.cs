@@ -5,7 +5,7 @@ using Orleans.Journaling.Json;
 
 namespace Orleans.Journaling;
 
-public sealed class VolatileJournalStorageProvider
+public sealed class VolatileJournalStorageProvider : IJournalStorageProvider
 {
     private readonly IOptions<JournaledStateManagerOptions>? _options;
     private readonly ConcurrentDictionary<GrainId, VolatileJournalStorage> _storage = new();
@@ -24,13 +24,15 @@ public sealed class VolatileJournalStorageProvider
         _options = options;
     }
 
-    public IJournalStorage Create(IGrainContext grainContext)
+    public IJournalStorage CreateStorage(IGrainContext grainContext)
     {
         var journalFormatKey = GetJournalFormatKey();
         var storage = _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage(journalFormatKey));
         storage.SetConfiguredJournalFormatKey(journalFormatKey);
         return storage;
     }
+
+    public IJournalStorage Create(IGrainContext grainContext) => CreateStorage(grainContext);
 
     private string GetJournalFormatKey()
         => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonJournalExtensions.JournalFormatKey);

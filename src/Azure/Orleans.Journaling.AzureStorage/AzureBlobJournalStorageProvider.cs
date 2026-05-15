@@ -10,7 +10,7 @@ internal sealed class AzureBlobJournalStorageProvider(
     IOptions<AzureBlobJournalStorageOptions> options,
     IOptions<JournaledStateManagerOptions> managerOptions,
     IServiceProvider serviceProvider,
-    ILogger<AzureBlobJournalStorage> logger) : ILifecycleParticipant<ISiloLifecycle>
+    ILogger<AzureBlobJournalStorage> logger) : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider
 {
     private readonly IBlobContainerFactory _containerFactory = options.Value.BuildContainerFactory(serviceProvider, options.Value);
     private readonly string _journalFormatKey = ValidateJournalFormatKey(managerOptions.Value.JournalFormatKey);
@@ -22,7 +22,7 @@ internal sealed class AzureBlobJournalStorageProvider(
         await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
     }
 
-    public IJournalStorage Create(IGrainContext grainContext)
+    public IJournalStorage CreateStorage(IGrainContext grainContext)
     {
         var journalFormatKey = _journalFormatKey;
         var journalFormat = serviceProvider.GetKeyedService<IJournalFormat>(journalFormatKey);
@@ -41,15 +41,19 @@ internal sealed class AzureBlobJournalStorageProvider(
 
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
         var blobName = _options.GetBlobNameForJournal(grainContext.GrainId);
-        var blobClient = container.GetAppendBlobClient(blobName);
+        var blobClient = container.GetAppendBlobClient(_options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, segmentId: 0));
         return new AzureBlobJournalStorage(
             blobClient,
             journalFormat.MimeType,
             logger,
             journalFormatKey: journalFormatKey,
-            snapshotNameFactory: () => _options.GetSnapshotBlobNameForJournal(grainContext.GrainId, blobName, Guid.NewGuid().ToString("N")),
-            snapshotClientFactory: container.GetBlockBlobClient);
+            walNameFactory: segmentId => _options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, segmentId),
+            walClientFactory: segmentId => container.GetAppendBlobClient(_options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, segmentId)),
+            checkpointNameFactory: checkpointId => _options.GetCheckpointBlobNameForJournal(grainContext.GrainId, blobName, checkpointId),
+            checkpointClientFactory: container.GetBlockBlobClient);
     }
+
+    public IJournalStorage Create(IGrainContext grainContext) => CreateStorage(grainContext);
 
     public void Participate(ISiloLifecycle observer)
     {

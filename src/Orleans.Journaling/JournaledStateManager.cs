@@ -18,6 +18,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private readonly Dictionary<string, IJournaledState> _states = new(StringComparer.Ordinal);
     private readonly Dictionary<uint, IJournaledState> _statesMap = [];
     private readonly JournaledStateManagerShared _shared;
+    private readonly IJournalStorage _storage;
     private readonly JournalBufferWriter _journalWriter;
     private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
     private readonly Queue<WorkItem> _workQueue = new();
@@ -28,10 +29,17 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
     private ManagerState _state;
     private bool _migrationSnapshotRequired;
 
-    public JournaledStateManager(JournaledStateManagerShared shared)
+    public JournaledStateManager(JournaledStateManagerShared shared, IJournalStorageProvider storageProvider, IGrainContext grainContext)
+        : this(shared, CreateStorage(storageProvider, grainContext))
+    {
+    }
+
+    internal JournaledStateManager(JournaledStateManagerShared shared, IJournalStorage storage)
     {
         ArgumentNullException.ThrowIfNull(shared);
+        ArgumentNullException.ThrowIfNull(storage);
         _shared = shared;
+        _storage = storage;
         _journalWriter = _shared.JournalFormat.CreateWriter();
         var serviceProvider = _shared.ServiceProvider;
         var journalStreamIdsCodec = JournalFormatServices.GetRequiredCommandCodec<IDurableDictionaryCommandCodec<string, uint>>(serviceProvider, WriteJournalFormatKey);
@@ -46,6 +54,13 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         // It is not stored in _journalStreamDirectory and does not participate in the general name->id mapping.
         _retirementTracker = new RetiredStateTracker(this, retirementTrackerCodec);
         _statesMap[RetiredStateTracker.Id] = _retirementTracker;
+    }
+
+    private static IJournalStorage CreateStorage(IJournalStorageProvider storageProvider, IGrainContext grainContext)
+    {
+        ArgumentNullException.ThrowIfNull(storageProvider);
+        ArgumentNullException.ThrowIfNull(grainContext);
+        return storageProvider.CreateStorage(grainContext) ?? throw new InvalidOperationException("The configured journal storage provider returned null.");
     }
 
     internal string WriteJournalFormatKey => _shared.JournalFormatKey;
@@ -171,7 +186,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                             //       If the current journal length is greater than the snapshot size, then take a snapshot instead of appending more journal entries.
                             var isSnapshot = workItem is WriteSnapshotWorkItem
                                 || _migrationSnapshotRequired
-                                || _shared.Storage.IsCompactionRequested;
+                                || _storage.IsCompactionRequested;
                             ArcBuffer committedBuffer = default;
                             ArcBuffer bufferToConsume = default;
                             var hasCommittedBuffer = false;
@@ -256,7 +271,10 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 else
                                 {
                                     hasCommittedBuffer = true;
-                                    hasBufferToConsume = true;
+                                    if (!isSnapshot)
+                                    {
+                                        hasBufferToConsume = true;
+                                    }
                                 }
                             }
 
@@ -284,13 +302,29 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                 var writeCompleted = false;
                                 try
                                 {
+                                    if (isSnapshot && hasBufferToConsume)
+                                    {
+                                        await _storage.AppendAsync(bufferToConsume.AsReadOnlySequence(), _shutdownCancellation.Token).ConfigureAwait(true);
+                                        lock (_lock)
+                                        {
+                                            _journalWriter.Consume(bufferToConsume);
+                                            foreach (var state in _states.Values)
+                                            {
+                                                state.OnWriteCompleted();
+                                            }
+                                        }
+
+                                        bufferToConsume.Dispose();
+                                        hasBufferToConsume = false;
+                                    }
+
                                     if (isSnapshot)
                                     {
-                                        await _shared.Storage.ReplaceAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
+                                        await _storage.ReplaceAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                     }
                                     else
                                     {
-                                        await _shared.Storage.AppendAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
+                                        await _storage.AppendAsync(writeSequence, _shutdownCancellation.Token).ConfigureAwait(true);
                                     }
 
                                     writeCompleted = true;
@@ -344,7 +378,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                         case DeleteStateWorkItem:
                         {
                             // Clear storage.
-                            await _shared.Storage.DeleteAsync(_shutdownCancellation.Token).ConfigureAwait(true);
+                            await _storage.DeleteAsync(_shutdownCancellation.Token).ConfigureAwait(true);
 
                             lock (_lock)
                             {
@@ -518,7 +552,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             ResetForRecovery();
         }
 
-        await _shared.Storage.ReadAsync(this, cancellationToken).ConfigureAwait(true);
+        await _storage.ReadAsync(this, cancellationToken).ConfigureAwait(true);
 
         lock (_lock)
         {
@@ -653,7 +687,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
         bool didEnqueue;
         lock (_lock)
         {
-            pendingWrite = _migrationSnapshotRequired || _shared.Storage.IsCompactionRequested
+            pendingWrite = _migrationSnapshotRequired || _storage.IsCompactionRequested
                 ? EnqueueOrGetPendingWorkItem<WriteSnapshotWorkItem>(out didEnqueue)
                 : EnqueueOrGetPendingWorkItem<AppendJournalWorkItem>(out didEnqueue);
         }

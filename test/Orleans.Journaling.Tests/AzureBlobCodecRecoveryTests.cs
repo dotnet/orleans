@@ -168,10 +168,9 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
             TimeProvider.System,
-            storage,
             ServiceProvider);
 
-        return new(shared);
+        return new(shared, storage);
     }
 
     private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();
@@ -229,10 +228,9 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
             TimeProvider.System,
-            storage,
             serviceProvider);
 
-        return new(shared);
+        return new(shared, storage);
     }
 
     private static DurableDictionary<string, int> CreateFormatAwareDictionary(IServiceProvider serviceProvider, JournaledStateManager manager, string journalFormatKey)

@@ -50,3 +50,16 @@ public interface IJournalStorage
     /// </summary>
     bool IsCompactionRequested { get; }
 }
+
+/// <summary>
+/// Creates journal storage for a grain activation.
+/// </summary>
+public interface IJournalStorageProvider
+{
+    /// <summary>
+    /// Creates journal storage for the provided grain context.
+    /// </summary>
+    /// <param name="grainContext">The grain context.</param>
+    /// <returns>The journal storage instance.</returns>
+    IJournalStorage CreateStorage(IGrainContext grainContext);
+}

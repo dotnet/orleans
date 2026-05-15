@@ -27,12 +27,20 @@ public sealed class AzureBlobJournalStorageOptions
     private static readonly Func<GrainId, string> DefaultGetBlobName = static grainId => grainId.ToString();
 
     /// <summary>
-    /// Gets or sets the delegate used to generate block blob names for compacted journal snapshots.
+    /// Gets or sets the delegate used to generate append blob names for journal WAL segments.
     /// </summary>
-    public Func<AzureBlobJournalSnapshotNameContext, string> GetSnapshotBlobName { get; set; } = DefaultGetSnapshotBlobName;
+    public Func<AzureBlobJournalWalSegmentNameContext, string> GetWalSegmentBlobName { get; set; } = DefaultGetWalSegmentBlobName;
 
-    private static readonly Func<AzureBlobJournalSnapshotNameContext, string> DefaultGetSnapshotBlobName =
-        static context => $"{context.JournalBlobName}.snapshots/{context.SnapshotId}";
+    private static readonly Func<AzureBlobJournalWalSegmentNameContext, string> DefaultGetWalSegmentBlobName =
+        static context => $"{context.JournalBlobName}.log.{context.SegmentId:X8}";
+
+    /// <summary>
+    /// Gets or sets the delegate used to generate block blob names for immutable journal checkpoints.
+    /// </summary>
+    public Func<AzureBlobJournalCheckpointNameContext, string> GetCheckpointBlobName { get; set; } = DefaultGetCheckpointBlobName;
+
+    private static readonly Func<AzureBlobJournalCheckpointNameContext, string> DefaultGetCheckpointBlobName =
+        static context => $"{context.JournalBlobName}.checkpoint.{context.CheckpointId:X8}";
 
     /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
@@ -65,9 +73,16 @@ public sealed class AzureBlobJournalStorageOptions
         return blobName;
     }
 
-    internal string GetSnapshotBlobNameForJournal(GrainId grainId, string journalBlobName, string snapshotId)
+    internal string GetWalSegmentBlobNameForJournal(GrainId grainId, string journalBlobName, uint segmentId)
     {
-        var blobName = GetSnapshotBlobName(new AzureBlobJournalSnapshotNameContext(grainId, journalBlobName, snapshotId));
+        var blobName = GetWalSegmentBlobName(new AzureBlobJournalWalSegmentNameContext(grainId, journalBlobName, segmentId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
+        return blobName;
+    }
+
+    internal string GetCheckpointBlobNameForJournal(GrainId grainId, string journalBlobName, uint checkpointId)
+    {
+        var blobName = GetCheckpointBlobName(new AzureBlobJournalCheckpointNameContext(grainId, journalBlobName, checkpointId));
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
@@ -136,24 +151,23 @@ public sealed class AzureBlobJournalStorageOptions
 }
 
 /// <summary>
-/// Context used to generate an Azure Blob journal snapshot name.
+/// Context used to generate an Azure Blob journal WAL segment name.
 /// </summary>
-public sealed class AzureBlobJournalSnapshotNameContext
+public sealed class AzureBlobJournalWalSegmentNameContext
 {
     /// <summary>
-    /// Initializes a new instance of the <see cref="AzureBlobJournalSnapshotNameContext"/> class.
+    /// Initializes a new instance of the <see cref="AzureBlobJournalWalSegmentNameContext"/> class.
     /// </summary>
     /// <param name="grainId">The grain id associated with the journal.</param>
-    /// <param name="journalBlobName">The append blob name used for the journal marker and tail.</param>
-    /// <param name="snapshotId">A generated id which is unique to the current compaction attempt.</param>
-    public AzureBlobJournalSnapshotNameContext(GrainId grainId, string journalBlobName, string snapshotId)
+    /// <param name="journalBlobName">The base blob name used for the journal.</param>
+    /// <param name="segmentId">The WAL segment id.</param>
+    public AzureBlobJournalWalSegmentNameContext(GrainId grainId, string journalBlobName, uint segmentId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
-        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
 
         GrainId = grainId;
         JournalBlobName = journalBlobName;
-        SnapshotId = snapshotId;
+        SegmentId = segmentId;
     }
 
     /// <summary>
@@ -162,12 +176,48 @@ public sealed class AzureBlobJournalSnapshotNameContext
     public GrainId GrainId { get; }
 
     /// <summary>
-    /// Gets the append blob name used for the journal marker and tail.
+    /// Gets the base blob name used for the journal.
     /// </summary>
     public string JournalBlobName { get; }
 
     /// <summary>
-    /// Gets a generated id which is unique to the current compaction attempt.
+    /// Gets the WAL segment id.
     /// </summary>
-    public string SnapshotId { get; }
+    public uint SegmentId { get; }
+}
+
+/// <summary>
+/// Context used to generate an Azure Blob journal checkpoint name.
+/// </summary>
+public sealed class AzureBlobJournalCheckpointNameContext
+{
+    /// <summary>
+    /// Initializes a new instance of the <see cref="AzureBlobJournalCheckpointNameContext"/> class.
+    /// </summary>
+    /// <param name="grainId">The grain id associated with the journal.</param>
+    /// <param name="journalBlobName">The base blob name used for the journal.</param>
+    /// <param name="checkpointId">The checkpoint id.</param>
+    public AzureBlobJournalCheckpointNameContext(GrainId grainId, string journalBlobName, uint checkpointId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
+
+        GrainId = grainId;
+        JournalBlobName = journalBlobName;
+        CheckpointId = checkpointId;
+    }
+
+    /// <summary>
+    /// Gets the grain id associated with the journal.
+    /// </summary>
+    public GrainId GrainId { get; }
+
+    /// <summary>
+    /// Gets the base blob name used for the journal.
+    /// </summary>
+    public string JournalBlobName { get; }
+
+    /// <summary>
+    /// Gets the checkpoint id.
+    /// </summary>
+    public uint CheckpointId { get; }
 }

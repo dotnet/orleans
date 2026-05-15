@@ -65,9 +65,8 @@ public abstract class JournalingTestBase
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Options.Create(options),
             provider,
-            storage,
             serviceProvider);
-        var manager = new JournaledStateManager(shared);
+        var manager = new JournaledStateManager(shared, storage);
         var lifecycle = new GrainLifecycle(serviceProvider.GetRequiredService<ILogger<GrainLifecycle>>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);

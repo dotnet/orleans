@@ -168,6 +168,11 @@ namespace Orleans.Journaling
         System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
     }
 
+    public partial interface IJournalStorageProvider
+    {
+        IJournalStorage CreateStorage(Runtime.IGrainContext grainContext);
+    }
+
     public partial interface IJournalStorageConsumer
     {
         void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata);
@@ -451,13 +456,14 @@ namespace Orleans.Journaling
         public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class VolatileJournalStorageProvider
+    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider
     {
         public VolatileJournalStorageProvider() { }
 
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
         public IJournalStorage Create(Runtime.IGrainContext grainContext) { throw null; }
+        public IJournalStorage CreateStorage(Runtime.IGrainContext grainContext) { throw null; }
     }
 }
 

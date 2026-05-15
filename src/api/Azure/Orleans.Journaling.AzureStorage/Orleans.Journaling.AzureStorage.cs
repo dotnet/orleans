@@ -21,7 +21,9 @@ namespace Orleans.Journaling
 
         public System.Func<Runtime.GrainId, string> GetBlobName { get { throw null; } set { } }
 
-        public System.Func<AzureBlobJournalSnapshotNameContext, string> GetSnapshotBlobName { get { throw null; } set { } }
+        public System.Func<AzureBlobJournalCheckpointNameContext, string> GetCheckpointBlobName { get { throw null; } set { } }
+
+        public System.Func<AzureBlobJournalWalSegmentNameContext, string> GetWalSegmentBlobName { get { throw null; } set { } }
 
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 
@@ -36,15 +38,26 @@ namespace Orleans.Journaling
         public void ConfigureBlobServiceClient(System.Uri serviceUri) { }
     }
 
-    public sealed partial class AzureBlobJournalSnapshotNameContext
+    public sealed partial class AzureBlobJournalCheckpointNameContext
     {
-        public AzureBlobJournalSnapshotNameContext(Runtime.GrainId grainId, string journalBlobName, string snapshotId) { }
+        public AzureBlobJournalCheckpointNameContext(Runtime.GrainId grainId, string journalBlobName, uint checkpointId) { }
+
+        public uint CheckpointId { get { throw null; } }
+
+        public Runtime.GrainId GrainId { get { throw null; } }
+
+        public string JournalBlobName { get { throw null; } }
+    }
+
+    public sealed partial class AzureBlobJournalWalSegmentNameContext
+    {
+        public AzureBlobJournalWalSegmentNameContext(Runtime.GrainId grainId, string journalBlobName, uint segmentId) { }
 
         public Runtime.GrainId GrainId { get { throw null; } }
 
         public string JournalBlobName { get { throw null; } }
 
-        public string SnapshotId { get { throw null; } }
+        public uint SegmentId { get { throw null; } }
     }
 
     public static partial class AzureBlobStorageHostingExtensions
