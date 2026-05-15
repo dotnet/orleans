@@ -299,9 +299,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             return;
         }
 
-        await _currentLogClient.SealAsync(
+        var response = await _currentLogClient.SealAsync(
             new AppendBlobRequestConditions { IfMatch = _currentSegmentETag },
             cancellationToken).ConfigureAwait(false);
+        _currentSegmentETag = response.Value.ETag;
+        if (_currentSegmentId == 0)
+        {
+            _rootLogETag = response.Value.ETag;
+        }
     }
 
     private async ValueTask ReadWalSegmentsAsync(

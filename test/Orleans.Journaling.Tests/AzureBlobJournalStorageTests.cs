@@ -97,6 +97,7 @@ public sealed class AzureBlobJournalStorageTests
 
         var metadata = appendBlobs.SetMetadataCalls.Single();
         Assert.Equal("blob.log.00000000", metadata.Name);
+        Assert.Equal(new ETag("\"seal-1\""), metadata.IfMatch);
         AssertAzureMetadataKeys(metadata.Metadata);
         Assert.Equal("blob.checkpoint.00000000", metadata.Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
         Assert.Equal("\"checkpoint-1\"", metadata.Metadata[AzureBlobJournalStorage.CheckpointETagMetadataKey]);
@@ -422,6 +423,7 @@ public sealed class AzureBlobJournalStorageTests
         private readonly Dictionary<string, StoredAppendBlob> _blobs = [];
         private int _createCount;
         private int _appendCount;
+        private int _sealCount;
 
         public bool FailNextAppend { get; set; }
 
@@ -531,6 +533,8 @@ public sealed class AzureBlobJournalStorageTests
 
             ThrowIfAppendConditionsFail(name, conditions);
             blob.IsSealed = true;
+            _sealCount++;
+            blob.ETag = new ETag($"\"seal-{_sealCount}\"");
             return Task.FromResult(Response.FromValue(BlobsModelFactory.BlobInfo(blob.ETag, default), TestResponse.Instance));
         }
 
