@@ -52,13 +52,16 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
+        // Appends are written as one Azure append block, so validate blob limits before touching storage.
         ThrowIfBatchTooLarge(value.Length);
+        // Ensure local state has the current WAL ETag and manifest before making a conditional append.
         await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
         ThrowIfCompactionRequired();
 
         using var stream = new ReadOnlySequenceStream(value);
         try
         {
+            // Use the last observed WAL ETag so appends fail if the WAL changed since this instance recovered it.
             var result = await _walClient.AppendBlockAsync(
                 stream,
                 new AppendBlobAppendBlockOptions
@@ -71,6 +74,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 cancellationToken).ConfigureAwait(false);
 
             LogAppend(_shared.Logger, stream.Length, _walClient.BlobContainerName, _walClient.Name);
+            // Cache Azure's post-append state so the next mutation is guarded by the new ETag and block count.
             SetWal(result.Value.ETag, result.Value.BlobCommittedBlockCount, _walLength + stream.Length, _checkpointName);
         }
         catch (RequestFailedException exception) when (IsBlobSealed(exception))
@@ -85,14 +89,17 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
+        // Fresh storage instances load the WAL manifest first so delete knows whether a checkpoint is referenced.
         if (!WalExists && !await TryLoadWalStateAsync(cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
+        // Remember the checkpoint before clearing local WAL state so obsolete checkpoint cleanup can still run.
         var checkpointName = _checkpointName;
         try
         {
+            // Delete the WAL under its ETag before checkpoint cleanup so a racing WAL update cannot lose its checkpoint.
             await _walClient.DeleteIfExistsAsync(
                 DeleteSnapshotsOption.None,
                 new BlobRequestConditions { IfMatch = _walETag },
@@ -106,6 +113,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
         if (checkpointName is not null)
         {
+            // Checkpoint cleanup happens after WAL deletion because without the WAL manifest it is unreachable.
             await DeleteCheckpointIfExistsAsync(checkpointName, cancellationToken).ConfigureAwait(false);
         }
     }
@@ -117,10 +125,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         Response<BlobDownloadStreamingResult> walResult;
         try
         {
+            // Download the WAL first because its metadata is the manifest for any checkpoint that must be replayed.
             walResult = await _walClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
+            // A missing WAL is an empty journal; clear cached state before reporting completion.
             SetWal(eTag: default, blockCount: 0, length: 0, checkpointName: null);
             consumer.Complete(metadata: null);
             return;
@@ -128,6 +138,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
         var walDetails = walResult.Value.Details;
         var manifest = CreateWalManifest(walDetails.Metadata);
+        // Recovery refreshes the cached ETag, length, block count, and checkpoint pointer from the WAL manifest.
         SetWal(walDetails.ETag, walDetails.BlobCommittedBlockCount, walDetails.ContentLength, manifest.Checkpoint?.Name);
 
         await using var walStream = walResult.Value.Content;
@@ -138,6 +149,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             var checkpointResult = await checkpointClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             await using var checkpointStream = checkpointResult.Value.Content;
 
+            // Replay the immutable checkpoint first because it represents the compacted prefix before WAL entries.
             var checkpointMetadata = ValidateCheckpointMetadata(checkpoint, checkpointResult.Value.Details, expectedFormat);
             var totalCheckpointBytes = await ReadStreamAsync(
                 consumer,
@@ -157,9 +169,11 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     $"Azure Blob journal checkpoint offset {checkpointOffset.WalOffset:N0} exceeds WAL length {walDetails.ContentLength:N0}.");
             }
 
+            // The checkpoint already contains WAL bytes through this offset, so replay only the WAL tail.
             await SkipStreamAsync(walStream, checkpointOffset.WalOffset, cancellationToken).ConfigureAwait(false);
         }
 
+        // Prefer WAL format metadata, falling back to the checkpoint when compaction recreated an empty WAL.
         var walMetadata = manifest.Metadata.Format is { Length: > 0 }
             ? manifest.Metadata
             : expectedFormat is { Length: > 0 }
@@ -172,22 +186,27 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             complete: false,
             cancellationToken).ConfigureAwait(false);
         LogRead(_shared.Logger, totalWalBytes, _walClient.BlobContainerName, _walClient.Name);
+        // Complete only after checkpoint and WAL tail have streamed as one logical journal.
         consumer.Complete(walMetadata);
     }
 
     public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
+        // Compaction publishes through WAL metadata, so first recover or create the WAL whose ETag will be checked.
         await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
 
+        // Snapshot the current publication state; the previous checkpoint is obsolete only after the new WAL wins.
         var walETag = _walETag;
         var previousCheckpointName = _checkpointName;
         using var checkpointStream = new ReadOnlySequenceStream(value);
         while (true)
         {
+            // The checkpoint blob is immutable and content-addressed by a random snapshot id for safe retry on collision.
             var checkpointName = GetCheckpointName(Guid.NewGuid().ToString("N"));
             var checkpointClient = GetCheckpointClient(checkpointName);
             try
             {
+                // Upload the checkpoint before publishing it from WAL metadata so upload failures leave recovery unchanged.
                 checkpointStream.Position = 0;
                 await checkpointClient.UploadAsync(
                     checkpointStream,
@@ -207,6 +226,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
             try
             {
+                // Recreate the WAL under its ETag to publish the checkpoint only if the existing WAL is unchanged.
                 var result = await CreateWalAsync(
                     checkpointName,
                     new AppendBlobRequestConditions { IfMatch = walETag },
@@ -220,16 +240,19 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
             if (previousCheckpointName is not null && !string.Equals(previousCheckpointName, checkpointName, StringComparison.Ordinal))
             {
+                // Keep the previous checkpoint until the new WAL is published so its manifest never points at a missing blob.
                 await DeleteCheckpointIfExistsAsync(previousCheckpointName, cancellationToken).ConfigureAwait(false);
             }
 
             LogReplace(_shared.Logger, checkpointClient.BlobContainerName, checkpointClient.Name, checkpointStream.Length);
+            // At this point the new checkpoint is reachable from WAL metadata and old state has been detached.
             return;
         }
     }
 
     private static void ThrowIfBatchTooLarge(long length)
     {
+        // Azure rejects oversize append blocks, so fail locally with the journal-specific guidance.
         if (length <= MaxAppendBlockBytes)
         {
             return;
@@ -242,6 +265,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private void ThrowIfCompactionRequired()
     {
+        // Stop before Azure's hard block cap so the caller can compact while there is still append headroom.
         if (_numBlocks < MaxBlocksPerBlob - HeadroomBlockCount)
         {
             return;
@@ -254,10 +278,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private async ValueTask EnsureWalAsync(CancellationToken cancellationToken)
     {
+        // Either create the initial WAL or load the WAL created by a racing instance, then loop until state is cached.
         while (!WalExists)
         {
             try
             {
+                // A newly-created WAL has no checkpoint pointer; existing WALs are handled by the conflict path.
                 var response = await CreateWalAsync(
                     checkpointName: null,
                     new AppendBlobRequestConditions { IfNoneMatch = ETag.All },
@@ -267,6 +293,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             }
             catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
             {
+                // Another instance created the WAL first; read/discard it to recover its ETag and manifest before appending.
                 await ReadAsync(DiscardingJournalStorageConsumer.Instance, cancellationToken).ConfigureAwait(false);
             }
         }
@@ -277,10 +304,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         Response<BlobDownloadStreamingResult> walResult;
         try
         {
+            // Open the WAL just long enough to read properties and metadata; the content is discarded here.
             walResult = await _walClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
+            // Missing WAL means there is no durable state to delete or mutate.
             SetWal(eTag: default, blockCount: 0, length: 0, checkpointName: null);
             return false;
         }
@@ -288,12 +317,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         await using var content = walResult.Value.Content;
         var walDetails = walResult.Value.Details;
         var manifest = CreateWalManifest(walDetails.Metadata);
+        // Cache the mutation preconditions and compaction signals without replaying journal bytes.
         SetWal(walDetails.ETag, walDetails.BlobCommittedBlockCount, walDetails.ContentLength, manifest.Checkpoint?.Name);
         return true;
     }
 
     private void SetWal(ETag eTag, int blockCount, long length, string? checkpointName)
     {
+        // Keep the cached WAL mutation precondition, compaction counters, and checkpoint pointer in sync.
         _walETag = eTag;
         _numBlocks = blockCount;
         _walLength = length;
@@ -302,6 +333,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private AppendBlobClient GetWalClient()
     {
+        // Resolve the provider-specific WAL client once; checkpoint clients are resolved by published name.
         var client = _shared.BlobClientProvider.GetWalClient(_grainContext.GrainId);
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal WAL client provider returned null.");
     }
@@ -310,6 +342,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         string? checkpointName,
         AppendBlobRequestConditions conditions,
         CancellationToken cancellationToken)
+        // Creating an append blob is also how compaction publishes a fresh WAL manifest.
         => await _walClient.CreateAsync(
             new AppendBlobCreateOptions
             {
@@ -320,10 +353,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             cancellationToken).ConfigureAwait(false);
 
     private static BlobHttpHeaders? CreateHttpHeaders(string? contentType)
+        // Content type is optional transport metadata; journal format is carried separately in blob metadata.
         => contentType is { Length: > 0 } ? new BlobHttpHeaders { ContentType = contentType } : null;
 
     private string GetCheckpointName(string snapshotId)
     {
+        // Let the configured provider own checkpoint naming so custom layouts stay consistent with WAL naming.
         var checkpointName = _shared.BlobClientProvider.GetCheckpointName(_grainContext.GrainId, snapshotId);
         if (string.IsNullOrWhiteSpace(checkpointName))
         {
@@ -335,6 +370,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private BlockBlobClient GetCheckpointClient(string checkpointName)
     {
+        // Resolve by the published checkpoint name so recovery can open checkpoints created by older instances.
         var client = _shared.BlobClientProvider.GetCheckpointClient(_grainContext.GrainId, checkpointName);
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal checkpoint client provider returned null.");
     }
@@ -344,6 +380,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         var checkpointClient = GetCheckpointClient(checkpointName);
         try
         {
+            // Obsolete checkpoint cleanup is best-effort because the published WAL no longer references it.
             await checkpointClient.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: null, cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception)
@@ -354,6 +391,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private Dictionary<string, string> CreateMetadataDictionary()
     {
+        // Start with metadata common to WAL and checkpoint blobs so recovery can verify the journal format.
         var metadata = new Dictionary<string, string>();
         if (_shared.JournalFormatKey is { Length: > 0 })
         {
@@ -367,6 +405,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private Dictionary<string, string> CreateWalMetadata(string? checkpointName, long checkpointOffset)
     {
+        // WAL metadata is the recovery manifest: common format plus optional checkpoint pointer and WAL offset.
         var metadata = CreateMetadataDictionary();
         if (checkpointName is not null)
         {
@@ -386,6 +425,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private static WalManifest CreateWalManifest(IDictionary<string, string>? metadata)
     {
+        // Decode the WAL manifest, accepting non-compacted WALs that have no checkpoint pointer.
         var fileMetadata = GetFormatKeyMetadata(metadata) is { } format
             ? new JournalFileMetadata(format)
             : JournalFileMetadata.Empty;
@@ -408,6 +448,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private static IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
     {
+        // Refuse to stitch checkpoint and WAL data together if their declared journal formats differ.
         var checkpointBlobFormat = GetFormatKeyMetadata(checkpointDetails.Metadata);
         if (expectedFormat is { Length: > 0 })
         {
@@ -440,6 +481,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 || exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase));
 
     private static bool IsWalMutationConflict(RequestFailedException exception)
+        // These failures mean our cached WAL view is stale or gone, so the caller must recover before retrying.
         => exception.Status is 404 or 412
             || exception.Status == 409 && string.Equals(exception.ErrorCode, "ConditionNotMet", StringComparison.Ordinal);
 
@@ -450,6 +492,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         bool complete,
         CancellationToken cancellationToken)
     {
+        // Stream one blob through a reusable buffer; callers decide when the combined logical journal completes.
         metadata ??= JournalFileMetadata.Empty;
         using var buffer = new ArcBufferWriter();
         long totalBytesRead = 0;
@@ -459,6 +502,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             var bytesRead = await input.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
             if (bytesRead == 0)
             {
+                // ReadAsync passes complete:false because checkpoint data and WAL tail are completed together later.
                 if (complete)
                 {
                     ReadBuffer(consumer, buffer, metadata, isCompleted: true);
@@ -474,12 +518,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
             buffer.AdvanceWriter(bytesRead);
             totalBytesRead += bytesRead;
+            // Let the consumer drain incrementally so large blobs do not need to be buffered in full.
             ReadBuffer(consumer, buffer, metadata, isCompleted: false);
         }
     }
 
     private static async ValueTask SkipStreamAsync(Stream input, long length, CancellationToken cancellationToken)
     {
+        // Used during recovery to consume checkpoint-covered WAL bytes without exposing them to the consumer.
         if (length <= 0)
         {
             return;
@@ -487,10 +533,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
         if (input.CanSeek)
         {
+            // Seeking is only used when supported; Azure response streams are often forward-only.
             input.Seek(length, SeekOrigin.Current);
             return;
         }
 
+        // Non-seekable streams can only advance by reading, so drain discarded bytes into a pooled buffer.
         var buffer = ArrayPool<byte>.Shared.Rent((int)Math.Min(81920, length));
         try
         {
@@ -515,6 +563,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private static void ReadBuffer(IJournalStorageConsumer consumer, ArcBufferWriter buffer, IJournalFileMetadata metadata, bool isCompleted)
     {
+        // The consumer advances the reader side of the buffer, leaving unread bytes to be detected by the caller.
         var reader = new JournalBufferReader(buffer.Reader, isCompleted);
         consumer.Read(reader, metadata);
     }
@@ -541,7 +590,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private sealed record WalManifest(IJournalFileMetadata Metadata, CheckpointReference? Checkpoint);
 
-    private sealed record CheckpointReference(string Name, long WalOffset);
+    private readonly record struct CheckpointReference(string Name, long WalOffset);
 
     internal sealed class SharedConfiguration
     {
@@ -600,96 +649,4 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) => buffer.Skip(buffer.Length);
     }
 
-    private sealed class ReadOnlySequenceStream(ReadOnlySequence<byte> sequence) : Stream
-    {
-        private readonly ReadOnlySequence<byte> _sequence = sequence;
-        private long _position;
-        private bool _disposed;
-
-        public override bool CanRead => !_disposed;
-
-        public override bool CanSeek => !_disposed;
-
-        public override bool CanWrite => false;
-
-        public override long Length
-        {
-            get
-            {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-                return _sequence.Length;
-            }
-        }
-
-        public override long Position
-        {
-            get
-            {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-                return _position;
-            }
-
-            set
-            {
-                ObjectDisposedException.ThrowIf(_disposed, this);
-                if (value < 0 || value > _sequence.Length)
-                {
-                    throw new ArgumentOutOfRangeException(nameof(value));
-                }
-
-                _position = value;
-            }
-        }
-
-        public override void Flush() => ObjectDisposedException.ThrowIf(_disposed, this);
-
-        public override int Read(byte[] buffer, int offset, int count) => Read(buffer.AsSpan(offset, count));
-
-        public override int Read(Span<byte> buffer)
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            if (buffer.IsEmpty || _position >= _sequence.Length)
-            {
-                return 0;
-            }
-
-            var length = (int)Math.Min(buffer.Length, _sequence.Length - _position);
-            _sequence.Slice(_position, length).CopyTo(buffer);
-            _position += length;
-            return length;
-        }
-
-        public override ValueTask<int> ReadAsync(Memory<byte> buffer, CancellationToken cancellationToken = default)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            return new ValueTask<int>(Read(buffer.Span));
-        }
-
-        public override long Seek(long offset, SeekOrigin origin)
-        {
-            ObjectDisposedException.ThrowIf(_disposed, this);
-            var newPosition = origin switch
-            {
-                SeekOrigin.Begin => offset,
-                SeekOrigin.Current => _position + offset,
-                SeekOrigin.End => _sequence.Length + offset,
-                _ => throw new ArgumentOutOfRangeException(nameof(origin))
-            };
-
-            Position = newPosition;
-            return _position;
-        }
-
-        public override void SetLength(long value) => throw new NotSupportedException("This stream is read-only.");
-
-        public override void Write(byte[] buffer, int offset, int count) => throw new NotSupportedException("This stream is read-only.");
-
-        public override void Write(ReadOnlySpan<byte> buffer) => throw new NotSupportedException("This stream is read-only.");
-
-        protected override void Dispose(bool disposing)
-        {
-            _disposed = true;
-            base.Dispose(disposing);
-        }
-    }
 }
