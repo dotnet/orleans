@@ -25,6 +25,7 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected CopierTester(ITestOutputHelper output) : base(output)
         {
+            output.WriteLine($"Random seed: {RandomSeed}");
             _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
         }
 
@@ -33,6 +34,7 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected CopierTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
         {
+            output.WriteLine($"Random seed: {RandomSeed}");
             _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
         }
 

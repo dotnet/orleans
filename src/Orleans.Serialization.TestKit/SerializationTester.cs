@@ -19,7 +19,8 @@ namespace Orleans.Serialization.TestKit
         protected SerializationTester(ITestOutputHelper output)
         {
             _ = output;
-            Random = CreateRandom();
+            RandomSeed = CreateRandomSeed();
+            Random = new(RandomSeed);
             ServiceProvider = CreateServiceProvider();
             _ownsServiceProvider = true;
         }
@@ -35,24 +36,26 @@ namespace Orleans.Serialization.TestKit
                 throw new ArgumentNullException(nameof(fixture));
             }
 
-            Random = CreateRandom();
+            RandomSeed = CreateRandomSeed();
+            Random = new(RandomSeed);
             ServiceProvider = fixture.GetOrCreateServiceProvider(CreateServiceProvider);
         }
 
-        private static Random CreateRandom()
+        private static int CreateRandomSeed()
         {
 #if NET6_0_OR_GREATER
-            var seed = Random.Shared.Next();
+            return Random.Shared.Next();
 #else
-            var seed = new Random().Next();
+            return new Random().Next();
 #endif
-            return new(seed);
         }
 
         /// <summary>
         /// Gets the random number generator.
         /// </summary>
         protected Random Random { get; }
+
+        internal int RandomSeed { get; }
 
         /// <summary>
         /// Gets the service provider.

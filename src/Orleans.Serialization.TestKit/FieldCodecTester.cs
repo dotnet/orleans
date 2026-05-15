@@ -33,6 +33,7 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected FieldCodecTester(ITestOutputHelper output) : base(output)
         {
+            output.WriteLine($"Random seed: {RandomSeed}");
             _sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         }
 
@@ -41,6 +42,7 @@ namespace Orleans.Serialization.TestKit
         /// </summary>
         protected FieldCodecTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
         {
+            output.WriteLine($"Random seed: {RandomSeed}");
             _sessionPool = ServiceProvider.GetRequiredService<SerializerSessionPool>();
         }
 
