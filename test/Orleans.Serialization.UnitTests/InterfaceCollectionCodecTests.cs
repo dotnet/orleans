@@ -586,7 +586,7 @@ internal static class InterfaceCollectionTestHelpers
 
 internal sealed class UnknownList<T>(IEnumerable<T> values) : IList<T>, IReadOnlyList<T>
 {
-    private readonly List<T> _values = [with(values)];
+    private readonly List<T> _values = [.. values];
 
     public int Count => _values.Count;
 

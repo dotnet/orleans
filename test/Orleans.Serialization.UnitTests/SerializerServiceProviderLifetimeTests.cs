@@ -24,7 +24,7 @@ public sealed class SerializerServiceProviderLifetimeTests
     [Fact]
     public void PooledSerializerStateCanBeReturnedAfterServiceProviderDisposal()
     {
-        using var serviceProvider = new ServiceCollection()
+        var serviceProvider = new ServiceCollection()
             .AddSerializer()
             .BuildServiceProvider();
         var session = serviceProvider.GetRequiredService<SerializerSessionPool>().GetSession();
