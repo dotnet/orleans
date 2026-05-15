@@ -10,18 +10,15 @@ namespace Orleans.Serialization.TestKit
 {
     [Xunit.Trait("Category", "BVT")]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public abstract partial class CopierTester<TValue, TCopier>
+    public abstract partial class CopierTester<TValue, TCopier> : SerializationTester
         where TCopier : class, Cloning.IDeepCopier<TValue>
     {
         protected CopierTester(Xunit.Abstractions.ITestOutputHelper output) { }
+        protected CopierTester(Xunit.Abstractions.ITestOutputHelper output, SerializationTesterFixture fixture) { }
 
         protected virtual bool IsImmutable { get { throw null; } }
 
         protected virtual bool IsPooled { get { throw null; } }
-
-        protected System.Random Random { get { throw null; } }
-
-        protected System.IServiceProvider ServiceProvider { get { throw null; } }
 
         protected abstract TValue[] TestValues { get; }
 
@@ -40,6 +37,7 @@ namespace Orleans.Serialization.TestKit
         public void CanCopyUntypedTupleViaSerializer() { }
 
         protected virtual void Configure(ISerializerBuilder builder) { }
+        protected override System.IServiceProvider CreateServiceProvider() { throw null; }
 
         [Xunit.Fact]
         public void CopiedValuesAreEqual() { }
@@ -55,15 +53,12 @@ namespace Orleans.Serialization.TestKit
 
     [Xunit.Trait("Category", "BVT")]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public abstract partial class FieldCodecTester<TValue, TCodec> : System.IDisposable where TCodec : class, Codecs.IFieldCodec<TValue>
+    public abstract partial class FieldCodecTester<TValue, TCodec> : SerializationTester where TCodec : class, Codecs.IFieldCodec<TValue>
     {
         protected FieldCodecTester(Xunit.Abstractions.ITestOutputHelper output) { }
+        protected FieldCodecTester(Xunit.Abstractions.ITestOutputHelper output, SerializationTesterFixture fixture) { }
 
         protected virtual int[] MaxSegmentSizes { get { throw null; } }
-
-        protected System.Random Random { get { throw null; } }
-
-        protected System.IServiceProvider ServiceProvider { get { throw null; } }
 
         protected Session.SerializerSessionPool SessionPool { get { throw null; } }
 
@@ -114,6 +109,7 @@ namespace Orleans.Serialization.TestKit
         public void CanSkipValue() { }
 
         protected virtual void Configure(ISerializerBuilder builder) { }
+        protected override System.IServiceProvider CreateServiceProvider() { throw null; }
 
         [Xunit.Fact]
         public void CorrectlyAdvancesReferenceCounter() { }
@@ -141,10 +137,36 @@ namespace Orleans.Serialization.TestKit
 
         protected object RoundTripThroughUntypedSerializer(object original, out string formattedBitStream) { throw null; }
 
-        void System.IDisposable.Dispose() { }
-
         [Xunit.Fact]
         public void WritersProduceSameResults() { }
+    }
+
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public abstract partial class SerializationTester : System.IDisposable
+    {
+        protected SerializationTester(Xunit.Abstractions.ITestOutputHelper output) { }
+        protected SerializationTester(Xunit.Abstractions.ITestOutputHelper output, SerializationTesterFixture fixture) { }
+
+        protected System.Random Random { get { throw null; } }
+
+        protected System.IServiceProvider ServiceProvider { get { throw null; } }
+
+        protected abstract System.IServiceProvider CreateServiceProvider();
+        protected virtual void Dispose(bool disposing) { }
+
+        void System.IDisposable.Dispose() { }
+    }
+
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public partial class SerializationTesterFixture : System.IDisposable
+    {
+        public SerializationTesterFixture() { }
+
+        public System.IServiceProvider ServiceProvider { get { throw null; } }
+
+        protected virtual void Dispose(bool disposing) { }
+
+        void System.IDisposable.Dispose() { }
     }
 
     public partial interface IOutputBuffer
@@ -199,6 +221,7 @@ namespace Orleans.Serialization.TestKit
     public abstract partial class ValueTypeFieldCodecTester<TField, TCodec> : FieldCodecTester<TField, TCodec> where TField : struct where TCodec : class, Codecs.IFieldCodec<TField>
     {
         protected ValueTypeFieldCodecTester(Xunit.Abstractions.ITestOutputHelper output) : base(default!) { }
+        protected ValueTypeFieldCodecTester(Xunit.Abstractions.ITestOutputHelper output, SerializationTesterFixture fixture) : base(default!) { }
 
         [Xunit.Fact]
         public void DirectAccessValueSerializerRoundTrip() { }

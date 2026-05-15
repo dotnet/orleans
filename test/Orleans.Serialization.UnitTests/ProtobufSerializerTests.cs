@@ -35,9 +35,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Needing highly optimized wire format
 /// </summary>
 [Trait("Category", "BVT")]
-public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IFieldCodec<MyProtobufClass?>>
+public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IFieldCodec<MyProtobufClass?>>, IClassFixture<SerializationTesterFixture>
 {
-    public ProtobufSerializerTests(ITestOutputHelper output) : base(output)
+    public ProtobufSerializerTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -101,9 +101,9 @@ public class ProtobufSerializerTests : FieldCodecTester<MyProtobufClass?, IField
 }
 
 [Trait("Category", "BVT")]
-public class ProtobufCodecCopierTests : CopierTester<MyProtobufClass?, IDeepCopier<MyProtobufClass?>>
+public class ProtobufCodecCopierTests : CopierTester<MyProtobufClass?, IDeepCopier<MyProtobufClass?>>, IClassFixture<SerializationTesterFixture>
 {
-    public ProtobufCodecCopierTests(ITestOutputHelper output) : base(output)
+    public ProtobufCodecCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -125,9 +125,9 @@ public class ProtobufCodecCopierTests : CopierTester<MyProtobufClass?, IDeepCopi
 }
 
 [Trait("Category", "BVT")]
-public class ProtobufRepeatedFieldCodecTests : FieldCodecTester<RepeatedField<int>, RepeatedFieldCodec<int>>
+public class ProtobufRepeatedFieldCodecTests : FieldCodecTester<RepeatedField<int>, RepeatedFieldCodec<int>>, IClassFixture<SerializationTesterFixture>
 {
-    public ProtobufRepeatedFieldCodecTests(ITestOutputHelper output) : base(output)
+    public ProtobufRepeatedFieldCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -147,9 +147,9 @@ public class ProtobufRepeatedFieldCodecTests : FieldCodecTester<RepeatedField<in
 }
 
 [Trait("Category", "BVT")]
-public class ProtobufRepeatedFieldCopierTests : CopierTester<RepeatedField<int>, IDeepCopier<RepeatedField<int>>>
+public class ProtobufRepeatedFieldCopierTests : CopierTester<RepeatedField<int>, IDeepCopier<RepeatedField<int>>>, IClassFixture<SerializationTesterFixture>
 {
-    public ProtobufRepeatedFieldCopierTests(ITestOutputHelper output) : base(output)
+    public ProtobufRepeatedFieldCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -171,9 +171,9 @@ public class ProtobufRepeatedFieldCopierTests : CopierTester<RepeatedField<int>,
 }
 
 [Trait("Category", "BVT")]
-public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFieldCodec<string, int>>
+public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFieldCodec<string, int>>, IClassFixture<SerializationTesterFixture>
 {
-    public MapFieldCodecTests(ITestOutputHelper output) : base(output)
+    public MapFieldCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -193,9 +193,9 @@ public class MapFieldCodecTests : FieldCodecTester<MapField<string, int>, MapFie
 }
 
 [Trait("Category", "BVT")]
-public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldCopier<string, int>>
+public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldCopier<string, int>>, IClassFixture<SerializationTesterFixture>
 {
-    public MapFieldCopierTests(ITestOutputHelper output) : base(output)
+    public MapFieldCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -215,9 +215,9 @@ public class MapFieldCopierTests : CopierTester<MapField<string, int>, MapFieldC
 }
 
 [Trait("Category", "BVT")]
-public class ByteStringCodecTests : FieldCodecTester<ByteString, ByteStringCodec>
+public class ByteStringCodecTests : FieldCodecTester<ByteString, ByteStringCodec>, IClassFixture<SerializationTesterFixture>
 {
-    public ByteStringCodecTests(ITestOutputHelper output) : base(output)
+    public ByteStringCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -234,9 +234,9 @@ public class ByteStringCodecTests : FieldCodecTester<ByteString, ByteStringCodec
 }
 
 [Trait("Category", "BVT")]
-public class ByteStringCopierTests : CopierTester<ByteString, ByteStringCopier>
+public class ByteStringCopierTests : CopierTester<ByteString, ByteStringCopier>, IClassFixture<SerializationTesterFixture>
 {
-    public ByteStringCopierTests(ITestOutputHelper output) : base(output)
+    public ByteStringCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 

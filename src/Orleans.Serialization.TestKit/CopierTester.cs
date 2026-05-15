@@ -16,23 +16,32 @@ namespace Orleans.Serialization.TestKit
     /// </summary>
     [Trait("Category", "BVT")]
     [ExcludeFromCodeCoverage]
-    public abstract class CopierTester<TValue, TCopier> where TCopier : class, IDeepCopier<TValue>
+    public abstract class CopierTester<TValue, TCopier> : SerializationTester where TCopier : class, IDeepCopier<TValue>
     {
-        private readonly IServiceProvider _serviceProvider;
         private readonly CodecProvider _codecProvider;
 
         /// <summary>
         /// Initializes a new <see cref="CopierTester{TValue, TCopier}"/> instance.
         /// </summary>
-        protected CopierTester(ITestOutputHelper output)
+        protected CopierTester(ITestOutputHelper output) : base(output)
         {
-            _ = output;
-#if NET6_0_OR_GREATER
-            var seed = Random.Shared.Next();
-#else
-            var seed = new Random().Next();
-#endif
-            Random = new(seed);
+            _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
+        }
+
+        /// <summary>
+        /// Initializes a new <see cref="CopierTester{TValue, TCopier}"/> instance.
+        /// </summary>
+        protected CopierTester(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
+        {
+            _codecProvider = ServiceProvider.GetRequiredService<CodecProvider>();
+        }
+
+        /// <inheritdoc/>
+        protected override IServiceProvider CreateServiceProvider()
+            => CreateServiceProviderCore(Configure);
+
+        internal static IServiceProvider CreateServiceProviderCore(Action<ISerializerBuilder> configure)
+        {
             var services = new ServiceCollection();
             _ = services.AddSerializer(builder => builder.Configure(config => config.Copiers.Add(typeof(TCopier))));
 
@@ -41,21 +50,10 @@ namespace Orleans.Serialization.TestKit
                 _ = services.AddSingleton<TCopier>();
             }
 
-            _ = services.AddSerializer(Configure);
+            _ = services.AddSerializer(configure);
 
-            _serviceProvider = services.BuildServiceProvider();
-            _codecProvider = _serviceProvider.GetRequiredService<CodecProvider>();
+            return services.BuildServiceProvider();
         }
-
-        /// <summary>
-        /// Gets the random number generator.
-        /// </summary>
-        protected Random Random { get; }
-
-        /// <summary>
-        /// Gets the service provider.
-        /// </summary>
-        protected IServiceProvider ServiceProvider => _serviceProvider;
 
         /// <summary>
         /// Gets a value indicating whether the type copied by this codec is immutable.
@@ -77,7 +75,7 @@ namespace Orleans.Serialization.TestKit
         /// <summary>
         /// Creates a copier instance for testing.
         /// </summary>
-        protected virtual TCopier CreateCopier() => _serviceProvider.GetRequiredService<TCopier>();
+        protected virtual TCopier CreateCopier() => ServiceProvider.GetRequiredService<TCopier>();
 
         /// <summary>
         /// Creates a value to copy.
@@ -139,7 +137,7 @@ namespace Orleans.Serialization.TestKit
 
             var value = CreateValue();
             var array = new TValue[] { value, value };
-            var arrayCopier = _serviceProvider.GetRequiredService<DeepCopier<TValue[]>>();
+            var arrayCopier = ServiceProvider.GetRequiredService<DeepCopier<TValue[]>>();
             var arrayCopy = arrayCopier.Copy(array);
             Assert.Same(arrayCopy[0], arrayCopy[1]);
 
@@ -159,7 +157,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyTupleViaSerializer()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<(string, TValue, TValue, string)>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<(string, TValue, TValue, string)>>();
 
             var original = (Guid.NewGuid().ToString(), CreateValue(), CreateValue(), Guid.NewGuid().ToString());
 
@@ -189,7 +187,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyUntypedTupleViaSerializer()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<(string, object, object, string)>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<(string, object, object, string)>>();
             var value = ((IEnumerable<TValue>)TestValues).Reverse().Concat(new[] { CreateValue(), CreateValue() }).Take(2).ToArray();
 
             var original = (Guid.NewGuid().ToString(), (object)value[0], (object)value[1], Guid.NewGuid().ToString());
@@ -220,7 +218,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyCollectionViaSerializer()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<List<TValue>>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<List<TValue>>>();
 
             var original = new List<TValue>();
             original.AddRange(TestValues);
@@ -247,7 +245,7 @@ namespace Orleans.Serialization.TestKit
         [Fact]
         public void CanCopyCollectionViaUntypedSerializer()
         {
-            var copier = _serviceProvider.GetRequiredService<DeepCopier<List<object>>>();
+            var copier = ServiceProvider.GetRequiredService<DeepCopier<List<object>>>();
 
             var original = new List<object>();
             foreach (var value in TestValues)
@@ -272,4 +270,5 @@ namespace Orleans.Serialization.TestKit
             }
         }
     }
+
 }

@@ -24,7 +24,7 @@ using static VerifyXunit.Verifier;
 
 namespace Orleans.Serialization.UnitTests;
 
-public class EnumerableInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<IEnumerable<int>, IFieldCodec<IEnumerable<int>>>(output)
+public class EnumerableInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IEnumerable<int>, IFieldCodec<IEnumerable<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IEnumerable<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IEnumerable<int>>();
     protected override IEnumerable<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -32,7 +32,7 @@ public class EnumerableInterfaceCodecTests(ITestOutputHelper output) : FieldCode
     protected override bool Equals(IEnumerable<int> left, IEnumerable<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class EnumerableInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IEnumerable<int>, IDeepCopier<IEnumerable<int>>>(output)
+public class EnumerableInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IEnumerable<int>, IDeepCopier<IEnumerable<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IEnumerable<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IEnumerable<int>>();
     protected override IEnumerable<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -40,7 +40,7 @@ public class EnumerableInterfaceCopierTests(ITestOutputHelper output) : CopierTe
     protected override bool Equals(IEnumerable<int> left, IEnumerable<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class ReadOnlyCollectionInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<IReadOnlyCollection<int>, IFieldCodec<IReadOnlyCollection<int>>>(output)
+public class ReadOnlyCollectionInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IReadOnlyCollection<int>, IFieldCodec<IReadOnlyCollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IReadOnlyCollection<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlyCollection<int>>();
     protected override IReadOnlyCollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -48,7 +48,7 @@ public class ReadOnlyCollectionInterfaceCodecTests(ITestOutputHelper output) : F
     protected override bool Equals(IReadOnlyCollection<int> left, IReadOnlyCollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class ReadOnlyCollectionInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IReadOnlyCollection<int>, IDeepCopier<IReadOnlyCollection<int>>>(output)
+public class ReadOnlyCollectionInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlyCollection<int>, IDeepCopier<IReadOnlyCollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlyCollection<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlyCollection<int>>();
     protected override IReadOnlyCollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -56,7 +56,7 @@ public class ReadOnlyCollectionInterfaceCopierTests(ITestOutputHelper output) : 
     protected override bool Equals(IReadOnlyCollection<int> left, IReadOnlyCollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class ReadOnlyListInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<IReadOnlyList<int>, IFieldCodec<IReadOnlyList<int>>>(output)
+public class ReadOnlyListInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IReadOnlyList<int>, IFieldCodec<IReadOnlyList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IReadOnlyList<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlyList<int>>();
     protected override IReadOnlyList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -64,7 +64,7 @@ public class ReadOnlyListInterfaceCodecTests(ITestOutputHelper output) : FieldCo
     protected override bool Equals(IReadOnlyList<int> left, IReadOnlyList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class ReadOnlyListInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IReadOnlyList<int>, IDeepCopier<IReadOnlyList<int>>>(output)
+public class ReadOnlyListInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlyList<int>, IDeepCopier<IReadOnlyList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlyList<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlyList<int>>();
     protected override IReadOnlyList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -72,7 +72,7 @@ public class ReadOnlyListInterfaceCopierTests(ITestOutputHelper output) : Copier
     protected override bool Equals(IReadOnlyList<int> left, IReadOnlyList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class CollectionInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<ICollection<int>, IFieldCodec<ICollection<int>>>(output)
+public class CollectionInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ICollection<int>, IFieldCodec<ICollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<ICollection<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<ICollection<int>>();
     protected override ICollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -80,7 +80,7 @@ public class CollectionInterfaceCodecTests(ITestOutputHelper output) : FieldCode
     protected override bool Equals(ICollection<int> left, ICollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class CollectionInterfaceCopierTests(ITestOutputHelper output) : CopierTester<ICollection<int>, IDeepCopier<ICollection<int>>>(output)
+public class CollectionInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ICollection<int>, IDeepCopier<ICollection<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<ICollection<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<ICollection<int>>();
     protected override ICollection<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -88,7 +88,7 @@ public class CollectionInterfaceCopierTests(ITestOutputHelper output) : CopierTe
     protected override bool Equals(ICollection<int> left, ICollection<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class ListInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<IList<int>, IFieldCodec<IList<int>>>(output)
+public class ListInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IList<int>, IFieldCodec<IList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IList<int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IList<int>>();
     protected override IList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -96,7 +96,7 @@ public class ListInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTeste
     protected override bool Equals(IList<int> left, IList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class ListInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IList<int>, IDeepCopier<IList<int>>>(output)
+public class ListInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IList<int>, IDeepCopier<IList<int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IList<int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IList<int>>();
     protected override IList<int> CreateValue() => InterfaceCollectionTestHelpers.CreateList(Random);
@@ -104,7 +104,7 @@ public class ListInterfaceCopierTests(ITestOutputHelper output) : CopierTester<I
     protected override bool Equals(IList<int> left, IList<int> right) => InterfaceCollectionTestHelpers.SequenceEqual(left, right);
 }
 
-public class SetInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<ISet<string>, IFieldCodec<ISet<string>>>(output)
+public class SetInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<ISet<string>, IFieldCodec<ISet<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<ISet<string>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<ISet<string>>();
     protected override ISet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
@@ -112,7 +112,7 @@ public class SetInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester
     protected override bool Equals(ISet<string> left, ISet<string> right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
 }
 
-public class SetInterfaceCopierTests(ITestOutputHelper output) : CopierTester<ISet<string>, IDeepCopier<ISet<string>>>(output)
+public class SetInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<ISet<string>, IDeepCopier<ISet<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<ISet<string>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<ISet<string>>();
     protected override ISet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
@@ -121,7 +121,7 @@ public class SetInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IS
 }
 
 #if NET5_0_OR_GREATER
-public class ReadOnlySetInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<IReadOnlySet<string>, IFieldCodec<IReadOnlySet<string>>>(output)
+public class ReadOnlySetInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IReadOnlySet<string>, IFieldCodec<IReadOnlySet<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IReadOnlySet<string>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlySet<string>>();
     protected override IReadOnlySet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
@@ -129,7 +129,7 @@ public class ReadOnlySetInterfaceCodecTests(ITestOutputHelper output) : FieldCod
     protected override bool Equals(IReadOnlySet<string> left, IReadOnlySet<string> right) => InterfaceCollectionTestHelpers.SetEqual(left, right);
 }
 
-public class ReadOnlySetInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IReadOnlySet<string>, IDeepCopier<IReadOnlySet<string>>>(output)
+public class ReadOnlySetInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlySet<string>, IDeepCopier<IReadOnlySet<string>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlySet<string>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlySet<string>>();
     protected override IReadOnlySet<string> CreateValue() => InterfaceCollectionTestHelpers.CreateSet(Random);
@@ -138,7 +138,7 @@ public class ReadOnlySetInterfaceCopierTests(ITestOutputHelper output) : CopierT
 }
 #endif
 
-public class DictionaryInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<IDictionary<string, int>, IFieldCodec<IDictionary<string, int>>>(output)
+public class DictionaryInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IDictionary<string, int>, IFieldCodec<IDictionary<string, int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IDictionary<string, int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IDictionary<string, int>>();
     protected override IDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
@@ -146,7 +146,7 @@ public class DictionaryInterfaceCodecTests(ITestOutputHelper output) : FieldCode
     protected override bool Equals(IDictionary<string, int> left, IDictionary<string, int> right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
 }
 
-public class DictionaryInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IDictionary<string, int>, IDeepCopier<IDictionary<string, int>>>(output)
+public class DictionaryInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IDictionary<string, int>, IDeepCopier<IDictionary<string, int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IDictionary<string, int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IDictionary<string, int>>();
     protected override IDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
@@ -154,7 +154,7 @@ public class DictionaryInterfaceCopierTests(ITestOutputHelper output) : CopierTe
     protected override bool Equals(IDictionary<string, int> left, IDictionary<string, int> right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
 }
 
-public class ReadOnlyDictionaryInterfaceCodecTests(ITestOutputHelper output) : FieldCodecTester<IReadOnlyDictionary<string, int>, IFieldCodec<IReadOnlyDictionary<string, int>>>(output)
+public class ReadOnlyDictionaryInterfaceCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : FieldCodecTester<IReadOnlyDictionary<string, int>, IFieldCodec<IReadOnlyDictionary<string, int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IFieldCodec<IReadOnlyDictionary<string, int>> CreateCodec() => ServiceProvider.GetRequiredService<ICodecProvider>().GetCodec<IReadOnlyDictionary<string, int>>();
     protected override IReadOnlyDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
@@ -162,7 +162,7 @@ public class ReadOnlyDictionaryInterfaceCodecTests(ITestOutputHelper output) : F
     protected override bool Equals(IReadOnlyDictionary<string, int> left, IReadOnlyDictionary<string, int> right) => InterfaceCollectionTestHelpers.DictionaryEqual(left, right);
 }
 
-public class ReadOnlyDictionaryInterfaceCopierTests(ITestOutputHelper output) : CopierTester<IReadOnlyDictionary<string, int>, IDeepCopier<IReadOnlyDictionary<string, int>>>(output)
+public class ReadOnlyDictionaryInterfaceCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : CopierTester<IReadOnlyDictionary<string, int>, IDeepCopier<IReadOnlyDictionary<string, int>>>(output, fixture), IClassFixture<SerializationTesterFixture>
 {
     protected override IDeepCopier<IReadOnlyDictionary<string, int>> CreateCopier() => ServiceProvider.GetRequiredService<IDeepCopierProvider>().GetDeepCopier<IReadOnlyDictionary<string, int>>();
     protected override IReadOnlyDictionary<string, int> CreateValue() => InterfaceCollectionTestHelpers.CreateDictionary(Random);
