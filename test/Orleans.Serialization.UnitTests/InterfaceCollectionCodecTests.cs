@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Globalization;
+using System.Threading.Tasks;
 #if NET8_0_OR_GREATER
 using System.Collections.Frozen;
 #endif
@@ -11,10 +12,15 @@ using Orleans;
 using Orleans.Serialization;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.Codecs;
+using Orleans.Serialization.Session;
 using Orleans.Serialization.Serializers;
 using Orleans.Serialization.TestKit;
+using Orleans.Serialization.Utilities;
 using Xunit;
 using Xunit.Abstractions;
+#if !NETCOREAPP3_1
+using static VerifyXunit.Verifier;
+#endif
 
 namespace Orleans.Serialization.UnitTests;
 
@@ -168,6 +174,15 @@ public class ReadOnlyDictionaryInterfaceCopierTests(ITestOutputHelper output) : 
 public class InterfaceCollectionRegressionTests
 {
     private const int MaxInterfaceCollectionCapacityHint = 16 * 1024;
+    private const string EnumerableCodecAlias = "EnumerableCodec`1";
+    private const string ReadOnlyCollectionCodecAlias = "ReadOnlyCollectionInterfaceCodec`1";
+    private const string ReadOnlyListCodecAlias = "ReadOnlyListInterfaceCodec`1";
+    private const string CollectionCodecAlias = "CollectionInterfaceCodec`1";
+    private const string ListCodecAlias = "ListInterfaceCodec`1";
+    private const string SetCodecAlias = "SetInterfaceCodec`1";
+    private const string ReadOnlySetCodecAlias = "ReadOnlySetInterfaceCodec`1";
+    private const string DictionaryCodecAlias = "DictionaryInterfaceCodec`2";
+    private const string ReadOnlyDictionaryCodecAlias = "ReadOnlyDictionaryInterfaceCodec`2";
     private static readonly int[] ExpectedArray = [1, 2, 3];
 
     [Fact]
@@ -287,6 +302,90 @@ public class InterfaceCollectionRegressionTests
     }
 #endif
 
+    [Fact]
+    public void CanSerializeGenericInterfaceFieldsUsingFallbackCodecTypes()
+    {
+        var original = new GenericInterfaceCollectionContainer
+        {
+            Enumerable = new UnknownList<int>(ExpectedArray),
+            ReadOnlyCollection = new MisreportedReadOnlyCollection<int>(ExpectedArray, ExpectedArray.Length),
+            ReadOnlyList = new UnknownList<int>(ExpectedArray),
+            Collection = new UnknownList<int>(ExpectedArray),
+            List = new UnknownList<int>(ExpectedArray),
+            Set = new UnknownSet<string>(["a", "b"]),
+#if NET5_0_OR_GREATER
+            ReadOnlySet = new UnknownSet<string>(["c", "d"]),
+#endif
+            Dictionary = new UnknownDictionary<string, int>(new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }),
+            ReadOnlyDictionary = new UnknownDictionary<string, int>(new Dictionary<string, int> { ["c"] = 3, ["d"] = 4 }),
+        };
+
+        var result = RoundTrip(original);
+
+        var enumerable = Assert.IsType<List<int>>(result.Enumerable);
+        Assert.Equal(ExpectedArray, enumerable);
+        var readOnlyCollection = Assert.IsType<List<int>>(result.ReadOnlyCollection);
+        Assert.Equal(ExpectedArray, readOnlyCollection);
+        var readOnlyList = Assert.IsType<List<int>>(result.ReadOnlyList);
+        Assert.Equal(ExpectedArray, readOnlyList);
+        var collection = Assert.IsType<List<int>>(result.Collection);
+        Assert.Equal(ExpectedArray, collection);
+        var list = Assert.IsType<List<int>>(result.List);
+        Assert.Equal(ExpectedArray, list);
+        var set = Assert.IsType<HashSet<string>>(result.Set);
+        Assert.True(set.SetEquals(["a", "b"]));
+#if NET5_0_OR_GREATER
+        var readOnlySet = Assert.IsType<HashSet<string>>(result.ReadOnlySet);
+        Assert.True(readOnlySet.SetEquals(["c", "d"]));
+#endif
+        var dictionary = Assert.IsType<Dictionary<string, int>>(result.Dictionary);
+        Assert.Equal(1, dictionary["a"]);
+        Assert.Equal(2, dictionary["b"]);
+        var readOnlyDictionary = Assert.IsType<Dictionary<string, int>>(result.ReadOnlyDictionary);
+        Assert.Equal(3, readOnlyDictionary["c"]);
+        Assert.Equal(4, readOnlyDictionary["d"]);
+    }
+
+#if !NETCOREAPP3_1
+    [Fact]
+    public Task EnumerableInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<IEnumerable<int>>(new UnknownList<int>(ExpectedArray), EnumerableCodecAlias);
+
+    [Fact]
+    public Task ReadOnlyCollectionInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<IReadOnlyCollection<int>>(new MisreportedReadOnlyCollection<int>(ExpectedArray, ExpectedArray.Length), ReadOnlyCollectionCodecAlias);
+
+    [Fact]
+    public Task ReadOnlyListInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<IReadOnlyList<int>>(new UnknownList<int>(ExpectedArray), ReadOnlyListCodecAlias);
+
+    [Fact]
+    public Task CollectionInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<ICollection<int>>(new UnknownList<int>(ExpectedArray), CollectionCodecAlias);
+
+    [Fact]
+    public Task ListInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<IList<int>>(new UnknownList<int>(ExpectedArray), ListCodecAlias);
+
+    [Fact]
+    public Task SetInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<ISet<string>>(new UnknownSet<string>(["a", "b"]), SetCodecAlias);
+
+#if NET5_0_OR_GREATER
+    [Fact]
+    public Task ReadOnlySetInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<IReadOnlySet<string>>(new UnknownSet<string>(["a", "b"]), ReadOnlySetCodecAlias);
+#endif
+
+    [Fact]
+    public Task DictionaryInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<IDictionary<string, int>>(new UnknownDictionary<string, int>(new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }), DictionaryCodecAlias);
+
+    [Fact]
+    public Task ReadOnlyDictionaryInterfaceFallback_Formatted_MatchesSnapshot()
+        => VerifyFallbackBitStream<IReadOnlyDictionary<string, int>>(new UnknownDictionary<string, int>(new Dictionary<string, int> { ["a"] = 1, ["b"] = 2 }), ReadOnlyDictionaryCodecAlias);
+#endif
+
     private static T RoundTrip<T>(T value)
     {
         using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
@@ -299,6 +398,24 @@ public class InterfaceCollectionRegressionTests
         using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
         return serviceProvider.GetRequiredService<DeepCopier<T>>().Copy(value);
     }
+
+#if !NETCOREAPP3_1
+    private static Task VerifyFallbackBitStream<T>(T value, string codecAlias)
+    {
+        var formatted = FormatSerializedPayload(value);
+        Assert.Contains($"TypeName \"{codecAlias}", formatted);
+        return Verify(formatted, extension: "txt").UseDirectory("snapshots");
+    }
+
+    private static string FormatSerializedPayload<T>(T value)
+    {
+        using var serviceProvider = new ServiceCollection().AddSerializer().BuildServiceProvider();
+        var serializer = serviceProvider.GetRequiredService<Serializer<T>>();
+        var payload = serializer.SerializeToArray(value);
+        using var session = serviceProvider.GetRequiredService<SerializerSessionPool>().GetSession();
+        return BitStreamFormatter.Format(payload, session);
+    }
+#endif
 
     [GenerateSerializer]
     [Alias("Orleans.Serialization.UnitTests.InterfaceCollectionRegressionTests.ReadOnlyListContainer")]
@@ -355,6 +472,40 @@ public class InterfaceCollectionRegressionTests
         public IReadOnlyDictionary<string, int> Dictionary { get; set; }
     }
 #endif
+
+    [GenerateSerializer]
+    [Alias("Orleans.Serialization.UnitTests.InterfaceCollectionRegressionTests.GenericInterfaceCollectionContainer")]
+    public sealed class GenericInterfaceCollectionContainer
+    {
+        [Id(0)]
+        public IEnumerable<int> Enumerable { get; set; }
+
+        [Id(1)]
+        public IReadOnlyCollection<int> ReadOnlyCollection { get; set; }
+
+        [Id(2)]
+        public IReadOnlyList<int> ReadOnlyList { get; set; }
+
+        [Id(3)]
+        public ICollection<int> Collection { get; set; }
+
+        [Id(4)]
+        public IList<int> List { get; set; }
+
+        [Id(5)]
+        public ISet<string> Set { get; set; }
+
+#if NET5_0_OR_GREATER
+        [Id(6)]
+        public IReadOnlySet<string> ReadOnlySet { get; set; }
+#endif
+
+        [Id(7)]
+        public IDictionary<string, int> Dictionary { get; set; }
+
+        [Id(8)]
+        public IReadOnlyDictionary<string, int> ReadOnlyDictionary { get; set; }
+    }
 }
 
 internal static class InterfaceCollectionTestHelpers
@@ -464,6 +615,99 @@ internal sealed class UnknownList<T>(IEnumerable<T> values) : IList<T>, IReadOnl
     public bool Remove(T item) => _values.Remove(item);
 
     public void RemoveAt(int index) => _values.RemoveAt(index);
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+internal sealed class UnknownSet<T>(IEnumerable<T> values) : ISet<T>
+#if NET5_0_OR_GREATER
+    , IReadOnlySet<T>
+#endif
+{
+    private readonly HashSet<T> _values = [.. values];
+
+    public int Count => _values.Count;
+
+    public bool IsReadOnly => false;
+
+    public bool Add(T item) => _values.Add(item);
+
+    void ICollection<T>.Add(T item) => Add(item);
+
+    public void ExceptWith(IEnumerable<T> other) => _values.ExceptWith(other);
+
+    public IEnumerator<T> GetEnumerator() => _values.GetEnumerator();
+
+    public void IntersectWith(IEnumerable<T> other) => _values.IntersectWith(other);
+
+    public bool IsProperSubsetOf(IEnumerable<T> other) => _values.IsProperSubsetOf(other);
+
+    public bool IsProperSupersetOf(IEnumerable<T> other) => _values.IsProperSupersetOf(other);
+
+    public bool IsSubsetOf(IEnumerable<T> other) => _values.IsSubsetOf(other);
+
+    public bool IsSupersetOf(IEnumerable<T> other) => _values.IsSupersetOf(other);
+
+    public bool Overlaps(IEnumerable<T> other) => _values.Overlaps(other);
+
+    public bool SetEquals(IEnumerable<T> other) => _values.SetEquals(other);
+
+    public void SymmetricExceptWith(IEnumerable<T> other) => _values.SymmetricExceptWith(other);
+
+    public void UnionWith(IEnumerable<T> other) => _values.UnionWith(other);
+
+    public void Clear() => _values.Clear();
+
+    public bool Contains(T item) => _values.Contains(item);
+
+    public void CopyTo(T[] array, int arrayIndex) => _values.CopyTo(array, arrayIndex);
+
+    public bool Remove(T item) => _values.Remove(item);
+
+    IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+}
+
+internal sealed class UnknownDictionary<TKey, TValue>(IDictionary<TKey, TValue> values) : IDictionary<TKey, TValue>, IReadOnlyDictionary<TKey, TValue>
+{
+    private readonly Dictionary<TKey, TValue> _values = new(values);
+
+    public int Count => _values.Count;
+
+    public bool IsReadOnly => false;
+
+    public ICollection<TKey> Keys => _values.Keys;
+
+    public ICollection<TValue> Values => _values.Values;
+
+    IEnumerable<TKey> IReadOnlyDictionary<TKey, TValue>.Keys => _values.Keys;
+
+    IEnumerable<TValue> IReadOnlyDictionary<TKey, TValue>.Values => _values.Values;
+
+    public TValue this[TKey key]
+    {
+        get => _values[key];
+        set => _values[key] = value;
+    }
+
+    public void Add(TKey key, TValue value) => _values.Add(key, value);
+
+    public void Add(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)_values).Add(item);
+
+    public void Clear() => _values.Clear();
+
+    public bool Contains(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)_values).Contains(item);
+
+    public bool ContainsKey(TKey key) => _values.ContainsKey(key);
+
+    public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) => ((ICollection<KeyValuePair<TKey, TValue>>)_values).CopyTo(array, arrayIndex);
+
+    public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator() => _values.GetEnumerator();
+
+    public bool Remove(TKey key) => _values.Remove(key);
+
+    public bool Remove(KeyValuePair<TKey, TValue> item) => ((ICollection<KeyValuePair<TKey, TValue>>)_values).Remove(item);
+
+    public bool TryGetValue(TKey key, out TValue value) => _values.TryGetValue(key, out value);
 
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
 }

@@ -1,7 +1,9 @@
 using System.Buffers;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Buffers;
 using Orleans.Serialization.Cloning;
 using Orleans.Serialization.GeneratedCodeHelpers;
+using Orleans.Serialization.Serializers;
 using Orleans.Serialization.WireProtocol;
 
 #nullable disable
@@ -36,6 +38,7 @@ internal static class InterfaceCollectionCodecHelpers
         ref Reader<TInput> reader,
         Field field,
         Type fallbackType,
+        Type codecType,
         out TField result)
     {
         if (field.WireType == WireType.Reference)
@@ -48,6 +51,7 @@ internal static class InterfaceCollectionCodecHelpers
         if (fieldType is not null
             && fieldType != typeof(TField)
             && fieldType != fallbackType
+            && fieldType != codecType
             && reader.Session.CodecProvider.TryGetCodec(fieldType) is { } specificCodec)
         {
             result = (TField)specificCodec.ReadValue(ref reader, field);
@@ -115,6 +119,101 @@ internal static class InterfaceCollectionCodecHelpers
         UInt32Codec.WriteField(ref writer, fieldIdDelta, (uint)capacityHint);
         return true;
     }
+
+    public static bool TryGetInterfaceTypeForCodecType(Type type, out Type interfaceType)
+    {
+        if (type is null || !type.IsConstructedGenericType)
+        {
+            interfaceType = null;
+            return false;
+        }
+
+        var genericTypeDefinition = type.GetGenericTypeDefinition();
+        var arguments = type.GetGenericArguments();
+        if (genericTypeDefinition == typeof(EnumerableCodec<>))
+        {
+            interfaceType = typeof(IEnumerable<>).MakeGenericType(arguments);
+            return true;
+        }
+
+        if (genericTypeDefinition == typeof(ReadOnlyCollectionInterfaceCodec<>))
+        {
+            interfaceType = typeof(IReadOnlyCollection<>).MakeGenericType(arguments);
+            return true;
+        }
+
+        if (genericTypeDefinition == typeof(ReadOnlyListInterfaceCodec<>))
+        {
+            interfaceType = typeof(IReadOnlyList<>).MakeGenericType(arguments);
+            return true;
+        }
+
+        if (genericTypeDefinition == typeof(CollectionInterfaceCodec<>))
+        {
+            interfaceType = typeof(ICollection<>).MakeGenericType(arguments);
+            return true;
+        }
+
+        if (genericTypeDefinition == typeof(ListInterfaceCodec<>))
+        {
+            interfaceType = typeof(IList<>).MakeGenericType(arguments);
+            return true;
+        }
+
+        if (genericTypeDefinition == typeof(SetInterfaceCodec<>))
+        {
+            interfaceType = typeof(ISet<>).MakeGenericType(arguments);
+            return true;
+        }
+
+#if NET5_0_OR_GREATER
+        if (genericTypeDefinition == typeof(ReadOnlySetInterfaceCodec<>))
+        {
+            interfaceType = typeof(IReadOnlySet<>).MakeGenericType(arguments);
+            return true;
+        }
+#endif
+
+        if (genericTypeDefinition == typeof(DictionaryInterfaceCodec<,>))
+        {
+            interfaceType = typeof(IDictionary<,>).MakeGenericType(arguments);
+            return true;
+        }
+
+        if (genericTypeDefinition == typeof(ReadOnlyDictionaryInterfaceCodec<,>))
+        {
+            interfaceType = typeof(IReadOnlyDictionary<,>).MakeGenericType(arguments);
+            return true;
+        }
+
+        interfaceType = null;
+        return false;
+    }
+}
+
+internal sealed class InterfaceCollectionCodecResolver(IServiceProvider serviceProvider) : IGeneralizedCodec
+{
+    public bool IsSupportedType(Type type) => InterfaceCollectionCodecHelpers.TryGetInterfaceTypeForCodecType(type, out _);
+
+    public object ReadValue<TInput>(ref Reader<TInput> reader, Field field)
+    {
+        if (!InterfaceCollectionCodecHelpers.TryGetInterfaceTypeForCodecType(field.FieldType, out var interfaceType))
+        {
+            throw new InvalidOperationException($"Type {field.FieldType} is not a supported interface collection codec type.");
+        }
+
+        return serviceProvider.GetRequiredService<ICodecProvider>().GetCodec(interfaceType).ReadValue(ref reader, field);
+    }
+
+    public void WriteField<TBufferWriter>(ref Writer<TBufferWriter> writer, uint fieldIdDelta, Type expectedType, object value) where TBufferWriter : IBufferWriter<byte>
+    {
+        if (!InterfaceCollectionCodecHelpers.TryGetInterfaceTypeForCodecType(expectedType, out var interfaceType))
+        {
+            throw new InvalidOperationException($"Type {expectedType} is not a supported interface collection codec type.");
+        }
+
+        serviceProvider.GetRequiredService<ICodecProvider>().GetCodec(interfaceType).WriteField(ref writer, fieldIdDelta, interfaceType, value);
+    }
 }
 
 internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterface> where TInterface : class, IEnumerable<T>
@@ -135,12 +234,13 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
             return;
         }
 
-        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, FallbackType, value))
+        var codecType = GetType();
+        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, codecType, value))
         {
             return;
         }
 
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, FallbackType, WireType.TagDelimited);
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, codecType, WireType.TagDelimited);
         if (InterfaceCollectionCodecHelpers.TryGetCount(value, out var count))
         {
             WriteElements(ref writer, value, count);
@@ -161,7 +261,7 @@ internal abstract class ListInterfaceCodec<TInterface, T> : IFieldCodec<TInterfa
 
     public TInterface ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
-        if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, out var result))
+        if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, GetType(), out var result))
         {
             return result;
         }
@@ -251,12 +351,13 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
             return;
         }
 
-        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, FallbackType, value))
+        var codecType = GetType();
+        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, codecType, value))
         {
             return;
         }
 
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, FallbackType, WireType.TagDelimited);
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, codecType, WireType.TagDelimited);
         if (InterfaceCollectionCodecHelpers.TryGetCount(value, out var count))
         {
             WriteElements(ref writer, value, count);
@@ -277,7 +378,7 @@ internal abstract class SetInterfaceCodec<TInterface, T> : IFieldCodec<TInterfac
 
     public TInterface ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
-        if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, out var result))
+        if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, GetType(), out var result))
         {
             return result;
         }
@@ -379,12 +480,13 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
             return;
         }
 
-        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, FallbackType, value))
+        var codecType = GetType();
+        if (ReferenceCodec.TryWriteReferenceField(ref writer, fieldIdDelta, expectedType, codecType, value))
         {
             return;
         }
 
-        writer.WriteFieldHeader(fieldIdDelta, expectedType, FallbackType, WireType.TagDelimited);
+        writer.WriteFieldHeader(fieldIdDelta, expectedType, codecType, WireType.TagDelimited);
         if (InterfaceCollectionCodecHelpers.TryGetCount(value, out var count))
         {
             WriteEntries(ref writer, value, count);
@@ -405,7 +507,7 @@ internal abstract class DictionaryInterfaceCodec<TInterface, TKey, TValue> : IFi
 
     public TInterface ReadValue<TInput>(ref Reader<TInput> reader, Field field)
     {
-        if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, out var result))
+        if (InterfaceCollectionCodecHelpers.TryReadReferenceOrSpecificCodec<TInterface, TInput>(ref reader, field, FallbackType, GetType(), out var result))
         {
             return result;
         }
@@ -580,6 +682,7 @@ internal abstract class DictionaryInterfaceCopier<TInterface, TKey, TValue>(
 }
 
 [RegisterSerializer]
+[Alias("EnumerableCodec`1")]
 internal sealed class EnumerableCodec<T>(IFieldCodec<T> elementCodec)
     : ListInterfaceCodec<IEnumerable<T>, T>(elementCodec)
 {
@@ -592,6 +695,7 @@ internal sealed class EnumerableCopier<T>(IDeepCopierProvider copierProvider, ID
 }
 
 [RegisterSerializer]
+[Alias("ReadOnlyCollectionInterfaceCodec`1")]
 internal sealed class ReadOnlyCollectionInterfaceCodec<T>(IFieldCodec<T> elementCodec)
     : ListInterfaceCodec<IReadOnlyCollection<T>, T>(elementCodec)
 {
@@ -604,6 +708,7 @@ internal sealed class ReadOnlyCollectionInterfaceCopier<T>(IDeepCopierProvider c
 }
 
 [RegisterSerializer]
+[Alias("ReadOnlyListInterfaceCodec`1")]
 internal sealed class ReadOnlyListInterfaceCodec<T>(IFieldCodec<T> elementCodec)
     : ListInterfaceCodec<IReadOnlyList<T>, T>(elementCodec)
 {
@@ -616,6 +721,7 @@ internal sealed class ReadOnlyListInterfaceCopier<T>(IDeepCopierProvider copierP
 }
 
 [RegisterSerializer]
+[Alias("CollectionInterfaceCodec`1")]
 internal sealed class CollectionInterfaceCodec<T>(IFieldCodec<T> elementCodec)
     : ListInterfaceCodec<ICollection<T>, T>(elementCodec)
 {
@@ -628,6 +734,7 @@ internal sealed class CollectionInterfaceCopier<T>(IDeepCopierProvider copierPro
 }
 
 [RegisterSerializer]
+[Alias("ListInterfaceCodec`1")]
 internal sealed class ListInterfaceCodec<T>(IFieldCodec<T> elementCodec)
     : ListInterfaceCodec<IList<T>, T>(elementCodec)
 {
@@ -640,6 +747,7 @@ internal sealed class ListInterfaceCopier<T>(IDeepCopierProvider copierProvider,
 }
 
 [RegisterSerializer]
+[Alias("SetInterfaceCodec`1")]
 internal sealed class SetInterfaceCodec<T>(IFieldCodec<T> elementCodec, IFieldCodec<IEqualityComparer<T>> comparerCodec)
     : SetInterfaceCodec<ISet<T>, T>(elementCodec, comparerCodec)
 {
@@ -653,6 +761,7 @@ internal sealed class SetInterfaceCopier<T>(IDeepCopierProvider copierProvider, 
 
 #if NET5_0_OR_GREATER
 [RegisterSerializer]
+[Alias("ReadOnlySetInterfaceCodec`1")]
 internal sealed class ReadOnlySetInterfaceCodec<T>(IFieldCodec<T> elementCodec, IFieldCodec<IEqualityComparer<T>> comparerCodec)
     : SetInterfaceCodec<IReadOnlySet<T>, T>(elementCodec, comparerCodec)
 {
@@ -666,6 +775,7 @@ internal sealed class ReadOnlySetInterfaceCopier<T>(IDeepCopierProvider copierPr
 #endif
 
 [RegisterSerializer]
+[Alias("DictionaryInterfaceCodec`2")]
 internal sealed class DictionaryInterfaceCodec<TKey, TValue>(
     IFieldCodec<TKey> keyCodec,
     IFieldCodec<TValue> valueCodec,
@@ -686,6 +796,7 @@ internal sealed class DictionaryInterfaceCopier<TKey, TValue>(
 }
 
 [RegisterSerializer]
+[Alias("ReadOnlyDictionaryInterfaceCodec`2")]
 internal sealed class ReadOnlyDictionaryInterfaceCodec<TKey, TValue>(
     IFieldCodec<TKey> keyCodec,
     IFieldCodec<TValue> valueCodec,

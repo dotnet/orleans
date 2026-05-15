@@ -73,6 +73,7 @@ namespace Orleans.Serialization
                 services.TryAddSingleton<CopyContextPool>();
 
                 services.AddSingleton<IGeneralizedCodec, WellKnownStringComparerCodec>();
+                services.AddSingleton<IGeneralizedCodec, InterfaceCollectionCodecResolver>();
 
                 services.AddSingleton<ExceptionCodec>();
                 services.AddSingleton<IGeneralizedCodec>(sp => sp.GetRequiredService<ExceptionCodec>());
