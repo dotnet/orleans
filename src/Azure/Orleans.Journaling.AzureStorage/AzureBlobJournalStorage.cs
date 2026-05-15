@@ -25,6 +25,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     private const int MaxBlocksPerBlob = 50_000;
     private const int HeadroomBlockCount = 100;
     private const int RequestCompactionBlockCount = 49_000;
+    private const int MaxSkipBufferBytes = 16 * 1024;
 
     private readonly SharedConfiguration _shared;
     private readonly IGrainContext _grainContext;
@@ -552,21 +553,26 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
 
         // Non-seekable streams can only advance by reading, so drain discarded bytes into a pooled buffer.
-        var buffer = ArrayPool<byte>.Shared.Rent((int)Math.Min(81920, length));
+        var maxChunkSize = (int)Math.Min(MaxSkipBufferBytes, length);
+        var buffer = ArrayPool<byte>.Shared.Rent(maxChunkSize);
+
         try
         {
             while (length > 0)
             {
-                var bytesRead = await input.ReadAsync(
-                    buffer.AsMemory(0, (int)Math.Min(buffer.Length, length)),
-                    cancellationToken).ConfigureAwait(false);
-                if (bytesRead == 0)
-                {
-                    throw new InvalidOperationException("Azure Blob journal WAL ended before the checkpoint offset was reached.");
-                }
+                // ArrayPool can return a larger array, so slice it to keep each skip read capped.
+                var toRead = (int)Math.Min(maxChunkSize, length);
 
-                length -= bytesRead;
+                // ReadExactlyAsync guarantees the buffer slice is completely filled before returning,
+                // or it throws an EndOfStreamException if the stream ends early.
+                await input.ReadExactlyAsync(buffer.AsMemory(0, toRead), cancellationToken).ConfigureAwait(false);
+
+                length -= toRead;
             }
+        }
+        catch (EndOfStreamException ex)
+        {
+            throw new InvalidOperationException("Azure Blob journal WAL ended before the checkpoint offset was reached.", ex);
         }
         finally
         {
