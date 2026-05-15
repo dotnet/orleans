@@ -1,3 +1,4 @@
+using System.Buffers;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
@@ -143,6 +144,35 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         Assert.Equal(17, await recovered.Tcs.Task);
     }
 
+    [SkippableFact]
+    public async Task AzureBlobStorage_CheckpointAndWal_RecoverAcrossFreshProviderInstances()
+    {
+        var blobName = $"journaling-checkpoint-wal-recovery/{Guid.NewGuid():N}";
+        var grainId = GrainId.Create("journaling-checkpoint-wal-recovery", Guid.NewGuid().ToString("N"));
+        var checkpointBytes = new byte[] { 0x10, 0x20, 0x30, 0x40 };
+        var walBytes = new byte[] { 0x50, 0x60, 0x70 };
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
+
+        await using (var writerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token))
+        {
+            var storage = writerProvider.StorageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
+            await storage.ReplaceAsync(new ReadOnlySequence<byte>(checkpointBytes), cts.Token);
+            await storage.AppendAsync(new ReadOnlySequence<byte>(walBytes), cts.Token);
+        }
+
+        await using var readerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token);
+        var recoveredStorage = readerProvider.StorageProvider.Create(new JournalBatchTests.TestGrainContext(grainId));
+        var recovered = new RecordingJournalStorageConsumer();
+
+        await recoveredStorage.ReadAsync(recovered, cts.Token);
+
+        Assert.True(recovered.IsCompleted);
+        Assert.All(recovered.Formats, format => Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, format));
+        Assert.Equal([.. checkpointBytes, .. walBytes], recovered.Bytes.ToArray());
+
+        await recoveredStorage.DeleteAsync(cts.Token);
+    }
+
     private DurableStates CreateStates(IJournalStorage storage)
     {
         var manager = CreateManager(storage);
@@ -255,6 +285,27 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
             using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
             await lifecycle.OnStop(cts.Token);
             await ServiceProvider.DisposeAsync();
+        }
+    }
+
+    private sealed class RecordingJournalStorageConsumer : IJournalStorageConsumer
+    {
+        public List<byte> Bytes { get; } = [];
+
+        public List<string?> Formats { get; } = [];
+
+        public bool IsCompleted { get; private set; }
+
+        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+        {
+            if (buffer.Length > 0)
+            {
+                Bytes.AddRange(buffer.ToArray());
+                buffer.Skip(buffer.Length);
+                Formats.Add(metadata?.Format);
+            }
+
+            IsCompleted |= buffer.IsCompleted;
         }
     }
 
