@@ -11,8 +11,8 @@ namespace Orleans.Journaling;
 internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 {
     internal const string FormatMetadataKey = "format";
-    internal const string GenerationMetadataKey = "generation";
     internal const string CheckpointMetadataKey = "checkpoint";
+    internal const string CheckpointOffsetMetadataKey = "checkpoint_offset";
 
     // Azure Append Blob hard limits documented at:
     // https://learn.microsoft.com/azure/storage/blobs/scalability-targets#scale-targets-for-blob-storage
@@ -20,24 +20,21 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     internal const long MaxAppendBlockBytes = 100L * 1024 * 1024;
 
     // An append blob can hold up to 50,000 committed blocks. The compaction request
-    // (IsCompactionRequested) trips earlier, above 49,000 blocks, so this guard exists only
-    // to roll before hitting the hard Azure limit if a consumer ignores compaction requests.
+    // (IsCompactionRequested) trips earlier, above 49,000 blocks, so this guard exists
+    // only to fail clearly before Azure rejects the append.
     private const int MaxBlocksPerBlob = 50_000;
     private const int HeadroomBlockCount = 100;
     private const int RequestCompactionBlockCount = 49_000;
 
     private readonly SharedConfiguration _shared;
     private readonly IGrainContext _grainContext;
-    private AppendBlobClient _currentLogClient;
-    private uint _currentGeneration;
-    private uint _currentSegmentId;
+    private readonly AppendBlobClient _walClient;
     private int _numBlocks;
-    private ETag _currentSegmentETag;
-    private ETag _rootLogETag;
+    private long _walLength;
+    private ETag _walETag;
+    private string? _checkpointName;
 
-    private bool CurrentSegmentExists => _currentSegmentETag != default;
-
-    private bool RootExists => _rootLogETag != default;
+    private bool WalExists => _walETag != default;
 
     public bool IsCompactionRequested => _numBlocks > RequestCompactionBlockCount;
 
@@ -50,118 +47,90 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
         _shared = shared;
         _grainContext = grainContext;
-        _currentLogClient = GetRootClient();
+        _walClient = GetWalClient();
     }
 
     public async ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
         ThrowIfBatchTooLarge(value.Length);
-        if (CurrentSegmentExists && _numBlocks >= MaxBlocksPerBlob - HeadroomBlockCount)
+        await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
+        ThrowIfCompactionRequired();
+
+        using var stream = new ReadOnlySequenceStream(value);
+        try
         {
-            await RollToNextSegmentAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        while (true)
-        {
-            await EnsureCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
-            var currentLogClient = _currentLogClient;
-
-            using var stream = new ReadOnlySequenceStream(value);
-            try
-            {
-                var result = await currentLogClient.AppendBlockAsync(
-                    stream,
-                    new AppendBlobAppendBlockOptions
-                    {
-                        Conditions = new AppendBlobRequestConditions
-                        {
-                            IfMatch = _currentSegmentETag,
-                        }
-                    },
-                    cancellationToken).ConfigureAwait(false);
-
-                LogAppend(_shared.Logger, stream.Length, currentLogClient.BlobContainerName, currentLogClient.Name);
-                _currentSegmentETag = result.Value.ETag;
-                _numBlocks = result.Value.BlobCommittedBlockCount;
-                if (_currentSegmentId == 0)
+            var result = await _walClient.AppendBlockAsync(
+                stream,
+                new AppendBlobAppendBlockOptions
                 {
-                    _rootLogETag = result.Value.ETag;
-                }
+                    Conditions = new AppendBlobRequestConditions
+                    {
+                        IfMatch = _walETag,
+                    }
+                },
+                cancellationToken).ConfigureAwait(false);
 
-                return;
-            }
-            catch (RequestFailedException exception) when (IsBlobSealed(exception))
-            {
-                await RollToNextSegmentAsync(cancellationToken).ConfigureAwait(false);
-            }
+            LogAppend(_shared.Logger, stream.Length, _walClient.BlobContainerName, _walClient.Name);
+            SetWal(result.Value.ETag, result.Value.BlobCommittedBlockCount, _walLength + stream.Length, _checkpointName);
         }
-    }
-
-    private static void ThrowIfBatchTooLarge(long length)
-    {
-        if (length <= MaxAppendBlockBytes)
+        catch (RequestFailedException exception) when (IsBlobSealed(exception))
         {
-            return;
+            throw new InvalidOperationException("Azure Blob journal WAL is sealed; recovery is required before appending.", exception);
         }
-
-        throw new InvalidOperationException(
-            $"Azure Append Blob journal batch of {length:N0} bytes exceeds the per-block limit of {MaxAppendBlockBytes:N0} bytes (100 MiB). " +
-            "Reduce the operation size or compact more aggressively.");
+        catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
+        {
+            throw new InvalidOperationException("Azure Blob journal WAL changed while appending; recovery is required.", exception);
+        }
     }
 
     public async ValueTask DeleteAsync(CancellationToken cancellationToken)
     {
-        if (!RootExists)
+        if (!WalExists && !await TryLoadWalStateAsync(cancellationToken).ConfigureAwait(false))
         {
             return;
         }
 
-        if (CurrentSegmentExists)
-        {
-            await SealCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        var generation = checked(_currentGeneration + 1u);
-        Response<BlobContentInfo> response;
+        var checkpointName = _checkpointName;
         try
         {
-            response = await CreateRootAsync(
-                generation,
-                checkpointName: null,
-                new AppendBlobRequestConditions { IfMatch = _rootLogETag },
+            await _walClient.DeleteIfExistsAsync(
+                DeleteSnapshotsOption.None,
+                new BlobRequestConditions { IfMatch = _walETag },
                 cancellationToken).ConfigureAwait(false);
+            SetWal(eTag: default, blockCount: 0, length: 0, checkpointName: null);
         }
-        catch (RequestFailedException exception) when (IsRootMutationConflict(exception))
+        catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
         {
-            throw new InvalidOperationException("Azure Blob journal root changed while deleting the journal; recovery is required.", exception);
+            throw new InvalidOperationException("Azure Blob journal WAL changed while deleting the journal; recovery is required.", exception);
         }
 
-        _currentGeneration = generation;
-        SetCurrentSegment(segmentId: 0, exists: true, response.Value.ETag, blockCount: 0);
+        if (checkpointName is not null)
+        {
+            await DeleteCheckpointIfExistsAsync(checkpointName, cancellationToken).ConfigureAwait(false);
+        }
     }
 
     public async ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
-        Response<BlobDownloadStreamingResult> rootResult;
+        Response<BlobDownloadStreamingResult> walResult;
         try
         {
-            rootResult = await GetRootLogClient().DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+            walResult = await _walClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         }
         catch (RequestFailedException exception) when (exception.Status is 404)
         {
-            _currentGeneration = 0;
-            SetCurrentSegment(segmentId: 0, exists: false, eTag: default, blockCount: 0);
-            _rootLogETag = default;
+            SetWal(eTag: default, blockCount: 0, length: 0, checkpointName: null);
             consumer.Complete(metadata: null);
             return;
         }
 
-        await using var rootStream = rootResult.Value.Content;
-        _rootLogETag = rootResult.Value.Details.ETag;
-        var manifest = CreateRootManifest(rootResult.Value.Details.Metadata);
-        _currentGeneration = manifest.Generation;
+        var walDetails = walResult.Value.Details;
+        var manifest = CreateWalManifest(walDetails.Metadata);
+        SetWal(walDetails.ETag, walDetails.BlobCommittedBlockCount, walDetails.ContentLength, manifest.Checkpoint?.Name);
+
+        await using var walStream = walResult.Value.Content;
         var expectedFormat = manifest.Metadata.Format;
         if (manifest.Checkpoint is { } checkpoint)
         {
@@ -180,27 +149,42 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             expectedFormat = checkpointMetadata.Format;
         }
 
-        await ReadRootAndSegmentsAsync(
+        if (manifest.Checkpoint is { WalOffset: > 0 } checkpointOffset)
+        {
+            if (checkpointOffset.WalOffset > walDetails.ContentLength)
+            {
+                throw new InvalidOperationException(
+                    $"Azure Blob journal checkpoint offset {checkpointOffset.WalOffset:N0} exceeds WAL length {walDetails.ContentLength:N0}.");
+            }
+
+            await SkipStreamAsync(walStream, checkpointOffset.WalOffset, cancellationToken).ConfigureAwait(false);
+        }
+
+        var walMetadata = manifest.Metadata.Format is { Length: > 0 }
+            ? manifest.Metadata
+            : expectedFormat is { Length: > 0 }
+                ? new JournalFileMetadata(expectedFormat)
+                : JournalFileMetadata.Empty;
+        var totalWalBytes = await ReadStreamAsync(
             consumer,
-            rootResult.Value.Details,
-            rootStream,
-            expectedFormat,
+            walStream,
+            walMetadata,
+            complete: false,
             cancellationToken).ConfigureAwait(false);
+        LogRead(_shared.Logger, totalWalBytes, _walClient.BlobContainerName, _walClient.Name);
+        consumer.Complete(walMetadata);
     }
 
     public async ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
     {
-        if (!CurrentSegmentExists)
-        {
-            await EnsureCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
-        }
+        await EnsureWalAsync(cancellationToken).ConfigureAwait(false);
 
-        var rootETag = _rootLogETag;
-        var generation = checked(_currentGeneration + 1u);
+        var walETag = _walETag;
+        var previousCheckpointName = _checkpointName;
         using var checkpointStream = new ReadOnlySequenceStream(value);
         while (true)
         {
-            var checkpointName = GetCheckpointName(generation);
+            var checkpointName = GetCheckpointName(Guid.NewGuid().ToString("N"));
             var checkpointClient = GetCheckpointClient(checkpointName);
             try
             {
@@ -211,269 +195,136 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                     {
                         Conditions = new BlobRequestConditions { IfNoneMatch = ETag.All },
                         HttpHeaders = CreateHttpHeaders(_shared.MimeType),
-                        Metadata = CreateCheckpointBlobMetadata(generation),
+                        Metadata = CreateCheckpointBlobMetadata(),
                     },
                     cancellationToken).ConfigureAwait(false);
-
-                Response<BlobContentInfo> rootResult;
-                try
-                {
-                    rootResult = await CreateRootAsync(
-                        generation,
-                        checkpointName,
-                        new AppendBlobRequestConditions { IfMatch = rootETag },
-                        cancellationToken).ConfigureAwait(false);
-                }
-                catch (RequestFailedException exception) when (IsRootMutationConflict(exception))
-                {
-                    throw new InvalidOperationException("Azure Blob journal root changed while publishing a checkpoint; recovery is required.", exception);
-                }
-
-                _currentGeneration = generation;
-                SetCurrentSegment(segmentId: 0, exists: true, rootResult.Value.ETag, blockCount: 0);
-                LogReplace(_shared.Logger, checkpointClient.BlobContainerName, checkpointClient.Name, checkpointStream.Length);
-                return;
             }
             catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
             {
-                var currentManifest = await ReadRootManifestForCollisionAsync(cancellationToken).ConfigureAwait(false);
-                if (currentManifest?.Checkpoint is { } checkpoint
-                    && currentManifest.Generation == generation
-                    && string.Equals(checkpoint.Name, checkpointName, StringComparison.Ordinal))
-                {
-                    throw new InvalidOperationException("Azure Blob journal checkpoint was already published; recovery is required.", exception);
-                }
-
-                generation = checked(Math.Max(generation, currentManifest?.Generation ?? _currentGeneration) + 1u);
+                // Snapshot ids are random, so this should be vanishingly rare. Retry with a new id.
+                continue;
             }
+
+            try
+            {
+                var result = await CreateWalAsync(
+                    checkpointName,
+                    new AppendBlobRequestConditions { IfMatch = walETag },
+                    cancellationToken).ConfigureAwait(false);
+                SetWal(result.Value.ETag, blockCount: 0, length: 0, checkpointName);
+            }
+            catch (RequestFailedException exception) when (IsWalMutationConflict(exception))
+            {
+                throw new InvalidOperationException("Azure Blob journal WAL changed while publishing a checkpoint; recovery is required.", exception);
+            }
+
+            if (previousCheckpointName is not null && !string.Equals(previousCheckpointName, checkpointName, StringComparison.Ordinal))
+            {
+                await DeleteCheckpointIfExistsAsync(previousCheckpointName, cancellationToken).ConfigureAwait(false);
+            }
+
+            LogReplace(_shared.Logger, checkpointClient.BlobContainerName, checkpointClient.Name, checkpointStream.Length);
+            return;
         }
     }
 
-    private async ValueTask EnsureCurrentSegmentAsync(CancellationToken cancellationToken)
+    private static void ThrowIfBatchTooLarge(long length)
     {
-        if (CurrentSegmentExists)
+        if (length <= MaxAppendBlockBytes)
         {
             return;
         }
 
-        Response<BlobContentInfo> response;
-        if (_currentSegmentId == 0)
+        throw new InvalidOperationException(
+            $"Azure Append Blob journal batch of {length:N0} bytes exceeds the per-block limit of {MaxAppendBlockBytes:N0} bytes (100 MiB). " +
+            "Reduce the operation size or compact more aggressively.");
+    }
+
+    private void ThrowIfCompactionRequired()
+    {
+        if (_numBlocks < MaxBlocksPerBlob - HeadroomBlockCount)
+        {
+            return;
+        }
+
+        throw new InvalidOperationException(
+            $"Azure Blob journal WAL has {_numBlocks:N0} committed append blocks and must be compacted before more appends. " +
+            $"Azure Append Blob supports at most {MaxBlocksPerBlob:N0} committed blocks.");
+    }
+
+    private async ValueTask EnsureWalAsync(CancellationToken cancellationToken)
+    {
+        while (!WalExists)
         {
             try
             {
-                response = await CreateRootAsync(
-                    _currentGeneration,
+                var response = await CreateWalAsync(
                     checkpointName: null,
                     new AppendBlobRequestConditions { IfNoneMatch = ETag.All },
                     cancellationToken).ConfigureAwait(false);
+                SetWal(response.Value.ETag, blockCount: 0, length: 0, checkpointName: null);
+                return;
             }
             catch (RequestFailedException exception) when (IsBlobAlreadyExists(exception))
             {
                 await ReadAsync(DiscardingJournalStorageConsumer.Instance, cancellationToken).ConfigureAwait(false);
-                if (!CurrentSegmentExists)
-                {
-                    await EnsureCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
-                }
-
-                return;
             }
-
-        }
-        else
-        {
-            response = await _currentLogClient.CreateAsync(
-                CreateOptions(new AppendBlobRequestConditions { IfNoneMatch = ETag.All }),
-                cancellationToken).ConfigureAwait(false);
-        }
-
-        SetCurrentSegment(_currentSegmentId, exists: true, response.Value.ETag, blockCount: 0);
-    }
-
-    private async ValueTask RollToNextSegmentAsync(CancellationToken cancellationToken)
-    {
-        if (CurrentSegmentExists)
-        {
-            await SealCurrentSegmentAsync(cancellationToken).ConfigureAwait(false);
-        }
-
-        SetCurrentSegment(checked(_currentSegmentId + 1), exists: false, eTag: default, blockCount: 0);
-    }
-
-    private async ValueTask SealCurrentSegmentAsync(CancellationToken cancellationToken)
-    {
-        if (!CurrentSegmentExists)
-        {
-            return;
-        }
-
-        var response = await _currentLogClient.SealAsync(
-            new AppendBlobRequestConditions { IfMatch = _currentSegmentETag },
-            cancellationToken).ConfigureAwait(false);
-        _currentSegmentETag = response.Value.ETag;
-        if (_currentSegmentId == 0)
-        {
-            _rootLogETag = response.Value.ETag;
         }
     }
 
-    private async ValueTask ReadRootAndSegmentsAsync(
-        IJournalStorageConsumer consumer,
-        BlobDownloadDetails rootDetails,
-        Stream rootStream,
-        string? expectedFormat,
-        CancellationToken cancellationToken)
+    private async ValueTask<bool> TryLoadWalStateAsync(CancellationToken cancellationToken)
     {
-        var rootFormat = GetFormatKeyMetadata(rootDetails.Metadata);
-        EnsureCompatibleFormat(expectedFormat, rootFormat, segmentId: 0);
-        var metadata = rootFormat is { Length: > 0 }
-            ? new JournalFileMetadata(rootFormat)
-            : expectedFormat is { Length: > 0 }
-                ? new JournalFileMetadata(expectedFormat)
-                : JournalFileMetadata.Empty;
-        var bytesRead = await ReadStreamAsync(consumer, rootStream, metadata, complete: false, cancellationToken).ConfigureAwait(false);
-        var rootLogClient = GetRootLogClient();
-        LogRead(_shared.Logger, bytesRead, rootLogClient.BlobContainerName, rootLogClient.Name);
-
-        if (!rootDetails.IsSealed)
+        Response<BlobDownloadStreamingResult> walResult;
+        try
         {
-            SetCurrentSegment(segmentId: 0, exists: true, rootDetails.ETag, rootDetails.BlobCommittedBlockCount);
-            consumer.Complete(metadata);
-            return;
+            walResult = await _walClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestFailedException exception) when (exception.Status is 404)
+        {
+            SetWal(eTag: default, blockCount: 0, length: 0, checkpointName: null);
+            return false;
         }
 
-        await ReadWalSegmentsAsync(
-            consumer,
-            startSegmentId: 1,
-            startOffset: 0,
-            expectedFormat: metadata.Format,
-            cancellationToken).ConfigureAwait(false);
+        await using var content = walResult.Value.Content;
+        var walDetails = walResult.Value.Details;
+        var manifest = CreateWalManifest(walDetails.Metadata);
+        SetWal(walDetails.ETag, walDetails.BlobCommittedBlockCount, walDetails.ContentLength, manifest.Checkpoint?.Name);
+        return true;
     }
 
-    private async ValueTask ReadWalSegmentsAsync(
-        IJournalStorageConsumer consumer,
-        uint startSegmentId,
-        long startOffset,
-        string? expectedFormat,
-        CancellationToken cancellationToken)
+    private void SetWal(ETag eTag, int blockCount, long length, string? checkpointName)
     {
-        var segmentId = startSegmentId;
-        var offset = startOffset;
-        var metadata = expectedFormat is { Length: > 0 } ? new JournalFileMetadata(expectedFormat) : JournalFileMetadata.Empty;
-        while (true)
-        {
-            Response<BlobDownloadStreamingResult> result;
-            Stream stream;
-            var client = GetWalClient(segmentId);
-            try
-            {
-                result = await client.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-            }
-            catch (RequestFailedException exception) when (exception.Status is 404)
-            {
-                SetCurrentSegment(segmentId, exists: false, eTag: default, blockCount: 0);
-                consumer.Complete(metadata);
-                return;
-            }
-
-            stream = result.Value.Content;
-            await using (stream.ConfigureAwait(false))
-            {
-                var details = result.Value.Details;
-                var segmentFormat = GetFormatKeyMetadata(details.Metadata);
-                EnsureCompatibleFormat(expectedFormat, segmentFormat, segmentId);
-                metadata = segmentFormat is { Length: > 0 } ? new JournalFileMetadata(segmentFormat) : metadata;
-                if (offset > details.ContentLength)
-                {
-                    throw new InvalidOperationException(
-                        $"Azure Blob journal checkpoint points to offset {offset:N0} in segment {client.Name}, but the segment length is {details.ContentLength:N0}.");
-                }
-
-                if (offset > 0)
-                {
-                    await SkipExactlyAsync(stream, offset, cancellationToken).ConfigureAwait(false);
-                }
-
-                var bytesRead = await ReadStreamAsync(consumer, stream, metadata, complete: false, cancellationToken).ConfigureAwait(false);
-                LogRead(_shared.Logger, bytesRead, client.BlobContainerName, client.Name);
-
-                if (!details.IsSealed)
-                {
-                    SetCurrentSegment(segmentId, exists: true, details.ETag, details.BlobCommittedBlockCount);
-                    consumer.Complete(metadata);
-                    return;
-                }
-            }
-
-            segmentId = checked(segmentId + 1);
-            offset = 0;
-        }
-    }
-
-    private void SetCurrentSegment(uint segmentId, bool exists, ETag eTag, int blockCount)
-    {
-        _currentSegmentId = segmentId;
-        _currentSegmentETag = exists ? eTag : default;
+        _walETag = eTag;
         _numBlocks = blockCount;
-        _currentLogClient = GetLogClient(segmentId);
-        if (segmentId == 0)
-        {
-            _rootLogETag = exists ? eTag : default;
-        }
+        _walLength = length;
+        _checkpointName = checkpointName;
     }
 
-    private AppendBlobClient GetRootLogClient() => _currentSegmentId == 0 ? _currentLogClient : GetRootClient();
-
-    private AppendBlobClient GetLogClient(uint segmentId) => segmentId == 0 ? GetRootClient() : GetWalSegmentClient(segmentId);
-
-    private AppendBlobClient GetWalClient(uint segmentId)
+    private AppendBlobClient GetWalClient()
     {
-        if (segmentId == 0)
-        {
-            return GetRootLogClient();
-        }
-
-        return GetWalSegmentClient(segmentId);
-    }
-
-    private AppendBlobClient GetRootClient()
-    {
-        var client = _shared.BlobClientProvider.GetRootClient(_grainContext.GrainId);
-        return client ?? throw new InvalidOperationException("The configured Azure Blob journal root client provider returned null.");
-    }
-
-    private AppendBlobClient GetWalSegmentClient(uint segmentId)
-    {
-        var client = _shared.BlobClientProvider.GetWalClient(_grainContext.GrainId, _currentGeneration, checked(segmentId - 1));
+        var client = _shared.BlobClientProvider.GetWalClient(_grainContext.GrainId);
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal WAL client provider returned null.");
     }
 
-    private AppendBlobCreateOptions CreateOptions(AppendBlobRequestConditions conditions) => new()
-    {
-        Conditions = conditions,
-        HttpHeaders = CreateHttpHeaders(_shared.MimeType),
-        Metadata = CreateSegmentMetadata(),
-    };
-
-    private async ValueTask<Response<BlobContentInfo>> CreateRootAsync(
-        uint generation,
+    private async ValueTask<Response<BlobContentInfo>> CreateWalAsync(
         string? checkpointName,
         AppendBlobRequestConditions conditions,
         CancellationToken cancellationToken)
-        => await GetRootLogClient().CreateAsync(
+        => await _walClient.CreateAsync(
             new AppendBlobCreateOptions
             {
                 Conditions = conditions,
                 HttpHeaders = CreateHttpHeaders(_shared.MimeType),
-                Metadata = CreateRootMetadata(generation, checkpointName),
+                Metadata = CreateWalMetadata(checkpointName, checkpointOffset: 0),
             },
             cancellationToken).ConfigureAwait(false);
 
     private static BlobHttpHeaders? CreateHttpHeaders(string? contentType)
         => contentType is { Length: > 0 } ? new BlobHttpHeaders { ContentType = contentType } : null;
 
-    private string GetCheckpointName(uint generation)
+    private string GetCheckpointName(string snapshotId)
     {
-        var checkpointName = _shared.BlobClientProvider.GetCheckpointName(_grainContext.GrainId, generation);
+        var checkpointName = _shared.BlobClientProvider.GetCheckpointName(_grainContext.GrainId, snapshotId);
         if (string.IsNullOrWhiteSpace(checkpointName))
         {
             throw new InvalidOperationException("The configured Azure Blob journal checkpoint client provider returned an empty blob name.");
@@ -488,12 +339,22 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         return client ?? throw new InvalidOperationException("The configured Azure Blob journal checkpoint client provider returned null.");
     }
 
-    private Dictionary<string, string> CreateMetadataDictionary(uint generation)
+    private async ValueTask DeleteCheckpointIfExistsAsync(string checkpointName, CancellationToken cancellationToken)
     {
-        var metadata = new Dictionary<string, string>
+        var checkpointClient = GetCheckpointClient(checkpointName);
+        try
         {
-            [GenerationMetadataKey] = FormatGeneration(generation),
-        };
+            await checkpointClient.DeleteIfExistsAsync(DeleteSnapshotsOption.None, conditions: null, cancellationToken).ConfigureAwait(false);
+        }
+        catch (RequestFailedException exception)
+        {
+            LogCheckpointCleanupFailure(_shared.Logger, checkpointClient.BlobContainerName, checkpointClient.Name, exception);
+        }
+    }
+
+    private Dictionary<string, string> CreateMetadataDictionary()
+    {
+        var metadata = new Dictionary<string, string>();
         if (_shared.JournalFormatKey is { Length: > 0 })
         {
             metadata[FormatMetadataKey] = _shared.JournalFormatKey;
@@ -502,16 +363,15 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         return metadata;
     }
 
-    private Dictionary<string, string> CreateSegmentMetadata() => CreateMetadataDictionary(_currentGeneration);
+    private Dictionary<string, string> CreateCheckpointBlobMetadata() => CreateMetadataDictionary();
 
-    private Dictionary<string, string> CreateCheckpointBlobMetadata(uint generation) => CreateMetadataDictionary(generation);
-
-    private Dictionary<string, string> CreateRootMetadata(uint generation, string? checkpointName)
+    private Dictionary<string, string> CreateWalMetadata(string? checkpointName, long checkpointOffset)
     {
-        var metadata = CreateMetadataDictionary(generation);
+        var metadata = CreateMetadataDictionary();
         if (checkpointName is not null)
         {
             metadata[CheckpointMetadataKey] = checkpointName;
+            metadata[CheckpointOffsetMetadataKey] = checkpointOffset.ToString(CultureInfo.InvariantCulture);
         }
 
         return metadata;
@@ -524,52 +384,30 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 ? storedKey
                 : null;
 
-    private static RootManifest CreateRootManifest(IDictionary<string, string>? metadata)
+    private static WalManifest CreateWalManifest(IDictionary<string, string>? metadata)
     {
-        if (!TryGetUInt32Metadata(metadata, GenerationMetadataKey, out var generation))
-        {
-            throw new InvalidOperationException(
-                $"Azure Blob journal root does not include valid '{GenerationMetadataKey}' metadata.");
-        }
-
         var fileMetadata = GetFormatKeyMetadata(metadata) is { } format
             ? new JournalFileMetadata(format)
             : JournalFileMetadata.Empty;
         if (metadata is null || !metadata.TryGetValue(CheckpointMetadataKey, out var checkpointName) || checkpointName is not { Length: > 0 })
         {
-            return new RootManifest(generation, fileMetadata, Checkpoint: null);
+            return new WalManifest(fileMetadata, Checkpoint: null);
         }
 
-        return new RootManifest(
-            generation,
-            fileMetadata,
-            new CheckpointReference(checkpointName, generation));
-    }
+        var checkpointOffset = 0L;
+        if (metadata.TryGetValue(CheckpointOffsetMetadataKey, out var checkpointOffsetValue)
+            && checkpointOffsetValue is { Length: > 0 }
+            && (!long.TryParse(checkpointOffsetValue, NumberStyles.None, CultureInfo.InvariantCulture, out checkpointOffset) || checkpointOffset < 0))
+        {
+            throw new InvalidOperationException(
+                $"Azure Blob journal checkpoint offset metadata is invalid: '{checkpointOffsetValue}'.");
+        }
 
-    private async ValueTask<RootManifest?> ReadRootManifestForCollisionAsync(CancellationToken cancellationToken)
-    {
-        try
-        {
-            var result = await GetRootLogClient().DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
-            await using (result.Value.Content.ConfigureAwait(false))
-            {
-                return CreateRootManifest(result.Value.Details.Metadata);
-            }
-        }
-        catch (RequestFailedException exception) when (exception.Status is 404)
-        {
-            return null;
-        }
+        return new WalManifest(fileMetadata, new CheckpointReference(checkpointName, checkpointOffset));
     }
 
     private static IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
     {
-        if (!TryGetUInt32Metadata(checkpointDetails.Metadata, GenerationMetadataKey, out var generation) || generation != checkpoint.Generation)
-        {
-            throw new InvalidOperationException(
-                $"Azure Blob journal checkpoint '{checkpoint.Name}' does not include the expected generation '{FormatGeneration(checkpoint.Generation)}'.");
-        }
-
         var checkpointBlobFormat = GetFormatKeyMetadata(checkpointDetails.Metadata);
         if (expectedFormat is { Length: > 0 })
         {
@@ -591,29 +429,6 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             : JournalFileMetadata.Empty;
     }
 
-    private static void EnsureCompatibleFormat(string? expectedFormat, string? segmentFormat, uint segmentId)
-    {
-        if (expectedFormat is null || segmentFormat is null || string.Equals(expectedFormat, segmentFormat, StringComparison.Ordinal))
-        {
-            return;
-        }
-
-        throw new InvalidOperationException(
-            $"Azure Blob journal WAL segment {FormatUInt32(segmentId)} format metadata is '{segmentFormat}', but recovery expected '{expectedFormat}'.");
-    }
-
-    private static bool TryGetUInt32Metadata(IDictionary<string, string>? metadata, string key, out uint value)
-    {
-        value = default;
-        return metadata is not null
-            && metadata.TryGetValue(key, out var text)
-            && uint.TryParse(text, NumberStyles.None, CultureInfo.InvariantCulture, out value);
-    }
-
-    private static string FormatUInt32(uint value) => value.ToString("X8", CultureInfo.InvariantCulture);
-
-    private static string FormatGeneration(uint value) => value.ToString(CultureInfo.InvariantCulture);
-
     private static bool IsBlobSealed(RequestFailedException exception)
         => exception.Status == 409
             && (string.Equals(exception.ErrorCode, "BlobIsSealed", StringComparison.Ordinal)
@@ -624,7 +439,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             && (string.Equals(exception.ErrorCode, "BlobAlreadyExists", StringComparison.Ordinal)
                 || exception.Message.Contains("already exists", StringComparison.OrdinalIgnoreCase));
 
-    private static bool IsRootMutationConflict(RequestFailedException exception)
+    private static bool IsWalMutationConflict(RequestFailedException exception)
         => exception.Status is 404 or 412
             || exception.Status == 409 && string.Equals(exception.ErrorCode, "ConditionNotMet", StringComparison.Ordinal);
 
@@ -663,20 +478,33 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    private static async ValueTask SkipExactlyAsync(Stream stream, long bytesToSkip, CancellationToken cancellationToken)
+    private static async ValueTask SkipStreamAsync(Stream input, long length, CancellationToken cancellationToken)
     {
-        var buffer = ArrayPool<byte>.Shared.Rent(81920);
+        if (length <= 0)
+        {
+            return;
+        }
+
+        if (input.CanSeek)
+        {
+            input.Seek(length, SeekOrigin.Current);
+            return;
+        }
+
+        var buffer = ArrayPool<byte>.Shared.Rent((int)Math.Min(81920, length));
         try
         {
-            while (bytesToSkip > 0)
+            while (length > 0)
             {
-                var bytesRead = await stream.ReadAsync(buffer.AsMemory(0, (int)Math.Min(buffer.Length, bytesToSkip)), cancellationToken).ConfigureAwait(false);
+                var bytesRead = await input.ReadAsync(
+                    buffer.AsMemory(0, (int)Math.Min(buffer.Length, length)),
+                    cancellationToken).ConfigureAwait(false);
                 if (bytesRead == 0)
                 {
-                    throw new InvalidOperationException("The stream ended before the requested WAL replay offset was reached.");
+                    throw new InvalidOperationException("Azure Blob journal WAL ended before the checkpoint offset was reached.");
                 }
 
-                bytesToSkip -= bytesRead;
+                length -= bytesRead;
             }
         }
         finally
@@ -706,9 +534,14 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         Message = "Wrote checkpoint blob \"{ContainerName}/{BlobName}\" containing {Length} bytes")]
     private static partial void LogReplace(ILogger logger, string containerName, string blobName, long length);
 
-    private sealed record RootManifest(uint Generation, IJournalFileMetadata Metadata, CheckpointReference? Checkpoint);
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Failed to delete obsolete Azure Blob journal checkpoint \"{ContainerName}/{BlobName}\"")]
+    private static partial void LogCheckpointCleanupFailure(ILogger logger, string containerName, string blobName, Exception exception);
 
-    private sealed record CheckpointReference(string Name, uint Generation);
+    private sealed record WalManifest(IJournalFileMetadata Metadata, CheckpointReference? Checkpoint);
+
+    private sealed record CheckpointReference(string Name, long WalOffset);
 
     internal sealed class SharedConfiguration
     {
@@ -738,11 +571,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     internal abstract class BlobClientProvider
     {
-        public abstract AppendBlobClient GetRootClient(GrainId grainId);
+        public abstract AppendBlobClient GetWalClient(GrainId grainId);
 
-        public abstract AppendBlobClient GetWalClient(GrainId grainId, uint generation, uint segmentId);
-
-        public abstract string GetCheckpointName(GrainId grainId, uint generation);
+        public abstract string GetCheckpointName(GrainId grainId, string snapshotId);
 
         public abstract BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName);
     }
@@ -751,16 +582,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         IBlobContainerFactory containerFactory,
         AzureBlobJournalStorageOptions options) : BlobClientProvider
     {
-        public override AppendBlobClient GetRootClient(GrainId grainId)
+        public override AppendBlobClient GetWalClient(GrainId grainId)
             => containerFactory.GetBlobContainerClient(grainId).GetAppendBlobClient(
-                options.GetRootBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId)));
+                options.GetWalBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId)));
 
-        public override AppendBlobClient GetWalClient(GrainId grainId, uint generation, uint segmentId)
-            => containerFactory.GetBlobContainerClient(grainId).GetAppendBlobClient(
-                options.GetWalSegmentBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId), generation, segmentId));
-
-        public override string GetCheckpointName(GrainId grainId, uint generation)
-            => options.GetCheckpointBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId), generation);
+        public override string GetCheckpointName(GrainId grainId, string snapshotId)
+            => options.GetCheckpointBlobNameForJournal(grainId, options.GetBlobNameForJournal(grainId), snapshotId);
 
         public override BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName)
             => containerFactory.GetBlobContainerClient(grainId).GetBlockBlobClient(checkpointName);

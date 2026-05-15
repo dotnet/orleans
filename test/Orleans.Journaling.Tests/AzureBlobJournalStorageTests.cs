@@ -1,4 +1,5 @@
 using System.Buffers;
+using System.Globalization;
 using Azure;
 using Azure.Core;
 using Azure.Storage.Blobs.Models;
@@ -12,7 +13,7 @@ namespace Orleans.Journaling.Tests;
 public sealed class AzureBlobJournalStorageTests
 {
     [Fact]
-    public async Task DeleteAsync_AllowsNextAppendToRecreateRootWal()
+    public async Task DeleteAsync_AllowsNextAppendToRecreateWal()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var storage = CreateStorage(appendBlobs);
@@ -21,8 +22,37 @@ public sealed class AzureBlobJournalStorageTests
         await storage.DeleteAsync(CancellationToken.None);
         await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
-        Assert.Equal(2, appendBlobs.CreateCalls.Count(call => call.Name == "blob/root"));
-        Assert.Equal(2, appendBlobs.AppendCalls.Count(call => call.Name == "blob/root"));
+        Assert.Equal(2, appendBlobs.CreateCalls.Count(call => call.Name == "blob/wal"));
+        Assert.Equal(2, appendBlobs.AppendCalls.Count(call => call.Name == "blob/wal"));
+        Assert.Equal([2], appendBlobs.GetContent("blob/wal"));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenWalETagChanges_DoesNotDeleteUpdatedWal()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        appendBlobs.BeforeDelete = (name, conditions) =>
+        {
+            if (name == "blob/wal" && conditions?.IfMatch == new ETag("\"append-1\""))
+            {
+                appendBlobs.BeforeDelete = null;
+                appendBlobs.Add("blob/wal", [1, 2], WalMetadata(), isSealed: false);
+            }
+        };
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.DeleteAsync(CancellationToken.None).AsTask());
+
+        var requestFailed = Assert.IsType<RequestFailedException>(exception.InnerException);
+        Assert.Equal(412, requestFailed.Status);
+
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(appendBlobs).ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
     }
 
     [Fact]
@@ -50,31 +80,30 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
-    public void DefaultWalAndCheckpointNames_UseFixedWidthHexIds()
+    public void DefaultWalAndCheckpointNames_UseFixedWalAndSnapshotPrefix()
     {
-        var options = new AzureBlobJournalStorageOptions();
-        var grainId = GrainId.Create("test-grain", "0");
-
-        Assert.Equal("journals/test/2/seg.0000000A", options.GetWalSegmentBlobName(new(grainId, "journals/test", generation: 2, segmentId: 10)));
-        Assert.Equal("journals/test/2/chk", options.GetCheckpointBlobName(new(grainId, "journals/test", generation: 2)));
+        Assert.Equal("journals/test/wal", AzureBlobJournalStorageOptions.GetDefaultWalBlobName("journals/test"));
+        Assert.Equal("journals/test/chk.snapshot", AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName("journals/test", "snapshot"));
     }
 
     [Fact]
-    public async Task AppendAsync_WhenCurrentWalIsSealed_RollsToNextWalSegment()
+    public async Task AppendAsync_WhenCurrentWalIsSealed_RequiresRecovery()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var storage = CreateStorage(appendBlobs);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        appendBlobs.Seal("blob/root");
-        await storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        appendBlobs.Seal("blob/wal");
 
-        Assert.Equal(["create:blob/root", "append:blob/root", "seal:blob/root", "append:blob/root", "seal:blob/root", "create:blob/0/seg.00000000", "append:blob/0/seg.00000000"], appendBlobs.Operations);
-        Assert.Equal([2], appendBlobs.GetContent("blob/0/seg.00000000"));
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
+
+        Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
+        Assert.DoesNotContain(appendBlobs.Operations, static operation => operation.Contains("seg.", StringComparison.Ordinal));
     }
 
     [Fact]
-    public async Task ReplaceAsync_SealsWalUploadsImmutableCheckpointAndPublishesRootMetadata()
+    public async Task ReplaceAsync_UploadsImmutableCheckpointAndPublishesWalMetadata()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var checkpoints = new FakeBlockBlobStore();
@@ -84,31 +113,38 @@ public sealed class AzureBlobJournalStorageTests
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([2, 3]), CancellationToken.None);
 
         var upload = checkpoints.UploadCalls.Single();
-        Assert.Equal("blob/1/chk", upload.Name);
+        Assert.StartsWith("blob/chk.", upload.Name);
         Assert.Equal(ETag.All, upload.IfNoneMatch);
         Assert.Equal([2, 3], upload.Payload);
         Assert.Equal("application/jsonl", upload.ContentType);
         AssertAzureMetadataKeys(upload.Metadata);
         Assert.Equal("json-lines", upload.Metadata[AzureBlobJournalStorage.FormatMetadataKey]);
-        Assert.Equal("1", upload.Metadata[AzureBlobJournalStorage.GenerationMetadataKey]);
+        Assert.DoesNotContain("generation", upload.Metadata.Keys);
 
-        var rootReplace = appendBlobs.CreateCalls.Last();
-        Assert.Equal("blob/root", rootReplace.Name);
-        Assert.Equal(new ETag("\"append-1\""), rootReplace.IfMatch);
-        AssertAzureMetadataKeys(rootReplace.Metadata);
-        Assert.Equal("1", rootReplace.Metadata[AzureBlobJournalStorage.GenerationMetadataKey]);
-        Assert.Equal("json-lines", rootReplace.Metadata[AzureBlobJournalStorage.FormatMetadataKey]);
-        Assert.Equal("blob/1/chk", rootReplace.Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
-        Assert.DoesNotContain("checkpoint_etag", rootReplace.Metadata.Keys);
-        Assert.DoesNotContain("checkpoint_length", rootReplace.Metadata.Keys);
-        Assert.DoesNotContain("checkpoint_format", rootReplace.Metadata.Keys);
+        var walPublish = appendBlobs.CreateCalls.Last();
+        Assert.Equal("blob/wal", walPublish.Name);
+        Assert.Equal(new ETag("\"append-1\""), walPublish.IfMatch);
+        AssertAzureMetadataKeys(walPublish.Metadata);
+        Assert.Equal("json-lines", walPublish.Metadata[AzureBlobJournalStorage.FormatMetadataKey]);
+        Assert.Equal(upload.Name, walPublish.Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
+        Assert.Equal("0", walPublish.Metadata[AzureBlobJournalStorage.CheckpointOffsetMetadataKey]);
+        Assert.DoesNotContain("generation", walPublish.Metadata.Keys);
+        Assert.DoesNotContain("checkpoint_etag", walPublish.Metadata.Keys);
+        Assert.DoesNotContain("checkpoint_length", walPublish.Metadata.Keys);
+        Assert.DoesNotContain("checkpoint_format", walPublish.Metadata.Keys);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([4]), CancellationToken.None);
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(appendBlobs, checkpoints).ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Equal([2, 3, 4], consumer.Bytes.ToArray());
     }
 
     [Fact]
-    public async Task ReadAsync_WhenNoCheckpointMetadata_ReadsRootWalOnly()
+    public async Task ReadAsync_WhenNoCheckpointMetadata_ReadsWalOnly()
     {
         var appendBlobs = new FakeAppendBlobStore();
-        appendBlobs.Add("blob/root", [1, 2], metadata: RootMetadata(generation: 0), isSealed: false);
+        appendBlobs.Add("blob/wal", [1, 2], metadata: WalMetadata(), isSealed: false);
         var checkpoints = new FakeBlockBlobStore();
         var storage = CreateStorage(appendBlobs, checkpoints);
 
@@ -116,7 +152,7 @@ public sealed class AzureBlobJournalStorageTests
         await storage.ReadAsync(consumer, CancellationToken.None);
 
         Assert.Equal([1, 2], consumer.Bytes.ToArray());
-        Assert.Single(appendBlobs.DownloadCalls);
+        Assert.Equal(["blob/wal"], appendBlobs.DownloadCalls.Select(static call => call.Name));
         Assert.Empty(checkpoints.DownloadCalls);
     }
 
@@ -125,19 +161,18 @@ public sealed class AzureBlobJournalStorageTests
     {
         var appendBlobs = new FakeAppendBlobStore();
         appendBlobs.Add(
-            "blob/root",
-            [3, 4],
-            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
+            "blob/wal",
+            [9, 8, 3, 4],
+            CheckpointMarkerMetadata("blob/chk.snapshot", "json-lines", checkpointOffset: 2),
             isSealed: false);
         var checkpoints = new FakeBlockBlobStore();
         checkpoints.Add(
-            "blob/1/chk",
+            "blob/chk.snapshot",
             [1, 2],
             new ETag("\"checkpoint-etag\""),
             new Dictionary<string, string>
             {
                 [AzureBlobJournalStorage.FormatMetadataKey] = "json-lines",
-                [AzureBlobJournalStorage.GenerationMetadataKey] = "1",
             });
         var storage = CreateStorage(appendBlobs, checkpoints);
 
@@ -146,13 +181,13 @@ public sealed class AzureBlobJournalStorageTests
 
         Assert.Equal("json-lines", consumer.JournalFormatKey);
         Assert.Equal([1, 2, 3, 4], consumer.Bytes.ToArray());
-        Assert.Equal(["blob/root"], appendBlobs.DownloadCalls.Select(static call => call.Name));
+        Assert.Equal(["blob/wal"], appendBlobs.DownloadCalls.Select(static call => call.Name));
         Assert.Single(checkpoints.DownloadCalls);
         Assert.Equal(default(ETag), checkpoints.DownloadCalls.Single().IfMatch);
     }
 
     [Fact]
-    public async Task ReplaceAsync_WhenCheckpointUploadFails_DoesNotPublishRootMetadata()
+    public async Task ReplaceAsync_WhenCheckpointUploadFails_DoesNotPublishWalMetadata()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var checkpoints = new FakeBlockBlobStore { FailNextUpload = true };
@@ -162,14 +197,13 @@ public sealed class AzureBlobJournalStorageTests
         await Assert.ThrowsAsync<RequestFailedException>(
             () => storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
 
-        Assert.Empty(appendBlobs.SetMetadataCalls);
-
         await storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
-        Assert.Equal([1, 3], appendBlobs.GetContent("blob/root"));
+        Assert.Equal([1, 3], appendBlobs.GetContent("blob/wal"));
+        Assert.Empty(appendBlobs.SetMetadataCalls);
     }
 
     [Fact]
-    public async Task ReplaceAsync_WhenRootMetadataUpdateFails_DoesNotPublishCheckpoint()
+    public async Task ReplaceAsync_WhenWalPublishFails_DoesNotResetWal()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var checkpoints = new FakeBlockBlobStore();
@@ -183,71 +217,115 @@ public sealed class AzureBlobJournalStorageTests
         Assert.Single(checkpoints.UploadCalls);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
-        Assert.Equal([1, 3], appendBlobs.GetContent("blob/root"));
+        Assert.Equal([1, 3], appendBlobs.GetContent("blob/wal"));
     }
 
     [Fact]
-    public async Task ReplaceAsync_WhenCheckpointGenerationExistsButRootDoesNotReferenceIt_BumpsGeneration()
+    public async Task ReplaceAsync_WhenWalETagConflicts_RequiresRecovery()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var checkpoints = new FakeBlockBlobStore();
         var storage = CreateStorage(appendBlobs, checkpoints);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        checkpoints.Add(
-            "blob/1/chk",
-            [9],
-            new ETag("\"orphan\""),
-            new Dictionary<string, string> { [AzureBlobJournalStorage.GenerationMetadataKey] = "1" });
-
-        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
-
-        Assert.Equal(["blob/1/chk", "blob/2/chk"], checkpoints.UploadCalls.Select(static call => call.Name));
-        var rootReplace = appendBlobs.CreateCalls.Last();
-        Assert.Equal("2", rootReplace.Metadata[AzureBlobJournalStorage.GenerationMetadataKey]);
-        Assert.Equal("blob/2/chk", rootReplace.Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
-    }
-
-    [Fact]
-    public async Task ReplaceAsync_WhenCheckpointGenerationExistsAndRootReferencesIt_RequiresRecovery()
-    {
-        var appendBlobs = new FakeAppendBlobStore();
-        var checkpoints = new FakeBlockBlobStore();
-        var storage = CreateStorage(appendBlobs, checkpoints);
-
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        checkpoints.Add(
-            "blob/1/chk",
-            [2],
-            new ETag("\"checkpoint-etag\""),
-            new Dictionary<string, string> { [AzureBlobJournalStorage.GenerationMetadataKey] = "1" });
-        appendBlobs.Add(
-            "blob/root",
-            [],
-            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
-            isSealed: false);
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
-
-        Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
-    }
-
-    [Fact]
-    public async Task ReplaceAsync_WhenRootETagConflicts_RequiresRecovery()
-    {
-        var appendBlobs = new FakeAppendBlobStore();
-        var checkpoints = new FakeBlockBlobStore();
-        var storage = CreateStorage(appendBlobs, checkpoints);
-
-        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        appendBlobs.Add("blob/root", [1], RootMetadata(generation: 0), isSealed: false);
+        appendBlobs.Add("blob/wal", [1], WalMetadata(), isSealed: false);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
             () => storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
 
         var requestFailed = Assert.IsType<RequestFailedException>(exception.InnerException);
         Assert.Equal(412, requestFailed.Status);
+        Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenWalETagChanges_DoesNotPublishStaleCheckpoint()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        var storage = CreateStorage(appendBlobs, checkpoints);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        appendBlobs.Add("blob/wal", [1, 2], WalMetadata(), isSealed: false);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.ReplaceAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None).AsTask());
+
+        var requestFailed = Assert.IsType<RequestFailedException>(exception.InnerException);
+        Assert.Equal(412, requestFailed.Status);
+        Assert.Single(checkpoints.UploadCalls);
+
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(appendBlobs, checkpoints).ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Equal([1, 2], consumer.Bytes.ToArray());
+        Assert.Empty(checkpoints.DownloadCalls);
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenWalNearBlockLimit_ResetsBlockBudgetAndAllowsMoreAppends()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        appendBlobs.Add("blob/wal", [1], metadata: WalMetadata(), isSealed: false, committedBlockCount: 49_900);
+        var checkpoints = new FakeBlockBlobStore();
+        var storage = CreateStorage(appendBlobs, checkpoints);
+
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+        Assert.True(storage.IsCompactionRequested);
+
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        await storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
+
+        Assert.False(storage.IsCompactionRequested);
+        Assert.Equal([3], appendBlobs.GetContent("blob/wal"));
+        var consumer = new CapturingJournalStorageConsumer();
+        await CreateStorage(appendBlobs, checkpoints).ReadAsync(consumer, CancellationToken.None);
+        Assert.Equal([2, 3], consumer.Bytes.ToArray());
+    }
+
+    [Fact]
+    public async Task ReplaceAsync_WhenReplacingExistingCheckpoint_DeletesPreviousCheckpointAfterPublishingNewWal()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        var storage = CreateStorage(appendBlobs, checkpoints);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
+        var previousCheckpoint = checkpoints.UploadCalls.Single().Name;
+
+        await storage.ReplaceAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
+
+        var currentCheckpoint = checkpoints.UploadCalls.Last().Name;
+        Assert.NotEqual(previousCheckpoint, currentCheckpoint);
+        Assert.False(checkpoints.Exists(previousCheckpoint));
+        Assert.True(checkpoints.Exists(currentCheckpoint));
+        Assert.Equal([previousCheckpoint], checkpoints.DeleteCalls.Select(static call => call.Name));
+    }
+
+    [Fact]
+    public async Task DeleteAsync_WhenWalExistsOnFreshStorage_DeletesWalAndReferencedCheckpoint()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        appendBlobs.Add(
+            "blob/wal",
+            [1],
+            CheckpointMarkerMetadata("blob/chk.snapshot", "json-lines"),
+            isSealed: false);
+        var checkpoints = new FakeBlockBlobStore();
+        checkpoints.Add(
+            "blob/chk.snapshot",
+            [2],
+            new ETag("\"checkpoint-etag\""),
+            new Dictionary<string, string>
+            {
+                [AzureBlobJournalStorage.FormatMetadataKey] = "json-lines",
+            });
+
+        await CreateStorage(appendBlobs, checkpoints).DeleteAsync(CancellationToken.None);
+
+        Assert.False(appendBlobs.Exists("blob/wal"));
+        Assert.False(checkpoints.Exists("blob/chk.snapshot"));
     }
 
     [Fact]
@@ -255,10 +333,10 @@ public sealed class AzureBlobJournalStorageTests
     {
         var appendBlobs = new FakeAppendBlobStore();
         appendBlobs.Add(
-            "blob/root",
+            "blob/wal",
             [],
-            CheckpointMarkerMetadata("missing-checkpoint", "json-lines", generation: 1),
-            isSealed: true);
+            CheckpointMarkerMetadata("missing-checkpoint", "json-lines"),
+            isSealed: false);
         var storage = CreateStorage(appendBlobs, new FakeBlockBlobStore());
 
         var exception = await Assert.ThrowsAsync<RequestFailedException>(
@@ -267,49 +345,20 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
-    public async Task ReadAsync_WhenCheckpointGenerationDoesNotMatch_Throws()
-    {
-        var appendBlobs = new FakeAppendBlobStore();
-        appendBlobs.Add(
-            "blob/root",
-            [],
-            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
-            isSealed: false);
-        var checkpoints = new FakeBlockBlobStore();
-        checkpoints.Add(
-            "blob/1/chk",
-            [2],
-            new ETag("\"checkpoint-etag\""),
-            new Dictionary<string, string>
-            {
-                [AzureBlobJournalStorage.FormatMetadataKey] = "json-lines",
-                [AzureBlobJournalStorage.GenerationMetadataKey] = "2",
-            });
-        var storage = CreateStorage(appendBlobs, checkpoints);
-
-        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-            () => storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None).AsTask());
-        Assert.Contains("generation", exception.Message);
-    }
-
-    [Fact]
     public async Task ReadAsync_WhenCheckpointFormatMetadataIsMissing_Throws()
     {
         var appendBlobs = new FakeAppendBlobStore();
         appendBlobs.Add(
-            "blob/root",
+            "blob/wal",
             [],
-            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
-            isSealed: true);
+            CheckpointMarkerMetadata("blob/chk.snapshot", "json-lines"),
+            isSealed: false);
         var checkpoints = new FakeBlockBlobStore();
         checkpoints.Add(
-            "blob/1/chk",
+            "blob/chk.snapshot",
             [2],
             new ETag("\"checkpoint-etag\""),
-            new Dictionary<string, string>
-            {
-                [AzureBlobJournalStorage.GenerationMetadataKey] = "1",
-            });
+            new Dictionary<string, string>());
         var storage = CreateStorage(appendBlobs, checkpoints);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -318,10 +367,38 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
+    public async Task ReadAsync_WhenCheckpointFormatDiffersFromWal_Throws()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        appendBlobs.Add(
+            "blob/wal",
+            [],
+            CheckpointMarkerMetadata("blob/chk.snapshot", "json-lines"),
+            isSealed: false);
+        var checkpoints = new FakeBlockBlobStore();
+        checkpoints.Add(
+            "blob/chk.snapshot",
+            [1, 2],
+            new ETag("\"checkpoint-etag\""),
+            new Dictionary<string, string>
+            {
+                [AzureBlobJournalStorage.FormatMetadataKey] = "binary",
+            });
+        var storage = CreateStorage(appendBlobs, checkpoints);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None).AsTask());
+
+        Assert.Contains("format", exception.Message);
+        Assert.Contains("binary", exception.Message);
+        Assert.Contains("json-lines", exception.Message);
+    }
+
+    [Fact]
     public async Task ReadAsync_UpdatesCompactionRequestFromCommittedBlockCount()
     {
         var appendBlobs = new FakeAppendBlobStore();
-        appendBlobs.Add("blob/root", [1], metadata: RootMetadata(generation: 0), isSealed: false, committedBlockCount: 49_001);
+        appendBlobs.Add("blob/wal", [1], metadata: WalMetadata(), isSealed: false, committedBlockCount: 49_001);
         var storage = CreateStorage(appendBlobs);
 
         await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
@@ -361,7 +438,7 @@ public sealed class AzureBlobJournalStorageTests
     }
 
     [Fact]
-    public async Task AppendAsync_WithoutPriorRead_LoadsExistingRootGeneration()
+    public async Task AppendAsync_WithoutPriorRead_LoadsExistingWal()
     {
         var appendBlobs = new FakeAppendBlobStore();
         var first = CreateStorage(appendBlobs);
@@ -370,8 +447,41 @@ public sealed class AzureBlobJournalStorageTests
         var second = CreateStorage(appendBlobs);
         await second.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
 
-        Assert.Equal([1, 2], appendBlobs.GetContent("blob/root"));
-        Assert.Contains(appendBlobs.DownloadCalls, static call => call.Name == "blob/root");
+        Assert.Equal([1, 2], appendBlobs.GetContent("blob/wal"));
+        Assert.Contains(appendBlobs.DownloadCalls, static call => call.Name == "blob/wal");
+    }
+
+    [Fact]
+    public async Task AppendAsync_WhenWalETagConflicts_RequiresRecovery()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var storage = CreateStorage(appendBlobs);
+
+        await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
+        appendBlobs.Add("blob/wal", [1, 2], WalMetadata(), isSealed: false);
+
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None).AsTask());
+
+        var requestFailed = Assert.IsType<RequestFailedException>(exception.InnerException);
+        Assert.Equal(412, requestFailed.Status);
+        Assert.Contains("recovery", exception.Message, StringComparison.OrdinalIgnoreCase);
+    }
+
+    [Fact]
+    public async Task AppendAsync_WhenWalNearBlockLimit_RequiresCompactionInsteadOfRolling()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        appendBlobs.Add("blob/wal", [1], metadata: WalMetadata(), isSealed: false, committedBlockCount: 49_900);
+        var storage = CreateStorage(appendBlobs);
+
+        await storage.ReadAsync(DiscardingJournalStorageConsumer.Instance, CancellationToken.None);
+        var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => storage.AppendAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None).AsTask());
+
+        Assert.Contains("compacted", exception.Message);
+        Assert.Empty(appendBlobs.AppendCalls);
+        Assert.DoesNotContain(appendBlobs.Operations, static operation => operation.Contains("seg.", StringComparison.Ordinal));
     }
 
     [Fact]
@@ -390,6 +500,20 @@ public sealed class AzureBlobJournalStorageTests
         Assert.Empty(appendBlobs.AppendCalls);
     }
 
+    [Fact]
+    public async Task ReadAsync_WhenWalDoesNotExist_CompletesEmpty()
+    {
+        var appendBlobs = new FakeAppendBlobStore();
+        var checkpoints = new FakeBlockBlobStore();
+        var storage = CreateStorage(appendBlobs, checkpoints);
+
+        var consumer = new CapturingJournalStorageConsumer();
+        await storage.ReadAsync(consumer, CancellationToken.None);
+
+        Assert.Empty(consumer.Bytes.ToArray());
+        Assert.Empty(checkpoints.DownloadCalls);
+    }
+
     private static AzureBlobJournalStorage CreateStorage(
         FakeAppendBlobStore appendBlobs,
         FakeBlockBlobStore? checkpoints = null,
@@ -406,12 +530,9 @@ public sealed class AzureBlobJournalStorageTests
             new JournalBatchTests.TestGrainContext(GrainId.Create("test-grain", "0")));
     }
 
-    private static Dictionary<string, string> RootMetadata(uint generation, string? format = null)
+    private static Dictionary<string, string> WalMetadata(string? format = null)
     {
-        var result = new Dictionary<string, string>
-        {
-            [AzureBlobJournalStorage.GenerationMetadataKey] = generation.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        };
+        var result = new Dictionary<string, string>();
         if (format is not null)
         {
             result[AzureBlobJournalStorage.FormatMetadataKey] = format;
@@ -423,12 +544,21 @@ public sealed class AzureBlobJournalStorageTests
     private static Dictionary<string, string> CheckpointMarkerMetadata(
         string checkpointName,
         string format,
-        uint generation) => new()
+        long? checkpointOffset = null)
     {
-        [AzureBlobJournalStorage.GenerationMetadataKey] = generation.ToString(System.Globalization.CultureInfo.InvariantCulture),
-        [AzureBlobJournalStorage.FormatMetadataKey] = format,
-        [AzureBlobJournalStorage.CheckpointMetadataKey] = checkpointName,
-    };
+        var result = new Dictionary<string, string>
+        {
+            [AzureBlobJournalStorage.FormatMetadataKey] = format,
+            [AzureBlobJournalStorage.CheckpointMetadataKey] = checkpointName,
+        };
+
+        if (checkpointOffset is { } offset)
+        {
+            result[AzureBlobJournalStorage.CheckpointOffsetMetadataKey] = offset.ToString(CultureInfo.InvariantCulture);
+        }
+
+        return result;
+    }
 
     private static void AssertAzureMetadataKeys(IDictionary<string, string> metadata)
         => Assert.All(metadata.Keys, key => Assert.Matches("^[A-Za-z_][A-Za-z0-9_]*$", key));
@@ -494,14 +624,11 @@ public sealed class AzureBlobJournalStorageTests
     {
         private const string JournalBlobName = "blob";
 
-        public override AppendBlobClient GetRootClient(GrainId grainId)
-            => appendBlobs.GetAppendBlobClient($"{JournalBlobName}/root");
+        public override AppendBlobClient GetWalClient(GrainId grainId)
+            => appendBlobs.GetAppendBlobClient(AzureBlobJournalStorageOptions.GetDefaultWalBlobName(JournalBlobName));
 
-        public override AppendBlobClient GetWalClient(GrainId grainId, uint generation, uint segmentId)
-            => appendBlobs.GetAppendBlobClient(AzureBlobJournalStorageOptions.GetDefaultWalSegmentBlobName(JournalBlobName, generation, segmentId));
-
-        public override string GetCheckpointName(GrainId grainId, uint generation)
-            => AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName(JournalBlobName, generation);
+        public override string GetCheckpointName(GrainId grainId, string snapshotId)
+            => AzureBlobJournalStorageOptions.GetDefaultCheckpointBlobName(JournalBlobName, snapshotId);
 
         public override BlockBlobClient GetCheckpointClient(GrainId grainId, string checkpointName)
             => blockBlobs.GetBlockBlobClient(checkpointName);
@@ -513,12 +640,19 @@ public sealed class AzureBlobJournalStorageTests
         private int _createCount;
         private int _appendCount;
         private int _sealCount;
+        private int _metadataCount;
 
         public bool FailNextAppend { get; set; }
 
         public bool FailNextCreate { get; set; }
 
         public bool FailNextSetMetadata { get; set; }
+
+        public Action<string, AppendBlobCreateOptions>? BeforeCreate { get; set; }
+
+        public Action<string, IDictionary<string, string>, BlobRequestConditions?>? BeforeSetMetadata { get; set; }
+
+        public Action<string, BlobRequestConditions?>? BeforeDelete { get; set; }
 
         public List<string> Operations { get; } = [];
 
@@ -530,11 +664,15 @@ public sealed class AzureBlobJournalStorageTests
 
         public List<SetMetadataCall> SetMetadataCalls { get; } = [];
 
+        public List<DeleteCall> DeleteCalls { get; } = [];
+
         public List<DownloadCall> DownloadCalls { get; } = [];
 
         public AppendBlobClient GetAppendBlobClient(string name) => new FakeAppendBlobClient(this, name);
 
         public byte[] GetContent(string name) => _blobs[name].Content;
+
+        public bool Exists(string name) => _blobs.ContainsKey(name);
 
         public void Add(string name, byte[] content, IDictionary<string, string> metadata, bool isSealed, int? committedBlockCount = null)
             => _blobs[name] = new StoredAppendBlob(content, new ETag($"\"{name}-etag\""), new Dictionary<string, string>(metadata), ContentType: null, committedBlockCount ?? (content.Length == 0 ? 0 : 1), isSealed);
@@ -556,7 +694,9 @@ public sealed class AzureBlobJournalStorageTests
                 options.Conditions?.IfNoneMatch ?? default,
                 options.HttpHeaders?.ContentType,
                 options.Metadata is null ? new Dictionary<string, string>() : new Dictionary<string, string>(options.Metadata)));
-            ThrowIfAppendConditionsFail(name, options.Conditions);
+            BeforeCreate?.Invoke(name, options);
+            ThrowIfConditionsFail(name, options.Conditions);
+
             if (FailNextCreate)
             {
                 FailNextCreate = false;
@@ -600,7 +740,7 @@ public sealed class AzureBlobJournalStorageTests
                 throw new RequestFailedException(409, "The specified blob is sealed.", "BlobIsSealed", null);
             }
 
-            ThrowIfAppendConditionsFail(name, options.Conditions);
+            ThrowIfConditionsFail(name, options.Conditions);
             if (FailNextAppend)
             {
                 FailNextAppend = false;
@@ -626,7 +766,7 @@ public sealed class AzureBlobJournalStorageTests
                 throw new RequestFailedException(404, "Blob does not exist.");
             }
 
-            ThrowIfAppendConditionsFail(name, conditions);
+            ThrowIfConditionsFail(name, conditions);
             blob.IsSealed = true;
             _sealCount++;
             blob.ETag = new ETag($"\"seal-{_sealCount}\"");
@@ -636,44 +776,45 @@ public sealed class AzureBlobJournalStorageTests
         private Task<Response<BlobInfo>> SetMetadataAsync(string name, IDictionary<string, string> metadata, BlobRequestConditions? conditions, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            Operations.Add($"set-metadata:{name}");
-            SetMetadataCalls.Add(new(name, conditions?.IfMatch ?? default, new Dictionary<string, string>(metadata)));
+            Operations.Add($"setMetadata:{name}");
+            SetMetadataCalls.Add(new(
+                name,
+                conditions?.IfMatch ?? default,
+                conditions?.IfNoneMatch ?? default,
+                new Dictionary<string, string>(metadata)));
+            BeforeSetMetadata?.Invoke(name, metadata, conditions);
             if (!_blobs.TryGetValue(name, out var blob))
             {
                 throw new RequestFailedException(404, "Blob does not exist.");
             }
 
-            if (conditions?.IfMatch is { } ifMatch && ifMatch != default && ifMatch != blob.ETag)
-            {
-                throw new RequestFailedException(412, "ETag mismatch.");
-            }
-
+            ThrowIfConditionsFail(name, conditions);
             if (FailNextSetMetadata)
             {
                 FailNextSetMetadata = false;
                 throw new RequestFailedException(500, "Set metadata failed.");
             }
 
+            _metadataCount++;
             blob.Metadata = new Dictionary<string, string>(metadata);
-            blob.ETag = new ETag($"\"metadata-{SetMetadataCalls.Count}\"");
+            blob.ETag = new ETag($"\"metadata-{_metadataCount}\"");
             return Task.FromResult(Response.FromValue(BlobsModelFactory.BlobInfo(blob.ETag, default), TestResponse.Instance));
         }
 
-        private Task<Response> DeleteAsync(string name, BlobRequestConditions? conditions, CancellationToken cancellationToken)
+        private Task<Response<bool>> DeleteIfExistsAsync(string name, BlobRequestConditions? conditions, CancellationToken cancellationToken)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            if (!_blobs.TryGetValue(name, out var blob))
+            Operations.Add($"delete:{name}");
+            DeleteCalls.Add(new(name, conditions?.IfMatch ?? default, conditions?.IfNoneMatch ?? default));
+            BeforeDelete?.Invoke(name, conditions);
+            if (!_blobs.TryGetValue(name, out _))
             {
-                throw new RequestFailedException(404, "Blob does not exist.");
+                return Task.FromResult(Response.FromValue(false, TestResponse.Instance));
             }
 
-            if (conditions?.IfMatch is { } ifMatch && ifMatch != default && ifMatch != blob.ETag)
-            {
-                throw new RequestFailedException(412, "ETag mismatch.");
-            }
-
+            ThrowIfConditionsFail(name, conditions);
             _blobs.Remove(name);
-            return Task.FromResult<Response>(TestResponse.Instance);
+            return Task.FromResult(Response.FromValue(true, TestResponse.Instance));
         }
 
         private Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(string name, BlobDownloadOptions? options, CancellationToken cancellationToken)
@@ -697,7 +838,7 @@ public sealed class AzureBlobJournalStorageTests
             return Task.FromResult(Response.FromValue(result, TestResponse.Instance));
         }
 
-        private void ThrowIfAppendConditionsFail(string name, AppendBlobRequestConditions? conditions)
+        private void ThrowIfConditionsFail(string name, BlobRequestConditions? conditions)
         {
             if (conditions is null)
             {
@@ -735,11 +876,11 @@ public sealed class AzureBlobJournalStorageTests
             public override Task<Response<BlobInfo>> SealAsync(AppendBlobRequestConditions conditions = default!, CancellationToken cancellationToken = default)
                 => store.SealAsync(name, conditions, cancellationToken);
 
-            public override Task<Response<BlobInfo>> SetMetadataAsync(IDictionary<string, string> metadata, BlobRequestConditions? conditions = null, CancellationToken cancellationToken = default)
+            public override Task<Response<BlobInfo>> SetMetadataAsync(IDictionary<string, string> metadata, BlobRequestConditions conditions = default!, CancellationToken cancellationToken = default)
                 => store.SetMetadataAsync(name, metadata, conditions, cancellationToken);
 
-            public override Task<Response> DeleteAsync(DeleteSnapshotsOption snapshotsOption = DeleteSnapshotsOption.None, BlobRequestConditions? conditions = null, CancellationToken cancellationToken = default)
-                => store.DeleteAsync(name, conditions, cancellationToken);
+            public override Task<Response<bool>> DeleteIfExistsAsync(DeleteSnapshotsOption snapshotsOption = DeleteSnapshotsOption.None, BlobRequestConditions conditions = default!, CancellationToken cancellationToken = default)
+                => store.DeleteIfExistsAsync(name, conditions, cancellationToken);
 
             public override Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(BlobDownloadOptions? options = null, CancellationToken cancellationToken = default)
                 => store.DownloadStreamingAsync(name, options, cancellationToken);
@@ -757,10 +898,14 @@ public sealed class AzureBlobJournalStorageTests
 
         public List<BlockDownloadCall> DownloadCalls { get; } = [];
 
+        public List<BlockDeleteCall> DeleteCalls { get; } = [];
+
         public BlockBlobClient GetBlockBlobClient(string name) => new FakeBlockBlobClient(this, name);
 
         public void Add(string name, byte[] content, ETag eTag, IDictionary<string, string> metadata)
             => _blobs[name] = new StoredBlockBlob(content, eTag, new Dictionary<string, string>(metadata), ContentType: null);
+
+        public bool Exists(string name) => _blobs.ContainsKey(name);
 
         private async Task<Response<BlobContentInfo>> UploadAsync(string name, Stream content, BlobUploadOptions options, CancellationToken cancellationToken)
         {
@@ -825,6 +970,25 @@ public sealed class AzureBlobJournalStorageTests
             return Task.FromResult(Response.FromValue(result, TestResponse.Instance));
         }
 
+        private Task<Response<bool>> DeleteIfExistsAsync(string name, BlobRequestConditions? conditions, CancellationToken cancellationToken)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            DeleteCalls.Add(new(name, conditions?.IfMatch ?? default, conditions?.IfNoneMatch ?? default));
+
+            if (!_blobs.TryGetValue(name, out var blob))
+            {
+                return Task.FromResult(Response.FromValue(false, TestResponse.Instance));
+            }
+
+            if (conditions?.IfMatch is { } ifMatch && ifMatch != default && ifMatch != blob.ETag)
+            {
+                throw new RequestFailedException(412, "Checkpoint ETag mismatch.");
+            }
+
+            _blobs.Remove(name);
+            return Task.FromResult(Response.FromValue(true, TestResponse.Instance));
+        }
+
         private sealed class FakeBlockBlobClient(FakeBlockBlobStore store, string name) : BlockBlobClient
         {
             public override string BlobContainerName => "container";
@@ -836,6 +1000,9 @@ public sealed class AzureBlobJournalStorageTests
 
             public override Task<Response<BlobDownloadStreamingResult>> DownloadStreamingAsync(BlobDownloadOptions? options = null, CancellationToken cancellationToken = default)
                 => store.DownloadStreamingAsync(name, options, cancellationToken);
+
+            public override Task<Response<bool>> DeleteIfExistsAsync(DeleteSnapshotsOption snapshotsOption = DeleteSnapshotsOption.None, BlobRequestConditions conditions = default!, CancellationToken cancellationToken = default)
+                => store.DeleteIfExistsAsync(name, conditions, cancellationToken);
         }
     }
 
@@ -845,13 +1012,17 @@ public sealed class AzureBlobJournalStorageTests
 
     private sealed record SealCall(string Name, ETag IfMatch);
 
-    private sealed record SetMetadataCall(string Name, ETag IfMatch, IDictionary<string, string> Metadata);
+    private sealed record SetMetadataCall(string Name, ETag IfMatch, ETag IfNoneMatch, IDictionary<string, string> Metadata);
+
+    private sealed record DeleteCall(string Name, ETag IfMatch, ETag IfNoneMatch);
 
     private sealed record DownloadCall(string Name);
 
     private sealed record BlockUploadCall(string Name, ETag IfMatch, ETag IfNoneMatch, string? ContentType, IDictionary<string, string> Metadata, byte[] Payload);
 
     private sealed record BlockDownloadCall(string Name, ETag IfMatch);
+
+    private sealed record BlockDeleteCall(string Name, ETag IfMatch, ETag IfNoneMatch);
 
     private sealed class StoredAppendBlob(
         byte[] content,
