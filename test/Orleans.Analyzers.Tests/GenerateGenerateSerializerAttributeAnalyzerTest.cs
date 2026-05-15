@@ -72,4 +72,19 @@ public class GenerateGenerateSerializerAttributeAnalyzerTest : DiagnosticAnalyze
             {
             }
             """);
+
+    [Fact]
+    public Task UserDefinedGenerateSerializerAttribute_ShouldTriggerDiagnostic()
+        => VerifyGeneratedDiagnostic(
+            """
+            namespace Custom
+            {
+                public sealed class GenerateSerializerAttribute : System.Attribute;
+            }
+
+            [System.Serializable, Custom.GenerateSerializer]
+            public class D
+            {
+            }
+            """);
 }

@@ -1,10 +1,6 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
 namespace Orleans.Analyzers
 {
@@ -13,32 +9,37 @@ namespace Orleans.Analyzers
 
     internal static class SyntaxHelpers
     {
-        private static bool TryGetTypeName(this AttributeSyntax attributeSyntax, out string typeName)
+        private static INamedTypeSymbol GetAttributeSymbol(this SemanticModel semanticModel, AttributeSyntax attributeSyntax)
         {
-            typeName = attributeSyntax.Name switch
+            var symbolInfo = semanticModel.GetSymbolInfo(attributeSyntax);
+            var symbol = symbolInfo.Symbol ?? symbolInfo.CandidateSymbols.FirstOrDefault();
+
+            return symbol switch
             {
-                IdentifierNameSyntax id => id.Identifier.Text,
-                QualifiedNameSyntax qualified => qualified.Right.Identifier.Text,
-                GenericNameSyntax generic => generic.Identifier.Text,
-                AliasQualifiedNameSyntax aliased => aliased.Name.Identifier.Text,
+                IMethodSymbol { MethodKind: MethodKind.Constructor } constructor => constructor.ContainingType,
+                INamedTypeSymbol namedType => namedType,
                 _ => null
             };
-
-            return typeName != null;
         }
 
-        public static bool IsAttribute(this AttributeSyntax attributeSyntax, string attributeName) =>
-            attributeSyntax.TryGetTypeName(out var name) &&
-            (string.Equals(name, attributeName, StringComparison.Ordinal)
-             || (name.StartsWith(attributeName, StringComparison.Ordinal) && name.EndsWith(nameof(Attribute), StringComparison.Ordinal) && name.Length == attributeName.Length + nameof(Attribute).Length));
+        public static bool IsAttribute(this AttributeSyntax attributeSyntax, SemanticModel semanticModel, string fullyQualifiedAttributeName)
+        {
+            if (attributeSyntax is null || semanticModel is null)
+            {
+                return false;
+            }
 
-        public static bool HasAttribute(this MemberDeclarationSyntax member, string attributeName)
+            var expectedAttribute = semanticModel.Compilation.GetTypeByMetadataName(fullyQualifiedAttributeName);
+            return expectedAttribute is not null && semanticModel.GetAttributeSymbol(attributeSyntax).Equals(expectedAttribute, SymbolEqualityComparer.Default);
+        }
+
+        public static bool HasAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, string fullyQualifiedAttributeName)
         {
             foreach (var list in member.AttributeLists)
             {
                 foreach (var attr in list.Attributes)
                 {
-                    if (attr.IsAttribute(attributeName))
+                    if (attr.IsAttribute(semanticModel, fullyQualifiedAttributeName))
                     {
                         return true;
                     }
@@ -48,13 +49,13 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static bool TryGetAttribute(this MemberDeclarationSyntax member, string attributeName, out AttributeSyntax attribute)
+        public static bool TryGetAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, string fullyQualifiedAttributeName, out AttributeSyntax attribute)
         {
             foreach (var list in member.AttributeLists)
             {
                 foreach (var attr in list.Attributes)
                 {
-                    if (attr.IsAttribute(attributeName))
+                    if (attr.IsAttribute(semanticModel, fullyQualifiedAttributeName))
                     {
                         attribute = attr;
                         return true;
@@ -105,28 +106,28 @@ namespace Orleans.Analyzers
                     isFieldOrAutoProperty = true;
                     break;
                 case PropertyDeclarationSyntax property:
+                {
+                    bool hasBody = property.ExpressionBody is not null;
+                    var accessors = property.AccessorList?.Accessors;
+                    if (!hasBody && accessors.HasValue)
                     {
-                        bool hasBody = property.ExpressionBody is not null;
-                        var accessors = property.AccessorList?.Accessors;
-                        if (!hasBody && accessors.HasValue)
+                        foreach (var accessor in accessors)
                         {
-                            foreach (var accessor in accessors)
+                            if (accessor.ExpressionBody is not null || accessor.Body is not null)
                             {
-                                if (accessor.ExpressionBody is not null || accessor.Body is not null)
-                                {
-                                    hasBody = true;
-                                    break;
-                                }
+                                hasBody = true;
+                                break;
                             }
                         }
-
-                        if (!hasBody)
-                        {
-                            isFieldOrAutoProperty = true;
-                        }
-
-                        break;
                     }
+
+                    if (!hasBody)
+                    {
+                        isFieldOrAutoProperty = true;
+                    }
+
+                    break;
+                }
             }
 
             return isFieldOrAutoProperty;
@@ -218,10 +219,10 @@ namespace Orleans.Analyzers
                 new(value, attribute.GetLocation()) : default;
         }
 
-        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, string attributeName) =>
+        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, SemanticModel semanticModel, string fullyQualifiedAttributeName) =>
             attributeLists
                 .SelectMany(attributeList => attributeList.Attributes)
-                .Where(attribute => attribute.IsAttribute(attributeName));
+                .Where(attribute => attribute.IsAttribute(semanticModel, fullyQualifiedAttributeName));
 
         public static string GetArgumentValue(this AttributeSyntax attribute, SemanticModel semanticModel)
         {

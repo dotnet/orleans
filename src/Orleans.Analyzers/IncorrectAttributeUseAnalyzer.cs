@@ -1,6 +1,6 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Immutable;
 
 namespace Orleans.Analyzers;
 
@@ -28,9 +28,9 @@ public class IncorrectAttributeUseAnalyzer : DiagnosticAnalyzer
 
         context.RegisterCompilationStartAction(context =>
         {
-            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.AliasAttribute");
-            var grainSymbol = context.Compilation.GetTypeByMetadataName("Orleans.Grain");
-            var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName("Orleans.GenerateSerializerAttribute");
+            var aliasAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.AliasAttributeFullyQualifiedName);
+            var grainSymbol = context.Compilation.GetTypeByMetadataName(Constants.GrainBaseFullyQualifiedName);
+            var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
             if (aliasAttributeSymbol is not null && grainSymbol is not null)
             {
                 context.RegisterSymbolAction(context => AnalyzeNamedType(context, aliasAttributeSymbol, grainSymbol, generateSerializerAttributeSymbol), SymbolKind.NamedType);
