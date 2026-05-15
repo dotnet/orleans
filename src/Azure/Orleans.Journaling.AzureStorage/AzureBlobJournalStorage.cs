@@ -25,9 +25,9 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     // to roll before hitting the hard Azure limit if a consumer ignores compaction requests.
     private const int AppendBlobBlockCeilingHeadroom = 100;
 
-    private AppendBlobClient _currentLogClient;
     private readonly SharedConfiguration _shared;
     private readonly IGrainContext _grainContext;
+    private AppendBlobClient _currentLogClient;
     private uint _currentGeneration;
     private uint _currentSegmentId;
     private int _numBlocks;
