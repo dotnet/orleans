@@ -40,9 +40,9 @@ namespace Orleans.Journaling
 
     public sealed partial class AzureBlobJournalCheckpointNameContext
     {
-        public AzureBlobJournalCheckpointNameContext(Runtime.GrainId grainId, string journalBlobName, uint checkpointId) { }
+        public AzureBlobJournalCheckpointNameContext(Runtime.GrainId grainId, string journalBlobName, ulong generation) { }
 
-        public uint CheckpointId { get { throw null; } }
+        public ulong Generation { get { throw null; } }
 
         public Runtime.GrainId GrainId { get { throw null; } }
 
@@ -51,7 +51,9 @@ namespace Orleans.Journaling
 
     public sealed partial class AzureBlobJournalWalSegmentNameContext
     {
-        public AzureBlobJournalWalSegmentNameContext(Runtime.GrainId grainId, string journalBlobName, uint segmentId) { }
+        public AzureBlobJournalWalSegmentNameContext(Runtime.GrainId grainId, string journalBlobName, ulong generation, uint segmentId) { }
+
+        public ulong Generation { get { throw null; } }
 
         public Runtime.GrainId GrainId { get { throw null; } }
 

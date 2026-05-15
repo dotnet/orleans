@@ -1,7 +1,8 @@
+using System.Globalization;
 using Azure;
-using Azure.Storage.Blobs;
-using Azure.Storage;
 using Azure.Core;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 using Orleans.Runtime;
 
 namespace Orleans.Journaling;
@@ -32,7 +33,7 @@ public sealed class AzureBlobJournalStorageOptions
     public Func<AzureBlobJournalWalSegmentNameContext, string> GetWalSegmentBlobName { get; set; } = DefaultGetWalSegmentBlobName;
 
     private static readonly Func<AzureBlobJournalWalSegmentNameContext, string> DefaultGetWalSegmentBlobName =
-        static context => $"{context.JournalBlobName}.log.{context.SegmentId:X8}";
+        static context => $"{context.JournalBlobName}/{context.Generation.ToString(CultureInfo.InvariantCulture)}/seg.{context.SegmentId:X8}";
 
     /// <summary>
     /// Gets or sets the delegate used to generate block blob names for immutable journal checkpoints.
@@ -40,7 +41,7 @@ public sealed class AzureBlobJournalStorageOptions
     public Func<AzureBlobJournalCheckpointNameContext, string> GetCheckpointBlobName { get; set; } = DefaultGetCheckpointBlobName;
 
     private static readonly Func<AzureBlobJournalCheckpointNameContext, string> DefaultGetCheckpointBlobName =
-        static context => $"{context.JournalBlobName}.checkpoint.{context.CheckpointId:X8}";
+        static context => $"{context.JournalBlobName}/{context.Generation.ToString(CultureInfo.InvariantCulture)}/chk";
 
     /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
@@ -73,16 +74,22 @@ public sealed class AzureBlobJournalStorageOptions
         return blobName;
     }
 
-    internal string GetWalSegmentBlobNameForJournal(GrainId grainId, string journalBlobName, uint segmentId)
+    internal string GetRootBlobNameForJournal(GrainId grainId, string journalBlobName)
     {
-        var blobName = GetWalSegmentBlobName(new AzureBlobJournalWalSegmentNameContext(grainId, journalBlobName, segmentId));
+        ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
+        return $"{journalBlobName}/root";
+    }
+
+    internal string GetWalSegmentBlobNameForJournal(GrainId grainId, string journalBlobName, ulong generation, uint segmentId)
+    {
+        var blobName = GetWalSegmentBlobName(new AzureBlobJournalWalSegmentNameContext(grainId, journalBlobName, generation, segmentId));
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
 
-    internal string GetCheckpointBlobNameForJournal(GrainId grainId, string journalBlobName, uint checkpointId)
+    internal string GetCheckpointBlobNameForJournal(GrainId grainId, string journalBlobName, ulong generation)
     {
-        var blobName = GetCheckpointBlobName(new AzureBlobJournalCheckpointNameContext(grainId, journalBlobName, checkpointId));
+        var blobName = GetCheckpointBlobName(new AzureBlobJournalCheckpointNameContext(grainId, journalBlobName, generation));
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
@@ -160,13 +167,15 @@ public sealed class AzureBlobJournalWalSegmentNameContext
     /// </summary>
     /// <param name="grainId">The grain id associated with the journal.</param>
     /// <param name="journalBlobName">The base blob name used for the journal.</param>
+    /// <param name="generation">The journal generation.</param>
     /// <param name="segmentId">The WAL segment id.</param>
-    public AzureBlobJournalWalSegmentNameContext(GrainId grainId, string journalBlobName, uint segmentId)
+    public AzureBlobJournalWalSegmentNameContext(GrainId grainId, string journalBlobName, ulong generation, uint segmentId)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
 
         GrainId = grainId;
         JournalBlobName = journalBlobName;
+        Generation = generation;
         SegmentId = segmentId;
     }
 
@@ -179,6 +188,11 @@ public sealed class AzureBlobJournalWalSegmentNameContext
     /// Gets the base blob name used for the journal.
     /// </summary>
     public string JournalBlobName { get; }
+
+    /// <summary>
+    /// Gets the journal generation.
+    /// </summary>
+    public ulong Generation { get; }
 
     /// <summary>
     /// Gets the WAL segment id.
@@ -196,14 +210,14 @@ public sealed class AzureBlobJournalCheckpointNameContext
     /// </summary>
     /// <param name="grainId">The grain id associated with the journal.</param>
     /// <param name="journalBlobName">The base blob name used for the journal.</param>
-    /// <param name="checkpointId">The checkpoint id.</param>
-    public AzureBlobJournalCheckpointNameContext(GrainId grainId, string journalBlobName, uint checkpointId)
+    /// <param name="generation">The journal generation.</param>
+    public AzureBlobJournalCheckpointNameContext(GrainId grainId, string journalBlobName, ulong generation)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
 
         GrainId = grainId;
         JournalBlobName = journalBlobName;
-        CheckpointId = checkpointId;
+        Generation = generation;
     }
 
     /// <summary>
@@ -217,7 +231,7 @@ public sealed class AzureBlobJournalCheckpointNameContext
     public string JournalBlobName { get; }
 
     /// <summary>
-    /// Gets the checkpoint id.
+    /// Gets the journal generation.
     /// </summary>
-    public uint CheckpointId { get; }
+    public ulong Generation { get; }
 }

@@ -41,15 +41,15 @@ internal sealed class AzureBlobJournalStorageProvider(
 
         var container = _containerFactory.GetBlobContainerClient(grainContext.GrainId);
         var blobName = _options.GetBlobNameForJournal(grainContext.GrainId);
-        var blobClient = container.GetAppendBlobClient(_options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, segmentId: 0));
+        var blobClient = container.GetAppendBlobClient(_options.GetRootBlobNameForJournal(grainContext.GrainId, blobName));
         return new AzureBlobJournalStorage(
             blobClient,
             journalFormat.MimeType,
             logger,
             journalFormatKey: journalFormatKey,
-            walNameFactory: segmentId => _options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, segmentId),
-            walClientFactory: segmentId => container.GetAppendBlobClient(_options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, segmentId)),
-            checkpointNameFactory: checkpointId => _options.GetCheckpointBlobNameForJournal(grainContext.GrainId, blobName, checkpointId),
+            walNameFactory: (generation, segmentId) => _options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, generation, segmentId),
+            walClientFactory: (generation, segmentId) => container.GetAppendBlobClient(_options.GetWalSegmentBlobNameForJournal(grainContext.GrainId, blobName, generation, segmentId)),
+            checkpointNameFactory: generation => _options.GetCheckpointBlobNameForJournal(grainContext.GrainId, blobName, generation),
             checkpointClientFactory: container.GetBlockBlobClient);
     }
 
