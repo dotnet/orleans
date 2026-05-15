@@ -97,10 +97,11 @@ public sealed class AzureBlobJournalStorageTests
         Assert.Equal(new ETag("\"append-1\""), rootReplace.IfMatch);
         AssertAzureMetadataKeys(rootReplace.Metadata);
         Assert.Equal("1", rootReplace.Metadata[AzureBlobJournalStorage.GenerationMetadataKey]);
+        Assert.Equal("json-lines", rootReplace.Metadata[AzureBlobJournalStorage.FormatMetadataKey]);
         Assert.Equal("blob/1/chk", rootReplace.Metadata[AzureBlobJournalStorage.CheckpointMetadataKey]);
-        Assert.Equal("\"checkpoint-1\"", rootReplace.Metadata[AzureBlobJournalStorage.CheckpointETagMetadataKey]);
-        Assert.Equal("2", rootReplace.Metadata[AzureBlobJournalStorage.CheckpointLengthMetadataKey]);
-        Assert.Equal("json-lines", rootReplace.Metadata[AzureBlobJournalStorage.CheckpointFormatMetadataKey]);
+        Assert.DoesNotContain("checkpoint_etag", rootReplace.Metadata.Keys);
+        Assert.DoesNotContain("checkpoint_length", rootReplace.Metadata.Keys);
+        Assert.DoesNotContain("checkpoint_format", rootReplace.Metadata.Keys);
     }
 
     [Fact]
@@ -126,7 +127,7 @@ public sealed class AzureBlobJournalStorageTests
         appendBlobs.Add(
             "blob/root",
             [3, 4],
-            CheckpointMarkerMetadata("blob/1/chk", new ETag("\"checkpoint-etag\""), "json-lines", 2, generation: 1),
+            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
             isSealed: false);
         var checkpoints = new FakeBlockBlobStore();
         checkpoints.Add(
@@ -147,7 +148,7 @@ public sealed class AzureBlobJournalStorageTests
         Assert.Equal([1, 2, 3, 4], consumer.Bytes.ToArray());
         Assert.Equal(["blob/root"], appendBlobs.DownloadCalls.Select(static call => call.Name));
         Assert.Single(checkpoints.DownloadCalls);
-        Assert.Equal(new ETag("\"checkpoint-etag\""), checkpoints.DownloadCalls.Single().IfMatch);
+        Assert.Equal(default(ETag), checkpoints.DownloadCalls.Single().IfMatch);
     }
 
     [Fact]
@@ -223,7 +224,7 @@ public sealed class AzureBlobJournalStorageTests
         appendBlobs.Add(
             "blob/root",
             [],
-            CheckpointMarkerMetadata("blob/1/chk", new ETag("\"checkpoint-etag\""), "json-lines", 1, generation: 1),
+            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
             isSealed: false);
 
         var exception = await Assert.ThrowsAsync<InvalidOperationException>(
@@ -256,7 +257,7 @@ public sealed class AzureBlobJournalStorageTests
         appendBlobs.Add(
             "blob/root",
             [],
-            CheckpointMarkerMetadata("missing-checkpoint", new ETag("\"missing\""), "json-lines", 1, generation: 1),
+            CheckpointMarkerMetadata("missing-checkpoint", "json-lines", generation: 1),
             isSealed: true);
         var storage = CreateStorage(appendBlobs, new FakeBlockBlobStore());
 
@@ -272,7 +273,7 @@ public sealed class AzureBlobJournalStorageTests
         appendBlobs.Add(
             "blob/root",
             [],
-            CheckpointMarkerMetadata("blob/1/chk", new ETag("\"checkpoint-etag\""), "json-lines", 1, generation: 1),
+            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
             isSealed: false);
         var checkpoints = new FakeBlockBlobStore();
         checkpoints.Add(
@@ -298,7 +299,7 @@ public sealed class AzureBlobJournalStorageTests
         appendBlobs.Add(
             "blob/root",
             [],
-            CheckpointMarkerMetadata("blob/1/chk", new ETag("\"checkpoint-etag\""), "json-lines", 1, generation: 1),
+            CheckpointMarkerMetadata("blob/1/chk", "json-lines", generation: 1),
             isSealed: true);
         var checkpoints = new FakeBlockBlobStore();
         checkpoints.Add(
@@ -420,17 +421,12 @@ public sealed class AzureBlobJournalStorageTests
 
     private static Dictionary<string, string> CheckpointMarkerMetadata(
         string checkpointName,
-        ETag checkpointETag,
         string format,
-        long checkpointLength,
         ulong generation) => new()
     {
         [AzureBlobJournalStorage.GenerationMetadataKey] = generation.ToString(System.Globalization.CultureInfo.InvariantCulture),
         [AzureBlobJournalStorage.FormatMetadataKey] = format,
         [AzureBlobJournalStorage.CheckpointMetadataKey] = checkpointName,
-        [AzureBlobJournalStorage.CheckpointETagMetadataKey] = checkpointETag.ToString(),
-        [AzureBlobJournalStorage.CheckpointFormatMetadataKey] = format,
-        [AzureBlobJournalStorage.CheckpointLengthMetadataKey] = checkpointLength.ToString(System.Globalization.CultureInfo.InvariantCulture),
     };
 
     private static void AssertAzureMetadataKeys(IDictionary<string, string> metadata)

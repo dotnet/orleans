@@ -15,9 +15,6 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     internal const string FormatMetadataKey = "format";
     internal const string GenerationMetadataKey = "generation";
     internal const string CheckpointMetadataKey = "checkpoint";
-    internal const string CheckpointETagMetadataKey = "checkpoint_etag";
-    internal const string CheckpointFormatMetadataKey = "checkpoint_format";
-    internal const string CheckpointLengthMetadataKey = "checkpoint_length";
 
     // Azure Append Blob hard limits documented at:
     // https://learn.microsoft.com/azure/storage/blobs/scalability-targets#scale-targets-for-blob-storage
@@ -150,7 +147,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         {
             response = await CreateRootAsync(
                 generation,
-                checkpoint: null,
+                checkpointName: null,
                 new AppendBlobRequestConditions { IfMatch = _rootLogETag },
                 cancellationToken).ConfigureAwait(false);
         }
@@ -189,15 +186,10 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         if (manifest.Checkpoint is { } checkpoint)
         {
             var checkpointClient = GetCheckpointClient(checkpoint.Name);
-            var checkpointResult = await checkpointClient.DownloadStreamingAsync(
-                new BlobDownloadOptions
-                {
-                    Conditions = new BlobRequestConditions { IfMatch = checkpoint.ETag }
-                },
-                cancellationToken).ConfigureAwait(false);
+            var checkpointResult = await checkpointClient.DownloadStreamingAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
             await using var checkpointStream = checkpointResult.Value.Content;
 
-            var checkpointMetadata = ValidateCheckpointMetadata(checkpoint, checkpointResult.Value.Details);
+            var checkpointMetadata = ValidateCheckpointMetadata(checkpoint, checkpointResult.Value.Details, expectedFormat);
             var totalCheckpointBytes = await ReadStreamAsync(
                 consumer,
                 checkpointStream,
@@ -233,7 +225,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             try
             {
                 checkpointStream.Position = 0;
-                var checkpointResult = await checkpointClient.UploadAsync(
+                await checkpointClient.UploadAsync(
                     checkpointStream,
                     new BlobUploadOptions
                     {
@@ -248,7 +240,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
                 {
                     rootResult = await CreateRootAsync(
                         generation,
-                        new CheckpointPublication(checkpointName, checkpointResult.Value.ETag, checkpointStream.Length),
+                        checkpointName,
                         new AppendBlobRequestConditions { IfMatch = rootETag },
                         cancellationToken).ConfigureAwait(false);
                 }
@@ -291,7 +283,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             {
                 response = await CreateRootAsync(
                     _currentGeneration,
-                    checkpoint: null,
+                    checkpointName: null,
                     new AppendBlobRequestConditions { IfNoneMatch = ETag.All },
                     cancellationToken).ConfigureAwait(false);
             }
@@ -469,7 +461,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private async ValueTask<Response<BlobContentInfo>> CreateRootAsync(
         ulong generation,
-        CheckpointPublication? checkpoint,
+        string? checkpointName,
         AppendBlobRequestConditions conditions,
         CancellationToken cancellationToken)
         => await _rootLogClient.CreateAsync(
@@ -477,7 +469,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             {
                 Conditions = conditions,
                 HttpHeaders = CreateHttpHeaders(),
-                Metadata = CreateRootMetadata(generation, checkpoint),
+                Metadata = CreateRootMetadata(generation, checkpointName),
             },
             cancellationToken).ConfigureAwait(false);
 
@@ -526,18 +518,12 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private Dictionary<string, string> CreateCheckpointBlobMetadata(ulong generation) => CreateMetadataDictionary(generation);
 
-    private Dictionary<string, string> CreateRootMetadata(ulong generation, CheckpointPublication? checkpoint)
+    private Dictionary<string, string> CreateRootMetadata(ulong generation, string? checkpointName)
     {
         var metadata = CreateMetadataDictionary(generation);
-        if (checkpoint is not null)
+        if (checkpointName is not null)
         {
-            metadata[CheckpointMetadataKey] = checkpoint.Name;
-            metadata[CheckpointETagMetadataKey] = checkpoint.ETag.ToString();
-            metadata[CheckpointLengthMetadataKey] = checkpoint.Length.ToString(CultureInfo.InvariantCulture);
-            if (_journalFormatKey is { Length: > 0 })
-            {
-                metadata[CheckpointFormatMetadataKey] = _journalFormatKey;
-            }
+            metadata[CheckpointMetadataKey] = checkpointName;
         }
 
         return metadata;
@@ -563,48 +549,13 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
             : JournalFileMetadata.Empty;
         if (metadata is null || !metadata.TryGetValue(CheckpointMetadataKey, out var checkpointName) || checkpointName is not { Length: > 0 })
         {
-            EnsureNoCheckpointMetadata(metadata);
             return new RootManifest(generation, fileMetadata, Checkpoint: null);
         }
-
-        if (!metadata.TryGetValue(CheckpointETagMetadataKey, out var checkpointETag) || checkpointETag is not { Length: > 0 })
-        {
-            throw new InvalidOperationException(
-                $"Azure Blob journal marker references checkpoint blob '{checkpointName}' but does not include '{CheckpointETagMetadataKey}' metadata.");
-        }
-
-        if (!metadata.TryGetValue(CheckpointLengthMetadataKey, out var checkpointLengthValue)
-            || !long.TryParse(checkpointLengthValue, NumberStyles.None, CultureInfo.InvariantCulture, out var checkpointLength)
-            || checkpointLength < 0)
-        {
-            throw new InvalidOperationException(
-                $"Azure Blob journal marker references checkpoint blob '{checkpointName}' but does not include valid '{CheckpointLengthMetadataKey}' metadata.");
-        }
-
-        var checkpointFormat = metadata.TryGetValue(CheckpointFormatMetadataKey, out var storedCheckpointFormat)
-            && storedCheckpointFormat is { Length: > 0 }
-                ? storedCheckpointFormat
-                : null;
 
         return new RootManifest(
             generation,
             fileMetadata,
-            new CheckpointReference(checkpointName, new ETag(checkpointETag), generation, checkpointFormat, checkpointLength));
-    }
-
-    private static void EnsureNoCheckpointMetadata(IDictionary<string, string>? metadata)
-    {
-        if (metadata is null)
-        {
-            return;
-        }
-
-        if (metadata.ContainsKey(CheckpointETagMetadataKey)
-            || metadata.ContainsKey(CheckpointFormatMetadataKey)
-            || metadata.ContainsKey(CheckpointLengthMetadataKey))
-        {
-            throw new InvalidOperationException("Azure Blob journal root contains partial checkpoint metadata.");
-        }
+            new CheckpointReference(checkpointName, generation));
     }
 
     private async ValueTask<RootManifest?> ReadRootManifestForCollisionAsync(CancellationToken cancellationToken)
@@ -623,14 +574,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
     }
 
-    private IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails)
+    private IJournalFileMetadata ValidateCheckpointMetadata(CheckpointReference checkpoint, BlobDownloadDetails checkpointDetails, string? expectedFormat)
     {
-        if (checkpointDetails.ContentLength != checkpoint.Length)
-        {
-            throw new InvalidOperationException(
-                $"Azure Blob journal checkpoint '{checkpoint.Name}' length is {checkpointDetails.ContentLength}, but marker metadata expected {checkpoint.Length}.");
-        }
-
         if (!TryGetUInt64Metadata(checkpointDetails.Metadata, GenerationMetadataKey, out var generation) || generation != checkpoint.Generation)
         {
             throw new InvalidOperationException(
@@ -638,22 +583,22 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
         }
 
         var checkpointBlobFormat = GetFormatKeyMetadata(checkpointDetails.Metadata);
-        if (checkpoint.Format is { } markerCheckpointFormat
-            && checkpointBlobFormat is { }
-            && !string.Equals(markerCheckpointFormat, checkpointBlobFormat, StringComparison.Ordinal))
+        if (expectedFormat is { Length: > 0 })
         {
-            throw new InvalidOperationException(
-                $"Azure Blob journal checkpoint '{checkpoint.Name}' format metadata is '{checkpointBlobFormat}', but marker metadata expected '{markerCheckpointFormat}'.");
+            if (checkpointBlobFormat is null)
+            {
+                throw new InvalidOperationException(
+                    $"Azure Blob journal checkpoint '{checkpoint.Name}' does not include format metadata.");
+            }
+
+            if (!string.Equals(expectedFormat, checkpointBlobFormat, StringComparison.Ordinal))
+            {
+                throw new InvalidOperationException(
+                    $"Azure Blob journal checkpoint '{checkpoint.Name}' format metadata is '{checkpointBlobFormat}', but recovery expected '{expectedFormat}'.");
+            }
         }
 
-        var effectiveCheckpointFormat = checkpoint.Format ?? checkpointBlobFormat;
-        if (checkpoint.Format is { } && checkpointBlobFormat is null)
-        {
-            throw new InvalidOperationException(
-                $"Azure Blob journal checkpoint '{checkpoint.Name}' does not include format metadata.");
-        }
-
-        return effectiveCheckpointFormat is { } format
+        return checkpointBlobFormat is { } format
             ? new JournalFileMetadata(format)
             : JournalFileMetadata.Empty;
     }
@@ -775,9 +720,7 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
 
     private sealed record RootManifest(ulong Generation, IJournalFileMetadata Metadata, CheckpointReference? Checkpoint);
 
-    private sealed record CheckpointReference(string Name, ETag ETag, ulong Generation, string? Format, long Length);
-
-    private sealed record CheckpointPublication(string Name, ETag ETag, long Length);
+    private sealed record CheckpointReference(string Name, ulong Generation);
 
     internal abstract class BlobClientProvider
     {
