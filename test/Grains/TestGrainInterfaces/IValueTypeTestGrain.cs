@@ -154,6 +154,24 @@ namespace UnitTests.GrainInterfaces
         Task<RetVal> GetRetValForParamVal(ParamVal param);
     }
 
+    /// <summary>
+    /// Grain interface for testing that collection expressions returned from grain methods
+    /// serialize and deserialize correctly when the declared return type is a collection interface.
+    /// Covers the scenario fixed by the interface collection codecs (issue #8934 / PR #10104).
+    /// </summary>
+    public interface ICollectionExpressionGrain : IGrainWithIntegerKey
+    {
+        Task<IEnumerable<int>> GetEnumerable();
+        Task<IReadOnlyList<int>> GetReadOnlyList();
+        Task<IList<int>> GetList();
+        Task<IReadOnlyCollection<int>> GetReadOnlyCollection();
+        Task<ICollection<int>> GetCollection();
+        Task<ISet<int>> GetSet();
+        Task<IReadOnlySet<int>> GetReadOnlySet();
+        Task<IDictionary<string, int>> GetDictionary();
+        Task<IReadOnlyDictionary<string, int>> GetReadOnlyDictionary();
+    }
+
     [GenerateSerializer]
     public record ParamVal([field: Id(0)] int Value);
 
