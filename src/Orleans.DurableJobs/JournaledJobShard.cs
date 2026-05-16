@@ -6,6 +6,9 @@ using Orleans.Journaling;
 
 namespace Orleans.DurableJobs;
 
+/// <summary>
+/// Journaled implementation of <see cref="IJobShard"/> that stores shard state in Orleans journaling storage.
+/// </summary>
 internal sealed class JournaledJobShard : IJobShard
 {
     private readonly JournaledJobShardState _state;
@@ -14,6 +17,17 @@ internal sealed class JournaledJobShard : IJobShard
     private readonly SemaphoreSlim _operationLock = new(1, 1);
     private int _disposed;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="JournaledJobShard"/> class.
+    /// </summary>
+    /// <param name="shardId">The unique identifier for this job shard.</param>
+    /// <param name="startTime">The start time of the time range managed by this shard.</param>
+    /// <param name="endTime">The end time of the time range managed by this shard.</param>
+    /// <param name="metadata">Optional metadata associated with this job shard.</param>
+    /// <param name="isClosed">A value indicating whether this shard is closed to new jobs.</param>
+    /// <param name="state">The journaled shard state.</param>
+    /// <param name="stateManager">The manager used to persist journaled state.</param>
+    /// <param name="shardManager">The shard manager that owns this shard.</param>
     public JournaledJobShard(
         JobShardId shardId,
         DateTimeOffset startTime,
@@ -42,22 +56,33 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
+    /// <inheritdoc/>
     public string Id { get; }
 
+    /// <inheritdoc/>
     public DateTimeOffset StartTime { get; }
 
+    /// <inheritdoc/>
     public DateTimeOffset EndTime { get; }
 
+    /// <inheritdoc/>
     public IDictionary<string, string>? Metadata { get; }
 
+    /// <inheritdoc/>
     public bool IsAddingCompleted => _state.IsAddingCompleted;
 
+    /// <summary>
+    /// Gets the backing journal storage identifier for this shard.
+    /// </summary>
     internal JournalStorageId StorageId => JobShardId.Parse(Id).ToJournalStorageId();
 
+    /// <inheritdoc/>
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _state.ConsumeDurableJobsAsync();
 
+    /// <inheritdoc/>
     public ValueTask<int> GetJobCountAsync() => ValueTask.FromResult(_state.Count);
 
+    /// <inheritdoc/>
     public async Task MarkAsCompleteAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -81,6 +106,7 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
+    /// <inheritdoc/>
     public async Task<bool> RemoveJobAsync(string jobId, CancellationToken cancellationToken)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
@@ -104,6 +130,7 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
+    /// <inheritdoc/>
     public async Task RetryJobLaterAsync(IJobRunContext jobContext, DateTimeOffset newDueTime, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(jobContext);
@@ -126,6 +153,7 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
+    /// <inheritdoc/>
     public async Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -158,6 +186,11 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
+    /// <summary>
+    /// Deletes this shard's journaled state.
+    /// </summary>
+    /// <param name="cancellationToken">A token to cancel the operation.</param>
+    /// <returns>A task that represents the asynchronous operation.</returns>
     internal async ValueTask DeleteStateAsync(CancellationToken cancellationToken)
     {
         ThrowIfDisposed();
@@ -173,6 +206,7 @@ internal sealed class JournaledJobShard : IJobShard
         }
     }
 
+    /// <inheritdoc/>
     public async ValueTask DisposeAsync()
     {
         if (Interlocked.Exchange(ref _disposed, 1) != 0)
