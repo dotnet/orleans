@@ -20,6 +20,7 @@ public class IdClashAttributeCodeFix : CodeFixProvider
     {
         var root = await context.Document.GetSyntaxRootAsync(context.CancellationToken).ConfigureAwait(false);
         var semanticModel = await context.Document.GetSemanticModelAsync(context.CancellationToken).ConfigureAwait(false);
+        var idAttributeSymbol = semanticModel.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
         var diagnostic = context.Diagnostics.First();
         if (root.FindNode(diagnostic.Location.SourceSpan) is not AttributeSyntax attribute)
         {
@@ -36,7 +37,7 @@ public class IdClashAttributeCodeFix : CodeFixProvider
                     var newIdValue = root
                         .DescendantNodes()
                         .OfType<AttributeSyntax>()
-                        .Where(a => a.IsAttribute(semanticModel, Constants.IdAttributeFullyQualifiedName))
+                        .Where(a => a.IsAttribute(semanticModel, idAttributeSymbol))
                         .Select(a => int.Parse(a.ArgumentList.Arguments.Single().ToString()))
                         .Max() + 1;
 

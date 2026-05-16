@@ -21,14 +21,15 @@ namespace Orleans.Analyzers
             public uint NextAvailableId { get; init; }
         }
 
-        public static TypeAnalysis AnalyzeTypeDeclaration(SemanticModel semanticModel, TypeDeclarationSyntax declaration)
+        public static TypeAnalysis AnalyzeTypeDeclaration(SemanticModel semanticModel, TypeDeclarationSyntax declaration,
+            INamedTypeSymbol idAttributeSymbol, INamedTypeSymbol generateSerializerAttributeSymbol, INamedTypeSymbol nonSerializedAttributeSymbol)
         {
             uint nextId = 0;
             var unannotatedSerializableMembers = new List<MemberDeclarationSyntax>();
             foreach (var member in declaration.Members)
             {
                 // Skip members with existing [Id(x)] attributes, but record the highest value of x so that newly added attributes can begin from that value.
-                if (member.TryGetAttribute(semanticModel, Constants.IdAttributeFullyQualifiedName, out var attribute))
+                if (member.TryGetAttribute(semanticModel, idAttributeSymbol, out var attribute))
                 {
                     var args = attribute.ArgumentList?.Arguments;
                     if (args.HasValue)
@@ -48,12 +49,12 @@ namespace Orleans.Analyzers
                     continue;
                 }
 
-                if (member is ConstructorDeclarationSyntax constructorDeclaration && constructorDeclaration.HasAttribute(semanticModel, Constants.GenerateSerializerAttributeFullyQualifiedName))
+                if (member is ConstructorDeclarationSyntax constructorDeclaration && constructorDeclaration.HasAttribute(semanticModel, generateSerializerAttributeSymbol))
                 {
                     continue;
                 }
 
-                if (!member.IsInstanceMember() || !member.IsFieldOrAutoProperty() || member.HasAttribute(semanticModel, Constants.NonSerializedAttributeFullyQualifiedName) || member.IsAbstract())
+                if (!member.IsInstanceMember() || !member.IsFieldOrAutoProperty() || member.HasAttribute(semanticModel, nonSerializedAttributeSymbol) || member.IsAbstract())
                 {
                     // No need to add any attribute.
                     continue;

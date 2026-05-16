@@ -22,24 +22,23 @@ namespace Orleans.Analyzers
             };
         }
 
-        public static bool IsAttribute(this AttributeSyntax attributeSyntax, SemanticModel semanticModel, string fullyQualifiedAttributeName)
+        public static bool IsAttribute(this AttributeSyntax attributeSyntax, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute)
         {
-            if (attributeSyntax is null || semanticModel is null)
+            if (attributeSyntax is null || semanticModel is null || expectedAttribute is null)
             {
                 return false;
             }
 
-            var expectedAttribute = semanticModel.Compilation.GetTypeByMetadataName(fullyQualifiedAttributeName);
-            return expectedAttribute is not null && semanticModel.GetAttributeSymbol(attributeSyntax).Equals(expectedAttribute, SymbolEqualityComparer.Default);
+            return SymbolEqualityComparer.Default.Equals(semanticModel.GetAttributeSymbol(attributeSyntax), expectedAttribute);
         }
 
-        public static bool HasAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, string fullyQualifiedAttributeName)
+        public static bool HasAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute)
         {
             foreach (var list in member.AttributeLists)
             {
                 foreach (var attr in list.Attributes)
                 {
-                    if (attr.IsAttribute(semanticModel, fullyQualifiedAttributeName))
+                    if (attr.IsAttribute(semanticModel, expectedAttribute))
                     {
                         return true;
                     }
@@ -49,13 +48,13 @@ namespace Orleans.Analyzers
             return false;
         }
 
-        public static bool TryGetAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, string fullyQualifiedAttributeName, out AttributeSyntax attribute)
+        public static bool TryGetAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute, out AttributeSyntax attribute)
         {
             foreach (var list in member.AttributeLists)
             {
                 foreach (var attr in list.Attributes)
                 {
-                    if (attr.IsAttribute(semanticModel, fullyQualifiedAttributeName))
+                    if (attr.IsAttribute(semanticModel, expectedAttribute))
                     {
                         attribute = attr;
                         return true;
@@ -219,10 +218,10 @@ namespace Orleans.Analyzers
                 new(value, attribute.GetLocation()) : default;
         }
 
-        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, SemanticModel semanticModel, string fullyQualifiedAttributeName) =>
+        public static IEnumerable<AttributeSyntax> GetAttributeSyntaxes(this SyntaxList<AttributeListSyntax> attributeLists, SemanticModel semanticModel, INamedTypeSymbol expectedAttribute) =>
             attributeLists
                 .SelectMany(attributeList => attributeList.Attributes)
-                .Where(attribute => attribute.IsAttribute(semanticModel, fullyQualifiedAttributeName));
+                .Where(attribute => attribute.IsAttribute(semanticModel, expectedAttribute));
 
         public static string GetArgumentValue(this AttributeSyntax attribute, SemanticModel semanticModel)
         {

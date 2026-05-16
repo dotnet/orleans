@@ -58,7 +58,11 @@ namespace Orleans.Analyzers
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
             var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration);
+            var compilation = semanticModel.Compilation;
+            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration,
+                compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.NonSerializedAttributeFullyQualifiedName));
 
             var nextId = analysis.NextAvailableId;
             foreach (var member in analysis.UnannotatedMembers)
@@ -77,7 +81,11 @@ namespace Orleans.Analyzers
         {
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
             var semanticModel = await context.Document.GetSemanticModelAsync(cancellationToken).ConfigureAwait(false);
-            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration);
+            var compilation = semanticModel.Compilation;
+            var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(semanticModel, declaration,
+                compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName),
+                compilation.GetTypeByMetadataName(Constants.NonSerializedAttributeFullyQualifiedName));
 
             foreach (var member in analysis.UnannotatedMembers)
             {
