@@ -18,6 +18,13 @@ public interface IJournaledStateManager : IAsyncDisposable
     ValueTask InitializeAsync(CancellationToken cancellationToken);
 
     /// <summary>
+    /// Reads the persisted journal, replacing registered states with their durable contents.
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>A <see cref="ValueTask"/> which represents the operation.</returns>
+    ValueTask ReadStateAsync(CancellationToken cancellationToken);
+
+    /// <summary>
     /// Registers a state with the manager.
     /// </summary>
     /// <param name="name">The state's stable identifier.</param>
