@@ -20,23 +20,30 @@ namespace Orleans.Runtime
 
         public Task Cancel(Guid id, CancellationTokenSource tokenSource, ConcurrentDictionary<GrainId, GrainReference> grainReferences)
         {
-            if (tokenSource.IsCancellationRequested)
-            {
-                // This token has already been canceled.
-                return Task.CompletedTask;
-            }
+            return Cancel(id, tokenSource, grainReferences, CancellationToken.None);
+        }
 
+        public Task Cancel(Guid id, CancellationTokenSource tokenSource, ConcurrentDictionary<GrainId, GrainReference> grainReferences, CancellationToken cancellationToken)
+        {
             // propagate the exception from the _cancellationTokenSource.Cancel back to the caller
             // but also cancel _targetGrainReferences.
             Task localTask = null;
-            try
+            if (!tokenSource.IsCancellationRequested)
             {
-                // Cancel the token now, preventing recursion.
-                tokenSource.Cancel();
+                try
+                {
+                    // Cancel the token now, preventing recursion.
+                    tokenSource.Cancel();
+                }
+                catch (Exception exception)
+                {
+                    localTask = Task.FromException(exception);
+                }
             }
-            catch (Exception exception)
+
+            if (cancellationToken.IsCancellationRequested)
             {
-                localTask = Task.FromException(exception);
+                return localTask ?? Task.FromCanceled(cancellationToken);
             }
 
             List<Task> tasks = null;
@@ -47,24 +54,40 @@ namespace Orleans.Runtime
                     tasks = new();
                     if (localTask != null) tasks.Add(localTask);
                 }
-                tasks.Add(CancelTokenWithRetries(id, grainReferences, reference.Key, reference.Value.AsReference<ICancellationSourcesExtension>()));
+                tasks.Add(CancelTokenWithRetries(id, grainReferences, reference.Key, reference.Value.AsReference<ICancellationSourcesExtension>(), cancellationToken));
             }
 
             return tasks is null ? localTask ?? Task.CompletedTask : Task.WhenAll(tasks);
         }
 
-         private async Task CancelTokenWithRetries(
-             Guid id,
-             ConcurrentDictionary<GrainId, GrainReference> grainReferences,
-             GrainId key,
-             ICancellationSourcesExtension tokenExtension)
+        private async Task CancelTokenWithRetries(
+            Guid id,
+            ConcurrentDictionary<GrainId, GrainReference> grainReferences,
+            GrainId key,
+            ICancellationSourcesExtension tokenExtension,
+            CancellationToken cancellationToken)
         {
-            await AsyncExecutorWithRetries.ExecuteWithRetries(
-                i => tokenExtension.CancelRemoteToken(id),
+            await AsyncExecutorWithRetries.ExecuteWithRetries<bool>(
+                async i =>
+                {
+                    var cancelTask = tokenExtension.CancelRemoteToken(id);
+                    try
+                    {
+                        await cancelTask.WaitAsync(cancellationToken);
+                    }
+                    catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+                    {
+                        cancelTask.Ignore();
+                        throw;
+                    }
+
+                    return true;
+                },
                 MaxNumCancelErrorTries,
                 _cancelCallRetryExceptionFilter,
                 _cancelCallMaxWaitTime,
-                _cancelCallBackoffProvider);
+                _cancelCallBackoffProvider,
+                cancellationToken);
             grainReferences.TryRemove(key, out _);
         }
     }

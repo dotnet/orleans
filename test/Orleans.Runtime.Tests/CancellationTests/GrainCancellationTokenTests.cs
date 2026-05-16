@@ -1,3 +1,7 @@
+using System.Collections.Concurrent;
+using Orleans.CodeGeneration;
+using Orleans.Runtime;
+using Orleans.Serialization.Invocation;
 using Microsoft.Extensions.Logging;
 using Orleans.Runtime.Placement;
 using Orleans.TestingHost;
@@ -131,6 +135,64 @@ namespace UnitTests.CancellationTests
             var grainTask = grain.LongWaitGrainCancellation(cts.Token, TimeSpan.FromSeconds(10), callId);
             await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
             await WaitForCallCancellation(grain, callId);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
+        public async Task CancelWithCanceledOperationToken_CancelsLocalToken()
+        {
+            using var cts = new GrainCancellationTokenSource();
+            using var operationCts = new CancellationTokenSource();
+            operationCts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cts.Cancel(operationCts.Token));
+
+            Assert.True(cts.IsCancellationRequested);
+            Assert.True(cts.Token.CancellationToken.IsCancellationRequested);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
+        public async Task CancelWithCanceledOperationToken_CanRetryRemotePropagation()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILongRunningTaskGrain<bool>>(Guid.NewGuid());
+            using var cts = new GrainCancellationTokenSource();
+            var callId = Guid.NewGuid();
+            var grainTask = grain.LongWaitGrainCancellation(cts.Token, TimeSpan.FromSeconds(10), callId);
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+            using var operationCts = new CancellationTokenSource();
+            operationCts.Cancel();
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => cts.Cancel(operationCts.Token));
+
+            Assert.True(cts.IsCancellationRequested);
+            Assert.False(grainTask.IsCompleted);
+
+            await cts.Cancel();
+            await Assert.ThrowsAsync<TaskCanceledException>(() => grainTask);
+            await WaitForCallCancellation(grain, callId);
+        }
+
+        [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
+        public async Task CancelWithShutdownToken_StopsWaitingForRemotePropagation()
+        {
+            var runtime = new GrainCancellationTokenRuntime();
+            var tokenSource = new CancellationTokenSource();
+            var extension = new ControllableCancellationSourcesExtension();
+            var grainId = GrainId.Create(GrainType.Create("shutdown-test"), IdSpan.Create(Guid.NewGuid().ToString("N")));
+            var grainReferences = new ConcurrentDictionary<GrainId, GrainReference>();
+            grainReferences[grainId] = CreateGrainReference(grainId, extension);
+            using var shutdownCts = new CancellationTokenSource(TimeSpan.FromMilliseconds(100));
+
+            await Assert.ThrowsAnyAsync<OperationCanceledException>(() => runtime.Cancel(Guid.NewGuid(), tokenSource, grainReferences, shutdownCts.Token));
+
+            Assert.True(tokenSource.IsCancellationRequested);
+            Assert.Single(grainReferences);
+
+            extension.CompleteSynchronously = true;
+
+            await runtime.Cancel(Guid.NewGuid(), tokenSource, grainReferences);
+
+            Assert.Empty(grainReferences);
+            Assert.True(extension.CancelCallCount >= 2);
         }
 
         [Fact, TestCategory("BVT"), TestCategory("Cancellation")]
@@ -329,6 +391,54 @@ namespace UnitTests.CancellationTests
             }
 
             Assert.Fail("Did not encounter the expected call id");
+        }
+
+        private static GrainReference CreateGrainReference(GrainId grainId, ICancellationSourcesExtension extension)
+        {
+            var runtime = new TestGrainReferenceRuntime(extension);
+            var shared = new GrainReferenceShared(
+                grainId.Type,
+                GrainInterfaceType.Create("shutdown-test"),
+                interfaceVersion: 0,
+                runtime,
+                InvokeMethodOptions.None,
+                codecProvider: null,
+                copyContextPool: null,
+                serviceProvider: null);
+
+            return GrainReference.FromGrainId(shared, grainId);
+        }
+
+        private sealed class TestGrainReferenceRuntime(ICancellationSourcesExtension extension) : IGrainReferenceRuntime
+        {
+            private readonly ICancellationSourcesExtension _extension = extension;
+
+            public object Cast(IAddressable grain, Type interfaceType)
+                => interfaceType == typeof(ICancellationSourcesExtension) ? _extension : throw new NotSupportedException();
+
+            public ValueTask<T> InvokeMethodAsync<T>(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+                => throw new NotSupportedException();
+
+            public ValueTask InvokeMethodAsync(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+                => throw new NotSupportedException();
+
+            public void InvokeMethod(GrainReference reference, IInvokable request, InvokeMethodOptions options)
+                => throw new NotSupportedException();
+        }
+
+        private sealed class ControllableCancellationSourcesExtension : ICancellationSourcesExtension
+        {
+            private readonly TaskCompletionSource _pendingCancellation = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+            public int CancelCallCount { get; private set; }
+
+            public bool CompleteSynchronously { get; set; }
+
+            public Task CancelRemoteToken(Guid tokenId)
+            {
+                ++CancelCallCount;
+                return CompleteSynchronously ? Task.CompletedTask : _pendingCancellation.Task;
+            }
         }
     }
 }

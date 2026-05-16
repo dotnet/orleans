@@ -88,13 +88,25 @@ namespace Orleans
         /// </returns>
         internal Task Cancel()
         {
+            return Cancel(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Cancels the cancellation token.
+        /// </summary>
+        /// <param name="cancellationToken">The token used to cancel waiting for cancellation propagation.</param>
+        /// <returns>
+        /// A <see cref="Task"/> representing the operation.
+        /// </returns>
+        internal Task Cancel(CancellationToken cancellationToken)
+        {
             if (_cancellationTokenRuntime == null)
             {
                 // Wrap in task
                 try
                 {
                     _cancellationTokenSource.Cancel();
-                    return Task.CompletedTask;
+                    return cancellationToken.IsCancellationRequested ? Task.FromCanceled(cancellationToken) : Task.CompletedTask;
                 }
                 catch (Exception exception)
                 {
@@ -104,7 +116,7 @@ namespace Orleans
                 }
             }
 
-            return _cancellationTokenRuntime.Cancel(Id, _cancellationTokenSource, _targetGrainReferences);
+            return _cancellationTokenRuntime.Cancel(Id, _cancellationTokenSource, _targetGrainReferences, cancellationToken);
         }
 
         /// <summary>

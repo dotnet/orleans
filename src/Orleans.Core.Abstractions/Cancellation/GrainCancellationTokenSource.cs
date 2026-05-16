@@ -61,7 +61,7 @@ namespace Orleans
         /// <see cref="CancellationToken" /> will be executed.
         /// </para>
         /// <para>
-        /// Cancelable operations and callbacks registered with the token should not <see langword="throw"/> exceptions. However, this overload of <see cref="Cancel"/> will aggregate any exceptions thrown into a
+        /// Cancelable operations and callbacks registered with the token should not <see langword="throw"/> exceptions. However, this overload of <see cref="Cancel()"/> will aggregate any exceptions thrown into a
         /// <see cref="AggregateException" /> , such that one callback throwing an exception will not prevent other registered callbacks from being executed.
         /// </para>
         /// <para>The <see cref="System.Threading.ExecutionContext" /> that was captured when each callback was registered will be reestablished when the callback is invoked.</para>
@@ -70,7 +70,35 @@ namespace Orleans
         /// <exception cref="ObjectDisposedException">This <see cref="GrainCancellationTokenSource" /> has been disposed.</exception>
         public Task Cancel()
         {
-            return _grainCancellationToken.Cancel();
+            return _grainCancellationToken.Cancel(CancellationToken.None);
+        }
+
+        /// <summary>
+        /// Communicates a request for cancellation.
+        /// </summary>
+        /// <remarks>
+        /// <para>
+        /// The associated <see cref="GrainCancellationToken" /> will be notified of the cancellation and will transition to a state where
+        /// <see cref="GrainCancellationToken.CancellationToken"><see cref="IsCancellationRequested"/></see> returns true. Any callbacks or cancelable operations registered with the
+        /// <see cref="CancellationToken" /> will be executed.
+        /// </para>
+        /// <para>
+        /// The <paramref name="cancellationToken"/> cancels waiting for cancellation to be propagated to remote observers. The associated
+        /// <see cref="GrainCancellationToken" /> remains canceled once cancellation has been requested.
+        /// </para>
+        /// <para>
+        /// Cancelable operations and callbacks registered with the token should not <see langword="throw"/> exceptions. However, this overload of <see cref="Cancel(CancellationToken)"/> will aggregate any exceptions thrown into a
+        /// <see cref="AggregateException" /> , such that one callback throwing an exception will not prevent other registered callbacks from being executed.
+        /// </para>
+        /// <para>The <see cref="System.Threading.ExecutionContext" /> that was captured when each callback was registered will be reestablished when the callback is invoked.</para>
+        /// </remarks>
+        /// <param name="cancellationToken">The token used to cancel waiting for cancellation propagation.</param>
+        /// <exception cref="AggregateException">An aggregate exception containing all the exceptions thrown by the registered callbacks on the associated <see cref="GrainCancellationToken" /> .</exception>
+        /// <exception cref="ObjectDisposedException">This <see cref="GrainCancellationTokenSource" /> has been disposed.</exception>
+        /// <exception cref="OperationCanceledException">The <paramref name="cancellationToken"/> was canceled.</exception>
+        public Task Cancel(CancellationToken cancellationToken)
+        {
+            return _grainCancellationToken.Cancel(cancellationToken);
         }
 
         /// <summary>

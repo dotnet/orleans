@@ -18,5 +18,15 @@ namespace Orleans.Runtime
         /// <param name="grainReferences">The grain references which are observing the cancellation token.</param>
         /// <returns>A <see cref="Task"/> representing the operation.</returns>
         Task Cancel(Guid id, CancellationTokenSource tokenSource, ConcurrentDictionary<GrainId, GrainReference> grainReferences);
+
+        /// <summary>
+        /// Cancels the <see cref="GrainCancellationToken"/> with the provided id.
+        /// </summary>
+        /// <param name="id">The grain cancellation token id.</param>
+        /// <param name="tokenSource">The grain cancellation token source being canceled.</param>
+        /// <param name="grainReferences">The grain references which are observing the cancellation token.</param>
+        /// <param name="cancellationToken">The token used to cancel waiting for cancellation propagation.</param>
+        /// <returns>A <see cref="Task"/> representing the operation.</returns>
+        Task Cancel(Guid id, CancellationTokenSource tokenSource, ConcurrentDictionary<GrainId, GrainReference> grainReferences, CancellationToken cancellationToken);
     }
 }

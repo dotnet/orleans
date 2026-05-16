@@ -1129,6 +1129,8 @@ namespace Orleans
 
         public System.Threading.Tasks.Task Cancel() { throw null; }
 
+        public System.Threading.Tasks.Task Cancel(System.Threading.CancellationToken cancellationToken) { throw null; }
+
         public void Dispose() { }
     }
 
