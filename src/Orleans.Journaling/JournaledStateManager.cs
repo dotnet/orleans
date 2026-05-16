@@ -367,7 +367,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
                                         var writeCompleted = false;
                                         try
                                         {
-                                            if (isSnapshot && hasBufferToConsume)
+                                            if (isSnapshot && hasBufferToConsume && !_migrationSnapshotRequired)
                                             {
                                                 await AppendStorageAsync(bufferToConsume.AsReadOnlySequence(), _shutdownCancellation.Token).ConfigureAwait(true);
                                                 lock (_lock)
