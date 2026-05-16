@@ -12,6 +12,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Orleans.Journaling\Orleans.Journaling.csproj" />
     <ProjectReference Include="..\Orleans.Runtime\Orleans.Runtime.csproj" />
   </ItemGroup>
 

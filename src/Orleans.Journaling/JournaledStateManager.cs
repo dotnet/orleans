@@ -151,7 +151,7 @@ internal sealed partial class JournaledStateManager : IJournaledStateManager, IJ
             _workSignal.Signal();
         }
 
-        await task;
+        await task.WaitAsync(cancellationToken);
     }
 
     private Task Start()

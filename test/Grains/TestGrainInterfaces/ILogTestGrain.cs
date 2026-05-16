@@ -66,6 +66,13 @@ namespace UnitTests.GrainInterfaces
         Task Deactivate();
     }
 
+    public interface ILogTestGrainWithAuxiliaryState : ILogTestGrain
+    {
+        Task<int> GetAuxiliaryValue();
+
+        Task SetAuxiliaryValue(int value);
+    }
+
     /// <summary>
     /// Used by unit tests. 
     /// The fields don't really have any meaning. 
