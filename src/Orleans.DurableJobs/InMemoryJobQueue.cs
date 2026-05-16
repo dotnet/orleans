@@ -12,6 +12,7 @@ namespace Orleans.DurableJobs;
 /// </summary>
 internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 {
+    private readonly TimeProvider _timeProvider;
     private readonly PriorityQueue<JobBucket, DateTimeOffset> _queue = new();
     private readonly Dictionary<string, JobBucket> _jobsIdToBucket = new();
     private readonly Dictionary<DateTimeOffset, JobBucket> _buckets = new();
@@ -21,6 +22,11 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
 #else
     private readonly object _syncLock = new();
 #endif
+
+    public InMemoryJobQueue(TimeProvider? timeProvider = null)
+    {
+        _timeProvider = timeProvider ?? TimeProvider.System;
+    }
 
     /// <summary>
     /// Gets the total number of jobs currently in the queue.
@@ -191,7 +197,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// </returns>
     public async IAsyncEnumerator<IJobRunContext> GetAsyncEnumerator(CancellationToken cancellationToken = default)
     {
-        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1));
+        using var timer = new PeriodicTimer(TimeSpan.FromSeconds(1), _timeProvider);
         while (true)
         {
             JobBucket? bucketToProcess = null;
@@ -209,7 +215,7 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
                 else if (_queue.Count > 0)
                 {
                     var nextBucket = _queue.Peek();
-                    if (nextBucket.DueTime < DateTimeOffset.UtcNow)
+                    if (nextBucket.DueTime < _timeProvider.GetUtcNow())
                     {
                         // Dequeue the entire bucket to process outside the lock
                         bucketToProcess = _queue.Dequeue();

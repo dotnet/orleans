@@ -31,6 +31,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private readonly IServiceProvider _serviceProvider;
     private readonly DurableJobsOptions _options;
     private readonly JournaledStateManagerOptions _journaledStateManagerOptions;
+    private readonly TimeProvider _timeProvider;
     private readonly ConcurrentDictionary<string, JournaledJobShard> _jobShardCache = new();
 
     public JournaledJobShardManager(
@@ -57,6 +58,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         _serviceProvider = serviceProvider;
         _options = options.Value;
         _journaledStateManagerOptions = journaledStateManagerOptions.Value;
+        _timeProvider = serviceProvider.GetService<TimeProvider>() ?? TimeProvider.System;
     }
 
     private static SiloAddress GetSiloAddress(ILocalSiloDetails localSiloDetails)
@@ -285,7 +287,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             }
 
             set[AdoptedCountProperty] = adoptedCount.ToString(CultureInfo.InvariantCulture);
-            set[LastAdoptedTimeProperty] = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture);
+            set[LastAdoptedTimeProperty] = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture);
         }
         else
         {
@@ -318,7 +320,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
             {
                 [PoisonedProperty] = bool.TrueString,
                 [AdoptedCountProperty] = adoptedCount.ToString(CultureInfo.InvariantCulture),
-                [LastAdoptedTimeProperty] = DateTimeOffset.UtcNow.ToString("O", CultureInfo.InvariantCulture),
+                [LastAdoptedTimeProperty] = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture),
                 [MembershipVersionProperty] = GetMembershipVersionString()
             },
             remove: null);
@@ -346,7 +348,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private async ValueTask<JournaledJobShard> OpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken)
     {
         var codec = CreateOperationCodec();
-        var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec);
+        var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
         var manager = _stateManagerFactory.Create(new JournalId(descriptor.StorageId.Value));
         try
         {

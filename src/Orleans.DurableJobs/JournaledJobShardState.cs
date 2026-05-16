@@ -10,21 +10,23 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     private readonly JobShardId _shardId;
     private readonly IDurableValueCommandCodec<DurableJobShardJournalRecord>? _codec;
-    private InMemoryJobQueue _jobQueue = new();
+    private readonly TimeProvider _timeProvider;
+    private InMemoryJobQueue _jobQueue;
     private JournalStreamWriter _writer;
 
     public JournaledJobShardState(
         JobShardId shardId,
         DateTimeOffset startTime,
         DateTimeOffset endTime,
-        IDurableValueCommandCodec<DurableJobShardJournalRecord> codec)
-        : this(shardId, startTime, endTime, codec, isAddingCompleted: false)
+        IDurableValueCommandCodec<DurableJobShardJournalRecord> codec,
+        TimeProvider? timeProvider = null)
+        : this(shardId, startTime, endTime, codec, timeProvider, isAddingCompleted: false)
     {
         ArgumentNullException.ThrowIfNull(codec);
     }
 
-    internal JournaledJobShardState(JobShardId shardId, DateTimeOffset startTime, DateTimeOffset endTime)
-        : this(shardId, startTime, endTime, codec: null, isAddingCompleted: false)
+    internal JournaledJobShardState(JobShardId shardId, DateTimeOffset startTime, DateTimeOffset endTime, TimeProvider? timeProvider = null)
+        : this(shardId, startTime, endTime, codec: null, timeProvider: timeProvider, isAddingCompleted: false)
     {
     }
 
@@ -33,6 +35,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
         DateTimeOffset startTime,
         DateTimeOffset endTime,
         IDurableValueCommandCodec<DurableJobShardJournalRecord>? codec,
+        TimeProvider? timeProvider,
         bool isAddingCompleted)
     {
         if (endTime < startTime)
@@ -42,6 +45,8 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
         _shardId = shardId;
         _codec = codec;
+        _timeProvider = timeProvider ?? TimeProvider.System;
+        _jobQueue = new(_timeProvider);
         StartTime = startTime;
         EndTime = endTime;
         IsAddingCompleted = isAddingCompleted;
@@ -161,7 +166,7 @@ internal sealed class JournaledJobShardState : IJournaledState, IDurableValueCom
 
     void IJournaledState.Reset(JournalStreamWriter writer)
     {
-        _jobQueue = new();
+        _jobQueue = new(_timeProvider);
         IsAddingCompleted = false;
         _writer = writer;
     }
