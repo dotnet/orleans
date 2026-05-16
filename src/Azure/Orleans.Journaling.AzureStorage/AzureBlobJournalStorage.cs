@@ -566,8 +566,8 @@ internal sealed partial class AzureBlobJournalStorage : IJournalStorage
     {
         var currentETag = expectedETag == default ? "Unknown" : expectedETag.ToString();
         return exception is null
-            ? new InconsistentStateException(message, storedEtag: currentETag, currentEtag: "Unknown")
-            : new InconsistentStateException(message, storedEtag: currentETag, currentEtag: "Unknown", exception);
+            ? new InconsistentStateException(message, storedEtag: "Unknown", currentEtag: currentETag)
+            : new InconsistentStateException(message, storedEtag: "Unknown", currentEtag: currentETag, exception);
     }
 
     [LoggerMessage(
