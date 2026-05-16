@@ -34,12 +34,6 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
     }
 
-    public IJournalStorage CreateStorage(IGrainContext grainContext)
-    {
-        ArgumentNullException.ThrowIfNull(grainContext);
-        return CreateStorage(JournalId.FromGrainId(grainContext.GrainId));
-    }
-
     public IJournalStorage CreateStorage(JournalId journalId)
     {
         if (journalId.IsDefault)

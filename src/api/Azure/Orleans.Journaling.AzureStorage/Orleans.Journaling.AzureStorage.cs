@@ -46,7 +46,6 @@ namespace Orleans.Journaling
     public partial interface IBlobContainerFactory
     {
         Azure.Storage.Blobs.BlobContainerClient GetBlobContainerClient(JournalId journalId);
-        Azure.Storage.Blobs.BlobContainerClient GetBlobContainerClient(Runtime.GrainId grainId);
         System.Threading.Tasks.Task InitializeAsync(Azure.Storage.Blobs.BlobServiceClient client, System.Threading.CancellationToken cancellationToken);
     }
 }

@@ -59,7 +59,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
         await using (var binaryProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token))
         {
-            var storage = binaryProvider.StorageProvider.CreateStorage(new JournalBatchTests.TestGrainContext(grainId));
+            var storage = binaryProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
             var manager = CreateFormatAwareManager(binaryProvider.ServiceProvider, storage, OrleansBinaryJournalFormat.JournalFormatKey);
             var dict = CreateFormatAwareDictionary(binaryProvider.ServiceProvider, manager, OrleansBinaryJournalFormat.JournalFormatKey);
             await manager.InitializeAsync(cts.Token);
@@ -70,7 +70,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         }
 
         await using var jsonProvider = await CreateAzureProviderAsync(JsonJournalExtensions.JournalFormatKey, blobName, cts.Token);
-        var migratedStorage = jsonProvider.StorageProvider.CreateStorage(new JournalBatchTests.TestGrainContext(grainId));
+        var migratedStorage = jsonProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
         var migratedManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, migratedStorage, JsonJournalExtensions.JournalFormatKey);
         var migratedDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, migratedManager, JsonJournalExtensions.JournalFormatKey);
         await migratedManager.InitializeAsync(cts.Token);
@@ -81,7 +81,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         await migratedManager.WriteStateAsync(cts.Token);
         ((IDisposable)migratedManager).Dispose();
 
-        var recoveredStorage = jsonProvider.StorageProvider.CreateStorage(new JournalBatchTests.TestGrainContext(grainId));
+        var recoveredStorage = jsonProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
         var recoveredManager = CreateFormatAwareManager(jsonProvider.ServiceProvider, recoveredStorage, JsonJournalExtensions.JournalFormatKey);
         var recoveredDict = CreateFormatAwareDictionary(jsonProvider.ServiceProvider, recoveredManager, JsonJournalExtensions.JournalFormatKey);
         await recoveredManager.InitializeAsync(cts.Token);
@@ -107,7 +107,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
     public async Task AzureBlobStorage_AllDurableTypes_RecoverWithBinaryCodec()
     {
         var grainId = GrainId.Create("journaling-codec-recovery", Guid.NewGuid().ToString("N"));
-        var storage = _storageProvider.CreateStorage(new JournalBatchTests.TestGrainContext(grainId));
+        var storage = _storageProvider.CreateStorage(JournalId.FromGrainId(grainId));
         var first = CreateStates(storage);
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(60));
         await first.Manager.InitializeAsync(cts.Token);
@@ -125,7 +125,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
         Assert.True(first.Tcs.TrySetResult(17));
         await first.Manager.WriteStateAsync(cts.Token);
 
-        var recoveredStorage = _storageProvider.CreateStorage(new JournalBatchTests.TestGrainContext(grainId));
+        var recoveredStorage = _storageProvider.CreateStorage(JournalId.FromGrainId(grainId));
         var recovered = CreateStates(recoveredStorage);
         await recovered.Manager.InitializeAsync(cts.Token);
 
@@ -155,13 +155,13 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
         await using (var writerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token))
         {
-            var storage = writerProvider.StorageProvider.CreateStorage(new JournalBatchTests.TestGrainContext(grainId));
+            var storage = writerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
             await storage.ReplaceAsync(new ReadOnlySequence<byte>(checkpointBytes), cts.Token);
             await storage.AppendAsync(new ReadOnlySequence<byte>(walBytes), cts.Token);
         }
 
         await using var readerProvider = await CreateAzureProviderAsync(OrleansBinaryJournalFormat.JournalFormatKey, blobName, cts.Token);
-        var recoveredStorage = readerProvider.StorageProvider.CreateStorage(new JournalBatchTests.TestGrainContext(grainId));
+        var recoveredStorage = readerProvider.StorageProvider.CreateStorage(JournalId.FromGrainId(grainId));
         var recovered = new RecordingJournalStorageConsumer();
 
         await recoveredStorage.ReadAsync(recovered, cts.Token);

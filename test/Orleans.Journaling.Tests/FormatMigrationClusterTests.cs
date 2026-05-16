@@ -75,14 +75,14 @@ public sealed class FormatMigrationClusterTests
 
     private sealed class SharedVolatileJournalStorageProvider
     {
-        private readonly ConcurrentDictionary<GrainId, VolatileJournalStorage> _storage = new();
+        private readonly ConcurrentDictionary<JournalId, VolatileJournalStorage> _storage = new();
 
         public IEnumerable<string?> StoredFormatKeys => _storage.Values.Select(static storage => storage.StoredJournalFormatKey);
 
-        public IJournalStorage Create(IGrainContext grainContext, IOptions<JournaledStateManagerOptions> options)
+        public IJournalStorage Create(JournalId journalId, IOptions<JournaledStateManagerOptions> options)
         {
             var journalFormatKey = JournalFormatServices.ValidateJournalFormatKey(options.Value.JournalFormatKey);
-            var storage = _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage(journalFormatKey));
+            var storage = _storage.GetOrAdd(journalId, _ => new VolatileJournalStorage(journalFormatKey));
             storage.SetConfiguredJournalFormatKey(journalFormatKey);
             return storage;
         }
@@ -93,6 +93,6 @@ public sealed class FormatMigrationClusterTests
         SharedVolatileJournalStorageProvider provider,
         IOptions<JournaledStateManagerOptions> options) : IJournalStorageProvider
     {
-        public IJournalStorage CreateStorage(IGrainContext grainContext) => provider.Create(grainContext, options);
+        public IJournalStorage CreateStorage(JournalId journalId) => provider.Create(journalId, options);
     }
 }

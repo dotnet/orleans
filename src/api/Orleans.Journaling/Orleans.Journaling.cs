@@ -171,7 +171,6 @@ namespace Orleans.Journaling
     public partial interface IJournalStorageProvider
     {
         IJournalStorage CreateStorage(JournalId journalId);
-        IJournalStorage CreateStorage(Runtime.IGrainContext grainContext);
     }
 
     public partial interface IJournalStorageConsumer
@@ -496,7 +495,6 @@ namespace Orleans.Journaling
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
-        public IJournalStorage CreateStorage(Runtime.IGrainContext grainContext) { throw null; }
     }
 }
 
