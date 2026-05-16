@@ -64,7 +64,7 @@ public class GenerateAliasAttributesCodeFix : CodeFixProvider
 
         var aliasAttribute =
             Attribute(
-                ParseName(Constants.AliasAttributeFullyQualifiedName))
+                ParseName(Constants.AliasAttributeSourceName))
                     .WithArgumentList(
                         ParseAttributeArgumentList($"(\"{ns}{typeName}{arityString}\")"))
                             .WithAdditionalAnnotations(Simplifier.Annotation);

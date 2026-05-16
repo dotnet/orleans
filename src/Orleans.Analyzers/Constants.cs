@@ -16,5 +16,10 @@ namespace Orleans.Analyzers
 
         public const string SerializableAttributeFullyQualifiedName = "System.SerializableAttribute";
         public const string NonSerializedAttributeFullyQualifiedName = "System.NonSerializedAttribute";
+
+        public const string AliasAttributeSourceName = "global::Orleans.AliasAttribute";
+        public const string IdAttributeSourceName = "global::Orleans.IdAttribute";
+        public const string GenerateSerializerAttributeSourceName = "global::Orleans.GenerateSerializerAttribute";
+        public const string NonSerializedAttributeSourceName = "global::System.NonSerializedAttribute";
     }
 }

@@ -48,7 +48,7 @@ namespace Orleans.Analyzers
             var editor = await DocumentEditor.CreateAsync(context.Document, cancellationToken).ConfigureAwait(false);
 
             // Add the [GenerateSerializer] attribute
-            var attribute = Attribute(ParseName(Constants.GenerateSerializerAttributeFullyQualifiedName))
+            var attribute = Attribute(ParseName(Constants.GenerateSerializerAttributeSourceName))
                 .WithAdditionalAnnotations(Simplifier.Annotation);
             editor.AddAttribute(declaration, attribute);
             return editor.GetChangedDocument();
@@ -68,7 +68,7 @@ namespace Orleans.Analyzers
             foreach (var member in analysis.UnannotatedMembers)
             {
                 // Add the [Id(x)] attribute
-                var attribute = Attribute(ParseName(Constants.IdAttributeFullyQualifiedName))
+                var attribute = Attribute(ParseName(Constants.IdAttributeSourceName))
                     .AddArgumentListArguments(AttributeArgument(LiteralExpression(SyntaxKind.NumericLiteralExpression, Literal((int)nextId++))))
                     .WithAdditionalAnnotations(Simplifier.Annotation);
                 editor.AddAttribute(member, attribute);
@@ -90,7 +90,7 @@ namespace Orleans.Analyzers
             foreach (var member in analysis.UnannotatedMembers)
             {
                 // Add the [NonSerialized] attribute
-                var attribute = AttributeList().AddAttributes(Attribute(ParseName(Constants.NonSerializedAttributeFullyQualifiedName)).WithAdditionalAnnotations(Simplifier.Annotation));
+                var attribute = AttributeList().AddAttributes(Attribute(ParseName(Constants.NonSerializedAttributeSourceName)).WithAdditionalAnnotations(Simplifier.Annotation));
 
                 // Since [NonSerialized] is a field-only attribute, add the field target specifier.
                 if (member is PropertyDeclarationSyntax)
