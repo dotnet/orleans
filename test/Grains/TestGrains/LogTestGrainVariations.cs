@@ -1,7 +1,10 @@
 using Orleans.Providers;
 using Orleans.Serialization;
+using Orleans.Journaling;
+using Microsoft.Extensions.DependencyInjection;
 using UnitTests.GrainInterfaces;
 
+#pragma warning disable ORLEANSEXP005
 namespace TestGrains
 {
     // variations of the log consistent grain are used to test a variety of provider and configurations
@@ -18,6 +21,29 @@ namespace TestGrains
     [LogConsistencyProvider(ProviderName = "LogStorage")]
     public class LogTestGrainSharedLogStorage : LogTestGrain
     {
+    }
+
+    [LogConsistencyProvider(ProviderName = "JournaledState")]
+    public class LogTestGrainJournaledStateStorage : LogTestGrain
+    {
+    }
+
+    [LogConsistencyProvider(ProviderName = "JournaledState")]
+    public class LogTestGrainJournaledStateStorageWithAuxiliaryState(
+        [FromKeyedServices("auxiliary-state")] IDurableValue<int> auxiliaryState)
+        : LogTestGrain,
+            ILogTestGrainWithAuxiliaryState
+    {
+        public Task<int> GetAuxiliaryValue()
+        {
+            return Task.FromResult(auxiliaryState.Value);
+        }
+
+        public Task SetAuxiliaryValue(int value)
+        {
+            auxiliaryState.Value = value;
+            return Task.CompletedTask;
+        }
     }
 
     // use the default storage provider as the shared storage
@@ -134,3 +160,4 @@ namespace TestGrains
 
 
 }
+#pragma warning restore ORLEANSEXP005
