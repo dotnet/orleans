@@ -1,12 +1,29 @@
 #nullable enable
 using System.Diagnostics;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
+using Microsoft.Extensions.Time.Testing;
+using Orleans.Configuration;
+using Orleans.Hosting;
 using Orleans.Internal;
+using Orleans.TestingHost;
 using TestExtensions;
 using UnitTests.GrainInterfaces;
 using Xunit;
 
 namespace DefaultCluster.Tests;
+
+public static class AsyncEnumerableGrainCallTestCollection
+{
+    public const string Name = nameof(AsyncEnumerableGrainCallTests);
+}
+
+[CollectionDefinition(AsyncEnumerableGrainCallTestCollection.Name)]
+public sealed class AsyncEnumerableGrainCallTestCollectionDefinition : ICollectionFixture<AsyncEnumerableGrainCallTests.Fixture>
+{
+}
 
 /// <summary>
 /// Tests support for grain methods which return <see cref="IAsyncEnumerable{T}"/>.
@@ -15,11 +32,19 @@ namespace DefaultCluster.Tests;
 /// Orleans uses a grain extension mechanism to manage the lifecycle of async enumerators
 /// across the distributed system.
 /// </summary>
-public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStarted
+[Collection(AsyncEnumerableGrainCallTestCollection.Name)]
+public class AsyncEnumerableGrainCallTests
 {
-    public AsyncEnumerableGrainCallTests(DefaultClusterFixture fixture) : base(fixture)
+    private readonly Fixture _fixture;
+
+    public AsyncEnumerableGrainCallTests(Fixture fixture)
     {
+        _fixture = fixture;
     }
+
+    private IGrainFactory GrainFactory => _fixture.GrainFactory;
+
+    private ILogger Logger => _fixture.Logger;
 
     /// <summary>
     /// Tests basic async enumerable functionality where a grain produces values that are consumed by the client.
@@ -543,9 +568,8 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var cleanupInterval = TimeSpan.FromMilliseconds(1_000);
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
-        using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId(), cleanupInterval);
+        using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId());
 
         var producer = Task.Run(async () =>
         {
@@ -558,20 +582,11 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         });
 
         var values = new List<string>();
-        var cleanupCountBeforeMoveNext = listener.CleanupCount;
         await foreach (var entry in grain.GetValues().WithBatchSize(1))
         {
             values.Add(entry);
 
-            // Wait for one cleanup cycle before reading the next value.
-            // Track the count captured before the corresponding MoveNext call to avoid waiting
-            // for a second cycle if cleanup happens right after MoveNext completes.
-            while (listener.CleanupCount == cleanupCountBeforeMoveNext)
-            {
-                await Task.Delay(cleanupInterval / 10, cts.Token);
-            }
-
-            cleanupCountBeforeMoveNext = listener.CleanupCount;
+            await AdvanceToNextCleanupAsync(listener, cts.Token);
             Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
         }
 
@@ -592,9 +607,8 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
     public async Task ObservableGrain_AsyncEnumerable_SlowConsumer_Evicted()
     {
         using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
-        var cleanupInterval = TimeSpan.FromMilliseconds(1_000);
         var grain = GrainFactory.GetGrain<IObservableGrain>(Guid.NewGuid());
-        using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId(), cleanupInterval);
+        using var listener = new AsyncEnumerableGrainExtensionListener(grain.GetGrainId());
 
         var producer = Task.Run(async () =>
         {
@@ -613,15 +627,10 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
             {
                 values.Add(entry);
 
-                // After the 3rd iteration, sleep for longer than the cleanup duration
-                // and wait for the enumerator to be cleaned up.
-                if (values.Count >= 3)
+                if (values.Count == 3)
                 {
-                    var initialCleanupCount = listener.CleanupCount;
-                    while (listener.CleanupCount < initialCleanupCount + 2)
-                    {
-                        await Task.Delay(cleanupInterval, cts.Token);
-                    }
+                    await AdvanceToNextCleanupAsync(listener, cts.Token);
+                    await AdvanceToNextCleanupAsync(listener, cts.Token);
                 }
 
                 Logger.LogInformation("ObservableGrain_AsyncEnumerable: {Entry}", entry);
@@ -675,6 +684,39 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
         Assert.Equal(2, values.Count);
     }
 
+    private async Task AdvanceToNextCleanupAsync(AsyncEnumerableGrainExtensionListener listener, CancellationToken cancellationToken)
+    {
+        var cleanupCount = listener.CleanupCount + 1;
+        _fixture.AdvanceTimeByResponseTimeout();
+        await listener.WaitForCleanupCountAsync(cleanupCount, cancellationToken);
+    }
+
+    /// <summary>
+    /// Test fixture which uses a fake silo time provider so cleanup timers can be advanced deterministically.
+    /// </summary>
+    public sealed class Fixture : BaseInProcessTestClusterFixture
+    {
+        private readonly FakeTimeProvider _timeProvider = new(new DateTimeOffset(2026, 1, 1, 0, 0, 0, TimeSpan.Zero));
+
+        protected override void ConfigureTestCluster(InProcessTestClusterBuilder builder)
+        {
+            builder.ConfigureSilo((_, siloBuilder) =>
+            {
+                siloBuilder
+                    .Configure<SiloMessagingOptions>(o => o.ClientGatewayShutdownNotificationTimeout = default)
+                    .UseInMemoryReminderService()
+                    .UseInMemoryDurableJobs()
+                    .AddMemoryGrainStorageAsDefault()
+                    .AddMemoryGrainStorage("MemoryStore");
+
+                siloBuilder.Services.Replace(ServiceDescriptor.Singleton<TimeProvider>(_timeProvider));
+            });
+        }
+
+        public void AdvanceTimeByResponseTimeout() =>
+            _timeProvider.Advance(HostedCluster.GetSiloServiceProvider().GetRequiredService<IOptions<SiloMessagingOptions>>().Value.ResponseTimeout);
+    }
+
     /// <summary>
     /// Diagnostic listener for monitoring AsyncEnumerableGrainExtension behavior during tests.
     /// This helper class allows tests to observe internal cleanup operations and verify
@@ -682,19 +724,49 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
     /// </summary>
     private sealed class AsyncEnumerableGrainExtensionListener : IObserver<KeyValuePair<string, object?>>, IObserver<DiagnosticListener>, IDisposable
     {
+        private readonly object _lock = new();
         private readonly IDisposable _allListenersSubscription;
         private readonly GrainId _targetGrainId;
-        private readonly TimeSpan _enumeratorCleanupInterval;
         private IDisposable? _instanceSubscription;
+        private TaskCompletionSource? _cleanupCompleted;
+        private int _cleanupCount;
 
-        public AsyncEnumerableGrainExtensionListener(GrainId targetGrainId, TimeSpan enumeratorCleanupInterval)
+        public AsyncEnumerableGrainExtensionListener(GrainId targetGrainId)
         {
             _allListenersSubscription = DiagnosticListener.AllListeners.Subscribe(this);
             _targetGrainId = targetGrainId;
-            _enumeratorCleanupInterval = enumeratorCleanupInterval;
         }
 
-        public int CleanupCount { get; private set; }
+        public int CleanupCount
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return _cleanupCount;
+                }
+            }
+        }
+
+        public async Task WaitForCleanupCountAsync(int cleanupCount, CancellationToken cancellationToken)
+        {
+            while (true)
+            {
+                Task cleanupCompletedTask;
+                lock (_lock)
+                {
+                    if (_cleanupCount >= cleanupCount)
+                    {
+                        return;
+                    }
+
+                    _cleanupCompleted ??= new(TaskCreationOptions.RunContinuationsAsynchronously);
+                    cleanupCompletedTask = _cleanupCompleted.Task;
+                }
+
+                await cleanupCompletedTask.WaitAsync(cancellationToken);
+            }
+        }
 
         void IObserver<KeyValuePair<string, object?>>.OnCompleted()
         {
@@ -713,14 +785,17 @@ public class AsyncEnumerableGrainCallTests : HostedTestClusterEnsureDefaultStart
                 return;
             }
 
-            if (value.Key == "OnAsyncEnumeratorGrainExtensionCreated")
-            {
-                extension.Timer.Change(_enumeratorCleanupInterval, _enumeratorCleanupInterval);
-            }
-
             if (value.Key == "OnEnumeratorCleanupCompleted")
             {
-                ++CleanupCount;
+                TaskCompletionSource? cleanupCompleted;
+                lock (_lock)
+                {
+                    ++_cleanupCount;
+                    cleanupCompleted = _cleanupCompleted;
+                    _cleanupCompleted = null;
+                }
+
+                cleanupCompleted?.TrySetResult();
             }
         }
 

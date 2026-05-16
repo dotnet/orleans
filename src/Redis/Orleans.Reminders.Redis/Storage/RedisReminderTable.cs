@@ -8,8 +8,6 @@ using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 
-using Newtonsoft.Json;
-
 using Orleans.Configuration;
 using Orleans.Runtime;
 
@@ -27,14 +25,6 @@ namespace Orleans.Reminders.Redis
         private readonly ILogger _logger;
         private IConnectionMultiplexer _muxer;
         private IDatabase _db;
-
-        private readonly JsonSerializerSettings _jsonSettings = new JsonSerializerSettings()
-        {
-            DateFormatHandling = DateFormatHandling.IsoDateFormat,
-            DefaultValueHandling = DefaultValueHandling.Ignore,
-            MissingMemberHandling = MissingMemberHandling.Ignore,
-            NullValueHandling = NullValueHandling.Ignore,
-        };
 
         public RedisReminderTable(
             ILogger<RedisReminderTable> logger,
@@ -191,7 +181,7 @@ namespace Orleans.Reminders.Redis
 
         private static ReminderEntry ConvertToEntry(string reminderValue)
         {
-            string[] segments = JsonConvert.DeserializeObject<string[]>($"[{reminderValue}]");
+            string[] segments = RedisReminderSerializer.DeserializeMember(reminderValue);
 
             return new ReminderEntry
             {
@@ -225,8 +215,8 @@ namespace Orleans.Reminders.Redis
 
         private (RedisValue from, RedisValue to) GetFilter(params string[] segments)
         {
-            string prefix = JsonConvert.SerializeObject(segments, _jsonSettings);
-            return ($"{prefix[1..^1]},\"", $"{prefix[1..^1]},#");
+            var filter = RedisReminderSerializer.GetFilter(segments);
+            return (filter.From, filter.To);
         }
 
         private (RedisValue eTag, RedisValue value) ConvertFromEntry(ReminderEntry entry)
@@ -243,7 +233,7 @@ namespace Orleans.Reminders.Redis
                 entry.Period.ToString()
             };
 
-            return (eTag, JsonConvert.SerializeObject(segments, _jsonSettings)[1..^1]);
+            return (eTag, RedisReminderSerializer.SerializeMember(segments));
         }
 
         private readonly struct ReminderEntryLogValue(ReminderEntry entry)

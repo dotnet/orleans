@@ -1,7 +1,10 @@
+using System.Globalization;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Newtonsoft.Json;
 using Orleans.Configuration;
 using Orleans.Reminders.Redis;
+using Orleans.Runtime;
 using StackExchange.Redis;
 using TestExtensions;
 using UnitTests;
@@ -73,6 +76,66 @@ namespace Tester.Redis.Reminders
         public async Task RemindersTable_Redis_ReminderSimple()
         {
             await ReminderSimple();
+        }
+
+        [SkippableFact]
+        public async Task RemindersTable_Redis_Upsert_IgnoresNewtonsoftDefaultSettings()
+        {
+            await RemindersTable.TestOnlyClearTable();
+
+            var previousDefaultSettings = JsonConvert.DefaultSettings;
+            JsonConvert.DefaultSettings = CreateHostileJsonSettings;
+            try
+            {
+                var grainId = GrainId.Create("clientaccount", Guid.NewGuid().ToString("N", CultureInfo.InvariantCulture));
+                var reminder = new ReminderEntry
+                {
+                    GrainId = grainId,
+                    Period = TimeSpan.FromDays(10),
+                    ReminderName = "Balance",
+                    StartAt = new DateTime(2026, 05, 13, 18, 55, 08, DateTimeKind.Utc).AddTicks(8620861)
+                };
+
+                reminder.ETag = await RemindersTable.UpsertRow(reminder);
+                reminder.StartAt = reminder.StartAt.AddMinutes(5);
+                reminder.ETag = await RemindersTable.UpsertRow(reminder);
+
+                var rows = await RemindersTable.ReadRows(grainId);
+                var matchingRows = rows.Reminders.Where(row => row.ReminderName == reminder.ReminderName).ToArray();
+
+                var row = Assert.Single(matchingRows);
+                Assert.Equal(reminder.StartAt, row.StartAt);
+                Assert.Equal(reminder.Period, row.Period);
+            }
+            finally
+            {
+                JsonConvert.DefaultSettings = previousDefaultSettings;
+                await RemindersTable.TestOnlyClearTable();
+            }
+        }
+
+        private static JsonSerializerSettings CreateHostileJsonSettings()
+        {
+            return new JsonSerializerSettings
+            {
+                Culture = CultureInfo.InvariantCulture,
+                Formatting = Formatting.Indented,
+                StringEscapeHandling = StringEscapeHandling.EscapeHtml,
+                Converters = { new HostileStringConverter() }
+            };
+        }
+
+        private sealed class HostileStringConverter : JsonConverter<string>
+        {
+            public override void WriteJson(JsonWriter writer, string value, JsonSerializer serializer)
+            {
+                writer.WriteValue($"converted:{value}");
+            }
+
+            public override string ReadJson(JsonReader reader, Type objectType, string existingValue, bool hasExistingValue, JsonSerializer serializer)
+            {
+                return (string)reader.Value;
+            }
         }
     }
 }

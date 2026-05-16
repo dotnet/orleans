@@ -1,13 +1,14 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <PackageId>Microsoft.Orleans.Journaling</PackageId>
     <Title>Microsoft Orleans Journaling</Title>
-    <Description>Extensible persistence for grains based on replicated state machines.</Description>
-    <PackageTags>$(PackageTags) Persistence State Machines</PackageTags>
+    <Description>Extensible persistence for grains based on replicated states, including a default System.Text.Json journal format.</Description>
+    <PackageTags>$(PackageTags) Persistence States JSON</PackageTags>
     <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
     <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
     <Nullable>enable</Nullable>
+    <NoWarn>$(NoWarn);ORLEANSEXP005</NoWarn>
     <VersionSuffix Condition="$(VersionSuffix) != ''">$(VersionSuffix).alpha.1</VersionSuffix>
     <VersionSuffix Condition="$(VersionSuffix) == ''">alpha.1</VersionSuffix>
   </PropertyGroup>
@@ -17,7 +18,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <InternalsVisibleTo Include="Benchmarks" />
     <InternalsVisibleTo Include="Orleans.Journaling.Tests" />
+    <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
   </ItemGroup>
 
   <ItemGroup>
@@ -28,6 +31,10 @@
 
   <ItemGroup>
     <Using Include="Orleans.Runtime" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
   </ItemGroup>
 
 </Project>

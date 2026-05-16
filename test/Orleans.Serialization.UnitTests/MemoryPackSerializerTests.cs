@@ -30,9 +30,9 @@ namespace Orleans.Serialization.UnitTests;
 /// - Needing better performance than JSON but more portability than Orleans' native format
 /// </summary>
 [Trait("Category", "BVT")]
-public class MemoryPackCodecTests : FieldCodecTester<MyMemoryPackClass?, IFieldCodec<MyMemoryPackClass?>>
+public class MemoryPackCodecTests : FieldCodecTester<MyMemoryPackClass?, IFieldCodec<MyMemoryPackClass?>>, IClassFixture<SerializationTesterFixture>
 {
-    public MemoryPackCodecTests(ITestOutputHelper output) : base(output)
+    public MemoryPackCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -101,9 +101,9 @@ public class MemoryPackCodecTests : FieldCodecTester<MyMemoryPackClass?, IFieldC
 
 
 [Trait("Category", "BVT")]
-public class MemoryPackUnionCodecTests : FieldCodecTester<IMyMemoryPackUnion?, IFieldCodec<IMyMemoryPackUnion?>>
+public class MemoryPackUnionCodecTests : FieldCodecTester<IMyMemoryPackUnion?, IFieldCodec<IMyMemoryPackUnion?>>, IClassFixture<SerializationTesterFixture>
 {
-    public MemoryPackUnionCodecTests(ITestOutputHelper output) : base(output)
+    public MemoryPackUnionCodecTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 
@@ -124,9 +124,9 @@ public class MemoryPackUnionCodecTests : FieldCodecTester<IMyMemoryPackUnion?, I
 
 
 [Trait("Category", "BVT")]
-public class MemoryPackCodecCopierTests : CopierTester<MyMemoryPackClass?, IDeepCopier<MyMemoryPackClass?>>
+public class MemoryPackCodecCopierTests : CopierTester<MyMemoryPackClass?, IDeepCopier<MyMemoryPackClass?>>, IClassFixture<SerializationTesterFixture>
 {
-    public MemoryPackCodecCopierTests(ITestOutputHelper output) : base(output)
+    public MemoryPackCodecCopierTests(ITestOutputHelper output, SerializationTesterFixture fixture) : base(output, fixture)
     {
     }
 

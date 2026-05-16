@@ -103,6 +103,35 @@ public sealed class RingRangeTests
     }
 
     [Fact]
+    public void RingRangeIntersectionsMatchIndependentModel()
+    {
+        Gen.Select(GenRingRange, GenRingRange).Sample(AssertIntersectionsMatchIndependentModel);
+    }
+
+    [Fact]
+    public void RingRangeIntersectionsMatchIndependentModel_WhenWrappedRangeContainsNormalRange()
+    {
+        var lowSideCases = Gen.Select(Gen.Int[0, 10_000], Gen.Int[0, 10_000], Gen.Int[0, 10_000], static (wrappedEndSeed, normalStartSeed, normalLengthSeed) =>
+        {
+            var wrappedEnd = (uint)(2 + wrappedEndSeed);
+            var normalStart = (uint)(normalStartSeed % (int)(wrappedEnd - 1));
+            var normalEnd = normalStart + 1 + (uint)(normalLengthSeed % (int)(wrappedEnd - normalStart));
+            return (Wrapped: RingRange.Create(uint.MaxValue - 10_000, wrappedEnd), Normal: RingRange.Create(normalStart, normalEnd));
+        });
+
+        var highSideCases = Gen.Select(Gen.Int[0, 10_000], Gen.Int[0, 10_000], Gen.Int[0, 10_000], static (wrappedStartSeed, normalStartOffsetSeed, normalLengthSeed) =>
+        {
+            var wrappedStart = (uint)(wrappedStartSeed + 1);
+            var normalStart = wrappedStart + 1 + (uint)normalStartOffsetSeed;
+            var normalEnd = normalStart + 1 + (uint)normalLengthSeed;
+            return (Wrapped: RingRange.Create(wrappedStart, 0), Normal: RingRange.Create(normalStart, normalEnd));
+        });
+
+        lowSideCases.Sample(testCase => AssertIntersectionsMatchIndependentModel(testCase.Wrapped, testCase.Normal));
+        highSideCases.Sample(testCase => AssertIntersectionsMatchIndependentModel(testCase.Wrapped, testCase.Normal));
+    }
+
+    [Fact]
     public void RingRangeContains()
     {
         Assert.False(RingRange.Empty.Contains(0));
@@ -182,5 +211,99 @@ public sealed class RingRangeTests
 
             throw new ArgumentException(null, nameof(index));
         }
+    }
+
+    private static void AssertIntersectionsMatchIndependentModel(RingRange left, RingRange right)
+    {
+        var expected = GetExpectedIntersections(left, right).ToArray();
+
+        var actual = left.Intersections(right).ToArray();
+        Assert.Equal(expected, actual);
+        Assert.All(actual, intersection =>
+        {
+            Assert.True(Contains(left, intersection));
+            Assert.True(Contains(right, intersection));
+        });
+
+        var reversed = right.Intersections(left).ToArray();
+        Assert.Equal(expected, reversed);
+        Assert.Equal(expected.Length > 0, left.Intersects(right));
+        Assert.Equal(left.Intersects(right), right.Intersects(left));
+    }
+
+    private static IEnumerable<RingRange> GetExpectedIntersections(RingRange left, RingRange right)
+    {
+        var intervals = new List<(uint Start, uint End)>();
+        foreach (var leftInterval in ToIntervals(left))
+        {
+            foreach (var rightInterval in ToIntervals(right))
+            {
+                var start = Math.Max(leftInterval.Start, rightInterval.Start);
+                var end = Math.Min(leftInterval.End, rightInterval.End);
+                if (start <= end)
+                {
+                    intervals.Add((start, end));
+                }
+            }
+        }
+
+        intervals.Sort(static (left, right) => left.Start.CompareTo(right.Start));
+        if (intervals.Count >= 2 && intervals[0].Start == 0 && intervals[^1].End == uint.MaxValue)
+        {
+            yield return RingRange.Create(unchecked(intervals[^1].Start - 1), intervals[0].End);
+            for (var i = 1; i < intervals.Count - 1; i++)
+            {
+                yield return FromInclusiveInterval(intervals[i].Start, intervals[i].End);
+            }
+
+            yield break;
+        }
+
+        foreach (var interval in intervals)
+        {
+            yield return FromInclusiveInterval(interval.Start, interval.End);
+        }
+    }
+
+    private static bool Contains(RingRange range, RingRange candidate)
+    {
+        return ToIntervals(candidate).All(candidateInterval =>
+            ToIntervals(range).Any(rangeInterval => rangeInterval.Start <= candidateInterval.Start && candidateInterval.End <= rangeInterval.End));
+    }
+
+    private static IEnumerable<(uint Start, uint End)> ToIntervals(RingRange range)
+    {
+        if (range.IsEmpty)
+        {
+            yield break;
+        }
+
+        if (range.IsFull)
+        {
+            yield return (0, uint.MaxValue);
+            yield break;
+        }
+
+        if (range.Start < range.End)
+        {
+            yield return (range.Start + 1, range.End);
+            yield break;
+        }
+
+        yield return (0, range.End);
+        if (range.Start < uint.MaxValue)
+        {
+            yield return (range.Start + 1, uint.MaxValue);
+        }
+    }
+
+    private static RingRange FromInclusiveInterval(uint start, uint end)
+    {
+        if (start == 0 && end == uint.MaxValue)
+        {
+            return RingRange.Full;
+        }
+
+        return RingRange.Create(unchecked(start - 1), end);
     }
 }

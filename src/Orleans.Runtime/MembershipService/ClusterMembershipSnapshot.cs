@@ -62,6 +62,18 @@ namespace Orleans.Runtime
         }
 
         /// <summary>
+        /// Gets status of the specified silo, treating unknown silos as dead if this snapshot is newer than when the silo was seen.
+        /// </summary>
+        /// <param name="silo">The silo.</param>
+        /// <param name="seenAtVersion">The membership version when the silo was last seen.</param>
+        /// <returns>The status of the specified silo.</returns>
+        public SiloStatus GetSiloStatus(SiloAddress silo, MembershipVersion seenAtVersion)
+        {
+            var status = GetSiloStatus(silo);
+            return status == SiloStatus.None && this.Version > seenAtVersion ? SiloStatus.Dead : status;
+        }
+
+        /// <summary>
         /// Returns a <see cref="ClusterMembershipUpdate"/> which represents this instance.
         /// </summary>
         /// <returns>A <see cref="ClusterMembershipUpdate"/> which represents this instance.</returns>

@@ -1,0 +1,4 @@
+﻿HEX: 010E0000000800000001400B616C70686101A9
+DISASSEMBLY:
+[entry 0] frame-version=1 length=14 streamId=8 payload-bytes=10
+0000  01 40 0B 61 6C 70 68 61  01 A9                     |.@.alpha..|

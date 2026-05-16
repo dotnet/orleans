@@ -16,6 +16,104 @@ using System.Runtime.InteropServices;
 
 namespace Orleans.Serialization.UnitTests
 {
+    [Trait("Category", "BVT")]
+    public sealed class ReaderTests
+    {
+        [Theory]
+        [InlineData(0x01, 1)]
+        [InlineData(0x02, 2)]
+        [InlineData(0x04, 3)]
+        [InlineData(0x08, 4)]
+        [InlineData(0x10, 5)]
+        [InlineData(0x20, 6)]
+        [InlineData(0x00, 9)]
+        public void GetVarIntByteCount_ReturnsEncodedByteCount(byte firstByte, int expected)
+        {
+            Assert.Equal(expected, Reader.GetVarIntByteCount(firstByte));
+        }
+
+        [Fact]
+        public void PeekByte_DoesNotAdvanceReader()
+        {
+            var reader = Reader.Create(new byte[] { 0x12, 0x34 }, session: null!);
+
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(0x12, reader.PeekByte());
+            Assert.Equal(0, reader.Position);
+            Assert.Equal(0x12, reader.ReadByte());
+            Assert.Equal(1, reader.Position);
+        }
+
+        [Fact]
+        public void ReadVarUInt32_RejectsOverflowBits()
+        {
+            var bytes = WriteVarUInt32(uint.MaxValue);
+            bytes[^1] |= 0xE0;
+
+            Assert.Throws<OverflowException>(() => ReadVarUInt32(bytes));
+        }
+
+        [Fact]
+        public void ReadVarUInt64_IgnoresFollowingByteAfterNineByteValue()
+        {
+            var bytes = WriteVarUInt64(1UL << 62);
+            Array.Resize(ref bytes, bytes.Length + 1);
+            bytes[^1] = 0x01;
+
+            var reader = Reader.Create(bytes, session: null!);
+
+            Assert.Equal(1UL << 62, reader.ReadVarUInt64());
+            Assert.Equal(0x01, reader.ReadByte());
+        }
+
+        [Fact]
+        public void ReadVarUInt64_RejectsOverflowBits()
+        {
+            var bytes = WriteVarUInt64(ulong.MaxValue);
+            bytes[^1] |= 0xFC;
+
+            Assert.Throws<OverflowException>(() => ReadVarUInt64(bytes));
+            Assert.Throws<OverflowException>(() => ReadVarUInt64FromStream(bytes));
+        }
+
+        private static uint ReadVarUInt32(byte[] bytes)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return reader.ReadVarUInt32();
+        }
+
+        private static ulong ReadVarUInt64(byte[] bytes)
+        {
+            var reader = Reader.Create(bytes, session: null!);
+            return reader.ReadVarUInt64();
+        }
+
+        private static ulong ReadVarUInt64FromStream(byte[] bytes)
+        {
+            using var stream = new MemoryStream(bytes);
+            var reader = Reader.Create(stream, session: null!);
+            return reader.ReadVarUInt64();
+        }
+
+        private static byte[] WriteVarUInt32(uint value)
+        {
+            var output = new ArrayBufferWriter<byte>();
+            var writer = Writer.Create(output, session: null!);
+            writer.WriteVarUInt32(value);
+            writer.Commit();
+            return output.WrittenSpan.ToArray();
+        }
+
+        private static byte[] WriteVarUInt64(ulong value)
+        {
+            var output = new ArrayBufferWriter<byte>();
+            var writer = Writer.Create(output, session: null!);
+            writer.WriteVarUInt64(value);
+            writer.Commit();
+            return output.WrittenSpan.ToArray();
+        }
+    }
+
     /// <summary>
     /// Tests for Orleans' low-level Reader and Writer implementations.
     /// 

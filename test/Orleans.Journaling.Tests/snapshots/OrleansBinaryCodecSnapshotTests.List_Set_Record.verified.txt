@@ -1,0 +1,6 @@
+﻿HEX: 012700000008000000030120E8401F736E617073686F742D7265636F7264011D21E84007746167011A03E0E0
+DISASSEMBLY:
+[entry 0] frame-version=1 length=39 streamId=8 payload-bytes=35
+0000  03 01 20 E8 40 1F 73 6E  61 70 73 68 6F 74 2D 72   |.. .@.snapshot-r|
+0010  65 63 6F 72 64 01 1D 21  E8 40 07 74 61 67 01 1A   |ecord..!.@.tag..|
+0020  03 E0 E0                                           |...|

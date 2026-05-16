@@ -15,27 +15,26 @@ namespace Orleans.Runtime.GrainDirectory
     internal sealed partial class GrainDirectoryHandoffManager
     {
         private static readonly TimeSpan RetryDelay = TimeSpan.FromMilliseconds(250);
-        private const int MAX_OPERATION_DEQUEUE = 2;
         private readonly LocalGrainDirectory localDirectory;
         private readonly ISiloStatusOracle siloStatusOracle;
+        private readonly IClusterMembershipService clusterMembershipService;
         private readonly IInternalGrainFactory grainFactory;
         private readonly ILogger logger;
-        private readonly Factory<LocalGrainDirectoryPartition> createPartion;
         private readonly Queue<(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)> pendingOperations = new();
         private readonly AsyncLock executorLock = new AsyncLock();
 
         internal GrainDirectoryHandoffManager(
             LocalGrainDirectory localDirectory,
             ISiloStatusOracle siloStatusOracle,
+            IClusterMembershipService clusterMembershipService,
             IInternalGrainFactory grainFactory,
-            Factory<LocalGrainDirectoryPartition> createPartion,
             ILoggerFactory loggerFactory)
         {
             logger = loggerFactory.CreateLogger<GrainDirectoryHandoffManager>();
             this.localDirectory = localDirectory;
             this.siloStatusOracle = siloStatusOracle;
+            this.clusterMembershipService = clusterMembershipService;
             this.grainFactory = grainFactory;
-            this.createPartion = createPartion;
         }
 
         internal void ProcessSiloAddEvent(SiloAddress addedSilo)
@@ -71,15 +70,33 @@ namespace Orleans.Runtime.GrainDirectory
         private async Task ProcessAddedSiloAsync(SiloAddress addedSilo, List<GrainAddress> splitPartListSingle)
         {
             if (!this.localDirectory.Running) return;
+            if (!addedSilo.Equals(localDirectory.FindSuccessor(localDirectory.MyAddress)))
+            {
+                LogDebugNotImmediateSuccessor(logger, addedSilo);
+                return;
+            }
 
             if (this.siloStatusOracle.GetApproximateSiloStatus(addedSilo) == SiloStatus.Active)
             {
                 if (splitPartListSingle.Count > 0)
                 {
                     LogDebugSendingEntries(logger, splitPartListSingle.Count, addedSilo);
+                    LogInformationSendingSplitPartition(logger, splitPartListSingle.Count, addedSilo);
                 }
 
-                await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
+                try
+                {
+                    await localDirectory.GetDirectoryReference(addedSilo).AcceptSplitPartition(splitPartListSingle);
+                    if (splitPartListSingle.Count > 0)
+                    {
+                        LogInformationCompletedSplitPartition(logger, splitPartListSingle.Count, addedSilo);
+                    }
+                }
+                catch (Exception exception)
+                {
+                    LogWarningSplitPartitionFailed(logger, exception, splitPartListSingle.Count, addedSilo);
+                    throw;
+                }
             }
             else
             {
@@ -95,6 +112,8 @@ namespace Orleans.Runtime.GrainDirectory
                 {
                     localDirectory.DirectoryPartition.RemoveGrain(activationAddress.GrainId);
                 }
+
+                LogInformationRemovedTransferredEntries(logger, splitPartListSingle.Count, addedSilo);
             }
         }
 
@@ -108,6 +127,17 @@ namespace Orleans.Runtime.GrainDirectory
         private async Task AcceptExistingRegistrationsAsync(List<GrainAddress> singleActivations)
         {
             if (!this.localDirectory.Running) return;
+
+            var snapshot = this.clusterMembershipService.CurrentSnapshot;
+            for (var i = singleActivations.Count - 1; i >= 0; i--)
+            {
+                if (!IsTransferableRegistration(singleActivations[i], snapshot))
+                {
+                    singleActivations.RemoveAt(i);
+                }
+            }
+
+            if (singleActivations.Count == 0) return;
 
             LogDebugAcceptingRegistrations(logger, singleActivations.Count);
 
@@ -170,6 +200,16 @@ namespace Orleans.Runtime.GrainDirectory
             }
         }
 
+        internal static bool IsTransferableRegistration(GrainAddress address, ClusterMembershipSnapshot snapshot)
+        {
+            if (address.SiloAddress is not { } silo)
+            {
+                return false;
+            }
+
+            return snapshot.GetSiloStatus(silo, address.MembershipVersion) != SiloStatus.Dead;
+        }
+
         private void EnqueueOperation(string name, object state, Func<GrainDirectoryHandoffManager, object, Task> action)
         {
             lock (this)
@@ -186,7 +226,6 @@ namespace Orleans.Runtime.GrainDirectory
         {
             using (await executorLock.LockAsync())
             {
-                var dequeueCount = 0;
                 while (true)
                 {
                     // Get the next operation, or exit if there are none.
@@ -198,33 +237,33 @@ namespace Orleans.Runtime.GrainDirectory
                         op = this.pendingOperations.Peek();
                     }
 
-                    dequeueCount++;
-
                     try
                     {
                         await op.Action(this, op.State);
-                        // Success, reset the dequeue count
-                        dequeueCount = 0;
+                        lock (this)
+                        {
+                            this.pendingOperations.Dequeue();
+                        }
                     }
                     catch (Exception exception)
                     {
-                        if (dequeueCount < MAX_OPERATION_DEQUEUE)
+                        if (!this.localDirectory.Running)
                         {
-                            LogWarningOperationFailedRetry(logger, exception, op.Name);
-                            await Task.Delay(RetryDelay);
+                            return;
                         }
-                        else
+
+                        LogWarningOperationFailedRetry(logger, exception, op.Name);
+                        await Task.Delay(RetryDelay);
+                        if (!this.localDirectory.Running)
                         {
-                            LogWarningOperationFailedNoRetry(logger, exception, op.Name);
+                            return;
                         }
-                    }
-                    if (dequeueCount == 0 || dequeueCount >= MAX_OPERATION_DEQUEUE)
-                    {
+
+                        // Keep retrying failed handoff work, but let later queued operations make progress.
                         lock (this)
                         {
-                            // Remove the operation from the queue if it was a success
-                            // or if we tried too many times
                             this.pendingOperations.Dequeue();
+                            this.pendingOperations.Enqueue(op);
                         }
                     }
                 }
@@ -256,6 +295,24 @@ namespace Orleans.Runtime.GrainDirectory
         private static partial void LogDebugSendingEntries(ILogger logger, int count, SiloAddress addedSilo);
 
         [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Rolling upgrade diagnostic: sending {Count} split-partition registrations to {AddedSilo}."
+        )]
+        private static partial void LogInformationSendingSplitPartition(ILogger logger, int count, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Rolling upgrade diagnostic: completed split-partition transfer of {Count} registrations to {AddedSilo}."
+        )]
+        private static partial void LogInformationCompletedSplitPartition(ILogger logger, int count, SiloAddress addedSilo);
+
+        [LoggerMessage(
+            Level = LogLevel.Warning,
+            Message = "Rolling upgrade diagnostic: split-partition transfer of {Count} registrations to {AddedSilo} failed."
+        )]
+        private static partial void LogWarningSplitPartitionFailed(ILogger logger, Exception exception, int count, SiloAddress addedSilo);
+
+        [LoggerMessage(
             Level = LogLevel.Warning,
             Message = "Silo {AddedSilo} is no longer active and therefore cannot receive this partition split"
         )]
@@ -266,6 +323,12 @@ namespace Orleans.Runtime.GrainDirectory
             Message = "Removing {Count} single activation after partition split"
         )]
         private static partial void LogDebugRemovingEntries(ILogger logger, int count);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Rolling upgrade diagnostic: removed {Count} transferred registrations after handoff to {AddedSilo}."
+        )]
+        private static partial void LogInformationRemovedTransferredEntries(ILogger logger, int count, SiloAddress addedSilo);
 
         [LoggerMessage(
             Level = LogLevel.Debug,
@@ -296,10 +359,5 @@ namespace Orleans.Runtime.GrainDirectory
         )]
         private static partial void LogWarningOperationFailedRetry(ILogger logger, Exception exception, string operation);
 
-        [LoggerMessage(
-            Level = LogLevel.Warning,
-            Message = "{Operation} failed, will NOT be retried"
-        )]
-        private static partial void LogWarningOperationFailedNoRetry(ILogger logger, Exception exception, string operation);
     }
 }

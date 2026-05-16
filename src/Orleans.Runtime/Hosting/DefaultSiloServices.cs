@@ -262,6 +262,7 @@ namespace Orleans.Hosting
 
             // Grain activation
             services.AddSingleton<PlacementService>();
+            services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, PlacementService>();
             services.AddSingleton<Catalog>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, Catalog>();
             services.AddSingleton<GrainContextActivator>();

@@ -707,14 +707,22 @@ namespace Orleans.TestingHost
             }
             if (options.UseTestClusterMembership)
             {
-                var gateways = new List<IPEndPoint>();
-                if (options.GatewayPerSilo)
+                var gateways = Silos
+                    .Where(silo => silo.IsActive && silo.GatewayAddress?.Endpoint is { Port: > 0 } )
+                    .Select(silo => new IPEndPoint(silo.GatewayAddress.Endpoint.Address, silo.GatewayAddress.Endpoint.Port))
+                    .Distinct()
+                    .ToList();
+
+                if (gateways.Count == 0)
                 {
-                    gateways.AddRange(Enumerable.Range(options.BaseGatewayPort, options.InitialSilosCount).Select(port => new IPEndPoint(IPAddress.Loopback, port)));
-                }
-                else
-                {
-                    gateways.Add(new IPEndPoint(IPAddress.Loopback, options.BaseGatewayPort));
+                    if (options.GatewayPerSilo)
+                    {
+                        gateways.AddRange(Enumerable.Range(options.BaseGatewayPort, options.InitialSilosCount).Select(port => new IPEndPoint(IPAddress.Loopback, port)));
+                    }
+                    else
+                    {
+                        gateways.Add(new IPEndPoint(IPAddress.Loopback, options.BaseGatewayPort));
+                    }
                 }
 
                 var clustering = new Dictionary<string, string?>();

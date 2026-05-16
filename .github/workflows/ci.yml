@@ -411,7 +411,7 @@ jobs:
           -e ENABLE_EXPLORER=false \
           -e ENABLE_TELEMETRY=false \
           -e LOG_LEVEL=warn \
-          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview
+          mcr.microsoft.com/cosmosdb/linux/azure-cosmos-emulator:vnext-preview@sha256:bf3bd3cbe3fae2005a0745f77b01d1fc8cd04112193f3ee32289ee15ee9ae5fa
     - name: Wait for Azure Cosmos DB emulator
       run: |
         endpoint="https://localhost:8081/"
@@ -434,11 +434,6 @@ jobs:
     - name: Test
       run: |
         cosmos_filter='Category=${{ matrix.provider }}&Category!=Performance&Category!=Stress'
-        # The Linux vNext emulator still misses a narrow set of ETag/version concurrency semantics.
-        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_ReadRow_Insert_Read'
-        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRow'
-        cosmos_filter+='&FullyQualifiedName!=Tester.Cosmos.Clustering.CosmosMembershipTableTests.MembershipTable_Cosmos_UpdateRowInParallel'
-        cosmos_filter+='&FullyQualifiedName!~Tester.Cosmos.Persistence.PersistenceProviderTests_Cosmos.PersistenceProvider_Azure_ChangeWriteFormat'
         for attempt in 1 2; do
           logger_name="test_results_${{ matrix.provider }}_${{ matrix.framework }}_attempt${attempt}.trx"
           extra_args=()

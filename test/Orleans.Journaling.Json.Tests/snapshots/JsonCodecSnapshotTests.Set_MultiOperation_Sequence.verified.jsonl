@@ -1,0 +1,4 @@
+﻿[8,["add","alpha"]]
+[8,["add","beta"]]
+[8,["remove","alpha"]]
+[8,["snapshot",["beta","gamma"]]]

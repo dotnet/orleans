@@ -317,8 +317,9 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
 
         var stateContainer = new ContainerProperties(_options.ContainerName, _options.PartitionKeyPath);
         stateContainer.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
-        stateContainer.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
-        stateContainer.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/\"State\"/*" });
+        stateContainer.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/*" });
+        stateContainer.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = $"/{nameof(GrainStateEntity<object>.GrainType)}/?" });
+        stateContainer.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = ToScalarIndexPath(_options.PartitionKeyPath) });
 
         if (_options.StateFieldsToIndex != null)
         {
@@ -367,6 +368,16 @@ public sealed partial class CosmosGrainStorage : IGrainStorage, ILifecyclePartic
             WrappedException.CreateAndRethrow(ex);
             throw;
         }
+    }
+
+    private static string ToScalarIndexPath(string path)
+    {
+        if (path.EndsWith("/?", StringComparison.Ordinal))
+        {
+            return path;
+        }
+
+        return path.EndsWith("/", StringComparison.Ordinal) ? $"{path}?" : $"{path}/?";
     }
 
     private void ResetGrainState<T>(IGrainState<T> grainState)

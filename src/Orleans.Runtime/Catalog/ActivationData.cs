@@ -12,6 +12,7 @@ using Orleans.Diagnostics;
 using Orleans.GrainDirectory;
 using Orleans.Internal;
 using Orleans.Runtime.Diagnostics;
+using Orleans.Runtime.GrainDirectory;
 using Orleans.Runtime.Placement;
 using Orleans.Runtime.Scheduler;
 using Orleans.Serialization.Invocation;
@@ -37,7 +38,8 @@ internal sealed partial class ActivationData :
     IGrainCallCancellationExtension,
     ICallChainReentrantGrainContext,
     IAsyncDisposable,
-    IDisposable
+    IDisposable,
+    IMessageReceiver
 {
     private const string GrainAddressMigrationContextKey = "sys.addr";
     private readonly GrainTypeSharedContext _shared;
@@ -594,7 +596,7 @@ internal sealed partial class ActivationData :
         var deactivateActivity = activityContext is { } parent
             ? ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain, ActivityKind.Internal, parentContext:parent)
             : ActivitySources.LifecycleGrainSource.StartActivity(ActivityNames.DeactivateGrain);
-        
+
         lock (this)
         {
             try
@@ -754,7 +756,7 @@ internal sealed partial class ActivationData :
                     }
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, diagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -779,7 +781,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: true, isWaiting: false, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
             }
 
@@ -803,7 +805,7 @@ internal sealed partial class ActivationData :
                     };
 
                     var response = messageFactory.CreateDiagnosticResponseMessage(message, isExecuting: false, isWaiting: true, messageDiagnostics);
-                    messageCenter.SendMessage(response);
+                    messageCenter.SendMessage(response, receiverCache: null);
                 }
 
                 queueLength++;
@@ -1138,6 +1140,8 @@ internal sealed partial class ActivationData :
                         DeactivationReason = new(DeactivationReasonCode.ActivationUnresponsive,
                             $"{DeactivationReason.Description}. Activation {this} has been deactivating since {DeactivationStartTime.Value} and is likely stuck");
                     }
+
+                    AbandonStuckDeactivatingActivation();
                 }
 
                 if (!IsStuckDeactivating && !IsStuckProcessingMessage)
@@ -1159,6 +1163,20 @@ internal sealed partial class ActivationData :
                 // Reject all pending messages
                 RejectAllQueuedMessages();
             }
+        }
+
+        void AbandonStuckDeactivatingActivation()
+        {
+            var forwardingAddress = ForwardingAddress;
+            LogWarningAbandoningStuckDeactivatingActivation(_shared.Logger, this, forwardingAddress);
+
+            // The migration target is not proven until deactivation reaches StartMigrationAsync.
+            // If deactivation is stuck before then, re-address messages instead of forwarding to a
+            // target which may not have a valid replacement activation.
+            ForwardingAddress = null;
+            UnregisterMessageTarget();
+            _shared.InternalRuntime.GrainLocator.Unregister(Address, UnregistrationCause.Force).Ignore();
+            GetDeactivationCompletionSource().TrySetResult(true);
         }
 
         bool MayInvokeRequest(Message incoming)
@@ -1573,15 +1591,6 @@ internal sealed partial class ActivationData :
                 return;
             }
 
-            // If deactivation was caused by a transient failure, allow messages to be forwarded.
-            if (DeactivationReason.ReasonCode.IsTransientError())
-            {
-                foreach (var msg in msgs)
-                {
-                    msg.ForwardCount = Math.Max(msg.ForwardCount - 1, 0);
-                }
-            }
-
             if (_shared.Logger.IsEnabled(LogLevel.Debug))
             {
                 if (ForwardingAddress is { } address)
@@ -1640,6 +1649,7 @@ internal sealed partial class ActivationData :
                     registerSpan?.SetTag(ActivityTagKeys.DirectoryPreviousRegistrationPresent,
                         PreviousRegistration is not null);
                     var previousRegistration = PreviousRegistration;
+                    var verifiedRecoveryMembershipVersion = 0L;
                     
                     try
                     {
@@ -1652,6 +1662,23 @@ internal sealed partial class ActivationData :
                             if (Address.Matches(result))
                             {
                                 Address = result;
+
+                                // If DGD recovery advanced while this registration was being committed, re-register
+                                // against the recovered view before this activation can become valid.
+                                if (_shared.GrainDirectory is DistributedGrainDirectory distributedGrainDirectory)
+                                {
+                                    var recoveryMembershipVersion = distributedGrainDirectory.RecoveryMembershipVersion;
+                                    if (recoveryMembershipVersion > verifiedRecoveryMembershipVersion
+                                        && recoveryMembershipVersion > result.MembershipVersion.Value)
+                                    {
+                                        verifiedRecoveryMembershipVersion = recoveryMembershipVersion;
+                                        previousRegistration = result;
+                                        _activationActivity?.AddEvent(new ActivityEvent("directory-register-retry-recovery"));
+                                        registerSpan?.AddEvent(new ActivityEvent("retry-recovery"));
+                                        continue;
+                                    }
+                                }
+
                                 success = true;
                                 _activationActivity?.AddEvent(new ActivityEvent("directory-register-success"));
                                 registerSpan?.AddEvent(new ActivityEvent("success"));
@@ -1978,11 +2005,6 @@ internal sealed partial class ActivationData :
                     }
                 }
             }
-            else if (isDirectoryFailure)
-            {
-                // Optimization: forward to the same host to restart activation without needing to invalidate caches.
-                ForwardingAddress ??= Address.SiloAddress;
-            }
         }
         catch (Exception ex)
         {
@@ -2261,6 +2283,15 @@ internal sealed partial class ActivationData :
     )]
     private static partial void LogErrorCancellationCallbackFailed(ILogger logger, Exception exception);
 
+    public void ReceiveMessage(Message message, IMessageReceiverCache cache)
+    {
+        if (!IsValid)
+        {
+            cache.MessageReceiver = null;
+        }
+
+        ReceiveMessage(message);
+    }
     #endregion
 
     /// <summary>
@@ -2588,6 +2619,11 @@ internal sealed partial class ActivationData :
         ActivationDataLogValue grain,
         Message blockingRequest,
         Message message);
+
+    [LoggerMessage(
+        Level = LogLevel.Warning,
+        Message = "Abandoning stuck deactivating activation {Activation}. ForwardingAddress={ForwardingAddress}")]
+    private static partial void LogWarningAbandoningStuckDeactivatingActivation(ILogger logger, ActivationData activation, SiloAddress? forwardingAddress);
 
     private readonly struct ActivationDataLogValue(ActivationData activation, bool includeExtraDetails = false)
     {

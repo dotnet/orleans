@@ -170,6 +170,7 @@ namespace Orleans.Configuration
     {
         public const int DEFAULT_CACHE_SIZE = 1000000;
         public const CachingStrategyType DEFAULT_CACHING_STRATEGY = 1;
+        public const int DEFAULT_PARTITIONS_PER_SILO = 1;
         [System.Obsolete("DEFAULT_INITIAL_CACHE_TTL is deprecated and will be removed in a future version.")]
         public static readonly System.TimeSpan DEFAULT_INITIAL_CACHE_TTL;
         [System.Obsolete("DEFAULT_MAXIMUM_CACHE_TTL is deprecated and will be removed in a future version.")]
@@ -189,8 +190,9 @@ namespace Orleans.Configuration
 
         public System.TimeSpan LazyDeregistrationDelay { get { throw null; } set { } }
 
-        [System.Obsolete("MaximumCacheTTL is deprecated and will be removed in a future version.")]
         public System.TimeSpan MaximumCacheTTL { get { throw null; } set { } }
+
+        public int PartitionsPerSilo { get { throw null; } set { } }
 
         public enum CachingStrategyType
         {
@@ -544,6 +546,8 @@ namespace Orleans.Runtime
         public ClusterMembershipUpdate CreateUpdate(ClusterMembershipSnapshot previous) { throw null; }
 
         public SiloStatus GetSiloStatus(SiloAddress silo) { throw null; }
+
+        public SiloStatus GetSiloStatus(SiloAddress silo, MembershipVersion seenAtVersion) { throw null; }
 
         public override string ToString() { throw null; }
     }

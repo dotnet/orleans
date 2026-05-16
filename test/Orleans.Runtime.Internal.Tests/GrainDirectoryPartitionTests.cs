@@ -31,15 +31,16 @@ namespace UnitTests;
 public class GrainDirectoryPartitionTests
 {
     private readonly LocalGrainDirectoryPartition _target;
-    private readonly MockSiloStatusOracle _siloStatusOracle;
-    private static readonly SiloAddress LocalSiloAddress =  SiloAddress.FromParsableString("127.0.0.1:11111@123");
-    private static readonly SiloAddress OtherSiloAddress =  SiloAddress.FromParsableString("127.0.0.2:11111@456");
+    private readonly MockClusterMembershipService _clusterMembershipService;
+    private static readonly SiloAddress LocalSiloAddress = SiloAddress.FromParsableString("127.0.0.1:11111@123");
+    private static readonly SiloAddress OtherSiloAddress = SiloAddress.FromParsableString("127.0.0.2:11111@456");
 
     public GrainDirectoryPartitionTests()
     {
-        _siloStatusOracle = new MockSiloStatusOracle();
+        _clusterMembershipService = new MockClusterMembershipService();
+        _clusterMembershipService.SetSiloStatus(LocalSiloAddress, SiloStatus.Active);
         _target = new LocalGrainDirectoryPartition(
-            _siloStatusOracle,
+            _clusterMembershipService,
             Options.Create(new GrainDirectoryOptions()),
             new LoggerFactory());
     }
@@ -53,7 +54,7 @@ public class GrainDirectoryPartitionTests
     [Fact]
     public void OverrideDeadEntryTest()
     {
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
 
         var grainId = GrainId.Create("testGrain", "myKey");
         var firstGrainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
@@ -62,7 +63,7 @@ public class GrainDirectoryPartitionTests
         var firstRegister = _target.AddSingleActivation(firstGrainAddress, previousAddress: null);
         Assert.Equal(firstGrainAddress, firstRegister.Address);
 
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
 
         // Previous entry is now pointing to a dead silo, it should be possible to override it now
         var secondGrainAddress = GrainAddress.NewActivationAddress(LocalSiloAddress, grainId);
@@ -79,7 +80,7 @@ public class GrainDirectoryPartitionTests
     [Fact]
     public void DoNotInsertInvalidEntryTest()
     {
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
 
         var grainId = GrainId.Create("testGrain", "myKey");
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
@@ -97,7 +98,7 @@ public class GrainDirectoryPartitionTests
     [Fact]
     public void DoNotOverrideValidEntryTest()
     {
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
 
         var grainId = GrainId.Create("testGrain", "myKey");
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
@@ -121,7 +122,7 @@ public class GrainDirectoryPartitionTests
     [Fact]
     public void OverrideValidEntryIfMatchesTest()
     {
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
 
         var grainId = GrainId.Create("testGrain", "myKey");
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
@@ -145,7 +146,7 @@ public class GrainDirectoryPartitionTests
     [Fact]
     public void DoNotOverrideValidEntryIfNoMatchTest()
     {
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
 
         var grainId = GrainId.Create("testGrain", "myKey");
         var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
@@ -176,7 +177,7 @@ public class GrainDirectoryPartitionTests
     [Fact]
     public void DoNotReturnInvalidEntryTest()
     {
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Active);
 
         var grainId = GrainId.Create("testGrain", "myKey");
         var grainAddress1 = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
@@ -185,65 +186,54 @@ public class GrainDirectoryPartitionTests
         var register1 = _target.AddSingleActivation(grainAddress1, previousAddress: null);
         Assert.Equal(grainAddress1, register1.Address);
 
-        _siloStatusOracle.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, SiloStatus.Dead);
 
         // Previous entry is no longer still valid, it should not be returned
         var lookup = _target.LookUpActivation(grainId);
         Assert.Null(lookup.Address);
     }
 
-    /// <summary>
-    /// Mock implementation of ISiloStatusOracle for testing.
-    /// The silo status oracle provides membership information about
-    /// which silos are alive, dead, or in other states. The grain
-    /// directory uses this to validate entries and make placement decisions.
-    /// </summary>
-    private class MockSiloStatusOracle : ISiloStatusOracle
+    [Theory]
+    [InlineData(SiloStatus.ShuttingDown)]
+    [InlineData(SiloStatus.Stopping)]
+    public void ReturnEntryForTerminatingButNotDeadSilo(SiloStatus status)
     {
-        private readonly Dictionary<SiloAddress, SiloStatus> _content = new();
+        _clusterMembershipService.SetSiloStatus(OtherSiloAddress, status);
 
-        public MockSiloStatusOracle(SiloAddress siloAddress = null)
+        var grainId = GrainId.Create("testGrain", "myKey");
+        var grainAddress = GrainAddress.NewActivationAddress(OtherSiloAddress, grainId);
+
+        var register = _target.AddSingleActivation(grainAddress, previousAddress: null);
+        Assert.Equal(grainAddress, register.Address);
+
+        var lookup = _target.LookUpActivation(grainId);
+        Assert.Equal(grainAddress, lookup.Address);
+    }
+
+    private sealed class MockClusterMembershipService : IClusterMembershipService
+    {
+        private readonly Dictionary<SiloAddress, (SiloStatus Status, string Name)> _statuses = new();
+        private long _version;
+
+        public ClusterMembershipSnapshot CurrentSnapshot { get; private set; } =
+            new(ImmutableDictionary<SiloAddress, ClusterMember>.Empty, MembershipVersion.MinValue);
+
+        public IAsyncEnumerable<ClusterMembershipSnapshot> MembershipUpdates => throw new NotImplementedException();
+
+        public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status)
         {
-            SiloAddress = siloAddress ?? LocalSiloAddress;
-            _content[SiloAddress] = SiloStatus.Active;
-        }
-
-        public SiloStatus CurrentStatus => SiloStatus.Active;
-
-        public string SiloName => "TestSilo";
-
-        public SiloAddress SiloAddress { get; }
-
-        public SiloStatus GetApproximateSiloStatus(SiloAddress siloAddress)
-        {
-            if (_content.TryGetValue(siloAddress, out var status))
+            _statuses[siloAddress] = (status, "TestSilo");
+            var members = ImmutableDictionary.CreateBuilder<SiloAddress, ClusterMember>();
+            foreach (var (silo, entry) in _statuses)
             {
-                return status;
+                members[silo] = new ClusterMember(silo, entry.Status, entry.Name);
             }
-            return SiloStatus.None;
+
+            CurrentSnapshot = new ClusterMembershipSnapshot(members.ToImmutable(), new MembershipVersion(++_version));
         }
 
-        public Dictionary<SiloAddress, SiloStatus> GetApproximateSiloStatuses(bool onlyActive = false)
-        {
-            return onlyActive
-                ? new Dictionary<SiloAddress, SiloStatus>(_content.Where(kvp => kvp.Value == SiloStatus.Active))
-                : new Dictionary<SiloAddress, SiloStatus>(_content);
-        }
+        public ValueTask Refresh(MembershipVersion minimumVersion = default, CancellationToken cancellationToken = default) => default;
 
-        public ImmutableArray<SiloAddress> GetActiveSilos() => _content.Keys.ToImmutableArray();
-
-        public void SetSiloStatus(SiloAddress siloAddress, SiloStatus status) => _content[siloAddress] = status;
-
-        public bool IsDeadSilo(SiloAddress silo) => GetApproximateSiloStatus(silo) == SiloStatus.Dead;
-
-        public bool IsFunctionalDirectory(SiloAddress siloAddress) => !GetApproximateSiloStatus(siloAddress).IsTerminating();
-
-        #region Not Implemented
-        public bool SubscribeToSiloStatusEvents(ISiloStatusListener observer) => throw new NotImplementedException();
-
-        public bool TryGetSiloName(SiloAddress siloAddress, out string siloName) => throw new NotImplementedException();
-
-        public bool UnSubscribeFromSiloStatusEvents(ISiloStatusListener observer) => throw new NotImplementedException();
-        #endregion
+        public Task<bool> TryKill(SiloAddress siloAddress) => throw new NotImplementedException();
     }
 }

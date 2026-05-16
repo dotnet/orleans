@@ -1,5 +1,6 @@
 using System.Diagnostics;
 using BenchmarkDotNet.Running;
+using Benchmarks.Journaling;
 using Benchmarks.MapReduce;
 using Benchmarks.Ping;
 using Benchmarks.Transactions;
@@ -190,6 +191,41 @@ internal class Program
         {
             new PingBenchmark(numSilos: 2, startClient: false, grainsOnSecondariesOnly: true).PingConcurrentHostedClient(blocksPerWorker: 1000).GetAwaiter().GetResult();
         },
+        ["AdaptivePing"] = _ =>
+        {
+            // Default: HostedClient mode with hill climbing concurrency tuning
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.HostedClient);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_HostedClient"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.HostedClient);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_ClientToOneSilo"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.ExternalClient, numSilos: 1);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_ClientToTwoSilos"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.ExternalClient, numSilos: 2);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_SiloToSilo"] = _ =>
+        {
+            var benchmark = new AdaptivePingBenchmark(AdaptivePingBenchmark.BenchmarkMode.SiloToSilo, numSilos: 2);
+            benchmark.RunAsync().GetAwaiter().GetResult();
+            benchmark.ShutdownAsync().GetAwaiter().GetResult();
+        },
+        ["AdaptivePing_All"] = _ =>
+        {
+            AdaptivePingBenchmark.RunAllScenariosAsync().GetAwaiter().GetResult();
+        },
         ["ConcurrentPing_OneSilo_Forever"] = _ =>
         {
             new PingBenchmark(numSilos: 1, startClient: true).PingConcurrentForever().GetAwaiter().GetResult();
@@ -293,6 +329,13 @@ internal class Program
             {
                 new Benchmarks.Dashboard.ManualTests().Run();
             },
+        ["Journaling"] = args =>
+        {
+            _ = BenchmarkSwitcher.FromTypes([
+                typeof(DurableListJournalBenchmarks),
+                typeof(DurableCommandReaderBenchmarks)
+            ]).Run(args);
+        },
         ["suite"] = args =>
         {
             _ = BenchmarkSwitcher.FromAssembly(typeof(Program).Assembly).Run(args);

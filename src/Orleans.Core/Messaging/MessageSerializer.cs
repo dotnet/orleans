@@ -301,13 +301,18 @@ namespace Orleans.Runtime.Messaging
 
         internal List<GrainAddressCacheUpdate> ReadCacheInvalidationHeaders<TInput>(ref Reader<TInput> reader)
         {
-            var n = (int)reader.ReadVarUInt32();
+            var n = reader.ReadVarUInt32();
             if (n > 0)
             {
-                var list = new List<GrainAddressCacheUpdate>(n);
-                for (int i = 0; i < n; i++)
+                var count = Math.Min(n, (uint)Message.MaxCacheInvalidationHeaderEntries);
+                var list = new List<GrainAddressCacheUpdate>((int)count);
+                for (uint i = 0; i < n; i++)
                 {
-                    list.Add(_grainAddressCacheUpdateCodec.ReadValue(ref reader, reader.ReadFieldHeader()));
+                    var update = _grainAddressCacheUpdateCodec.ReadValue(ref reader, reader.ReadFieldHeader());
+                    if (i < count)
+                    {
+                        list.Add(update);
+                    }
                 }
 
                 return list;

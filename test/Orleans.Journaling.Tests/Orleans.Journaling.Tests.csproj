@@ -16,6 +16,9 @@
     <PackageReference Include="xunit.runner.visualstudio" />
     <PackageReference Include="Microsoft.NET.Test.Sdk" />
     <PackageReference Include="Microsoft.Extensions.TimeProvider.Testing" />
+    <PackageReference Include="Verify.Xunit" />
+    <Compile Remove="snapshots\**\*" />
+    <None Include="snapshots\**\*" />
   </ItemGroup>
 
   <ItemGroup>
@@ -26,6 +29,10 @@
     <ProjectReference Include="$(SourceRoot)src\Orleans.TestingHost\Orleans.TestingHost.csproj" />
     <ProjectReference Include="$(SourceRoot)test\Extensions\Orleans.Azure.Tests\Orleans.Azure.Tests.csproj" />
     <ProjectReference Include="$(SourceRoot)test\TestInfrastructure\TestExtensions\TestExtensions.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.Journaling.Json.Tests" />
   </ItemGroup>
 
 </Project>

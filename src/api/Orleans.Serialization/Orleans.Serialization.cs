@@ -753,19 +753,23 @@ namespace Orleans.Serialization.Buffers
     {
         private readonly object _dummy;
         private readonly int _dummyPrimitive;
-        public ArcBufferReader(ArcBufferWriter writer) { }
-
         public int Length { get { throw null; } }
 
         public readonly void Consume(System.Span<byte> output) { }
 
         public readonly ArcBuffer ConsumeSlice(int count) { throw null; }
 
+        public readonly bool IsNext(System.ReadOnlySpan<byte> next, bool advancePast = false) { throw null; }
+
+        public readonly byte Peek(long offset) { throw null; }
+
         public readonly System.ReadOnlySpan<byte> Peek(scoped in System.Span<byte> destination) { throw null; }
 
         public readonly ArcBuffer PeekSlice(int count) { throw null; }
 
         public readonly void Skip(int count) { }
+
+        public readonly bool TryReadTo(out ArcBuffer slice, byte delimiter, bool advancePastDelimiter = true) { throw null; }
     }
 
     [Immutable]
@@ -773,10 +777,13 @@ namespace Orleans.Serialization.Buffers
     {
         public const int MinimumPageSize = 16384;
         public int Length { get { throw null; } }
+        public ArcBufferReader Reader { get { throw null; } }
 
         public void AdvanceReader(int count) { }
 
         public void AdvanceWriter(int count) { }
+
+        public void AppendPinned(ArcBuffer input) { }
 
         public ArcBuffer ConsumeSlice(int count) { throw null; }
 
@@ -954,6 +961,8 @@ namespace Orleans.Serialization.Buffers
         public static Reader<SpanReaderInput> Create(System.ReadOnlyMemory<byte> buffer, Session.SerializerSession session) { throw null; }
 
         public static Reader<SpanReaderInput> Create(System.ReadOnlySpan<byte> buffer, Session.SerializerSession session) { throw null; }
+
+        public static int GetVarIntByteCount(byte firstByte) { throw null; }
     }
 
     public abstract partial class ReaderInput
@@ -985,6 +994,8 @@ namespace Orleans.Serialization.Buffers
         public void ForkFrom(long position, out Reader<TInput> forked) { throw null; }
 
         public byte ReadByte() { throw null; }
+
+        public byte PeekByte() { throw null; }
 
         public void ReadBytes(scoped System.Span<byte> destination) { }
 
@@ -1281,9 +1292,11 @@ namespace Orleans.Serialization.Cloning
             where T : class { throw null; }
     }
 
-    public sealed partial class CopyContextPool
+    public sealed partial class CopyContextPool : System.IDisposable
     {
         public CopyContextPool(Serializers.CodecProvider codecProvider) { }
+
+        public void Dispose() { }
 
         public CopyContext GetContext() { throw null; }
     }
@@ -3806,11 +3819,13 @@ namespace Orleans.Serialization.Session
         public void Reset() { }
     }
 
-    public sealed partial class SerializerSessionPool
+    public sealed partial class SerializerSessionPool : System.IDisposable
     {
         public SerializerSessionPool(TypeSystem.TypeCodec typeCodec, WellKnownTypeCollection wellKnownTypes, Serializers.CodecProvider codecProvider) { }
 
         public Serializers.CodecProvider CodecProvider { get { throw null; } }
+
+        public void Dispose() { }
 
         public SerializerSession GetSession() { throw null; }
     }

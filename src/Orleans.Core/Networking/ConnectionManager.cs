@@ -49,6 +49,11 @@ namespace Orleans.Runtime.Messaging
 
         public ValueTask<Connection> GetConnection(SiloAddress endpoint)
         {
+            if (endpoint.Generation != 0)
+            {
+                endpoint = SiloAddress.New(endpoint.Endpoint, 0);
+            }
+
             if (this.connections.TryGetValue(endpoint, out var entry) && entry.NextConnection() is { } connection)
             {
                 if (!entry.HasSufficientConnections(connectionOptions) && entry.PendingConnection is null)

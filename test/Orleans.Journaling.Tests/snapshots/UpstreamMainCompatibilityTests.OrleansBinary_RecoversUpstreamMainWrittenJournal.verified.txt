@@ -1,0 +1,40 @@
+﻿HEX: 1701000140096469637401111701000140096C697374011319010001400B71756575650115150100014007736574011719010001400B76616C7565011919010001400B7374617465011B150100014007746373011D19110001400B616C706861010517110001400962657461010915130001400B666972737417130001400D7365636F6E6415130001400B74686972640B15000100290B1500010051111700014007666F6F1117000140076261720B19000100A9171B0001400B68656C6C6F010D1D0001001A03
+DISASSEMBLY:
+[entry 0] frame-version=0 length=11 streamId=0 payload-bytes=9 legacy-command-version=0
+0000  01 40 09 64 69 63 74 01  11                        |.@.dict..|
+[entry 1] frame-version=0 length=11 streamId=0 payload-bytes=9 legacy-command-version=0
+0000  01 40 09 6C 69 73 74 01  13                        |.@.list..|
+[entry 2] frame-version=0 length=12 streamId=0 payload-bytes=10 legacy-command-version=0
+0000  01 40 0B 71 75 65 75 65  01 15                     |.@.queue..|
+[entry 3] frame-version=0 length=10 streamId=0 payload-bytes=8 legacy-command-version=0
+0000  01 40 07 73 65 74 01 17                            |.@.set..|
+[entry 4] frame-version=0 length=12 streamId=0 payload-bytes=10 legacy-command-version=0
+0000  01 40 0B 76 61 6C 75 65  01 19                     |.@.value..|
+[entry 5] frame-version=0 length=12 streamId=0 payload-bytes=10 legacy-command-version=0
+0000  01 40 0B 73 74 61 74 65  01 1B                     |.@.state..|
+[entry 6] frame-version=0 length=10 streamId=0 payload-bytes=8 legacy-command-version=0
+0000  01 40 07 74 63 73 01 1D                            |.@.tcs..|
+[entry 7] frame-version=0 length=12 streamId=8 payload-bytes=10 legacy-command-version=0
+0000  01 40 0B 61 6C 70 68 61  01 05                     |.@.alpha..|
+[entry 8] frame-version=0 length=11 streamId=8 payload-bytes=9 legacy-command-version=0
+0000  01 40 09 62 65 74 61 01  09                        |.@.beta..|
+[entry 9] frame-version=0 length=10 streamId=9 payload-bytes=8 legacy-command-version=0
+0000  01 40 0B 66 69 72 73 74                            |.@.first|
+[entry 10] frame-version=0 length=11 streamId=9 payload-bytes=9 legacy-command-version=0
+0000  01 40 0D 73 65 63 6F 6E  64                        |.@.second|
+[entry 11] frame-version=0 length=10 streamId=9 payload-bytes=8 legacy-command-version=0
+0000  01 40 0B 74 68 69 72 64                            |.@.third|
+[entry 12] frame-version=0 length=5 streamId=10 payload-bytes=3 legacy-command-version=0
+0000  01 00 29                                           |..)|
+[entry 13] frame-version=0 length=5 streamId=10 payload-bytes=3 legacy-command-version=0
+0000  01 00 51                                           |..Q|
+[entry 14] frame-version=0 length=8 streamId=11 payload-bytes=6 legacy-command-version=0
+0000  01 40 07 66 6F 6F                                  |.@.foo|
+[entry 15] frame-version=0 length=8 streamId=11 payload-bytes=6 legacy-command-version=0
+0000  01 40 07 62 61 72                                  |.@.bar|
+[entry 16] frame-version=0 length=5 streamId=12 payload-bytes=3 legacy-command-version=0
+0000  01 00 A9                                           |...|
+[entry 17] frame-version=0 length=11 streamId=13 payload-bytes=9 legacy-command-version=0
+0000  01 40 0B 68 65 6C 6C 6F  01                        |.@.hello.|
+[entry 18] frame-version=0 length=6 streamId=14 payload-bytes=4 legacy-command-version=0
+0000  01 00 1A 03                                        |....|

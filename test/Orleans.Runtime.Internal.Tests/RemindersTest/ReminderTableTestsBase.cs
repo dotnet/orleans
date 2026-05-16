@@ -55,6 +55,7 @@ namespace UnitTests.RemindersTest
 
         protected abstract IReminderTable CreateRemindersTable();
         protected abstract Task<string> GetConnectionString();
+        protected IReminderTable RemindersTable => remindersTable;
 
         protected virtual string GetAdoInvariant()
         {
@@ -93,6 +94,7 @@ namespace UnitTests.RemindersTest
             Assert.Equal(readReminder.StartAt, reminder.StartAt);
             Assert.NotNull(etagTemp);
 
+            reminder.StartAt = reminder.StartAt.AddSeconds(1);
             reminder.ETag = await remindersTable.UpsertRow(reminder);
 
             var removeRowRes = await remindersTable.RemoveRow(reminder.GrainId, reminder.ReminderName, etagTemp);

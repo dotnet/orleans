@@ -1,7 +1,9 @@
 # Microsoft Orleans Journaling for Azure Storage
 
 ## Introduction
-Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows logging and tracking of grain operations using Azure Storage as a backing store.
+Microsoft Orleans Journaling for Azure Storage provides an Azure Storage implementation of the Orleans Journaling provider. This allows journaling and tracking of grain operations using Azure Storage as a backing store.
+
+Blob names are derived from the configured grain storage identity and do not use journal format file extensions. Azure append blobs store the journal format key in blob metadata and, when the selected journal format provides a MIME type, are created with that content type.
 
 ## Getting Started
 To use this package, install it via NuGet:
@@ -11,14 +13,47 @@ dotnet add package Microsoft.Orleans.Journaling.AzureStorage
 ```
 
 ## Example - Configuring Azure Storage Journaling
+
+The journaling provider resolves a registered `BlobServiceClient` from DI. How you obtain that client depends on your hosting model.
+
+### Authentication options
+
+For production workloads, prefer Microsoft Entra (Azure AD) credentials with `DefaultAzureCredential` rather than long-lived connection strings:
+
+```csharp
+using Azure.Identity;
+using Azure.Storage.Blobs;
+using Microsoft.Extensions.DependencyInjection;
+
+builder.Services.AddSingleton(_ =>
+    new BlobServiceClient(
+        new Uri("https://<your-account>.blob.core.windows.net"),
+        new DefaultAzureCredential()));
+```
+
+If you are integrating with .NET Aspire (as the bundled `JournalingAzureBlobJson` sample does), the AppHost emits a connection string that the consuming project resolves via `AddAzureBlobServiceClient`. Aspire wires up local emulator credentials in development and Entra-backed credentials in production.
+
+For ad-hoc local development you may register a `BlobServiceClient` from a connection string (such as the Azurite UseDevelopmentStorage shortcut). Do not embed production connection strings in source.
+
+### Wiring it into the silo
+
 ```csharp
 using Microsoft.Extensions.Hosting;
 using Orleans.Hosting;
 using Orleans.Configuration;
+using Orleans.Journaling.Json;
+using System.Text.Json.Serialization;
 using System;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using MyGrainNamespace;
+
+[JsonSerializable(typeof(DateTime))]
+[JsonSerializable(typeof(int))]
+[JsonSerializable(typeof(long))]
+[JsonSerializable(typeof(string))]
+[JsonSerializable(typeof(ulong))]
+internal partial class JournalJsonContext : JsonSerializerContext;
 
 var builder = Host.CreateApplicationBuilder(args)
     .UseOrleans(siloBuilder =>
@@ -26,10 +61,12 @@ var builder = Host.CreateApplicationBuilder(args)
         siloBuilder
             .UseLocalhostClustering()
             // Configure Azure Storage as a journaling provider
-            .AddAzureAppendBlobStateMachineStorage(optionsBuilder =>
+            .AddAzureBlobJournalStorage(optionsBuilder =>
             {
                 optionsBuilder.Configure((options, serviceProvider) => options.BlobServiceClient = serviceProvider.GetRequiredService<BlobServiceClient>());
-            });
+            })
+            // JSON Lines is the default journaling format. Register metadata for all journaled payload types.
+            .UseJsonJournalFormat(JournalJsonContext.Default);
     });
 
 var host = await builder.StartAsync();

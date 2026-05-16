@@ -8,6 +8,7 @@ internal partial class CosmosReminderTable : IReminderTable
 {
     private const HttpStatusCode TooManyRequests = (HttpStatusCode)429;
     private const string PARTITION_KEY_PATH = "/PartitionKey";
+    private static readonly SemaphoreSlim EmulatorResourceCreationLock = new(1, 1);
     private readonly CosmosReminderTableOptions _options;
     private readonly ClusterOptions _clusterOptions;
     private readonly ILogger _logger;
@@ -221,7 +222,7 @@ internal partial class CosmosReminderTable : IReminderTable
 
             return true;
         }
-        catch (CosmosException dce) when (dce.StatusCode is HttpStatusCode.PreconditionFailed)
+        catch (CosmosException dce) when (dce.StatusCode is HttpStatusCode.PreconditionFailed or HttpStatusCode.NotFound)
         {
             return false;
         }
@@ -314,6 +315,27 @@ internal partial class CosmosReminderTable : IReminderTable
 
     private async Task TryCreateCosmosResources()
     {
+        if (_client.Endpoint.IsLoopback)
+        {
+            // The Linux emulator can return a duplicate-key 500 when concurrent silos race through container creation.
+            await EmulatorResourceCreationLock.WaitAsync().ConfigureAwait(false);
+            try
+            {
+                await TryCreateCosmosResourcesCore().ConfigureAwait(false);
+            }
+            finally
+            {
+                EmulatorResourceCreationLock.Release();
+            }
+
+            return;
+        }
+
+        await TryCreateCosmosResourcesCore().ConfigureAwait(false);
+    }
+
+    private async Task TryCreateCosmosResourcesCore()
+    {
         var dbResponse = await _client.CreateDatabaseIfNotExistsAsync(_options.DatabaseName, _options.DatabaseThroughput).ConfigureAwait(false);
         var db = dbResponse.Database;
 
@@ -321,8 +343,8 @@ internal partial class CosmosReminderTable : IReminderTable
 
         remindersCollection.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
         remindersCollection.IndexingPolicy.IncludedPaths.Add(new IncludedPath { Path = "/*" });
-        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartAt/*" });
-        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Period/*" });
+        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/StartAt/?" });
+        remindersCollection.IndexingPolicy.ExcludedPaths.Add(new ExcludedPath { Path = "/Period/?" });
         remindersCollection.IndexingPolicy.IndexingMode = IndexingMode.Consistent;
 
         const int maxRetries = 3;
@@ -356,6 +378,7 @@ internal partial class CosmosReminderTable : IReminderTable
         return new ReminderEntity
         {
             Id = ReminderEntity.ConstructId(entry.GrainId, entry.ReminderName),
+            ETag = entry.ETag,
             PartitionKey = ReminderEntity.ConstructPartitionKey(_clusterOptions.ServiceId, entry.GrainId),
             ServiceId = _clusterOptions.ServiceId,
             GrainHash = entry.GrainId.GetUniformHashCode(),
