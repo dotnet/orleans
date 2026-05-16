@@ -70,7 +70,10 @@ internal sealed class JournaledJobShard : IJobShard
                 return;
             }
 
-            _state.MarkAsComplete();
+            if (await _shardManager.TryMarkShardClosedAsync(Id, cancellationToken))
+            {
+                _state.MarkAsComplete();
+            }
         }
         finally
         {

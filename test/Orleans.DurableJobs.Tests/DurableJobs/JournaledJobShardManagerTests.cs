@@ -131,6 +131,21 @@ public class JournaledJobShardManagerTests
         Assert.NotNull(scheduled);
 
         await shard.MarkAsCompleteAsync(CancellationToken.None);
+        await shard.DisposeAsync();
+
+        var reopenedManager = CreateManager(services, membership, silo);
+        var reopened = await reopenedManager.AssignJobShardsAsync(DateTimeOffset.UtcNow.AddHours(1), int.MaxValue, CancellationToken.None);
+        shard = Assert.Single(reopened);
+        Assert.True(shard.IsAddingCompleted);
+
+        var rejected = await shard.TryScheduleJobAsync(new()
+        {
+            Target = GrainId.Create("type", "target2"),
+            JobName = "rejected-job",
+            DueTime = DateTimeOffset.UtcNow,
+            Metadata = null
+        }, CancellationToken.None);
+        Assert.Null(rejected);
 
         await foreach (var jobContext in shard.ConsumeDurableJobsAsync().WithCancellation(CancellationToken.None))
         {
@@ -139,7 +154,7 @@ public class JournaledJobShardManagerTests
         }
 
         Assert.Equal(0, await shard.GetJobCountAsync());
-        await manager.UnregisterShardAsync(shard, CancellationToken.None);
+        await reopenedManager.UnregisterShardAsync(shard, CancellationToken.None);
     }
 
     [Fact]
