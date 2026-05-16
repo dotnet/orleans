@@ -106,10 +106,9 @@ public sealed class UpstreamMainCompatibilityTests : JournalingTestBase
             LoggerFactory.CreateLogger<JournaledStateManager>(),
             Options.Create(ManagerOptions),
             TimeProvider.System,
-            storage,
             ServiceProvider);
 
-        return new(shared);
+        return new(shared, storage);
     }
 
     private IFieldCodec<T> ValueCodec<T>() => CodecProvider.GetCodec<T>();

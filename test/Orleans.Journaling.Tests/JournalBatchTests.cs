@@ -29,7 +29,7 @@ public sealed class AzureStorageJournalBatchTests : JournalBatchTests
     }
 
     protected override IJournalStorage CreateStorage(IServiceProvider serviceProvider, IGrainContext grainContext) =>
-        serviceProvider.GetRequiredService<AzureBlobJournalStorageProvider>().Create(grainContext);
+        serviceProvider.GetRequiredService<AzureBlobJournalStorageProvider>().CreateStorage(grainContext);
 }
 
 public sealed class InMemoryJournalBatchTests : JournalBatchTests
@@ -40,7 +40,7 @@ public sealed class InMemoryJournalBatchTests : JournalBatchTests
     }
 
     protected override IJournalStorage CreateStorage(IServiceProvider serviceProvider, IGrainContext grainContext) =>
-        serviceProvider.GetRequiredService<VolatileJournalStorageProvider>().Create(grainContext);
+        serviceProvider.GetRequiredService<VolatileJournalStorageProvider>().CreateStorage(grainContext);
 }
 
 /// <summary>
@@ -58,12 +58,11 @@ public abstract class JournalBatchTests : IAsyncLifetime
         JournalFormatKey = OrleansBinaryJournalFormat.JournalFormatKey
     });
 
-    private JournaledStateManagerShared CreateShared(IJournalStorage storage)
+    private JournaledStateManagerShared CreateShared()
         => new(
             _serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             ManagerOptions,
             TimeProvider.System,
-            storage,
             _serviceProvider);
 
     public virtual async Task InitializeAsync()
@@ -117,7 +116,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
         var grainContext = new TestGrainContext(grainId); // Use provided GrainId
         var storage = CreateStorage(_serviceProvider, grainContext);
-        var manager = new JournaledStateManager(CreateShared(storage));
+        var manager = new JournaledStateManager(CreateShared(), storage);
         var list = new DurableList<T>(listName, manager, new OrleansBinaryDurableListCommandCodec<T>(codecProvider.GetCodec<T>(), sessionPool));
         return (manager, list, storage);
     }
@@ -175,7 +174,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
 
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new JournaledStateManager(CreateShared(storage));
+        var manager2 = new JournaledStateManager(CreateShared(), storage);
         var list2 = new DurableList<string>(listName, manager2, new OrleansBinaryDurableListCommandCodec<string>(codecProvider.GetCodec<string>(), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 
@@ -374,7 +373,7 @@ public abstract class JournalBatchTests : IAsyncLifetime
         // Test recovery (potentially from snapshot)
         var sessionPool = _serviceProvider.GetRequiredService<SerializerSessionPool>();
         var codecProvider = _serviceProvider.GetRequiredService<ICodecProvider>();
-        var manager2 = new JournaledStateManager(CreateShared(storage)); // Reuses the storage object linked via grainId
+        var manager2 = new JournaledStateManager(CreateShared(), storage); // Reuses the storage object linked via grainId
         var list2 = new DurableList<int>(listName, manager2, new OrleansBinaryDurableListCommandCodec<int>(codecProvider.GetCodec<int>(), sessionPool));
         await manager2.InitializeAsync(cts.Token);
 

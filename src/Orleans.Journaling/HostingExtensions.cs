@@ -11,6 +11,7 @@ public static class HostingExtensions
         builder.Services.AddOptions<JournaledStateManagerOptions>();
         builder.Services.TryAddScoped<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager, JournaledStateManager>();
+        builder.Services.TryAddScoped<IJournaledStateManagerFactory, JournaledStateManagerFactory>();
 
         // Register JSON as the default format family and keep Orleans binary available for existing data.
         builder.Services.AddJsonJournalFormat(new JsonJournalOptions().SerializerOptions, tryAdd: true);

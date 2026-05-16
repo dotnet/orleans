@@ -29,8 +29,8 @@ public sealed class FormatMigrationClusterTests
                     : JsonJournalExtensions.JournalFormatKey;
             });
             siloBuilder.Services.AddSingleton(storageProvider);
-            siloBuilder.Services.AddScoped<IJournalStorage>(sp => storageProvider.Create(
-                sp.GetRequiredService<IGrainContext>(),
+            siloBuilder.Services.AddScoped<IJournalStorageProvider>(sp => new SharedVolatileJournalStorageProviderAdapter(
+                storageProvider,
                 sp.GetRequiredService<IOptions<JournaledStateManagerOptions>>()));
         });
         var cluster = builder.Build();
@@ -87,5 +87,12 @@ public sealed class FormatMigrationClusterTests
             return storage;
         }
 
+    }
+
+    private sealed class SharedVolatileJournalStorageProviderAdapter(
+        SharedVolatileJournalStorageProvider provider,
+        IOptions<JournaledStateManagerOptions> options) : IJournalStorageProvider
+    {
+        public IJournalStorage CreateStorage(IGrainContext grainContext) => provider.Create(grainContext, options);
     }
 }

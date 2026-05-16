@@ -21,10 +21,9 @@ internal static class JournalReplayContextFactory
             NullLogger<JournaledStateManager>.Instance,
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
             TimeProvider.System,
-            new NullJournalStorage(),
             serviceProvider);
 
-        var manager = new JournaledStateManager(shared);
+        var manager = new JournaledStateManager(shared, new NullJournalStorage());
         manager.BindStateForReplay(streamId, state);
         return new(manager);
     }

@@ -19,7 +19,9 @@ namespace Orleans.Journaling
 
         public string ContainerName { get { throw null; } set { } }
 
-        public System.Func<Runtime.GrainId, string> GetBlobName { get { throw null; } set { } }
+        public bool DeleteOldCheckpoints { get { throw null; } set { } }
+
+        public System.Func<JournalId, string> GetBlobName { get { throw null; } set { } }
 
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 
@@ -43,6 +45,7 @@ namespace Orleans.Journaling
 
     public partial interface IBlobContainerFactory
     {
+        Azure.Storage.Blobs.BlobContainerClient GetBlobContainerClient(JournalId journalId);
         Azure.Storage.Blobs.BlobContainerClient GetBlobContainerClient(Runtime.GrainId grainId);
         System.Threading.Tasks.Task InitializeAsync(Azure.Storage.Blobs.BlobServiceClient client, System.Threading.CancellationToken cancellationToken);
     }

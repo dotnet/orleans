@@ -1,9 +1,8 @@
+using System.Collections.Immutable;
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
 using Microsoft.CodeAnalysis.Diagnostics;
-using System.Collections.Immutable;
-using System.Linq;
 
 namespace Orleans.Analyzers
 {
@@ -24,16 +23,30 @@ namespace Orleans.Analyzers
         {
             context.EnableConcurrentExecution();
             context.ConfigureGeneratedCodeAnalysis(GeneratedCodeAnalysisFlags.Analyze);
-            context.RegisterSyntaxNodeAction(CheckSyntaxNode, SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration, SyntaxKind.RecordDeclaration, SyntaxKind.RecordStructDeclaration);
+            context.RegisterCompilationStartAction(context =>
+            {
+                var idAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.IdAttributeFullyQualifiedName);
+                var generateSerializerAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.GenerateSerializerAttributeFullyQualifiedName);
+                var nonSerializedAttributeSymbol = context.Compilation.GetTypeByMetadataName(Constants.NonSerializedAttributeFullyQualifiedName);
+
+                if (idAttributeSymbol is not null && generateSerializerAttributeSymbol is not null && nonSerializedAttributeSymbol is not null)
+                {
+                    context.RegisterSyntaxNodeAction(
+                        context => CheckSyntaxNode(context, idAttributeSymbol, generateSerializerAttributeSymbol, nonSerializedAttributeSymbol),
+                        SyntaxKind.ClassDeclaration, SyntaxKind.StructDeclaration, SyntaxKind.RecordDeclaration, SyntaxKind.RecordStructDeclaration);
+                }
+            });
         }
 
-        private void CheckSyntaxNode(SyntaxNodeAnalysisContext context)
+        private static void CheckSyntaxNode(SyntaxNodeAnalysisContext context, INamedTypeSymbol idAttributeSymbol,
+            INamedTypeSymbol generateSerializerAttributeSymbol, INamedTypeSymbol nonSerializedAttributeSymbol)
         {
             if (context.Node is TypeDeclarationSyntax declaration && !declaration.Modifiers.Any(m => m.IsKind(SyntaxKind.StaticKeyword)))
             {
-                if (declaration.TryGetAttribute(Constants.GenerateSerializerAttributeName, out var attribute))
+                if (declaration.TryGetAttribute(context.SemanticModel, generateSerializerAttributeSymbol, out var attribute))
                 {
-                    var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(declaration);
+                    var analysis = SerializationAttributesHelper.AnalyzeTypeDeclaration(context.SemanticModel, declaration,
+                        idAttributeSymbol, generateSerializerAttributeSymbol, nonSerializedAttributeSymbol);
                     if (analysis.UnannotatedMembers.Count > 0)
                     {
                         // Check if GenerateFieldIds is set to PublicProperties

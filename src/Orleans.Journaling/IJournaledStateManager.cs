@@ -5,8 +5,11 @@ namespace Orleans.Journaling;
 /// <summary>
 /// Manages the states for a given grain.
 /// </summary>
-public interface IJournaledStateManager
+public interface IJournaledStateManager : IAsyncDisposable
 {
+    /// <inheritdoc/>
+    ValueTask IAsyncDisposable.DisposeAsync() => default;
+
     /// <summary>
     /// Initializes the state manager.
     /// </summary>

@@ -1,8 +1,6 @@
 using Azure.Storage.Blobs;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Orleans;
-using Orleans.Hosting;
 using Orleans.Journaling;
 using Orleans.Providers;
 

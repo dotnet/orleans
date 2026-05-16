@@ -121,6 +121,18 @@ public static class JournalStorageConsumerExtensions
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>The number of bytes read from <paramref name="input"/>.</returns>
     public static async ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, Stream input, IJournalFileMetadata? metadata, CancellationToken cancellationToken)
+        => await consumer.ReadAsync(input, metadata, complete: true, cancellationToken).ConfigureAwait(false);
+
+    /// <summary>
+    /// Reads all bytes from <paramref name="input"/> and incrementally supplies them to <paramref name="consumer"/>.
+    /// </summary>
+    /// <param name="consumer">The journal storage consumer.</param>
+    /// <param name="input">The stream to read from.</param>
+    /// <param name="metadata">The metadata associated with the journal data being read, or <see langword="null"/> if no metadata is available.</param>
+    /// <param name="complete">Whether to notify the consumer that no more data will be supplied. If <see langword="false"/>, the consumer must read all supplied bytes.</param>
+    /// <param name="cancellationToken">The cancellation token.</param>
+    /// <returns>The number of bytes read from <paramref name="input"/>.</returns>
+    public static async ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, Stream input, IJournalFileMetadata? metadata, bool complete, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
         ArgumentNullException.ThrowIfNull(input);
@@ -134,12 +146,7 @@ public static class JournalStorageConsumerExtensions
             var bytesRead = await input.ReadAsync(memory, cancellationToken).ConfigureAwait(false);
             if (bytesRead == 0)
             {
-                ReadBuffer(consumer, buffer, metadata, isCompleted: true);
-                if (buffer.Length > 0)
-                {
-                    throw new InvalidOperationException("The journal storage consumer did not read all supplied journal data.");
-                }
-
+                CompleteOrThrowIfUnread(consumer, buffer, metadata, complete);
                 return totalBytesRead;
             }
 

@@ -347,9 +347,8 @@ public class CodecRecoveryTests : JournalingTestBase
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Microsoft.Extensions.Options.Options.Create(managerOptions),
             TimeProvider.System,
-            storage,
             serviceProvider);
-        var manager = new JournaledStateManager(shared);
+        var manager = new JournaledStateManager(shared, storage);
         var lifecycle = new TestGrainLifecycle(serviceProvider.GetRequiredService<ILogger<TestGrainLifecycle>>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return (manager, storage, lifecycle);
@@ -406,10 +405,9 @@ public class CodecRecoveryTests : JournalingTestBase
             serviceProvider.GetRequiredService<ILogger<JournaledStateManager>>(),
             Microsoft.Extensions.Options.Options.Create(managerOptions),
             TimeProvider.System,
-            storage,
             serviceProvider);
 
-        var manager = new JournaledStateManager(shared);
+        var manager = new JournaledStateManager(shared, storage);
         var lifecycle = new TestGrainLifecycle(serviceProvider.GetRequiredService<ILogger<TestGrainLifecycle>>());
         (manager as ILifecycleParticipant<IGrainLifecycle>)?.Participate(lifecycle);
         return new(serviceProvider, manager, lifecycle);

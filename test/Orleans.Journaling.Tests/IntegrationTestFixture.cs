@@ -24,7 +24,7 @@ public class IntegrationTestFixture : IAsyncLifetime
             siloBuilder.AddJournalStorage();
             siloBuilder.UseJsonJournalFormat(JournalingTestsJsonContext.Default);
             siloBuilder.Services.AddSingleton(storageProvider);
-            siloBuilder.Services.AddScoped<IJournalStorage>(sp => storageProvider.Create(sp.GetRequiredService<IGrainContext>()));
+            siloBuilder.Services.AddSingleton<IJournalStorageProvider>(storageProvider);
         });
         ConfigureTestCluster(builder);
         Cluster = builder.Build();

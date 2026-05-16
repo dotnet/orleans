@@ -1,8 +1,5 @@
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.DependencyInjection.Extensions;
 using Orleans.Configuration.Internal;
-using Orleans.Runtime;
-using Orleans.Hosting;
 
 namespace Orleans.Journaling;
 
@@ -24,11 +21,9 @@ public static class AzureBlobStorageHostingExtensions
         if (!services.Any(service => service.ServiceType.Equals(typeof(AzureBlobJournalStorageProvider))))
         {
             builder.Services.AddSingleton<AzureBlobJournalStorageProvider>();
+            builder.Services.AddFromExisting<IJournalStorageProvider, AzureBlobJournalStorageProvider>();
             builder.Services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, AzureBlobJournalStorageProvider>();
         }
-
-        builder.Services.TryAddScoped<IJournalStorage>(static sp =>
-            sp.GetRequiredService<AzureBlobJournalStorageProvider>().Create(sp.GetRequiredService<IGrainContext>()));
         return builder;
     }
 }

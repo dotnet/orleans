@@ -5,10 +5,10 @@ using Orleans.Journaling.Json;
 
 namespace Orleans.Journaling;
 
-public sealed class VolatileJournalStorageProvider
+public sealed class VolatileJournalStorageProvider : IJournalStorageProvider
 {
     private readonly IOptions<JournaledStateManagerOptions>? _options;
-    private readonly ConcurrentDictionary<GrainId, VolatileJournalStorage> _storage = new();
+    private readonly ConcurrentDictionary<JournalId, VolatileJournalStorage> _storage = new();
 
     public VolatileJournalStorageProvider()
     {
@@ -24,10 +24,21 @@ public sealed class VolatileJournalStorageProvider
         _options = options;
     }
 
-    public IJournalStorage Create(IGrainContext grainContext)
+    public IJournalStorage CreateStorage(IGrainContext grainContext)
     {
+        ArgumentNullException.ThrowIfNull(grainContext);
+        return CreateStorage(JournalId.FromGrainId(grainContext.GrainId));
+    }
+
+    public IJournalStorage CreateStorage(JournalId journalId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
         var journalFormatKey = GetJournalFormatKey();
-        var storage = _storage.GetOrAdd(grainContext.GrainId, _ => new VolatileJournalStorage(journalFormatKey));
+        var storage = _storage.GetOrAdd(journalId, _ => new VolatileJournalStorage(journalFormatKey));
         storage.SetConfiguredJournalFormatKey(journalFormatKey);
         return storage;
     }

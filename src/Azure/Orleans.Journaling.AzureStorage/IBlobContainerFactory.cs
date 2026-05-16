@@ -1,13 +1,28 @@
-﻿using Azure.Storage.Blobs;
-using Orleans.Runtime;
+using Azure.Storage.Blobs;
 
 namespace Orleans.Journaling;
 
 /// <summary>
-/// A factory for building container clients for blob storage using GrainId
+/// A factory for building container clients for blob storage.
 /// </summary>
 public interface IBlobContainerFactory
 {
+    /// <summary>
+    /// Gets the container which should be used for the specified journal.
+    /// </summary>
+    /// <param name="journalId">The journal id.</param>
+    /// <returns>A configured blob client.</returns>
+    public BlobContainerClient GetBlobContainerClient(JournalId journalId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
+        throw new NotSupportedException(
+            $"This blob container factory does not support grain-independent journals. Implement {nameof(GetBlobContainerClient)}({nameof(JournalId)}) to support on-demand journals.");
+    }
+
     /// <summary>
     /// Gets the container which should be used for the specified grain.
     /// </summary>

@@ -1,8 +1,7 @@
 using Azure;
-using Azure.Storage.Blobs;
-using Azure.Storage;
 using Azure.Core;
-using Orleans.Runtime;
+using Azure.Storage;
+using Azure.Storage.Blobs;
 
 namespace Orleans.Journaling;
 
@@ -11,8 +10,6 @@ namespace Orleans.Journaling;
 /// </summary>
 public sealed class AzureBlobJournalStorageOptions
 {
-    private BlobServiceClient? _blobServiceClient;
-
     /// <summary>
     /// Container name where state is stored.
     /// </summary>
@@ -20,11 +17,11 @@ public sealed class AzureBlobJournalStorageOptions
     public const string DEFAULT_CONTAINER_NAME = "state";
 
     /// <summary>
-    /// Gets or sets the delegate used to generate the blob name for a given grain.
+    /// Gets or sets the delegate used to generate the blob name for a journal.
     /// </summary>
-    public Func<GrainId, string> GetBlobName { get; set; } = DefaultGetBlobName;
+    public Func<JournalId, string> GetBlobName { get; set; } = DefaultGetBlobName;
 
-    private static readonly Func<GrainId, string> DefaultGetBlobName = static grainId => grainId.ToString();
+    private static readonly Func<JournalId, string> DefaultGetBlobName = static journalId => journalId.Value;
 
     /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
@@ -36,26 +33,55 @@ public sealed class AzureBlobJournalStorageOptions
     /// </summary>
     public BlobServiceClient? BlobServiceClient
     {
-        get => _blobServiceClient;
+        get;
         set
         {
             ArgumentNullException.ThrowIfNull(value);
-            _blobServiceClient = value;
+            field = value;
             CreateClient = ct => Task.FromResult(value);
         }
     }
+
+    /// <summary>
+    /// Gets or sets a value indicating whether obsolete checkpoint blobs are deleted after a new checkpoint is published. Defaults to true.
+    /// </summary>
+    public bool DeleteOldCheckpoints { get; set; } = true;
 
     /// <summary>
     /// The optional delegate used to create a <see cref="BlobServiceClient"/> instance.
     /// </summary>
     internal Func<CancellationToken, Task<BlobServiceClient>>? CreateClient { get; private set; }
 
-    internal string GetBlobNameForJournal(GrainId grainId)
+    internal string GetBlobNameForJournal(JournalId journalId)
     {
-        var blobName = GetBlobName(grainId);
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
+        var blobName = GetBlobName(journalId);
         ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
         return blobName;
     }
+
+    internal static string GetWalBlobNameForJournal(JournalId journalId, string journalBlobName)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
+        return GetDefaultWalBlobName(journalBlobName);
+    }
+
+    internal static string GetCheckpointBlobNameForJournal(JournalId journalId, string journalBlobName, string snapshotId)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(journalBlobName);
+        ArgumentException.ThrowIfNullOrWhiteSpace(snapshotId);
+        return GetDefaultCheckpointBlobName(journalBlobName, snapshotId);
+    }
+
+    internal static string GetDefaultWalBlobName(string journalBlobName)
+        => $"{journalBlobName}/wal";
+
+    internal static string GetDefaultCheckpointBlobName(string journalBlobName, string snapshotId)
+        => $"{journalBlobName}/chk.{snapshotId}";
 
     /// <summary>
     /// A function for building container factory instances.

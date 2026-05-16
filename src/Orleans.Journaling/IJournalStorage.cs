@@ -25,6 +25,9 @@ public interface IJournalStorage
     /// <summary>
     /// Replaces the journal with the provided value atomically.
     /// </summary>
+    /// <remarks>
+    /// Implementations should throw <see cref="Orleans.Storage.InconsistentStateException"/> when optimistic concurrency fails.
+    /// </remarks>
     /// <param name="value">The encoded journal bytes to write. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
@@ -33,6 +36,9 @@ public interface IJournalStorage
     /// <summary>
     /// Appends the provided segment to the journal atomically.
     /// </summary>
+    /// <remarks>
+    /// Implementations should throw <see cref="Orleans.Storage.InconsistentStateException"/> when optimistic concurrency fails.
+    /// </remarks>
     /// <param name="value">The encoded journal bytes to append. The storage provider must not retain this buffer after the returned task completes.</param>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
@@ -41,6 +47,9 @@ public interface IJournalStorage
     /// <summary>
     /// Deletes the journal atomically.
     /// </summary>
+    /// <remarks>
+    /// Implementations should throw <see cref="Orleans.Storage.InconsistentStateException"/> when optimistic concurrency fails.
+    /// </remarks>
     /// <param name="cancellationToken">The cancellation token.</param>
     /// <returns>A <see cref="ValueTask"/> representing the operation.</returns>
     ValueTask DeleteAsync(CancellationToken cancellationToken);
@@ -49,4 +58,37 @@ public interface IJournalStorage
     /// Gets a value indicating whether compaction has been requested.
     /// </summary>
     bool IsCompactionRequested { get; }
+}
+
+/// <summary>
+/// Creates journal storage.
+/// </summary>
+public interface IJournalStorageProvider
+{
+    /// <summary>
+    /// Creates journal storage for the provided journal id.
+    /// </summary>
+    /// <param name="journalId">The journal id.</param>
+    /// <returns>The journal storage instance.</returns>
+    IJournalStorage CreateStorage(JournalId journalId)
+    {
+        if (journalId.IsDefault)
+        {
+            throw new ArgumentException("The journal id must not be the default value.", nameof(journalId));
+        }
+
+        throw new NotSupportedException(
+            $"This journal storage provider does not support grain-independent journals. Implement {nameof(CreateStorage)}({nameof(JournalId)}) to support on-demand journals.");
+    }
+
+    /// <summary>
+    /// Creates journal storage for the provided grain context.
+    /// </summary>
+    /// <param name="grainContext">The grain context.</param>
+    /// <returns>The journal storage instance.</returns>
+    IJournalStorage CreateStorage(IGrainContext grainContext)
+    {
+        ArgumentNullException.ThrowIfNull(grainContext);
+        return CreateStorage(JournalId.FromGrainId(grainContext.GrainId));
+    }
 }

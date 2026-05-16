@@ -1,5 +1,4 @@
 using Azure.Storage.Blobs;
-using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
@@ -16,6 +15,9 @@ internal sealed class DefaultBlobContainerFactory(AzureBlobJournalStorageOptions
 
     /// <inheritdoc/>
     public BlobContainerClient GetBlobContainerClient(GrainId grainId) => _defaultContainer;
+
+    /// <inheritdoc/>
+    public BlobContainerClient GetBlobContainerClient(JournalId journalId) => _defaultContainer;
 
     /// <inheritdoc/>
     public async Task InitializeAsync(BlobServiceClient client, CancellationToken cancellationToken)

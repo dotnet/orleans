@@ -282,10 +282,9 @@ public static class JournalTestReplayContext
             NullLogger<JournaledStateManager>.Instance,
             Options.Create(new JournaledStateManagerOptions { JournalFormatKey = journalFormatKey }),
             TimeProvider.System,
-            new NullJournalStorage(),
             serviceProvider);
 
-        return new JournaledStateManager(shared);
+        return new JournaledStateManager(shared, new NullJournalStorage());
     }
 
     private sealed class TestJournalFormat(string journalFormatKey) : IJournalFormat
