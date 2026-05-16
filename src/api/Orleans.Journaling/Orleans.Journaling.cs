@@ -237,6 +237,7 @@ namespace Orleans.Journaling
     {
         System.Threading.Tasks.ValueTask DeleteStateAsync(System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask InitializeAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask ReadStateAsync(System.Threading.CancellationToken cancellationToken);
         void RegisterState(string name, IJournaledState state);
         bool TryGetState(string name, out IJournaledState? state);
         System.Threading.Tasks.ValueTask WriteStateAsync(System.Threading.CancellationToken cancellationToken);

@@ -1,9 +1,13 @@
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Microsoft.Extensions.Options;
 using Orleans.EventSourcing.CustomStorage;
+using Orleans.Journaling;
 using Orleans.Storage;
 using Orleans.TestingHost;
 using TestExtensions;
 
+#pragma warning disable ORLEANSEXP005
 namespace Tester.EventSourcingTests
 {
     /// <summary>
@@ -13,6 +17,8 @@ namespace Tester.EventSourcingTests
     /// </summary>
     public class EventSourcingClusterFixture : BaseTestClusterFixture
     {
+        private const string OrleansBinaryJournalFormatKey = "orleans-binary";
+
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
@@ -20,12 +26,18 @@ namespace Tester.EventSourcingTests
 
         private class TestSiloConfigurator : ISiloConfigurator
         {
+            private static readonly VolatileJournalStorageProvider JournalStorageProvider = new(Options.Create(new JournaledStateManagerOptions
+            {
+                JournalFormatKey = OrleansBinaryJournalFormatKey
+            }));
+
             public void Configure(ISiloBuilder hostBuilder)
             {
                 // we use a slowed-down memory storage provider
                 hostBuilder
                     .AddLogStorageBasedLogConsistencyProvider("LogStorage")
                     .AddStateStorageBasedLogConsistencyProvider("StateStorage")
+                    .AddJournaledStateBasedLogConsistencyProvider("JournaledState")
                     .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
                     {
@@ -36,7 +48,10 @@ namespace Tester.EventSourcingTests
                     .AddMemoryGrainStorage("AzureStore")
                     .AddMemoryGrainStorage("MemoryStore")
                     .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
+
+                hostBuilder.Services.AddSingleton<IJournalStorageProvider>(JournalStorageProvider);
             }
         }
     }
 }
+#pragma warning restore ORLEANSEXP005

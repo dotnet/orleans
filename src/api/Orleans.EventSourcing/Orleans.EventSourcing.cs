@@ -441,6 +441,20 @@ namespace Orleans.EventSourcing.LogStorage
     }
 }
 
+namespace Orleans.EventSourcing.JournaledState
+{
+    public sealed partial class LogConsistencyProvider : ILogViewAdaptorFactory
+    {
+        public LogConsistencyProvider() { }
+
+        public bool UsesStorageProvider { get { throw null; } }
+
+        public ILogViewAdaptor<TView, TEntry> MakeLogViewAdaptor<TView, TEntry>(ILogViewAdaptorHost<TView, TEntry> hostGrain, TView initialState, string grainTypeName, Storage.IGrainStorage grainStorage, ILogConsistencyProtocolServices services)
+            where TView : class, new()
+            where TEntry : class { throw null; }
+    }
+}
+
 namespace Orleans.EventSourcing.StateStorage
 {
     [GenerateSerializer]
@@ -510,6 +524,13 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddLogStorageBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "LogStorage") { throw null; }
 
         public static ISiloBuilder AddLogStorageBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder) { throw null; }
+    }
+
+    public static partial class JournaledStateSiloBuilderExtensions
+    {
+        public static ISiloBuilder AddJournaledStateBasedLogConsistencyProvider(this ISiloBuilder builder, string name = "JournaledState") { throw null; }
+
+        public static ISiloBuilder AddJournaledStateBasedLogConsistencyProviderAsDefault(this ISiloBuilder builder) { throw null; }
     }
 
     public static partial class StateStorageSiloBuilderExtensions
