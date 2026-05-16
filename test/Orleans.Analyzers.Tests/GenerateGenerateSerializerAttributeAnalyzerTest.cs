@@ -79,7 +79,9 @@ public class GenerateGenerateSerializerAttributeAnalyzerTest : DiagnosticAnalyze
             """
             namespace Custom
             {
-                public sealed class GenerateSerializerAttribute : System.Attribute;
+                public sealed class GenerateSerializerAttribute : System.Attribute
+                {
+                }
             }
 
             [System.Serializable, Custom.GenerateSerializer]

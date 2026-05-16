@@ -30,7 +30,8 @@ namespace Orleans.Analyzers
             }
 
             var expectedAttribute = semanticModel.Compilation.GetTypeByMetadataName(fullyQualifiedAttributeName);
-            return expectedAttribute is not null && semanticModel.GetAttributeSymbol(attributeSyntax).Equals(expectedAttribute, SymbolEqualityComparer.Default);
+            var actualAttribute = semanticModel.GetAttributeSymbol(attributeSyntax);
+            return expectedAttribute is not null && SymbolEqualityComparer.Default.Equals(actualAttribute, expectedAttribute);
         }
 
         public static bool HasAttribute(this MemberDeclarationSyntax member, SemanticModel semanticModel, string fullyQualifiedAttributeName)

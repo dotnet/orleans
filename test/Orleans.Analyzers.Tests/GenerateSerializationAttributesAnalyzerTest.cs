@@ -71,7 +71,12 @@ public class GenerateSerializationAttributesAnalyzerTest : DiagnosticAnalyzerTes
             """
             namespace Custom
             {
-                public sealed class IdAttribute(uint id) : System.Attribute;
+                public sealed class IdAttribute : System.Attribute
+                {
+                    public IdAttribute(uint id)
+                    {
+                    }
+                }
             }
 
             [GenerateSerializer]
