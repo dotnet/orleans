@@ -83,6 +83,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
 
             if (descriptor.MembershipVersion > membershipSnapshot.Version)
             {
+                // Refresh membership to at least that version.
                 await _membershipService.Refresh(descriptor.MembershipVersion, cancellationToken);
                 membershipSnapshot = _membershipService.CurrentSnapshot;
             }
@@ -93,26 +94,33 @@ internal sealed class JournaledJobShardManager : JobShardManager
                 continue;
             }
 
+            // Determine if this is an adopted shard (taken from dead owner) vs orphaned (gracefully released).
             var isAdopted = false;
             if (descriptor.Owner is { } previousOwner)
             {
                 var ownerStatus = membershipSnapshot.GetSiloStatus(previousOwner);
                 if (ownerStatus is not SiloStatus.Dead and not SiloStatus.None)
                 {
+                    // Owner is still active and it's not me, skip this shard.
                     continue;
                 }
 
                 isAdopted = ownerStatus == SiloStatus.Dead;
             }
 
+            // Respect the slow-start budget: skip claiming if we've exhausted the budget.
+            // This must be checked before incrementing the adopted count to avoid
+            // inflating the count when the shard isn't actually claimed.
             if (newClaimCount >= maxNewClaims)
             {
                 continue;
             }
 
+            // Try to claim orphaned or adopted shard.
             var claimedShard = await TryClaimShardAsync(descriptor, isAdopted, cancellationToken);
             if (claimedShard is null)
             {
+                // Either poisoned shard or someone else took ownership.
                 continue;
             }
 
@@ -168,10 +176,12 @@ internal sealed class JournaledJobShardManager : JobShardManager
             var count = await shard.GetJobCountAsync();
             if (count == 0)
             {
+                // No jobs left, we can delete the shard.
                 await journaledShard.DeleteStateAsync(cancellationToken);
             }
             else
             {
+                // There are still jobs in the shard, release ownership gracefully.
                 var update = new JournalStoragePropertiesUpdate(
                     new Dictionary<string, string>(StringComparer.Ordinal)
                     {
@@ -273,15 +283,18 @@ internal sealed class JournaledJobShardManager : JobShardManager
         {
             [OwnerProperty] = SiloAddress.ToParsableString(),
             [MembershipVersionProperty] = GetMembershipVersionString(),
+            // We don't want to add new jobs to shards that we just took ownership of.
             [ClosedProperty] = bool.TrueString
         };
         List<string>? remove = null;
 
         if (isAdopted)
         {
+            // Increment adopted count for shards taken from dead owners.
             adoptedCount++;
             if (adoptedCount > _options.MaxAdoptedCount)
             {
+                // Persist poisoned marker so this shard is not repeatedly re-evaluated as newly poisoned.
                 await TryMarkShardPoisonedAsync(descriptor, adoptedCount, cancellationToken);
                 return null;
             }
@@ -291,6 +304,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         }
         else
         {
+            // Reset adopted count since we're gracefully releasing.
             set[AdoptedCountProperty] = "0";
             remove = [LastAdoptedTimeProperty];
         }
