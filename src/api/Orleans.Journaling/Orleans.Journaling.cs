@@ -259,6 +259,14 @@ namespace Orleans.Journaling
         System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
     }
 
+    public partial interface IJournalStorageCatalog
+    {
+        System.Threading.Tasks.ValueTask<JournalStorageCreateResult> CreateIfNotExistsAsync(JournalStorageId storageId, System.Collections.Generic.IReadOnlyDictionary<string, string>? properties = null, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<JournalStorageProperties?> GetPropertiesAsync(JournalStorageId storageId, System.Threading.CancellationToken cancellationToken = default);
+        System.Collections.Generic.IAsyncEnumerable<JournalStorageId> ListAsync(JournalStoragePrefix prefix, System.Threading.CancellationToken cancellationToken = default);
+        System.Threading.Tasks.ValueTask<JournalStoragePropertiesUpdateResult> UpdatePropertiesAsync(JournalStorageId storageId, JournalStoragePropertiesUpdate update, string? expectedETag, System.Threading.CancellationToken cancellationToken = default);
+    }
+
     public partial interface IJournalStorageConsumer
     {
         void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata);
@@ -441,6 +449,143 @@ namespace Orleans.Journaling
         public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
+    public sealed partial class JournalStorageCreateResult
+    {
+        public JournalStorageCreateResult(JournalStorageCreateStatus status, JournalStorageProperties? properties) { }
+
+        public JournalStorageProperties? Properties { get { throw null; } }
+
+        public JournalStorageCreateStatus Status { get { throw null; } }
+    }
+
+    public enum JournalStorageCreateStatus
+    {
+        Created = 0,
+        AlreadyExists = 1,
+        Conflict = 2
+    }
+
+    public sealed partial class JournalStorageId : System.IComparable<JournalStorageId>, System.IEquatable<JournalStorageId>
+    {
+        internal JournalStorageId() { }
+
+        public System.Collections.Generic.IReadOnlyList<string> Segments { get { throw null; } }
+
+        public string Value { get { throw null; } }
+
+        public JournalStoragePrefix AsPrefix() { throw null; }
+
+        public int CompareTo(JournalStorageId? other) { throw null; }
+
+        public static JournalStorageId Create(System.Collections.Generic.IEnumerable<string> segments) { throw null; }
+
+        public static JournalStorageId Create(string firstSegment, params string[] additionalSegments) { throw null; }
+
+        public bool Equals(JournalStorageId? other) { throw null; }
+
+        public override bool Equals(object? obj) { throw null; }
+
+        public static JournalStorageId ForGrain(Runtime.GrainId grainId) { throw null; }
+
+        public static JournalStorageId ForGrain(Runtime.IGrainContext grainContext) { throw null; }
+
+        public override int GetHashCode() { throw null; }
+
+        public static bool operator ==(JournalStorageId? left, JournalStorageId? right) { throw null; }
+
+        public static bool operator !=(JournalStorageId? left, JournalStorageId? right) { throw null; }
+
+        public static JournalStorageId Parse(string value) { throw null; }
+
+        public override string ToString() { throw null; }
+    }
+
+    public sealed partial class JournalStoragePrefix : System.IEquatable<JournalStoragePrefix>
+    {
+        internal JournalStoragePrefix() { }
+
+        public bool IsRoot { get { throw null; } }
+
+        public static JournalStoragePrefix Root { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyList<string> Segments { get { throw null; } }
+
+        public string Value { get { throw null; } }
+
+        public static JournalStoragePrefix Create(System.Collections.Generic.IEnumerable<string> segments) { throw null; }
+
+        public static JournalStoragePrefix Create(params string[] segments) { throw null; }
+
+        public bool Equals(JournalStoragePrefix? other) { throw null; }
+
+        public override bool Equals(object? obj) { throw null; }
+
+        public override int GetHashCode() { throw null; }
+
+        public bool Matches(JournalStorageId storageId) { throw null; }
+
+        public static bool operator ==(JournalStoragePrefix? left, JournalStoragePrefix? right) { throw null; }
+
+        public static bool operator !=(JournalStoragePrefix? left, JournalStoragePrefix? right) { throw null; }
+
+        public static JournalStoragePrefix Parse(string value) { throw null; }
+
+        public override string ToString() { throw null; }
+    }
+
+    public sealed partial class JournalStorageProperties
+    {
+        public JournalStorageProperties(string? eTag, System.Collections.Generic.IReadOnlyDictionary<string, string>? values) { }
+
+        public static JournalStorageProperties Empty { get { throw null; } }
+
+        public string? ETag { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> Values { get { throw null; } }
+
+        public JournalStorageProperties WithETag(string? eTag) { throw null; }
+    }
+
+    public sealed partial class JournalStoragePropertiesUpdate
+    {
+        public JournalStoragePropertiesUpdate(System.Collections.Generic.IReadOnlyDictionary<string, string>? set, System.Collections.Generic.IEnumerable<string>? remove) { }
+
+        public static JournalStoragePropertiesUpdate Empty { get { throw null; } }
+
+        public bool IsEmpty { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlySet<string> Remove { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> Set { get { throw null; } }
+
+        public static JournalStoragePropertiesUpdate RemoveProperty(string propertyName) { throw null; }
+
+        public static JournalStoragePropertiesUpdate SetProperty(string propertyName, string value) { throw null; }
+    }
+
+    public sealed partial class JournalStoragePropertiesUpdateResult
+    {
+        public JournalStoragePropertiesUpdateResult(JournalStoragePropertiesUpdateStatus status, JournalStorageProperties? properties) { }
+
+        public JournalStorageProperties? Properties { get { throw null; } }
+
+        public JournalStoragePropertiesUpdateStatus Status { get { throw null; } }
+    }
+
+    public enum JournalStoragePropertiesUpdateStatus
+    {
+        Updated = 0,
+        NotFound = 1,
+        ETagMismatch = 2,
+        NoChange = 3
+    }
+
+    public static partial class JournalStoragePropertyNames
+    {
+        public const string ProviderReservedPrefix = "$";
+        public static bool IsProviderOwned(string propertyName) { throw null; }
+    }
+
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>
     {
         private readonly int _dummyPrimitive;
@@ -481,6 +626,8 @@ namespace Orleans.Journaling
     {
         public VolatileJournalStorage() { }
 
+        public VolatileJournalStorage(JournalStorageId storageId, string? journalFormatKey = null) { }
+
         public VolatileJournalStorage(string? journalFormatKey) { }
 
         public bool IsCompactionRequested { get { throw null; } }
@@ -494,13 +641,23 @@ namespace Orleans.Journaling
         public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
-    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider
+    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
         public VolatileJournalStorageProvider() { }
 
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
+
+        public IJournalStorage Create(JournalStorageId storageId) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<JournalStorageCreateResult> CreateIfNotExistsAsync(JournalStorageId storageId, System.Collections.Generic.IReadOnlyDictionary<string, string>? properties = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<JournalStorageProperties?> GetPropertiesAsync(JournalStorageId storageId, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Collections.Generic.IAsyncEnumerable<JournalStorageId> ListAsync(JournalStoragePrefix prefix, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<JournalStoragePropertiesUpdateResult> UpdatePropertiesAsync(JournalStorageId storageId, JournalStoragePropertiesUpdate update, string? expectedETag, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 

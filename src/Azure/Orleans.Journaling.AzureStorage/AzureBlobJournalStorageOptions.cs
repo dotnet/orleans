@@ -24,6 +24,13 @@ public sealed class AzureBlobJournalStorageOptions
     private static readonly Func<JournalId, string> DefaultGetBlobName = static journalId => journalId.Value;
 
     /// <summary>
+    /// Gets or sets the delegate used to generate the blob name for a provider-neutral storage id.
+    /// </summary>
+    public Func<JournalStorageId, string> GetStorageBlobName { get; set; } = DefaultGetStorageBlobName;
+
+    private static readonly Func<JournalStorageId, string> DefaultGetStorageBlobName = static storageId => storageId.Value;
+
+    /// <summary>
     /// Options to be used when configuring the blob storage client, or <see langword="null"/> to use the default options.
     /// </summary>
     public BlobClientOptions? ClientOptions { get; set; }
@@ -82,6 +89,14 @@ public sealed class AzureBlobJournalStorageOptions
 
     internal static string GetDefaultCheckpointBlobName(string journalBlobName, string snapshotId)
         => $"{journalBlobName}/chk.{snapshotId}";
+
+    internal string GetBlobNameForJournal(JournalStorageId storageId)
+    {
+        ArgumentNullException.ThrowIfNull(storageId);
+        var blobName = GetStorageBlobName(storageId);
+        ArgumentException.ThrowIfNullOrWhiteSpace(blobName);
+        return blobName;
+    }
 
     /// <summary>
     /// A function for building container factory instances.

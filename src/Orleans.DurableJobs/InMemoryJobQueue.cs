@@ -37,6 +37,10 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     public void Enqueue(DurableJob job, int dequeueCount)
     {
         ArgumentNullException.ThrowIfNull(job);
+        if (dequeueCount < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(dequeueCount));
+        }
 
         lock (_syncLock)
         {
@@ -97,27 +101,83 @@ internal sealed class InMemoryJobQueue : IAsyncEnumerable<IJobRunContext>
     /// </remarks>
     public void RetryJobLater(IJobRunContext jobContext, DateTimeOffset newDueTime)
     {
-        var jobId = jobContext.Job.Id;
-        var newJob = new DurableJob
+        ArgumentNullException.ThrowIfNull(jobContext);
+        _ = RetryJobLater(jobContext.Job.Id, newDueTime, jobContext.DequeueCount);
+    }
+
+    /// <summary>
+    /// Reschedules a job for retry with a new due time.
+    /// </summary>
+    /// <param name="jobId">The unique identifier of the job to retry.</param>
+    /// <param name="newDueTime">The new due time for the job.</param>
+    /// <param name="dequeueCount">The persisted dequeue count to associate with the retried job.</param>
+    /// <returns>True if the job was found and rescheduled; false if the job was not found.</returns>
+    public bool RetryJobLater(string jobId, DateTimeOffset newDueTime, int dequeueCount)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(jobId);
+        if (dequeueCount < 0)
         {
-            Id = jobContext.Job.Id,
-            Name = jobContext.Job.Name,
-            DueTime = newDueTime,
-            TargetGrainId = jobContext.Job.TargetGrainId,
-            ShardId = jobContext.Job.ShardId,
-            Metadata = jobContext.Job.Metadata
-        };
+            throw new ArgumentOutOfRangeException(nameof(dequeueCount));
+        }
 
         lock (_syncLock)
         {
-            if (_jobsIdToBucket.TryGetValue(jobId, out var oldBucket))
+            if (!_jobsIdToBucket.TryGetValue(jobId, out var oldBucket) || !oldBucket.TryGetJob(jobId, out var existing))
             {
-                oldBucket.RemoveJob(jobId);
-                _jobsIdToBucket.Remove(jobId);
-                var newBucket = GetJobBucket(newDueTime);
-                newBucket.AddJob(newJob, jobContext.DequeueCount);
-                _jobsIdToBucket[jobId] = newBucket;
+                return false;
             }
+
+            var newJob = new DurableJob
+            {
+                Id = existing.Job.Id,
+                Name = existing.Job.Name,
+                DueTime = newDueTime,
+                TargetGrainId = existing.Job.TargetGrainId,
+                ShardId = existing.Job.ShardId,
+                Metadata = existing.Job.Metadata
+            };
+
+            oldBucket.RemoveJob(jobId);
+            _jobsIdToBucket.Remove(jobId);
+            var newBucket = GetJobBucket(newDueTime);
+            newBucket.AddJob(newJob, dequeueCount);
+            _jobsIdToBucket[jobId] = newBucket;
+            return true;
+        }
+    }
+
+    /// <summary>
+    /// Gets a point-in-time snapshot of live jobs and their persisted dequeue counts.
+    /// </summary>
+    /// <returns>The current live jobs and dequeue counts.</returns>
+    public IReadOnlyList<(DurableJob Job, int DequeueCount)> GetSnapshot()
+    {
+        lock (_syncLock)
+        {
+            var result = new List<(DurableJob Job, int DequeueCount)>(_jobsIdToBucket.Count);
+            foreach (var (jobId, bucket) in _jobsIdToBucket)
+            {
+                if (bucket.TryGetJob(jobId, out var item))
+                {
+                    result.Add(item);
+                }
+            }
+
+            return result;
+        }
+    }
+
+    /// <summary>
+    /// Clears all queue state.
+    /// </summary>
+    public void Clear()
+    {
+        lock (_syncLock)
+        {
+            _queue.Clear();
+            _jobsIdToBucket.Clear();
+            _buckets.Clear();
+            _isComplete = false;
         }
     }
 
@@ -229,5 +289,10 @@ internal sealed class JobBucket
     public bool RemoveJob(string jobId)
     {
         return _jobs.Remove(jobId);
+    }
+
+    public bool TryGetJob(string jobId, out (DurableJob Job, int DequeueCount) job)
+    {
+        return _jobs.TryGetValue(jobId, out job);
     }
 }

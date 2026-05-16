@@ -16,10 +16,13 @@ using Orleans.Runtime.Messaging;
 namespace Orleans.DurableJobs;
 
 /// <inheritdoc/>
-internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILifecycleParticipant<ISiloLifecycle>
+internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>
 {
+    internal static readonly GrainType JobManagerGrainType = SystemTargetGrainId.CreateGrainType("job-manager");
+
     private readonly JobShardManager _shardManager;
     private readonly ShardExecutor _shardExecutor;
+    private readonly IInternalGrainFactory _grainFactory;
     private readonly IAsyncEnumerable<ClusterMembershipSnapshot> _clusterMembershipUpdates;
     private readonly IOverloadDetector _overloadDetector;
     private readonly TimeProvider _timeProvider;
@@ -45,16 +48,18 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     public LocalDurableJobManager(
         JobShardManager shardManager,
         ShardExecutor shardExecutor,
+        IInternalGrainFactory grainFactory,
         IClusterMembershipService clusterMembership,
         IOverloadDetector overloadDetector,
         TimeProvider timeProvider,
         IOptions<DurableJobsOptions> options,
         SystemTargetShared shared,
         ILogger<LocalDurableJobManager> logger)
-        : base(SystemTargetGrainId.CreateGrainType("job-manager"), shared)
+        : base(JobManagerGrainType, shared)
     {
         _shardManager = shardManager;
         _shardExecutor = shardExecutor;
+        _grainFactory = grainFactory;
         _clusterMembershipUpdates = clusterMembership.MembershipUpdates;
         _overloadDetector = overloadDetector;
         _timeProvider = timeProvider;
@@ -177,16 +182,35 @@ internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobMa
     {
         LogCancellingJob(_logger, job.Id, job.Name, job.ShardId);
 
-        if (!_shardCache.TryGetValue(job.ShardId, out var shard))
+        if (_shardCache.TryGetValue(job.ShardId, out var shard))
+        {
+            if (!await _shardManager.IsShardOwnedByLocalSiloAsync(job.ShardId, cancellationToken))
+            {
+                LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
+                return false;
+            }
+
+            using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
+            var wasRemoved = await shard.RemoveJobAsync(job.Id, linkedCts.Token);
+            LogJobCancelled(_logger, job.Id, job.Name, job.ShardId);
+            return wasRemoved;
+        }
+
+        var owner = await _shardManager.GetShardOwnerAsync(job.ShardId, cancellationToken);
+        if (owner is null || owner.Equals(Silo))
         {
             LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
             return false;
         }
 
-        using var linkedCts = CancellationTokenSource.CreateLinkedTokenSource(cancellationToken, _cts.Token);
-        var wasRemoved = await shard.RemoveJobAsync(job.Id, linkedCts.Token);
-        LogJobCancelled(_logger, job.Id, job.Name, job.ShardId);
-        return wasRemoved;
+        var remote = _grainFactory.GetSystemTarget<ILocalDurableJobManagerSystemTarget>(JobManagerGrainType, owner);
+        var routed = await remote.TryCancelDurableJobAsync(job, cancellationToken);
+        if (!routed)
+        {
+            LogJobCancellationFailed(_logger, job.Id, job.Name, job.ShardId);
+        }
+
+        return routed;
     }
 
     private async Task ProcessMembershipUpdates()

@@ -459,16 +459,29 @@ public class CodecRecoveryTests : JournalingTestBase
 
     private sealed class MetadataOverridingStorage(VolatileJournalStorage inner, string? storedJournalFormatKey) : IJournalStorage
     {
+        public JournalStorageId StorageId => inner.StorageId;
+
+        public string? ETag => inner.ETag;
+
         public bool IsCompactionRequested => inner.IsCompactionRequested;
 
         public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.AppendAsync(value, cancellationToken);
 
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, string? expectedETag, CancellationToken cancellationToken)
+            => inner.AppendAsync(value, expectedETag, cancellationToken);
+
         public ValueTask DeleteAsync(CancellationToken cancellationToken)
             => inner.DeleteAsync(cancellationToken);
 
+        public ValueTask DeleteAsync(string? expectedETag, CancellationToken cancellationToken)
+            => inner.DeleteAsync(expectedETag, cancellationToken);
+
         public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
             => inner.ReplaceAsync(value, cancellationToken);
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, string? expectedETag, CancellationToken cancellationToken)
+            => inner.ReplaceAsync(value, expectedETag, cancellationToken);
 
         public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
         {
