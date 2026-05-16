@@ -251,6 +251,36 @@ public class CodecRecoveryTests : JournalingTestBase
     }
 
     [Fact]
+    public async Task Recovery_JsonJournalWithBinaryFormat_ReplacesWithoutAppendingDuringMigration()
+    {
+        var innerStorage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
+        using var first = CreateFormatAwareTestSystem(innerStorage, JsonJournalExtensions.JournalFormatKey);
+        var dict = CreateFormatAwareDictionary(first, JsonJournalExtensions.JournalFormatKey);
+        await first.Lifecycle.OnStart();
+        dict.Add("alpha", 1);
+        await first.Manager.WriteStateAsync(CancellationToken.None);
+
+        innerStorage.SetConfiguredJournalFormatKey(OrleansBinaryJournalFormat.JournalFormatKey);
+        var storage = new CountingStorage(innerStorage);
+        using var recovered = CreateFormatAwareTestSystem(storage, OrleansBinaryJournalFormat.JournalFormatKey);
+        var recoveredDict = CreateFormatAwareDictionary(recovered, OrleansBinaryJournalFormat.JournalFormatKey);
+        await recovered.Lifecycle.OnStart();
+
+        recoveredDict.Add("beta", 2);
+        await recovered.Manager.WriteStateAsync(CancellationToken.None);
+
+        Assert.Equal(0, storage.AppendCount);
+        Assert.Equal(1, storage.ReplaceCount);
+        Assert.Equal(OrleansBinaryJournalFormat.JournalFormatKey, innerStorage.StoredJournalFormatKey);
+
+        using var final = CreateFormatAwareTestSystem(innerStorage, OrleansBinaryJournalFormat.JournalFormatKey);
+        var finalDict = CreateFormatAwareDictionary(final, OrleansBinaryJournalFormat.JournalFormatKey);
+        await final.Lifecycle.OnStart();
+        Assert.Equal(1, finalDict["alpha"]);
+        Assert.Equal(2, finalDict["beta"]);
+    }
+
+    [Fact]
     public async Task Recovery_MetadataLessJournal_UsesConfiguredFormat()
     {
         var storage = new VolatileJournalStorage(JsonJournalExtensions.JournalFormatKey);
@@ -496,6 +526,33 @@ public class CodecRecoveryTests : JournalingTestBase
                 cancellationToken.ThrowIfCancellationRequested();
                 yield return segment;
             }
+        }
+    }
+
+    private sealed class CountingStorage(VolatileJournalStorage inner) : IJournalStorage
+    {
+        public int AppendCount { get; private set; }
+
+        public int ReplaceCount { get; private set; }
+
+        public bool IsCompactionRequested => inner.IsCompactionRequested;
+
+        public ValueTask AppendAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            AppendCount++;
+            return inner.AppendAsync(value, cancellationToken);
+        }
+
+        public ValueTask DeleteAsync(CancellationToken cancellationToken)
+            => inner.DeleteAsync(cancellationToken);
+
+        public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
+            => inner.ReadAsync(consumer, cancellationToken);
+
+        public ValueTask ReplaceAsync(ReadOnlySequence<byte> value, CancellationToken cancellationToken)
+        {
+            ReplaceCount++;
+            return inner.ReplaceAsync(value, cancellationToken);
         }
     }
 
