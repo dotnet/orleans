@@ -1,3 +1,4 @@
+using System.Text.Json;
 using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -38,13 +39,8 @@ namespace Tester.EventSourcingTests
                     .UseJsonJournalFormat(options =>
                     {
                         options.SerializerOptions.IncludeFields = true;
+                        options.SerializerOptions.Converters.Add(new LogTestEventJsonConverter());
                         options.AddTypeInfoResolver(EventSourcingTestsJsonContext.Default);
-                        options.ConfigurePolymorphicType<object>()
-                            .AddDerivedType<UpdateA>()
-                            .AddDerivedType<UpdateB>()
-                            .AddDerivedType<IncrementA>()
-                            .AddDerivedType<AddReservation>()
-                            .AddDerivedType<RemoveReservation>();
                     })
                     .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
@@ -58,6 +54,67 @@ namespace Tester.EventSourcingTests
                     .AddFaultInjectionMemoryStorage("SlowMemoryStore", options=>options.NumStorageGrains = 10, faultyOptions => faultyOptions.Latency = TimeSpan.FromMilliseconds(15));
 
                 hostBuilder.Services.AddSingleton<IJournalStorageProvider>(JournalStorageProvider);
+            }
+
+            private sealed class LogTestEventJsonConverter : JsonConverter<object>
+            {
+                public override bool CanConvert(Type typeToConvert) => typeToConvert == typeof(object);
+
+                public override object Read(ref Utf8JsonReader reader, Type typeToConvert, JsonSerializerOptions options)
+                {
+                    if (reader.TokenType is JsonTokenType.Null)
+                    {
+                        return null;
+                    }
+
+                    using var document = JsonDocument.ParseValue(ref reader);
+                    var root = document.RootElement;
+                    var type = root.GetProperty("$type").GetString();
+                    var value = root.TryGetProperty(nameof(UpdateA.Val), out var valueProperty) ? valueProperty.GetInt32() : 0;
+
+                    return type switch
+                    {
+                        nameof(UpdateA) => new UpdateA { Val = value },
+                        nameof(UpdateB) => new UpdateB { Val = value },
+                        nameof(IncrementA) => new IncrementA { Val = value },
+                        nameof(AddReservation) => new AddReservation { Val = value },
+                        nameof(RemoveReservation) => new RemoveReservation { Val = value },
+                        _ => throw new JsonException($"Unknown log test event type '{type}'.")
+                    };
+                }
+
+                public override void Write(Utf8JsonWriter writer, object value, JsonSerializerOptions options)
+                {
+                    writer.WriteStartObject();
+                    switch (value)
+                    {
+                        case UpdateA update:
+                            WriteEvent(writer, nameof(UpdateA), update.Val);
+                            break;
+                        case UpdateB update:
+                            WriteEvent(writer, nameof(UpdateB), update.Val);
+                            break;
+                        case IncrementA update:
+                            WriteEvent(writer, nameof(IncrementA), update.Val);
+                            break;
+                        case AddReservation update:
+                            WriteEvent(writer, nameof(AddReservation), update.Val);
+                            break;
+                        case RemoveReservation update:
+                            WriteEvent(writer, nameof(RemoveReservation), update.Val);
+                            break;
+                        default:
+                            throw new JsonException($"Unsupported log test event type '{value.GetType()}'.");
+                    }
+
+                    writer.WriteEndObject();
+                }
+
+                private static void WriteEvent(Utf8JsonWriter writer, string type, int value)
+                {
+                    writer.WriteString("$type", type);
+                    writer.WriteNumber(nameof(UpdateA.Val), value);
+                }
             }
         }
     }
