@@ -42,11 +42,27 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         JournalId prefix = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        var journalIds = _storage
-            .Where(pair => pair.Value.Exists && TryParseJournalId(pair.Key, out var journalId) && prefix.IsPrefixOf(journalId))
-            .Select(static pair => new JournalId(pair.Key))
-            .OrderBy(static storageId => storageId.Value, StringComparer.Ordinal)
-            .ToArray();
+        List<JournalId> journalIds = [];
+        foreach (var (key, store) in _storage)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            if (!TryParseJournalId(key, out var journalId) || !prefix.IsPrefixOf(journalId))
+            {
+                continue;
+            }
+
+            lock (store.SyncRoot)
+            {
+                if (!store.Exists)
+                {
+                    continue;
+                }
+            }
+
+            journalIds.Add(journalId);
+        }
+
+        journalIds.Sort(static (left, right) => StringComparer.Ordinal.Compare(left.Value, right.Value));
 
         foreach (var journalId in journalIds)
         {

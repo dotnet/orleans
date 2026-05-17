@@ -1,6 +1,8 @@
 using System;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
+using Orleans.Configuration.Internal;
 using Orleans.DurableJobs;
 using Orleans.Journaling;
 using Orleans.Journaling.Json;
@@ -32,6 +34,7 @@ public static class AzureStorageDurableJobsExtensions
         builder.AddDurableJobs();
         builder.AddAzureBlobJournalStorage(configure);
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        builder.Services.UseJournaledDurableJobs();
         return builder;
     }
 
@@ -58,6 +61,14 @@ public static class AzureStorageDurableJobsExtensions
         builder.AddAzureBlobJournalStorage(configure);
         builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
 
+        services.UseJournaledDurableJobs();
+        return services;
+    }
+
+    private static IServiceCollection UseJournaledDurableJobs(this IServiceCollection services)
+    {
+        services.TryAddSingleton<JournaledJobShardManager>();
+        services.AddFromExisting<JobShardManager, JournaledJobShardManager>();
         return services;
     }
 

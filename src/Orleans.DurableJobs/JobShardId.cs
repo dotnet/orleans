@@ -5,7 +5,7 @@ namespace Orleans.DurableJobs;
 
 internal readonly record struct JobShardId
 {
-    private const string RootSegment = "durable-jobs";
+    private const string RootSegment = "jobs";
     private const string ShardsSegment = "shards";
 
     public JobShardId(string value)
