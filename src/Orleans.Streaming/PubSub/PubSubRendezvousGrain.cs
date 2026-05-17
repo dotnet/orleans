@@ -49,8 +49,7 @@ namespace Orleans.Streams
             {
                 LogDebugFallbackToStorageProvider(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
 
-                storage = _serviceProvider.GetRequiredKeyedService<IGrainStorage>(
-                    ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
+                storage = _serviceProvider.GetRequiredKeyedService<IGrainStorage>(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
             }
 
             return new(nameof(PubSubRendezvousGrain), grain.GrainContext, storage);
@@ -73,8 +72,8 @@ namespace Orleans.Streams
     [GenerateSerializer]
     internal sealed class PubSubGrainState
     {
-        [Id(0)] public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
-
+        [Id(0)]
+        public HashSet<PubSubPublisherState> Producers { get; set; } = new HashSet<PubSubPublisherState>();
         [Id(1)]
         public HashSet<PubSubSubscriptionState> Consumers { get; set; } = new HashSet<PubSubSubscriptionState>();
     }
@@ -90,8 +89,7 @@ namespace Orleans.Streams
 
         private PubSubGrainState State => _storage.State;
 
-        public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory,
-            ILogger<PubSubRendezvousGrain> logger)
+        public PubSubRendezvousGrain(PubSubGrainStateStorageFactory storageFactory, ILogger<PubSubRendezvousGrain> logger)
         {
             _storageFactory = storageFactory;
             _logger = logger;
@@ -110,8 +108,7 @@ namespace Orleans.Streams
             return Task.CompletedTask;
         }
 
-        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId,
-            GrainId streamProducer)
+        public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
             TagList? tags = null;
 
@@ -143,7 +140,6 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
-
             return State.Consumers.Where(c => !c.IsFaulted).ToSet();
         }
 
@@ -185,7 +181,6 @@ namespace Orleans.Streams
                 DeactivateOnIdle();
                 throw;
             }
-
             if (State.Producers.Count == 0 && State.Consumers.Count == 0)
             {
                 DeactivateOnIdle(); // No producers or consumers left now, so flag ourselves to expedite Deactivation
@@ -253,8 +248,7 @@ namespace Orleans.Streams
             {
                 foreach (PubSubPublisherState producerState in producers)
                 {
-                    tasks.Add(ExecuteProducerTask(producerState,
-                        p => p.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData)));
+                    tasks.Add(ExecuteProducerTask(producerState, p => p.AddSubscriber(subscriptionId, streamId, streamConsumer, filterData)));
                 }
 
                 Exception? exception = null;
@@ -337,7 +331,6 @@ namespace Orleans.Streams
                         await WriteStateAsync();
                         StreamingEvents.EmitSubscriptionUnregistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, GrainContext.Address.SiloAddress);
                     }
-
                     await NotifyProducersOfRemovedSubscription(subscriptionId, streamId);
                 }
 
@@ -391,10 +384,8 @@ namespace Orleans.Streams
                     numConsumers = State.Consumers.Count;
 
                 string when = args != null && args.Length != 0 ? string.Format(fmt, args) : fmt;
-                _logger.LogDebug(
-                    "{When}. Now have total of {ProducerCount} producers and {ConsumerCount} consumers. All Consumers = {Consumers}, All Producers = {Producers}",
-                    when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers),
-                    Utils.EnumerableToString(State?.Producers));
+                _logger.LogDebug("{When}. Now have total of {ProducerCount} producers and {ConsumerCount} consumers. All Consumers = {Consumers}, All Producers = {Producers}",
+                    when, numProducers, numConsumers, Utils.EnumerableToString(State?.Consumers), Utils.EnumerableToString(State?.Producers));
             }
         }
 
@@ -454,6 +445,7 @@ namespace Orleans.Streams
                                     c.Consumer)).ToList();
                 return Task.FromResult(subscriptions);
             }
+
         }
 
         public async Task FaultSubscription(GuidId subscriptionId)
@@ -463,7 +455,6 @@ namespace Orleans.Streams
             {
                 return;
             }
-
             try
             {
                 pubSubState.Fault();
@@ -491,8 +482,7 @@ namespace Orleans.Streams
 
                 // Notify producers about unregistered consumer.
                 List<Task> tasks = State.Producers
-                    .Select(producerState =>
-                        ExecuteProducerTask(producerState, p => p.RemoveSubscriber(subscriptionId, streamId)))
+                    .Select(producerState => ExecuteProducerTask(producerState, p => p.RemoveSubscriber(subscriptionId, streamId)))
                     .ToList();
                 await Task.WhenAll(tasks);
                 //if producers got removed
@@ -507,18 +497,15 @@ namespace Orleans.Streams
         /// <returns></returns>
         private async Task<bool> TryClearState()
         {
-            if (State.Producers.Count == 0 &&
-                State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
+            if (State.Producers.Count == 0 && State.Consumers.Count == 0) // + we already know that numProducers == 0 from previous if-clause
             {
                 await ClearStateAsync(); //State contains no producers or consumers, remove it from storage
                 return true;
             }
-
             return false;
         }
 
-        private async Task ExecuteProducerTask(PubSubPublisherState producer,
-            Func<IStreamProducerExtension, Task> producerTask)
+        private async Task ExecuteProducerTask(PubSubPublisherState producer, Func<IStreamProducerExtension, Task> producerTask)
         {
             try
             {
