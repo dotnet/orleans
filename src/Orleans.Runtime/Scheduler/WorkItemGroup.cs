@@ -43,7 +43,12 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
     public IGrainContext GrainContext { get; set; }
 
-    internal ILogger Logger => GrainContext.ActivationServices.GetRequiredService<ILogger<WorkItemGroup>>();
+    internal ILogger Logger => GrainContext switch
+    {
+        ActivationData activation => activation.Shared.SchedulerLogger,
+        SystemTarget systemTarget => systemTarget.SchedulerLogger,
+        _ => GrainContext.ActivationServices.GetRequiredService<ILogger<WorkItemGroup>>()
+    };
 
     internal int ExternalWorkItemCount
     {

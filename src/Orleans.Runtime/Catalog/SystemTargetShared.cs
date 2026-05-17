@@ -20,6 +20,7 @@ internal sealed class SystemTargetShared(
     public SiloAddress SiloAddress => localSiloDetails.SiloAddress;
 
     public ILoggerFactory LoggerFactory => loggerFactory;
+    internal ILogger SchedulerLogger { get; } = loggerFactory.CreateLogger<WorkItemGroup>();
     public GrainReferenceActivator GrainReferenceActivator => grainReferenceActivator;
     public ITimerRegistry TimerRegistry => timerRegistry;
 
