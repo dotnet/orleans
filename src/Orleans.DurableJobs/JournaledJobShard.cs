@@ -72,9 +72,9 @@ internal sealed class JournaledJobShard : IJobShard
     public bool IsAddingCompleted => _state.IsAddingCompleted;
 
     /// <summary>
-    /// Gets the backing journal storage identifier for this shard.
+    /// Gets the backing journal identifier for this shard.
     /// </summary>
-    internal JournalStorageId StorageId => JobShardId.Parse(Id).ToJournalStorageId();
+    internal JournalId StorageId => JobShardId.Parse(Id).ToJournalId();
 
     /// <inheritdoc/>
     public IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() => _state.ConsumeDurableJobsAsync();

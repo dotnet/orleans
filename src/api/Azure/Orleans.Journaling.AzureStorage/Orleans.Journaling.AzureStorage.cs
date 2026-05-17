@@ -23,8 +23,6 @@ namespace Orleans.Journaling
 
         public System.Func<JournalId, string> GetBlobName { get { throw null; } set { } }
 
-        public System.Func<JournalStorageId, string> GetStorageBlobName { get { throw null; } set { } }
-
         public void ConfigureBlobServiceClient(System.Func<System.Threading.CancellationToken, System.Threading.Tasks.Task<Azure.Storage.Blobs.BlobServiceClient>> createClientCallback) { }
 
         public void ConfigureBlobServiceClient(string connectionString) { }

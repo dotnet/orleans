@@ -114,10 +114,10 @@ public class JournaledJobShardStateTests
     {
         var shardId = new JobShardId("silo/with/slashes:job");
 
-        var storageId = shardId.ToJournalStorageId();
+        var storageId = shardId.ToJournalId();
 
-        Assert.True(JobShardId.StoragePrefix.Matches(storageId));
-        Assert.Equal(shardId, JobShardId.FromJournalStorageId(storageId));
+        Assert.True(JobShardId.StoragePrefix.IsPrefixOf(storageId));
+        Assert.Equal(shardId, JobShardId.FromJournalId(storageId));
     }
 
     private static DurableJob CreateJob(JobShardId shardId, string id, string name, DateTimeOffset dueTime) => new()

@@ -26,6 +26,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private const string MetadataPropertyPrefix = "DurableJobsMetadata_";
 
     private readonly IJournaledStateManagerFactory _stateManagerFactory;
+    private readonly IJournalStorageProvider _storageProvider;
     private readonly IJournalStorageCatalog _catalog;
     private readonly IClusterMembershipService _membershipService;
     private readonly IServiceProvider _serviceProvider;
@@ -37,6 +38,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     public JournaledJobShardManager(
         ILocalSiloDetails localSiloDetails,
         IJournaledStateManagerFactory stateManagerFactory,
+        IJournalStorageProvider storageProvider,
         IJournalStorageCatalog catalog,
         IClusterMembershipService membershipService,
         IServiceProvider serviceProvider,
@@ -46,6 +48,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     {
         ArgumentNullException.ThrowIfNull(localSiloDetails);
         ArgumentNullException.ThrowIfNull(stateManagerFactory);
+        ArgumentNullException.ThrowIfNull(storageProvider);
         ArgumentNullException.ThrowIfNull(catalog);
         ArgumentNullException.ThrowIfNull(membershipService);
         ArgumentNullException.ThrowIfNull(serviceProvider);
@@ -53,6 +56,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
         ArgumentNullException.ThrowIfNull(journaledStateManagerOptions);
 
         _stateManagerFactory = stateManagerFactory;
+        _storageProvider = storageProvider;
         _catalog = catalog;
         _membershipService = membershipService;
         _serviceProvider = serviceProvider;
@@ -137,15 +141,15 @@ internal sealed class JournaledJobShardManager : JobShardManager
         while (true)
         {
             var shardId = JobShardId.New();
-            var storageId = shardId.ToJournalStorageId();
+            var storageId = shardId.ToJournalId();
             var initialProperties = CreateInitialProperties(minDueTime, maxDueTime, metadata);
-            var createResult = await _catalog.CreateIfNotExistsAsync(storageId, initialProperties, cancellationToken);
-            if (createResult.Status is not JournalStorageCreateStatus.Created)
+            var storage = _storageProvider.CreateStorage(storageId);
+            if (!await storage.CreateIfNotExistsAsync(initialProperties, cancellationToken))
             {
                 continue;
             }
 
-            var properties = createResult.Properties ?? await _catalog.GetPropertiesAsync(storageId, cancellationToken);
+            var properties = await storage.GetMetadataAsync(cancellationToken);
             var descriptor = properties is not null ? ShardCatalogProperties.From(storageId, properties) : null;
             if (descriptor is null)
             {
@@ -182,23 +186,19 @@ internal sealed class JournaledJobShardManager : JobShardManager
             else
             {
                 // There are still jobs in the shard, release ownership gracefully.
-                var update = new JournalStoragePropertiesUpdate(
+                var updatedMetadata = await UpdateMetadataAsync(
+                    descriptor,
                     new Dictionary<string, string>(StringComparer.Ordinal)
                     {
                         [ClosedProperty] = bool.TrueString,
                         [MembershipVersionProperty] = GetMembershipVersionString()
                     },
-                    [OwnerProperty, AdoptedCountProperty, LastAdoptedTimeProperty]);
-
-                var updateResult = await _catalog.UpdatePropertiesAsync(
-                    descriptor.StorageId,
-                    update,
-                    descriptor.Properties.ETag,
+                    [OwnerProperty, AdoptedCountProperty, LastAdoptedTimeProperty],
                     cancellationToken);
 
-                if (updateResult.Status is not JournalStoragePropertiesUpdateStatus.Updated and not JournalStoragePropertiesUpdateStatus.NoChange)
+                if (updatedMetadata is null)
                 {
-                    throw new InvalidOperationException($"Failed to release DurableJobs shard '{shard.Id}' ownership. Catalog update status: {updateResult.Status}.");
+                    throw new InvalidOperationException($"Failed to release DurableJobs shard '{shard.Id}' ownership.");
                 }
             }
         }
@@ -253,23 +253,18 @@ internal sealed class JournaledJobShardManager : JobShardManager
                 return true;
             }
 
-            var update = new JournalStoragePropertiesUpdate(
+            var result = await UpdateMetadataAsync(
+                descriptor,
                 new Dictionary<string, string>(StringComparer.Ordinal)
                 {
                     [ClosedProperty] = bool.TrueString,
                     [MembershipVersionProperty] = GetMembershipVersionString()
                 },
-                remove: null);
-
-            var result = await _catalog.UpdatePropertiesAsync(descriptor.StorageId, update, descriptor.Properties.ETag, cancellationToken);
-            if (result.Status is JournalStoragePropertiesUpdateStatus.Updated or JournalStoragePropertiesUpdateStatus.NoChange)
+                remove: null,
+                cancellationToken);
+            if (result is not null)
             {
                 return true;
-            }
-
-            if (result.Status is not JournalStoragePropertiesUpdateStatus.ETagMismatch)
-            {
-                return false;
             }
         }
 
@@ -309,19 +304,13 @@ internal sealed class JournaledJobShardManager : JobShardManager
             remove = [LastAdoptedTimeProperty];
         }
 
-        var updateResult = await _catalog.UpdatePropertiesAsync(
-            descriptor.StorageId,
-            new JournalStoragePropertiesUpdate(set, remove),
-            descriptor.Properties.ETag,
-            cancellationToken);
-
-        if (updateResult.Status is not JournalStoragePropertiesUpdateStatus.Updated and not JournalStoragePropertiesUpdateStatus.NoChange
-            || updateResult.Properties is null)
+        var updatedMetadata = await UpdateMetadataAsync(descriptor, set, remove, cancellationToken);
+        if (updatedMetadata is null)
         {
             return null;
         }
 
-        var updatedDescriptor = ShardCatalogProperties.From(descriptor.StorageId, updateResult.Properties);
+        var updatedDescriptor = ShardCatalogProperties.From(descriptor.StorageId, updatedMetadata);
         return updatedDescriptor is null || updatedDescriptor.Owner is null || !updatedDescriptor.Owner.Equals(SiloAddress)
             ? null
             : await OpenShardAsync(updatedDescriptor, cancellationToken);
@@ -329,7 +318,8 @@ internal sealed class JournaledJobShardManager : JobShardManager
 
     private async Task TryMarkShardPoisonedAsync(ShardCatalogProperties descriptor, int adoptedCount, CancellationToken cancellationToken)
     {
-        var update = new JournalStoragePropertiesUpdate(
+        await UpdateMetadataAsync(
+            descriptor,
             new Dictionary<string, string>(StringComparer.Ordinal)
             {
                 [PoisonedProperty] = bool.TrueString,
@@ -337,9 +327,8 @@ internal sealed class JournaledJobShardManager : JobShardManager
                 [LastAdoptedTimeProperty] = _timeProvider.GetUtcNow().ToString("O", CultureInfo.InvariantCulture),
                 [MembershipVersionProperty] = GetMembershipVersionString()
             },
-            remove: null);
-
-        await _catalog.UpdatePropertiesAsync(descriptor.StorageId, update, descriptor.Properties.ETag, cancellationToken);
+            remove: null,
+            cancellationToken);
     }
 
     private async ValueTask<JournaledJobShard> GetOrOpenShardAsync(ShardCatalogProperties descriptor, CancellationToken cancellationToken)
@@ -363,7 +352,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     {
         var codec = CreateOperationCodec();
         var state = new JournaledJobShardState(descriptor.ShardId, descriptor.StartTime, descriptor.EndTime, codec, _timeProvider);
-        var manager = _stateManagerFactory.Create(new JournalId(descriptor.StorageId.Value));
+        var manager = _stateManagerFactory.Create(descriptor.StorageId);
         try
         {
             manager.RegisterState(JournaledJobShardState.StateName, state);
@@ -403,7 +392,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
     {
         try
         {
-            return await GetDescriptorAsync(JobShardId.Parse(shardId).ToJournalStorageId(), cancellationToken);
+            return await GetDescriptorAsync(JobShardId.Parse(shardId).ToJournalId(), cancellationToken);
         }
         catch (ArgumentException)
         {
@@ -411,10 +400,20 @@ internal sealed class JournaledJobShardManager : JobShardManager
         }
     }
 
-    private async ValueTask<ShardCatalogProperties?> GetDescriptorAsync(JournalStorageId storageId, CancellationToken cancellationToken)
+    private async ValueTask<ShardCatalogProperties?> GetDescriptorAsync(JournalId storageId, CancellationToken cancellationToken)
     {
-        var properties = await _catalog.GetPropertiesAsync(storageId, cancellationToken);
+        var properties = await _storageProvider.CreateStorage(storageId).GetMetadataAsync(cancellationToken);
         return properties is null ? null : ShardCatalogProperties.From(storageId, properties);
+    }
+
+    private async ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+        ShardCatalogProperties descriptor,
+        IReadOnlyDictionary<string, string>? set,
+        IEnumerable<string>? remove,
+        CancellationToken cancellationToken)
+    {
+        var storage = _storageProvider.CreateStorage(descriptor.StorageId);
+        return await storage.UpdateMetadataAsync(set, remove, descriptor.Properties.ETag, cancellationToken);
     }
 
     private Dictionary<string, string> CreateInitialProperties(DateTimeOffset minDueTime, DateTimeOffset maxDueTime, IDictionary<string, string>? metadata)
@@ -458,9 +457,9 @@ internal sealed class JournaledJobShardManager : JobShardManager
     private sealed class ShardCatalogProperties
     {
         private ShardCatalogProperties(
-            JournalStorageId storageId,
+            JournalId storageId,
             JobShardId shardId,
-            JournalStorageProperties properties,
+            IJournalMetadata properties,
             SiloAddress? owner,
             MembershipVersion membershipVersion,
             DateTimeOffset startTime,
@@ -483,11 +482,11 @@ internal sealed class JournaledJobShardManager : JobShardManager
             Metadata = metadata;
         }
 
-        public JournalStorageId StorageId { get; }
+        public JournalId StorageId { get; }
 
         public JobShardId ShardId { get; }
 
-        public JournalStorageProperties Properties { get; }
+        public IJournalMetadata Properties { get; }
 
         public SiloAddress? Owner { get; }
 
@@ -505,11 +504,11 @@ internal sealed class JournaledJobShardManager : JobShardManager
 
         public IReadOnlyDictionary<string, string> Metadata { get; }
 
-        public static ShardCatalogProperties? From(JournalStorageId storageId, JournalStorageProperties properties)
+        public static ShardCatalogProperties? From(JournalId storageId, IJournalMetadata properties)
         {
             try
             {
-                var values = properties.Values;
+                var values = properties.Properties;
                 if (!values.TryGetValue(MinDueTimeProperty, out var minDueTimeValue)
                     || !DateTimeOffset.TryParse(minDueTimeValue, CultureInfo.InvariantCulture, DateTimeStyles.RoundtripKind, out var minDueTime)
                     || !values.TryGetValue(MaxDueTimeProperty, out var maxDueTimeValue)
@@ -549,7 +548,7 @@ internal sealed class JournaledJobShardManager : JobShardManager
                     }
                 }
 
-                var shardId = JobShardId.FromJournalStorageId(storageId);
+                var shardId = JobShardId.FromJournalId(storageId);
                 return new(storageId, shardId, properties, owner, membershipVersion, minDueTime, maxDueTime, adoptedCount, poisoned, closed, metadata);
             }
             catch (Exception exception) when (exception is ArgumentException or FormatException)

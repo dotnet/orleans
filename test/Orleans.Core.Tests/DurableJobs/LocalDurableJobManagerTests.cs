@@ -213,7 +213,7 @@ public class LocalDurableJobManagerTests
         Assert.Equal(job.Id, jobContext.Job.Id);
         await AdvanceUntilCompletedAsync(timeProvider, runTask!, TimeSpan.FromSeconds(1));
         await runTask!.WaitAsync(TimeSpan.FromSeconds(5));
-        Assert.Null(await storageProvider.GetPropertiesAsync(JobShardId.Parse(job.ShardId).ToJournalStorageId()));
+        Assert.Null(await storageProvider.CreateStorage(JobShardId.Parse(job.ShardId).ToJournalId()).GetMetadataAsync());
     }
 
     private static DurableJobsOptions CreateOptions() => new()

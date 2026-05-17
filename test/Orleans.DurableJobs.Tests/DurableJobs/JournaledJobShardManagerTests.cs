@@ -97,11 +97,11 @@ public class JournaledJobShardManagerTests
             CancellationToken.None);
         var storageId = ((JournaledJobShard)shard).StorageId;
 
-        Assert.NotNull(await storageProvider.GetPropertiesAsync(storageId));
+        Assert.NotNull(await storageProvider.CreateStorage(storageId).GetMetadataAsync());
 
         await manager.UnregisterShardAsync(shard, CancellationToken.None);
 
-        Assert.Null(await storageProvider.GetPropertiesAsync(storageId));
+        Assert.Null(await storageProvider.CreateStorage(storageId).GetMetadataAsync());
         Assert.Empty(await ToListAsync(storageProvider.ListAsync(JobShardId.StoragePrefix)));
     }
 
@@ -266,6 +266,7 @@ public class JournaledJobShardManagerTests
         => new(
             new TestLocalSiloDetails(siloAddress),
             services.GetRequiredService<IJournaledStateManagerFactory>(),
+            services.GetRequiredService<IJournalStorageProvider>(),
             services.GetRequiredService<IJournalStorageCatalog>(),
             membership,
             services,

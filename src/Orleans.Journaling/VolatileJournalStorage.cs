@@ -1,6 +1,5 @@
 using System.Buffers;
 using System.Collections.Concurrent;
-using System.Diagnostics.CodeAnalysis;
 using System.Globalization;
 using System.Runtime.CompilerServices;
 using Microsoft.Extensions.Options;
@@ -39,162 +38,38 @@ public sealed class VolatileJournalStorageProvider : IJournalStorageProvider, IJ
         return new VolatileJournalStorage(store, journalFormatKey);
     }
 
-    public IJournalStorage Create(JournalStorageId storageId)
-    {
-        ArgumentNullException.ThrowIfNull(storageId);
-        var journalFormatKey = GetJournalFormatKey();
-        var store = _storage.GetOrAdd(storageId.Value, static key => new VolatileJournalStorage.Store(key));
-        return new VolatileJournalStorage(store, journalFormatKey);
-    }
-
-    public async IAsyncEnumerable<JournalStorageId> ListAsync(
-        JournalStoragePrefix prefix,
+    public async IAsyncEnumerable<JournalId> ListAsync(
+        JournalId prefix = default,
         [EnumeratorCancellation] CancellationToken cancellationToken = default)
     {
-        ArgumentNullException.ThrowIfNull(prefix);
-
-        var storageIds = _storage
-            .Where(pair => pair.Value.Exists && TryParseStorageId(pair.Key, out var storageId) && prefix.Matches(storageId))
-            .Select(pair => JournalStorageId.Parse(pair.Key))
+        var journalIds = _storage
+            .Where(pair => pair.Value.Exists && TryParseJournalId(pair.Key, out var journalId) && prefix.IsPrefixOf(journalId))
+            .Select(static pair => new JournalId(pair.Key))
             .OrderBy(static storageId => storageId.Value, StringComparer.Ordinal)
             .ToArray();
 
-        foreach (var storageId in storageIds)
+        foreach (var journalId in journalIds)
         {
             cancellationToken.ThrowIfCancellationRequested();
-            yield return storageId;
+            yield return journalId;
         }
 
         await Task.CompletedTask.ConfigureAwait(false);
     }
 
-    public ValueTask<JournalStorageCreateResult> CreateIfNotExistsAsync(
-        JournalStorageId storageId,
-        IReadOnlyDictionary<string, string>? properties = null,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(storageId);
-        ValidateCallerProperties(properties);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        var store = _storage.GetOrAdd(storageId.Value, static key => new VolatileJournalStorage.Store(key));
-        lock (store.SyncRoot)
-        {
-            if (store.Exists)
-            {
-                var current = store.GetProperties();
-                var status = InitialPropertiesMatch(current.Values, properties)
-                    ? JournalStorageCreateStatus.AlreadyExists
-                    : JournalStorageCreateStatus.Conflict;
-                return new(new JournalStorageCreateResult(status, current));
-            }
-
-            store.Create(properties);
-            return new(new JournalStorageCreateResult(JournalStorageCreateStatus.Created, store.GetProperties()));
-        }
-    }
-
-    public ValueTask<JournalStorageProperties?> GetPropertiesAsync(JournalStorageId storageId, CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(storageId);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (!_storage.TryGetValue(storageId.Value, out var store))
-        {
-            return new((JournalStorageProperties?)null);
-        }
-
-        lock (store.SyncRoot)
-        {
-            return new(store.Exists ? store.GetProperties() : null);
-        }
-    }
-
-    public ValueTask<JournalStoragePropertiesUpdateResult> UpdatePropertiesAsync(
-        JournalStorageId storageId,
-        JournalStoragePropertiesUpdate update,
-        string? expectedETag,
-        CancellationToken cancellationToken = default)
-    {
-        ArgumentNullException.ThrowIfNull(storageId);
-        ArgumentNullException.ThrowIfNull(update);
-        cancellationToken.ThrowIfCancellationRequested();
-
-        if (!_storage.TryGetValue(storageId.Value, out var store))
-        {
-            return new(new JournalStoragePropertiesUpdateResult(JournalStoragePropertiesUpdateStatus.NotFound, properties: null));
-        }
-
-        lock (store.SyncRoot)
-        {
-            if (!store.Exists)
-            {
-                return new(new JournalStoragePropertiesUpdateResult(JournalStoragePropertiesUpdateStatus.NotFound, properties: null));
-            }
-
-            var current = store.GetProperties();
-            if (expectedETag is not null && !string.Equals(expectedETag, current.ETag, StringComparison.Ordinal))
-            {
-                return new(new JournalStoragePropertiesUpdateResult(JournalStoragePropertiesUpdateStatus.ETagMismatch, current));
-            }
-
-            if (!store.ApplyPropertiesUpdate(update))
-            {
-                return new(new JournalStoragePropertiesUpdateResult(JournalStoragePropertiesUpdateStatus.NoChange, current));
-            }
-
-            return new(new JournalStoragePropertiesUpdateResult(JournalStoragePropertiesUpdateStatus.Updated, store.GetProperties()));
-        }
-    }
-
     private string GetJournalFormatKey()
         => JournalFormatServices.ValidateJournalFormatKey(_options?.Value.JournalFormatKey ?? JsonJournalExtensions.JournalFormatKey);
 
-    private static void ValidateCallerProperties(IReadOnlyDictionary<string, string>? properties)
-    {
-        if (properties is null)
-        {
-            return;
-        }
-
-        foreach (var (key, value) in properties)
-        {
-            JournalStorageProperties.ValidateCallerPropertyName(key);
-            ArgumentNullException.ThrowIfNull(value);
-        }
-    }
-
-    private static bool InitialPropertiesMatch(
-        IReadOnlyDictionary<string, string> current,
-        IReadOnlyDictionary<string, string>? requested)
-    {
-        if (requested is null || requested.Count == 0)
-        {
-            return true;
-        }
-
-        foreach (var (key, value) in requested)
-        {
-            if (!current.TryGetValue(key, out var currentValue)
-                || !string.Equals(currentValue, value, StringComparison.Ordinal))
-            {
-                return false;
-            }
-        }
-
-        return true;
-    }
-
-    private static bool TryParseStorageId(string value, [NotNullWhen(true)] out JournalStorageId? storageId)
+    private static bool TryParseJournalId(string value, out JournalId journalId)
     {
         try
         {
-            storageId = JournalStorageId.Parse(value);
+            journalId = new JournalId(value);
             return true;
         }
         catch (ArgumentException)
         {
-            storageId = null;
+            journalId = default;
             return false;
         }
     }
@@ -217,16 +92,6 @@ public sealed class VolatileJournalStorage : IJournalStorage
     /// </summary>
     /// <param name="journalFormatKey">The journal format key to stamp on writes.</param>
     public VolatileJournalStorage(string? journalFormatKey) : this(new Store(CreateVolatileStorageId()), journalFormatKey)
-    {
-    }
-
-    /// <summary>
-    /// Initializes a new instance of the <see cref="VolatileJournalStorage"/> class.
-    /// </summary>
-    /// <param name="storageId">The journal storage id.</param>
-    /// <param name="journalFormatKey">The journal format key to stamp on writes.</param>
-    public VolatileJournalStorage(JournalStorageId storageId, string? journalFormatKey = null)
-        : this(new Store((storageId ?? throw new ArgumentNullException(nameof(storageId))).Value), journalFormatKey)
     {
     }
 
@@ -274,18 +139,64 @@ public sealed class VolatileJournalStorage : IJournalStorage
         _configuredJournalFormatKey = journalFormatKey;
     }
 
+    public ValueTask<bool> CreateIfNotExistsAsync(
+        IReadOnlyDictionary<string, string>? metadata = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var values = JournalMetadata.CopyProperties(metadata);
+        lock (_store.SyncRoot)
+        {
+            if (_store.Exists)
+            {
+                return new(false);
+            }
+
+            _store.Create(values);
+            return new(true);
+        }
+    }
+
+    public ValueTask<IJournalMetadata?> GetMetadataAsync(CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        lock (_store.SyncRoot)
+        {
+            return new(_store.Exists ? _store.GetMetadata() : null);
+        }
+    }
+
+    public ValueTask<IJournalMetadata?> UpdateMetadataAsync(
+        IReadOnlyDictionary<string, string>? set = null,
+        IEnumerable<string>? remove = null,
+        string? expectedETag = null,
+        CancellationToken cancellationToken = default)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        var setValues = JournalMetadata.CopyProperties(set);
+        var removeValues = CopyRemove(remove, setValues);
+        lock (_store.SyncRoot)
+        {
+            if (!_store.Exists || expectedETag is not null && !string.Equals(expectedETag, _store.ETag, StringComparison.Ordinal))
+            {
+                return new((IJournalMetadata?)null);
+            }
+
+            _store.ApplyMetadataUpdate(setValues, removeValues);
+            return new(_store.GetMetadata());
+        }
+    }
+
     /// <inheritdoc/>
     public ValueTask ReadAsync(IJournalStorageConsumer consumer, CancellationToken cancellationToken)
     {
         ArgumentNullException.ThrowIfNull(consumer);
 
         byte[][] segments;
-        IJournalFileMetadata metadata;
+        IJournalMetadata metadata;
         lock (_store.SyncRoot)
         {
-            metadata = _store.StoredJournalFormatKey is { } storedJournalFormatKey
-                ? new JournalFileMetadata(storedJournalFormatKey)
-                : JournalFileMetadata.Empty;
+            metadata = _store.Exists ? _store.GetMetadata() : JournalMetadata.Empty;
             segments = _store.Segments.ToArray();
         }
 
@@ -389,17 +300,17 @@ public sealed class VolatileJournalStorage : IJournalStorage
             Version++;
         }
 
-        public JournalStorageProperties GetProperties() => new(ETag, Properties);
+        public IJournalMetadata GetMetadata() => new JournalMetadata(StoredJournalFormatKey, ETag, Properties);
 
-        public bool ApplyPropertiesUpdate(JournalStoragePropertiesUpdate update)
+        public bool ApplyMetadataUpdate(IReadOnlyDictionary<string, string> set, IReadOnlySet<string> remove)
         {
             var changed = false;
-            foreach (var propertyName in update.Remove)
+            foreach (var propertyName in remove)
             {
                 changed |= Properties.Remove(propertyName);
             }
 
-            foreach (var (propertyName, value) in update.Set)
+            foreach (var (propertyName, value) in set)
             {
                 if (!Properties.TryGetValue(propertyName, out var currentValue)
                     || !string.Equals(currentValue, value, StringComparison.Ordinal))
@@ -425,5 +336,27 @@ public sealed class VolatileJournalStorage : IJournalStorage
         }
 
         public override string ToString() => storageId;
+    }
+
+    private static IReadOnlySet<string> CopyRemove(IEnumerable<string>? remove, IReadOnlyDictionary<string, string> set)
+    {
+        if (remove is null)
+        {
+            return new HashSet<string>(StringComparer.Ordinal);
+        }
+
+        var result = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var key in remove)
+        {
+            JournalMetadata.ValidateCallerPropertyName(key);
+            if (set.ContainsKey(key))
+            {
+                throw new ArgumentException($"Journal metadata property '{key}' cannot be both set and removed.", nameof(remove));
+            }
+
+            result.Add(key);
+        }
+
+        return result;
     }
 }

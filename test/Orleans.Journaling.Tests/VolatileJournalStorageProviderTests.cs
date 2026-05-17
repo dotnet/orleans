@@ -7,127 +7,118 @@ namespace Orleans.Journaling.Tests;
 public sealed class VolatileJournalStorageProviderTests
 {
     [Fact]
-    public async Task CreateIfNotExists_ListAndGetPropertiesUseNamedStorageIds()
+    public async Task CreateIfNotExists_ListAndGetMetadataUseJournalIds()
     {
         var provider = new VolatileJournalStorageProvider();
-        var idA = JournalStorageId.Create("named", "logs", "a");
-        var idB = JournalStorageId.Create("named", "logs", "b");
-        var idChild = JournalStorageId.Create("named", "logs", "a", "child");
-        var other = JournalStorageId.Create("named", "other", "a");
+        var idA = JournalId.Create("named", "logs", "a");
+        var idB = JournalId.Create("named", "logs", "b");
+        var idChild = JournalId.Create("named", "logs", "a", "child");
+        var other = JournalId.Create("named", "other", "a");
 
-        var created = await provider.CreateIfNotExistsAsync(idA, new Dictionary<string, string> { ["owner"] = "one" });
-        await provider.CreateIfNotExistsAsync(idB);
-        await provider.CreateIfNotExistsAsync(idChild);
-        await provider.CreateIfNotExistsAsync(other);
+        var storageA = provider.CreateStorage(idA);
+        var created = await storageA.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "one" });
+        await provider.CreateStorage(idB).CreateIfNotExistsAsync();
+        await provider.CreateStorage(idChild).CreateIfNotExistsAsync();
+        await provider.CreateStorage(other).CreateIfNotExistsAsync();
 
-        Assert.Equal(JournalStorageCreateStatus.Created, created.Status);
-        Assert.NotNull(created.Properties);
-        Assert.NotNull(created.Properties.ETag);
-        Assert.Equal("one", created.Properties.Values["owner"]);
+        Assert.True(created);
+        var metadata = await storageA.GetMetadataAsync();
+        Assert.NotNull(metadata);
+        Assert.NotNull(metadata.ETag);
+        Assert.Equal("one", metadata.Properties["owner"]);
 
-        var alreadyExists = await provider.CreateIfNotExistsAsync(idA, new Dictionary<string, string> { ["owner"] = "one" });
-        Assert.Equal(JournalStorageCreateStatus.AlreadyExists, alreadyExists.Status);
-        Assert.Equal("one", alreadyExists.Properties!.Values["owner"]);
+        var alreadyExists = await storageA.CreateIfNotExistsAsync(new Dictionary<string, string> { ["owner"] = "two" });
+        Assert.False(alreadyExists);
+        Assert.Equal("one", (await storageA.GetMetadataAsync())!.Properties["owner"]);
 
-        var conflict = await provider.CreateIfNotExistsAsync(idA, new Dictionary<string, string> { ["owner"] = "two" });
-        Assert.Equal(JournalStorageCreateStatus.Conflict, conflict.Status);
-        Assert.Equal("one", conflict.Properties!.Values["owner"]);
-
-        var listed = await ToListAsync(provider.ListAsync(JournalStoragePrefix.Create("named", "logs")));
+        var listed = await ToListAsync(provider.ListAsync(JournalId.Create("named", "logs")));
         Assert.Equal([idA, idChild, idB], listed);
 
-        Assert.NotNull(await provider.GetPropertiesAsync(idB));
-        Assert.Null(await provider.GetPropertiesAsync(JournalStorageId.Create("named", "missing")));
+        Assert.NotNull(await provider.CreateStorage(idB).GetMetadataAsync());
+        Assert.Null(await provider.CreateStorage(JournalId.Create("named", "missing")).GetMetadataAsync());
     }
 
     [Fact]
-    public async Task UpdateProperties_UsesETagCasAndReportsNoChange()
+    public async Task UpdateMetadata_UsesETagCasAndReportsNoChange()
     {
         var provider = new VolatileJournalStorageProvider();
-        var storageId = JournalStorageId.Create("named", "properties", "cas");
-        var created = await provider.CreateIfNotExistsAsync(
-            storageId,
-            new Dictionary<string, string>
-            {
-                ["keep"] = "1",
-                ["remove"] = "2"
-            });
-        var original = created.Properties!;
+        var storage = provider.CreateStorage(JournalId.Create("named", "properties", "cas"));
+        Assert.True(await storage.CreateIfNotExistsAsync(new Dictionary<string, string>
+        {
+            ["keep"] = "1",
+            ["remove"] = "2"
+        }));
+        var original = (await storage.GetMetadataAsync())!;
 
-        var updated = await provider.UpdatePropertiesAsync(
-            storageId,
-            new JournalStoragePropertiesUpdate(
-                new Dictionary<string, string> { ["keep"] = "3", ["add"] = "4" },
-                ["remove"]),
+        var updated = await storage.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["keep"] = "3", ["add"] = "4" },
+            ["remove"],
             original.ETag);
 
-        Assert.Equal(JournalStoragePropertiesUpdateStatus.Updated, updated.Status);
-        Assert.NotEqual(original.ETag, updated.Properties!.ETag);
-        Assert.Equal("3", updated.Properties.Values["keep"]);
-        Assert.Equal("4", updated.Properties.Values["add"]);
-        Assert.False(updated.Properties.Values.ContainsKey("remove"));
+        Assert.NotNull(updated);
+        Assert.NotEqual(original.ETag, updated.ETag);
+        Assert.Equal("3", updated.Properties["keep"]);
+        Assert.Equal("4", updated.Properties["add"]);
+        Assert.False(updated.Properties.ContainsKey("remove"));
 
-        var stale = await provider.UpdatePropertiesAsync(
-            storageId,
-            JournalStoragePropertiesUpdate.SetProperty("keep", "5"),
+        var stale = await storage.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["keep"] = "5" },
+            remove: null,
             original.ETag);
-        Assert.Equal(JournalStoragePropertiesUpdateStatus.ETagMismatch, stale.Status);
-        Assert.Equal(updated.Properties.ETag, stale.Properties!.ETag);
-        Assert.Equal("3", stale.Properties.Values["keep"]);
+        Assert.Null(stale);
+        Assert.Equal("3", (await storage.GetMetadataAsync())!.Properties["keep"]);
 
-        var noChange = await provider.UpdatePropertiesAsync(
-            storageId,
-            JournalStoragePropertiesUpdate.SetProperty("keep", "3"),
-            updated.Properties.ETag);
-        Assert.Equal(JournalStoragePropertiesUpdateStatus.NoChange, noChange.Status);
-        Assert.Equal(updated.Properties.ETag, noChange.Properties!.ETag);
+        var noChange = await storage.UpdateMetadataAsync(
+            new Dictionary<string, string> { ["keep"] = "3" },
+            remove: null,
+            updated.ETag);
+        Assert.NotNull(noChange);
+        Assert.Equal(updated.ETag, noChange.ETag);
     }
 
     [Fact]
-    public async Task StorageOperationsUpdateCatalogPropertiesAndDeleteRemovesStorage()
+    public async Task StorageOperationsUpdateMetadataAndDeleteRemovesStorage()
     {
         var provider = new VolatileJournalStorageProvider();
-        var storageId = JournalStorageId.Create("named", "conditional", "storage");
-        var storage = provider.Create(storageId);
+        var storageId = JournalId.Create("named", "conditional", "storage");
+        var storage = provider.CreateStorage(storageId);
 
-        Assert.Null(await provider.GetPropertiesAsync(storageId));
+        Assert.Null(await storage.GetMetadataAsync());
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([1]), CancellationToken.None);
-        var appendProperties = await provider.GetPropertiesAsync(storageId);
+        var appendProperties = await storage.GetMetadataAsync();
         Assert.NotNull(appendProperties);
         Assert.NotNull(appendProperties.ETag);
 
         await storage.ReplaceAsync(new ReadOnlySequence<byte>([2]), CancellationToken.None);
-        var replaceProperties = await provider.GetPropertiesAsync(storageId);
+        var replaceProperties = await storage.GetMetadataAsync();
         Assert.NotNull(replaceProperties);
         Assert.NotEqual(appendProperties.ETag, replaceProperties.ETag);
 
         await storage.AppendAsync(new ReadOnlySequence<byte>([3]), CancellationToken.None);
-        var finalProperties = await provider.GetPropertiesAsync(storageId);
+        var finalProperties = await storage.GetMetadataAsync();
         Assert.NotNull(finalProperties);
         Assert.NotEqual(replaceProperties.ETag, finalProperties.ETag);
 
-        Assert.Equal([storageId], await ToListAsync(provider.ListAsync(storageId.AsPrefix())));
+        Assert.Equal([storageId], await ToListAsync(provider.ListAsync(storageId)));
 
         await storage.DeleteAsync(CancellationToken.None);
 
-        Assert.Null(await provider.GetPropertiesAsync(storageId));
-        Assert.Empty(await ToListAsync(provider.ListAsync(storageId.AsPrefix())));
+        Assert.Null(await storage.GetMetadataAsync());
+        Assert.Empty(await ToListAsync(provider.ListAsync(storageId)));
     }
 
     [Fact]
     public async Task CallerCannotSetProviderOwnedProperties()
     {
         var provider = new VolatileJournalStorageProvider();
-        var storageId = JournalStorageId.Create("named", "reserved", "properties");
+        var storage = provider.CreateStorage(JournalId.Create("named", "reserved", "properties"));
 
         await Assert.ThrowsAsync<ArgumentException>(
-            () => provider.CreateIfNotExistsAsync(
-                storageId,
-                new Dictionary<string, string> { [JournalStoragePropertyNames.ProviderReservedPrefix + "owner"] = "provider" }).AsTask());
+            () => storage.CreateIfNotExistsAsync(new Dictionary<string, string> { ["$owner"] = "provider" }).AsTask());
 
-        Assert.Throws<ArgumentException>(
-            () => JournalStoragePropertiesUpdate.SetProperty(JournalStoragePropertyNames.ProviderReservedPrefix + "owner", "provider"));
+        await Assert.ThrowsAsync<ArgumentException>(
+            () => storage.UpdateMetadataAsync(new Dictionary<string, string> { ["$owner"] = "provider" }).AsTask());
     }
 
     private static async Task<List<T>> ToListAsync<T>(IAsyncEnumerable<T> source)
