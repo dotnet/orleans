@@ -153,6 +153,35 @@ namespace Orleans.BroadcastChannel
     }
 }
 
+namespace Orleans.BroadcastChannel.Diagnostics
+{
+    public static partial class BroadcastChannelEvents
+    {
+        public const string ListenerName = "Orleans.BroadcastChannel";
+        public static System.IObservable<BroadcastChannelEvent> AllEvents { get { throw null; } }
+
+        public abstract partial class BroadcastChannelEvent
+        {
+            public readonly string ProviderName;
+            protected BroadcastChannelEvent(string providerName) { }
+        }
+
+        public sealed partial class ItemDelivered : BroadcastChannelEvent
+        {
+            public readonly ChannelId ChannelId;
+            public readonly Runtime.GrainId ConsumerGrainId;
+            public ItemDelivered(string providerName, ChannelId channelId, Runtime.GrainId consumerGrainId) : base(default!) { }
+        }
+
+        public sealed partial class ItemPublished : BroadcastChannelEvent
+        {
+            public readonly ChannelId ChannelId;
+            public readonly int SubscriberCount;
+            public ItemPublished(string providerName, ChannelId channelId, int subscriberCount) : base(default!) { }
+        }
+    }
+}
+
 namespace Orleans.Hosting
 {
     public static partial class ChannelHostingExtensions

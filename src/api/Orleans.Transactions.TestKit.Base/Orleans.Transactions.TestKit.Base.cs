@@ -74,6 +74,39 @@ namespace Orleans.Transactions.TestKit
         public DoubleStateTransactionalGrain(Abstractions.ITransactionalState<GrainData> data1, Abstractions.ITransactionalState<GrainData> data2, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) : base(default!, default!) { }
     }
 
+    [Concurrency.StatelessWorker]
+    [Concurrency.Reentrant]
+    public partial class ExclusiveLockCoordinatorGrain : Grain, IExclusiveLockCoordinatorGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
+    {
+        public System.Threading.Tasks.Task ReadThenWrite(ITransactionTestGrain grain, int value) { throw null; }
+
+        public System.Threading.Tasks.Task ReadThenWriteWithExclusiveLock(IExclusiveLockTransactionTestGrain grain, int value) { throw null; }
+    }
+
+    [Concurrency.Reentrant]
+    public partial class ExclusiveLockTransactionTestGrain : Grain, IExclusiveLockTransactionTestGrain, IGrainWithGuidKey, IGrain, Runtime.IAddressable
+    {
+        protected Microsoft.Extensions.Logging.ILogger logger;
+        public ExclusiveLockTransactionTestGrain(Abstractions.ITransactionalState<GrainData> data, Microsoft.Extensions.Logging.ILoggerFactory loggerFactory) { }
+
+        public System.Threading.Tasks.Task<int[]> Add(int numberToAdd) { throw null; }
+
+        public System.Threading.Tasks.Task<int[]> Get() { throw null; }
+
+        public override System.Threading.Tasks.Task OnActivateAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task Set(int newValue) { throw null; }
+    }
+
+    public abstract partial class ExclusiveLockTransactionTestRunner : TransactionTestRunnerBase
+    {
+        protected ExclusiveLockTransactionTestRunner(IGrainFactory grainFactory, System.Action<string> output) : base(default!, default!) { }
+
+        public virtual System.Threading.Tasks.Task ConcurrentReadThenWriteWithExclusiveLock_NoLockException(string grainStates) { throw null; }
+
+        public virtual System.Threading.Tasks.Task ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(string grainStates) { throw null; }
+    }
+
     [GenerateSerializer]
     public partial class FailOperation : Abstractions.ITransactionCommitOperation<IRemoteCommitService>
     {
@@ -214,6 +247,25 @@ namespace Orleans.Transactions.TestKit
     {
         [Transaction(TransactionOption.CreateOrJoin)]
         System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> GetNestedTransactionIds(int tier, System.Collections.Generic.List<ITransactionAttributionGrain>[] tiers);
+    }
+
+    public partial interface IExclusiveLockCoordinatorGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
+    {
+        [Transaction(TransactionOption.Create)]
+        System.Threading.Tasks.Task ReadThenWrite(ITransactionTestGrain grain, int value);
+        [Transaction(TransactionOption.Create)]
+        System.Threading.Tasks.Task ReadThenWriteWithExclusiveLock(IExclusiveLockTransactionTestGrain grain, int value);
+    }
+
+    public partial interface IExclusiveLockTransactionTestGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
+    {
+        [Transaction(TransactionOption.CreateOrJoin)]
+        System.Threading.Tasks.Task<int[]> Add(int numberToAdd);
+        [UseExclusiveLock]
+        [Transaction(TransactionOption.CreateOrJoin)]
+        System.Threading.Tasks.Task<int[]> Get();
+        [Transaction(TransactionOption.CreateOrJoin)]
+        System.Threading.Tasks.Task Set(int newValue);
     }
 
     public partial interface IFaultInjectionTransactionalStateConfiguration : Abstractions.ITransactionalStateConfiguration
@@ -757,6 +809,7 @@ namespace Orleans.Transactions.TestKit
     public static partial class TransactionTestConstants
     {
         public const string DoubleStateTransactionalGrain = "DoubleStateTransactionalGrain";
+        public const string ExclusiveLockTransactionTestGrain = "ExclusiveLockTransactionTestGrain";
         public const int MaxCoordinatedTransactions = 8;
         public const string MaxStateTransactionalGrain = "MaxStateTransactionalGrain";
         public const string NoStateTransactionalGrain = "NoStateTransactionalGrain";
@@ -1073,6 +1126,96 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
 
         public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_ICreateOrJoinAttributionGrain_GrainReference_C9B8ECB8 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 instance) { }
+
+        public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF instance) { }
+
+        public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 instance) { }
+
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 instance) { }
+
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 value)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Codec_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0>, global::Orleans.Serialization.Codecs.IFieldCodec
+    {
+        public Codec_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0> _activator) { }
+
+        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 instance) { }
+
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
+
+        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 instance)
+            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
+
+        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 value)
             where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
     }
 
@@ -1722,6 +1865,56 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3> _activator) { }
+
+        public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 DeepCopy(Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF> _activator) { }
+
+        public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF DeepCopy(Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3> _activator) { }
+
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 DeepCopy(Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8> _activator) { }
+
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 DeepCopy(Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    public sealed partial class Copier_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0>, global::Orleans.Serialization.Cloning.IDeepCopier
+    {
+        public Copier_Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0> _activator) { }
+
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 DeepCopy(Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_Invokable_IFaultInjectionTransactionCoordinatorGrain_GrainReference_70FF7C60 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_IFaultInjectionTransactionCoordinatorGrain_GrainReference_70FF7C60>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_Invokable_IFaultInjectionTransactionCoordinatorGrain_GrainReference_70FF7C60(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider, global::Orleans.Serialization.Activators.IActivator<Invokable_IFaultInjectionTransactionCoordinatorGrain_GrainReference_70FF7C60> _activator) { }
@@ -2101,6 +2294,171 @@ namespace OrleansCodeGen.Orleans.Transactions.TestKit
         public override object GetTarget() { throw null; }
 
         protected override System.Threading.Tasks.Task<System.Collections.Generic.List<string>[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Transactions.TestKit.IExclusiveLockCoordinatorGrain), "148E55F3" })]
+    public sealed partial class Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3 : global::Orleans.TransactionTaskRequest
+    {
+        public global::Orleans.Transactions.TestKit.ITransactionTestGrain arg0;
+        public int arg1;
+        public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_148E55F3(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Transactions.TestKit.IExclusiveLockCoordinatorGrain), "F880C5FF" })]
+    public sealed partial class Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF : global::Orleans.TransactionTaskRequest
+    {
+        public global::Orleans.Transactions.TestKit.IExclusiveLockTransactionTestGrain arg0;
+        public int arg1;
+        public Invokable_IExclusiveLockCoordinatorGrain_GrainReference_F880C5FF(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Transactions.TestKit.IExclusiveLockTransactionTestGrain), "16E53FE3" })]
+    public sealed partial class Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3 : global::Orleans.TransactionTaskRequest<int[]>
+    {
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_16E53FE3(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<int[]> InvokeInner() { throw null; }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Transactions.TestKit.IExclusiveLockTransactionTestGrain), "81B05CD8" })]
+    public sealed partial class Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8 : global::Orleans.TransactionTaskRequest<int[]>
+    {
+        public int arg0;
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_81B05CD8(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task<int[]> InvokeInner() { throw null; }
+
+        public override void SetArgument(int index, object value) { }
+
+        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
+    }
+
+    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
+    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
+    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
+    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.Transactions.TestKit.IExclusiveLockTransactionTestGrain), "BD3AA4D0" })]
+    public sealed partial class Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0 : global::Orleans.TransactionTaskRequest
+    {
+        public int arg0;
+        public Invokable_IExclusiveLockTransactionTestGrain_GrainReference_BD3AA4D0(global::Orleans.Serialization.Serializer<global::Orleans.Transactions.OrleansTransactionAbortedException> base0, System.IServiceProvider base1) : base(default(Serialization.Serializer<Transactions.OrleansTransactionAbortedException>)!, default!) { }
+
+        public override void Dispose() { }
+
+        public override string GetActivityName() { throw null; }
+
+        public override object GetArgument(int index) { throw null; }
+
+        public override int GetArgumentCount() { throw null; }
+
+        public override string GetInterfaceName() { throw null; }
+
+        public override System.Type GetInterfaceType() { throw null; }
+
+        public override System.Reflection.MethodInfo GetMethod() { throw null; }
+
+        public override string GetMethodName() { throw null; }
+
+        public override object GetTarget() { throw null; }
+
+        protected override System.Threading.Tasks.Task InvokeInner() { throw null; }
 
         public override void SetArgument(int index, object value) { }
 
