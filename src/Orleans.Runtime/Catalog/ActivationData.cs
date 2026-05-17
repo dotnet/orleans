@@ -47,7 +47,7 @@ internal sealed partial class ActivationData :
     private readonly WorkItemGroup _workItemGroup;
     private readonly List<(Message Message, CoarseStopwatch QueuedTime)> _waitingRequests = new();
     private readonly Dictionary<Message, CoarseStopwatch> _runningRequests = new();
-    private readonly SingleWaiterAutoResetEvent _workSignal = new() { RunContinuationsAsynchronously = true };
+    private readonly ActivationAutoResetEvent _workSignal;
     private GrainLifecycle? _lifecycle;
     private Queue<object>? _pendingOperations;
     private Message? _blockingRequest;
@@ -101,6 +101,7 @@ internal sealed partial class ActivationData :
         Debug.Assert(_serviceScope != null, "_serviceScope must not be null.");
         _workItemGroup = createWorkItemGroup(this);
         Debug.Assert(_workItemGroup != null, "_workItemGroup must not be null.");
+        _workSignal = new(_workItemGroup);
     }
 
     internal void SetActivationActivity(Activity activity)
