@@ -272,7 +272,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IGrainContextAccessor, GrainContextAccessor>();
             services.AddSingleton<IncomingRequestMonitor>();
             services.AddFromExisting<ILifecycleParticipant<ISiloLifecycle>, IncomingRequestMonitor>();
-            services.AddFromExisting<IActivationWorkingSetObserver, IncomingRequestMonitor>();
             services.AddSingleton<ILocalActivationStatusChecker, Runtime.LocalActivationStatusChecker>();
 
             // Scoped to a grain activation
