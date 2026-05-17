@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
 using Orleans.Streams;
@@ -48,8 +49,9 @@ namespace Orleans.Streaming.EventHubs
         private readonly ILogger logger;
 
         private EventHubPartitionCheckpointEntity entity;
-        private Task inProgressSave;
+        private Task inProgressSave = Task.CompletedTask;
         private DateTime? throttleSavesUntilUtc;
+        private string latestOffset;
 
         /// <summary>
         /// Indicates if a checkpoint exists
@@ -112,32 +114,78 @@ namespace Orleans.Streaming.EventHubs
                 entity = results.Entity;
             }
 
+            latestOffset = entity.Offset;
             return entity.Offset;
         }
 
         /// <summary>
         /// Updates the checkpoint.  This is a best effort.  It does not always update the checkpoint.
+        /// The latest offset is always tracked in memory so that <see cref="FlushAsync"/> can persist it on shutdown.
         /// </summary>
         /// <param name="offset"></param>
         /// <param name="utcNow"></param>
         public void Update(string offset, DateTime utcNow)
         {
             // if offset has not changed, do nothing
-            if (string.Compare(entity.Offset, offset, StringComparison.Ordinal) == 0)
+            if (string.Compare(latestOffset, offset, StringComparison.Ordinal) == 0)
             {
                 return;
             }
 
-            // if we've saved before but it's not time for another save or the last save operation has not completed, do nothing
-            if (throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
+            var mustSaveNow = IsBefore(offset, entity.Offset);
+
+            // Always track the latest offset in memory so FlushAsync can persist it.
+            latestOffset = offset;
+
+            // If we've saved before but it's not time for another save or the last save operation has not completed,
+            // do nothing unless this update lowers the checkpoint to protect a slower subscription.
+            if (!mustSaveNow && throttleSavesUntilUtc.HasValue && (throttleSavesUntilUtc.Value > utcNow || !inProgressSave.IsCompleted))
             {
                 return;
             }
 
-            entity.Offset = offset;
             throttleSavesUntilUtc = utcNow + persistInterval;
-            inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+            if (inProgressSave.IsCompleted)
+            {
+                entity.Offset = latestOffset;
+                inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+            }
+            else
+            {
+                var previousSave = inProgressSave;
+                inProgressSave = SaveLatestAfter(previousSave);
+            }
+
             inProgressSave.Ignore();
+        }
+
+        private async Task SaveLatestAfter(Task previousSave)
+        {
+            await previousSave;
+            entity.Offset = latestOffset;
+            await dataManager.UpsertTableEntryAsync(entity);
+        }
+
+        /// <summary>
+        /// Flushes any pending checkpoint to persistent storage.
+        /// Awaits any in-progress save, then persists the latest offset if it has advanced beyond the last saved value.
+        /// </summary>
+        public async Task FlushAsync()
+        {
+            await inProgressSave;
+            if (string.Compare(entity.Offset, latestOffset, StringComparison.Ordinal) != 0)
+            {
+                entity.Offset = latestOffset;
+                inProgressSave = dataManager.UpsertTableEntryAsync(entity);
+                await inProgressSave;
+            }
+        }
+
+        private static bool IsBefore(string offset, string currentOffset)
+        {
+            return long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset)
+                && long.TryParse(currentOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedCurrentOffset)
+                && parsedOffset < parsedCurrentOffset;
         }
 
         [LoggerMessage(

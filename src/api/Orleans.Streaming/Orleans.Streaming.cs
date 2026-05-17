@@ -1365,6 +1365,11 @@ namespace Orleans.Streams
         void AddToCache(System.Collections.Generic.IList<IBatchContainer> messages);
         IQueueCacheCursor GetCacheCursor(Runtime.StreamId streamId, StreamSequenceToken token);
         bool IsUnderPressure();
+        void NotifyBatchProcessed(Runtime.StreamId streamId, Runtime.GuidId subscriptionId, StreamSequenceToken token) { }
+        void NotifyStreamRegistrationCompleted(Runtime.StreamId streamId) { }
+        void NotifyStreamRegistrationStarted(Runtime.StreamId streamId) { }
+        void NotifySubscriptionAdded(Runtime.StreamId streamId, Runtime.GuidId subscriptionId, StreamSequenceToken token) { }
+        void NotifySubscriptionRemoved(Runtime.StreamId streamId, Runtime.GuidId subscriptionId) { }
         bool TryPurgeFromCache(out System.Collections.Generic.IList<IBatchContainer> purgedItems);
     }
 
@@ -1470,6 +1475,7 @@ namespace Orleans.Streams
 
         System.Threading.Tasks.Task<TCheckpoint> Load();
         void Update(TCheckpoint offset, System.DateTime utcNow);
+        System.Threading.Tasks.Task FlushAsync() { return System.Threading.Tasks.Task.CompletedTask; }
     }
 
     public partial interface IStreamQueueMapper

@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
@@ -55,6 +56,14 @@ namespace Orleans.Streaming.EventHubs
 
         private IStreamQueueCheckpointer<string> checkpointer;
         private AggregatedQueueFlowController flowController;
+
+        // Per-subscription progress tracking for low-watermark checkpointing.
+        // Tracks the max processed EventHub offset per (stream, subscription) so a fast
+        // subscription cannot advance the checkpoint past a slower active subscription.
+        private readonly object deliveryTrackingLock = new();
+        private readonly Dictionary<(StreamId StreamId, GuidId SubscriptionId), long?> processedOffsets = new();
+        private readonly HashSet<StreamId> pendingRegistrations = new();
+        private long? cachePurgeOffset;
 
         // Receiver life cycle
         private int receiverState = ReceiverShutdown;
@@ -113,7 +122,7 @@ namespace Orleans.Streaming.EventHubs
                     this.cache.Dispose();
                     this.cache = null;
                 }
-                this.cache = this.cacheFactory(this.settings.Partition, this.checkpointer, this.loggerFactory);
+                this.cache = this.cacheFactory(this.settings.Partition, new CachePurgeCheckpointer(this), this.loggerFactory);
                 this.flowController = new AggregatedQueueFlowController(MaxMessagesPerRead) { this.cache, LoadShedQueueFlowController.CreateAsPercentOfLoadSheddingLimit(this.loadSheddingOptions, environmentStatisticsProvider) };
                 string offset = await this.checkpointer.Load();
                 this.receiver = this.eventHubReceiverFactory(this.settings, offset, this.logger);
@@ -184,12 +193,6 @@ namespace Orleans.Streaming.EventHubs
             {
                 batches.Add(new StreamActivityNotificationBatch(streamPosition));
             }
-            if (!this.checkpointer.CheckpointExists)
-            {
-                this.checkpointer.Update(
-                    messages[0].OffsetString,
-                    DateTime.UtcNow);
-            }
             return batches;
         }
 
@@ -206,6 +209,7 @@ namespace Orleans.Streaming.EventHubs
             //if under pressure, which means consuming speed is less than producing speed, then shouldn't purge, and don't read more message into the cache
             if (!this.IsUnderPressure())
                 this.cache.SignalPurge();
+
             return false;
         }
 
@@ -224,6 +228,148 @@ namespace Orleans.Streaming.EventHubs
             return Task.CompletedTask;
         }
 
+        public void NotifyStreamRegistrationStarted(StreamId streamId)
+        {
+            lock (deliveryTrackingLock)
+            {
+                pendingRegistrations.Add(streamId);
+            }
+        }
+
+        public void NotifyStreamRegistrationCompleted(StreamId streamId)
+        {
+            string checkpointOffset;
+            lock (deliveryTrackingLock)
+            {
+                pendingRegistrations.Remove(streamId);
+                checkpointOffset = GetCheckpointOffset();
+            }
+
+            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
+        }
+
+        public void NotifySubscriptionAdded(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token)
+        {
+            var hasStartOffset = TryGetOffset(token, out var startOffset);
+            string checkpointOffset;
+            var key = (streamId, subscriptionId);
+            lock (deliveryTrackingLock)
+            {
+                if (!processedOffsets.TryGetValue(key, out var offset)
+                    || (hasStartOffset && (!offset.HasValue || startOffset < offset.Value)))
+                {
+                    processedOffsets[key] = hasStartOffset ? startOffset : null;
+                }
+
+                checkpointOffset = GetCheckpointOffset();
+            }
+
+            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
+        }
+
+        public void NotifySubscriptionRemoved(StreamId streamId, GuidId subscriptionId)
+        {
+            string checkpointOffset;
+            lock (deliveryTrackingLock)
+            {
+                processedOffsets.Remove((streamId, subscriptionId));
+                checkpointOffset = GetCheckpointOffset();
+            }
+
+            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
+        }
+
+        public void NotifyBatchProcessed(StreamId streamId, GuidId subscriptionId, StreamSequenceToken token)
+        {
+            if (!TryGetOffset(token, out var offset))
+            {
+                return;
+            }
+
+            string checkpointOffset;
+            var key = (streamId, subscriptionId);
+            lock (deliveryTrackingLock)
+            {
+                if (!processedOffsets.TryGetValue(key, out var currentOffset)
+                    || !currentOffset.HasValue
+                    || offset > currentOffset.Value)
+                {
+                    processedOffsets[key] = offset;
+                }
+
+                checkpointOffset = GetCheckpointOffset();
+            }
+
+            UpdateCheckpoint(checkpointOffset, DateTime.UtcNow);
+        }
+
+        private void NotifyCachePurged(string offset, DateTime utcNow)
+        {
+            if (!long.TryParse(offset, NumberStyles.Integer, CultureInfo.InvariantCulture, out var parsedOffset))
+            {
+                return;
+            }
+
+            string checkpointOffset;
+            lock (deliveryTrackingLock)
+            {
+                if (!cachePurgeOffset.HasValue || parsedOffset > cachePurgeOffset.Value)
+                {
+                    cachePurgeOffset = parsedOffset;
+                }
+
+                checkpointOffset = GetCheckpointOffset();
+            }
+
+            UpdateCheckpoint(checkpointOffset, utcNow);
+        }
+
+        private string GetCheckpointOffset()
+        {
+            if (pendingRegistrations.Count > 0)
+            {
+                return null;
+            }
+
+            if (processedOffsets.Count == 0)
+            {
+                return cachePurgeOffset?.ToString(CultureInfo.InvariantCulture);
+            }
+
+            long watermark = long.MaxValue;
+            foreach (var offset in processedOffsets.Values)
+            {
+                if (!offset.HasValue)
+                {
+                    return null;
+                }
+
+                watermark = Math.Min(watermark, offset.Value);
+            }
+
+            return watermark == long.MaxValue ? null : watermark.ToString(CultureInfo.InvariantCulture);
+        }
+
+        private void UpdateCheckpoint(string offset, DateTime utcNow)
+        {
+            if (offset is not null)
+            {
+                this.checkpointer?.Update(offset, utcNow);
+            }
+        }
+
+        private static bool TryGetOffset(StreamSequenceToken token, out long offset)
+        {
+            if (token is IEventHubPartitionLocation location
+                && long.TryParse(location.EventHubOffset, NumberStyles.Integer, CultureInfo.InvariantCulture, out offset))
+            {
+                return true;
+            }
+
+            offset = 0;
+            return false;
+        }
+
         public async Task Shutdown(TimeSpan timeout)
         {
             var watch = Stopwatch.StartNew();
@@ -236,6 +382,13 @@ namespace Orleans.Streaming.EventHubs
                 }
 
                 LogInfoStoppingReadingFromEventHubPartition(this.settings.Hub.EventHubName, this.settings.Partition);
+
+                // Flush the checkpoint before disposing the cache or closing the receiver,
+                // so the latest processed offset is persisted and not replayed on restart.
+                if (this.checkpointer != null)
+                {
+                    await this.checkpointer.FlushAsync();
+                }
 
                 // clear cache and receiver
                 IEventHubQueueCache localCache = Interlocked.Exchange(ref this.cache, null);
@@ -267,6 +420,26 @@ namespace Orleans.Streaming.EventHubs
         private static IEventHubReceiver CreateReceiver(EventHubPartitionSettings partitionSettings, string offset, ILogger logger)
         {
             return new EventHubReceiverProxy(partitionSettings, offset, logger);
+        }
+
+        private sealed class CachePurgeCheckpointer(EventHubAdapterReceiver receiver) : IStreamQueueCheckpointer<string>
+        {
+            public bool CheckpointExists => receiver.checkpointer?.CheckpointExists ?? false;
+
+            public Task<string> Load()
+            {
+                return receiver.checkpointer?.Load() ?? Task.FromResult(EventHubConstants.StartOfStream);
+            }
+
+            public void Update(string offset, DateTime utcNow)
+            {
+                receiver.NotifyCachePurged(offset, utcNow);
+            }
+
+            public Task FlushAsync()
+            {
+                return receiver.checkpointer?.FlushAsync() ?? Task.CompletedTask;
+            }
         }
 
         /// <summary>
