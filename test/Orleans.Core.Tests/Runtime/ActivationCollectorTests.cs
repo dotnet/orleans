@@ -105,6 +105,7 @@ namespace UnitTests.Runtime
         [InlineData(80.0, 70.0, 1000, 100, 200, true, 155)] // More activations, smaller per-activation size
         [InlineData(80.0, 70.0, 1000, 800, 100, false, 0)] // Well below threshold
         [InlineData(80.0, 70.0, 1000, 50,  10,  true, 7)] // Few activations, large per-activation size
+        [InlineData(80.0, 70.0, 1000, 100, 0, false, 0)] // No activations
         public void IsMemoryOverloaded_WorksAsExpected(
             double memoryLoadThreshold,
             double targetMemoryLoad,
@@ -155,6 +156,10 @@ namespace UnitTests.Runtime
             if (overloaded)
             {
                 Assert.Equal(expectedActivationsTarget, activationCount - surplusActivations);
+            }
+            else
+            {
+                Assert.Equal(0, surplusActivations);
             }
         }
 
@@ -302,6 +307,51 @@ namespace UnitTests.Runtime
 
             // Verify no exceptions occurred during deactivation
             Assert.Empty(exceptions);
+        }
+
+        [Fact]
+        public async Task DeactivateInDueTimeOrder_SkipsActiveAndInvalidActivations()
+        {
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
+
+            var logger = NullLogger<ActivationCollector>.Instance;
+            var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
+            var timer = Substitute.For<IAsyncTimer>();
+            timer.NextTick().Returns(Task.FromResult(false));
+            var timerFactory = Substitute.For<IAsyncTimerFactory>();
+            timerFactory.Create(Arg.Any<TimeSpan>(), Arg.Any<string>()).Returns(timer);
+
+            var wsLogger = NullLogger<ActivationWorkingSet>.Instance;
+            var workingSet = new ActivationWorkingSet(timerFactory, wsLogger, new[] { collector });
+
+            var inactiveActivation1 = PrepareActivation(1, collector);
+            var activeActivation = PrepareActivation(1, collector);
+            var invalidActivation = PrepareActivation(1, collector);
+            var inactiveActivation2 = PrepareActivation(1, collector);
+
+            inactiveActivation1.IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+            activeActivation.IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+            invalidActivation.IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+            inactiveActivation2.IsCandidateForRemoval(Arg.Any<bool>()).Returns(true);
+
+            workingSet.OnActivated(inactiveActivation1);
+            workingSet.OnActivated(activeActivation);
+            workingSet.OnActivated(invalidActivation);
+            workingSet.OnActivated(inactiveActivation2);
+
+            ((ICollectibleGrainContext)activeActivation).IsInactive.Returns(false);
+            ((ICollectibleGrainContext)invalidActivation).IsValid.Returns(false);
+
+            await collector.DeactivateInDueTimeOrder(4, CancellationToken.None);
+
+            ((ICollectibleGrainContext)inactiveActivation1).Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            ((ICollectibleGrainContext)inactiveActivation2).Received(1).Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            ((ICollectibleGrainContext)activeActivation).DidNotReceive().Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            ((ICollectibleGrainContext)invalidActivation).DidNotReceive().Deactivate(Arg.Any<DeactivationReason>(), Arg.Any<CancellationToken>());
+            Assert.Equal(2, collector._activationCount);
         }
 
         private IActivationWorkingSetMember PrepareActivation(int collectionAgeLimitMinutes, ActivationCollector collector)
