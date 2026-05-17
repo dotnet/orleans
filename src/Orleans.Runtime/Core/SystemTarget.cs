@@ -28,6 +28,8 @@ namespace Orleans.Runtime
         internal ActivationId ActivationId { get; set; }
         private readonly ILogger _logger;
 
+        internal ILogger SchedulerLogger => _shared.SchedulerLogger;
+
         internal InsideRuntimeClient RuntimeClient => _shared.RuntimeClient;
 
         /// <inheritdoc/>
