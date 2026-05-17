@@ -1,5 +1,4 @@
 using System.Diagnostics.CodeAnalysis;
-using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Metadata;
@@ -11,8 +10,6 @@ internal partial class ActivationDataActivatorProvider(
     GrainClassMap grainClassMap,
     IServiceProvider serviceProvider,
     GrainTypeSharedContextResolver sharedComponentsResolver,
-    ILogger<WorkItemGroup> workItemGroupLogger,
-    ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
     IOptions<SchedulingOptions> schedulingOptions,
     IOptions<StatelessWorkerOptions> statelessWorkerOptions) : IGrainContextActivatorProvider
 {
@@ -35,8 +32,6 @@ internal partial class ActivationDataActivatorProvider(
             instanceActivator,
             serviceProvider,
             sharedContext,
-            workItemGroupLogger,
-            activationTaskSchedulerLogger,
             schedulingOptions);
 
         if (sharedContext.PlacementStrategy is StatelessWorkerPlacement)
@@ -54,8 +49,6 @@ internal partial class ActivationDataActivatorProvider(
 
     private partial class ActivationDataActivator : IGrainContextActivator
     {
-        private readonly ILogger<WorkItemGroup> _workItemGroupLogger;
-        private readonly ILogger<ActivationTaskScheduler> _activationTaskSchedulerLogger;
         private readonly IOptions<SchedulingOptions> _schedulingOptions;
         private readonly IGrainActivator _grainActivator;
         private readonly IServiceProvider _serviceProvider;
@@ -67,22 +60,16 @@ internal partial class ActivationDataActivatorProvider(
             IGrainActivator grainActivator,
             IServiceProvider serviceProvider,
             GrainTypeSharedContext sharedComponents,
-            ILogger<WorkItemGroup> workItemGroupLogger,
-            ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
             IOptions<SchedulingOptions> schedulingOptions)
         {
-            _workItemGroupLogger = workItemGroupLogger;
-            _activationTaskSchedulerLogger = activationTaskSchedulerLogger;
             _schedulingOptions = schedulingOptions;
             _grainActivator = grainActivator;
             _serviceProvider = serviceProvider;
             _sharedComponents = sharedComponents;
             _createWorkItemGroup = context => new WorkItemGroup(
                 context,
-                _workItemGroupLogger,
-                _activationTaskSchedulerLogger,
                 _schedulingOptions);
-             _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
+            _startActivation = state => ((ActivationData)state!).Start(_grainActivator);
         }
 
         public IGrainContext CreateContext(GrainAddress activationAddress)
