@@ -17,12 +17,7 @@ namespace Orleans.Runtime
     /// </summary>
     internal sealed partial class ActivationWorkingSet : IActivationWorkingSet, ILifecycleParticipant<ISiloLifecycle>
     {
-        private class MemberState
-        {
-            public bool IsIdle { get; set; }
-        }
-
-        private readonly ConcurrentDictionary<IActivationWorkingSetMember, MemberState> _members = new();
+        private readonly ConcurrentDictionary<IActivationWorkingSetMember, bool> _members = new();
         private readonly ILogger _logger;
         private readonly IAsyncTimer _scanPeriodTimer;
         private readonly List<IActivationWorkingSetObserver> _observers;
@@ -46,7 +41,7 @@ namespace Orleans.Runtime
         public void OnActivated(IActivationWorkingSetMember member)
         {
             Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
-            if (_members.TryAdd(member, new MemberState()))
+            if (_members.TryAdd(member, false))
             {
                 Interlocked.Increment(ref _activeCount);
                 foreach (var observer in _observers)
@@ -62,14 +57,15 @@ namespace Orleans.Runtime
 
         public void OnActive(IActivationWorkingSetMember member)
         {
-            if (_members.TryGetValue(member, out var state))
-            {
-                state.IsIdle = false;
-            }
-            else if (_members.TryAdd(member, new()))
-            {
-                Interlocked.Increment(ref _activeCount);
-            }
+            _members.AddOrUpdate(
+                member,
+                static (_, state) =>
+                {
+                    Interlocked.Increment(ref state._activeCount);
+                    return false;
+                },
+                static (_, _, _) => false,
+                this);
 
             foreach (var observer in _observers)
             {
@@ -125,9 +121,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private void VisitMember(IActivationWorkingSetMember member, MemberState state)
+        private void VisitMember(IActivationWorkingSetMember member, bool isIdle)
         {
-            var wouldRemove = state.IsIdle;
+            var wouldRemove = isIdle;
             if (member.IsCandidateForRemoval(wouldRemove))
             {
                 if (wouldRemove)
@@ -136,16 +132,18 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    state.IsIdle = true;
-                    foreach (var observer in _observers)
+                    if (_members.TryUpdate(member, true, comparisonValue: isIdle))
                     {
-                        observer.OnIdle(member);
+                        foreach (var observer in _observers)
+                        {
+                            observer.OnIdle(member);
+                        }
                     }
                 }
             }
             else
             {
-                state.IsIdle = false;
+                _members.TryUpdate(member, false, comparisonValue: isIdle);
                 foreach (var observer in _observers)
                 {
                     observer.OnActive(member);
