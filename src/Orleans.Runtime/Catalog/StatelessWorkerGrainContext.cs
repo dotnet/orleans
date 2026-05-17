@@ -77,6 +77,14 @@ internal partial class StatelessWorkerGrainContext : IGrainContext, IAsyncDispos
 
     public GrainAddress Address { get; }
 
+    public IGrainRuntime GrainRuntime => _shared.Shared.Runtime;
+
+    IGrainRuntime? IGrainContext.GrainRuntime
+    {
+        get => GrainRuntime;
+        set => _shared.Shared.SetComponent(value);
+    }
+
     public IServiceProvider ActivationServices => throw new NotImplementedException();
 
     public IGrainLifecycle ObservableLifecycle => throw new NotImplementedException();

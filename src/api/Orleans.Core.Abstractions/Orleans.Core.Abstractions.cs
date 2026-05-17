@@ -2574,6 +2574,8 @@ namespace Orleans.Runtime
 
         GrainReference GrainReference { get; }
 
+        IGrainRuntime? GrainRuntime { get; set; }
+
         IGrainLifecycle ObservableLifecycle { get; }
 
         IWorkItemScheduler Scheduler { get; }

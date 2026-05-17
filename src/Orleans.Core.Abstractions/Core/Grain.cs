@@ -29,18 +29,21 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// </summary>
     public GrainReference GrainReference { get { return GrainContext.GrainReference; } }
 
-    internal IGrainRuntime Runtime { get; }
+    internal IGrainRuntime Runtime => GrainContext?.GrainRuntime
+        ?? throw new InvalidOperationException("Grain was created outside of the Orleans creation process and no runtime was specified.");
 
     /// <summary>
-    /// Gets an object which can be used to access other grains. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
+    /// Gets an object which can be used to access other grains.
     /// </summary>
+    /// <exception cref="InvalidOperationException">
+    /// The grain was created outside of the Orleans activation process and no runtime was provided.
+    /// </exception>
     protected IGrainFactory GrainFactory => Runtime.GrainFactory;
 
     /// <summary>
     /// Gets the IServiceProvider managed by the runtime. Null if this grain is not associated with a Runtime, such as when created directly for unit testing.
     /// </summary>
-    // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
-    protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? Runtime?.ServiceProvider!;
+    protected internal IServiceProvider ServiceProvider => GrainContext?.ActivationServices ?? GrainContext?.GrainRuntime?.ServiceProvider!;
 
     internal GrainId GrainId => GrainContext.GrainId;
 
@@ -57,12 +60,17 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// This constructor is particularly useful for unit testing where test code can create a Grain and replace
     /// the IGrainIdentity and IGrainRuntime with test doubles (mocks/stubs).
     /// </summary>
+    /// <remarks>
+    /// When <paramref name="grainRuntime"/> is provided, it is registered as an <see cref="IGrainRuntime"/>
+    /// component on <paramref name="grainContext"/>.
+    /// </remarks>
     protected Grain(IGrainContext grainContext, IGrainRuntime? grainRuntime = null)
     {
         GrainContext = grainContext;
-
-        // ! The runtime ensures that this is not null and Unit testing frameworks must make sure that this is not null.
-        Runtime = grainRuntime ?? grainContext?.ActivationServices.GetService<IGrainRuntime>()!;
+        if (grainRuntime is not null)
+        {
+            grainContext!.GrainRuntime = grainRuntime;
+        }
     }
 
     /// <summary>
@@ -74,7 +82,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// A unique identifier for the current silo.
     /// There is no semantic content to this string, but it may be useful for logging.
     /// </summary>
-    public string RuntimeIdentity => Runtime?.SiloIdentity ?? string.Empty;
+    public string RuntimeIdentity => GrainContext?.GrainRuntime?.SiloIdentity ?? string.Empty;
 
     /// <summary>
     /// Registers a timer to send periodic callbacks to this grain.
@@ -169,13 +177,7 @@ public abstract partial class Grain : IGrainBase, IAddressable
     /// <param name="cancellationToken">A cancellation token which signals when deactivation should complete promptly.</param>
     public virtual Task OnDeactivateAsync(DeactivationReason reason, CancellationToken cancellationToken) => Task.CompletedTask;
 
-    internal void EnsureRuntime()
-    {
-        if (Runtime == null)
-        {
-            throw new InvalidOperationException("Grain was created outside of the Orleans creation process and no runtime was specified.");
-        }
-    }
+    internal void EnsureRuntime() => _ = Runtime;
 }
 
 /// <summary>

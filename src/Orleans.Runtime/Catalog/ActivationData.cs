@@ -142,7 +142,20 @@ internal sealed partial class ActivationData :
     }
 
     public ActivationTaskScheduler ActivationTaskScheduler => _workItemGroup.TaskScheduler;
-    public IGrainRuntime GrainRuntime => _shared.Runtime;
+    public IGrainRuntime GrainRuntime
+    {
+        get
+        {
+            var extras = _extras;
+            return extras is null ? _shared.Runtime : Volatile.Read(ref extras.GrainRuntime) ?? _shared.Runtime;
+        }
+    }
+
+    IGrainRuntime? IGrainContext.GrainRuntime
+    {
+        get => GrainRuntime;
+        set => SetComponent(value);
+    }
     public object? GrainInstance { get; private set; }
     public GrainAddress Address { get; private set; }
     public GrainReference GrainReference => _selfReference ??= _shared.GrainReferenceActivator.CreateReference(GrainId, default);
@@ -357,6 +370,10 @@ internal sealed partial class ActivationData :
         {
             result = this;
         }
+        else if (componentType == typeof(IGrainRuntime))
+        {
+            result = GrainRuntime;
+        }
         else if (_extras is { } components && components.TryGetValue(componentType, out var resultObj))
         {
             result = resultObj;
@@ -393,6 +410,13 @@ internal sealed partial class ActivationData :
 
         lock (this)
         {
+            if (componentType == typeof(IGrainRuntime))
+            {
+                _extras ??= new();
+                Volatile.Write(ref _extras.GrainRuntime, (IGrainRuntime?)instance);
+                return;
+            }
+
             if (instance == null)
             {
                 _extras?.Remove(componentType);
@@ -2373,6 +2397,8 @@ internal sealed partial class ActivationData :
         private const int IsStuckDeactivatingFlag = 1 << 1;
         private const int IsDisposingFlag = 1 << 2;
         private byte _flags;
+
+        public IGrainRuntime? GrainRuntime;
 
         public HashSet<IGrainTimer>? Timers { get => GetValueOrDefault<HashSet<IGrainTimer>>(nameof(Timers)); set => SetOrRemoveValue(nameof(Timers), value); }
 

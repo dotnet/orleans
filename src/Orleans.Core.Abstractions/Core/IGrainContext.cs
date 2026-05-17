@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Orleans.Serialization.Invocation;
 
 namespace Orleans.Runtime
@@ -40,6 +41,20 @@ namespace Orleans.Runtime
         /// Gets the <see cref="IServiceProvider" /> that provides access to the grain activation's service container.
         /// </summary>
         IServiceProvider ActivationServices { get; }
+
+        /// <summary>
+        /// Gets the grain runtime, if available.
+        /// </summary>
+        /// <remarks>
+        /// Runtime contexts provide this value directly. Custom contexts can override it by registering an
+        /// <see cref="IGrainRuntime"/> component or service.
+        /// </remarks>
+        IGrainRuntime? GrainRuntime
+        {
+            get => GetComponent(typeof(IGrainRuntime)) as IGrainRuntime
+                ?? ActivationServices?.GetService<IGrainRuntime>();
+            set => SetComponent(value);
+        }
 
         /// <summary>
         /// Gets the observable <see cref="Grain"/> lifecycle, which can be used to add lifecycle hooks.
