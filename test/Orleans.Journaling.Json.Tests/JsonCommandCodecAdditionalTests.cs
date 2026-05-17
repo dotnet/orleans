@@ -1,4 +1,3 @@
-using System.Text;
 using System.Text.Json;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -190,58 +189,6 @@ public sealed class JsonCommandCodecAdditionalTests
             serviceProvider.GetRequiredKeyedService<IDurableTaskCompletionSourceCommandCodec<int>>(key));
     }
 
-    [Fact]
-    public void ConfigurePolymorphicType_ObjectPayload_RoundTripsRegisteredDerivedTypes()
-    {
-        var options = CreatePolymorphicOptions();
-        var codec = new JsonDurableListCommandCodec<object>(options);
-        var payload = CodecTestHelpers.WriteEntry(writer => codec.WriteAdd(new JsonPolymorphicTestCreated("created", 1), writer));
-
-        Assert.Equal("""["add",{"$type":"created","$value":{"Name":"created","Count":1}}]""", Encoding.UTF8.GetString(payload));
-
-        var consumer = new CapturingListCommandHandler<object>();
-        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
-
-        Assert.Equal(new JsonPolymorphicTestCreated("created", 1), Assert.IsType<JsonPolymorphicTestCreated>(Assert.Single(consumer.Items)));
-    }
-
-    [Fact]
-    public void ConfigurePolymorphicType_TypedBasePayload_RoundTripsRegisteredDerivedTypes()
-    {
-        var options = CreatePolymorphicOptions();
-        var codec = new JsonDurableValueCommandCodec<JsonPolymorphicTestEvent>(options);
-        var payload = CodecTestHelpers.WriteEntry(writer => codec.WriteSet(new JsonPolymorphicTestUpdated("updated"), writer));
-
-        Assert.Equal("""["set",{"$type":"updated","$value":{"Name":"updated"}}]""", Encoding.UTF8.GetString(payload));
-
-        var consumer = new RecordingValueCommandHandler<JsonPolymorphicTestEvent>();
-        codec.Apply(CodecTestHelpers.ReadBuffer(payload), consumer);
-
-        Assert.Equal(new JsonPolymorphicTestUpdated("updated"), Assert.IsType<JsonPolymorphicTestUpdated>(consumer.Value));
-    }
-
-    [Fact]
-    public void ConfigurePolymorphicType_UnknownDiscriminatorThrows()
-    {
-        var codec = new JsonDurableListCommandCodec<object>(CreatePolymorphicOptions());
-        var payload = """["add",{"$type":"unknown","$value":{"Name":"created","Count":1}}]"""u8.ToArray();
-
-        var exception = Assert.Throws<JsonException>(() => codec.Apply(CodecTestHelpers.ReadBuffer(payload), new CapturingListCommandHandler<object>()));
-
-        Assert.Contains("unknown", exception.Message, StringComparison.Ordinal);
-        Assert.Contains("not registered", exception.Message, StringComparison.Ordinal);
-    }
-
-    [Fact]
-    public void ConfigurePolymorphicType_DuplicateRegistrationThrows()
-    {
-        var options = new JsonJournalOptions();
-        var builder = options.ConfigurePolymorphicType<object>().AddDerivedType<JsonPolymorphicTestCreated>("event");
-
-        Assert.Throws<ArgumentException>(() => builder.AddDerivedType<JsonPolymorphicTestUpdated>("event"));
-        Assert.Throws<InvalidOperationException>(() => options.ConfigurePolymorphicType<object>());
-    }
-
     private static void Apply<TKey, TValue>(
         IDurableDictionaryCommandCodec<TKey, TValue> codec,
         Action<JournalStreamWriter> write,
@@ -249,36 +196,6 @@ public sealed class JsonCommandCodecAdditionalTests
         where TKey : notnull
     {
         codec.Apply(CodecTestHelpers.ReadBuffer(CodecTestHelpers.WriteEntry(write)), consumer);
-    }
-
-    private static JsonSerializerOptions CreatePolymorphicOptions()
-    {
-        var options = new JsonJournalOptions();
-        options.AddTypeInfoResolver(JsonCodecTestJsonContext.Default);
-        options.ConfigurePolymorphicType<object>()
-            .AddDerivedType<JsonPolymorphicTestCreated>("created")
-            .AddDerivedType<JsonPolymorphicTestUpdated>("updated");
-        options.ConfigurePolymorphicType<JsonPolymorphicTestEvent>()
-            .AddDerivedType<JsonPolymorphicTestCreated>("created")
-            .AddDerivedType<JsonPolymorphicTestUpdated>("updated");
-        return options.SerializerOptions;
-    }
-
-    private sealed class CapturingListCommandHandler<T> : IDurableListCommandHandler<T>
-    {
-        public List<T> Items { get; } = [];
-
-        public void ApplyAdd(T item) => Items.Add(item);
-
-        public void ApplySet(int index, T item) => Items[index] = item;
-
-        public void ApplyInsert(int index, T item) => Items.Insert(index, item);
-
-        public void ApplyRemoveAt(int index) => Items.RemoveAt(index);
-
-        public void ApplyClear() => Items.Clear();
-
-        public void Reset(int capacityHint) => Items.Clear();
     }
 
     private sealed class TestSiloBuilder : ISiloBuilder

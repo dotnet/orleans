@@ -529,12 +529,6 @@ namespace Orleans.Journaling.Json
         public System.Text.Json.JsonSerializerOptions SerializerOptions { get { throw null; } set { } }
 
         public JsonJournalOptions AddTypeInfoResolver(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
-        public JsonPolymorphicTypeBuilder<TBase> ConfigurePolymorphicType<TBase>(string typeDiscriminatorPropertyName = "$type") where TBase : class { throw null; }
-    }
-
-    public sealed partial class JsonPolymorphicTypeBuilder<TBase> where TBase : class
-    {
-        public JsonPolymorphicTypeBuilder<TBase> AddDerivedType<TDerived>(string? typeDiscriminator = null) where TDerived : class, TBase { throw null; }
     }
 
     public sealed partial class JsonDurableListCommandCodec<T> : IDurableListCommandCodec<T>
