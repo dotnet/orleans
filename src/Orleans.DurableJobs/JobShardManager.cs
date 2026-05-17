@@ -12,7 +12,7 @@ namespace Orleans.DurableJobs;
 /// <remarks>
 /// Each silo instance has its own shard manager.
 /// </remarks>
-internal abstract class JobShardManager
+public abstract class JobShardManager
 {
     /// <summary>
     /// Gets the silo address this manager is associated with.

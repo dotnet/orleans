@@ -16,7 +16,7 @@ using Orleans.Runtime.Messaging;
 namespace Orleans.DurableJobs;
 
 /// <inheritdoc/>
-internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>
+internal partial class LocalDurableJobManager : SystemTarget, ILocalDurableJobManager, ILocalDurableJobManagerSystemTarget, ILifecycleParticipant<ISiloLifecycle>
 {
     internal static readonly GrainType JobManagerGrainType = SystemTargetGrainId.CreateGrainType("job-manager");
 

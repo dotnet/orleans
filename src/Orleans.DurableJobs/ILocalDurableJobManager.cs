@@ -28,4 +28,7 @@ public interface ILocalDurableJobManager
     Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken);
 }
 
-internal interface ILocalDurableJobManagerSystemTarget : ILocalDurableJobManager, ISystemTarget;
+internal interface ILocalDurableJobManagerSystemTarget : ISystemTarget
+{
+    Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken);
+}

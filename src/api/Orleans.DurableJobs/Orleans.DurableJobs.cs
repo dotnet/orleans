@@ -79,10 +79,75 @@ namespace Orleans.DurableJobs
         string RunId { get; }
     }
 
+    public partial interface IJobShard : System.IAsyncDisposable
+    {
+        System.DateTimeOffset EndTime { get; }
+
+        string Id { get; }
+
+        bool IsAddingCompleted { get; }
+
+        System.Collections.Generic.IDictionary<string, string>? Metadata { get; }
+
+        System.DateTimeOffset StartTime { get; }
+
+        System.Collections.Generic.IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync();
+        System.Threading.Tasks.ValueTask<int> GetJobCountAsync();
+        System.Threading.Tasks.Task MarkAsCompleteAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken);
+    }
+
     public partial interface ILocalDurableJobManager
     {
         System.Threading.Tasks.Task<DurableJob> ScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.Task<bool> TryCancelDurableJobAsync(DurableJob job, System.Threading.CancellationToken cancellationToken);
+    }
+
+    public abstract partial class JobShard : IJobShard, System.IAsyncDisposable
+    {
+        protected JobShard(string id, System.DateTimeOffset startTime, System.DateTimeOffset endTime) { }
+
+        public System.DateTimeOffset EndTime { get { throw null; } protected set { } }
+
+        public string Id { get { throw null; } protected set { } }
+
+        public bool IsAddingCompleted { get { throw null; } protected set { } }
+
+        public System.Collections.Generic.IDictionary<string, string>? Metadata { get { throw null; } protected set { } }
+
+        public System.DateTimeOffset StartTime { get { throw null; } protected set { } }
+
+        public System.Collections.Generic.IAsyncEnumerable<IJobRunContext> ConsumeDurableJobsAsync() { throw null; }
+
+        public virtual System.Threading.Tasks.ValueTask DisposeAsync() { throw null; }
+
+        protected void EnqueueJob(DurableJob job, int dequeueCount) { }
+
+        public System.Threading.Tasks.ValueTask<int> GetJobCountAsync() { throw null; }
+
+        public System.Threading.Tasks.Task MarkAsCompleteAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        protected abstract System.Threading.Tasks.Task PersistAddJobAsync(string jobId, string jobName, System.DateTimeOffset dueTime, Runtime.GrainId target, System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.Task PersistRemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken);
+        protected abstract System.Threading.Tasks.Task PersistRetryJobAsync(string jobId, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken);
+        public System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken) { throw null; }
+    }
+
+    public abstract partial class JobShardManager
+    {
+        protected JobShardManager(Runtime.SiloAddress siloAddress) { }
+
+        protected Runtime.SiloAddress SiloAddress { get { throw null; } }
+
+        public abstract System.Threading.Tasks.Task<System.Collections.Generic.List<IJobShard>> AssignJobShardsAsync(System.DateTimeOffset maxDueTime, int maxNewClaims, System.Threading.CancellationToken cancellationToken);
+        public abstract System.Threading.Tasks.Task<IJobShard> CreateShardAsync(System.DateTimeOffset minDueTime, System.DateTimeOffset maxDueTime, System.Collections.Generic.IDictionary<string, string> metadata, System.Threading.CancellationToken cancellationToken);
+        public abstract System.Threading.Tasks.Task UnregisterShardAsync(IJobShard shard, System.Threading.CancellationToken cancellationToken);
     }
 
     public readonly partial struct ScheduleJobRequest
@@ -186,42 +251,6 @@ namespace OrleansCodeGen.Orleans.DurableJobs
     [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
     [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
     [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_ILocalDurableJobManager_GrainReference_60887CAF : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILocalDurableJobManager_GrainReference_60887CAF>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_Invokable_ILocalDurableJobManager_GrainReference_60887CAF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_ILocalDurableJobManager_GrainReference_60887CAF instance) { }
-
-        public Invokable_ILocalDurableJobManager_GrainReference_60887CAF ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_ILocalDurableJobManager_GrainReference_60887CAF instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_ILocalDurableJobManager_GrainReference_60887CAF value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Codec_Invokable_ILocalDurableJobManager_GrainReference_9A773386 : global::Orleans.Serialization.Codecs.IFieldCodec<Invokable_ILocalDurableJobManager_GrainReference_9A773386>, global::Orleans.Serialization.Codecs.IFieldCodec
-    {
-        public Codec_Invokable_ILocalDurableJobManager_GrainReference_9A773386(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public void Deserialize<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, Invokable_ILocalDurableJobManager_GrainReference_9A773386 instance) { }
-
-        public Invokable_ILocalDurableJobManager_GrainReference_9A773386 ReadValue<TReaderInput>(ref global::Orleans.Serialization.Buffers.Reader<TReaderInput> reader, global::Orleans.Serialization.WireProtocol.Field field) { throw null; }
-
-        public void Serialize<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, Invokable_ILocalDurableJobManager_GrainReference_9A773386 instance)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-
-        public void WriteField<TBufferWriter>(ref global::Orleans.Serialization.Buffers.Writer<TBufferWriter> writer, uint fieldIdDelta, System.Type expectedType, Invokable_ILocalDurableJobManager_GrainReference_9A773386 value)
-            where TBufferWriter : System.Buffers.IBufferWriter<byte> { }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
     public sealed partial class Copier_DurableJob : global::Orleans.Serialization.Cloning.IDeepCopier<global::Orleans.DurableJobs.DurableJob>, global::Orleans.Serialization.Cloning.IDeepCopier
     {
         public Copier_DurableJob(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableJobs.DurableJob> _activator, global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
@@ -237,103 +266,5 @@ namespace OrleansCodeGen.Orleans.DurableJobs
         public Copier_DurableJobRunResult(global::Orleans.Serialization.Activators.IActivator<global::Orleans.DurableJobs.DurableJobRunResult> _activator) { }
 
         public global::Orleans.DurableJobs.DurableJobRunResult DeepCopy(global::Orleans.DurableJobs.DurableJobRunResult original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_ILocalDurableJobManager_GrainReference_60887CAF : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILocalDurableJobManager_GrainReference_60887CAF>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_Invokable_ILocalDurableJobManager_GrainReference_60887CAF(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public Invokable_ILocalDurableJobManager_GrainReference_60887CAF DeepCopy(Invokable_ILocalDurableJobManager_GrainReference_60887CAF original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    public sealed partial class Copier_Invokable_ILocalDurableJobManager_GrainReference_9A773386 : global::Orleans.Serialization.Cloning.IDeepCopier<Invokable_ILocalDurableJobManager_GrainReference_9A773386>, global::Orleans.Serialization.Cloning.IDeepCopier
-    {
-        public Copier_Invokable_ILocalDurableJobManager_GrainReference_9A773386(global::Orleans.Serialization.Serializers.ICodecProvider codecProvider) { }
-
-        public Invokable_ILocalDurableJobManager_GrainReference_9A773386 DeepCopy(Invokable_ILocalDurableJobManager_GrainReference_9A773386 original, global::Orleans.Serialization.Cloning.CopyContext context) { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.DurableJobs.ILocalDurableJobManager), "60887CAF" })]
-    public sealed partial class Invokable_ILocalDurableJobManager_GrainReference_60887CAF : global::Orleans.Runtime.TaskRequest<bool>
-    {
-        public global::Orleans.DurableJobs.DurableJob arg0;
-        public System.Threading.CancellationToken arg1;
-        public override bool IsCancellable { get { throw null; } }
-
-        public override void Dispose() { }
-
-        public override string GetActivityName() { throw null; }
-
-        public override object GetArgument(int index) { throw null; }
-
-        public override int GetArgumentCount() { throw null; }
-
-        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
-
-        public override string GetInterfaceName() { throw null; }
-
-        public override System.Type GetInterfaceType() { throw null; }
-
-        public override System.Reflection.MethodInfo GetMethod() { throw null; }
-
-        public override string GetMethodName() { throw null; }
-
-        public override object GetTarget() { throw null; }
-
-        protected override System.Threading.Tasks.Task<bool> InvokeInner() { throw null; }
-
-        public override void SetArgument(int index, object value) { }
-
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
-
-        public override bool TryCancel() { throw null; }
-    }
-
-    [System.CodeDom.Compiler.GeneratedCode("OrleansCodeGen", "10.0.0.0")]
-    [System.ComponentModel.EditorBrowsable(System.ComponentModel.EditorBrowsableState.Never)]
-    [System.Diagnostics.CodeAnalysis.ExcludeFromCodeCoverage]
-    [global::Orleans.CompoundTypeAlias(new[] { "inv", typeof(global::Orleans.Runtime.GrainReference), typeof(global::Orleans.DurableJobs.ILocalDurableJobManager), "9A773386" })]
-    public sealed partial class Invokable_ILocalDurableJobManager_GrainReference_9A773386 : global::Orleans.Runtime.TaskRequest<global::Orleans.DurableJobs.DurableJob>
-    {
-        public global::Orleans.DurableJobs.ScheduleJobRequest arg0;
-        public System.Threading.CancellationToken arg1;
-        public override bool IsCancellable { get { throw null; } }
-
-        public override void Dispose() { }
-
-        public override string GetActivityName() { throw null; }
-
-        public override object GetArgument(int index) { throw null; }
-
-        public override int GetArgumentCount() { throw null; }
-
-        public override System.Threading.CancellationToken GetCancellationToken() { throw null; }
-
-        public override string GetInterfaceName() { throw null; }
-
-        public override System.Type GetInterfaceType() { throw null; }
-
-        public override System.Reflection.MethodInfo GetMethod() { throw null; }
-
-        public override string GetMethodName() { throw null; }
-
-        public override object GetTarget() { throw null; }
-
-        protected override System.Threading.Tasks.Task<global::Orleans.DurableJobs.DurableJob> InvokeInner() { throw null; }
-
-        public override void SetArgument(int index, object value) { }
-
-        public override void SetTarget(global::Orleans.Serialization.Invocation.ITargetHolder holder) { }
-
-        public override bool TryCancel() { throw null; }
     }
 }
