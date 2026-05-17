@@ -180,7 +180,6 @@ internal sealed partial class ActivationData :
     public int WaitingCount => _waitingRequests.Count;
     public bool IsInactive => !IsCurrentlyExecuting && _waitingRequests.Count == 0;
     public bool IsCurrentlyExecuting => _runningRequests.Count > 0;
-    public bool IsIdle { get; set; }
     public IWorkItemScheduler Scheduler => _workItemGroup;
     public Task Deactivated => GetDeactivationCompletionSource().Task;
 

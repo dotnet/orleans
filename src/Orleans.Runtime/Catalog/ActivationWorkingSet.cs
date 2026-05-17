@@ -111,7 +111,7 @@ namespace Orleans.Runtime
                 {
                     try
                     {
-                        VisitMember(pair.Key);
+                        VisitMember(pair.Key, pair.Value);
                     }
                     catch (Exception exception)
                     {
@@ -121,9 +121,9 @@ namespace Orleans.Runtime
             }
         }
 
-        private void VisitMember(IActivationWorkingSetMember member)
+        private void VisitMember(IActivationWorkingSetMember member, bool isIdle)
         {
-            var wouldRemove = member.IsIdle;
+            var wouldRemove = isIdle;
             if (member.IsCandidateForRemoval(wouldRemove))
             {
                 if (wouldRemove)
@@ -132,16 +132,18 @@ namespace Orleans.Runtime
                 }
                 else
                 {
-                    member.IsIdle = true;
-                    foreach (var observer in _observers)
+                    if (_members.TryUpdate(member, true, comparisonValue: isIdle))
                     {
-                        observer.OnIdle(member);
+                        foreach (var observer in _observers)
+                        {
+                            observer.OnIdle(member);
+                        }
                     }
                 }
             }
             else
             {
-                member.IsIdle = false;
+                _members.TryUpdate(member, false, comparisonValue: isIdle);
                 foreach (var observer in _observers)
                 {
                     observer.OnActive(member);
@@ -214,11 +216,6 @@ namespace Orleans.Runtime
     /// </summary>
     public interface IActivationWorkingSetMember
     {
-        /// <summary>
-        /// Gets or sets a value indicating whether this member was idle during the previous working set scan.
-        /// </summary>
-        bool IsIdle { get; set; }
-
         /// <summary>
         /// Returns <see langword="true"/> if the member is eligible for removal, <see langword="false"/> otherwise.
         /// </summary>
