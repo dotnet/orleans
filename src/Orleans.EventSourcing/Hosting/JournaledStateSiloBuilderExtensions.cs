@@ -12,8 +12,6 @@ namespace Orleans.Hosting
 {
     public static class JournaledStateSiloBuilderExtensions
     {
-        private const string OrleansBinaryJournalFormatKey = "orleans-binary";
-
         /// <summary>
         /// Adds a journaled-state log consistency provider as the default consistency provider.
         /// </summary>
@@ -42,7 +40,6 @@ namespace Orleans.Hosting
             ArgumentException.ThrowIfNullOrWhiteSpace(name);
 
             services.AddLogConsistencyProtocolServicesFactory();
-            services.Configure<JournaledStateManagerOptions>(options => options.JournalFormatKey = OrleansBinaryJournalFormatKey);
             services.TryAddSingleton<ILogViewAdaptorFactory>(sp => sp.GetKeyedService<ILogViewAdaptorFactory>(ProviderConstants.DEFAULT_STORAGE_PROVIDER_NAME));
             return services.AddKeyedSingleton<ILogViewAdaptorFactory, LogConsistencyProvider>(name);
         }
