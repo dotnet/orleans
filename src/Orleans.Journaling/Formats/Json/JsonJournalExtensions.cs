@@ -21,6 +21,8 @@ public sealed class JsonJournalOptions
     /// </remarks>
     public JsonSerializerOptions SerializerOptions { get; set; } = new JsonSerializerOptions(JsonSerializerDefaults.General);
 
+    private readonly HashSet<Type> _polymorphicTypes = [];
+
     /// <summary>
     /// Adds source-generated JSON metadata to the serializer options used for journaled payload values.
     /// </summary>
@@ -43,6 +45,43 @@ public sealed class JsonJournalOptions
 
         SerializerOptions.TypeInfoResolverChain.Add(typeInfoResolver);
         return this;
+    }
+
+    /// <summary>
+    /// Configures explicit polymorphic JSON serialization for a journaled payload base type.
+    /// </summary>
+    /// <typeparam name="TBase">The base type used by the journaled payload, such as an event base type or <see cref="object"/>.</typeparam>
+    /// <param name="typeDiscriminatorPropertyName">The JSON property name used to store the event type discriminator.</param>
+    /// <returns>A builder used to register the derived payload types which can be written and read.</returns>
+    /// <remarks>
+    /// JSON journaling only deserializes explicitly registered derived types. Register a source-generated
+    /// <see cref="System.Text.Json.Serialization.JsonSerializerContext"/> using <see cref="AddTypeInfoResolver"/>
+    /// when trimming or using Native AOT.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// builder.AddJournalStorage().UseJsonJournalFormat(options =>
+    /// {
+    ///     options.AddTypeInfoResolver(MyJournalJsonContext.Default);
+    ///     options.ConfigurePolymorphicType&lt;object&gt;()
+    ///         .AddDerivedType&lt;OrderCreated&gt;("order-created")
+    ///         .AddDerivedType&lt;OrderShipped&gt;("order-shipped");
+    /// });
+    /// </code>
+    /// </example>
+    public JsonPolymorphicTypeBuilder<TBase> ConfigurePolymorphicType<TBase>(string typeDiscriminatorPropertyName = "$type")
+        where TBase : class
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(typeDiscriminatorPropertyName);
+
+        if (!_polymorphicTypes.Add(typeof(TBase)))
+        {
+            throw new InvalidOperationException($"Polymorphic JSON journaling is already configured for payload base type '{typeof(TBase).FullName}'.");
+        }
+
+        var registry = new JsonPolymorphicTypeRegistry<TBase>(typeDiscriminatorPropertyName);
+        SerializerOptions.Converters.Add(new JsonPolymorphicTypeConverter<TBase>(registry));
+        return new JsonPolymorphicTypeBuilder<TBase>(registry);
     }
 }
 
