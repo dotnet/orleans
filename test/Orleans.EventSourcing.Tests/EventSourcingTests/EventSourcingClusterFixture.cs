@@ -1,10 +1,12 @@
+using System.Text.Json.Serialization;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.EventSourcing.CustomStorage;
 using Orleans.Journaling;
+using Orleans.Journaling.Json;
 using Orleans.Storage;
 using Orleans.TestingHost;
+using TestGrains;
 using TestExtensions;
 
 #pragma warning disable ORLEANSEXP005
@@ -17,8 +19,6 @@ namespace Tester.EventSourcingTests
     /// </summary>
     public class EventSourcingClusterFixture : BaseTestClusterFixture
     {
-        private const string OrleansBinaryJournalFormatKey = "orleans-binary";
-
         protected override void ConfigureTestCluster(TestClusterBuilder builder)
         {
             builder.AddSiloBuilderConfigurator<TestSiloConfigurator>();
@@ -26,10 +26,7 @@ namespace Tester.EventSourcingTests
 
         private class TestSiloConfigurator : ISiloConfigurator
         {
-            private static readonly VolatileJournalStorageProvider JournalStorageProvider = new(Options.Create(new JournaledStateManagerOptions
-            {
-                JournalFormatKey = OrleansBinaryJournalFormatKey
-            }));
+            private static readonly VolatileJournalStorageProvider JournalStorageProvider = new();
 
             public void Configure(ISiloBuilder hostBuilder)
             {
@@ -38,6 +35,17 @@ namespace Tester.EventSourcingTests
                     .AddLogStorageBasedLogConsistencyProvider("LogStorage")
                     .AddStateStorageBasedLogConsistencyProvider("StateStorage")
                     .AddJournaledStateBasedLogConsistencyProvider("JournaledState")
+                    .UseJsonJournalFormat(options =>
+                    {
+                        options.SerializerOptions.IncludeFields = true;
+                        options.AddTypeInfoResolver(EventSourcingTestsJsonContext.Default);
+                        options.ConfigurePolymorphicType<object>()
+                            .AddDerivedType<UpdateA>()
+                            .AddDerivedType<UpdateB>()
+                            .AddDerivedType<IncrementA>()
+                            .AddDerivedType<AddReservation>()
+                            .AddDerivedType<RemoveReservation>();
+                    })
                     .AddCustomStorageBasedLogConsistencyProvider("CustomStoragePrimaryCluster")
                     .ConfigureLogging(builder =>
                     {
@@ -53,5 +61,18 @@ namespace Tester.EventSourcingTests
             }
         }
     }
+
+    [JsonSourceGenerationOptions(IncludeFields = true)]
+    [JsonSerializable(typeof(DateTime))]
+    [JsonSerializable(typeof(int))]
+    [JsonSerializable(typeof(object))]
+    [JsonSerializable(typeof(string))]
+    [JsonSerializable(typeof(uint))]
+    [JsonSerializable(typeof(UpdateA))]
+    [JsonSerializable(typeof(UpdateB))]
+    [JsonSerializable(typeof(IncrementA))]
+    [JsonSerializable(typeof(AddReservation))]
+    [JsonSerializable(typeof(RemoveReservation))]
+    internal sealed partial class EventSourcingTestsJsonContext : JsonSerializerContext;
 }
 #pragma warning restore ORLEANSEXP005
