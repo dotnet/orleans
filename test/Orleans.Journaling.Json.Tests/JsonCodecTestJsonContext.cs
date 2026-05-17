@@ -5,25 +5,15 @@ namespace Orleans.Journaling.Json.Tests;
 
 [JsonSerializable(typeof(DateTime))]
 [JsonSerializable(typeof(int))]
-[JsonSerializable(typeof(object))]
 [JsonSerializable(typeof(string))]
 [JsonSerializable(typeof(ThrowingJsonValue))]
 [JsonSerializable(typeof(uint))]
 [JsonSerializable(typeof(ulong))]
 [JsonSerializable(typeof(JsonCodecTestValue))]
-[JsonSerializable(typeof(JsonPolymorphicTestEvent))]
-[JsonSerializable(typeof(JsonPolymorphicTestCreated))]
-[JsonSerializable(typeof(JsonPolymorphicTestUpdated))]
 [JsonSerializable(typeof(JournalingSnapshotRecord))]
 internal partial class JsonCodecTestJsonContext : JsonSerializerContext;
 
 internal sealed record JsonCodecTestValue(string Name, int Count);
-
-internal abstract record JsonPolymorphicTestEvent;
-
-internal sealed record JsonPolymorphicTestCreated(string Name, int Count) : JsonPolymorphicTestEvent;
-
-internal sealed record JsonPolymorphicTestUpdated(string Name) : JsonPolymorphicTestEvent;
 
 /// <summary>
 /// JSON-side mirror of <see cref="Orleans.Journaling.Tests.JournalingSnapshotRecord"/>: the
