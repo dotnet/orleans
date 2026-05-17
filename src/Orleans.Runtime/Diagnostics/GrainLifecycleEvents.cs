@@ -15,7 +15,7 @@ public static class GrainLifecycleEvents
     /// <summary>
     /// The name of the diagnostic listener for grain activation events.
     /// </summary>
-    public const string ListenerName = "Orleans.GrainsLifecycle";
+    public const string ListenerName = "Orleans.GrainLifecycle";
 
     private static readonly DiagnosticListener Listener = new(ListenerName);
 
