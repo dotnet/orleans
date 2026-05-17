@@ -561,6 +561,27 @@ namespace Orleans.Journaling.Json
         public void WriteSnapshot(System.Collections.Generic.IReadOnlyCollection<System.Collections.Generic.KeyValuePair<TKey, TValue>> items, JournalStreamWriter writer) { }
     }
 
+    public static partial class JsonJournalExtensions
+    {
+        public const string JournalFormatKey = "json";
+        public static Hosting.ISiloBuilder UseJsonJournalFormat(this Hosting.ISiloBuilder builder, System.Action<JsonJournalOptions>? configure = null) { throw null; }
+
+        public static Hosting.ISiloBuilder UseJsonJournalFormat(this Hosting.ISiloBuilder builder, System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
+    }
+
+    public sealed partial class JsonJournalOptions
+    {
+        public System.Text.Json.JsonSerializerOptions SerializerOptions { get { throw null; } set { } }
+
+        public JsonJournalOptions AddTypeInfoResolver(System.Text.Json.Serialization.Metadata.IJsonTypeInfoResolver typeInfoResolver) { throw null; }
+        public JsonPolymorphicTypeBuilder<TBase> ConfigurePolymorphicType<TBase>(string typeDiscriminatorPropertyName = "$type") where TBase : class { throw null; }
+    }
+
+    public sealed partial class JsonPolymorphicTypeBuilder<TBase> where TBase : class
+    {
+        public JsonPolymorphicTypeBuilder<TBase> AddDerivedType<TDerived>(string? typeDiscriminator = null) where TDerived : class, TBase { throw null; }
+    }
+
     public sealed partial class JsonDurableListCommandCodec<T> : IDurableListCommandCodec<T>
     {
         public JsonDurableListCommandCodec(System.Text.Json.JsonSerializerOptions? options = null) { }
