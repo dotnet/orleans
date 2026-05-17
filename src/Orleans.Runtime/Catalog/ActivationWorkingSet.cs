@@ -38,6 +38,14 @@ namespace Orleans.Runtime
 
         public int Count => _activeCount;
 
+        internal void ForEach<TState>(Action<IActivationWorkingSetMember, bool, TState> action, TState state)
+        {
+            foreach (var pair in _members)
+            {
+                action(pair.Key, pair.Value, state);
+            }
+        }
+
         public void OnActivated(IActivationWorkingSetMember member)
         {
             Debug.Assert(member is not ICollectibleGrainContext collectible || collectible.IsValid);
