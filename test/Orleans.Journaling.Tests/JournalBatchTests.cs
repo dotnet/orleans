@@ -186,6 +186,26 @@ public abstract class JournalBatchTests : IAsyncLifetime
         Assert.Equal("three", list2[2]);
     }
 
+    [SkippableFact]
+    public async Task ReadStateAsync_ReplacesUnflushedChanges()
+    {
+        using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(30));
+        var grainId = GrainId.Create("test-grain", $"readState-{Guid.NewGuid()}");
+        var (manager, list, _) = CreateTestComponents<string>("readStateList", grainId);
+        await manager.InitializeAsync(cts.Token);
+
+        list.Add("persisted");
+        await manager.WriteStateAsync(cts.Token);
+
+        list.Add("unflushed");
+        Assert.Equal(2, list.Count);
+
+        await manager.ReadStateAsync(cts.Token);
+
+        Assert.Single(list);
+        Assert.Equal("persisted", list[0]);
+    }
+
     /// <summary>
     /// Tests storing and retrieving complex objects, including updates to mutable properties.
     /// </summary>

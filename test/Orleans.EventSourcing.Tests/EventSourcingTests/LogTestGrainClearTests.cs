@@ -24,6 +24,7 @@ namespace Tester.EventSourcingTests
         [InlineData("TestGrains.LogTestGrainDefaultStorage", 721001L)]
         [InlineData("TestGrains.LogTestGrainSharedLogStorage", 721002L)]
         [InlineData("TestGrains.LogTestGrainCustomStoragePrimaryCluster", 721003L)]
+        [InlineData("TestGrains.LogTestGrainJournaledStateStorage", 721004L)]
         public async Task ClearLog_ResetDropsTentativeAndAllowsFurtherWrites(string grainClass, long grainId)
         {
             var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(grainId, grainClass);
@@ -63,6 +64,63 @@ namespace Tester.EventSourcingTests
             await grain.Clear();
             await grain.SetAGlobal(7);
             Assert.Equal(7, await grain.GetAGlobal());
+            Assert.Equal(1, await grain.GetConfirmedVersion());
+        }
+
+        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        public async Task JournaledStateLogStorage_PersistsEventsAcrossActivation()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(721005L, "TestGrains.LogTestGrainJournaledStateStorage");
+
+            await grain.Clear();
+            await grain.SetAGlobal(10);
+            await grain.IncrementAGlobal();
+
+            var eventLog = await grain.GetEventLog();
+            Assert.Equal(2, eventLog.Count);
+            Assert.Equal(11, await grain.GetAGlobal());
+
+            await grain.Deactivate();
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+            grain = this.fixture.GrainFactory.GetGrain<ILogTestGrain>(721005L, "TestGrains.LogTestGrainJournaledStateStorage");
+            Assert.Equal(11, await grain.GetAGlobal());
+            Assert.Equal(2, await grain.GetConfirmedVersion());
+
+            eventLog = await grain.GetEventLog();
+            Assert.Equal(2, eventLog.Count);
+        }
+
+        [Fact, TestCategory("EventSourcing"), TestCategory("Functional")]
+        public async Task JournaledStateLogStorage_ClearPreservesOtherJournaledState()
+        {
+            var grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721006L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+
+            await grain.Clear();
+            await grain.SetAuxiliaryValue(17);
+            await grain.SetAGlobal(10);
+
+            Assert.Equal(17, await grain.GetAuxiliaryValue());
+            Assert.Equal(10, await grain.GetAGlobal());
+            Assert.Equal(1, await grain.GetConfirmedVersion());
+
+            await grain.Clear();
+
+            Assert.Equal(17, await grain.GetAuxiliaryValue());
+            Assert.Equal(0, await grain.GetConfirmedVersion());
+            Assert.Equal(0, await grain.GetAGlobal());
+
+            await grain.Deactivate();
+            await Task.Delay(TimeSpan.FromMilliseconds(100));
+
+            grain = this.fixture.GrainFactory.GetGrain<ILogTestGrainWithAuxiliaryState>(721006L, "TestGrains.LogTestGrainJournaledStateStorageWithAuxiliaryState");
+
+            Assert.Equal(17, await grain.GetAuxiliaryValue());
+            Assert.Equal(0, await grain.GetConfirmedVersion());
+            Assert.Equal(0, await grain.GetAGlobal());
+
+            await grain.SetAGlobal(42);
+            Assert.Equal(17, await grain.GetAuxiliaryValue());
             Assert.Equal(1, await grain.GetConfirmedVersion());
         }
 
