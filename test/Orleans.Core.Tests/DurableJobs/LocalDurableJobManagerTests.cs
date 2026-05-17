@@ -172,6 +172,7 @@ public class LocalDurableJobManagerTests
         var journaledShardManager = new JournaledJobShardManager(
             localSiloDetails,
             services.GetRequiredService<IJournaledStateManagerFactory>(),
+            services.GetRequiredService<IJournalStorageProvider>(),
             services.GetRequiredService<IJournalStorageCatalog>(),
             membership,
             services,
