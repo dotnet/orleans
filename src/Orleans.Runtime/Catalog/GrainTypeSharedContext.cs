@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Threading;
 using Microsoft.Extensions.DependencyInjection;
@@ -21,6 +22,8 @@ namespace Orleans.Runtime;
 /// </summary>
 public sealed class GrainTypeSharedContext
 {
+    private static readonly ConcurrentStack<Dictionary<Message, CoarseStopwatch>> RunningRequestsMapPool = new();
+    private static readonly ConcurrentStack<List<(Message Message, CoarseStopwatch QueuedTime)>> WaitingRequestsListPool = new();
     private readonly IServiceProvider _serviceProvider;
     private readonly Dictionary<Type, object> _components = [];
 
@@ -70,6 +73,26 @@ public sealed class GrainTypeSharedContext
     /// Gets the grain instance type name, if available.
     /// </summary>
     public string? GrainTypeName { get; }
+
+    internal static Dictionary<Message, CoarseStopwatch> RentRunningRequestsMap()
+        => RunningRequestsMapPool.TryPop(out var value) ? value : new(capacity: 1);
+
+    internal static void ReturnRunningRequestsMap(Dictionary<Message, CoarseStopwatch> value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        value.Clear();
+        RunningRequestsMapPool.Push(value);
+    }
+
+    internal static List<(Message Message, CoarseStopwatch QueuedTime)> RentWaitingRequestsList()
+        => WaitingRequestsListPool.TryPop(out var value) ? value : new(capacity: 1);
+
+    internal static void ReturnWaitingRequestsList(List<(Message Message, CoarseStopwatch QueuedTime)> value)
+    {
+        ArgumentNullException.ThrowIfNull(value);
+        value.Clear();
+        WaitingRequestsListPool.Push(value);
+    }
 
     private static TimeSpan GetCollectionAgeLimit(GrainType grainType, Type grainClass, GrainManifest siloManifest, GrainCollectionOptions collectionOptions)
     {
