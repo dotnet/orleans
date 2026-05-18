@@ -14,6 +14,7 @@
     <ProjectReference
       Include="$(SourceRoot)src/Orleans.CodeGenerator/Orleans.CodeGenerator.csproj"
       OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
       PrivateAssets="None"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
     <ProjectReference
@@ -22,6 +23,7 @@
       UndefineProperties="TargetFramework"
       SkipGetTargetFrameworkProperties="true"
       OutputItemType="Analyzer"
+      ReferenceOutputAssembly="false"
       PrivateAssets="None"
       Condition=" '$(OrleansBuildTimeCodeGen)' == 'true' "/>
   </ItemGroup>

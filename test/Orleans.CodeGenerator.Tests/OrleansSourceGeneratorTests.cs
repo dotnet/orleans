@@ -978,6 +978,317 @@ public class DemoClass
 }");
 
     /// <summary>
+    /// Tests that invokable deduplication works correctly when multiple grain interfaces
+    /// share a common base interface. The base method <c>DoWork</c> is inherited by both
+    /// <c>IGrainA</c> and <c>IGrainB</c>, but the generator should produce only one
+    /// invokable class for that method per declaring interface, not duplicate it for each
+    /// derived interface.
+    /// This behavior is currently handled by the active proxy pipeline via the
+    /// <c>_invokableMethodDescriptions</c> dictionary on the proxy-generation state.
+    /// </summary>
+    [Fact]
+    public async Task SharedBaseInterfaceMethodProducesDeduplicatedInvokable()
+    {
+        var code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface IBaseGrain : IGrainWithGuidKey
+            {
+                Task DoWork();
+            }
+
+            public interface IGrainA : IBaseGrain
+            {
+                Task DoExtraA();
+            }
+
+            public interface IGrainB : IBaseGrain
+            {
+                Task DoExtraB();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        Assert.Empty(compilation.GetDiagnostics());
+
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        var generatedSource = ConcatenateGeneratedSources(result);
+
+        // The base method DoWork is declared on IBaseGrain. Regardless of how many interfaces
+        // inherit from IBaseGrain, only one invokable should be generated for DoWork on IBaseGrain.
+        var invokableDoWorkCount = System.Text.RegularExpressions.Regex.Matches(
+            generatedSource, @"sealed class Invokable_IBaseGrain_GrainReference_\w+").Count;
+        Assert.Equal(1, invokableDoWorkCount);
+
+        // Each derived interface should get its own invokable for its unique method.
+        Assert.Contains("Invokable_IGrainA_GrainReference_", generatedSource);
+        Assert.Contains("Invokable_IGrainB_GrainReference_", generatedSource);
+    }
+
+    [Fact]
+    public async Task DerivedInterfaceInheritingGenerateMethodSerializersProducesProxy()
+    {
+        var code = """
+            using Orleans;
+            using Orleans.Runtime;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface IBaseGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+
+            public interface IDerivedGrain : IBaseGrain
+            {
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        Assert.Empty(compilation.GetDiagnostics());
+
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        var generatedSource = ConcatenateGeneratedSources(result);
+        Assert.Contains("Proxy_IDerivedGrain", generatedSource);
+        Assert.Contains("Invokable_IBaseGrain_GrainReference_", generatedSource);
+    }
+
+    /// <summary>
+    /// Tests that the compilation-level reference-assembly extraction path correctly handles
+    /// types discovered via [GenerateCodeForDeclaringAssembly]. These types cannot be found by
+    /// ForAttributeWithMetadataName since they live in other assemblies.
+    /// </summary>
+    [Fact]
+    public async Task GeneratesSerializersForReferencedAssemblyTypesViaGenerateCodeForDeclaringAssembly()
+    {
+        var libraryCode = """
+            using Orleans;
+
+            namespace LibraryProject;
+
+            [GenerateSerializer]
+            public class LibraryDto
+            {
+                [Id(0)]
+                public string Name { get; set; } = string.Empty;
+
+                [Id(1)]
+                public int Value { get; set; }
+            }
+        """;
+
+        var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
+        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        // Run the generator on the library so its output assembly includes the generated metadata
+        var libraryGeneratorResult = RunSourceGenerator(libraryCompilation);
+        Assert.Empty(libraryGeneratorResult.Diagnostics);
+
+        // Build the consumer that references the library via [GenerateCodeForDeclaringAssembly]
+        var consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryProject.LibraryDto))]
+        """;
+
+        var consumerCompilation = await CreateCompilation(consumerCode, "ConsumerProject");
+
+        // Add the library as a metadata reference so the consumer can see its types
+        consumerCompilation = consumerCompilation.AddReferences(libraryCompilation.ToMetadataReference());
+        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerResult = RunSourceGenerator(consumerCompilation);
+        Assert.Empty(consumerResult.Diagnostics);
+        Assert.NotEmpty(consumerResult.GeneratedSources);
+
+        var generatedSource = ConcatenateGeneratedSources(consumerResult);
+
+        // The generator should produce a serializer (codec) for LibraryDto from the referenced assembly
+        Assert.Contains("LibraryDto", generatedSource);
+        Assert.Contains("Codec", generatedSource);
+    }
+
+    [Fact]
+    public async Task GeneratesSerializersForReferencedNestedAndGenericAssemblyTypesViaGenerateCodeForDeclaringAssembly()
+    {
+        var libraryCode = """
+            using Orleans;
+
+            namespace LibraryProject;
+
+            [GenerateSerializer]
+            public sealed class GenericDto<T>
+            {
+                [Id(0)]
+                public T Value { get; set; } = default!;
+            }
+
+            public sealed class Container
+            {
+                [GenerateSerializer]
+                public sealed class NestedDto
+                {
+                    [Id(0)]
+                    public int Value { get; set; }
+                }
+
+                [GenerateSerializer]
+                public sealed class NestedGenericDto<T>
+                {
+                    [Id(0)]
+                    public T Value { get; set; } = default!;
+                }
+            }
+        """;
+
+        var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
+        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryProject.Container.NestedGenericDto<>))]
+        """;
+
+        var consumerCompilation = (await CreateCompilation(consumerCode, "ConsumerProject"))
+            .AddReferences(libraryCompilation.ToMetadataReference());
+        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerResult = RunSourceGenerator(consumerCompilation);
+        Assert.Empty(consumerResult.Diagnostics);
+
+        Assert.Contains(
+            consumerResult.GeneratedSources,
+            source => source.HintName.Contains("LibraryProject.GenericDto", StringComparison.Ordinal));
+        Assert.Contains(
+            consumerResult.GeneratedSources,
+            source => source.HintName.Contains("LibraryProject.Container.NestedDto", StringComparison.Ordinal));
+        Assert.Contains(
+            consumerResult.GeneratedSources,
+            source => source.HintName.Contains("LibraryProject.Container.NestedGenericDto", StringComparison.Ordinal));
+
+        var generatedSource = ConcatenateGeneratedSources(consumerResult);
+        Assert.Contains("global::LibraryProject.GenericDto", generatedSource);
+        Assert.Contains("global::LibraryProject.Container.NestedDto", generatedSource);
+        Assert.Contains("global::LibraryProject.Container.NestedGenericDto", generatedSource);
+    }
+
+    [Fact]
+    public async Task ReferencedSerializerResolutionUsesAssemblyMetadataIdentityWhenConsumerShadowsFullName()
+    {
+        var libraryCode = """
+            using Orleans;
+
+            namespace LibraryProject
+            {
+                public sealed class Marker
+                {
+                }
+            }
+
+            namespace Shadowed
+            {
+                [GenerateSerializer]
+                public sealed class DuplicateDto
+                {
+                    [Id(0)]
+                    public int LibraryValue { get; set; }
+                }
+            }
+        """;
+
+        var libraryCompilation = await CreateCompilation(libraryCode, "LibraryProject");
+        Assert.Empty(libraryCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerCode = """
+            using Orleans;
+
+            [assembly: GenerateCodeForDeclaringAssembly(typeof(LibraryProject.Marker))]
+
+            namespace Shadowed;
+
+            public sealed class DuplicateDto
+            {
+                public string ConsumerValue { get; set; } = string.Empty;
+            }
+        """;
+
+        var consumerCompilation = (await CreateCompilation(consumerCode, "ConsumerProject"))
+            .AddReferences(libraryCompilation.ToMetadataReference());
+        Assert.Empty(consumerCompilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var consumerResult = RunSourceGenerator(consumerCompilation);
+        Assert.Empty(consumerResult.Diagnostics);
+
+        var generatedSource = ConcatenateGeneratedSources(consumerResult);
+        Assert.Contains("LibraryValue", generatedSource);
+        Assert.DoesNotContain("ConsumerValue", generatedSource);
+    }
+
+    [Fact]
+    public async Task GeneratesProxiesForGenericAndNestedInterfaces()
+    {
+        var code = """
+            using Orleans;
+            using Orleans.Runtime;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateMethodSerializers(typeof(GrainReference))]
+            public interface IGenericGrain<T> : IGrainWithIntegerKey
+            {
+                Task<T> Echo(T value);
+            }
+
+            public sealed class Container
+            {
+                [GenerateMethodSerializers(typeof(GrainReference))]
+                public interface INestedGrain : IGrainWithIntegerKey
+                {
+                    Task Ping();
+                }
+
+                [GenerateMethodSerializers(typeof(GrainReference))]
+                public interface INestedGenericGrain<T> : IGrainWithIntegerKey
+                {
+                    Task<T> Echo(T value);
+                }
+            }
+        """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var result = RunSourceGenerator(compilation);
+        Assert.Empty(result.Diagnostics);
+
+        Assert.Contains(
+            result.GeneratedSources,
+            source => source.HintName.Contains("IGenericGrain", StringComparison.Ordinal));
+        Assert.Contains(
+            result.GeneratedSources,
+            source => source.HintName.Contains("Container.INestedGrain", StringComparison.Ordinal));
+        Assert.Contains(
+            result.GeneratedSources,
+            source => source.HintName.Contains("Container.INestedGenericGrain", StringComparison.Ordinal));
+
+        var generatedSource = ConcatenateGeneratedSources(result);
+        Assert.Contains("Proxy_IGenericGrain", generatedSource);
+        Assert.Contains("Proxy_INestedGrain", generatedSource);
+        Assert.Contains("Proxy_INestedGenericGrain", generatedSource);
+    }
+
+    /// <summary>
     /// Tests that the generator emits a warning when [GenerateSerializer] is used in a reference assembly.
     /// Reference assemblies contain only metadata, no implementation, so generating serializers
     /// in them is incorrect. This test ensures developers get proper diagnostics for this mistake.
@@ -1014,6 +1325,32 @@ public class DemoClass
 
         var result = RunSourceGenerator(compilation);
         Assert.Contains(result.Diagnostics, d => d.Id == DiagnosticRuleId.ReferenceAssemblyWithGenerateSerializer);
+    }
+
+    [Fact]
+    public async Task EmitsInvalidFieldIdDiagnosticForImplicitPublicProperties()
+    {
+        const string code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public class AutoDto
+            {
+                public string Value { get; set; } = string.Empty;
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        Assert.Empty(compilation.GetDiagnostics().Where(d => d.Severity == DiagnosticSeverity.Error));
+
+        var result = RunSourceGenerator(compilation);
+        var diagnostic = Assert.Single(result.Diagnostics, d => d.Id == CanNotGenerateImplicitFieldIdsDiagnostic.DiagnosticId);
+
+        Assert.Equal(DiagnosticRuleId.CanNotGenerateImplicitFieldIds, diagnostic.Id);
+        Assert.Equal(DiagnosticSeverity.Error, diagnostic.Severity);
+        Assert.Contains("AutoDto", diagnostic.GetMessage(), StringComparison.Ordinal);
     }
 
     [Fact]
@@ -1071,14 +1408,254 @@ public class DemoClass
                 ["build_property.orleans_generateserializerattributes"] = "TestProject.CustomGenerateSerializerAttribute",
             });
 
-        Assert.Single(baselineResult.GeneratedSources);
-        Assert.Single(configuredResult.GeneratedSources);
+        Assert.NotEmpty(baselineResult.GeneratedSources);
+        Assert.NotEmpty(configuredResult.GeneratedSources);
         Assert.Equal(
-            baselineResult.GeneratedSources[0].SourceText.ToString(),
-            configuredResult.GeneratedSources[0].SourceText.ToString());
+            baselineResult.GeneratedSources.Select(source => source.HintName).OrderBy(name => name),
+            configuredResult.GeneratedSources.Select(source => source.HintName).OrderBy(name => name));
+        Assert.Equal(
+            ConcatenateGeneratedSources(baselineResult),
+            ConcatenateGeneratedSources(configuredResult));
         Assert.Equal(
             baselineResult.Diagnostics.Select(d => d.Id).OrderBy(id => id),
             configuredResult.Diagnostics.Select(d => d.Id).OrderBy(id => id));
+    }
+
+    [Fact]
+    public async Task GlobalGenerateFieldIdsOption_AllowsImplicitPublicProperties()
+    {
+        var code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public class DemoData
+            {
+                public string Value { get; set; } = string.Empty;
+                public int Count { get; set; }
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var baselineResult = RunSourceGenerator(compilation);
+        var configuredResult = RunSourceGenerator(
+            compilation,
+            new Dictionary<string, string>
+            {
+                ["build_property.orleans_generatefieldids"] = "PublicProperties",
+            });
+
+        Assert.Contains(baselineResult.Diagnostics, d => d.Id == DiagnosticRuleId.CanNotGenerateImplicitFieldIds);
+        Assert.Empty(configuredResult.Diagnostics);
+        Assert.Contains(configuredResult.GeneratedSources, source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task CompatibilityInvokersOption_GeneratesAdditionalInheritedInvokables()
+    {
+        var code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            public interface IBaseGrain : IGrainWithIntegerKey
+            {
+                Task Ping();
+            }
+
+            public interface IDerivedGrain : IBaseGrain
+            {
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var baselineResult = RunSourceGenerator(compilation);
+        var configuredResult = RunSourceGenerator(
+            compilation,
+            new Dictionary<string, string>
+            {
+                ["build_property.orleansgeneratecompatibilityinvokers"] = "true",
+            });
+
+        Assert.Empty(baselineResult.Diagnostics);
+        Assert.Empty(configuredResult.Diagnostics);
+
+        var baselineSource = ConcatenateGeneratedSources(baselineResult);
+        var configuredSource = ConcatenateGeneratedSources(configuredResult);
+
+        Assert.True(
+            CountGeneratedInvokableClasses(configuredSource) > CountGeneratedInvokableClasses(baselineSource),
+            "Enabling compatibility invokers should generate additional invokable classes for inherited grain methods.");
+    }
+
+    [Fact]
+    public async Task AttachDebuggerFalseOption_DoesNotChangeOutput()
+    {
+        var code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public class DemoData
+            {
+                [Id(0)]
+                public string Value { get; set; } = string.Empty;
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var baselineResult = RunSourceGenerator(compilation);
+        var configuredResult = RunSourceGenerator(
+            compilation,
+            new Dictionary<string, string>
+            {
+                ["build_property.orleans_attachdebugger"] = "false",
+            });
+
+        Assert.Empty(baselineResult.Diagnostics);
+        Assert.Empty(configuredResult.Diagnostics);
+        Assert.Equal(
+            baselineResult.GeneratedSources.Select(source => source.HintName).OrderBy(name => name),
+            configuredResult.GeneratedSources.Select(source => source.HintName).OrderBy(name => name));
+        Assert.Equal(
+            ConcatenateGeneratedSources(baselineResult),
+            ConcatenateGeneratedSources(configuredResult));
+    }
+
+    [Fact]
+    public async Task GeneratedSources_EmitMetadataLast()
+    {
+        var code = """
+            using Orleans;
+            using System.Threading.Tasks;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public class DemoData
+            {
+                [Id(0)]
+                public string Value { get; set; } = string.Empty;
+            }
+
+            public interface IMyGrain : IGrainWithIntegerKey
+            {
+                Task<DemoData> Get();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var result = RunSourceGenerator(compilation);
+
+        Assert.Empty(result.Diagnostics);
+
+        var emittedHintNames = result.GeneratedSources
+            .Where(static source => !string.IsNullOrWhiteSpace(source.SourceText.ToString()))
+            .Select(static source => source.HintName)
+            .ToArray();
+
+        Assert.NotEmpty(emittedHintNames);
+        Assert.Contains(emittedHintNames, static hintName => hintName.Contains(".orleans.ser.", StringComparison.Ordinal));
+        Assert.Contains(emittedHintNames, static hintName => hintName.Contains(".orleans.proxy.", StringComparison.Ordinal));
+        Assert.EndsWith(".orleans.metadata.g.cs", emittedHintNames[^1], StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public async Task GeneratedInvokableActivators_AreRegisteredInMetadata()
+    {
+        var code = """
+            using System;
+            using System.Threading.Tasks;
+            using Orleans;
+            using Orleans.Runtime;
+
+            namespace TestProject;
+
+            [InvokableBaseType(typeof(GrainReference), typeof(Task<>), typeof(ActivatingTaskRequest<>))]
+            [AttributeUsage(AttributeTargets.Method)]
+            public sealed class ActivatingAttribute : Attribute
+            {
+            }
+
+            public abstract class ActivatingTaskRequest<TResult> : TaskRequest<TResult>
+            {
+                [GeneratedActivatorConstructor]
+                protected ActivatingTaskRequest(IServiceProvider serviceProvider)
+                {
+                }
+            }
+
+            public interface IActivatingGrain : IGrainWithIntegerKey
+            {
+                [Activating]
+                Task<string> GetValue();
+            }
+
+            public interface INormalGrain : IGrainWithIntegerKey
+            {
+                Task<string> GetValue();
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var result = RunSourceGenerator(compilation);
+
+        Assert.Empty(result.Diagnostics);
+
+        var emittedActivatorNames = GetGeneratedClassNames(result, ".orleans.proxy.", "Activator_Invokable_");
+        var registeredActivatorNames = GetRegisteredGeneratedInvokableActivatorNames(result);
+
+        Assert.Single(emittedActivatorNames);
+        Assert.Equal(emittedActivatorNames, registeredActivatorNames);
+        Assert.Contains(emittedActivatorNames, static name => name.Contains("IActivatingGrain", StringComparison.Ordinal));
+        Assert.DoesNotContain(registeredActivatorNames, static name => name.Contains("INormalGrain", StringComparison.Ordinal));
+    }
+
+    [Fact]
+    public async Task RecordPrimaryConstructorFieldIds_AreNotDuplicatedOrDropped()
+    {
+        var code = """
+            using Orleans;
+
+            namespace TestProject;
+
+            [GenerateSerializer]
+            public sealed record PrimaryCtorRecord(
+                [property: Id(0)] string Value,
+                [field: Id(1)] int Count)
+            {
+                [Id(2)]
+                public string Extra { get; init; } = string.Empty;
+            }
+            """;
+
+        var compilation = await CreateCompilation(code, "TestProject");
+        var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
+        GeneratorDriver driver = CSharpGeneratorDriver.Create(
+            generators: [generator],
+            driverOptions: new GeneratorDriverOptions(default));
+        driver = driver.RunGeneratorsAndUpdateCompilation(compilation, out var outputCompilation, out var generatorDiagnostics);
+        var result = driver.GetRunResult().Results.Single();
+
+        Assert.Empty(generatorDiagnostics.Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+        Assert.Empty(result.Diagnostics);
+        Assert.Empty(outputCompilation.GetDiagnostics().Where(static diagnostic => diagnostic.Severity == DiagnosticSeverity.Error));
+
+        var serializerSource = Assert.Single(
+            result.GeneratedSources,
+            static source => source.HintName.Contains(".orleans.ser.", StringComparison.Ordinal)
+                && source.SourceText.ToString().Contains("Codec_PrimaryCtorRecord", StringComparison.Ordinal));
+        var serializerText = serializerSource.SourceText.ToString();
+
+        Assert.Equal(1, CountOccurrences(serializerText, "instance.Value"));
+        Assert.Equal(1, CountOccurrences(serializerText, "instance.Count"));
+        Assert.Equal(1, CountOccurrences(serializerText, "instance.Extra"));
+        Assert.Equal(1, CountOccurrences(serializerText, "if (id == 0U)"));
+        Assert.Equal(1, CountOccurrences(serializerText, "if (id == 1U)"));
+        Assert.Equal(1, CountOccurrences(serializerText, "if (id == 2U)"));
     }
 
     private static GeneratorRunResult RunSourceGenerator(
@@ -1089,7 +1666,7 @@ public class DemoClass
             ? null
             : new TestAnalyzerConfigOptionsProvider(globalOptions);
 
-        var generator = new OrleansSerializationSourceGenerator();
+        var generator = new OrleansSerializationSourceGenerator().AsSourceGenerator();
         GeneratorDriver driver = CSharpGeneratorDriver.Create(
             generators: [generator],
             optionsProvider: optionsProvider,
@@ -1111,12 +1688,270 @@ public class DemoClass
         var result = RunSourceGenerator(compilation);
         Assert.Empty(result.Diagnostics);
 
-        Assert.Single(result.GeneratedSources);
-        Assert.Equal($"{projectName}.orleans.g.cs", result.GeneratedSources[0].HintName);
-        var generatedSource = result.GeneratedSources[0].SourceText.ToString();
+        Assert.NotEmpty(result.GeneratedSources);
+        Assert.All(result.GeneratedSources, generated =>
+            Assert.StartsWith($"{projectName}.orleans.", generated.HintName, StringComparison.Ordinal));
+        var generatedSource = ConcatenateGeneratedSources(result);
 
         await Verify(generatedSource, extension: "cs").UseDirectory("snapshots");
     }
+
+    private static string ConcatenateGeneratedSources(GeneratorRunResult result)
+    {
+        var assemblyAttributes = new List<AttributeListSyntax>();
+        var topLevelMembers = new List<MemberDeclarationSyntax>();
+        var namespaces = new Dictionary<string, NamespaceMembers>(StringComparer.Ordinal);
+
+        foreach (var item in result.GeneratedSources
+            .Select(static (source, index) => (Source: source, Index: index))
+            .Where(static item => !string.IsNullOrWhiteSpace(item.Source.SourceText.ToString()))
+            .OrderBy(static item => GetSnapshotSourceOrder(item.Source.HintName))
+            .ThenBy(static item => item.Index))
+        {
+            var root = CSharpSyntaxTree.ParseText(item.Source.SourceText.ToString().TrimStart('\uFEFF').TrimEnd()).GetCompilationUnitRoot();
+            assemblyAttributes.AddRange(root.AttributeLists);
+
+            foreach (var member in root.Members)
+            {
+                if (member is NamespaceDeclarationSyntax namespaceDeclaration)
+                {
+                    var namespaceName = namespaceDeclaration.Name.ToString();
+                    if (!namespaces.TryGetValue(namespaceName, out var namespaceMembers))
+                    {
+                        namespaceMembers = new NamespaceMembers(namespaceDeclaration.Usings);
+                        namespaces.Add(namespaceName, namespaceMembers);
+                    }
+
+                    namespaceMembers.Members.AddRange(namespaceDeclaration.Members);
+                }
+                else
+                {
+                    topLevelMembers.Add(member);
+                }
+            }
+        }
+
+        var combinedMembers = new List<MemberDeclarationSyntax>();
+        combinedMembers.AddRange(topLevelMembers);
+        foreach (var pair in namespaces.OrderBy(static pair => pair.Key, StringComparer.Ordinal))
+        {
+            combinedMembers.Add(
+                SyntaxFactory.NamespaceDeclaration(SyntaxFactory.ParseName(pair.Key))
+                    .WithUsings(pair.Value.Usings)
+                    .WithMembers(SyntaxFactory.List(OrderLegacyGeneratedMembers(pair.Value.Members))));
+        }
+
+        var unit = SyntaxFactory.CompilationUnit()
+            .WithAttributeLists(SyntaxFactory.List(assemblyAttributes))
+            .WithMembers(SyntaxFactory.List(combinedMembers));
+        var resultText = unit.NormalizeWhitespace().ToFullString();
+        resultText = resultText.Replace(".Add(typeof(int));", ".Add(typeof( int ));", StringComparison.Ordinal);
+        if (assemblyAttributes.Count > 0)
+        {
+            resultText += $"{Environment.NewLine}#pragma warning restore CS1591, RS0016, RS0041";
+        }
+
+        return resultText;
+
+        static int GetSnapshotSourceOrder(string hintName)
+        {
+            if (hintName.Contains(".orleans.proxy.", StringComparison.Ordinal))
+            {
+                return 0;
+            }
+
+            if (hintName.Contains(".orleans.ser.", StringComparison.Ordinal))
+            {
+                return 1;
+            }
+
+            if (hintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal))
+            {
+                return 3;
+            }
+
+            return 2;
+        }
+    }
+
+    private static List<MemberDeclarationSyntax> OrderLegacyGeneratedMembers(List<MemberDeclarationSyntax> members)
+    {
+        var serializerOrder = GetSerializerOrder(members);
+        return members
+            .Select(static (member, index) => (Member: member, Index: index))
+            .OrderBy(static item => GetLegacyMemberCategory(item.Member))
+            .ThenBy(item => GetSerializerOrderIndex(item.Member, serializerOrder))
+            .ThenBy(static item => GetSerializerMemberKindOrder(item.Member))
+            .ThenBy(static item => item.Index)
+            .Select(static item => item.Member)
+            .ToList();
+    }
+
+    private static Dictionary<string, int> GetSerializerOrder(List<MemberDeclarationSyntax> members)
+    {
+        var result = new Dictionary<string, int>(StringComparer.Ordinal);
+        foreach (var metadataClass in members
+            .OfType<ClassDeclarationSyntax>()
+            .Where(static declaration => declaration.Identifier.ValueText.StartsWith("Metadata_", StringComparison.Ordinal)))
+        {
+            foreach (var invocation in metadataClass.DescendantNodes().OfType<InvocationExpressionSyntax>())
+            {
+                if (invocation.Expression is not MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Add", Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Serializers" } }
+                    || invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression is not TypeOfExpressionSyntax typeOfExpression)
+                {
+                    continue;
+                }
+
+                var serializerClassName = GetGeneratedClassIdentifier(typeOfExpression.Type.ToString().Split('.').Last());
+                if (serializerClassName.StartsWith("Codec_", StringComparison.Ordinal))
+                {
+                    result.TryAdd(serializerClassName["Codec_".Length..], result.Count);
+                }
+            }
+        }
+
+        return result;
+    }
+
+    private static string GetGeneratedClassIdentifier(string typeName)
+    {
+        var genericMarkerIndex = typeName.IndexOf('<');
+        return genericMarkerIndex >= 0 ? typeName[..genericMarkerIndex] : typeName;
+    }
+
+    private static int GetLegacyMemberCategory(MemberDeclarationSyntax member)
+    {
+        if (member is not ClassDeclarationSyntax classDeclaration)
+        {
+            return 1;
+        }
+
+        var className = classDeclaration.Identifier.ValueText;
+        if (className.StartsWith("Invokable_", StringComparison.Ordinal)
+            || className.StartsWith("Proxy_", StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        if (className.StartsWith("Metadata_", StringComparison.Ordinal))
+        {
+            return 3;
+        }
+
+        return 1;
+    }
+
+    private static int GetSerializerOrderIndex(MemberDeclarationSyntax member, Dictionary<string, int> serializerOrder)
+    {
+        if (member is not ClassDeclarationSyntax classDeclaration)
+        {
+            return int.MaxValue;
+        }
+
+        var className = classDeclaration.Identifier.ValueText;
+        var serializableTypeName = GetSerializableTypeName(className);
+        if (serializableTypeName is not null && serializerOrder.TryGetValue(serializableTypeName, out var order))
+        {
+            return order;
+        }
+
+        return int.MaxValue;
+    }
+
+    private static int GetSerializerMemberKindOrder(MemberDeclarationSyntax member)
+    {
+        if (member is not ClassDeclarationSyntax classDeclaration)
+        {
+            return 0;
+        }
+
+        var className = classDeclaration.Identifier.ValueText;
+        if (className.StartsWith("Codec_", StringComparison.Ordinal))
+        {
+            return 0;
+        }
+
+        if (className.StartsWith("Copier_", StringComparison.Ordinal))
+        {
+            return 1;
+        }
+
+        if (className.StartsWith("Activator_", StringComparison.Ordinal))
+        {
+            return 2;
+        }
+
+        return 0;
+    }
+
+    private static string? GetSerializableTypeName(string generatedClassName)
+    {
+        if (generatedClassName.StartsWith("Codec_", StringComparison.Ordinal))
+        {
+            return generatedClassName["Codec_".Length..];
+        }
+
+        if (generatedClassName.StartsWith("Copier_", StringComparison.Ordinal))
+        {
+            return generatedClassName["Copier_".Length..];
+        }
+
+        if (generatedClassName.StartsWith("Activator_", StringComparison.Ordinal))
+        {
+            return generatedClassName["Activator_".Length..];
+        }
+
+        return null;
+    }
+
+    private static int CountGeneratedInvokableClasses(string source)
+        => source.Split(Environment.NewLine)
+            .Count(line => line.Contains("public sealed class Invokable_", StringComparison.Ordinal));
+
+    private static int CountOccurrences(string value, string substring)
+    {
+        var count = 0;
+        var index = 0;
+        while ((index = value.IndexOf(substring, index, StringComparison.Ordinal)) >= 0)
+        {
+            count++;
+            index += substring.Length;
+        }
+
+        return count;
+    }
+
+    private static string[] GetGeneratedClassNames(GeneratorRunResult result, string hintNameFragment, string classNamePrefix)
+        => result.GeneratedSources
+            .Where(source => source.HintName.Contains(hintNameFragment, StringComparison.Ordinal))
+            .SelectMany(static source => CSharpSyntaxTree.ParseText(source.SourceText.ToString().TrimStart('\uFEFF')).GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<ClassDeclarationSyntax>())
+            .Select(static declaration => declaration.Identifier.ValueText)
+            .Where(name => name.StartsWith(classNamePrefix, StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
+
+    private static string[] GetRegisteredGeneratedInvokableActivatorNames(GeneratorRunResult result)
+        => result.GeneratedSources
+            .Where(static source => source.HintName.EndsWith(".orleans.metadata.g.cs", StringComparison.Ordinal))
+            .SelectMany(static source => CSharpSyntaxTree.ParseText(source.SourceText.ToString().TrimStart('\uFEFF')).GetCompilationUnitRoot()
+                .DescendantNodes()
+                .OfType<InvocationExpressionSyntax>())
+            .Where(static invocation =>
+                invocation.Expression is MemberAccessExpressionSyntax
+                {
+                    Name.Identifier.ValueText: "Add",
+                    Expression: MemberAccessExpressionSyntax { Name.Identifier.ValueText: "Activators" }
+                })
+            .Select(static invocation => invocation.ArgumentList.Arguments.FirstOrDefault()?.Expression)
+            .OfType<TypeOfExpressionSyntax>()
+            .Select(static typeOfExpression => GetGeneratedClassIdentifier(typeOfExpression.Type.ToString().Split('.').Last()))
+            .Where(static name => name.StartsWith("Activator_Invokable_", StringComparison.Ordinal))
+            .Distinct(StringComparer.Ordinal)
+            .OrderBy(static name => name, StringComparer.Ordinal)
+            .ToArray();
 
     private sealed class TestAnalyzerConfigOptionsProvider : AnalyzerConfigOptionsProvider
     {
@@ -1147,43 +1982,18 @@ public class DemoClass
         public override bool TryGetValue(string key, out string value) => _options.TryGetValue(key, out value!);
     }
 
+    private sealed class NamespaceMembers(SyntaxList<UsingDirectiveSyntax> usings)
+    {
+        public SyntaxList<UsingDirectiveSyntax> Usings { get; } = usings;
+
+        public List<MemberDeclarationSyntax> Members { get; } = [];
+    }
+
     /// <summary>
     /// Creates a Roslyn compilation with the necessary Orleans references.
     /// This simulates the build environment where the source generator runs,
     /// including all required Orleans assemblies and .NET framework references.
     /// </summary>
-    private static async Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
-    {
-#if NET10_0_OR_GREATER
-        // Manually construct .NET 10.0 reference assemblies
-        var net10References = new ReferenceAssemblies(
-            "net10.0",
-            new PackageIdentity("Microsoft.NETCore.App.Ref", "10.0.0"),
-            Path.Combine("ref", "net10.0"));
-        
-        var references = await net10References.ResolveAsync(LanguageNames.CSharp, default);
-#else
-        var references = await ReferenceAssemblies.Net.Net80.ResolveAsync(LanguageNames.CSharp, default);
-#endif
-
-        // Add the Orleans Orleans.Core.Abstractions assembly
-        references = references.AddRange(
-            // Orleans.Core.Abstractions
-            MetadataReference.CreateFromFile(typeof(GrainId).Assembly.Location),
-            // Orleans.Core
-            MetadataReference.CreateFromFile(typeof(IClusterClientLifecycle).Assembly.Location),
-            // Orleans.Runtime
-            MetadataReference.CreateFromFile(typeof(IGrainActivator).Assembly.Location),
-            // Orleans.Serialization
-            MetadataReference.CreateFromFile(typeof(Serializer).Assembly.Location),
-            // Orleans.Serialization.Abstractions
-            MetadataReference.CreateFromFile(typeof(GenerateFieldIds).Assembly.Location),
-            // Microsoft.Extensions.DependencyInjection.Abstractions
-            MetadataReference.CreateFromFile(typeof(ActivatorUtilitiesConstructorAttribute).Assembly.Location)
-        );
-
-        var syntaxTree = CSharpSyntaxTree.ParseText(sourceCode);
-
-        return CSharpCompilation.Create(assemblyName, [syntaxTree], references, new CSharpCompilationOptions(OutputKind.DynamicallyLinkedLibrary));
-    }
+    private static Task<CSharpCompilation> CreateCompilation(string sourceCode, string assemblyName = "TestProject")
+        => TestCompilationHelper.CreateCompilation(sourceCode, assemblyName);
 }

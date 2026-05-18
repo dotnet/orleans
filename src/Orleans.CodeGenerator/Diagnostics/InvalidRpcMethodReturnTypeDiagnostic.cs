@@ -1,9 +1,7 @@
-using System.Linq;
 using Microsoft.CodeAnalysis;
 
 namespace Orleans.CodeGenerator.Diagnostics;
 
-#nullable disable
 public static class InvalidRpcMethodReturnTypeDiagnostic
 {
     public const string RuleId = DiagnosticRuleId.InvalidRpcMethodReturnType; 
@@ -14,7 +12,7 @@ public static class InvalidRpcMethodReturnTypeDiagnostic
 
     internal static readonly DiagnosticDescriptor Rule = new DiagnosticDescriptor(RuleId, Title, MessageFormat, Category, DiagnosticSeverity.Error, isEnabledByDefault: true, description: Description);
 
-    public static Diagnostic CreateDiagnostic(Location location, string returnType, string methodIdentifier, string supportedReturnTypeList) => Diagnostic.Create(Rule, location, returnType, methodIdentifier, supportedReturnTypeList);
+    public static Diagnostic CreateDiagnostic(Location? location, string returnType, string methodIdentifier, string supportedReturnTypeList) => Diagnostic.Create(Rule, location, returnType, methodIdentifier, supportedReturnTypeList);
 
     internal static Diagnostic CreateDiagnostic(InvokableMethodDescription methodDescription)
     {

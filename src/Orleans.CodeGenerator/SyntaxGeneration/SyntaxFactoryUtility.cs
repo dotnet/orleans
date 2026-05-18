@@ -1,114 +1,111 @@
 using Microsoft.CodeAnalysis;
 using Microsoft.CodeAnalysis.CSharp;
 using Microsoft.CodeAnalysis.CSharp.Syntax;
-using System.Collections.Generic;
-using System.Linq;
 using static Microsoft.CodeAnalysis.CSharp.SyntaxFactory;
 
-namespace Orleans.CodeGenerator.SyntaxGeneration
+namespace Orleans.CodeGenerator.SyntaxGeneration;
+
+internal static class SyntaxFactoryUtility
 {
-    internal static class SyntaxFactoryUtility
+    /// <summary>
+    /// Returns member access syntax.
+    /// </summary>
+    /// <param name="instance">
+    /// The instance.
+    /// </param>
+    /// <param name="member">
+    /// The member.
+    /// </param>
+    /// <returns>
+    /// The resulting <see cref="MemberAccessExpressionSyntax"/>.
+    /// </returns>
+    public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, string member) => instance.Member(member.ToIdentifierName());
+
+    /// <summary>
+    /// Returns member access syntax.
+    /// </summary>
+    /// <param name="instance">
+    /// The instance.
+    /// </param>
+    /// <param name="member">
+    /// The member.
+    /// </param>
+    /// <returns>
+    /// The resulting <see cref="MemberAccessExpressionSyntax"/>.
+    /// </returns>
+    public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, IdentifierNameSyntax member) => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, instance, member);
+
+    public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, GenericNameSyntax member) => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, instance, member);
+
+    public static MemberAccessExpressionSyntax Member(
+        this ExpressionSyntax instance,
+        string member,
+        params TypeSyntax[] genericTypes) => instance.Member(
+                member.ToGenericName()
+                    .AddTypeArgumentListArguments(genericTypes));
+
+    public static GenericNameSyntax ToGenericName(this string identifier) => GenericName(identifier.ToIdentifier());
+
+    public static ClassDeclarationSyntax AddGenericTypeParameters(
+        ClassDeclarationSyntax classDeclaration,
+        List<(string Name, ITypeParameterSymbol Parameter)> typeParameters)
     {
-        /// <summary>
-        /// Returns member access syntax.
-        /// </summary>
-        /// <param name="instance">
-        /// The instance.
-        /// </param>
-        /// <param name="member">
-        /// The member.
-        /// </param>
-        /// <returns>
-        /// The resulting <see cref="MemberAccessExpressionSyntax"/>.
-        /// </returns>
-        public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, string member) => instance.Member(member.ToIdentifierName());
-
-        /// <summary>
-        /// Returns member access syntax.
-        /// </summary>
-        /// <param name="instance">
-        /// The instance.
-        /// </param>
-        /// <param name="member">
-        /// The member.
-        /// </param>
-        /// <returns>
-        /// The resulting <see cref="MemberAccessExpressionSyntax"/>.
-        /// </returns>
-        public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, IdentifierNameSyntax member) => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, instance, member);
-
-        public static MemberAccessExpressionSyntax Member(this ExpressionSyntax instance, GenericNameSyntax member) => MemberAccessExpression(SyntaxKind.SimpleMemberAccessExpression, instance, member);
-
-        public static MemberAccessExpressionSyntax Member(
-            this ExpressionSyntax instance,
-            string member,
-            params TypeSyntax[] genericTypes) => instance.Member(
-                    member.ToGenericName()
-                        .AddTypeArgumentListArguments(genericTypes));
-
-        public static GenericNameSyntax ToGenericName(this string identifier) => GenericName(identifier.ToIdentifier());
-
-        public static ClassDeclarationSyntax AddGenericTypeParameters(
-            ClassDeclarationSyntax classDeclaration,
-            List<(string Name, ITypeParameterSymbol Parameter)> typeParameters)
+        var typeParametersWithConstraints = GetTypeParameterConstraints(typeParameters);
+        foreach (var (name, constraints) in typeParametersWithConstraints)
         {
-            var typeParametersWithConstraints = GetTypeParameterConstraints(typeParameters);
-            foreach (var (name, constraints) in typeParametersWithConstraints)
+            if (constraints.Count > 0)
             {
-                if (constraints.Count > 0)
-                {
-                    classDeclaration = classDeclaration.AddConstraintClauses(
-                        TypeParameterConstraintClause(name).AddConstraints(constraints.ToArray()));
-                }
+                classDeclaration = classDeclaration.AddConstraintClauses(
+                    TypeParameterConstraintClause(name).AddConstraints([.. constraints]));
             }
-
-            if (typeParametersWithConstraints.Count > 0)
-            {
-                classDeclaration = classDeclaration.WithTypeParameterList(
-                    TypeParameterList(SeparatedList(typeParametersWithConstraints.Select(tp => TypeParameter(tp.Name)))));
-            }
-
-            return classDeclaration;
         }
 
-        public static List<(string Name, List<TypeParameterConstraintSyntax> Constraints)> GetTypeParameterConstraints(List<(string Name, ITypeParameterSymbol Parameter)> typeParameter)
+        if (typeParametersWithConstraints.Count > 0)
         {
-            var allConstraints = new List<(string, List<TypeParameterConstraintSyntax>)>();
-            foreach (var (name, tp) in typeParameter)
+            classDeclaration = classDeclaration.WithTypeParameterList(
+                TypeParameterList(SeparatedList(typeParametersWithConstraints.Select(tp => TypeParameter(tp.Name)))));
+        }
+
+        return classDeclaration;
+    }
+
+    public static List<(string Name, List<TypeParameterConstraintSyntax> Constraints)> GetTypeParameterConstraints(List<(string Name, ITypeParameterSymbol Parameter)> typeParameter)
+    {
+        var allConstraints = new List<(string, List<TypeParameterConstraintSyntax>)>();
+        foreach (var (name, tp) in typeParameter)
+        {
+            var constraints = new List<TypeParameterConstraintSyntax>();
+
+            if (tp.HasUnmanagedTypeConstraint)
             {
-                var constraints = new List<TypeParameterConstraintSyntax>();
-
-                if (tp.HasUnmanagedTypeConstraint)
-                {
-                    constraints.Add(TypeConstraint(IdentifierName("unmanaged")));
-                }
-                else if (tp.HasValueTypeConstraint)
-                {
-                    constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
-                }
-                else if (tp.HasNotNullConstraint)
-                {
-                    constraints.Add(TypeConstraint(IdentifierName("notnull")));
-                }
-                else if (tp.HasReferenceTypeConstraint)
-                {
-                    constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
-                }
-
-                foreach (var c in tp.ConstraintTypes)
-                {
-                    constraints.Add(TypeConstraint(c.ToTypeSyntax()));
-                }
-
-                if (tp.HasConstructorConstraint)
-                {
-                    constraints.Add(ConstructorConstraint());
-                }
-
-                allConstraints.Add((name, constraints));
+                constraints.Add(TypeConstraint(IdentifierName("unmanaged")));
+            }
+            else if (tp.HasValueTypeConstraint)
+            {
+                constraints.Add(ClassOrStructConstraint(SyntaxKind.StructConstraint));
+            }
+            else if (tp.HasNotNullConstraint)
+            {
+                constraints.Add(TypeConstraint(IdentifierName("notnull")));
+            }
+            else if (tp.HasReferenceTypeConstraint)
+            {
+                constraints.Add(ClassOrStructConstraint(SyntaxKind.ClassConstraint));
             }
 
-            return allConstraints;
+            foreach (var c in tp.ConstraintTypes)
+            {
+                constraints.Add(TypeConstraint(c.ToTypeSyntax()));
+            }
+
+            if (tp.HasConstructorConstraint)
+            {
+                constraints.Add(ConstructorConstraint());
+            }
+
+            allConstraints.Add((name, constraints));
         }
+
+        return allConstraints;
     }
 }
