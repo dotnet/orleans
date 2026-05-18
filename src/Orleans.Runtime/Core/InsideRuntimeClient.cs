@@ -1,8 +1,6 @@
 using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Diagnostics;
-using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
@@ -32,7 +30,7 @@ namespace Orleans.Runtime
         private readonly ILogger invokeExceptionLogger;
         private readonly ILoggerFactory loggerFactory;
         private readonly SiloMessagingOptions messagingOptions;
-        private readonly ConcurrentDictionary<(GrainId, CorrelationId), CallbackData> callbacks;
+        private readonly StripedCallbackDictionary<CallbackData> callbacks;
         private readonly InterfaceToImplementationMappingCache interfaceToImplementationMapping;
         private readonly SharedCallbackData sharedCallbackData;
         private readonly SharedCallbackData systemSharedCallbackData;
@@ -74,7 +72,7 @@ namespace Orleans.Runtime
             this._applicationRequestInstruments = new(orleansInstruments);
             this.ServiceProvider = serviceProvider;
             this.MySilo = siloDetails.SiloAddress;
-            this.callbacks = new ConcurrentDictionary<(GrainId, CorrelationId), CallbackData>();
+            this.callbacks = new StripedCallbackDictionary<CallbackData>();
             this.messageFactory = messageFactory;
             this.ConcreteGrainFactory = new GrainFactory(this, referenceActivator, interfaceIdResolver, interfaceToTypeResolver);
             this.logger = loggerFactory.CreateLogger<InsideRuntimeClient>();
@@ -88,7 +86,7 @@ namespace Orleans.Runtime
 
             var callbackDataLogger = loggerFactory.CreateLogger<CallbackData>();
             this.sharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.ResponseTimeout,
                 this.messagingOptions.CancelRequestOnTimeout,
@@ -96,7 +94,7 @@ namespace Orleans.Runtime
                 cancellationManager: null);
 
             this.systemSharedCallbackData = new SharedCallbackData(
-                msg => this.UnregisterCallback(msg.SendingGrain, msg.Id),
+                msg => this.UnregisterCallback(msg.Id),
                 callbackDataLogger,
                 this.messagingOptions.SystemResponseTimeout,
                 cancelOnTimeout: false,
@@ -181,7 +179,7 @@ namespace Orleans.Runtime
 
                 // Register a callback for the request.
                 var callbackData = new CallbackData(sharedData, context, message, _applicationRequestInstruments);
-                callbacks.TryAdd((message.SendingGrain, message.Id), callbackData);
+                callbacks.TryAdd(message.Id, callbackData);
                 callbackData.SubscribeForCancellation(cancellationToken);
             }
             else
@@ -218,9 +216,9 @@ namespace Orleans.Runtime
         /// <summary>
         /// UnRegister a callback.
         /// </summary>
-        private void UnregisterCallback(GrainId grainId, CorrelationId correlationId)
+        private void UnregisterCallback(CorrelationId correlationId)
         {
-            callbacks.TryRemove((grainId, correlationId), out _);
+            callbacks.TryRemove(correlationId, out _);
         }
 
         public void SniffIncomingMessage(Message message)
@@ -433,7 +431,7 @@ namespace Orleans.Runtime
             else if (message.Result == Message.ResponseTypes.Status)
             {
                 var status = (StatusResponse)message.BodyObject;
-                callbacks.TryGetValue((message.TargetGrain, message.Id), out var callback);
+                callbacks.TryGetValue(message.Id, out var callback);
                 var request = callback?.Message;
                 if (request is not null)
                 {
@@ -467,7 +465,7 @@ namespace Orleans.Runtime
             }
 
             CallbackData callbackData;
-            bool found = callbacks.TryRemove((message.TargetGrain, message.Id), out callbackData);
+            bool found = callbacks.TryRemove(message.Id, out callbackData);
             if (found)
             {
                 // IMPORTANT: we do not schedule the response callback via the scheduler, since the only thing it does
@@ -556,7 +554,7 @@ namespace Orleans.Runtime
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+            => this.callbacks.CountWhere(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         private async Task MonitorCallbackExpiry()
         {
