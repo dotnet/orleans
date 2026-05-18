@@ -88,6 +88,11 @@ namespace Orleans.Serialization.Configuration
         public bool AllowAllTypes { get; set; }
 
         /// <summary>
+        /// Gets the set of registered providers, keyed by (Target, Kind, Name).
+        /// </summary>
+        public Dictionary<(string Target, string Kind, string Name), Type> RegisteredProviders { get; } = new Dictionary<(string, string, string), Type>();
+
+        /// <summary>
         /// Gets the set of type manifest providers which have configured this instance.
         /// </summary>
         internal HashSet<object> TypeManifestProviders { get; } = new();
