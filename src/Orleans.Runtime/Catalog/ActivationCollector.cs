@@ -327,6 +327,13 @@ namespace Orleans.Runtime
             var stats = _environmentStatisticsProvider.GetEnvironmentStatistics();
             var limit = _grainCollectionOptions.MemoryUsageLimitPercentage / 100f;
 
+            var activationCount = _activationCount;
+            if (activationCount == 0)
+            {
+                surplusActivationCount = 0;
+                return false;
+            }
+
             var usage = stats.NormalizedMemoryUsage;
             if (usage <= limit)
             {
@@ -336,7 +343,6 @@ namespace Orleans.Runtime
             }
 
             // Calculate the surplus activations based the memory usage target.
-            var activationCount = _activationCount;
             var target = _grainCollectionOptions.MemoryUsageTargetPercentage / 100f;
             surplusActivationCount = (int)Math.Max(0, activationCount - Math.Floor(activationCount * target / usage));
             if (surplusActivationCount <= 0)
@@ -375,6 +381,13 @@ namespace Orleans.Runtime
                     }
 
                     var activation = item.Value;
+                    lock (activation)
+                    {
+                        if (!activation.IsValid || !activation.IsInactive)
+                        {
+                            continue;
+                        }
+                    }
 
                     candidates.Add(activation);
                 }
