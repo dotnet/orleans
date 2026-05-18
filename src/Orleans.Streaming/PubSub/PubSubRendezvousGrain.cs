@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
 using System.Linq;
 using System.Runtime.ExceptionServices;
 using System.Text;
@@ -12,8 +13,10 @@ using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Serialization.Serializers;
 using Orleans.Storage;
+using Orleans.Streaming;
 using Orleans.Streams.Core;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
+using TagList = System.Diagnostics.TagList;
 
 namespace Orleans.Streams
 {
@@ -42,7 +45,7 @@ namespace Orleans.Streams
             LogDebugTryingToFindStorageProvider(providerName);
 
             var storage = _serviceProvider.GetKeyedService<IGrainStorage>(providerName);
-            if (storage == null)
+            if (storage is null)
             {
                 LogDebugFallbackToStorageProvider(ProviderConstants.DEFAULT_PUBSUB_PROVIDER_NAME);
 
@@ -107,7 +110,13 @@ namespace Orleans.Streams
 
         public async Task<ISet<PubSubSubscriptionState>> RegisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
-            StreamInstruments.PubSubProducersAdded.Add(1);
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubProducersAdded.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                StreamInstruments.PubSubProducersAdded.Add(1, tags.Value);
+            }
 
             try
             {
@@ -116,7 +125,12 @@ namespace Orleans.Streams
                 LogPubSubCounts("RegisterProducer {0}", streamProducer);
                 await WriteStateAsync();
                 StreamingEvents.EmitProducerRegistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
-                StreamInstruments.PubSubProducersTotal.Add(1);
+
+                if (StreamInstruments.PubSubProducersTotal.Enabled)
+                {
+                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                    StreamInstruments.PubSubProducersTotal.Add(1, tags.Value);
+                }
             }
             catch (Exception exc)
             {
@@ -131,7 +145,14 @@ namespace Orleans.Streams
 
         public async Task UnregisterProducer(QualifiedStreamId streamId, GrainId streamProducer)
         {
-            StreamInstruments.PubSubProducersRemoved.Add(1);
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubProducersRemoved.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                StreamInstruments.PubSubProducersRemoved.Add(1, tags.Value);
+            }
+
             try
             {
                 int numRemoved = State.Producers.RemoveWhere(s => s.Equals(streamId, streamProducer));
@@ -145,7 +166,12 @@ namespace Orleans.Streams
                     await updateStorageTask;
                     StreamingEvents.EmitProducerUnregistered(streamId.ProviderName, streamId.StreamId, streamProducer, GrainContext.Address.SiloAddress);
                 }
-                StreamInstruments.PubSubProducersTotal.Add(-numRemoved);
+
+                if (StreamInstruments.PubSubProducersTotal.Enabled)
+                {
+                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamProducer);
+                    StreamInstruments.PubSubProducersTotal.Add(-numRemoved, tags.Value);
+                }
             }
             catch (Exception exc)
             {
@@ -167,13 +193,20 @@ namespace Orleans.Streams
             GrainId streamConsumer,
             string filterData)
         {
-            StreamInstruments.PubSubConsumersAdded.Add(1);
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubConsumersAdded.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
+                StreamInstruments.PubSubConsumersAdded.Add(1, tags.Value);
+            }
+
             var pubSubState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
-            if (pubSubState != null && pubSubState.IsFaulted)
+            if (pubSubState is not null && pubSubState.IsFaulted)
                 throw new FaultedSubscriptionException(subscriptionId, streamId);
             try
             {
-                if (pubSubState == null)
+                if (pubSubState is null)
                 {
                     pubSubState = new PubSubSubscriptionState(subscriptionId, streamId, streamConsumer);
                     State.Consumers.Add(pubSubState);
@@ -185,7 +218,12 @@ namespace Orleans.Streams
                 LogPubSubCounts("RegisterConsumer {0}", streamConsumer);
                 await WriteStateAsync();
                 StreamingEvents.EmitSubscriptionRegistered(streamId.ProviderName, streamId.StreamId, subscriptionId.Guid, streamConsumer, GrainContext.Address.SiloAddress);
-                StreamInstruments.PubSubConsumersTotal.Add(1);
+
+                if (StreamInstruments.PubSubConsumersTotal.Enabled)
+                {
+                    tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
+                    StreamInstruments.PubSubConsumersTotal.Add(1, tags.Value);
+                }
             }
             catch (Exception exc)
             {
@@ -227,10 +265,16 @@ namespace Orleans.Streams
                 if (State.Producers.Count != initialProducerCount)
                 {
                     await WriteStateAsync();
-                    StreamInstruments.PubSubConsumersTotal.Add(-(initialProducerCount - State.Producers.Count));
+
+                    if (StreamInstruments.PubSubConsumersTotal.Enabled)
+                    {
+                        tags ??= StreamInstrumentsTagUtils.InitializeTags(streamId, streamConsumer);
+                        StreamInstruments.PubSubConsumersTotal.Add(
+                            -(initialProducerCount - State.Producers.Count), tags.Value);
+                    }
                 }
 
-                if (exception != null)
+                if (exception is not null)
                 {
                     ExceptionDispatchInfo.Capture(exception).Throw();
                 }
@@ -258,7 +302,16 @@ namespace Orleans.Streams
 
         public async Task UnregisterConsumer(GuidId subscriptionId, QualifiedStreamId streamId)
         {
-            StreamInstruments.PubSubConsumersRemoved.Add(1);
+            var consumerState = State.Consumers.FirstOrDefault(s => s.Equals(subscriptionId));
+            TagList? tags = null;
+
+            if (StreamInstruments.PubSubConsumersRemoved.Enabled)
+            {
+                tags = consumerState is not null
+                    ? StreamInstrumentsTagUtils.InitializeTags(streamId, consumerState.Consumer)
+                    : StreamInstrumentsTagUtils.InitializeTags(streamId);
+                StreamInstruments.PubSubConsumersRemoved.Add(1, tags.Value);
+            }
 
             try
             {
@@ -280,7 +333,14 @@ namespace Orleans.Streams
                     }
                     await NotifyProducersOfRemovedSubscription(subscriptionId, streamId);
                 }
-                StreamInstruments.PubSubConsumersTotal.Add(-numRemoved);
+
+                if (StreamInstruments.PubSubConsumersTotal.Enabled)
+                {
+                    tags ??= consumerState is not null
+                        ? StreamInstrumentsTagUtils.InitializeTags(streamId, consumerState.Consumer)
+                        : StreamInstrumentsTagUtils.InitializeTags(streamId);
+                    StreamInstruments.PubSubConsumersTotal.Add(-numRemoved, tags.Value);
+                }
             }
             catch (Exception exc)
             {

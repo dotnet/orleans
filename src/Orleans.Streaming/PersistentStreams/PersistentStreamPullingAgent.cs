@@ -11,8 +11,10 @@ using Orleans.Internal;
 using Orleans.Runtime;
 using Orleans.Runtime.Internal;
 using Orleans.Runtime.Scheduler;
+using Orleans.Streaming;
 using StreamingEvents = Orleans.Streaming.Diagnostics.StreamingEvents;
 using Orleans.Streams.Filtering;
+using TagList = System.Diagnostics.TagList;
 
 #nullable disable
 namespace Orleans.Streams
@@ -472,12 +474,14 @@ namespace Orleans.Streams
         /// <returns></returns>
         private async Task<bool> ReadFromQueue(QueueId myQueueId, IQueueAdapterReceiver rcvr, int maxCacheAddCount, CancellationToken cancellationToken)
         {
-            if (rcvr == null || IsShutdown || cancellationToken.IsCancellationRequested)
+            if (rcvr is null || IsShutdown || cancellationToken.IsCancellationRequested)
             {
                 return false;
             }
 
             var now = _timeProvider.GetUtcNow().UtcDateTime;
+            TagList? tags = null;
+
             // Try to cleanup the pubsub cache at the cadence of 10 times in the configurable StreamInactivityPeriod.
             if ((now - lastTimeCleanedPubSubCache) >= this.options.StreamInactivityPeriod.Divide(StreamInactivityCheckFrequency))
             {
@@ -490,7 +494,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (queueCache != null)
+            if (queueCache is not null)
             {
                 IList<IBatchContainer> purgedItems;
                 if (queueCache.TryPurgeFromCache(out purgedItems))
@@ -511,7 +515,7 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (queueCache != null && queueCache.IsUnderPressure())
+            if (queueCache is not null && queueCache.IsUnderPressure())
             {
                 // Under back pressure. Exit the loop. Will attempt again in the next timer callback.
                 LogInfoStreamCacheUnderPressure();
@@ -526,17 +530,21 @@ namespace Orleans.Streams
                 return false;
             }
 
-            if (multiBatch == null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
+            if (multiBatch is null || multiBatch.Count == 0) return false; // queue is empty. Exit the loop. Will attempt again in the next timer callback.
 
             queueCache?.AddToCache(multiBatch);
             numMessages += multiBatch.Count;
-            StreamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count);
+            if (StreamInstruments.PersistentStreamReadMessages.Enabled)
+            {
+                tags = StreamInstrumentsTagUtils.InitializeTags(myQueueId, streamProviderName);
+                StreamInstruments.PersistentStreamReadMessages.Add(multiBatch.Count, tags.Value);
+            }
 
             LogTraceGotMessages(multiBatch.Count, new(myQueueId), numMessages);
 
             foreach (var group in
                 multiBatch
-                .Where(m => m != null)
+                .Where(m => m is not null)
                 .GroupBy(container => container.StreamId))
             {
                 if (IsShutdown || cancellationToken.IsCancellationRequested)
@@ -709,22 +717,23 @@ namespace Orleans.Streams
 
         private async Task RunConsumerCursor(StreamConsumerData consumerData)
         {
+            TagList? tags = null;
             try
             {
                 // double check in case of interleaving
                 if (consumerData.State == StreamConsumerDataState.Active ||
-                    consumerData.Cursor == null) return;
+                    consumerData.Cursor is null) return;
 
                 consumerData.State = StreamConsumerDataState.Active;
                 var deliveredAny = false;
-                while (!IsShutdown && consumerData.Cursor != null)
+                while (!IsShutdown && consumerData.Cursor is not null)
                 {
                     IBatchContainer batch = null;
                     Exception exceptionOccured = null;
                     try
                     {
                         batch = GetBatchForConsumer(consumerData.Cursor, consumerData.StreamId, consumerData.FilterData);
-                        if (batch == null)
+                        if (batch is null)
                         {
                             // Only emit cursor-drained when we transitioned from delivering to empty,
                             // not on every empty poll.
@@ -740,7 +749,7 @@ namespace Orleans.Streams
                         consumerData.Cursor = queueCache.GetCacheCursor(consumerData.StreamId, null);
                     }
 
-                    if (batch != null)
+                    if (batch is not null)
                     {
                         deliveredAny = true;
                         if (!ShouldDeliverBatch(consumerData.StreamId, batch, consumerData.FilterData))
@@ -749,13 +758,19 @@ namespace Orleans.Streams
 
                     try
                     {
-                        StreamInstruments.PersistentStreamSentMessages.Add(1);
+                        if (StreamInstruments.PersistentStreamSentMessages.Enabled)
+                        {
+                            tags ??= StreamInstrumentsTagUtils.InitializeTags(
+                                consumerData.StreamId, consumerData.StreamConsumer.GetGrainId());
+                            StreamInstruments.PersistentStreamSentMessages.Add(1, tags.Value);
+                        }
+
                         if (IsShutdown)
                         {
                             break;
                         }
 
-                        if (batch != null)
+                        if (batch is not null)
                         {
                             StreamHandshakeToken newToken = await AsyncExecutorWithRetries.ExecuteWithRetries(
                                 i => DeliverBatchToConsumer(consumerData, batch),
@@ -764,7 +779,7 @@ namespace Orleans.Streams
                                 (exception, i) => exception is not ClientNotAvailableException && !IsShutdown,
                                 this.options.MaxEventDeliveryTime,
                                 deliveryBackoffProvider);
-                            if (newToken != null)
+                            if (newToken is not null)
                             {
                                 consumerData.LastToken = newToken;
                                 IQueueCacheCursor newCursor = queueCache.GetCacheCursor(consumerData.StreamId, newToken.Token);
@@ -786,7 +801,7 @@ namespace Orleans.Streams
                             : new StreamEventDeliveryFailureException(consumerData.StreamId);
                     }
                     // if we failed to deliver a batch
-                    if (exceptionOccured != null)
+                    if (exceptionOccured is not null)
                     {
                         bool faultedSubscription = await ErrorProtocol(consumerData, exceptionOccured, true, batch, batch?.SequenceToken);
                         if (faultedSubscription) return;
