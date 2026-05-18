@@ -11,6 +11,8 @@ namespace Orleans.Serialization.Invocation
     /// </summary>
     public sealed class ResponseCompletionSource : IResponseCompletionSource, IValueTaskSource<Response>, IValueTaskSource
     {
+        // This source is pooled and GetResult returns it to the pool. Continuations must not run inline from SetResult/SetException,
+        // or they can reset/reuse this instance before completion unwinds.
         private ManualResetValueTaskSourceCore<Response> _core = new() { RunContinuationsAsynchronously = true };
 
         /// <summary>
@@ -114,6 +116,8 @@ namespace Orleans.Serialization.Invocation
     /// <typeparam name="TResult">The underlying result type.</typeparam>
     public sealed class ResponseCompletionSource<TResult> : IResponseCompletionSource, IValueTaskSource<TResult>, IValueTaskSource
     {
+        // This source is pooled and GetResult returns it to the pool. Continuations must not run inline from SetResult/SetException,
+        // or they can reset/reuse this instance before completion unwinds.
         private ManualResetValueTaskSourceCore<TResult> _core = new() { RunContinuationsAsynchronously = true };
 
         /// <summary>
@@ -156,31 +160,36 @@ namespace Orleans.Serialization.Invocation
         public void SetResult(TResult result) => _core.SetResult(result);
 
         /// <inheritdoc/>
+        [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Complete(Response value)
         {
-            if (value is Response<TResult> typed)
-            {
-                Complete(typed);
-            }
-            else if (value.Exception is { } exception)
+            // Fast path: check exception first since it's a simple null check
+            if (value.Exception is { } exception)
             {
                 SetException(exception);
+                return;
+            }
+
+            // Check for typed response (common for void returns)
+            if (value is Response<TResult> typed)
+            {
+                SetResult(typed.TypedResult);
+                return;
+            }
+
+            // Handle untyped successful response
+            var result = value.Result;
+            if (result is null)
+            {
+                SetResult(default);
+            }
+            else if (result is TResult typedResult)
+            {
+                SetResult(typedResult);
             }
             else
             {
-                var result = value.Result;
-                if (result is null)
-                {
-                    SetResult(default);
-                }
-                else if (result is TResult typedResult)
-                {
-                    SetResult(typedResult);
-                }
-                else
-                {
-                    SetInvalidCastException(result);
-                }
+                SetInvalidCastException(result);
             }
         }
 
