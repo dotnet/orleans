@@ -99,6 +99,7 @@
   </Folder>
   <Folder Name="/src/Extensions/Redis/">
     <Project Path="src/Redis/Orleans.Clustering.Redis/Orleans.Clustering.Redis.csproj" />
+    <Project Path="src/Redis/Orleans.DurableJobs.Redis/Orleans.DurableJobs.Redis.csproj" />
     <Project Path="src/Redis/Orleans.GrainDirectory.Redis/Orleans.GrainDirectory.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Persistence.Redis/Orleans.Persistence.Redis.csproj" />
     <Project Path="src/Redis/Orleans.Reminders.Redis/Orleans.Reminders.Redis.csproj" />
