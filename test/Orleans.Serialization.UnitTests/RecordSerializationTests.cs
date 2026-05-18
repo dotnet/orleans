@@ -228,6 +228,37 @@ public class RecordSerializationTests
             Assert.Equal(original, deserialized);
         }
 
+        [Fact]
+        public void Can_Roundtrip_RecordWithParameterIdAttribute()
+        {
+            var original = new RecordWithParameterIdAttribute(42, "test");
+
+            var bytes = _serializer.SerializeToArray(original);
+
+            var deserialized = _serializer.Deserialize<RecordWithParameterIdAttribute>(bytes);
+
+            Assert.NotNull(deserialized);
+            Assert.Equal(original, deserialized);
+            Assert.Equal(42, deserialized.Value);
+            Assert.Equal("test", deserialized.Name);
+        }
+
+        [Fact]
+        public void Can_Roundtrip_ComplexRecordWithMixedIdAttributes()
+        {
+            var original = new ComplexRecordWithMixedIdAttributes(123, "primary", "extra");
+
+            var bytes = _serializer.SerializeToArray(original);
+
+            var deserialized = _serializer.Deserialize<ComplexRecordWithMixedIdAttributes>(bytes);
+
+            Assert.NotNull(deserialized);
+            Assert.Equal(original, deserialized);
+            Assert.Equal(123, deserialized.Id);
+            Assert.Equal("primary", deserialized.Name);
+            Assert.Equal("extra", deserialized.Description);
+        }
+
     // TODO: This type should cause a build error because "Bar" is an init-only non-auto property but has an [Id(...)] attribute.
     // It is suited for an diagnostic analyzer test, but the current implementation
     // of the source generator does not support execution as an analyzer.
@@ -367,3 +398,26 @@ public record AppleRecord(string Name) : FruitRecord(Name);
 
 [GenerateSerializer]
 public record FooRecord([property: Id(0)] Guid Id);
+
+/// <summary>
+/// Record using [Id] on primary constructor parameters instead of [property: Id].
+/// This tests the new, more concise syntax.
+/// </summary>
+[GenerateSerializer]
+public record RecordWithParameterIdAttribute([Id(0)] int Value, [Id(1)] string Name);
+
+/// <summary>
+/// Record mixing [Id] on constructor parameters with properties having their own [Id] attributes.
+/// This tests that both approaches can coexist in the same type.
+/// </summary>
+[GenerateSerializer]
+public record ComplexRecordWithMixedIdAttributes([Id(0)] int Id, [Id(1)] string Name)
+{
+    [Id(2)]
+    public string Description { get; init; } = string.Empty;
+
+    public ComplexRecordWithMixedIdAttributes(int Id, string Name, string Description) : this(Id, Name)
+    {
+        this.Description = Description;
+    }
+};
