@@ -138,6 +138,19 @@ namespace Orleans.Transactions.TestKit.xUnit
         public override void TransactionGrainsThrowWhenTransactions(string transactionTestGrainClassName) { }
     }
 
+    public abstract partial class ExclusiveLockTransactionTestRunnerxUnit : ExclusiveLockTransactionTestRunner
+    {
+        protected ExclusiveLockTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }
+
+        [SkippableTheory(new[] { })]
+        [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
+        public override System.Threading.Tasks.Task ConcurrentReadThenWriteWithExclusiveLock_NoLockException(string grainStates) { throw null; }
+
+        [SkippableTheory(new[] { })]
+        [Xunit.InlineData(new[] { "SingleStateTransactionalGrain" })]
+        public override System.Threading.Tasks.Task ConcurrentReadThenWriteWithoutExclusiveLock_ThrowsLockException(string grainStates) { throw null; }
+    }
+
     public abstract partial class GoldenPathTransactionTestRunnerxUnit : GoldenPathTransactionTestRunner
     {
         protected GoldenPathTransactionTestRunnerxUnit(IGrainFactory grainFactory, Xunit.Abstractions.ITestOutputHelper output) : base(default!, default!) { }

@@ -14,24 +14,30 @@ namespace Orleans.Runtime.Scheduler
     [DebuggerDisplay("ActivationTaskScheduler RunQueue={workerGroup.ExternalWorkItemCount} GrainContext={workerGroup.GrainContext}")]
     internal sealed partial class ActivationTaskScheduler : TaskScheduler
     {
+#if DEBUG
         private readonly ILogger logger;
 
         private static long idCounter;
         private readonly long myId;
+#endif
         private readonly WorkItemGroup workerGroup;
 #if EXTRA_STATS
         private readonly CounterStatistic turnsExecutedStatistic;
 #endif
 
-        internal ActivationTaskScheduler(WorkItemGroup workGroup, ILogger<ActivationTaskScheduler> logger)
+        internal ActivationTaskScheduler(WorkItemGroup workGroup)
         {
-            this.logger = logger;
+#if DEBUG
+            logger = workGroup.Logger;
             myId = Interlocked.Increment(ref idCounter);
+#endif
             workerGroup = workGroup;
 #if EXTRA_STATS
             turnsExecutedStatistic = CounterStatistic.FindOrCreate(name + ".TasksExecuted");
 #endif
+#if DEBUG
             LogCreatedTaskScheduler(this, workerGroup.GrainContext);
+#endif
         }
 
         /// <summary>Gets an enumerable of the tasks currently scheduled on this scheduler.</summary>
@@ -108,8 +114,16 @@ namespace Orleans.Runtime.Scheduler
             return done;
         }
 
-        public override string ToString() => $"{GetType().Name}-{myId}:Queued={workerGroup.ExternalWorkItemCount}";
+        public override string ToString()
+        {
+#if DEBUG
+            return $"{GetType().Name}-{myId}:Queued={workerGroup.ExternalWorkItemCount}";
+#else
+            return $"{GetType().Name}:Queued={workerGroup.ExternalWorkItemCount}";
+#endif
+        }
 
+#if DEBUG
         [LoggerMessage(
             Level = LogLevel.Debug,
             Message = "Created {TaskScheduler} with GrainContext={GrainContext}"
@@ -152,5 +166,6 @@ namespace Orleans.Runtime.Scheduler
             Message = "{TaskScheduler} Completed TryExecuteTaskInline Task Id={TaskId} Thread={Thread} Execute=Done Ok={Ok}"
         )]
         private partial void LogTraceTryExecuteTaskInlineCompleted(long taskScheduler, int taskId, int thread, bool ok);
+#endif
     }
 }

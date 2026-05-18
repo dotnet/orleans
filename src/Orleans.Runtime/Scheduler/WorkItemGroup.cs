@@ -6,6 +6,7 @@ using System.Runtime.CompilerServices;
 using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
@@ -22,7 +23,6 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
         Running = 2
     }
 
-    private readonly ILogger _log;
 #if NET9_0_OR_GREATER
     private readonly Lock _lockObj = new();
 #else
@@ -43,6 +43,13 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
     public IGrainContext GrainContext { get; set; }
 
+    internal ILogger Logger => GrainContext switch
+    {
+        ActivationData activation => activation.Shared.SchedulerLogger,
+        SystemTarget systemTarget => systemTarget.SchedulerLogger,
+        _ => GrainContext.ActivationServices.GetRequiredService<ILogger<WorkItemGroup>>()
+    };
+
     internal int ExternalWorkItemCount
     {
         get { lock (_lockObj) { return _workItems.Count; } }
@@ -50,16 +57,13 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
     public WorkItemGroup(
         IGrainContext grainContext,
-        ILogger<WorkItemGroup> logger,
-        ILogger<ActivationTaskScheduler> activationTaskSchedulerLogger,
         IOptions<SchedulingOptions> schedulingOptions)
     {
         ArgumentNullException.ThrowIfNull(grainContext);
         GrainContext = grainContext;
         _schedulingOptions = schedulingOptions.Value;
         _state = WorkGroupStatus.Waiting;
-        _log = logger;
-        TaskScheduler = new ActivationTaskScheduler(this, activationTaskSchedulerLogger);
+        TaskScheduler = new ActivationTaskScheduler(this);
     }
 
     /// <summary>
@@ -70,9 +74,10 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     public void EnqueueTask(Task task)
     {
 #if DEBUG
-        if (_log.IsEnabled(LogLevel.Trace))
+        var logger = Logger;
+        if (logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceEnqueueWorkItem(_log, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
+            LogTraceEnqueueWorkItem(logger, task, GrainContext, System.Threading.Tasks.TaskScheduler.Current);
         }
 #endif
 
@@ -101,9 +106,10 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
             _state = WorkGroupStatus.Runnable;
 #if DEBUG
-            if (_log.IsEnabled(LogLevel.Trace))
+            var runQueueLogger = Logger;
+            if (runQueueLogger.IsEnabled(LogLevel.Trace))
             {
-                LogTraceAddToRunQueue(_log, task, thisSequenceNumber, GrainContext);
+                LogTraceAddToRunQueue(runQueueLogger, task, thisSequenceNumber, GrainContext);
             }
 #endif
             ScheduleExecution(this);
@@ -113,7 +119,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTooManyTasksInQueue(int count, int maxPendingItemsLimit)
     {
-        LogWarningTooManyPendingItems(_log, count, GrainContext?.ToString() ?? "Unknown", maxPendingItemsLimit);
+        LogWarningTooManyPendingItems(Logger, count, GrainContext?.ToString() ?? "Unknown", maxPendingItemsLimit);
     }
 
     /// <summary>
@@ -215,9 +221,10 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskStart(Task task)
     {
-        if (_log.IsEnabled(LogLevel.Trace))
+        var logger = Logger;
+        if (logger.IsEnabled(LogLevel.Trace))
         {
-            LogTraceAboutToExecuteTask(_log, task, GrainContext);
+            LogTraceAboutToExecuteTask(logger, task, GrainContext);
         }
     }
 #endif
@@ -225,7 +232,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
     [MethodImpl(MethodImplOptions.NoInlining)]
     private void LogTaskLoopError(Exception ex)
     {
-        LogErrorTaskLoop(_log, ex, Environment.CurrentManagedThreadId);
+        LogErrorTaskLoop(Logger, ex, Environment.CurrentManagedThreadId);
     }
 
     [MethodImpl(MethodImplOptions.NoInlining)]
@@ -238,7 +245,7 @@ internal sealed partial class WorkItemGroup : IThreadPoolWorkItem, IWorkItemSche
 
         var taskDuration = TimeSpan.FromMilliseconds(taskDurationMs);
         LogWarningLongRunningTurn(
-            _log,
+            Logger,
             task.AsyncState ?? task,
             GrainContext?.ToString() ?? "Unknown",
             taskDuration.ToString("g"),

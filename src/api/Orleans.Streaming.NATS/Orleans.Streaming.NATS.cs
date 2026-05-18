@@ -16,9 +16,13 @@ namespace Orleans.Streaming.NATS
 
         public global::NATS.Client.Core.NatsOpts? NatsClientOptions { get { throw null; } set { } }
 
+        public int NumReplicas { get { throw null; } set { } }
+
         public int PartitionCount { get { throw null; } set { } }
 
         public int ProducerCount { get { throw null; } set { } }
+
+        public global::NATS.Client.JetStream.Models.StreamConfigStorage StorageType { get { throw null; } set { } }
 
         public string StreamName { get { throw null; } set { } }
     }

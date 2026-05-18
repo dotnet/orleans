@@ -31,10 +31,33 @@ jobs:
         continue-on-error: true
 
       - name: Create or update pull request
-        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8
-        with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          branch: update-api-diffs
-          base: main
-          title: "[Automated] Update API Surface Area"
-          body: "Auto-generated update to the API surface to compare current surface vs latest release. This should only be merged once this surface area ships in a new release."
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR_BRANCH: update-api-diffs
+          PR_TITLE: "[Automated] Update API Surface Area"
+          PR_BODY: "Auto-generated update to the API surface to compare current surface vs latest release. This should only be merged once this surface area ships in a new release."
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet && git diff --cached --quiet; then
+            echo "No API surface changes detected."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add -A
+          git commit -m "$PR_TITLE"
+
+          push_options=(--force-with-lease="refs/heads/$PR_BRANCH:")
+          if remote_ref=$(git ls-remote --exit-code --heads origin "$PR_BRANCH" | cut -f1); then
+            push_options=(--force-with-lease="refs/heads/$PR_BRANCH:$remote_ref")
+          fi
+          git push "${push_options[@]}" origin HEAD:"$PR_BRANCH"
+
+          if pr_number=$(gh pr view "$PR_BRANCH" --repo "$GITHUB_REPOSITORY" --json number --jq .number 2>/dev/null); then
+            gh pr edit "$pr_number" --repo "$GITHUB_REPOSITORY" --title "$PR_TITLE" --body "$PR_BODY" --base main
+          else
+            gh pr create --repo "$GITHUB_REPOSITORY" --base main --head "$PR_BRANCH" --title "$PR_TITLE" --body "$PR_BODY"
+          fi

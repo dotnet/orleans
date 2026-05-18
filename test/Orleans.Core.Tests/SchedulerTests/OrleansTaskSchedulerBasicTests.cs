@@ -17,11 +17,13 @@ namespace UnitTests.SchedulerTests
         public static UnitTestSchedulingContext Create(ILoggerFactory loggerFactory)
         {
             var result = new UnitTestSchedulingContext();
-            result.WorkItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(result, loggerFactory);
+            result.WorkItemGroup = SchedulingHelper.CreateWorkItemGroupForTesting(result, loggerFactory, out result._activationServices);
             return result;
         }
 
         private UnitTestSchedulingContext() { }
+
+        private IServiceProvider _activationServices;
 
         public WorkItemGroup WorkItemGroup { get; private set; }
 
@@ -35,7 +37,7 @@ namespace UnitTests.SchedulerTests
 
         public GrainAddress Address => throw new NotImplementedException();
 
-        public IServiceProvider ActivationServices => throw new NotImplementedException();
+        public IServiceProvider ActivationServices => _activationServices;
 
         public IDictionary<object, object> Items => throw new NotImplementedException();
 
@@ -52,7 +54,11 @@ namespace UnitTests.SchedulerTests
         public void Activate(Dictionary<string, object> requestContext, CancellationToken cancellationToken) => throw new NotImplementedException();
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken) { }
         public Task Deactivated => Task.CompletedTask;
-        public void Dispose() => (Scheduler as IDisposable)?.Dispose();
+        public void Dispose()
+        {
+            (Scheduler as IDisposable)?.Dispose();
+            (_activationServices as IDisposable)?.Dispose();
+        }
         public object GetComponent(Type componentType) => throw new NotImplementedException();
         public object GetTarget() => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
