@@ -135,7 +135,6 @@ namespace Orleans.DurableJobs
         public System.Threading.Tasks.Task<bool> RemoveJobAsync(string jobId, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.Task RetryJobLaterAsync(IJobRunContext jobContext, System.DateTimeOffset newDueTime, System.Threading.CancellationToken cancellationToken) { throw null; }
-
         public System.Threading.Tasks.Task<DurableJob?> TryScheduleJobAsync(ScheduleJobRequest request, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
@@ -173,6 +172,8 @@ namespace Orleans.Hosting
         public static ISiloBuilder AddDurableJobs(this ISiloBuilder builder) { throw null; }
 
         public static ISiloBuilder UseInMemoryDurableJobs(this ISiloBuilder builder) { throw null; }
+
+        public static Microsoft.Extensions.DependencyInjection.IServiceCollection UseInMemoryDurableJobs(this Microsoft.Extensions.DependencyInjection.IServiceCollection services) { throw null; }
     }
 
     public sealed partial class DurableJobsOptions

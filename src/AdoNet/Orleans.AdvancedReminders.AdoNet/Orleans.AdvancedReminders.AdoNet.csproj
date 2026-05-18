@@ -1,0 +1,34 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageId>Microsoft.Orleans.AdvancedReminders.AdoNet</PackageId>
+    <Title>Microsoft Orleans Advanced Reminders for ADO.NET</Title>
+    <Description>ADO.NET provider for Microsoft Orleans Advanced Reminders.</Description>
+    <PackageTags>$(PackageTags) ADO.NET SQL MySQL PostgreSQL Oracle</PackageTags>
+    <TargetFrameworks>$(DefaultTargetFrameworks)</TargetFrameworks>
+    <OrleansBuildTimeCodeGen>true</OrleansBuildTimeCodeGen>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <AssemblyName>Orleans.AdvancedReminders.AdoNet</AssemblyName>
+    <RootNamespace>Orleans.AdvancedReminders.AdoNet</RootNamespace>
+    <DefineConstants>$(DefineConstants);REMINDERS_ADONET;ADVANCED_REMINDERS_ADONET</DefineConstants>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <Compile Include="..\Shared\Storage\*.cs" LinkBase="Storage" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="$(SourceRoot)src\Orleans.Runtime\Orleans.Runtime.csproj" />
+    <ProjectReference Include="$(SourceRoot)src\Orleans.AdvancedReminders\Orleans.AdvancedReminders.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <None Include="README.md" Pack="true" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="Orleans.AdoNet.Tests" />
+  </ItemGroup>
+</Project>

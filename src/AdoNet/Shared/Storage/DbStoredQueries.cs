@@ -265,7 +265,7 @@ namespace Orleans.Tests.SqlUtils
 
             internal static int GetVersion(IDataRecord record)
             {
-                return Convert.ToInt32(record.GetValue<object>(nameof(Version)));
+                return record.GetInt32(nameof(Version));
             }
 
             internal static Uri GetGatewayUri(IDataRecord record)
@@ -456,6 +456,36 @@ namespace Orleans.Tests.SqlUtils
             internal string ReminderName
             {
                 set { Add(nameof(ReminderName), value); }
+            }
+
+            internal string CronExpression
+            {
+                set { Add(nameof(CronExpression), value, dbType: DbType.String); }
+            }
+
+            internal string CronTimeZoneId
+            {
+                set { Add(nameof(CronTimeZoneId), value, dbType: DbType.String); }
+            }
+
+            internal DateTime? NextDueUtc
+            {
+                set { Add(nameof(NextDueUtc), value); }
+            }
+
+            internal DateTime? LastFireUtc
+            {
+                set { Add(nameof(LastFireUtc), value); }
+            }
+
+            internal int Priority
+            {
+                set { Add(nameof(Priority), value); }
+            }
+
+            internal int Action
+            {
+                set { Add(nameof(Action), value); }
             }
 
             internal TimeSpan Period

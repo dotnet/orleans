@@ -6,6 +6,8 @@ using System.Diagnostics.CodeAnalysis;
 
 #if ORLEANS_CLUSTERING
 namespace Orleans.Clustering.AzureStorage.Utilities
+#elif ADVANCED_REMINDERS_AZURE
+namespace Orleans.AdvancedReminders.AzureStorage.Utilities
 #elif ORLEANS_PERSISTENCE
 namespace Orleans.Persistence.AzureStorage.Utilities
 #elif ORLEANS_REMINDERS_PROVIDER
