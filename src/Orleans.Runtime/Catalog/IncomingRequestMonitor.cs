@@ -88,21 +88,24 @@ namespace Orleans.Runtime
                 }
 
                 var now = DateTime.UtcNow;
-                _activationWorkingSet.ForEach(
-                    static (member, isIdle, state) =>
+                var iteration = 0;
+                foreach (var pair in _activationWorkingSet.Members)
+                {
+                    var member = pair.Key;
+                    if (!pair.Value && member is ActivationData activation)
                     {
-                        var (self, messageCenter, options, now) = state;
-                        if (isIdle || member is not ActivationData activation)
-                        {
-                            return;
-                        }
-
                         lock (activation)
                         {
-                            activation.AnalyzeWorkload(now, messageCenter, self._messageFactory, options);
+                            activation.AnalyzeWorkload(now, messageCenter, _messageFactory, options);
                         }
-                    },
-                    (this, messageCenter, options, now));
+                    }
+
+                    if (++iteration % 100 == 0)
+                    {
+                        await Task.Yield();
+                        now = DateTime.UtcNow;
+                    }
+                }
             }
         }
     }

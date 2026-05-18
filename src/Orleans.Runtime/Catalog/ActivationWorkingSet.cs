@@ -38,13 +38,7 @@ namespace Orleans.Runtime
 
         public int Count => _activeCount;
 
-        internal void ForEach<TState>(Action<IActivationWorkingSetMember, bool, TState> action, TState state)
-        {
-            foreach (var pair in _members)
-            {
-                action(pair.Key, pair.Value, state);
-            }
-        }
+        internal IEnumerable<KeyValuePair<IActivationWorkingSetMember, bool>> Members => _members;
 
         public void OnActivated(IActivationWorkingSetMember member)
         {
@@ -65,15 +59,21 @@ namespace Orleans.Runtime
 
         public void OnActive(IActivationWorkingSetMember member)
         {
-            _members.AddOrUpdate(
-                member,
-                static (_, state) =>
+            while (true)
+            {
+                if (_members.TryGetValue(member, out var isIdle))
                 {
-                    Interlocked.Increment(ref state._activeCount);
-                    return false;
-                },
-                static (_, _, _) => false,
-                this);
+                    if (_members.TryUpdate(member, false, comparisonValue: isIdle))
+                    {
+                        break;
+                    }
+                }
+                else if (_members.TryAdd(member, false))
+                {
+                    Interlocked.Increment(ref _activeCount);
+                    break;
+                }
+            }
 
             foreach (var observer in _observers)
             {
@@ -151,7 +151,11 @@ namespace Orleans.Runtime
             }
             else
             {
-                _members.TryUpdate(member, false, comparisonValue: isIdle);
+                if (isIdle)
+                {
+                    _members.TryUpdate(member, false, comparisonValue: true);
+                }
+
                 foreach (var observer in _observers)
                 {
                     observer.OnActive(member);
