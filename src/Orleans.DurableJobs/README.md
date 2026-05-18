@@ -58,13 +58,10 @@ builder.UseOrleans(siloBuilder =>
     siloBuilder
         .UseLocalhostClustering()
         // Configure Azure Storage Durable Jobs
-        .UseAzureStorageDurableJobs(options =>
+        .UseAzureBlobDurableJobs(options =>
         {
-            options.Configure(o =>
-            {
-                o.BlobServiceClient = new Azure.Storage.Blobs.BlobServiceClient("YOUR_CONNECTION_STRING");
-                o.ContainerName = "durable-jobs";
-            });
+            options.BlobServiceClient = new Azure.Storage.Blobs.BlobServiceClient("YOUR_CONNECTION_STRING");
+            options.ContainerName = "durable-jobs";
         });
 });
 

@@ -234,11 +234,6 @@ namespace Orleans.Journaling
         IJournaledStateManager Create(JournalId journalId);
     }
 
-    public partial interface IJournalFileMetadata
-    {
-        string? Format { get; }
-    }
-
     public partial interface IJournalFormat
     {
         string FormatKey { get; }
@@ -249,19 +244,36 @@ namespace Orleans.Journaling
         void Replay(JournalBufferReader input, JournalReplayContext context);
     }
 
+    public partial interface IJournalMetadata
+    {
+        string? ETag { get; }
+
+        string? Format { get; }
+
+        System.Collections.Generic.IReadOnlyDictionary<string, string> Properties { get; }
+    }
+
     public partial interface IJournalStorage
     {
         bool IsCompactionRequested { get; }
 
         System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<IJournalMetadata?> GetMetadataAsync(System.Threading.CancellationToken cancellationToken = default);
         System.Threading.Tasks.ValueTask ReadAsync(IJournalStorageConsumer consumer, System.Threading.CancellationToken cancellationToken);
         System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> value, System.Threading.CancellationToken cancellationToken);
+        System.Threading.Tasks.ValueTask<IJournalMetadata?> UpdateMetadataAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? set = null, System.Collections.Generic.IEnumerable<string>? remove = null, string? expectedETag = null, System.Threading.CancellationToken cancellationToken = default);
+    }
+
+    public partial interface IJournalStorageCatalog
+    {
+        System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, System.Threading.CancellationToken cancellationToken = default);
     }
 
     public partial interface IJournalStorageConsumer
     {
-        void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata);
+        void Read(JournalBufferReader buffer, IJournalMetadata? metadata);
     }
 
     public partial interface IJournalStorageProvider
@@ -379,15 +391,6 @@ namespace Orleans.Journaling
         public void Dispose() { }
     }
 
-    public sealed partial class JournalFileMetadata : IJournalFileMetadata
-    {
-        public JournalFileMetadata(string? format) { }
-
-        public static IJournalFileMetadata Empty { get { throw null; } }
-
-        public string? Format { get { throw null; } }
-    }
-
     public readonly partial struct JournalId : System.IEquatable<JournalId>
     {
         private readonly object _dummy;
@@ -398,6 +401,10 @@ namespace Orleans.Journaling
 
         public string Value { get { throw null; } }
 
+        public static JournalId Create(System.Collections.Generic.IEnumerable<string> segments) { throw null; }
+
+        public static JournalId Create(string firstSegment, params string[] additionalSegments) { throw null; }
+
         public readonly bool Equals(JournalId other) { throw null; }
 
         public override readonly bool Equals(object? obj) { throw null; }
@@ -406,11 +413,26 @@ namespace Orleans.Journaling
 
         public override readonly int GetHashCode() { throw null; }
 
+        public readonly bool IsPrefixOf(JournalId journalId) { throw null; }
+
         public static bool operator ==(JournalId left, JournalId right) { throw null; }
 
         public static bool operator !=(JournalId left, JournalId right) { throw null; }
 
         public override readonly string ToString() { throw null; }
+    }
+
+    public sealed partial class JournalMetadata : IJournalMetadata
+    {
+        public JournalMetadata(string? format, string? eTag = null, System.Collections.Generic.IReadOnlyDictionary<string, string>? properties = null) { }
+
+        public static IJournalMetadata Empty { get { throw null; } }
+
+        public string? ETag { get { throw null; } }
+
+        public string? Format { get { throw null; } }
+
+        public System.Collections.Generic.IReadOnlyDictionary<string, string> Properties { get { throw null; } }
     }
 
     public readonly partial struct JournalReplayContext
@@ -428,17 +450,17 @@ namespace Orleans.Journaling
 
     public static partial class JournalStorageConsumerExtensions
     {
-        public static void Complete(this IJournalStorageConsumer consumer, IJournalFileMetadata? metadata) { }
+        public static void Complete(this IJournalStorageConsumer consumer, IJournalMetadata? metadata) { }
 
-        public static void Read(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, IJournalFileMetadata? metadata, bool complete) { }
+        public static void Read(this IJournalStorageConsumer consumer, System.Buffers.ReadOnlySequence<byte> input, IJournalMetadata? metadata, bool complete) { }
 
-        public static void Read(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, IJournalFileMetadata? metadata, bool complete) { }
+        public static void Read(this IJournalStorageConsumer consumer, System.Collections.Generic.IEnumerable<System.ReadOnlyMemory<byte>> segments, IJournalMetadata? metadata, bool complete) { }
 
-        public static void Read(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalFileMetadata? metadata, bool complete) { }
+        public static void Read(this IJournalStorageConsumer consumer, System.ReadOnlyMemory<byte> input, IJournalMetadata? metadata, bool complete) { }
 
-        public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, bool complete, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalMetadata? metadata, bool complete, System.Threading.CancellationToken cancellationToken) { throw null; }
 
-        public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalFileMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
+        public static System.Threading.Tasks.ValueTask<long> ReadAsync(this IJournalStorageConsumer consumer, System.IO.Stream input, IJournalMetadata? metadata, System.Threading.CancellationToken cancellationToken) { throw null; }
     }
 
     public readonly partial struct JournalStreamId : System.IEquatable<JournalStreamId>
@@ -487,20 +509,28 @@ namespace Orleans.Journaling
 
         public System.Threading.Tasks.ValueTask AppendAsync(System.Buffers.ReadOnlySequence<byte> segment, System.Threading.CancellationToken cancellationToken) { throw null; }
 
+        public System.Threading.Tasks.ValueTask<bool> CreateIfNotExistsAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? metadata = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
+
         public System.Threading.Tasks.ValueTask DeleteAsync(System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<IJournalMetadata?> GetMetadataAsync(System.Threading.CancellationToken cancellationToken = default) { throw null; }
 
         public System.Threading.Tasks.ValueTask ReadAsync(IJournalStorageConsumer consumer, System.Threading.CancellationToken cancellationToken) { throw null; }
 
         public System.Threading.Tasks.ValueTask ReplaceAsync(System.Buffers.ReadOnlySequence<byte> snapshot, System.Threading.CancellationToken cancellationToken) { throw null; }
+
+        public System.Threading.Tasks.ValueTask<IJournalMetadata?> UpdateMetadataAsync(System.Collections.Generic.IReadOnlyDictionary<string, string>? set = null, System.Collections.Generic.IEnumerable<string>? remove = null, string? expectedETag = null, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 
-    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider
+    public sealed partial class VolatileJournalStorageProvider : IJournalStorageProvider, IJournalStorageCatalog
     {
         public VolatileJournalStorageProvider() { }
 
         public VolatileJournalStorageProvider(Microsoft.Extensions.Options.IOptions<JournaledStateManagerOptions> options) { }
 
         public IJournalStorage CreateStorage(JournalId journalId) { throw null; }
+
+        public System.Collections.Generic.IAsyncEnumerable<JournalId> ListAsync(JournalId prefix = default, System.Threading.CancellationToken cancellationToken = default) { throw null; }
     }
 }
 

@@ -1,10 +1,13 @@
 using System.Linq;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.DependencyInjection.Extensions;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Options;
 using Orleans.Configuration.Internal;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
+using Orleans.Journaling;
+using Orleans.Journaling.Json;
 
 namespace Orleans.Hosting;
 
@@ -32,6 +35,7 @@ public static class DurableJobsExtensions
         }
 
         services.AddSingleton<IConfigurationValidator, DurableJobsOptionsValidator>();
+        services.AddSingleton<IConfigurationValidator, DurableJobsJournalingConfigurationValidator>();
         services.AddSingleton<ShardExecutor>();
         services.AddSingleton<LocalDurableJobManager>();
         services.AddFromExisting<ILocalDurableJobManager, LocalDurableJobManager>();
@@ -54,8 +58,10 @@ public static class DurableJobsExtensions
     public static ISiloBuilder UseInMemoryDurableJobs(this ISiloBuilder builder)
     {
         builder.AddDurableJobs();
+        builder.AddJournalStorage();
+        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
 
-        builder.ConfigureServices(services => services.UseInMemoryDurableJobs());
+        builder.ConfigureServices(services => services.UseVolatileJournaledDurableJobs());
         return builder;
     }
 
@@ -69,14 +75,32 @@ public static class DurableJobsExtensions
     /// <returns>The provided <see cref="IServiceCollection"/>, for chaining.</returns>
     internal static IServiceCollection UseInMemoryDurableJobs(this IServiceCollection services)
     {
-        services.AddSingleton<InMemoryJobShardManager>(sp =>
-        {
-            var siloDetails = sp.GetRequiredService<ILocalSiloDetails>();
-            var membershipService = sp.GetRequiredService<IClusterMembershipService>();
-            var durableJobsOptions = sp.GetRequiredService<IOptions<DurableJobsOptions>>();
-            return new InMemoryJobShardManager(siloDetails.SiloAddress, membershipService, durableJobsOptions.Value.MaxAdoptedCount);
-        });
-        services.AddFromExisting<JobShardManager, InMemoryJobShardManager>();
+        var builder = new ServiceCollectionSiloBuilder(services);
+        builder.AddJournalStorage();
+        builder.UseJsonJournalFormat(options => options.AddTypeInfoResolver(DurableJobsJsonContext.Default));
+        return services.UseVolatileJournaledDurableJobs();
+    }
+
+    private static IServiceCollection UseVolatileJournaledDurableJobs(this IServiceCollection services)
+    {
+        services.TryAddSingleton<VolatileJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageProvider, VolatileJournalStorageProvider>();
+        services.AddFromExisting<IJournalStorageCatalog, VolatileJournalStorageProvider>();
+        services.TryAddSingleton<JournaledJobShardManager>();
+        services.AddFromExisting<JobShardManager, JournaledJobShardManager>();
         return services;
+    }
+
+    private sealed class ServiceCollectionSiloBuilder : ISiloBuilder
+    {
+        public ServiceCollectionSiloBuilder(IServiceCollection services)
+        {
+            Services = services;
+            Configuration = new ConfigurationBuilder().Build();
+        }
+
+        public IServiceCollection Services { get; }
+
+        public IConfiguration Configuration { get; }
     }
 }

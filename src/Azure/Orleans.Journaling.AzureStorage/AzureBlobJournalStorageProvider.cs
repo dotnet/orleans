@@ -1,14 +1,21 @@
+using System.Runtime.CompilerServices;
+using Azure;
+using Azure.Storage.Blobs;
+using Azure.Storage.Blobs.Models;
+using Azure.Storage.Blobs.Specialized;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
+using Orleans.Runtime;
 
 namespace Orleans.Journaling;
 
-internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider
+internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<ISiloLifecycle>, IJournalStorageProvider, IJournalStorageCatalog
 {
     private readonly IBlobContainerFactory _containerFactory;
     private readonly AzureBlobJournalStorageOptions _options;
     private readonly AzureBlobJournalStorage.AzureBlobJournalStorageShared _shared;
+    private BlobContainerClient? _defaultContainer;
 
     public AzureBlobJournalStorageProvider(
         IOptions<AzureBlobJournalStorageOptions> options,
@@ -31,6 +38,8 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
     private async Task Initialize(CancellationToken cancellationToken)
     {
         var client = await _options.CreateClient!(cancellationToken);
+        _defaultContainer = client.GetBlobContainerClient(_options.ContainerName);
+        await _defaultContainer.CreateIfNotExistsAsync(cancellationToken: cancellationToken).ConfigureAwait(false);
         await _containerFactory.InitializeAsync(client, cancellationToken).ConfigureAwait(false);
     }
 
@@ -44,12 +53,67 @@ internal sealed class AzureBlobJournalStorageProvider : ILifecycleParticipant<IS
         return new AzureBlobJournalStorage(_shared, journalId);
     }
 
+    public async IAsyncEnumerable<JournalId> ListAsync(
+        JournalId prefix = default,
+        [EnumeratorCancellation] CancellationToken cancellationToken = default)
+    {
+        var container = GetDefaultContainerClient();
+        var blobPrefix = prefix.IsDefault ? null : prefix.Value;
+        var journalIds = new List<JournalId>();
+        await foreach (var item in container.GetBlobsAsync(
+            traits: BlobTraits.None,
+            states: BlobStates.None,
+            prefix: blobPrefix,
+            cancellationToken: cancellationToken))
+        {
+            if (item.Properties.BlobType is { } blobType && blobType != BlobType.Append)
+            {
+                continue;
+            }
+
+            if (!item.Name.EndsWith("/wal", StringComparison.Ordinal))
+            {
+                continue;
+            }
+
+            var storageIdValue = item.Name[..^"/wal".Length];
+            if (TryParseJournalId(storageIdValue, out var journalId) && prefix.IsPrefixOf(journalId))
+            {
+                journalIds.Add(journalId);
+            }
+        }
+
+        foreach (var journalId in journalIds.OrderBy(static journalId => journalId.Value, StringComparer.Ordinal))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            yield return journalId;
+        }
+    }
+
     public void Participate(ISiloLifecycle observer)
     {
         observer.Subscribe(
             nameof(AzureBlobJournalStorageProvider),
             ServiceLifecycleStage.RuntimeInitialize,
             onStart: Initialize);
+    }
+
+    private BlobContainerClient GetDefaultContainerClient()
+        => _defaultContainer ?? throw new InvalidOperationException(
+            $"{nameof(AzureBlobJournalStorageProvider)} has not been initialized. Ensure the silo lifecycle has started before using journal storage.");
+
+    private static bool TryParseJournalId(string value, out JournalId journalId)
+    {
+        try
+        {
+            journalId = new JournalId(value);
+            return true;
+        }
+        catch (ArgumentException)
+        {
+            journalId = default;
+            return false;
+        }
     }
 
     private static IJournalFormat GetJournalFormat(IServiceProvider serviceProvider, string journalFormatKey)

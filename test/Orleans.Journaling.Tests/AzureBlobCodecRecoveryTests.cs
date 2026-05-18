@@ -296,7 +296,7 @@ public sealed class AzureBlobCodecRecoveryTests : JournalingTestBase, IAsyncLife
 
         public bool IsCompleted { get; private set; }
 
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
             if (buffer.Length > 0)
             {

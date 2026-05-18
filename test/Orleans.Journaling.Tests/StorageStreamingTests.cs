@@ -224,7 +224,7 @@ public sealed class StorageStreamingTests
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
             if (buffer.IsCompleted || buffer.Length == 0)
             {
@@ -241,7 +241,7 @@ public sealed class StorageStreamingTests
     {
         public List<byte[]> Segments { get; } = [];
 
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
             var temp = new byte[2];
             while (buffer.TryPeek(temp))
@@ -267,7 +267,7 @@ public sealed class StorageStreamingTests
 
         public int CompletedLength { get; private set; }
 
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata)
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata)
         {
             IsCompleted = buffer.IsCompleted;
             CompletedLength = buffer.Length;
@@ -276,7 +276,7 @@ public sealed class StorageStreamingTests
 
     private sealed class LeavingJournalStorageConsumer : IJournalStorageConsumer
     {
-        public void Read(JournalBufferReader buffer, IJournalFileMetadata? metadata) { }
+        public void Read(JournalBufferReader buffer, IJournalMetadata? metadata) { }
     }
 
     private sealed class ChunkedReadStream(byte[] data, int chunkSize) : Stream

@@ -1,8 +1,11 @@
 using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Runtime;
 using Orleans.DurableJobs;
+using Orleans.Journaling;
 
 namespace Orleans.Hosting;
 
@@ -209,4 +212,88 @@ public sealed partial class DurableJobsOptionsValidator : IConfigurationValidato
         Message = "DurableJobsOptions validated: ShardDuration={ShardDuration}"
     )]
     private static partial void LogInformationOptionsValidated(ILogger logger, TimeSpan shardDuration);
+}
+
+internal sealed class DurableJobsJournalingConfigurationValidator : IConfigurationValidator
+{
+    private readonly IServiceProvider _serviceProvider;
+
+    public DurableJobsJournalingConfigurationValidator(IServiceProvider serviceProvider)
+    {
+        _serviceProvider = serviceProvider;
+    }
+
+    public void ValidateConfiguration()
+    {
+        var missingServices = new List<string>();
+        var serviceProviderIsService = _serviceProvider.GetService<IServiceProviderIsService>();
+
+        CheckService<IJournalStorageProvider>(serviceProviderIsService, missingServices);
+        CheckService<IJournalStorageCatalog>(serviceProviderIsService, missingServices);
+        CheckService<IJournaledStateManagerFactory>(serviceProviderIsService, missingServices);
+        CheckService<JobShardManager>(serviceProviderIsService, missingServices);
+
+        if (missingServices.Count > 0)
+        {
+            throw new OrleansConfigurationException(
+                $"DurableJobs requires Orleans.Journaling storage. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...) before starting the silo. Missing services: {string.Join(", ", missingServices)}.");
+        }
+
+        var shardManager = ResolveRequiredService<JobShardManager>();
+        if (shardManager is not JournaledJobShardManager)
+        {
+            throw new OrleansConfigurationException(
+                $"DurableJobs requires the journaled shard manager, but '{shardManager.GetType().FullName}' is registered. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...).");
+        }
+    }
+
+    private void CheckService<TService>(IServiceProviderIsService? serviceProviderIsService, List<string> missingServices)
+        where TService : class
+    {
+        if (serviceProviderIsService is not null)
+        {
+            if (!serviceProviderIsService.IsService(typeof(TService)))
+            {
+                missingServices.Add(typeof(TService).Name);
+            }
+
+            return;
+        }
+
+        if (ResolveService<TService>() is null)
+        {
+            missingServices.Add(typeof(TService).Name);
+        }
+    }
+
+    private TService? ResolveService<TService>()
+        where TService : class
+    {
+        try
+        {
+            return _serviceProvider.GetService<TService>();
+        }
+        catch (Exception exception)
+        {
+            throw CreateServiceResolutionException<TService>(exception);
+        }
+    }
+
+    private TService ResolveRequiredService<TService>()
+        where TService : notnull
+    {
+        try
+        {
+            return _serviceProvider.GetRequiredService<TService>();
+        }
+        catch (Exception exception)
+        {
+            throw CreateServiceResolutionException<TService>(exception);
+        }
+    }
+
+    private static OrleansConfigurationException CreateServiceResolutionException<TService>(Exception exception)
+        => new(
+            $"DurableJobs requires Orleans.Journaling storage, but service '{typeof(TService).Name}' could not be resolved. Configure DurableJobs storage using UseInMemoryDurableJobs() or UseAzureBlobDurableJobs(...).",
+            exception);
 }

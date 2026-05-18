@@ -9,9 +9,9 @@ public static class HostingExtensions
     public static ISiloBuilder AddJournalStorage(this ISiloBuilder builder)
     {
         builder.Services.AddOptions<JournaledStateManagerOptions>();
-        builder.Services.TryAddScoped<JournaledStateManagerShared>();
+        builder.Services.TryAddSingleton<JournaledStateManagerShared>();
         builder.Services.TryAddScoped<IJournaledStateManager, JournaledStateManager>();
-        builder.Services.TryAddScoped<IJournaledStateManagerFactory, JournaledStateManagerFactory>();
+        builder.Services.TryAddSingleton<IJournaledStateManagerFactory, JournaledStateManagerFactory>();
 
         // Register JSON as the default format family and keep Orleans binary available for existing data.
         builder.Services.AddJsonJournalFormat(new JsonJournalOptions().SerializerOptions, tryAdd: true);

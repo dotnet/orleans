@@ -27,3 +27,8 @@ public interface ILocalDurableJobManager
     /// <returns>A <see cref="Task"/> representing the asynchronous operation that returns <see langword="true"/> if the job was successfully canceled; otherwise, <see langword="false"/>.</returns>
     Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken);
 }
+
+internal interface ILocalDurableJobManagerSystemTarget : ISystemTarget
+{
+    Task<bool> TryCancelDurableJobAsync(DurableJob job, CancellationToken cancellationToken);
+}
