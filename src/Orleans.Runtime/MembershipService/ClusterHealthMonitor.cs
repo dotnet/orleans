@@ -11,6 +11,7 @@ using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 using Orleans.Configuration;
 using Orleans.Internal;
+using Orleans.Runtime.Messaging;
 using static Orleans.Runtime.MembershipService.SiloHealthMonitor;
 
 #nullable disable
@@ -26,6 +27,7 @@ namespace Orleans.Runtime.MembershipService
         private readonly ILocalSiloDetails localSiloDetails;
         private readonly IServiceProvider serviceProvider;
         private readonly IMembershipManager membershipManager;
+        private readonly ConnectionManager connectionManager;
         private readonly ILogger<ClusterHealthMonitor> log;
         private readonly IFatalErrorHandler fatalErrorHandler;
         private readonly IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions;
@@ -51,11 +53,13 @@ namespace Orleans.Runtime.MembershipService
             ILogger<ClusterHealthMonitor> log,
             IOptionsMonitor<ClusterMembershipOptions> clusterMembershipOptions,
             IFatalErrorHandler fatalErrorHandler,
-            IServiceProvider serviceProvider)
+            IServiceProvider serviceProvider,
+            ConnectionManager connectionManager)
         {
             this.localSiloDetails = localSiloDetails;
             this.serviceProvider = serviceProvider;
             this.membershipManager = membershipManager;
+            this.connectionManager = connectionManager;
             this.log = log;
             this.fatalErrorHandler = fatalErrorHandler;
             this.clusterMembershipOptions = clusterMembershipOptions;
@@ -317,13 +321,47 @@ namespace Orleans.Runtime.MembershipService
             {
                 if (probeResult.Status == ProbeResultStatus.Failed && probeResult.FailedProbeCount >= this.clusterMembershipOptions.CurrentValue.NumMissedProbesLimit)
                 {
+                    if (IsConnectionActiveWithinMonitoringWindow(monitor.TargetSiloAddress))
+                    {
+                        return;
+                    }
+
                     await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, null, this.shutdownCancellation.Token).ConfigureAwait(false);
                 }
             }
             else if (probeResult.Status == ProbeResultStatus.Failed)
             {
+                if (IsConnectionActiveWithinMonitoringWindow(monitor.TargetSiloAddress))
+                {
+                    return;
+                }
+
                 await this.membershipManager.TrySuspectSilo(monitor.TargetSiloAddress, probeResult.Intermediary, this.shutdownCancellation.Token).ConfigureAwait(false);
             }
+        }
+
+        /// <summary>
+        /// Checks whether a connection to the specified silo has received a message within the monitoring window
+        /// (<see cref="ClusterMembershipOptions.ProbeTimeout"/> × <see cref="ClusterMembershipOptions.NumMissedProbesLimit"/>).
+        /// If so, the silo is demonstrably alive and the vote should be suppressed.
+        /// </summary>
+        private bool IsConnectionActiveWithinMonitoringWindow(SiloAddress targetSilo)
+        {
+            var options = this.clusterMembershipOptions.CurrentValue;
+            if (!options.EnableConnectionLivenessCheck)
+            {
+                return false;
+            }
+
+            var monitoringWindow = options.ProbeTimeout.Multiply(options.NumMissedProbesLimit);
+
+            if (this.connectionManager.GetElapsedSinceLastMessageReceived(targetSilo) is { } elapsed && elapsed <= monitoringWindow)
+            {
+                LogInformationSuppressingVoteDueToActiveConnection(log, targetSilo, elapsed, monitoringWindow);
+                return true;
+            }
+
+            return false;
         }
 
         bool IHealthCheckable.CheckHealth(DateTime lastCheckTime, out string reason)
@@ -457,5 +495,11 @@ namespace Orleans.Runtime.MembershipService
             Message = "Error disposing monitor for {SiloAddress}."
         )]
         private static partial void LogErrorDisposingMonitorForSilo(ILogger logger, Exception exception, SiloAddress siloAddress);
+
+        [LoggerMessage(
+            Level = LogLevel.Information,
+            Message = "Suppressing vote to suspect silo {SiloAddress}: connection received a message {Elapsed} ago, within the {MonitoringWindow} monitoring window. The silo is demonstrably alive."
+        )]
+        private static partial void LogInformationSuppressingVoteDueToActiveConnection(ILogger logger, SiloAddress siloAddress, TimeSpan elapsed, TimeSpan monitoringWindow);
     }
 }
