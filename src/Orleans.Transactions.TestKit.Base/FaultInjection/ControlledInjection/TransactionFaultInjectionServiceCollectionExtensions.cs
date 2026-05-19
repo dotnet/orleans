@@ -6,7 +6,6 @@ using Orleans.Configuration;
 using Orleans.Providers;
 using Orleans.Runtime;
 using Orleans.Transactions.Abstractions;
-using Orleans.Transactions.State;
 using Orleans.Transactions.TestKit;
 
 #nullable disable
@@ -25,7 +24,6 @@ namespace Orleans.Hosting
             services.AddSingleton<IAttributeToFactoryMapper<FaultInjectionTransactionalStateAttribute>, FaultInjectionTransactionalStateAttributeMapper>();
             services.TryAddTransient<IFaultInjectionTransactionalStateFactory, FaultInjectionTransactionalStateFactory>();
             services.AddTransient(typeof(IFaultInjectionTransactionalState<>), typeof(FaultInjectionTransactionalState<>));
-            services.TryAddScoped<ITransactionQueueStorageEventHandler>(sp => sp.GetService<ITransactionFaultInjector>() as ITransactionQueueStorageEventHandler);
             return services;
         }
 

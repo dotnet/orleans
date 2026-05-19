@@ -185,8 +185,7 @@ namespace Orleans.Transactions.TestKit
         Deactivation = 1,
         ExceptionBeforeStore = 2,
         ExceptionAfterStore = 3,
-        GenericExceptionAfterStore = 4,
-        ExceptionAfterStorageWriteCompleted = 5
+        GenericExceptionAfterStore = 4
     }
 
     public abstract partial class GoldenPathTransactionTestRunner : TransactionTestRunnerBase
@@ -234,8 +233,6 @@ namespace Orleans.Transactions.TestKit
 
     public partial interface IControlledTransactionFaultInjector : ITransactionFaultInjector
     {
-        bool InjectAfterStorageWriteCompleted { get; set; }
-
         bool InjectAfterStore { get; set; }
 
         bool InjectBeforeStore { get; set; }
@@ -552,8 +549,6 @@ namespace Orleans.Transactions.TestKit
         public bool InjectBeforeStore { get { throw null; } set { } }
 
         public bool InjectGenericAfterStore { get { throw null; } set { } }
-
-        public bool InjectAfterStorageWriteCompleted { get { throw null; } set { } }
 
         public void AfterStore() { }
 

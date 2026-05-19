@@ -49,8 +49,7 @@ namespace Orleans.Transactions.TestKit
         Deactivation,
         ExceptionBeforeStore,
         ExceptionAfterStore,
-        GenericExceptionAfterStore,
-        ExceptionAfterStorageWriteCompleted
+        GenericExceptionAfterStore
     }
 
     public interface IFaultInjectionTransactionalState<TState> : ITransactionalState<TState> where TState : class, new()

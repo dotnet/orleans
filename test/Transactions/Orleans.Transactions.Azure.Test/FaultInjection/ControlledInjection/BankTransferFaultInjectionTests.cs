@@ -60,19 +60,14 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
     [Fact]
     public async Task ExceptionAfterStorageWriteCompleted_CommitsDurableFullBankTransfer()
     {
-        var commitFault = new BankTransferFault
-        {
-            Phase = TransactionFaultInjectPhase.BeforePrepareAndCommit,
-            Type = FaultInjectionType.ExceptionAfterStorageWriteCompleted
-        };
-
         await RunFaultedDepositManagerTransfer(
-            commitFault,
+            commitFault: null,
             100,
             0,
             expectedFrom: 99,
             expectedTo: 1,
-            "the storage write returned successfully before a post-store queue step faulted, so recovery must reload and complete the durable commit");
+            "the storage write returned successfully before a post-store queue step faulted, so recovery must reload and complete the durable commit",
+            to => BankTransferDiagnosticFaults.ThrowOnStorageWriteCompleted(to));
     }
 
     private async Task RunFaultedDepositManagerTransfer(
@@ -81,7 +76,8 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         long initialTo,
         long expectedFrom,
         long expectedTo,
-        string because)
+        string because,
+        Func<IBankTransferFaultInjectionAccountGrain, StorageWriteCompletedFaultScope> createDiagnosticFault = null)
     {
         BankTransferTrace.Clear();
 
@@ -92,8 +88,24 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         await from.SetBalance(initialFrom);
         await to.SetBalance(initialTo);
 
-        var exception = await Assert.ThrowsAnyAsync<OrleansTransactionException>(
-            () => teller.TransferReturnBalancesWithDepositAsManager(from, to, 1, commitFault));
+        StorageWriteCompletedFaultScope diagnosticFault = null;
+        OrleansTransactionException exception;
+        try
+        {
+            diagnosticFault = createDiagnosticFault?.Invoke(to);
+            exception = await Assert.ThrowsAnyAsync<OrleansTransactionException>(
+                () => teller.TransferReturnBalancesWithDepositAsManager(from, to, 1, commitFault));
+        }
+        finally
+        {
+            diagnosticFault?.Dispose();
+        }
+
+        if (diagnosticFault is not null)
+        {
+            diagnosticFault.FaultInjected.Should().BeTrue("the diagnostic fault should be injected exactly once for the target transaction manager");
+            diagnosticFault.ObservedCount.Should().BeGreaterThan(0, "the diagnostic event should be emitted after the target storage write completes");
+        }
 
         var committed = await teller.GetBalances(from, to);
 

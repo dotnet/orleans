@@ -3,20 +3,17 @@ using System.ComponentModel;
 using System.Runtime.Serialization;
 using Azure;
 using Microsoft.Extensions.Logging;
-using Orleans.Transactions.State;
 
 namespace Orleans.Transactions.TestKit
 {
-    public partial class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector, ITransactionQueueStorageEventHandler
+    public partial class SimpleAzureStorageExceptionInjector : IControlledTransactionFaultInjector
     {
         public bool InjectBeforeStore { get; set; }
         public bool InjectAfterStore { get; set; }
         public bool InjectGenericAfterStore { get; set; }
-        public bool InjectAfterStorageWriteCompleted { get; set; }
         private int injectionBeforeStoreCounter = 0;
         private int injectionAfterStoreCounter = 0;
         private int genericInjectionAfterStoreCounter = 0;
-        private int injectionAfterStorageWriteCompletedCounter = 0;
         private readonly ILogger logger;
         public SimpleAzureStorageExceptionInjector(ILogger<SimpleAzureStorageExceptionInjector> logger)
         {
@@ -53,18 +50,6 @@ namespace Orleans.Transactions.TestKit
                 var message = $"Storage exception thrown before store. Thrown total {injectionBeforeStoreCounter}";
                 LogInformationMessage(this.logger, message);
                 throw new SimpleAzureStorageException(message);
-            }
-        }
-
-        void ITransactionQueueStorageEventHandler.OnStorageWriteCompleted()
-        {
-            if (InjectAfterStorageWriteCompleted)
-            {
-                InjectAfterStorageWriteCompleted = false;
-                this.injectionAfterStorageWriteCompletedCounter++;
-                var message = $"Transaction queue exception thrown after storage write completed, thrown total {injectionAfterStorageWriteCompletedCounter}";
-                LogInformationMessage(this.logger, message);
-                throw new InvalidOperationException(message);
             }
         }
 
