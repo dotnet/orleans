@@ -24,6 +24,7 @@ namespace Orleans.Transactions.State
         protected readonly ILogger logger;
         private readonly IActivationLifetime activationLifetime;
         private readonly ConfirmationWorker<TState> confirmationWorker;
+        private readonly ITransactionQueueStorageEventHandler storageEventHandler;
         private CommitQueue<TState> commitQueue;
         private Task readyTask;
 
@@ -56,7 +57,8 @@ namespace Orleans.Transactions.State
             IClock clock,
             ILogger logger,
             ITimerManager timerManager,
-            IActivationLifetime activationLifetime)
+            IActivationLifetime activationLifetime,
+            ITransactionQueueStorageEventHandler storageEventHandler = null)
         {
             this.options = options.Value;
             this.resource = resource;
@@ -65,6 +67,7 @@ namespace Orleans.Transactions.State
             this.Clock = new CausalClock(clock);
             this.logger = logger;
             this.activationLifetime = activationLifetime;
+            this.storageEventHandler = storageEventHandler;
             this.storageWorker = new BatchWorkerFromDelegate(StorageWork, this.activationLifetime.OnDeactivating);
             this.RWLock = new ReadWriteLock<TState>(options, this, this.storageWorker, logger, activationLifetime);
             this.confirmationWorker = new ConfirmationWorker<TState>(options, this.resource, this.storageWorker, () => this.storageBatch, this.logger, timerManager, activationLifetime);
@@ -568,6 +571,8 @@ namespace Orleans.Transactions.State
                             await RecoverFromStorageOutcomeUnknown(TransactionalStatus.UnknownException, exception);
                             return;
                         }
+
+                        this.storageEventHandler?.OnStorageWriteCompleted();
                     }
 
                     if (committableEntries > 0)

@@ -4,5 +4,7 @@
     {
         bool InjectBeforeStore { get; set; }
         bool InjectAfterStore { get; set; }
+        bool InjectGenericAfterStore { get; set; }
+        bool InjectAfterStorageWriteCompleted { get; set; }
     }
 }

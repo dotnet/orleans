@@ -22,7 +22,66 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
     }
 
     [Fact]
-    public async Task StorageExceptionAfterCommitStore_DoesNotExposePartialBankTransfer()
+    public async Task StorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
+    {
+        var commitFault = new BankTransferFault
+        {
+            Phase = TransactionFaultInjectPhase.BeforePrepareAndCommit,
+            Type = FaultInjectionType.ExceptionAfterStore
+        };
+
+        await RunFaultedDepositManagerTransfer(
+            commitFault,
+            100,
+            0,
+            expectedFrom: 99,
+            expectedTo: 1,
+            "the transaction manager committed its durable state before the storage exception was surfaced");
+    }
+
+    [Fact]
+    public async Task GenericStorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
+    {
+        var commitFault = new BankTransferFault
+        {
+            Phase = TransactionFaultInjectPhase.BeforePrepareAndCommit,
+            Type = FaultInjectionType.GenericExceptionAfterStore
+        };
+
+        await RunFaultedDepositManagerTransfer(
+            commitFault,
+            100,
+            0,
+            expectedFrom: 99,
+            expectedTo: 1,
+            "a generic exception surfaced after the underlying storage write must recover the durable commit instead of partially aborting it");
+    }
+
+    [Fact]
+    public async Task ExceptionAfterStorageWriteCompleted_CommitsDurableFullBankTransfer()
+    {
+        var commitFault = new BankTransferFault
+        {
+            Phase = TransactionFaultInjectPhase.BeforePrepareAndCommit,
+            Type = FaultInjectionType.ExceptionAfterStorageWriteCompleted
+        };
+
+        await RunFaultedDepositManagerTransfer(
+            commitFault,
+            100,
+            0,
+            expectedFrom: 99,
+            expectedTo: 1,
+            "the storage write returned successfully before a post-store queue step faulted, so recovery must reload and complete the durable commit");
+    }
+
+    private async Task RunFaultedDepositManagerTransfer(
+        BankTransferFault commitFault,
+        long initialFrom,
+        long initialTo,
+        long expectedFrom,
+        long expectedTo,
+        string because)
     {
         BankTransferTrace.Clear();
 
@@ -30,17 +89,9 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         var to = _grainFactory.GetGrain<IBankTransferFaultInjectionAccountGrain>(Guid.NewGuid());
         var teller = _grainFactory.GetGrain<IBankTransferFaultInjectionTellerGrain>(0);
 
-        await from.SetBalance(0);
-        await to.SetBalance(0);
+        await from.SetBalance(initialFrom);
+        await to.SetBalance(initialTo);
 
-        var commitFault = new BankTransferFault
-        {
-            Phase = TransactionFaultInjectPhase.BeforePrepareAndCommit,
-            Type = FaultInjectionType.ExceptionAfterStore
-        };
-
-        // The deposit account is deliberately the transaction manager. Its store succeeds, then
-        // faults before follow-up actions can confirm the withdrawal participant.
         var exception = await Assert.ThrowsAnyAsync<OrleansTransactionException>(
             () => teller.TransferReturnBalancesWithDepositAsManager(from, to, 1, commitFault));
 
@@ -52,6 +103,8 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             _output.WriteLine($"{traceEvent.Timestamp:O} {traceEvent.TransactionId} {traceEvent.GrainId} {traceEvent.Stage} {traceEvent.Balance}");
         }
 
-        committed.Total.Should().Be(0, "committed account balances should remain atomic after storage faults");
+        committed.From.Should().Be(expectedFrom, because);
+        committed.To.Should().Be(expectedTo, because);
+        committed.Total.Should().Be(initialFrom + initialTo, "storage faults must not expose or durably persist a partial bank transfer");
     }
 }
