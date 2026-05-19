@@ -600,14 +600,8 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
-                    if (storageWriteMayHaveCompleted)
-                    {
-                        await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false);
-                    }
-                    else
-                    {
-                        await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: true);
-                    }
+                    var notifyOfAbort = !storageWriteMayHaveCompleted;
+                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: notifyOfAbort);
                 }
             }
         }
@@ -618,7 +612,7 @@ namespace Orleans.Transactions.State
             return this.readyTask;
         }
 
-        private async Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool force = false)
+        private async Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation = false)
         {
             List<Task> pending = new List<Task>();
             pending.Add(RWLock.AbortExecutingTransactions(exception));
@@ -642,7 +636,7 @@ namespace Orleans.Transactions.State
             commitQueue.Clear();
 
             await Task.WhenAll(pending);
-            if (++failCounter >= 10 || force)
+            if (++failCounter >= 10 || forceDeactivation)
             {
                 LogDebugStorageWorkerTriggeringGrainDeactivation();
                 this.deactivate();
