@@ -558,16 +558,21 @@ namespace Orleans.Transactions.State
                                 return;
                             }
                         }
-                        catch (InconsistentStateException exception)
-                        {
-                            LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
-                            await Bail(TransactionalStatus.StorageConflict, exception, notifyOfAbort: false, force: true);
-                            return;
-                        }
                         catch (Exception exception)
                         {
-                            LogWarningStorageExceptionInStorageWorker(exception);
-                            await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false);
+                            bool forceDeactivation;
+                            if (exception is InconsistentStateException)
+                            {
+                                forceDeactivation = true;
+                                LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
+                            }
+                            else
+                            {
+                                forceDeactivation = false;
+                                LogWarningStorageExceptionInStorageWorker(exception);
+                            }
+
+                            await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false, forceDeactivation: forceDeactivation);
                             return;
                         }
 
@@ -606,9 +611,9 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool force = false)
+        private Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation = false)
         {
-            this.readyTask = BailAsync(status, exception, notifyOfAbort, force);
+            this.readyTask = BailAsync(status, exception, notifyOfAbort, forceDeactivation);
             return this.readyTask;
         }
 
