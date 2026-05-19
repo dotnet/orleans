@@ -614,49 +614,34 @@ namespace Orleans.Transactions.State
 
         private Task AbortAndRestore(TransactionalStatus status, Exception exception, bool force = false)
         {
-            this.readyTask = Bail(status, exception, force);
+            this.readyTask = Bail(status, exception, notifyOfAbort: true, force);
             return this.readyTask;
         }
 
         private Task RecoverFromStorageOutcomeUnknown(TransactionalStatus status, Exception exception, bool force = false)
         {
-            this.readyTask = RecoverFromStorageOutcomeUnknownAsync(status, exception, force);
+            this.readyTask = Bail(status, exception, notifyOfAbort: false, force);
             return this.readyTask;
         }
 
-        private async Task RecoverFromStorageOutcomeUnknownAsync(TransactionalStatus status, Exception exception, bool force = false)
+        private async Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool force = false)
         {
             List<Task> pending = new List<Task>();
             pending.Add(RWLock.AbortExecutingTransactions(exception));
             this.RWLock.AbortQueuedTransactions();
 
-            // The storage write may have committed before the exception surfaced, or a later action may
-            // have failed after the write completed. Do not send abort/cancel messages from stale
-            // in-memory state; restore from storage and let recovery confirm or abort.
             foreach (var entry in commitQueue.Elements)
             {
-                switch (entry.Role)
+                if (notifyOfAbort)
                 {
-                    case CommitRole.NotYetDetermined:
-                        break;
-                    case CommitRole.RemoteCommit:
-                        entry.ConfirmationResponsePromise?.TrySetException(exception ?? new OrleansException($"Confirm failed: Status {status}"));
-                        break;
-                    case CommitRole.LocalCommit:
-                    case CommitRole.ReadOnly:
-                        if (exception is not null)
-                        {
-                            entry.PromiseForTA.TrySetException(exception);
-                        }
-                        else
-                        {
-                            entry.PromiseForTA.TrySetResult(status);
-                        }
-
-                        break;
-                    default:
-                        LogErrorImpossibleCase(entry.Role);
-                        throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
+                    pending.Add(NotifyOfAbort(entry, status, exception: exception));
+                }
+                else
+                {
+                    // The storage write may have committed before the exception surfaced, or a later action may
+                    // have failed after the write completed. Do not send abort/cancel messages from stale
+                    // in-memory state; restore from storage and let recovery confirm or abort.
+                    CompleteInDoubtEntryLocally(entry, status, exception);
                 }
             }
 
@@ -668,31 +653,34 @@ namespace Orleans.Transactions.State
                 LogDebugStorageWorkerTriggeringGrainDeactivation();
                 this.deactivate();
             }
-
             await this.Restore();
         }
 
-        private async Task Bail(TransactionalStatus status, Exception exception, bool force = false)
+        private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception exception)
         {
-            List<Task> pending = new List<Task>();
-            pending.Add(RWLock.AbortExecutingTransactions(exception));
-            this.RWLock.AbortQueuedTransactions();
-
-            // abort all entries in the commit queue
-            foreach (var entry in commitQueue.Elements)
+            switch (entry.Role)
             {
-                pending.Add(NotifyOfAbort(entry, status, exception: exception));
-            }
+                case CommitRole.NotYetDetermined:
+                    break;
+                case CommitRole.RemoteCommit:
+                    entry.ConfirmationResponsePromise?.TrySetException(exception ?? new OrleansException($"Confirm failed: Status {status}"));
+                    break;
+                case CommitRole.LocalCommit:
+                case CommitRole.ReadOnly:
+                    if (exception is not null)
+                    {
+                        entry.PromiseForTA.TrySetException(exception);
+                    }
+                    else
+                    {
+                        entry.PromiseForTA.TrySetResult(status);
+                    }
 
-            commitQueue.Clear();
-
-            await Task.WhenAll(pending);
-            if (++failCounter >= 10 || force)
-            {
-                LogDebugStorageWorkerTriggeringGrainDeactivation();
-                this.deactivate();
+                    break;
+                default:
+                    LogErrorImpossibleCase(entry.Role);
+                    throw new NotSupportedException($"{entry.Role} is not a supported CommitRole.");
             }
-            await this.Restore();
         }
 
         private async Task CheckProgressOfCommitQueue()
