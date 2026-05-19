@@ -419,7 +419,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false);
+                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false, forceDeactivation: false);
                 }
             }
         }
@@ -554,7 +554,7 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
-                                await Bail(TransactionalStatus.CommitFailure, exception: null, notifyOfAbort: true);
+                                await Bail(TransactionalStatus.CommitFailure, exception: null, notifyOfAbort: true, forceDeactivation: false);
                                 return;
                             }
                         }
@@ -606,18 +606,18 @@ namespace Orleans.Transactions.State
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
                     var notifyOfAbort = !storageWriteMayHaveCompleted;
-                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: notifyOfAbort);
+                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: false);
                 }
             }
         }
 
-        private Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation = false)
+        private Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
         {
-            this.readyTask = BailAsync(status, exception, notifyOfAbort, forceDeactivation);
+            this.readyTask = BailAsync(status, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: forceDeactivation);
             return this.readyTask;
         }
 
-        private async Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation = false)
+        private async Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
         {
             List<Task> pending = new List<Task>();
             pending.Add(RWLock.AbortExecutingTransactions(exception));
