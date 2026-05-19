@@ -509,7 +509,7 @@ namespace Orleans.Transactions.State
 
             using (this.activationLifetime.BlockDeactivation())
             {
-                var storageWriteCompleted = false;
+                var storageWriteMayHaveCompleted = false;
 
                 try
                 {
@@ -545,9 +545,10 @@ namespace Orleans.Transactions.State
                         {
                             if (await batchBeingSentToStorage.CheckStorePreConditions())
                             {
+                                // Once Store is invoked, a thrown exception cannot prove that no durable write occurred.
+                                storageWriteMayHaveCompleted = true;
                                 // perform the actual store, and record the e-tag
                                 this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
-                                storageWriteCompleted = true;
                                 failCounter = 0;
                             }
                             else
@@ -599,7 +600,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
-                    if (storageWriteCompleted)
+                    if (storageWriteMayHaveCompleted)
                     {
                         await RecoverFromStorageOutcomeUnknown(TransactionalStatus.UnknownException, exception);
                     }
