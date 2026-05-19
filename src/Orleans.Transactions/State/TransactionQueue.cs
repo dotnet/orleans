@@ -419,7 +419,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await RecoverFromStorageOutcomeUnknown(TransactionalStatus.UnknownException, exception);
+                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false);
                 }
             }
         }
@@ -554,20 +554,20 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
-                                await AbortAndRestore(TransactionalStatus.CommitFailure, exception: null);
+                                await Bail(TransactionalStatus.CommitFailure, exception: null, notifyOfAbort: true);
                                 return;
                             }
                         }
                         catch (InconsistentStateException exception)
                         {
                             LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
-                            await RecoverFromStorageOutcomeUnknown(TransactionalStatus.StorageConflict, exception, true);
+                            await Bail(TransactionalStatus.StorageConflict, exception, notifyOfAbort: false, force: true);
                             return;
                         }
                         catch (Exception exception)
                         {
                             LogWarningStorageExceptionInStorageWorker(exception);
-                            await RecoverFromStorageOutcomeUnknown(TransactionalStatus.UnknownException, exception);
+                            await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false);
                             return;
                         }
 
@@ -602,29 +602,23 @@ namespace Orleans.Transactions.State
                     LogWarningExceptionInStorageWorker(failCounter, exception);
                     if (storageWriteMayHaveCompleted)
                     {
-                        await RecoverFromStorageOutcomeUnknown(TransactionalStatus.UnknownException, exception);
+                        await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false);
                     }
                     else
                     {
-                        await AbortAndRestore(TransactionalStatus.UnknownException, exception);
+                        await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: true);
                     }
                 }
             }
         }
 
-        private Task AbortAndRestore(TransactionalStatus status, Exception exception, bool force = false)
+        private Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool force = false)
         {
-            this.readyTask = Bail(status, exception, notifyOfAbort: true, force);
+            this.readyTask = BailAsync(status, exception, notifyOfAbort, force);
             return this.readyTask;
         }
 
-        private Task RecoverFromStorageOutcomeUnknown(TransactionalStatus status, Exception exception, bool force = false)
-        {
-            this.readyTask = Bail(status, exception, notifyOfAbort: false, force);
-            return this.readyTask;
-        }
-
-        private async Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool force = false)
+        private async Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool force = false)
         {
             List<Task> pending = new List<Task>();
             pending.Add(RWLock.AbortExecutingTransactions(exception));
