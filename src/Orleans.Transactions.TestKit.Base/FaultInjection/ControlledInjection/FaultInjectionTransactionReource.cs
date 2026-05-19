@@ -37,6 +37,8 @@ namespace Orleans.Transactions.TestKit
                     this.faultInjector.InjectBeforeStore = true;
                 if (this.faultInjectionControl.FaultInjectionType == FaultInjectionType.ExceptionAfterStore)
                     this.faultInjector.InjectAfterStore = true;
+                if (this.faultInjectionControl.FaultInjectionType == FaultInjectionType.GenericExceptionAfterStore)
+                    this.faultInjector.InjectGenericAfterStore = true;
                 LogInformationInjectedFaultBeforePrepareAndCommit(this.logger, context.GrainInstance, transactionId, faultInjectionControl.FaultInjectionType);
             }
             var result = await this.tm.PrepareAndCommit(transactionId, accessCount, timeStamp, writeParticipants, totalParticipants);
@@ -190,6 +192,8 @@ namespace Orleans.Transactions.TestKit
                     this.faultInjector.InjectBeforeStore = true;
                 if (this.faultInjectionControl.FaultInjectionType == FaultInjectionType.ExceptionAfterStore)
                     this.faultInjector.InjectAfterStore = true;
+                if (this.faultInjectionControl.FaultInjectionType == FaultInjectionType.GenericExceptionAfterStore)
+                    this.faultInjector.InjectGenericAfterStore = true;
                 LogInformationInjectedFaultBeforeConfirm(this.logger, context.GrainInstance, transactionId, faultInjectionControl.FaultInjectionType);
             }
             await this.tResource.Confirm(transactionId, timeStamp);
@@ -212,6 +216,8 @@ namespace Orleans.Transactions.TestKit
                     this.faultInjector.InjectBeforeStore = true;
                 if (this.faultInjectionControl.FaultInjectionType == FaultInjectionType.ExceptionAfterStore)
                     this.faultInjector.InjectAfterStore = true;
+                if (this.faultInjectionControl.FaultInjectionType == FaultInjectionType.GenericExceptionAfterStore)
+                    this.faultInjector.InjectGenericAfterStore = true;
                 LogInformationInjectedFaultBeforePrepare(this.logger, this.context.GrainInstance, transactionId, faultInjectionControl.FaultInjectionType);
             }
 

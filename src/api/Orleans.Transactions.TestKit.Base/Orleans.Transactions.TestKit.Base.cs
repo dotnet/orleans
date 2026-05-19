@@ -184,7 +184,8 @@ namespace Orleans.Transactions.TestKit
         None = 0,
         Deactivation = 1,
         ExceptionBeforeStore = 2,
-        ExceptionAfterStore = 3
+        ExceptionAfterStore = 3,
+        GenericExceptionAfterStore = 4
     }
 
     public abstract partial class GoldenPathTransactionTestRunner : TransactionTestRunnerBase
@@ -235,6 +236,8 @@ namespace Orleans.Transactions.TestKit
         bool InjectAfterStore { get; set; }
 
         bool InjectBeforeStore { get; set; }
+
+        bool InjectGenericAfterStore { get; set; }
     }
 
     public partial interface ICreateAttributionGrain : IGrainWithGuidKey, IGrain, Runtime.IAddressable
@@ -544,6 +547,8 @@ namespace Orleans.Transactions.TestKit
         public bool InjectAfterStore { get { throw null; } set { } }
 
         public bool InjectBeforeStore { get { throw null; } set { } }
+
+        public bool InjectGenericAfterStore { get { throw null; } set { } }
 
         public void AfterStore() { }
 

@@ -57,6 +57,9 @@ namespace Orleans.Transactions
         public string ETag { get; set; }
 
         public int BatchSize => total;
+
+        public int CommitCount => commit;
+
         public override string ToString()
         {
             return $"batchsize={total} [{read}r {prepare}p {commit}c {confirm}cf {collect}cl {cancel}cc]";
