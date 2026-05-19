@@ -5,15 +5,15 @@ using System.Runtime.CompilerServices;
 
 namespace Orleans.Transactions.Diagnostics;
 
-internal static class TransactionQueueEvents
+internal static class TransactionDiagnosticEvents
 {
     internal const string ListenerName = "Orleans.Transactions";
 
     private static readonly DiagnosticListener Listener = new(ListenerName);
 
-    internal static IObservable<TransactionQueueEvent> AllEvents { get; } = new Observable();
+    internal static IObservable<TransactionDiagnosticEvent> AllEvents { get; } = new Observable();
 
-    internal abstract class TransactionQueueEvent(ParticipantId resource)
+    internal abstract class TransactionDiagnosticEvent(ParticipantId resource)
     {
         public readonly ParticipantId Resource = resource;
     }
@@ -22,7 +22,7 @@ internal static class TransactionQueueEvents
         ParticipantId resource,
         string eTag,
         int batchSize,
-        int commitCount) : TransactionQueueEvent(resource)
+        int commitCount) : TransactionDiagnosticEvent(resource)
     {
         public readonly string ETag = eTag;
         public readonly int BatchSize = batchSize;
@@ -46,18 +46,18 @@ internal static class TransactionQueueEvents
         }
     }
 
-    private sealed class Observable : IObservable<TransactionQueueEvent>
+    private sealed class Observable : IObservable<TransactionDiagnosticEvent>
     {
-        public IDisposable Subscribe(IObserver<TransactionQueueEvent> observer) => Listener.Subscribe(new Observer(observer));
+        public IDisposable Subscribe(IObserver<TransactionDiagnosticEvent> observer) => Listener.Subscribe(new Observer(observer));
 
-        private sealed class Observer(IObserver<TransactionQueueEvent> observer) : IObserver<KeyValuePair<string, object?>>
+        private sealed class Observer(IObserver<TransactionDiagnosticEvent> observer) : IObserver<KeyValuePair<string, object?>>
         {
             public void OnCompleted() => observer.OnCompleted();
             public void OnError(Exception error) => observer.OnError(error);
 
             public void OnNext(KeyValuePair<string, object?> value)
             {
-                if (value.Value is TransactionQueueEvent evt)
+                if (value.Value is TransactionDiagnosticEvent evt)
                 {
                     observer.OnNext(evt);
                 }

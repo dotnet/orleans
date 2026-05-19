@@ -571,7 +571,7 @@ namespace Orleans.Transactions.State
                             return;
                         }
 
-                        TransactionQueueEvents.EmitStorageWriteCompleted(
+                        TransactionDiagnosticEvents.EmitStorageWriteCompleted(
                             this.resource,
                             this.storageBatch.ETag,
                             batchBeingSentToStorage.BatchSize,

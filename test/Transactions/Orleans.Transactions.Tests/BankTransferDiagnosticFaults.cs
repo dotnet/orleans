@@ -25,7 +25,7 @@ public sealed class StorageWriteCompletedFaultScope : IDisposable
     {
         this.targetGrainId = targetGrainId;
         this.stateName = stateName;
-        this.subscription = TransactionQueueEvents.AllEvents.Subscribe(new Observer(this));
+        this.subscription = TransactionDiagnosticEvents.AllEvents.Subscribe(new Observer(this));
     }
 
     public int ObservedCount => Volatile.Read(ref this.observedCount);
@@ -37,7 +37,7 @@ public sealed class StorageWriteCompletedFaultScope : IDisposable
         this.subscription.Dispose();
     }
 
-    private void OnStorageWriteCompleted(TransactionQueueEvents.StorageWriteCompleted evt)
+    private void OnStorageWriteCompleted(TransactionDiagnosticEvents.StorageWriteCompleted evt)
     {
         if (evt.Resource.Name != this.stateName || evt.Resource.Reference.GrainId != this.targetGrainId || evt.CommitCount == 0)
         {
@@ -52,7 +52,7 @@ public sealed class StorageWriteCompletedFaultScope : IDisposable
         }
     }
 
-    private sealed class Observer(StorageWriteCompletedFaultScope scope) : IObserver<TransactionQueueEvents.TransactionQueueEvent>
+    private sealed class Observer(StorageWriteCompletedFaultScope scope) : IObserver<TransactionDiagnosticEvents.TransactionDiagnosticEvent>
     {
         public void OnCompleted()
         {
@@ -62,9 +62,9 @@ public sealed class StorageWriteCompletedFaultScope : IDisposable
         {
         }
 
-        public void OnNext(TransactionQueueEvents.TransactionQueueEvent value)
+        public void OnNext(TransactionDiagnosticEvents.TransactionDiagnosticEvent value)
         {
-            if (value is TransactionQueueEvents.StorageWriteCompleted storageWriteCompleted)
+            if (value is TransactionDiagnosticEvents.StorageWriteCompleted storageWriteCompleted)
             {
                 scope.OnStorageWriteCompleted(storageWriteCompleted);
             }
