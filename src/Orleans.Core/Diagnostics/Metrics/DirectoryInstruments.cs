@@ -1,13 +1,14 @@
 using System;
-using System.Collections.Generic;
+using System.Collections.Immutable;
 using System.Diagnostics.Metrics;
+using System.Threading;
 
 #nullable disable
 namespace Orleans.Runtime;
 
 internal static class DirectoryInstruments
 {
-    private static readonly List<CacheSizeObserverRegistration> CacheSizeObservers = new();
+    private static ImmutableArray<CacheSizeObserverRegistration> CacheSizeObservers = [];
 
     internal static readonly Counter<int> LookupsLocalIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
     internal static readonly Counter<int> LookupsLocalSuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
@@ -42,11 +43,7 @@ internal static class DirectoryInstruments
         ArgumentNullException.ThrowIfNull(observeValue);
 
         var registration = new CacheSizeObserverRegistration(observeValue);
-        lock (CacheSizeObservers)
-        {
-            CacheSizeObservers.Add(registration);
-        }
-
+        ImmutableInterlocked.Update(ref CacheSizeObservers, static (observers, registration) => observers.Add(registration), registration);
         return registration;
     }
 
@@ -88,14 +85,8 @@ internal static class DirectoryInstruments
 
     private static int ObserveCacheSize()
     {
-        CacheSizeObserverRegistration[] observers;
-        lock (CacheSizeObservers)
-        {
-            observers = CacheSizeObservers.ToArray();
-        }
-
         var result = 0;
-        foreach (var observer in observers)
+        foreach (var observer in CacheSizeObservers)
         {
             result += observer.Observe();
         }
@@ -114,21 +105,15 @@ internal static class DirectoryInstruments
 
         public int Observe()
         {
-            var observer = observeValue;
+            var observer = Volatile.Read(ref observeValue);
             return observer is null ? 0 : observer();
         }
 
         public void Dispose()
         {
-            lock (CacheSizeObservers)
+            if (Interlocked.Exchange(ref observeValue, null) is not null)
             {
-                if (observeValue is null)
-                {
-                    return;
-                }
-
-                observeValue = null;
-                CacheSizeObservers.Remove(this);
+                ImmutableInterlocked.Update(ref CacheSizeObservers, static (observers, registration) => observers.Remove(registration), this);
             }
         }
     }
