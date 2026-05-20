@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using System.Diagnostics.Metrics;
 
 #nullable disable
@@ -6,6 +7,8 @@ namespace Orleans.Runtime;
 
 internal static class DirectoryInstruments
 {
+    private static readonly List<CacheSizeObserverRegistration> CacheSizeObservers = new();
+
     internal static readonly Counter<int> LookupsLocalIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_ISSUED);
     internal static readonly Counter<int> LookupsLocalSuccesses = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_LOOKUPS_LOCAL_SUCCESSES);
 
@@ -34,10 +37,18 @@ internal static class DirectoryInstruments
         DirectoryPartitionSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_PARTITION_SIZE, observeValue);
     }
 
-    internal static ObservableGauge<int> CacheSize;
-    internal static void RegisterCacheSizeObserve(Func<int> observeValue)
+    internal static readonly ObservableGauge<int> CacheSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, ObserveCacheSize);
+    internal static IDisposable RegisterCacheSizeObserve(Func<int> observeValue)
     {
-        CacheSize = Instruments.Meter.CreateObservableGauge<int>(InstrumentNames.DIRECTORY_CACHE_SIZE, observeValue);
+        ArgumentNullException.ThrowIfNull(observeValue);
+
+        var registration = new CacheSizeObserverRegistration(observeValue);
+        lock (CacheSizeObservers)
+        {
+            CacheSizeObservers.Add(registration);
+        }
+
+        return registration;
     }
 
     internal static ObservableGauge<int> RingSize;
@@ -75,4 +86,51 @@ internal static class DirectoryInstruments
     internal static readonly Counter<int> UnregistrationsManyIssued = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_ISSUED);
     internal static readonly Counter<int> UnregistrationsManyRemoteSent = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_SENT);
     internal static readonly Counter<int> UnregistrationsManyRemoteReceived = Instruments.Meter.CreateCounter<int>(InstrumentNames.DIRECTORY_UNREGISTRATIONS_MANY_REMOTE_RECEIVED);
+
+    private static int ObserveCacheSize()
+    {
+        CacheSizeObserverRegistration[] observers;
+        lock (CacheSizeObservers)
+        {
+            observers = CacheSizeObservers.ToArray();
+        }
+
+        var result = 0;
+        foreach (var observer in observers)
+        {
+            result += observer.Observe();
+        }
+
+        return result;
+    }
+
+    private sealed class CacheSizeObserverRegistration : IDisposable
+    {
+        private Func<int> observeValue;
+
+        public CacheSizeObserverRegistration(Func<int> observeValue)
+        {
+            this.observeValue = observeValue;
+        }
+
+        public int Observe()
+        {
+            var observer = observeValue;
+            return observer is null ? 0 : observer();
+        }
+
+        public void Dispose()
+        {
+            lock (CacheSizeObservers)
+            {
+                if (observeValue is null)
+                {
+                    return;
+                }
+
+                observeValue = null;
+                CacheSizeObservers.Remove(this);
+            }
+        }
+    }
 }

@@ -78,11 +78,6 @@ namespace UnitTests.Directory
             throw new NotImplementedException();
         }
 
-        public bool LocalLookup(GrainId grain, out AddressAndTag addresses)
-        {
-            throw new NotImplementedException();
-        }
-
         public Task<AddressAndTag> LookupAsync(GrainId grainId, int hopCount = 0)
         {
             throw new NotImplementedException();

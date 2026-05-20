@@ -217,6 +217,7 @@ namespace Orleans.Runtime.GrainDirectory
                 ThrowUnsupportedGrainType(grainId);
             }
 
+            DirectoryInstruments.LookupsCacheIssued.Add(1);
             if (this.cache.LookUp(grainId, out address, out _))
             {
                 // If the silo is dead, remove the entry
@@ -228,6 +229,7 @@ namespace Orleans.Runtime.GrainDirectory
                 else
                 {
                     // Entry found and valid -> return it
+                    DirectoryInstruments.LookupsCacheSuccesses.Add(1);
                     return true;
                 }
             }

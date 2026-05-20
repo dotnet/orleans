@@ -788,63 +788,6 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
 
-        public bool LocalLookup(GrainId grain, out AddressAndTag result)
-        {
-            DirectoryInstruments.LookupsLocalIssued.Add(1);
-
-            var silo = CalculateGrainDirectoryPartition(grain);
-
-            LogDebugLocalLookupAttempt(
-                MyAddress,
-                grain,
-                silo,
-                new(grain),
-                new(silo));
-
-            //this will only happen if I'm the only silo in the cluster and I'm shutting down
-            if (silo == null)
-            {
-                LogTraceLocalLookupMineNull(grain);
-                result = default;
-                return false;
-            }
-
-            // handle cache
-            DirectoryInstruments.LookupsCacheIssued.Add(1);
-            var address = GetLocalCacheData(grain);
-            if (address != default)
-            {
-                result = new(address, 0);
-
-                LogTraceLocalLookupCache(grain, result.Address);
-                DirectoryInstruments.LookupsCacheSuccesses.Add(1);
-                DirectoryInstruments.LookupsLocalSuccesses.Add(1);
-                return true;
-            }
-
-            // check if we own the grain
-            if (silo.Equals(MyAddress))
-            {
-                DirectoryInstruments.LookupsLocalDirectoryIssued.Add(1);
-                result = GetLocalDirectoryData(grain);
-                if (result.Address == null)
-                {
-                    // it can happen that we cannot find the grain in our partition if there were
-                    // some recent changes in the membership
-                    LogTraceLocalLookupMineNull(grain);
-                    return false;
-                }
-                LogTraceLocalLookupMine(grain, result.Address);
-                DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
-                DirectoryInstruments.LookupsLocalSuccesses.Add(1);
-                return true;
-            }
-
-            LogTraceTryFullLookupElse(grain);
-            result = default;
-            return false;
-        }
-
         public AddressAndTag GetLocalDirectoryData(GrainId grain) => DirectoryPartition.LookUpActivation(grain);
 
         public GrainAddress? GetLocalCacheData(GrainId grain)
@@ -1008,7 +951,17 @@ namespace Orleans.Runtime.GrainDirectory
         }
 
         public void AddOrUpdateCacheEntry(GrainId grainId, SiloAddress siloAddress) => this.DirectoryCache.AddOrUpdate(new GrainAddress { GrainId = grainId, SiloAddress = siloAddress }, 0);
-        public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address) => (address = GetLocalCacheData(grainId)) is not null;
+        public bool TryCachedLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
+        {
+            DirectoryInstruments.LookupsCacheIssued.Add(1);
+            if ((address = GetLocalCacheData(grainId)) is null)
+            {
+                return false;
+            }
+
+            DirectoryInstruments.LookupsCacheSuccesses.Add(1);
+            return true;
+        }
         void ILifecycleParticipant<ISiloLifecycle>.Participate(ISiloLifecycle lifecycle)
         {
             lifecycle.Subscribe<LocalGrainDirectory>(ServiceLifecycleStage.RuntimeServices, (ct) => Task.Run(() => Start()), (ct) => Task.Run(() => StopAsync()));
@@ -1135,36 +1088,6 @@ namespace Orleans.Runtime.GrainDirectory
             Message = "RegisterAsync - It seems we are not the owner of some activations, trying to forward it to {Count} silos (hopCount={HopCount})"
         )]
         private partial void LogWarningUnregisterManyAsyncNotOwner(int count, int hopCount);
-
-        [LoggerMessage(
-            Level = LogLevel.Debug,
-            Message = "Silo {SiloAddress} tries to lookup for {Grain}-->{PartitionOwner} ({GrainHashCode}-->{PartitionOwnerHashCode})"
-        )]
-        private partial void LogDebugLocalLookupAttempt(SiloAddress siloAddress, GrainId grain, SiloAddress? partitionOwner, GrainHashLogValue grainHashCode, SiloHashLogValue partitionOwnerHashCode);
-
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "LocalLookup mine {GrainId}=null"
-        )]
-        private partial void LogTraceLocalLookupMineNull(GrainId grainId);
-
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "LocalLookup cache {GrainId}={TargetAddress}"
-        )]
-        private partial void LogTraceLocalLookupCache(GrainId grainId, GrainAddress? targetAddress);
-
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "LocalLookup mine {GrainId}={Address}"
-        )]
-        private partial void LogTraceLocalLookupMine(GrainId grainId, GrainAddress? address);
-
-        [LoggerMessage(
-            Level = LogLevel.Trace,
-            Message = "TryFullLookup else {GrainId}=null"
-        )]
-        private partial void LogTraceTryFullLookupElse(GrainId grainId);
 
         [LoggerMessage(
             Level = LogLevel.Warning,

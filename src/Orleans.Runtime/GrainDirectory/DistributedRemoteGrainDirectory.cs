@@ -312,6 +312,7 @@ internal sealed partial class DistributedRemoteGrainDirectory : SystemTarget, IR
 
     public async Task<List<AddressAndTag>> LookUpMany(List<(GrainId GrainId, int Version)> grainAndETagList)
     {
+        DirectoryInstruments.ValidationsCacheReceived.Add(1);
         LogInformationLookUpManyReceived(_logger, Silo, grainAndETagList.Count);
 
         using (var cts = CreateTimeoutCts(_directory.OnStoppedToken))

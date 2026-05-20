@@ -50,18 +50,14 @@ internal static class InstrumentNames
     public const string CATALOG_ACTIVATION_CONCURRENT_REGISTRATION_ATTEMPTS = "orleans-catalog-activation-concurrent-registration-attempts";
 
     // Directory
-    // not used...
     public const string DIRECTORY_LOOKUPS_LOCAL_ISSUED = "orleans-directory-lookups-local-issued";
-    // not used...
     public const string DIRECTORY_LOOKUPS_LOCAL_SUCCESSES = "orleans-directory-lookups-local-successes";
     public const string DIRECTORY_LOOKUPS_FULL_ISSUED = "orleans-directory-lookups-full-issued";
     public const string DIRECTORY_LOOKUPS_REMOTE_SENT = "orleans-directory-lookups-remote-sent";
     public const string DIRECTORY_LOOKUPS_REMOTE_RECEIVED = "orleans-directory-lookups-remote-received";
     public const string DIRECTORY_LOOKUPS_LOCALDIRECTORY_ISSUED = "orleans-directory-lookups-local-directory-issued";
     public const string DIRECTORY_LOOKUPS_LOCALDIRECTORY_SUCCESSES = "orleans-directory-lookups-local-directory-successes";
-    // not used
     public const string DIRECTORY_LOOKUPS_CACHE_ISSUED = "orleans-directory-lookups-cache-issued";
-    // not used
     public const string DIRECTORY_LOOKUPS_CACHE_SUCCESSES = "orleans-directory-lookups-cache-successes";
     public const string DIRECTORY_VALIDATIONS_CACHE_SENT = "orleans-directory-validations-cache-sent";
     public const string DIRECTORY_VALIDATIONS_CACHE_RECEIVED = "orleans-directory-validations-cache-received";
