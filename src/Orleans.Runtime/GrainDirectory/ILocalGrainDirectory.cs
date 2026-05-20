@@ -73,6 +73,14 @@ namespace Orleans.Runtime.GrainDirectory
         AddressAndTag GetLocalDirectoryData(GrainId grain);
 
         /// <summary>
+        /// Attempts to find the grain address in this silo's local cache or authoritative local directory partition.
+        /// </summary>
+        /// <param name="grainId">The grain id to find.</param>
+        /// <param name="address">The resulting grain address, if found, or <see langword="null"/> if not found.</param>
+        /// <returns>A value indicating whether a valid entry was found.</returns>
+        bool TryLocalLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address);
+
+        /// <summary>
         /// For testing and troubleshooting purposes only.
         /// Returns the directory information held in a local directory cache for the provided grain ID.
         /// The result will be null if no information is held.

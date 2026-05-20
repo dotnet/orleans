@@ -243,6 +243,69 @@ namespace UnitTests.Directory
         }
 
         [Fact]
+        public async Task LocalGrainDirectoryTryLocalLookupFindsLocalPartitionEntryOnCacheMiss()
+        {
+            var localSilo = GenerateSiloAddress();
+            var membershipService = new MockClusterMembershipService(new()
+            {
+                [localSilo] = (SiloStatus.Active, "local")
+            });
+            var localSiloDetails = Substitute.For<ILocalSiloDetails>();
+            localSiloDetails.SiloAddress.Returns(localSilo);
+            localSiloDetails.GatewayAddress.Returns(localSilo);
+            localSiloDetails.DnsHostName.Returns("localhost");
+            localSiloDetails.Name.Returns("TestSilo");
+            localSiloDetails.ClusterId.Returns("TestCluster");
+            var siloStatusOracle = Substitute.For<ISiloStatusOracle>();
+            var grainFactory = Substitute.For<IInternalGrainFactory>();
+            var services = new ServiceCollection().BuildServiceProvider();
+            Factory<LocalGrainDirectoryPartition> partitionFactory = () => new LocalGrainDirectoryPartition(
+                membershipService.Target,
+                Options.Create(new GrainDirectoryOptions()),
+                this.loggerFactory);
+            var systemTargetShared = new SystemTargetShared(
+                runtimeClient: null!,
+                localSiloDetails: localSiloDetails,
+                loggerFactory: this.loggerFactory,
+                schedulingOptions: Options.Create(new SchedulingOptions()),
+                grainReferenceActivator: null,
+                timerRegistry: null,
+                activations: new ActivationDirectory());
+            var localGrainDirectory = new LocalGrainDirectory(
+                serviceProvider: services,
+                siloDetails: localSiloDetails,
+                siloStatusOracle: siloStatusOracle,
+                clusterMembershipService: membershipService.Target,
+                grainFactory: grainFactory,
+                grainDirectoryPartitionFactory: partitionFactory,
+                developmentClusterMembershipOptions: Options.Create(new DevelopmentClusterMembershipOptions()),
+                grainDirectoryOptions: Options.Create(new GrainDirectoryOptions()),
+                loggerFactory: this.loggerFactory,
+                systemTargetShared: systemTargetShared)
+            {
+                Running = true
+            };
+
+            var address = GenerateGrainAddress(localSilo, membershipService.CurrentVersion);
+
+            try
+            {
+                var registered = await localGrainDirectory.RegisterAsync(address, hopCount: 0);
+                Assert.Equal(address, registered.Address);
+
+                localGrainDirectory.InvalidateCacheEntry(address.GrainId);
+                Assert.False(localGrainDirectory.TryCachedLookup(address.GrainId, out _));
+
+                Assert.True(localGrainDirectory.TryLocalLookup(address.GrainId, out var result));
+                Assert.Equal(address, result);
+            }
+            finally
+            {
+                await localGrainDirectory.StopAsync();
+            }
+        }
+
+        [Fact]
         public async Task RegisterWhenOtherEntryExists()
         {
             var expectedSilo = GenerateSiloAddress();

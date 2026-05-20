@@ -790,6 +790,36 @@ namespace Orleans.Runtime.GrainDirectory
 
         public AddressAndTag GetLocalDirectoryData(GrainId grain) => DirectoryPartition.LookUpActivation(grain);
 
+        public bool TryLocalLookup(GrainId grainId, [NotNullWhen(true)] out GrainAddress? address)
+        {
+            DirectoryInstruments.LookupsLocalIssued.Add(1);
+            if (TryCachedLookup(grainId, out address))
+            {
+                DirectoryInstruments.LookupsLocalSuccesses.Add(1);
+                return true;
+            }
+
+            var owner = CalculateGrainDirectoryPartition(grainId, this.directoryMembership);
+            if (!MyAddress.Equals(owner))
+            {
+                address = null;
+                return false;
+            }
+
+            DirectoryInstruments.LookupsLocalDirectoryIssued.Add(1);
+            var localResult = DirectoryPartition.LookUpActivation(grainId);
+            if (localResult.Address is null)
+            {
+                address = null;
+                return false;
+            }
+
+            address = localResult.Address;
+            DirectoryInstruments.LookupsLocalDirectorySuccesses.Add(1);
+            DirectoryInstruments.LookupsLocalSuccesses.Add(1);
+            return true;
+        }
+
         public GrainAddress? GetLocalCacheData(GrainId grain)
         {
             if (!DirectoryCache.LookUp(grain, out var cache))
