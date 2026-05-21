@@ -10,6 +10,7 @@ using Orleans.Configuration;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using Orleans.Runtime.Placement;
 
 namespace UnitTests.ActivationsLifeCycleTests
 {
@@ -236,6 +237,8 @@ namespace UnitTests.ActivationsLifeCycleTests
 
         private async Task<ICollectionTestGrain> PickGrainInNonPrimary()
         {
+            var targetSilo = this.testCluster.SecondarySilos.First().SiloAddress;
+
             for (int i = 0; i < 500; i++)
             {
                 if (i % 30 == 29) await Task.Delay(1000); // give some extra time to stabilize if it can't find a suitable grain
@@ -250,7 +253,18 @@ namespace UnitTests.ActivationsLifeCycleTests
                 {
                     continue;
                 }
-                string siloHostingActivation = await grain.GetRuntimeInstanceId();
+
+                string siloHostingActivation;
+                try
+                {
+                    RequestContext.Set(IPlacementDirector.PlacementHintKey, targetSilo);
+                    siloHostingActivation = await grain.GetRuntimeInstanceId();
+                }
+                finally
+                {
+                    RequestContext.Remove(IPlacementDirector.PlacementHintKey);
+                }
+
                 if (this.testCluster.Primary.SiloAddress.ToString().Equals(siloHostingActivation))
                 {
                     continue;
