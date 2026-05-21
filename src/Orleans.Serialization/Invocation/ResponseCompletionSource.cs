@@ -163,7 +163,7 @@ namespace Orleans.Serialization.Invocation
         [MethodImpl(MethodImplOptions.AggressiveInlining)]
         public void Complete(Response value)
         {
-            // Fast path: check exception first since it's a simple null check
+            // Check exception first since it's a simple null check
             if (value.Exception is { } exception)
             {
                 SetException(exception);
