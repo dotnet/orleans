@@ -567,7 +567,6 @@ namespace Orleans.Transactions.State
                             {
                                 status = TransactionalStatus.StorageConflict;
                                 forceDeactivation = true;
-                                notifyOfAbort = true;
                                 LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
                             }
                             else
