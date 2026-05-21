@@ -26,7 +26,7 @@ namespace Orleans
         private readonly ILogger logger;
         private readonly ClientMessagingOptions clientMessagingOptions;
 
-        private readonly ConcurrentDictionary<CorrelationId, CallbackData> callbacks;
+        private readonly StripedCallbackDictionary<CallbackData> callbacks;
         private InvokableObjectManager localObjects;
         private bool disposing;
         private bool disposed;
@@ -85,7 +85,7 @@ namespace Orleans
             this.loggerFactory = loggerFactory;
             this.messagingTrace = messagingTrace;
             this.logger = loggerFactory.CreateLogger<OutsideRuntimeClient>();
-            callbacks = new ConcurrentDictionary<CorrelationId, CallbackData>();
+            callbacks = new StripedCallbackDictionary<CallbackData>();
             this.clientMessagingOptions = clientMessagingOptions.Value;
             var period = Max(
                 TimeSpan.FromMilliseconds(1),
@@ -442,7 +442,7 @@ namespace Orleans
         }
 
         public int GetRunningRequestsCount(GrainInterfaceType grainInterfaceType)
-            => this.callbacks.Count(c => c.Value.Message.InterfaceType == grainInterfaceType);
+            => this.callbacks.CountWhere(c => c.Value.Message.InterfaceType == grainInterfaceType);
 
         /// <inheritdoc />
         public void NotifyClusterConnectionLost()

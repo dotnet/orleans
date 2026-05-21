@@ -50,7 +50,8 @@ namespace Orleans.Runtime
         private CorrelationId GetNextCorrelationId()
         {
             var id = _seed ^ Interlocked.Increment(ref _nextId);
-            return new CorrelationId(unchecked((long)id));
+            var stripeIndex = StripedCallbackDictionary<object>.GetCurrentThreadStripeIndex();
+            return StripedCallbackDictionary<object>.CreateCorrelationId(unchecked((long)id), stripeIndex);
         }
 
         public Message CreateResponseMessage(Message request)
