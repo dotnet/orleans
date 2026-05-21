@@ -419,7 +419,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: true, forceDeactivation: false);
+                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: true);
                 }
             }
         }
@@ -556,26 +556,25 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
-                                await BailAsync(TransactionalStatus.CommitFailure, exception: null, storageOutcomeInDoubt: false, forceDeactivation: false);
+                                await BailAsync(TransactionalStatus.CommitFailure, exception: null, storageOutcomeInDoubt: false);
                                 return;
                             }
                         }
                         catch (Exception exception)
                         {
-                            var status = TransactionalStatus.UnknownException;
-                            var forceDeactivation = false;
+                            TransactionalStatus status;
                             if (exception is InconsistentStateException)
                             {
                                 status = TransactionalStatus.StorageConflict;
-                                forceDeactivation = true;
                                 LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
                             }
                             else
                             {
+                                status = TransactionalStatus.UnknownException;
                                 LogWarningStorageExceptionInStorageWorker(exception);
                             }
 
-                            await BailAsync(status, exception, storageOutcomeInDoubt: writeAttempted, forceDeactivation: forceDeactivation);
+                            await BailAsync(status, exception, storageOutcomeInDoubt: writeAttempted);
                             return;
                         }
 
@@ -610,17 +609,17 @@ namespace Orleans.Transactions.State
                     LogWarningExceptionInStorageWorker(failCounter, exception);
 
                     // If a write was attempted, the durable outcome is unknown and recovery must resolve it.
-                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: writeAttempted, forceDeactivation: false);
+                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: writeAttempted);
                 }
             }
         }
 
-        private Task BailAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt, bool forceDeactivation)
+        private Task BailAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
         {
-            this.readyTask = BailCoreAsync(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt, forceDeactivation: forceDeactivation);
+            this.readyTask = BailCoreAsync(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt);
             return this.readyTask;
 
-            async Task BailCoreAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt, bool forceDeactivation)
+            async Task BailCoreAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
             {
                 List<Task> pending = new List<Task>();
                 pending.Add(RWLock.AbortExecutingTransactions(exception));
@@ -644,7 +643,7 @@ namespace Orleans.Transactions.State
                 commitQueue.Clear();
 
                 await Task.WhenAll(pending);
-                if (++failCounter >= 10 || forceDeactivation)
+                if (++failCounter >= 10 || status == TransactionalStatus.StorageConflict)
                 {
                     LogDebugStorageWorkerTriggeringGrainDeactivation();
                     this.deactivate();
