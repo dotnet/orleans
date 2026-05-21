@@ -420,7 +420,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: true);
+                    await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: false);
                 }
             }
         }
@@ -615,10 +615,10 @@ namespace Orleans.Transactions.State
             }
         }
 
-        private Task AbortAndRestore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
+        private async Task AbortAndRestore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
         {
-            this.readyTask = AbortAndRestoreCore(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt);
-            return this.readyTask;
+            var task = this.readyTask = AbortAndRestoreCore(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt);
+            await task;
 
             async Task AbortAndRestoreCore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
             {
