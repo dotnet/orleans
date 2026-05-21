@@ -356,7 +356,7 @@ namespace Orleans.Transactions.State
 
             // setting this field makes this entry ready for batching
 
-            remoteEntry.ConfirmationResponsePromise = remoteEntry.ConfirmationResponsePromise ?? new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
+            remoteEntry.ConfirmationResponsePromise ??= new TaskCompletionSource<bool>(TaskCreationOptions.RunContinuationsAsynchronously);
 
             storageWorker.Notify();
 
@@ -419,7 +419,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await BailAsync(TransactionalStatus.UnknownException, exception, notifyOfAbort: false, forceDeactivation: false);
+                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: true, forceDeactivation: false);
                 }
             }
         }
@@ -556,7 +556,7 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
-                                await BailAsync(TransactionalStatus.CommitFailure, exception: null, notifyOfAbort: true, forceDeactivation: false);
+                                await BailAsync(TransactionalStatus.CommitFailure, exception: null, storageOutcomeInDoubt: false, forceDeactivation: false);
                                 return;
                             }
                         }
@@ -575,7 +575,7 @@ namespace Orleans.Transactions.State
                                 LogWarningStorageExceptionInStorageWorker(exception);
                             }
 
-                            await BailAsync(status, exception, notifyOfAbort: !writeAttempted, forceDeactivation: forceDeactivation);
+                            await BailAsync(status, exception, storageOutcomeInDoubt: writeAttempted, forceDeactivation: forceDeactivation);
                             return;
                         }
 
@@ -609,18 +609,18 @@ namespace Orleans.Transactions.State
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
 
-                    // Abort transactions if the write was not attempted. If a write was attempted then we assume we do not know the outcome.
-                    await BailAsync(TransactionalStatus.UnknownException, exception, notifyOfAbort: !writeAttempted, forceDeactivation: false);
+                    // If a write was attempted, the durable outcome is unknown and recovery must resolve it.
+                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: writeAttempted, forceDeactivation: false);
                 }
             }
         }
 
-        private Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
+        private Task BailAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt, bool forceDeactivation)
         {
-            this.readyTask = BailCoreAsync(status, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: forceDeactivation);
+            this.readyTask = BailCoreAsync(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt, forceDeactivation: forceDeactivation);
             return this.readyTask;
 
-            async Task BailCoreAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
+            async Task BailCoreAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt, bool forceDeactivation)
             {
                 List<Task> pending = new List<Task>();
                 pending.Add(RWLock.AbortExecutingTransactions(exception));
@@ -628,16 +628,16 @@ namespace Orleans.Transactions.State
 
                 foreach (var entry in commitQueue.Elements)
                 {
-                    if (notifyOfAbort)
-                    {
-                        pending.Add(NotifyOfAbort(entry, status, exception: exception));
-                    }
-                    else
+                    if (storageOutcomeInDoubt)
                     {
                         // The storage write may have committed before the exception surfaced, or a later action may
                         // have failed after the write completed. Do not send abort/cancel messages from stale
                         // in-memory state; restore from storage and let recovery confirm or abort.
                         CompleteInDoubtEntryLocally(entry, status, exception);
+                    }
+                    else
+                    {
+                        pending.Add(NotifyOfAbort(entry, status, exception: exception));
                     }
                 }
 
