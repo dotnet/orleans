@@ -509,7 +509,7 @@ namespace Orleans.Transactions.State
 
             using (this.activationLifetime.BlockDeactivation())
             {
-                var storageWriteMayHaveCompleted = false;
+                var writeAttempted = false;
 
                 try
                 {
@@ -545,8 +545,9 @@ namespace Orleans.Transactions.State
                         {
                             if (await batchBeingSentToStorage.CheckStorePreConditions())
                             {
-                                // Once Store is invoked, a thrown exception cannot prove that no durable write occurred.
-                                storageWriteMayHaveCompleted = true;
+                                // Once Store is invoked, failures are ambiguous: the write may have failed, or it may
+                                // have succeeded and only the response failed/timed out. Recover from storage to resolve it.
+                                writeAttempted = true;
                                 // perform the actual store, and record the e-tag
                                 this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
                                 failCounter = 0;
@@ -562,7 +563,7 @@ namespace Orleans.Transactions.State
                         {
                             var status = TransactionalStatus.UnknownException;
                             var forceDeactivation = false;
-                            var notifyOfAbort = !storageWriteMayHaveCompleted;
+                            var notifyOfAbort = !writeAttempted;
                             if (exception is InconsistentStateException)
                             {
                                 status = TransactionalStatus.StorageConflict;
@@ -607,7 +608,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
-                    var notifyOfAbort = !storageWriteMayHaveCompleted;
+                    var notifyOfAbort = !writeAttempted;
                     await BailAsync(TransactionalStatus.UnknownException, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: false);
                 }
             }
