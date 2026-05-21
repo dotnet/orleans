@@ -618,7 +618,6 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Invalid)
                 {
-                    Debug.Assert(State is ActivationState.Invalid);
                     deactivateActivity?.Stop();
                     return;
                 }
