@@ -405,10 +405,11 @@ namespace Orleans.Transactions.State
         /// <returns></returns>
         public Task Ready()
         {
-            if (this.readyTask.Status == TaskStatus.RanToCompletion)
+            if (this.readyTask.IsCompletedSuccessfully)
             {
                 return readyTask;
             }
+
             return ReadyAsync();
             async Task ReadyAsync()
             {
