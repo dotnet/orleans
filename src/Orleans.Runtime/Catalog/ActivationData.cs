@@ -592,7 +592,8 @@ internal sealed partial class ActivationData :
                 Deactivate(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cancellationToken);
             }
 
-            return State is ActivationState.Deactivating;
+            Debug.Assert(State is ActivationState.Deactivating, "Migration must transition the activation to deactivating.");
+            return true;
         }
     }
 
