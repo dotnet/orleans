@@ -548,6 +548,7 @@ namespace Orleans.Transactions.State
                                 // Once Store is invoked, failures are ambiguous: the write may have failed, or it may
                                 // have succeeded and only the response failed/timed out. Recover from storage to resolve it.
                                 writeAttempted = true;
+
                                 // perform the actual store, and record the e-tag
                                 this.storageBatch.ETag = await batchBeingSentToStorage.Store(storage);
                                 failCounter = 0;
@@ -563,7 +564,6 @@ namespace Orleans.Transactions.State
                         {
                             var status = TransactionalStatus.UnknownException;
                             var forceDeactivation = false;
-                            var notifyOfAbort = !writeAttempted;
                             if (exception is InconsistentStateException)
                             {
                                 status = TransactionalStatus.StorageConflict;
@@ -575,7 +575,7 @@ namespace Orleans.Transactions.State
                                 LogWarningStorageExceptionInStorageWorker(exception);
                             }
 
-                            await BailAsync(status, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: forceDeactivation);
+                            await BailAsync(status, exception, notifyOfAbort: !writeAttempted, forceDeactivation: forceDeactivation);
                             return;
                         }
 
@@ -608,8 +608,9 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
-                    var notifyOfAbort = !writeAttempted;
-                    await BailAsync(TransactionalStatus.UnknownException, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: false);
+
+                    // Abort transactions if the write was not attempted. If a write was attempted then we assume we do not know the outcome.
+                    await BailAsync(TransactionalStatus.UnknownException, exception, notifyOfAbort: !writeAttempted, forceDeactivation: false);
                 }
             }
         }
