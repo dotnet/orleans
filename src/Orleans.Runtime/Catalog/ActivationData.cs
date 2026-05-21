@@ -592,7 +592,6 @@ internal sealed partial class ActivationData :
                 Deactivate(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cancellationToken);
             }
 
-            Debug.Assert(State is ActivationState.Deactivating, "Migration must transition the activation to deactivating.");
             return true;
         }
     }
@@ -619,6 +618,7 @@ internal sealed partial class ActivationData :
 
                 if (state is ActivationState.Invalid)
                 {
+                    Debug.Assert(State is ActivationState.Invalid);
                     deactivateActivity?.Stop();
                     return;
                 }
@@ -654,6 +654,8 @@ internal sealed partial class ActivationData :
                 {
                     deactivateActivity?.Stop();
                 }
+
+                Debug.Assert(State is ActivationState.Deactivating or ActivationState.Invalid, "Deactivate should leave the activation deactivating or invalid.");
             }
             catch (Exception ex)
             {
