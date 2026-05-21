@@ -1,5 +1,4 @@
 #nullable enable
-using System.Diagnostics.CodeAnalysis;
 using Microsoft.Extensions.DependencyInjection;
 using Orleans.Configuration;
 using Orleans.Placement.Repartitioning;
@@ -80,13 +79,9 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
         public Task Deactivated => _deactivated.Task;
 
-        public bool TryStartMigration(
-            Dictionary<string, object>? requestContext,
-            [NotNullWhen(true)] out Task? deactivated,
-            CancellationToken cancellationToken = default)
+        public bool TryStartMigration(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default)
         {
             TryStartMigrationCallCount++;
-            deactivated = null;
             return false;
         }
 

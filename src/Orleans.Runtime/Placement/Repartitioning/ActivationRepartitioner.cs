@@ -526,9 +526,9 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
                 {
                     if (localActivation is IGrainContextMigration migration)
                     {
-                        if (migration.TryStartMigration(migrationRequestContext, out var deactivated))
+                        if (migration.TryStartMigration(migrationRequestContext))
                         {
-                            deactivationTasks.Add(deactivated);
+                            deactivationTasks.Add(localActivation.Deactivated);
                         }
                     }
                     else

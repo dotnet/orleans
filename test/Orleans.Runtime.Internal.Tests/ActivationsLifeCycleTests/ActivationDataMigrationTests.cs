@@ -16,17 +16,15 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
     private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary;
 
     [Fact]
-    public async Task TryStartMigration_ReturnsDeactivatedTask_WhenActivationCanStartMigration()
+    public async Task TryStartMigration_ReturnsTrue_WhenActivationCanStartMigration()
     {
         var activation = await GetActivation();
 
-        Assert.True(activation.TryStartMigration(requestContext: null, out var deactivated));
+        Assert.True(activation.TryStartMigration(requestContext: null));
 
-        Assert.NotNull(deactivated);
-        Assert.Same(activation.Deactivated, deactivated);
         Assert.Equal(ActivationState.Deactivating, activation.State);
 
-        await deactivated.WaitAsync(TimeSpan.FromSeconds(10));
+        await activation.Deactivated.WaitAsync(TimeSpan.FromSeconds(10));
     }
 
     [Fact]
@@ -38,8 +36,7 @@ public class ActivationDataMigrationTests(ActivationDataMigrationTests.Fixture f
         await originalDeactivated.WaitAsync(TimeSpan.FromSeconds(10));
 
         Assert.Equal(ActivationState.Invalid, activation.State);
-        Assert.False(activation.TryStartMigration(requestContext: null, out var deactivated));
-        Assert.Null(deactivated);
+        Assert.False(activation.TryStartMigration(requestContext: null));
     }
 
     private async Task<ActivationData> GetActivation()

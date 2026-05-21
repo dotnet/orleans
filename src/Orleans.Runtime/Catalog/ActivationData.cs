@@ -571,25 +571,20 @@ internal sealed partial class ActivationData :
     }
 
     public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) =>
-        TryStartMigration(requestContext, out _, cancellationToken);
+        TryStartMigration(requestContext, cancellationToken);
 
-    internal bool TryStartMigration(
-        Dictionary<string, object>? requestContext,
-        [NotNullWhen(true)] out Task? deactivated,
-        CancellationToken cancellationToken = default)
+    internal bool TryStartMigration(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default)
     {
         lock (this)
         {
             if (State is not (ActivationState.Activating or ActivationState.Valid or ActivationState.Deactivating))
             {
-                deactivated = null;
                 return false;
             }
 
             // If migration has not already been started, set a migration context to capture any state which should be transferred.
             // Doing this signals to the deactivation process that a migration is occurring, so it is important that this happens before we begin deactivation.
             DehydrationContext ??= new(_shared.SerializerSessionPool, requestContext);
-            deactivated = GetDeactivationCompletionSource().Task;
 
             if (State is not ActivationState.Deactivating)
             {
@@ -597,21 +592,12 @@ internal sealed partial class ActivationData :
                 Deactivate(new DeactivationReason(DeactivationReasonCode.Migrating, "Migrating to a new location."), cancellationToken);
             }
 
-            if (State is ActivationState.Deactivating)
-            {
-                return true;
-            }
-
-            deactivated = null;
-            return false;
+            return State is ActivationState.Deactivating;
         }
     }
 
-    bool IGrainContextMigration.TryStartMigration(
-        Dictionary<string, object>? requestContext,
-        [NotNullWhen(true)] out Task? deactivated,
-        CancellationToken cancellationToken) =>
-        TryStartMigration(requestContext, out deactivated, cancellationToken);
+    bool IGrainContextMigration.TryStartMigration(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) =>
+        TryStartMigration(requestContext, cancellationToken);
 
     public void Deactivate(DeactivationReason reason, ActivityContext? activityContext, CancellationToken cancellationToken = default)
     {
