@@ -30,7 +30,6 @@ namespace Orleans.Runtime;
 [DebuggerDisplay("GrainId = {GrainId}, State = {State}, Waiting = {WaitingCount}, Executing = {IsCurrentlyExecuting}")]
 internal sealed partial class ActivationData :
     IGrainContext,
-    IGrainContextMigration,
     ICollectibleGrainContext,
     IGrainExtensionBinder,
     IActivationWorkingSetMember,
@@ -595,10 +594,6 @@ internal sealed partial class ActivationData :
             return true;
         }
     }
-
-    bool IGrainContextMigration.TryStartMigration(Dictionary<string, object>? requestContext, CancellationToken cancellationToken) =>
-        TryStartMigration(requestContext, cancellationToken);
-
     public void Deactivate(DeactivationReason reason, ActivityContext? activityContext, CancellationToken cancellationToken = default)
     {
         var currentActivity = Activity.Current;

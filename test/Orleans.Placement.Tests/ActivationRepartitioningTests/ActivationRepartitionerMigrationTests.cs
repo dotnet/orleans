@@ -18,7 +18,7 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
     private InProcessSiloHandle PrimarySilo => (InProcessSiloHandle)_fixture.HostedCluster.Primary;
 
     [Fact]
-    public async Task FinalizeProtocol_DoesNotAwaitDeactivated_WhenMigrationDoesNotStart()
+    public async Task FinalizeProtocol_DoesNotAwaitDeactivated_ForNonActivationDataContext()
     {
         var services = PrimarySilo.SiloHost.Services;
         var directory = services.GetRequiredService<ActivationDirectory>();
@@ -30,7 +30,7 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
         {
             await repartitioner.FinalizeProtocol([context.GrainId], [], SiloAddress.Zero, []).WaitAsync(TimeSpan.FromSeconds(3));
 
-            Assert.Equal(1, context.TryStartMigrationCallCount);
+            Assert.Equal(1, context.MigrateCallCount);
             Assert.False(context.Deactivated.IsCompleted);
         }
         finally
@@ -64,11 +64,11 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
         }
     }
 
-    private sealed class NonMigratingGrainContext(GrainId grainId) : IGrainContext, IGrainContextMigration
+    private sealed class NonMigratingGrainContext(GrainId grainId) : IGrainContext
     {
         private readonly TaskCompletionSource _deactivated = new(TaskCreationOptions.RunContinuationsAsynchronously);
 
-        public int TryStartMigrationCallCount { get; private set; }
+        public int MigrateCallCount { get; private set; }
         public GrainId GrainId { get; } = grainId;
         public GrainReference GrainReference => throw new NotImplementedException();
         public object? GrainInstance => null;
@@ -79,18 +79,12 @@ public class ActivationRepartitionerMigrationTests(ActivationRepartitionerMigrat
         public IWorkItemScheduler Scheduler => throw new NotImplementedException();
         public Task Deactivated => _deactivated.Task;
 
-        public bool TryStartMigration(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default)
-        {
-            TryStartMigrationCallCount++;
-            return false;
-        }
-
         public void SetComponent<TComponent>(TComponent? value) where TComponent : class => throw new NotImplementedException();
         public void ReceiveMessage(object message) => throw new NotImplementedException();
         public void Activate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public void Deactivate(DeactivationReason deactivationReason, CancellationToken cancellationToken = default) => throw new NotImplementedException();
         public void Rehydrate(IRehydrationContext context) => throw new NotImplementedException();
-        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => throw new NotImplementedException();
+        public void Migrate(Dictionary<string, object>? requestContext, CancellationToken cancellationToken = default) => MigrateCallCount++;
         public object? GetTarget() => null;
         public object? GetComponent(Type componentType) => null;
         public bool Equals(IGrainContext? other) => ReferenceEquals(this, other);

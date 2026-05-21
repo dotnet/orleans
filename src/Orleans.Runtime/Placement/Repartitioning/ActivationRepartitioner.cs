@@ -524,11 +524,11 @@ internal sealed partial class ActivationRepartitioner : SystemTarget, IActivatio
             {
                 if (_activationDirectory.FindTarget(grainId) is { } localActivation)
                 {
-                    if (localActivation is IGrainContextMigration migration)
+                    if (localActivation is ActivationData activation)
                     {
-                        if (migration.TryStartMigration(migrationRequestContext))
+                        if (activation.TryStartMigration(migrationRequestContext))
                         {
-                            deactivationTasks.Add(localActivation.Deactivated);
+                            deactivationTasks.Add(activation.Deactivated);
                         }
                     }
                     else
