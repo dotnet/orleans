@@ -164,6 +164,23 @@ namespace UnitTests.Runtime
         }
 
         [Fact]
+        public void IsMemoryOverloaded_DoesNotQueryStats_WhenNoActivations()
+        {
+            var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
+            var statsProvider = Substitute.For<IEnvironmentStatisticsProvider>();
+            var logger = NullLogger<ActivationCollector>.Instance;
+            var timeProvider = new FakeTimeProvider(DateTimeOffset.UtcNow);
+            var collector = new ActivationCollector(timeProvider, grainCollectionOptions, logger, statsProvider);
+
+            collector._activationCount = 0;
+            var overloaded = collector.IsMemoryOverloaded(out var surplusActivations);
+
+            Assert.False(overloaded);
+            Assert.Equal(0, surplusActivations);
+            statsProvider.DidNotReceive().GetEnvironmentStatistics();
+        }
+
+        [Fact]
         public async Task DeactivateInDueTimeOrder_OnlyOldestAndEligibleAreDeactivated()
         {
             var grainCollectionOptions = Options.Create(new GrainCollectionOptions());
