@@ -419,7 +419,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: true);
+                    await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: true);
                 }
             }
         }
@@ -556,7 +556,7 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
-                                await BailAsync(TransactionalStatus.CommitFailure, exception: null, storageOutcomeInDoubt: false);
+                                await AbortAndRestore(TransactionalStatus.CommitFailure, exception: null, storageOutcomeInDoubt: false);
                                 return;
                             }
                         }
@@ -574,7 +574,7 @@ namespace Orleans.Transactions.State
                                 LogWarningStorageExceptionInStorageWorker(exception);
                             }
 
-                            await BailAsync(status, exception, storageOutcomeInDoubt: writeAttempted);
+                            await AbortAndRestore(status, exception, storageOutcomeInDoubt: writeAttempted);
                             return;
                         }
 
@@ -609,20 +609,19 @@ namespace Orleans.Transactions.State
                     LogWarningExceptionInStorageWorker(failCounter, exception);
 
                     // If a write was attempted, the durable outcome is unknown and recovery must resolve it.
-                    await BailAsync(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: writeAttempted);
+                    await AbortAndRestore(TransactionalStatus.UnknownException, exception, storageOutcomeInDoubt: writeAttempted);
                 }
             }
         }
 
-        private Task BailAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
+        private Task AbortAndRestore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
         {
-            this.readyTask = BailCoreAsync(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt);
+            this.readyTask = AbortAndRestoreCore(status, exception, storageOutcomeInDoubt: storageOutcomeInDoubt);
             return this.readyTask;
 
-            async Task BailCoreAsync(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
+            async Task AbortAndRestoreCore(TransactionalStatus status, Exception exception, bool storageOutcomeInDoubt)
             {
-                List<Task> pending = new List<Task>();
-                pending.Add(RWLock.AbortExecutingTransactions(exception));
+                List<Task> pending = [RWLock.AbortExecutingTransactions(exception)];
                 this.RWLock.AbortQueuedTransactions();
 
                 foreach (var entry in commitQueue.Elements)
