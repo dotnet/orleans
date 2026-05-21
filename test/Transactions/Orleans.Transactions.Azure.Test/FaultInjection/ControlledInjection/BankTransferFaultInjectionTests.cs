@@ -21,7 +21,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
         _output = output;
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task StorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
     {
         var commitFault = new BankTransferFault
@@ -39,7 +39,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             "the transaction manager committed its durable state before the storage exception was surfaced");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task GenericStorageExceptionAfterCommitStore_CommitsDurableFullBankTransfer()
     {
         var commitFault = new BankTransferFault
@@ -57,7 +57,7 @@ public sealed class BankTransferFaultInjectionTests : IClassFixture<ControlledFa
             "a generic exception surfaced after the underlying storage write must recover the durable commit instead of partially aborting it");
     }
 
-    [Fact]
+    [SkippableFact]
     public async Task ExceptionAfterStorageWriteCompleted_CommitsDurableFullBankTransfer()
     {
         await RunFaultedDepositManagerTransfer(

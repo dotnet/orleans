@@ -419,7 +419,7 @@ namespace Orleans.Transactions.State
                 catch (Exception exception)
                 {
                     LogWarningExceptionInTransactionQueue(exception);
-                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false, forceDeactivation: false);
+                    await BailAsync(TransactionalStatus.UnknownException, exception, notifyOfAbort: false, forceDeactivation: false);
                 }
             }
         }
@@ -554,25 +554,28 @@ namespace Orleans.Transactions.State
                             else
                             {
                                 LogWarningStorePreConditionsNotMet();
-                                await Bail(TransactionalStatus.CommitFailure, exception: null, notifyOfAbort: true, forceDeactivation: false);
+                                await BailAsync(TransactionalStatus.CommitFailure, exception: null, notifyOfAbort: true, forceDeactivation: false);
                                 return;
                             }
                         }
                         catch (Exception exception)
                         {
-                            bool forceDeactivation;
+                            var status = TransactionalStatus.UnknownException;
+                            var forceDeactivation = false;
+                            var notifyOfAbort = !storageWriteMayHaveCompleted;
                             if (exception is InconsistentStateException)
                             {
+                                status = TransactionalStatus.StorageConflict;
                                 forceDeactivation = true;
+                                notifyOfAbort = true;
                                 LogWarningReloadFromStorageTriggeredByETagMismatch(exception);
                             }
                             else
                             {
-                                forceDeactivation = false;
                                 LogWarningStorageExceptionInStorageWorker(exception);
                             }
 
-                            await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: false, forceDeactivation: forceDeactivation);
+                            await BailAsync(status, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: forceDeactivation);
                             return;
                         }
 
@@ -606,47 +609,47 @@ namespace Orleans.Transactions.State
                 {
                     LogWarningExceptionInStorageWorker(failCounter, exception);
                     var notifyOfAbort = !storageWriteMayHaveCompleted;
-                    await Bail(TransactionalStatus.UnknownException, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: false);
+                    await BailAsync(TransactionalStatus.UnknownException, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: false);
                 }
             }
         }
 
-        private Task Bail(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
+        private Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
         {
-            this.readyTask = BailAsync(status, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: forceDeactivation);
+            this.readyTask = BailCoreAsync(status, exception, notifyOfAbort: notifyOfAbort, forceDeactivation: forceDeactivation);
             return this.readyTask;
-        }
 
-        private async Task BailAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
-        {
-            List<Task> pending = new List<Task>();
-            pending.Add(RWLock.AbortExecutingTransactions(exception));
-            this.RWLock.AbortQueuedTransactions();
-
-            foreach (var entry in commitQueue.Elements)
+            async Task BailCoreAsync(TransactionalStatus status, Exception exception, bool notifyOfAbort, bool forceDeactivation)
             {
-                if (notifyOfAbort)
-                {
-                    pending.Add(NotifyOfAbort(entry, status, exception: exception));
-                }
-                else
-                {
-                    // The storage write may have committed before the exception surfaced, or a later action may
-                    // have failed after the write completed. Do not send abort/cancel messages from stale
-                    // in-memory state; restore from storage and let recovery confirm or abort.
-                    CompleteInDoubtEntryLocally(entry, status, exception);
-                }
-            }
+                List<Task> pending = new List<Task>();
+                pending.Add(RWLock.AbortExecutingTransactions(exception));
+                this.RWLock.AbortQueuedTransactions();
 
-            commitQueue.Clear();
+                foreach (var entry in commitQueue.Elements)
+                {
+                    if (notifyOfAbort)
+                    {
+                        pending.Add(NotifyOfAbort(entry, status, exception: exception));
+                    }
+                    else
+                    {
+                        // The storage write may have committed before the exception surfaced, or a later action may
+                        // have failed after the write completed. Do not send abort/cancel messages from stale
+                        // in-memory state; restore from storage and let recovery confirm or abort.
+                        CompleteInDoubtEntryLocally(entry, status, exception);
+                    }
+                }
 
-            await Task.WhenAll(pending);
-            if (++failCounter >= 10 || forceDeactivation)
-            {
-                LogDebugStorageWorkerTriggeringGrainDeactivation();
-                this.deactivate();
+                commitQueue.Clear();
+
+                await Task.WhenAll(pending);
+                if (++failCounter >= 10 || forceDeactivation)
+                {
+                    LogDebugStorageWorkerTriggeringGrainDeactivation();
+                    this.deactivate();
+                }
+                await this.Restore();
             }
-            await this.Restore();
         }
 
         private void CompleteInDoubtEntryLocally(TransactionRecord<TState> entry, TransactionalStatus status, Exception exception)
