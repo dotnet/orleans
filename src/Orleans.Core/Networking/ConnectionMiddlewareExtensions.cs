@@ -19,7 +19,7 @@ namespace Orleans
         {
             builder.Use(next =>
             {
-                var middleware = ActivatorUtilities.CreateInstance<T>(builder.ApplicationServices, next);
+                var middleware = ActivatorUtilities.CreateInstance<T>(builder.ApplicationServices);
                 return context => middleware.OnConnectionAsync(context, next);
             });
 
